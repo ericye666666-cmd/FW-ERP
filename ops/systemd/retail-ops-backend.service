@@ -1,0 +1,18 @@
+[Unit]
+Description=Retail Ops Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/retail-ops
+EnvironmentFile=/opt/retail-ops/ops/env/prod.env
+ExecStart=/opt/retail-ops/start_backend.sh
+Restart=always
+RestartSec=3
+User=retailops
+Group=retailops
+StandardOutput=append:/var/log/retail-ops/backend.stdout.log
+StandardError=append:/var/log/retail-ops/backend.stderr.log
+
+[Install]
+WantedBy=multi-user.target

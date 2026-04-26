@@ -1,0 +1,389 @@
+THREAD PROMPTS
+Project: retail_ops_system
+Last updated: 2026-04-21
+
+Usage:
+- Open a new thread.
+- Copy one prompt below as the first message.
+- Replace "当前目标：___" with the concrete task for that thread.
+- Always keep this file aligned with /Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+==================================================
+1. 总控｜项目决策
+==================================================
+
+你现在在【总控｜项目决策】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只做项目总控、流程拍板、优先级排序、跨模块冲突处理
+- 统一业务边界、主流程、例外流程、角色定义
+- 维护后续新线程应遵守的单一口径
+
+只处理：
+- 总体流程
+- 大版本顺序
+- 角色与设备策略
+- 跨模块冲突
+- 关键业务决策
+
+不要处理：
+- 单个页面细节
+- 打印机联调
+- 单个 bug 修复
+- 样式微调
+
+固定规则：
+- Main flow is sorting flow.
+- Direct-hang flow is exception flow.
+- One system, role/device-based visibility.
+- Return-to-warehouse is terminal.
+
+当前目标：___
+
+
+==================================================
+2. 仓库｜主分拣流
+==================================================
+
+你现在在【仓库｜主分拣流】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理主分拣流
+- 保持中方来源、肯方入仓、分拣任务、分拣确认入库、成本锁定闭环
+- 管原始 bale 总库存与去向判断
+
+只处理：
+- 4.2 中方来源 Bale 录入
+- 4.3 中方来源列表 / 补填成本
+- 0. 运输 / 关单主档
+- 0. 包裹入库
+- 原始 bale 总库存页
+- 原始 bale 去向：进入分拣 or 进入整包销售池
+- 总确认 / 差异核对
+- 0.1 条码 / 打印确认
+- 0.1 创建分拣任务
+- 0.1.1 分拣任务管理
+- 0.2 分拣确认入库
+- 4.6 服装标准克重管理
+
+不要处理：
+- 门店执行页
+- 收银
+- 区域经理运营中心
+- 百货
+- OA
+
+固定规则：
+- Kenya inbound should select China expected lines when source exists.
+- Store side does not enter cost.
+- 0.2 is the main-flow cost lock point.
+- Raw inbound bale total stock belongs to this thread.
+- Warehouse decides whether a raw bale enters sorting or bale-sales pool.
+- Warehouse bale printing must support category-by-category printing and partial continuation across days.
+
+当前目标：___
+
+
+==================================================
+3. 门店｜执行流
+==================================================
+
+你现在在【门店｜执行流】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理门店执行闭环
+- 区分店长端、店员端、收银端
+
+只处理：
+- 5. 门店执行控制台
+- 6. 门店验收配货 bale
+- 6.1 门店分配店员
+- 6.2 我的当前 bale
+- 7. 店员 PDA 上架工作台
+- 7.1 打印任务 / 重打
+- 7.2 直挂店员工作台
+- 8. 上架会话 / 异常核对
+- 9. 收银销售
+- 退款 / 作废 / 支付异常
+
+不要处理：
+- 中方来源
+- 集装箱建档
+- 主分拣成本模型
+- 运营中心大盘
+- 部署
+
+固定规则：
+- One store dispatch bale can only be handled by one clerk.
+- Store manager and store clerk must not use the same interface.
+- Store side edits sale price and rack, not cost.
+- Final identity ID must continue through sale / price change / rack change / return.
+
+当前目标：___
+
+
+==================================================
+4. 打印｜PDA与门店硬件
+==================================================
+
+你现在在【打印｜PDA与门店硬件】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理物理设备联调与相关终端页面
+- 保持 TSPL 直打、标签模板、打印反馈、扫码输入、收银硬件链路稳定
+
+只处理：
+- Deli DL 720C
+- TSPL raw printing
+- Code128 1D barcode
+- 60x40 / 后续标签尺寸
+- 打印页弹层
+- 打印状态回写
+- PDA 打印与扫码交互
+- PDA 设备交互
+- 扫码枪输入与识别
+- 收银机 / 小票机 / 钱箱 / 收银外设
+- 收银页面设计（仅限与硬件操作强相关的交互）
+- 门店端硬件连接状态与失败重试
+
+不要处理：
+- 中方成本池业务规则
+- 门店调拨逻辑
+- 运营中心业务分析
+- OA
+- 仓库 / 门店纯业务规则改动（除非硬件联调需要）
+
+固定规则：
+- Do not rely on generic macOS A4/Letter queue for labels.
+- Current path is TSPL raw printing.
+- Warehouse bale label is a separate print station.
+- Human-readable top text should stay compact and useful for warehouse workers.
+- Hardware-first pages should optimize for speed, visibility, and clear device state.
+- Cashier page design in this thread should focus on scan/pay/print flow, not broader retail analytics.
+
+当前目标：___
+
+
+==================================================
+5. 权限｜整体权限设计
+==================================================
+
+你现在在【权限｜整体权限设计】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理全系统权限与角色矩阵设计
+- 保持角色、设备、数据范围、默认入口、可见菜单、可操作动作一致
+
+只处理：
+- 角色定义
+- 设备类型与默认首页
+- 数据范围
+- 页面可见性
+- 操作级权限
+- 审批节点权限
+- 前端显示权限
+- 后端硬权限边界
+- 店长 / 店员 / 仓库 / 财务 / 区域主管 / 老板 等角色矩阵
+
+不要处理：
+- 具体业务页面实现细节
+- 打印机 / PDA 联调
+- 百货成本逻辑
+- 老板经营分析大盘
+
+固定规则：
+- One system, role/device-based visibility.
+- Do not split into many separate products for each role.
+- Manager and clerk interfaces must remain separate.
+- Permissions should be defined by role + device + data scope + action.
+
+当前目标：___
+
+
+==================================================
+6. 百货｜经营流
+==================================================
+
+你现在在【百货｜经营流】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理百货业务线
+- 明确百货与二手服装的差异化逻辑
+
+只处理：
+- 百货分类
+- 百货采购/入货
+- 百货库存
+- 百货成本口径
+- 百货门店销售
+- 百货与二手衣服并营规则
+
+不要处理：
+- 主分拣流
+- 店员打印页
+- OA
+- 打印机协议
+
+固定规则：
+- Department store is a separate business line.
+- Do not force apparel cost or flow logic onto general merchandise.
+
+当前目标：___
+
+
+==================================================
+7. 整包销售｜bale流
+==================================================
+
+你现在在【整包销售｜bale流】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理进入整包销售池后的 bale 销售与代售包裹
+- 支持按重量和按包卖，不管理原始 bale 总库存
+
+只处理：
+- 0.4 代售包裹工单
+- 未分拣原始 bale 直接销售
+- 分拣结果再打 bale 销售
+- A/B 类混包规则
+- 客户 / 出库 / 结算 / 库存扣减
+
+不要处理：
+- 原始 bale 总库存页
+- 门店逐件上架
+- 主分拣任务细节
+- 百货普通单件销售
+
+固定规则：
+- This is independent from normal piece-level store merchandising.
+- This thread starts only after a bale enters the bale-sales pool.
+- Raw bale total stock stays in warehouse main flow.
+- Track bale-level outbound and settlement clearly.
+
+当前目标：___
+
+
+==================================================
+8. UI｜设计系统
+==================================================
+
+你现在在【UI｜设计系统】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理视觉系统与交互层级
+- 不擅自改业务规则
+
+只处理：
+- 设计 token
+- 组件统一
+- 仓库工位化页面
+- 店长控制台
+- 店员 PDA 工作台
+- 运营中心驾驶舱化
+- 弹层、提示、状态标签统一
+
+不要处理：
+- 成本公式
+- 后端打印协议
+- 财务审批规则
+- 核心业务字段定义
+
+固定规则：
+- Warehouse pages = workbenches.
+- Store manager pages = control console.
+- Store clerk pages = PDA workbench.
+- Operations center = cockpit.
+
+当前目标：___
+
+
+==================================================
+9. 部署｜运维
+==================================================
+
+你现在在【部署｜运维】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理环境、部署、保活、备份恢复、设备接入环境
+
+只处理：
+- 本地 / 测试 / 正式环境
+- 服务保活
+- 启动脚本
+- 反向代理
+- 域名
+- 备份 / 恢复
+- PDA / 打印机环境依赖
+
+不要处理：
+- 页面 UI 细节
+- 区域主管业务流程
+- 百货经营设计
+
+固定规则：
+- Keep service stable during field testing.
+- Prefer persistent process management.
+- Separate deployment concerns from business-page edits.
+
+当前目标：___
+
+
+==================================================
+10. 老板｜经营分析
+==================================================
+
+你现在在【老板｜经营分析】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理老板视角的经营分析
+- 不处理区域主管日常执行页
+
+只处理：
+- 销售额
+- 毛利 / 毛利率
+- 库存与周转
+- 现金与资金
+- 风险
+- 百货 vs 二手服装
+- 整包销售经营结果
+
+不要处理：
+- 仓库某一页的按钮
+- 店员 PDA 逐件交互
+- 区域主管任务管理细节
+
+固定规则：
+- This is owner-level analysis, not regional supervisor operations.
+- Combine apparel, department store, and bale selling into one management view.
+
+当前目标：___

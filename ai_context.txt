@@ -1,0 +1,708 @@
+AI CONTEXT
+Project: retail_ops_system
+Last updated: 2026-04-21
+
+Read this file first in any new thread.
+Goal: keep business logic, system boundaries, and fixed decisions consistent across threads.
+
+==================================================
+1. BUSINESS MODEL
+==================================================
+
+Core business:
+- Multi-store retail.
+- Main business is second-hand apparel.
+- Main operating flow is warehouse sorting flow.
+- A smaller exception flow exists for already-sorted goods that can go directly to stores.
+
+Additional business lines:
+- Department store / general merchandise ("百货") will be added as a separate business line.
+- Bulk bale selling ("整包销售流") is a dedicated sale scene, separate from normal store piece-level merchandising.
+- Bale selling may consume either raw inbound bales that never enter sorting or bales re-packed from sorted results.
+- Some A/B grade goods may be mixed into resale bales and sold by weight.
+
+Store strategy:
+- Stores may sell both second-hand apparel and department store goods.
+- Current core operational focus is apparel.
+
+==================================================
+2. SYSTEM STRATEGY
+==================================================
+
+Important principle:
+- One system.
+- Do not build many separate products.
+- Control visibility by role + device + data scope.
+
+Typical device types:
+- PDA Android app
+- Desktop / laptop
+- Android supervisor app / mobile manager view
+
+Typical roles:
+- China data entry
+- China finance
+- Warehouse inbound clerk
+- Warehouse supervisor
+- Sorting worker
+- Dispatch / picking worker
+- Store manager
+- Store clerk
+- Cashier
+- Regional supervisor
+- HQ admin / owner
+- HR / finance admin
+
+Role strategy:
+- Store manager and store clerk must NOT see the same interface.
+- Store manager side = execution control / assignment / exception handling.
+- Store clerk side = current bale / edit sale price / rack / print / shelf.
+- Cashier side = POS / refund / void / payment exceptions.
+
+==================================================
+3. ERP STRUCTURE
+==================================================
+
+Current major modules:
+
+1) China source & cost
+- 4.2 China source bale entry
+- 4.3 China source list / cost supplement
+- 4.5 direct-hang unpacking / counting / cost confirmation
+- 4.6 apparel standard weight management
+
+2) Warehouse
+- 0. transport / shipment master
+- 0. package inbound
+- total confirmation / expected vs actual reconciliation
+- 0.1 bale barcode / printing
+- 0.1 sorting task creation
+- 0.1.1 sorting task management
+- 0.2 sorting confirmation inbound
+- 0.4 resale bale work order
+
+3) Store
+- 5. store execution control center
+- 6. store receives dispatch bales
+- 6.1 assign clerk
+- 6.2 my current bale
+- 7. store clerk PDA workbench
+- 7.1 print / reprint support page
+- 7.2 direct-hang clerk workbench
+- 8. shelving session / exception support page
+- 9. cashier sale
+- refund / void / payment exception pages
+
+4) Operations center
+- replenishment suggestions
+- store transfer order drafting
+- warehouse picking / dispatch printing
+- store dispatch bale / delivery tracking
+- exception flow
+- data integration framework
+
+5) System management
+- user / account / role display control
+- product master
+- print template management
+- OA / HR / finance approval framework
+
+6) Identity ledger
+- 4.4 product identity ID ledger
+
+==================================================
+4. MAIN FLOW (PRIMARY FLOW)
+==================================================
+
+Main flow = sorting flow.
+This is the default business flow.
+More than 80% of goods are expected to go through this flow.
+
+Step-by-step:
+
+1. China source bale entry
+- China side records container type, shipment, supplier, category, subcategory, package count, per-package weight, package price.
+
+2. China cost supplement
+- Add head freight, customs, tail freight, currency, amount, payer, payment method, proof files.
+- System forms container-level / source-bale-level cost pool.
+
+3. Kenya shipment master creation
+- Kenya side selects a China-created shipment.
+- Do not freely type shipment if source already exists.
+
+4. Package inbound
+- Kenya side records actual inbound by selecting China expected lines.
+- Kenya side should not freely type supplier/category here.
+- Kenya records actual package count and actual per-package weight.
+
+5. Total confirmation / reconciliation
+- Compare China expected vs Kenya actual.
+- Confirm differences before moving on.
+
+6. Inbound bale one-code-per-bale
+- Generate warehouse-side bale barcode.
+- This is for warehouse tracking, not the final store barcode.
+
+7. Create sorting task
+- Select bales.
+- Bind sorter(s).
+
+8. Sorting task management
+- Supervisors view parallel tasks.
+- Tasks have start time / end time / running duration.
+
+9. Sorting confirmation inbound
+- Record sorting result lines.
+- This is where product-level token is generated.
+- This is also where single-piece cost is locked for main flow.
+
+10. Store transfer order
+- Operations / supervisor decides which sorted goods go to which store.
+
+11. Warehouse picking / dispatch
+- Warehouse picks by transfer order.
+
+12. Create store dispatch bales
+- Repack goods for a store into new bales.
+- These are NOT the original inbound bales.
+
+13. Delivery to store
+
+14. Store signs receipt of dispatch bales
+- Store receives store-dispatch bale barcode.
+
+15. Store manager assigns one bale to one clerk
+- One dispatch bale can only be handled by one clerk.
+
+16. Store clerk edits sale information
+- Clerk fills:
+  - sale price
+  - rack location
+- Clerk may identify high-value pieces and assign higher prices.
+
+17. Store clerk prints final item barcode
+- This activates the final physical item identity in store execution.
+
+18. Shelf / in-store placement
+
+19. Sale / price update / rack update / return-to-warehouse
+
+Important:
+- Return-to-warehouse is terminal.
+- No return-to-warehouse -> re-transfer flow.
+
+==================================================
+5. EXCEPTION FLOW (DIRECT-HANG FLOW)
+==================================================
+
+Exception flow is only for a small portion of goods that are already sorted and can go straight to store hanging.
+
+Flow:
+- China source + cost pool
+- Kenya inbound
+- 4.5 direct-hang unpacking / counting / cost confirmation
+- store transfer
+- warehouse dispatch bale creation
+- store receives bale
+- assign one clerk
+- 7.2 direct-hang clerk workbench
+- print final item barcode
+- shelf
+
+Important direct-hang cost rule:
+- China/source bale gives total bale cost.
+- Kenya warehouse unpacks and counts total pieces.
+- unit_cost = source_bale_total_cost / actual_piece_count
+- then transfer to stores by quantity.
+
+==================================================
+6. BULK BALE SELLING FLOW
+==================================================
+
+This is separate from normal store item flow.
+
+Source paths:
+- Raw inbound bales may be sold directly by bale / by weight without entering sorting.
+- Sorted results may be recombined into bales and sold by bale / by weight.
+
+Cases:
+- Some resale bales mix controlled proportions of A and B grade goods.
+
+Important:
+- This is not the same as store piece-level merchandising.
+- Treat as a small inventory + outbound + settlement flow.
+- Raw bale total stock stays under warehouse main flow until a bale is moved into bale-sales pool.
+- Bale sales thread only handles bales already assigned for direct sale or re-packed sale.
+
+Current page:
+- 0.4 resale bale work order
+
+==================================================
+7. COST MODEL
+==================================================
+
+Three levels of cost:
+
+1. China goods value
+- package price
+- original goods cost
+
+2. Source bale / container cost pool
+- goods value
+- head freight
+- customs
+- tail freight
+- unified into KES as management currency
+
+3. Piece-level unit cost
+- locked when goods become item-level token
+
+Main flow cost lock point:
+- 0.2 sorting confirmation inbound
+
+Direct-hang flow cost lock point:
+- 4.5 direct-hang unpacking / counting / cost confirmation
+
+Current cost models:
+- sorting_pool_avg_v1
+  - source pool -> source bale -> total pieces average
+- sorting_piece_weight_v2
+  - use standard piece weight per category/subcategory for weighted allocation
+
+Important:
+- Store staff do not enter cost.
+- Store only edits sale price and rack position.
+
+==================================================
+8. PRODUCT / CATEGORY / SUPPLIER LOGIC
+==================================================
+
+Product master:
+- Product creation is simplified.
+- Required order:
+  1. supplier
+  2. category_main
+  3. category_sub
+- product_name = category_sub
+
+Supplier/category structure:
+- Different suppliers provide different category trees.
+- If user selects supplier A, they should only see supplier A's category_main/category_sub.
+- Switching supplier should switch visible categories.
+
+Language rules:
+- China-side pages: supplier / category_main / category_sub show Chinese + English when available.
+- Kenya-side pages: only English.
+
+Current key pages using this logic:
+- 1. product creation
+- 4.2 China source bale entry
+
+==================================================
+9. COMMON FIELDS / IDENTIFIERS
+==================================================
+
+Use these consistently:
+
+Business keys:
+- shipment_no
+- master_id / inbound master id
+- source_bale_token
+- source_pool_token
+- parcel_batch_no
+- bale_barcode
+- sorting_task_no
+- store_transfer_no
+- store_dispatch_bale_no
+- item_token_no
+- identity_id
+- barcode_value
+
+Master / goods fields:
+- supplier_name
+- supplier_name_zh
+- category_main
+- category_main_zh
+- category_sub
+- category_sub_zh
+- product_name
+- quantity / qty
+- package_count
+- per_package_weight_kg
+- total_weight_kg
+- package_unit_price
+- currency
+- rack_code
+- suggested_sale_price
+- final_sale_price
+
+Cost fields:
+- goods_value_amount
+- additional_cost_amount
+- cost_pool_kes
+- unit_cost_kes
+- cost_model_code
+- cost_version
+
+Status / audit fields:
+- status
+- created_at
+- started_at
+- completed_at
+- printed_at
+- shelved_at
+- assigned_at
+- updated_at
+- operator_id
+- owner_id
+
+==================================================
+10. PRINTING LOGIC
+==================================================
+
+Current physical testing target:
+- Warehouse bale barcode label printing
+- Printer: Deli DL 720C
+- Label size currently tested: 60x40 mm
+- Use TSPL raw printing
+- Barcode type: Code128 1D barcode
+
+Important:
+- Do NOT rely on generic macOS A4/Letter printer queue for label output.
+- macOS generic queue may show installed but still be wrong for label printing.
+- Current working path is TSPL raw printing.
+
+Warehouse bale label human-readable display direction:
+- Remove BALE-BL- prefix from human-readable large text.
+- Show compact identity parts for people.
+- Keep full barcode value for machine scanning.
+
+Printing workbench:
+- Printing page is now treated as a separate print station.
+- User can lock one shipment and then print categories in chosen order.
+- Do not force direct transition into sorting.
+- Print by category.
+- Support partially completed daily printing.
+
+==================================================
+11. STORE EXECUTION RULES
+==================================================
+
+Manager side:
+- receive dispatch bales
+- assign one bale to one clerk
+- monitor progress
+- handle exceptions
+
+Clerk side:
+- work only on assigned bale(s)
+- fill sale price and rack
+- mark high-value items
+- print barcode
+- shelf items
+
+Practical rule:
+- One hanger usually holds one type/category.
+- Clerk tends to hang one category first, then print labels in batch for that category.
+- Therefore PDA workbench should support grouped handling, not constant per-piece switching.
+
+==================================================
+12. IDENTIFYING THE FINAL ITEM
+==================================================
+
+There are multiple identifiers in the system:
+
+1. Inbound warehouse bale barcode
+- warehouse tracking only
+
+2. Store dispatch bale barcode
+- used for store receipt and assignment
+
+3. Product token / item token
+- generated before final store print
+
+4. Final item identity ID / final item barcode
+- used after store print
+- this is the long-term lifecycle identity
+
+The final item identity must connect:
+- supplier
+- cost
+- store
+- print time
+- shelf time
+- sale price
+- future sale
+- future price change
+- future rack change
+- future return-to-warehouse
+
+==================================================
+13. UI / PRODUCT DECISIONS
+==================================================
+
+Important fixed direction:
+- Do not build many separate products.
+- Use one system, role-gated visibility.
+
+Current role-based entry strategy:
+- Store manager default page: store execution control center
+- Store clerk default page: my current bale
+- Cashier default page: cashier sale page
+
+UI direction:
+- Warehouse pages = task stations / workbenches
+- Store manager pages = control console
+- Store clerk pages = PDA workbench
+- Operations center = cockpit / command center
+
+==================================================
+14. THINGS THAT SHOULD NOT BE REDESIGNED WITHOUT EXPLICIT APPROVAL
+==================================================
+
+- Main flow is sorting flow.
+- Direct-hang flow is exception flow.
+- Product subcategory = product name.
+- Return-to-warehouse is terminal.
+- One store dispatch bale can only be handled by one clerk.
+- Kenya package inbound should not freely invent supplier/category when China expected line exists.
+- Store side edits price/rack, not cost.
+- Warehouse printing page should allow category-by-category printing and partial continuation across days.
+
+==================================================
+15. CURRENT KNOWN IN-PROGRESS / SENSITIVE AREAS
+==================================================
+
+- 0.1 bale barcode / printing page is under active field testing.
+- Avoid large redesign there unless explicitly asked.
+- Prioritize fixing concrete printing/testing problems.
+
+- 4.2 China source bale import had instability during Excel import / row injection.
+- Re-test before assuming stable.
+
+- Backend service can drop if started in a non-persistent way.
+- Prefer keeping it in a persistent session when field testing.
+
+==================================================
+16. RECOMMENDED NEW THREAD BOOT MESSAGE
+==================================================
+
+Use this in a new thread:
+
+1. Read /Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt first.
+2. Main flow is sorting flow. Direct-hang flow is exception flow.
+3. This is one system with role/device-based visibility, not multiple separate products.
+4. Do not redesign fixed business logic unless explicitly requested.
+5. Focus on the current module only and make local, testable fixes.
+
+==================================================
+17. MODULE CHECKLIST / WHAT EACH MODULE STILL NEEDS
+==================================================
+
+Use this as the current module-level to-do map.
+
+1. China source & cost
+Main pages:
+- 4.2 China source bale entry
+- 4.3 China source list / cost supplement
+- 4.5 direct-hang unpacking / counting / cost confirmation
+- 4.6 apparel standard weight management
+
+Still needs:
+- stabilize Excel import / row injection in 4.2
+- ensure supplier -> category_main -> category_sub dependency is stable
+- keep China-side bilingual display consistent
+- make 4.3 cost pool clearer:
+  - goods value
+  - head freight
+  - customs
+  - tail freight
+  - KES conversion
+- keep 4.5 usable for exception direct-hang flow
+- keep 4.6 standard piece weight table maintainable
+
+2. Warehouse main sorting flow
+Main pages:
+- 0. transport / shipment master
+- 0. package inbound
+- total confirmation / reconciliation
+- 0.1 bale barcode / printing
+- 0.1 sorting task creation
+- 0.1.1 sorting task management
+- 0.2 sorting confirmation inbound
+
+Still needs:
+- keep shipment selection and source carry-over stable
+- keep expected vs actual reconciliation readable
+- keep 0.1 printing page usable as a separate print station
+- category-by-category printing must remain supported
+- partial daily continuation must remain supported
+- sorting task management must clearly show progress / duration / owner
+- 0.2 must continue to show cost lock status clearly
+
+3. Store execution flow
+Main pages:
+- 5. store execution control center
+- 6. store receives dispatch bales
+- 6.1 assign clerk
+- 6.2 my current bale
+- 7. store clerk PDA workbench
+- 7.1 print / reprint support page
+- 7.2 direct-hang clerk workbench
+- 8. shelving support page
+- 9. cashier sale
+
+Still needs:
+- keep manager and clerk flows separated by role
+- manager side should focus on receive / assign / progress / exception
+- clerk side should focus on current bale / grouped pricing / printing / shelf
+- cashier side should stay isolated from warehouse/store execution clutter
+- ensure final identity ID lifecycle is visible after print / shelf / sale / return
+
+4. Permissions / role design
+Main area:
+- role / permission matrix
+- role-based default entry
+- device-aware visibility
+- data-scope-aware visibility
+- action-level permissions
+
+Still needs:
+- move from frontend visibility only to backend hard permissions
+- define page-level and action-level rules for all major roles
+- define approval ownership across HR / finance / manager / owner
+- keep one-system strategy without splitting into many role-specific products
+
+5. Identity ledger
+Main page:
+- 4.4 product identity ID ledger
+
+Still needs:
+- preserve full lifecycle:
+  - source
+  - cost
+  - store
+  - price history
+  - rack history
+  - sale
+  - return-to-warehouse
+- keep direct-hang and main sorting flow both traceable
+- keep cost explanation readable
+
+6. Resale bale / bulk selling flow
+Main page:
+- 0.4 resale bale work order
+
+Still needs:
+- define source split: raw-bale direct sale vs sorted-result re-bale sale
+- define bale mixing rules for A/B grade goods
+- support sell-by-weight and sell-by-bale logic
+- connect outbound + settlement + stock deduction
+- keep raw bale total stock under warehouse main flow
+- keep this independent from normal store piece-level merchandising
+
+7. Department store / general merchandise
+Status:
+- framework only, not fully built
+
+Still needs:
+- separate category system
+- separate cost logic
+- separate stock and sales logic where needed
+- define how department store and second-hand apparel coexist in store analysis
+
+8. OA / HR / finance approvals
+Main pages:
+- HR attendance / supplement
+- payroll batch
+- finance approval workbench
+
+Still needs:
+- stabilize form flows
+- make payroll and approval statuses clearer
+- define approval node ownership:
+  - HR
+  - finance
+  - manager
+  - owner
+- connect attendance -> payroll -> payment approval
+
+9. Roles / permissions
+Main pages:
+- user / account / role display control
+
+Still needs:
+- backend hard permissions, not only frontend visibility
+- page-level and action-level permissions
+- device-aware default entry by role
+- keep one-system strategy, do not split into many products
+
+10. Deployment / devices
+Current:
+- active field testing
+- TSPL raw print path already in use for Deli DL 720C
+
+Still needs:
+- keep backend running in persistent session during testing
+- keep print path stable
+- refine label layout only after print logic is stable
+- later do PDA real device testing when devices arrive
+- include later physical integration for:
+  - PDA
+  - label printer
+  - scanner gun
+  - cashier terminal / receipt printer / related peripherals
+
+==================================================
+18. ONE SINGLE MASTER PROMPT FOR NEW THREADS
+==================================================
+
+Copy this whole block into a new thread:
+
+Read /Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt first and follow it as the single source of truth.
+
+Rules:
+- Main flow is sorting flow.
+- Direct-hang flow is exception flow.
+- This is one system with role/device-based visibility, not many separate products.
+- Do not redesign fixed business logic unless explicitly requested.
+- Focus only on the current module and make local, testable fixes.
+- Preserve already fixed decisions:
+  - product_name = category_sub
+  - return-to-warehouse is terminal
+  - one store dispatch bale can only be handled by one clerk
+  - store side edits price/rack, not cost
+  - warehouse bale printing supports category-by-category printing and partial continuation across days
+
+Current module map and expected work:
+- China source & cost:
+  stabilize 4.2 import, supplier/category dependency, 4.3 cost pool, 4.5 direct-hang count-cost, 4.6 standard weight table
+- Warehouse main sorting flow:
+  keep shipment/source carry-over stable, expected vs actual reconciliation clear, 0.1 separate print station usable, 0.2 cost lock readable
+- Store execution flow:
+  keep manager and clerk separated, preserve PDA-first clerk flow, preserve final identity lifecycle
+- Operations center:
+  turn framework pages into real execution/data pages
+- Identity ledger:
+  keep source/cost/store/price/rack/sale/return traceable
+- Resale bale / bulk selling:
+  split raw-bale stock ownership vs bale-sales handling; support A/B mixing, sell-by-weight, sell-by-bale, settlement, stock deduction
+- Department store:
+  design separate business line and cost logic
+- OA / HR / finance:
+  connect attendance, payroll, and approval chain
+- Roles / permissions:
+  move from frontend visibility to hard permission rules
+- Deployment / devices:
+  keep service stable, keep TSPL print path stable, test device integration incrementally
+
+Before changing code:
+- state which module you are working on
+- state the local goal
+- avoid touching unrelated modules
+
+When done:
+- report what changed
+- report what remains
+- report risks or unstable areas

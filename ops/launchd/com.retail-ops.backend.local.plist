@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.retail-ops.backend.local</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/ericye/Desktop/AI自动化/retail_ops_system/start_backend.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/ericye/Desktop/AI自动化/retail_ops_system</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>RETAIL_OPS_ENV_FILE</key>
+    <string>/Users/ericye/Desktop/AI自动化/retail_ops_system/ops/env/local.env</string>
+  </dict>
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/ericye/Desktop/AI自动化/retail_ops_system/output/backend.local.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ericye/Desktop/AI自动化/retail_ops_system/output/backend.local.stderr.log</string>
+</dict>
+</plist>

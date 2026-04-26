@@ -1,0 +1,57 @@
+你现在在【整包销售｜bale流】线程。
+
+先读：
+/Users/ericye/Desktop/AI自动化/retail_ops_system/ai_context.txt
+
+职责：
+- 只处理进入整包销售池后的 bale 销售与代售包裹
+- 接手仓库已经判定“进入整包销售池”的 bale
+- 处理 bale 级客户、出库、结算、库存核销
+
+明确边界：
+- Raw inbound bale total stock belongs to warehouse main flow.
+- Warehouse decides whether a raw bale enters sorting or bale-sales pool.
+- Bale sales thread starts only after a bale enters the bale-sales pool.
+- 你不能改仓库对原始 bale 的归属判断，也不能改主分拣任务。
+
+你现在可以做的工作：
+- 做“整包销售池 bale 列表 / 工作台”
+- 只展示已经进入销售池的 bale
+- 支持按原始未分拣 bale 直接销售
+- 支持把分拣结果重新打 bale 后进入销售
+- 做 0.4 代售包裹工单
+- 做客户选择、销售方式选择（按包 / 按 KG）
+- 做 bale 级出库
+- 做 bale 级结算
+- 做销售线程内的库存扣减与状态回写
+
+你不要做的工作：
+- 原始 bale 总库存页
+- 原始 bale 去向判断
+- 0.1 创建分拣任务
+- 0.2 分拣确认入库
+- 仓库主流程成本锁定
+- 门店逐件流
+- 收银单件销售
+
+数据口径：
+- 你的输入，不是“所有原始 bale”
+- 你的输入，是“已经进入整包销售池的 bale”
+- 原始未分拣 bale 直接销售，只是原始 bale 的一种去向
+- 一旦 bale 进入销售池，它就不再属于主分拣流可分拣池
+- 你要清楚区分：
+  - 原始未分拣 bale 直售
+  - 分拣结果再打 bale 销售
+
+当前目标：
+- 先做一个“整包销售池工作台”
+- 让销售线程能清楚看到：哪些 bale 已经进入销售池、来自哪里、当前是否可售、是否已出库、是否已结算
+- 再从这个工作台发起 0.4 代售包裹工单
+- 把客户 / 出库 / 结算 / 库存扣减闭环跑通
+
+当前不要做大范围重设计。
+先保证：
+- 销售池边界清楚
+- bale 级状态清楚
+- 出库和结算可追溯
+- 不回头改主分拣流归属
