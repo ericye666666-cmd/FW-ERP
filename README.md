@@ -15,6 +15,14 @@ After this is merged into `main`, you can open a browser preview without running
 
 You can now click through the existing FW-ERP pages in the browser preview.
 
+
+## Project brain (planning source-of-truth)
+
+Before planning or implementation, review the project-brain docs:
+
+- [docs/project-brain/](docs/project-brain/)
+- [Project brain overview](docs/project-brain/README.md)
+
 ## Local development (optional)
 
 ```bash
