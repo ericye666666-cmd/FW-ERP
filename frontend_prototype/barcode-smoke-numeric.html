@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Numeric Barcode Smoke Test</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f2ea;
+        --card: #fffdf8;
+        --ink: #17313a;
+        --muted: #5d6d74;
+        --line: #c9d7d6;
+        --accent: #1f7a8c;
+        --ok: #1b8f4d;
+        --warn: #b96b11;
+        --bad: #b42318;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(31, 122, 140, 0.08), transparent 28%),
+          linear-gradient(180deg, #f9f6ef 0%, var(--bg) 100%);
+        color: var(--ink);
+        font-family: "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      }
+      .wrap {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+      .hero {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(28px, 4vw, 42px);
+        line-height: 1;
+      }
+      .hero p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .scan-panel {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 14px 40px rgba(23, 49, 58, 0.06);
+        margin-bottom: 22px;
+      }
+      .scan-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+      }
+      .scan-input {
+        width: 100%;
+        min-height: 64px;
+        border-radius: 18px;
+        border: 2px solid #c7d8d7;
+        background: #fff;
+        padding: 0 18px;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--ink);
+      }
+      .scan-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px rgba(31, 122, 140, 0.12);
+      }
+      .focus-btn {
+        min-width: 180px;
+        border: none;
+        border-radius: 18px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 18px;
+        font-weight: 700;
+        padding: 0 20px;
+        cursor: pointer;
+      }
+      .status {
+        padding: 14px 16px;
+        border-radius: 18px;
+        font-size: 18px;
+        font-weight: 700;
+        background: #eef4f6;
+        color: var(--ink);
+      }
+      .status.ok { background: rgba(27, 143, 77, 0.12); color: var(--ok); }
+      .status.warn { background: rgba(185, 107, 17, 0.12); color: var(--warn); }
+      .status.bad { background: rgba(180, 35, 24, 0.12); color: var(--bad); }
+      .cards {
+        display: grid;
+        gap: 16px;
+      }
+      .card {
+        display: grid;
+        gap: 12px;
+        padding: 20px 22px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: var(--card);
+        box-shadow: 0 16px 32px rgba(23, 49, 58, 0.05);
+      }
+      .card small {
+        color: var(--muted);
+        font-size: 14px;
+        letter-spacing: 0.08em;
+      }
+      .expected {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+      }
+      .barcode-box {
+        min-height: 240px;
+        display: grid;
+        place-items: center;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid #dbe4e4;
+        padding: 22px 26px;
+        overflow-x: auto;
+      }
+      .barcode-box svg {
+        width: auto;
+        height: 180px;
+        min-width: 880px;
+        flex: none;
+      }
+      .note {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .recent {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .recent-item {
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(23, 49, 58, 0.05);
+        font-size: 15px;
+        color: var(--ink);
+      }
+      @media (max-width: 720px) {
+        .scan-row { grid-template-columns: 1fr; }
+        .focus-btn { min-height: 56px; }
+        .barcode-box svg {
+          min-width: 760px;
+          height: 156px;
+        }
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1>纯数字短码对照测试</h1>
+        <p>如果这页能完整扫出最后一位，就说明你这把枪更适合数字型短码，当前问题不在 TSPL 出纸。</p>
+      </section>
+
+      <section class="scan-panel">
+        <div class="scan-row">
+          <input id="scanInput" class="scan-input" type="text" placeholder="点这里后直接扫，预期应完整显示 12 位纯数字码" autocomplete="off" spellcheck="false" />
+          <button id="focusBtn" class="focus-btn" type="button">聚焦扫码框</button>
+        </div>
+        <div id="status" class="status">等待扫码。扫完会直接判断是不是漏位。</div>
+        <div id="recent" class="recent"></div>
+      </section>
+
+      <section id="cards" class="cards"></section>
+    </div>
+
+    <script>
+      const codes = ["420200000001", "420200000002", "420200000008", "420200000009"];
+      const scanInput = document.getElementById("scanInput");
+      const focusBtn = document.getElementById("focusBtn");
+      const statusEl = document.getElementById("status");
+      const recentEl = document.getElementById("recent");
+      const cardsEl = document.getElementById("cards");
+      const recentScans = [];
+
+      function renderCards() {
+        cardsEl.innerHTML = codes.map((code, index) => `
+          <article class="card">
+            <small>NUMERIC TEST ${index + 1}</small>
+            <div class="expected">${code}</div>
+            <div class="barcode-box"><svg id="barcode-${index}"></svg></div>
+            <div class="note">预期扫码结果必须完整等于 <strong>${code}</strong></div>
+          </article>
+        `).join("");
+
+        codes.forEach((code, index) => {
+          JsBarcode(`#barcode-${index}`, code, {
+            format: "CODE128",
+            width: 5.2,
+            height: 160,
+            margin: 20,
+            displayValue: false,
+          });
+        });
+      }
+
+      function setStatus(kind, message) {
+        statusEl.className = `status${kind ? ` ${kind}` : ""}`;
+        statusEl.textContent = message;
+      }
+
+      function renderRecent() {
+        recentEl.innerHTML = recentScans.map((entry) => `<div class="recent-item">${entry}</div>`).join("");
+      }
+
+      function classifyScan(value) {
+        if (codes.includes(value)) {
+          return { kind: "ok", message: `命中完整数字短码：${value}` };
+        }
+        const missingLastDigit = codes.find((code) => code.startsWith(value) && code.length === value.length + 1);
+        if (missingLastDigit) {
+          return { kind: "bad", message: `少了最后一位。当前扫到 ${value}，预期应为 ${missingLastDigit}` };
+        }
+        return { kind: "warn", message: `扫到了未预置的内容：${value}` };
+      }
+
+      function commitScan(rawValue) {
+        const value = String(rawValue || "").trim();
+        if (!value) return;
+        const result = classifyScan(value);
+        setStatus(result.kind, result.message);
+        recentScans.unshift(`${new Date().toLocaleTimeString()}  ${result.message}`);
+        recentScans.splice(5);
+        renderRecent();
+        scanInput.value = "";
+        scanInput.focus();
+      }
+
+      focusBtn.addEventListener("click", () => scanInput.focus());
+      scanInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === "Tab") {
+          event.preventDefault();
+          commitScan(scanInput.value);
+        }
+      });
+      scanInput.addEventListener("blur", () => {
+        window.setTimeout(() => {
+          if (document.activeElement !== scanInput) scanInput.focus();
+        }, 80);
+      });
+
+      renderCards();
+      scanInput.focus();
+    </script>
+  </body>
+</html>

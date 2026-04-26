@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>60x40 Barcode Candidate Lab</title>
+    <style>
+      :root {
+        --bg: #f6f2ea;
+        --panel: rgba(255, 255, 255, 0.92);
+        --border: rgba(31, 109, 127, 0.18);
+        --border-strong: rgba(31, 109, 127, 0.42);
+        --text: #163545;
+        --muted: #6b7d84;
+        --accent: #17697c;
+        --accent-soft: rgba(23, 105, 124, 0.08);
+        --success: #21865f;
+        --success-soft: rgba(33, 134, 95, 0.12);
+        --warning: #c2791c;
+        --shadow: 0 18px 60px rgba(12, 47, 58, 0.10);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "SF Pro Display", "Helvetica Neue", "PingFang SC", "Noto Sans SC", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.85), transparent 34%),
+          linear-gradient(180deg, #f8f5ee 0%, #efe7dc 100%);
+      }
+
+      .page {
+        width: min(1520px, calc(100vw - 40px));
+        margin: 24px auto 80px;
+      }
+
+      .hero {
+        padding: 28px 32px;
+        border-radius: 28px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(27, 103, 122, 0.12);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 18px 0 10px;
+        font-size: clamp(32px, 5vw, 56px);
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+      }
+
+      .hero-copy {
+        max-width: 980px;
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.75;
+        color: var(--muted);
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 18px;
+        margin-top: 26px;
+      }
+
+      .stats,
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .toolbar-field {
+        min-width: 220px;
+        padding: 10px 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid var(--border);
+      }
+
+      .toolbar-field label {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .toolbar-field input {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-weight: 700;
+        outline: none;
+      }
+
+      .auth-strip {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 12px;
+        margin-top: 18px;
+        padding: 16px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid var(--border);
+      }
+
+      .auth-strip .toolbar-field {
+        flex: 1 1 180px;
+        min-width: 180px;
+      }
+
+      .auth-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .auth-meta {
+        width: 100%;
+        color: var(--muted);
+        line-height: 1.65;
+        font-size: 14px;
+      }
+
+      .stat-card {
+        min-width: 140px;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid var(--border);
+      }
+
+      .stat-card span {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .stat-card strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 28px;
+        letter-spacing: -0.04em;
+      }
+
+      button,
+      .section-link {
+        appearance: none;
+        border: 1px solid rgba(22, 53, 69, 0.12);
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--text);
+        border-radius: 999px;
+        font: inherit;
+        font-weight: 700;
+        padding: 12px 18px;
+        cursor: pointer;
+        transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, color 140ms ease;
+      }
+
+      button:hover,
+      .section-link:hover {
+        transform: translateY(-1px);
+        border-color: var(--border-strong);
+      }
+
+      button[data-active="true"] {
+        background: #173c46;
+        color: #f6fbfc;
+        border-color: transparent;
+      }
+
+      .section-nav {
+        position: sticky;
+        top: 10px;
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 20px 0 22px;
+        padding: 14px;
+        border-radius: 22px;
+        background: rgba(246, 242, 234, 0.84);
+        backdrop-filter: blur(14px);
+        border: 1px solid rgba(31, 109, 127, 0.12);
+      }
+
+      .sections {
+        display: grid;
+        gap: 28px;
+      }
+
+      .section-card {
+        padding: 24px;
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid var(--border);
+        box-shadow: 0 10px 36px rgba(18, 55, 67, 0.08);
+      }
+
+      .section-head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+        margin-bottom: 20px;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 34px);
+        letter-spacing: -0.04em;
+      }
+
+      .section-head p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .field-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .section-head-side {
+        display: grid;
+        gap: 12px;
+        justify-items: end;
+      }
+
+      .section-head-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .field-pill,
+      .tag-pill {
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .field-pill {
+        background: rgba(23, 105, 124, 0.08);
+        color: var(--accent);
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 18px;
+      }
+
+      .candidate-card {
+        padding: 16px;
+        border-radius: 24px;
+        border: 1px solid rgba(31, 109, 127, 0.14);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 246, 247, 0.96) 100%);
+        box-shadow: 0 10px 28px rgba(18, 55, 67, 0.06);
+      }
+
+      .candidate-card[data-selected="true"] {
+        border-color: rgba(33, 134, 95, 0.42);
+        box-shadow: 0 10px 28px rgba(33, 134, 95, 0.12);
+      }
+
+      .candidate-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 12px;
+      }
+
+      .candidate-meta h3 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+
+      .candidate-meta p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+
+      .candidate-no {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 52px;
+        height: 34px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(23, 105, 124, 0.1);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .preview-shell {
+        padding: 16px;
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.96), rgba(246, 242, 234, 0.86)),
+          linear-gradient(180deg, rgba(246, 242, 234, 0.92), rgba(238, 233, 224, 0.92));
+        border: 1px solid rgba(31, 109, 127, 0.1);
+      }
+
+      .label-canvas {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 3 / 2;
+        border-radius: 18px;
+        background: #fff;
+        overflow: hidden;
+        box-shadow: inset 0 0 0 1px rgba(18, 55, 67, 0.06);
+      }
+
+      .preview-block {
+        position: absolute;
+        overflow: hidden;
+      }
+
+      .preview-text {
+        display: flex;
+        align-items: center;
+        color: #102f38;
+        line-height: 1.02;
+        letter-spacing: 0.01em;
+        word-break: break-word;
+      }
+
+      .preview-text[data-align="center"] {
+        justify-content: center;
+        text-align: center;
+      }
+
+      .preview-text[data-align="right"] {
+        justify-content: flex-end;
+        text-align: right;
+      }
+
+      .preview-text[data-tone="muted"] {
+        color: #718087;
+      }
+
+      .preview-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+        align-content: center;
+      }
+
+      .preview-badge {
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: rgba(18, 72, 89, 0.1);
+        color: #0f5b69;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .preview-barcode {
+        display: grid;
+        place-items: center;
+      }
+
+      .preview-line {
+        background: #111;
+        border-radius: 999px;
+      }
+
+      .preview-barcode::before {
+        content: "";
+        width: 100%;
+        height: 100%;
+        border-radius: 2px;
+        background:
+          linear-gradient(90deg,
+            #111 0%,
+            #111 1.5%,
+            transparent 1.5%,
+            transparent 3.2%,
+            #111 3.2%,
+            #111 4.1%,
+            transparent 4.1%,
+            transparent 5.3%,
+            #111 5.3%,
+            #111 6.9%,
+            transparent 6.9%,
+            transparent 7.7%,
+            #111 7.7%,
+            #111 8.4%,
+            transparent 8.4%,
+            transparent 10.1%,
+            #111 10.1%,
+            #111 11.8%,
+            transparent 11.8%,
+            transparent 12.4%,
+            #111 12.4%,
+            #111 13.0%,
+            transparent 13.0%,
+            transparent 15.0%,
+            #111 15.0%,
+            #111 16.1%,
+            transparent 16.1%,
+            transparent 17.0%,
+            #111 17.0%,
+            #111 19.4%,
+            transparent 19.4%,
+            transparent 20.3%,
+            #111 20.3%,
+            #111 21.0%,
+            transparent 21.0%,
+            transparent 22.6%,
+            #111 22.6%,
+            #111 23.8%,
+            transparent 23.8%,
+            transparent 24.6%,
+            #111 24.6%,
+            #111 25.4%,
+            transparent 25.4%,
+            transparent 26.3%,
+            #111 26.3%,
+            #111 28.9%,
+            transparent 28.9%,
+            transparent 30.4%,
+            #111 30.4%,
+            #111 31.0%,
+            transparent 31.0%,
+            transparent 32.5%,
+            #111 32.5%,
+            #111 34.0%,
+            transparent 34.0%,
+            transparent 35.6%,
+            #111 35.6%,
+            #111 36.4%,
+            transparent 36.4%,
+            transparent 37.6%,
+            #111 37.6%,
+            #111 39.9%,
+            transparent 39.9%,
+            transparent 41.3%,
+            #111 41.3%,
+            #111 42.0%,
+            transparent 42.0%,
+            transparent 43.4%,
+            #111 43.4%,
+            #111 44.8%,
+            transparent 44.8%,
+            transparent 45.5%,
+            #111 45.5%,
+            #111 46.1%,
+            transparent 46.1%,
+            transparent 48.5%,
+            #111 48.5%,
+            #111 50.3%,
+            transparent 50.3%,
+            transparent 52.0%,
+            #111 52.0%,
+            #111 52.8%,
+            transparent 52.8%,
+            transparent 54.0%,
+            #111 54.0%,
+            #111 56.2%,
+            transparent 56.2%,
+            transparent 57.0%,
+            #111 57.0%,
+            #111 58.1%,
+            transparent 58.1%,
+            transparent 59.0%,
+            #111 59.0%,
+            #111 60.2%,
+            transparent 60.2%,
+            transparent 61.0%,
+            #111 61.0%,
+            #111 63.6%,
+            transparent 63.6%,
+            transparent 64.8%,
+            #111 64.8%,
+            #111 65.6%,
+            transparent 65.6%,
+            transparent 66.8%,
+            #111 66.8%,
+            #111 67.5%,
+            transparent 67.5%,
+            transparent 68.6%,
+            #111 68.6%,
+            #111 70.8%,
+            transparent 70.8%,
+            transparent 71.7%,
+            #111 71.7%,
+            #111 73.4%,
+            transparent 73.4%,
+            transparent 74.1%,
+            #111 74.1%,
+            #111 74.8%,
+            transparent 74.8%,
+            transparent 76.6%,
+            #111 76.6%,
+            #111 79.2%,
+            transparent 79.2%,
+            transparent 80.0%,
+            #111 80.0%,
+            #111 81.2%,
+            transparent 81.2%,
+            transparent 82.8%,
+            #111 82.8%,
+            #111 83.6%,
+            transparent 83.6%,
+            transparent 84.8%,
+            #111 84.8%,
+            #111 86.9%,
+            transparent 86.9%,
+            transparent 88.0%,
+            #111 88.0%,
+            #111 88.8%,
+            transparent 88.8%,
+            transparent 90.0%,
+            #111 90.0%,
+            #111 92.3%,
+            transparent 92.3%,
+            transparent 94.0%,
+            #111 94.0%,
+            #111 95.0%,
+            transparent 95.0%,
+            transparent 96.2%,
+            #111 96.2%,
+            #111 98.6%,
+            transparent 98.6%,
+            transparent 100%);
+      }
+
+      .candidate-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .tag-pill {
+        background: rgba(20, 54, 69, 0.08);
+        color: #325865;
+      }
+
+      .candidate-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .candidate-actions button {
+        flex: 1;
+        justify-content: center;
+      }
+
+      .candidate-actions button[data-role="select"][data-selected="true"] {
+        background: rgba(33, 134, 95, 0.14);
+        color: var(--success);
+        border-color: rgba(33, 134, 95, 0.26);
+      }
+
+      .section-card[data-hidden="true"],
+      .candidate-card[data-hidden="true"] {
+        display: none;
+      }
+
+      .footer-note {
+        margin-top: 28px;
+        padding: 20px 24px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(31, 109, 127, 0.12);
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      .footer-note strong {
+        color: var(--text);
+      }
+
+      .lab-status {
+        margin: 18px 0 0;
+        padding: 16px 18px;
+        border-radius: 18px;
+        border: 1px solid rgba(31, 109, 127, 0.12);
+        background: rgba(255, 255, 255, 0.88);
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .lab-status[data-tone="success"] {
+        border-color: rgba(33, 134, 95, 0.24);
+        background: rgba(33, 134, 95, 0.10);
+        color: #196647;
+      }
+
+      .lab-status[data-tone="danger"] {
+        border-color: rgba(185, 52, 37, 0.24);
+        background: rgba(185, 52, 37, 0.10);
+        color: #a12d20;
+      }
+
+      @media (max-width: 880px) {
+        .page {
+          width: min(calc(100vw - 22px), 1520px);
+          margin-top: 12px;
+        }
+
+        .hero,
+        .section-card {
+          padding: 18px;
+          border-radius: 22px;
+        }
+
+        .section-nav {
+          top: 0;
+          padding: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="eyebrow">60x40 Candidate Lab</div>
+        <h1>60x40 标签排列候选页</h1>
+        <p class="hero-copy">
+          这个页面只做布局选择和候选版测试打印，不改当前已经验证可扫的一维码参数。当前先把仓库 raw bale 收窄成 5 套固定结构，
+          商品级和送店 bale 先保留参考组。你只需要挑出顺眼、信息够用、右侧浪费更少、实体出纸更稳定的版本。
+        </p>
+        <div class="toolbar">
+          <div class="stats">
+            <div class="stat-card">
+              <span>候选总数</span>
+              <strong id="candidateTotal">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>已选备选</span>
+              <strong id="shortlistTotal">0</strong>
+            </div>
+            <div class="stat-card">
+              <span>标签尺寸</span>
+              <strong>60×40</strong>
+            </div>
+            <div class="toolbar-field">
+              <label for="candidatePrinterName">测试打印机</label>
+              <input id="candidatePrinterName" value="Deli DL-720C" />
+            </div>
+          </div>
+          <div class="actions">
+            <button id="toggleShortlistOnly" data-active="false" type="button">只看已选</button>
+            <button id="copyShortlist" type="button">复制已选编号</button>
+            <button id="clearShortlist" type="button">清空已选</button>
+          </div>
+        </div>
+        <div class="auth-strip">
+          <div class="toolbar-field">
+            <label for="candidateLoginUsername">打印测试账号</label>
+            <input id="candidateLoginUsername" value="warehouse_supervisor_1" />
+          </div>
+          <div class="toolbar-field">
+            <label for="candidateLoginPassword">密码</label>
+            <input id="candidateLoginPassword" type="password" value="demo1234" />
+          </div>
+          <div class="auth-actions">
+            <button id="candidateLoginButton" type="button">登录打印</button>
+            <button id="candidateLogoutButton" type="button">退出打印登录</button>
+          </div>
+          <div id="candidateSessionMeta" class="auth-meta">这页会直接复用本机本地测试账号；如果你没登录主系统，也可以只在这里登录后测试打印。</div>
+        </div>
+        <div id="labStatus" class="lab-status">打印测试会读取当前浏览器同源登录态；如果你还没在主系统登录，点击打印时会直接提示。</div>
+      </section>
+
+      <nav class="section-nav" id="sectionNav"></nav>
+
+      <section class="sections" id="galleryRoot"></section>
+
+      <section class="footer-note">
+        <strong>说明：</strong>
+        这一页只用于比较布局和字段组合，当前预览里的条码块保持统一风格，不代表重新定义打印参数。你昨晚已经验证通过的
+        1D 可扫方案我没有动；仓库 bale 组现在可以直接发测试打印到 Deli TSPL。等你选定候选后，再把入选版本接到真实模板和打印链路里。
+      </section>
+    </main>
+
+    <script src="./label-candidate-gallery.js?v=20260422-1555"></script>
+    <script>
+      (function () {
+        const gallery = window.LabelCandidateGallery;
+        if (!gallery) {
+          return;
+        }
+
+        const FONT_SIZE_MAP = {
+          xs: "10px",
+          sm: "12px",
+          md: "18px",
+          lg: "24px",
+        };
+
+        const root = document.getElementById("galleryRoot");
+        const sectionNav = document.getElementById("sectionNav");
+        const candidateTotal = document.getElementById("candidateTotal");
+        const shortlistTotal = document.getElementById("shortlistTotal");
+        const toggleShortlistOnlyButton = document.getElementById("toggleShortlistOnly");
+        const copyShortlistButton = document.getElementById("copyShortlist");
+        const clearShortlistButton = document.getElementById("clearShortlist");
+        const candidatePrinterName = document.getElementById("candidatePrinterName");
+        const labStatus = document.getElementById("labStatus");
+        const candidateLoginUsername = document.getElementById("candidateLoginUsername");
+        const candidateLoginPassword = document.getElementById("candidateLoginPassword");
+        const candidateLoginButton = document.getElementById("candidateLoginButton");
+        const candidateLogoutButton = document.getElementById("candidateLogoutButton");
+        const candidateSessionMeta = document.getElementById("candidateSessionMeta");
+
+        const groups = gallery.buildLabelCandidateGroups();
+        const total = gallery.countLabelCandidates(groups);
+        let shortlist = gallery.loadShortlist();
+        let shortlistOnly = false;
+
+        candidateTotal.textContent = String(total);
+
+        function getAccessToken() {
+          return String(localStorage.getItem("retail_ops_access_token") || "").trim();
+        }
+
+        function getStoredUser() {
+          try {
+            return JSON.parse(localStorage.getItem("retail_ops_current_user") || "null");
+          } catch (_error) {
+            return null;
+          }
+        }
+
+        function getPrinterName() {
+          return String(candidatePrinterName?.value || "").trim() || "Deli DL-720C";
+        }
+
+        function setLabStatus(message, tone = "") {
+          if (!labStatus) {
+            return;
+          }
+          labStatus.textContent = message;
+          labStatus.dataset.tone = tone;
+        }
+
+        function refreshCandidateSessionMeta() {
+          const token = getAccessToken();
+          const user = getStoredUser();
+          if (!candidateSessionMeta) {
+            return;
+          }
+          if (token && user?.username) {
+            candidateSessionMeta.textContent = `当前打印登录：${user.full_name || user.username} · ${user.username}。现在点“打印本版 / 打印这一组对比”会直接发到 ${getPrinterName()}。`;
+            return;
+          }
+          candidateSessionMeta.textContent = "当前没有打印登录态。你可以直接在这里点“登录打印”，不用回主系统。";
+        }
+
+        async function loginForCandidatePrint() {
+          const username = String(candidateLoginUsername?.value || "").trim();
+          const password = String(candidateLoginPassword?.value || "").trim();
+          if (!username || !password) {
+            setLabStatus("先填打印测试账号和密码。", "danger");
+            return;
+          }
+          setLabStatus("正在登录打印测试账号…");
+          const response = await fetch(`${window.location.origin}/api/v1/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username, password }),
+          });
+          let body = {};
+          try {
+            body = await response.json();
+          } catch (_error) {
+            body = {};
+          }
+          if (!response.ok) {
+            const detail = body.detail || body.message || `登录失败 (${response.status})`;
+            setLabStatus(String(detail), "danger");
+            return;
+          }
+          localStorage.setItem("retail_ops_access_token", String(body.access_token || ""));
+          localStorage.setItem("retail_ops_current_user", JSON.stringify(body.user || null));
+          refreshCandidateSessionMeta();
+          setLabStatus(`已登录 ${body.user?.username || username}，现在可以直接测试打印。`, "success");
+        }
+
+        function logoutCandidatePrint() {
+          localStorage.removeItem("retail_ops_access_token");
+          localStorage.removeItem("retail_ops_current_user");
+          refreshCandidateSessionMeta();
+          setLabStatus("已经清掉这页的打印登录态。", "success");
+        }
+
+        async function postCandidatePrint(path, payload) {
+          const token = getAccessToken();
+          if (!token) {
+            setLabStatus("当前没有检测到打印登录态。先在这页点“登录打印”，再测试打印。", "danger");
+            throw new Error("missing_token");
+          }
+          setLabStatus(`正在发送到 ${getPrinterName()}…`);
+          const response = await fetch(`${window.location.origin}/api/v1${path}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(payload),
+          });
+          let body = {};
+          try {
+            body = await response.json();
+          } catch (_error) {
+            body = {};
+          }
+          if (!response.ok) {
+            const detail = body.detail || body.message || `打印失败 (${response.status})`;
+            setLabStatus(String(detail), "danger");
+            throw new Error(String(detail));
+          }
+          setLabStatus(String(body.message || "已发送测试打印。"), "success");
+          return body;
+        }
+
+        function renderBadgeRow(block) {
+          const element = document.createElement("div");
+          element.className = "preview-block preview-badges";
+          applyRect(element, block);
+          (block.values || []).forEach((value) => {
+            const badge = document.createElement("span");
+            badge.className = "preview-badge";
+            badge.textContent = value;
+            element.appendChild(badge);
+          });
+          return element;
+        }
+
+        function renderTextBlock(block) {
+          const element = document.createElement("div");
+          element.className = "preview-block preview-text";
+          element.dataset.align = block.align || "left";
+          element.dataset.tone = block.tone || "primary";
+          element.style.fontSize = FONT_SIZE_MAP[block.size] || FONT_SIZE_MAP.sm;
+          element.style.fontWeight = block.weight || "700";
+          element.textContent = block.value || "";
+          applyRect(element, block);
+          return element;
+        }
+
+        function renderBarcodeBlock(block) {
+          const element = document.createElement("div");
+          element.className = "preview-block preview-barcode";
+          applyRect(element, block);
+          return element;
+        }
+
+        function renderLineBlock(block) {
+          const element = document.createElement("div");
+          element.className = "preview-block preview-line";
+          applyRect(element, block);
+          return element;
+        }
+
+        function applyRect(element, block) {
+          element.style.left = gallery.mmToPercent(block.x_mm, 60);
+          element.style.top = gallery.mmToPercent(block.y_mm, 40);
+          element.style.width = gallery.mmToPercent(block.w_mm, 60);
+          element.style.height = gallery.mmToPercent(block.h_mm, 40);
+        }
+
+        function renderPreview(candidate) {
+          const canvas = document.createElement("div");
+          canvas.className = "label-canvas";
+
+          candidate.blocks.forEach((block) => {
+            let node;
+            if (block.type === "text") {
+              node = renderTextBlock(block);
+            } else if (block.type === "badgeRow") {
+              node = renderBadgeRow(block);
+            } else if (block.type === "barcode") {
+              node = renderBarcodeBlock(block);
+            } else if (block.type === "line") {
+              node = renderLineBlock(block);
+            }
+            if (node) {
+              canvas.appendChild(node);
+            }
+          });
+
+          return canvas;
+        }
+
+        function updateShortlistSummary() {
+          shortlistTotal.textContent = String(shortlist.length);
+          toggleShortlistOnlyButton.dataset.active = shortlistOnly ? "true" : "false";
+          toggleShortlistOnlyButton.textContent = shortlistOnly ? "显示全部" : "只看已选";
+        }
+
+        function applyFilters() {
+          document.querySelectorAll(".candidate-card").forEach((card) => {
+            const isSelected = shortlist.includes(card.dataset.candidateId);
+            const shouldHide = shortlistOnly && !isSelected;
+            card.dataset.hidden = shouldHide ? "true" : "false";
+            card.dataset.selected = isSelected ? "true" : "false";
+
+            const selectButton = card.querySelector('[data-role="select"]');
+            if (selectButton) {
+              selectButton.dataset.selected = isSelected ? "true" : "false";
+              selectButton.textContent = isSelected ? "已加入备选" : "加入备选";
+            }
+          });
+
+          document.querySelectorAll(".section-card").forEach((section) => {
+            const visibleCount = Array.from(section.querySelectorAll(".candidate-card")).filter((card) => card.dataset.hidden !== "true").length;
+            section.dataset.hidden = visibleCount === 0 ? "true" : "false";
+          });
+
+          updateShortlistSummary();
+        }
+
+        function copyShortlist() {
+          const text = shortlist.join("\n");
+          if (!text) {
+            copyShortlistButton.textContent = "当前没有已选";
+            window.setTimeout(() => {
+              copyShortlistButton.textContent = "复制已选编号";
+            }, 1200);
+            return;
+          }
+
+          navigator.clipboard.writeText(text).then(() => {
+            copyShortlistButton.textContent = "已复制";
+            window.setTimeout(() => {
+              copyShortlistButton.textContent = "复制已选编号";
+            }, 1200);
+          }).catch(() => {
+            copyShortlistButton.textContent = "复制失败";
+            window.setTimeout(() => {
+              copyShortlistButton.textContent = "复制已选编号";
+            }, 1200);
+          });
+        }
+
+        function render() {
+          sectionNav.innerHTML = "";
+          root.innerHTML = "";
+
+          groups.forEach((group) => {
+            const sectionLink = document.createElement("a");
+            sectionLink.className = "section-link";
+            sectionLink.href = `#${group.key}`;
+            sectionLink.textContent = `${group.title} · ${group.candidates.length}款`;
+            sectionNav.appendChild(sectionLink);
+
+            const section = document.createElement("section");
+            section.className = "section-card";
+            section.id = group.key;
+
+            const head = document.createElement("div");
+            head.className = "section-head";
+            const headMain = document.createElement("div");
+            headMain.innerHTML = `
+              <h2>${group.title}</h2>
+              <p>${group.typeLabel}</p>
+            `;
+
+            const side = document.createElement("div");
+            side.className = "section-head-side";
+
+            const fieldList = document.createElement("div");
+            fieldList.className = "field-list";
+            group.fields.forEach((field) => {
+              const pill = document.createElement("span");
+              pill.className = "field-pill";
+              pill.textContent = field;
+              fieldList.appendChild(pill);
+            });
+            side.appendChild(fieldList);
+
+            if (group.key === "warehouse_bale") {
+              const headActions = document.createElement("div");
+              headActions.className = "section-head-actions";
+
+              const printBatchButton = document.createElement("button");
+              printBatchButton.type = "button";
+              printBatchButton.textContent = `打印这 ${group.candidates.length} 版对比`;
+              printBatchButton.addEventListener("click", async () => {
+                const payload = gallery.buildCandidateBatchPrintPayload(group, { printerName: getPrinterName() });
+                try {
+                  await postCandidatePrint("/print-jobs/candidate-lab/print-batch", payload);
+                } catch (_error) {
+                }
+              });
+
+              headActions.appendChild(printBatchButton);
+              side.appendChild(headActions);
+            }
+
+            head.appendChild(headMain);
+            head.appendChild(side);
+            section.appendChild(head);
+
+            const cards = document.createElement("div");
+            cards.className = "cards";
+
+            group.candidates.forEach((candidate) => {
+              const card = document.createElement("article");
+              card.className = "candidate-card";
+              card.dataset.candidateId = candidate.id;
+
+              const meta = document.createElement("div");
+              meta.className = "candidate-meta";
+              meta.innerHTML = `
+                <div>
+                  <h3>${candidate.short_name}</h3>
+                  <p>${candidate.description}</p>
+                </div>
+                <span class="candidate-no">${String(candidate.candidate_no).padStart(2, "0")}</span>
+              `;
+              card.appendChild(meta);
+
+              const previewShell = document.createElement("div");
+              previewShell.className = "preview-shell";
+              previewShell.appendChild(renderPreview(candidate));
+              card.appendChild(previewShell);
+
+              const tagList = document.createElement("div");
+              tagList.className = "candidate-tags";
+              candidate.tags.forEach((tag) => {
+                const pill = document.createElement("span");
+                pill.className = "tag-pill";
+                pill.textContent = tag;
+                tagList.appendChild(pill);
+              });
+              card.appendChild(tagList);
+
+              const actions = document.createElement("div");
+              actions.className = "candidate-actions";
+
+              const selectButton = document.createElement("button");
+              selectButton.type = "button";
+              selectButton.dataset.role = "select";
+              selectButton.addEventListener("click", () => {
+                shortlist = gallery.toggleShortlistId(candidate.id);
+                applyFilters();
+              });
+
+              const codeButton = document.createElement("button");
+              codeButton.type = "button";
+              codeButton.textContent = "复制编号";
+              codeButton.addEventListener("click", () => {
+                navigator.clipboard.writeText(candidate.id).then(() => {
+                  codeButton.textContent = "已复制";
+                  window.setTimeout(() => {
+                    codeButton.textContent = "复制编号";
+                  }, 1000);
+                });
+              });
+
+              actions.appendChild(selectButton);
+              actions.appendChild(codeButton);
+
+              if (group.key === "warehouse_bale") {
+                const printButton = document.createElement("button");
+                printButton.type = "button";
+                printButton.textContent = "打印本版";
+                printButton.addEventListener("click", async () => {
+                  const payload = gallery.buildCandidatePrintPayload(candidate, { printerName: getPrinterName() });
+                  try {
+                    await postCandidatePrint("/print-jobs/candidate-lab/print", payload);
+                  } catch (_error) {
+                  }
+                });
+                actions.appendChild(printButton);
+              }
+
+              card.appendChild(actions);
+
+              cards.appendChild(card);
+            });
+
+            section.appendChild(cards);
+            root.appendChild(section);
+          });
+
+          applyFilters();
+        }
+
+        toggleShortlistOnlyButton.addEventListener("click", () => {
+          shortlistOnly = !shortlistOnly;
+          applyFilters();
+        });
+
+        clearShortlistButton.addEventListener("click", () => {
+          shortlist = gallery.saveShortlist([]);
+          shortlistOnly = false;
+          applyFilters();
+        });
+
+        copyShortlistButton.addEventListener("click", copyShortlist);
+        candidateLoginButton?.addEventListener("click", loginForCandidatePrint);
+        candidateLogoutButton?.addEventListener("click", logoutCandidatePrint);
+
+        refreshCandidateSessionMeta();
+        render();
+      })();
+    </script>
+  </body>
+</html>

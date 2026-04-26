@@ -1,0 +1,3455 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>店铺进销存工作台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <section id="authPage" class="auth-page">
+      <div class="auth-shell">
+        <section class="auth-brand">
+          <p class="eyebrow">Retail Ops Prototype</p>
+          <h1>店铺进销存工作台</h1>
+          <p class="subtle">
+            先登录，再按角色进入系统。收银员会直接进入高速交易终端，其他角色仍进入各自工作区。
+          </p>
+          <div class="auth-brand-points">
+            <article>
+              <strong>仓库功能区</strong>
+              <span>海运关单主档、包裹入仓、总确认、一包一码、分拣确认和仓库执行。</span>
+            </article>
+            <article>
+              <strong>运营中心</strong>
+              <span>区域经理看多店经营、调货动作、风控异常、现金闭环、巡店评分和会议任务。</span>
+            </article>
+            <article>
+              <strong>门店功能区</strong>
+              <span>门店分批上架、货架位、收银结算、作废、退款和支付异常。</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="auth-card">
+          <div class="panel-head">
+            <h2>登录系统</h2>
+          </div>
+          <div class="hero-card">
+            <label for="apiBase">API 地址（先不要改）</label>
+            <input id="apiBase" value="http://127.0.0.1:8000/api/v1" />
+            <button id="saveBaseButton" type="button">保存地址</button>
+          </div>
+          <form id="loginForm" class="form-grid compact auth-form">
+            <input name="username" placeholder="用户名" value="admin_1" />
+            <input name="password" type="password" placeholder="密码" value="demo1234" />
+            <button type="submit">登录并进入终端 / 工作区</button>
+          </form>
+          <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
+          <div class="subtle small">默认测试密码：<code>demo1234</code></div>
+          <pre id="authOutput" class="output hidden-output"></pre>
+        </section>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell hidden-screen">
+      <section class="workspace-top-panel">
+        <div class="workspace-top-row">
+          <div class="workspace-top-brand">
+            <p class="eyebrow">Retail Ops Workspace</p>
+            <strong>店铺进销存工作台</strong>
+          </div>
+          <div class="workspace-tabs">
+            <button class="workspace-tab active" data-workspace-target="overview" type="button">今日总览</button>
+            <button class="workspace-tab" data-workspace-target="testing" type="button">测试工具</button>
+            <button class="workspace-tab" data-workspace-target="warehouse" type="button">仓库功能区</button>
+            <button class="workspace-tab" data-workspace-target="operations" type="button">运营中心</button>
+            <button class="workspace-tab" data-workspace-target="store" type="button">门店功能区</button>
+            <button class="workspace-tab" data-workspace-target="admin" type="button">系统管理</button>
+          </div>
+          <div class="workspace-session-strip">
+            <div id="sessionSummary" class="session-summary">未登录</div>
+            <div id="appSessionMeta" class="session-meta-inline">登录后显示角色和默认门店</div>
+            <button id="logoutButton" type="button" class="ghost-button mini-button">退出登录</button>
+          </div>
+        </div>
+        <div id="workspaceHint" class="workspace-top-hint">当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。</div>
+      </section>
+
+      <div class="workspace-shell">
+        <aside class="workspace-side-panel">
+        <div class="workspace-page-bar">
+          <h3 id="workspacePageTitle" class="hidden-screen" aria-hidden="true">今日总览</h3>
+          <div class="button-row">
+            <button id="workspacePrevButton" type="button" class="ghost-button">上一页</button>
+            <button id="workspaceNextButton" type="button" class="ghost-button">下一页</button>
+          </div>
+          <label class="workspace-page-search" for="workspacePageSearch">
+            <span class="workspace-page-search-icon" aria-hidden="true"></span>
+            <input id="workspacePageSearch" type="search" placeholder="搜索当前页面..." />
+          </label>
+        </div>
+        <div id="workspacePageNav" class="workspace-page-nav"></div>
+        </aside>
+
+        <main id="workspacePanels" class="layout locked">
+      <section class="panel guide-panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>先这样测试</h2>
+        </div>
+        <ol class="guide-list">
+          <li>先登录，用户名 <code>admin_1</code>，密码 <code>demo1234</code>。</li>
+          <li><strong>主流程</strong> 默认走分拣流：关单主档、包裹入仓、总确认、一包一码、创建分拣任务、分拣确认入库。</li>
+          <li>分拣员线下记录数量，仓库主管核验后，在 <strong>分拣确认入库</strong> 里录入结果、库位，并生成商品 token。</li>
+          <li><strong>例外流程</strong> 只有少量已分好、可直接挂店的货才走：<strong>4.5 直挂拆包计件 / 成本确认</strong>，然后直接接门店调拨和门店工作台。</li>
+          <li>仓库配货、门店配货 bale、配送跟踪、门店签收和店员分配，分别在 <strong>仓库功能区</strong> 的“门店补货”分组和 <strong>门店功能区</strong> 继续执行。</li>
+          <li><strong>运营中心</strong> 负责区域经理的经营分析、限价动作、风控异常、现金记录、巡店和会议闭环。</li>
+          <li><strong>门店功能区</strong> 负责门店验收 bale、分配店员、PDA 编辑售价/货架位、蓝牙打印贴码、上架、收银和退仓。</li>
+          <li>如果收银打错单或顾客临时不要了，用 <strong>作废单</strong>；如果顾客买走后退货，用 <strong>退款单</strong>；钱不对，用 <strong>支付异常单</strong>。</li>
+          <li>最后回 <strong>今日总览</strong> 看门店经营摘要、红色预警和关店待办。</li>
+        </ol>
+        <p class="subtle">系统管理里再看：门店、供应商、货物类型、账号权限和新店建议。</p>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>全链路流程 / 角色分工</h2>
+        </div>
+        <div class="ops-overview-grid">
+          <article class="ops-overview-card">
+            <div class="ops-overview-head">
+              <span class="eyebrow">Flow</span>
+              <strong>当前业务主线（主分拣流）</strong>
+            </div>
+            <div class="summary-breakdown-list ops-step-list">
+              <div class="summary-breakdown-row ops-step-item">
+                <span>1. 中方建档 / 补成本</span>
+                <span>4.2 / 4.3</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>2. 肯方集装箱建档</span>
+                <span>运输 / 关单主档</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>3. Bale 入库</span>
+                <span>中方预报项 -> 肯方实收</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>4. 总确认 / 差异核对</span>
+                <span>预报 vs 实收</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>5. 入仓 Bale 一包一码</span>
+                <span>仓库内部追踪</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>6. 创建分拣任务</span>
+                <span>绑定分拣人</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>7. 分拣结果入库</span>
+                <span>生成商品 token</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>8. 门店调拨单 / 仓库配货</span>
+                <span>按门店销量配货</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>9. 门店配货 Bale 液压打包</span>
+                <span>生成门店 bale 码</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>10. 门店签收 / 分配店员</span>
+                <span>一包只给一个店员</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>11. Token 编辑 / 蓝牙打印贴码</span>
+                <span>生成商品身份证 ID</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>12. 门店上架 / 销售 / 编辑 / 退仓</span>
+                <span>全部围绕商品 ID</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="ops-overview-card">
+            <div class="ops-overview-head">
+              <span class="eyebrow">Exception</span>
+              <strong>例外直挂流</strong>
+            </div>
+            <div class="summary-breakdown-list ops-step-list">
+              <div class="summary-breakdown-row ops-step-item">
+                <span>1. 中方建档 / 补成本</span>
+                <span>4.2 / 4.3</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>2. 肯方入仓 / 一包一码</span>
+                <span>只确认到包裹</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>3. 直挂拆包计件</span>
+                <span>4.5 锁单件成本</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>4. 门店调拨 / 仓库配货</span>
+                <span>按件形成门店配货 bale</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>5. 门店签收 / 分配店员</span>
+                <span>一包只给一个店员</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>6. 直挂店员工作台</span>
+                <span>编辑售价 / 货架位</span>
+              </div>
+              <div class="summary-breakdown-row ops-step-item">
+                <span>7. 蓝牙打印 / 上架</span>
+                <span>生成商品身份证 ID</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="ops-overview-card">
+            <div class="ops-overview-head">
+              <span class="eyebrow">Roles</span>
+              <strong>当前主要角色</strong>
+            </div>
+            <div class="summary-breakdown-list ops-role-list">
+              <div class="summary-breakdown-row ops-role-item">
+                <span>中方录入员</span>
+                <span>整柜预报</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>中方财务</span>
+                <span>货值 / 头程 / 清关 / 尾程</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>肯尼亚入仓员</span>
+                <span>实收 Bale</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>仓库主管</span>
+                <span>总确认 / 分拣任务 / 调拨配货</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>分拣员</span>
+                <span>分件数 / 分等级 / 入库</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>配货员 / 发货员</span>
+                <span>门店拣货 / 压 Bale / 出库</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>门店主管 / 店长</span>
+                <span>签收 / 分配店员 / 监督完成</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>门店店员</span>
+                <span>改售价 / 货架位 / 打印贴码 / 上架</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>区域经理</span>
+                <span>调货 / 定价 / 执行追踪</span>
+              </div>
+              <div class="summary-breakdown-row ops-role-item">
+                <span>老板 / 总部</span>
+                <span>看货 / 钱 / 人 / 风险</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>开发顺序 / 开发待办</h2>
+        </div>
+        <div id="devTrackerSummary" class="candidate-summary empty-state">这里会显示当前开发节奏、进行中事项和高优先级待办。</div>
+        <div class="dev-board-grid">
+          <article class="dev-board-card">
+            <div class="dev-board-head">
+              <span class="eyebrow">Roadmap</span>
+              <strong>当前开发顺序</strong>
+            </div>
+            <div id="devRoadmapList" class="dev-roadmap-list"></div>
+          </article>
+
+          <article class="dev-board-card">
+            <div class="dev-board-head">
+              <span class="eyebrow">Editor</span>
+              <strong>维护开发事项</strong>
+            </div>
+            <form id="devTaskForm" class="form-grid compact">
+              <input type="hidden" name="task_id" value="" />
+              <input name="title" placeholder="事项标题，如：第四步接真实打印机" />
+              <select name="track">
+                <option value="roadmap">开发顺序</option>
+                <option value="backlog">开发待办</option>
+              </select>
+              <select name="bucket">
+                <option value="current">本轮优先</option>
+                <option value="next">下一轮</option>
+              </select>
+              <select name="status">
+                <option value="in_progress">进行中</option>
+                <option value="todo">待开始</option>
+                <option value="planned">已规划</option>
+                <option value="done">已完成</option>
+              </select>
+              <select name="priority">
+                <option value="high">高优先级</option>
+                <option value="medium">中优先级</option>
+                <option value="low">低优先级</option>
+              </select>
+              <select name="module">
+                <option value="warehouse">仓库</option>
+                <option value="store">门店</option>
+                <option value="operations">运营中心</option>
+                <option value="ai">AI 看板</option>
+                <option value="finance">业财融合</option>
+                <option value="general">通用</option>
+              </select>
+              <input name="next_action" placeholder="下一步动作，如：接打印机真实动作与回写" />
+              <textarea name="detail" rows="4" placeholder="补充背景、目标和完成标准"></textarea>
+              <div class="button-row">
+                <button type="submit">保存事项</button>
+                <button type="button" class="ghost-button" id="devTaskResetButton">清空编辑</button>
+              </div>
+            </form>
+          </article>
+        </div>
+        <div class="dev-board-grid">
+          <article class="dev-board-card">
+            <div class="dev-board-head">
+              <span class="eyebrow">Current Sprint</span>
+              <strong>本轮优先</strong>
+            </div>
+            <div id="devCurrentList" class="dev-task-stack"></div>
+          </article>
+          <article class="dev-board-card">
+            <div class="dev-board-head">
+              <span class="eyebrow">Next Wave</span>
+              <strong>下一轮</strong>
+            </div>
+            <div id="devNextList" class="dev-task-stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>下一阶段五大块</h2>
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>权限矩阵</strong><span>角色 / 设备 / 数据范围</span></article>
+          <article class="store-metric"><strong>异常流</strong><span>统一闭环</span></article>
+          <article class="store-metric"><strong>运营数据</strong><span>接真实接口</span></article>
+          <article class="store-metric"><strong>代售包裹</strong><span>A/B 混包</span></article>
+          <article class="store-metric"><strong>简易 OA</strong><span>HR / 财务审批</span></article>
+        </div>
+        <div class="ops-overview-grid">
+          <article class="ops-overview-card">
+            <div class="ops-overview-head">
+              <span class="eyebrow">1 / 2 / 3</span>
+              <strong>当前优先三块</strong>
+            </div>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>权限矩阵</span><span>统一一个系统，按角色和设备裁剪首页、菜单与动作</span></div>
+              <div class="summary-breakdown-row"><span>异常流</span><span>把少件、多件、拒收、打印失败、任务中断统一进异常闭环</span></div>
+              <div class="summary-breakdown-row"><span>运营数据接入</span><span>把 POS、人流、Lark、M-Pesa、现金闭环接成真实主题</span></div>
+            </div>
+          </article>
+          <article class="ops-overview-card">
+            <div class="ops-overview-head">
+              <span class="eyebrow">Warehouse</span>
+              <strong>新增：代售包裹</strong>
+            </div>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>业务口径</span><span>把 A 类与 B 类货按可控比例混在一个包裹里，按重量卖市场</span></div>
+              <div class="summary-breakdown-row"><span>控制项</span><span>比例、总重、单包重、来源等级、售价 / KG、结算回款</span></div>
+              <div class="summary-breakdown-row"><span>系统落点</span><span>先放到仓库工单，再决定是否接成真实执行流</span></div>
+            </div>
+          </article>
+          <article class="ops-overview-card">
+            <div class="ops-overview-head">
+              <span class="eyebrow">Admin</span>
+              <strong>新增：简易 OA</strong>
+            </div>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>HR</span><span>打卡、班次、请假、加班</span></div>
+              <div class="summary-breakdown-row"><span>Payroll</span><span>底薪、提成、扣款、补贴、工资单确认</span></div>
+              <div class="summary-breakdown-row"><span>Finance</span><span>采购、借款、报销、付款审批与回写</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head hidden-screen" aria-hidden="true">
+          <h2>0. 运输 / 关单主档</h2>
+        </div>
+        <div class="inbound-flow-context empty-state" data-inbound-flow-context data-inbound-step="create"></div>
+        <form id="inboundShipmentForm" class="form-grid compact form-clean-placeholders warehouse-step-form">
+          <input type="hidden" name="shipment_type" value="sea_freight" />
+          <select name="customs_notice_no" data-cn-source-shipment-select>
+            <option value="">请选择中方已录船单</option>
+          </select>
+          <input name="unload_date" type="datetime-local" />
+          <textarea name="coc_goods_manifest" rows="4" placeholder="例如 Mixed apparel, shoes, bags, cosmetics"></textarea>
+          <div class="field-stack">
+            <label for="inboundShipmentDocs">上传 COC / 原单证图片</label>
+            <input id="inboundShipmentDocs" name="coc_documents_files" type="file" accept="image/*" multiple />
+          </div>
+          <input name="note" placeholder="例如 这一柜可以重复给多个供应商、多种货做入仓" />
+          <button type="submit">创建入库主档</button>
+        </form>
+        <div id="inboundShipmentSummary" class="hidden-screen" aria-hidden="true"></div>
+        <pre id="inboundShipmentOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head hidden-screen" aria-hidden="true">
+          <h2>0. 包裹入库</h2>
+        </div>
+        <div class="inbound-flow-context empty-state" data-inbound-flow-context data-inbound-step="packages"></div>
+        <div id="parcelBatchResultSummary" class="candidate-summary empty-state">
+          先完成这张主档对应的包裹入库，再进入总确认。
+        </div>
+        <form id="parcelBatchForm" class="form-grid compact warehouse-step-form">
+          <input type="hidden" name="inbound_shipment_no" value="" />
+          <input type="hidden" name="intake_type" value="sea_freight" />
+          <div class="line-builder">
+            <div class="line-builder-head">
+              <div>
+                <strong>包裹入库明细</strong>
+                <p>把这柜里实际入仓的包裹逐条录进来，下一步再统一做总确认。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-parcel-batch-add>新增一行</button>
+            </div>
+            <div id="parcelBatchItemsBuilder" class="line-builder-body"></div>
+          </div>
+          <div id="parcelBatchSupplierInline" class="inline-creator hidden-screen">
+            <div class="inline-creator-head">
+              <strong>当前页新建供应商</strong>
+              <span class="subtle small">保存后会自动选中，不用离开当前流程。</span>
+            </div>
+            <div class="inline-creator-grid">
+              <input name="supplier_name_new" placeholder="供应商名称" />
+              <input name="supplier_code_new" placeholder="供应商代码（可留空自动生成）" />
+              <input name="supplier_contact_person_new" placeholder="联系人" />
+              <input name="supplier_phone_new" placeholder="联系电话" />
+              <input name="supplier_note_new" placeholder="备注" />
+            </div>
+            <button type="button" class="ghost-button" data-inline-supplier-submit="parcelBatchForm">保存供应商并选中</button>
+          </div>
+          <button type="submit">确认包裹入库，进入下一步</button>
+        </form>
+        <pre id="parcelBatchOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head hidden-screen" aria-hidden="true">
+          <h2>0. 集装箱服装入库（总确认）</h2>
+        </div>
+        <div class="inbound-flow-context empty-state" data-inbound-flow-context data-inbound-step="confirm"></div>
+        <form id="generateBaleBarcodesForm" class="form-grid compact hidden-screen">
+          <input type="hidden" name="shipment_no" value="" />
+          <button type="submit">按一包一码生成 bale barcode</button>
+        </form>
+        <div id="shipmentIntakeSummary" class="candidate-summary empty-state">
+          先锁定一张已创建的入库主档。等这张主档所有包裹都录完，再做总确认；总确认后才能一包一码生成 bale barcode。
+        </div>
+        <div class="button-row summary-actions-row">
+          <button type="button" class="ghost-button" data-open-inbound-step="packages">返回上一步继续添加</button>
+        </div>
+        <form id="shipmentIntakeConfirmForm" class="form-grid compact flow-primary-action-form">
+          <input type="hidden" name="shipment_no" value="" />
+          <input type="hidden" name="note" value="已按箱单核对，系统累计录入明细与实物一致" />
+          <button type="submit">人工核对无误，确认进入下一步</button>
+        </form>
+        <pre id="shipmentIntakeOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head hidden-screen" aria-hidden="true">
+          <h2>0.1 条码 / 打印确认</h2>
+        </div>
+        <div class="inbound-flow-context hidden-screen" aria-hidden="true" data-inbound-flow-context data-inbound-step="barcodes"></div>
+        <form id="baleBarcodeViewForm" class="form-grid compact bale-shipment-lock-form">
+          <div class="field-stack">
+            <label for="baleShipmentSelect">选择船单并锁定这次条码打印</label>
+            <select id="baleShipmentSelect" name="shipment_no" data-shipment-select="required">
+              <option value="">请选择船单</option>
+            </select>
+          </div>
+          <button id="lockBaleShipmentButton" type="button">锁定这张船单</button>
+        </form>
+        <div id="baleBarcodeLockSummary" class="candidate-summary empty-state">
+          先锁定一张船单，再按你决定的类别顺序逐类贴码。
+        </div>
+        <form id="balePrinterConsoleForm" class="form-grid compact hidden-screen">
+          <select name="shipment_no" data-shipment-select="required">
+            <option value="">请选择船单</option>
+          </select>
+          <select name="template_code">
+            <option value="warehouse_in">warehouse in</option>
+          </select>
+          <select name="printer_name">
+            <option value="Deli DL-720C">得力 DL-720C</option>
+          </select>
+        </form>
+        <div id="baleBarcodeDirectorySummary" class="candidate-summary empty-state">
+          完成总确认后，这里会显示本柜的 bale 贴码作业台。
+        </div>
+        <button id="balePrintConfirmButton" class="flow-primary-action" type="button">继续按类贴码</button>
+        <pre id="baleBarcodeDirectoryOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-support-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0. 主档库</h2>
+          <button data-action="load-inbound-shipments" type="button">读取主档记录</button>
+        </div>
+        <div id="inboundShipmentHistorySummary" class="candidate-summary empty-state">
+          这里按主档保留记录，只做查看，不再承担流程操作。
+        </div>
+      </section>
+
+      <section class="panel warehouse-support-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0. 包裹批次目录</h2>
+          <button data-action="load-parcel-directory" type="button">读取批次目录</button>
+        </div>
+        <div id="parcelDirectorySummary" class="candidate-summary empty-state">
+          这里会按船单 / 关单号显示目录。点开某一个船单，就能看到这柜里有哪些包裹批次，以及对应的 COC 原单证图片。
+        </div>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.1 原始 Bale 总库存</h2>
+        </div>
+        <div id="warehouseBaleHubNav" data-warehouse-hub-nav-slot class="candidate-summary empty-state">
+          这里会显示仓库总控页的 4 个页面跳转。
+        </div>
+        <form id="rawBaleStockFilterForm" class="form-grid compact">
+          <input name="search" placeholder="搜索信息：bale barcode / 来源 token / 批次 / 供应商 / 类别" />
+          <button type="submit">读取原始 bale 总库存</button>
+        </form>
+        <div id="rawBaleStockSummary" class="candidate-summary empty-state">
+          这里是仓库现有总库存（Bales）入口页。当前先只统计“贴完码后的入仓 raw bale”，右侧继续保留已分拣 / 已售出的时间序列。
+        </div>
+        <div class="split-grid sorting-stock-split-grid">
+          <div id="rawBaleStockList" class="sorting-stock-list">
+            <div class="empty-state">先读取原始 bale 总库存。左侧只显示当前仍在原始 bale 生命周期里的库存。</div>
+          </div>
+          <div id="rawBaleStockTimeline" class="candidate-summary empty-state">
+            右侧会按时间序列显示已经完成分拣的原始 bale，以及已经售出的 raw bale。
+          </div>
+        </div>
+        <div id="warehouseSortedInventorySummary" class="candidate-summary empty-state">
+          这里同步显示仓库已分拣服装，并和 0.3 分拣库存页面保持一致。
+        </div>
+        <div id="warehouseSortedInventoryList" class="sorting-stock-list">
+          <div class="empty-state">这里会同步显示已分拣服装库存；顶部入口也可以直接跳到 0.3 分拣库存页面。</div>
+        </div>
+        <pre id="rawBaleStockOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.1 创建分拣任务</h2>
+        </div>
+        <form id="sortingTaskForm" class="sorting-task-form warehouse-step-form">
+          <div id="sortingTaskFlowSummary" class="sorting-task-flow">
+            <div class="empty-state">先扫描或输入 bale barcode，把要分拣的包裹逐包加入当前任务。</div>
+          </div>
+          <div class="sorting-task-scan-shell">
+            <div class="sorting-task-scan-row">
+              <div class="sorting-task-scan-box">
+                <span class="eyebrow">扫码识别添加</span>
+                <div class="sorting-task-toolbar sorting-task-toolbar-compact">
+                  <input name="bale_lookup" placeholder="扫短码或输入 bale 号后直接加入任务" />
+                  <button type="button" class="ghost-button" data-sorting-lookup-add>加入</button>
+                </div>
+              </div>
+              <div id="sortingScannerHealthSummary" class="candidate-summary empty-state sorting-scanner-summary">
+                上方扫码区会显示最近一次扫码识别状态。
+              </div>
+            </div>
+            <div class="sorting-task-searchbar">
+              <input name="bale_search" placeholder="检索当前可加入 bale：bale / 船单 / 供应商 / 类别" />
+            </div>
+          </div>
+          <div id="sortingTaskNotice" class="inline-feedback hidden-screen" data-empty-text=""></div>
+          <div class="sorting-task-layout">
+            <section class="sorting-task-panel">
+              <div class="sorting-task-panel-head">
+                <div>
+                  <span class="eyebrow">Step 1</span>
+                  <strong>扫码 / 检索加入包裹</strong>
+                  <p>从当前原始 bale 库存里检索可分拣 bale。可以跨船单加入，但每包都要保留 bale 级追溯。</p>
+                </div>
+              </div>
+              <div id="sortingBaleSelectorList" class="sorting-task-list">
+                <div class="empty-state">先扫描 bale barcode，或在左侧检索当前可加入的 bale。</div>
+              </div>
+            </section>
+            <section class="sorting-task-panel sorting-task-panel-selected">
+              <div class="sorting-task-panel-head">
+                <div>
+                  <span class="eyebrow">Step 2</span>
+                  <strong>绑定分拣人</strong>
+                  <p>确认右侧已加入的 bale，再绑定这次负责分拣的处理人。</p>
+                </div>
+              </div>
+              <div id="sortingSelectedBatchSummary" class="sorting-task-selected-list">
+                <div class="empty-state">右侧会汇总本次任务已加入的 bale，支持随时移除。</div>
+              </div>
+              <textarea
+                name="handler_names_json"
+                class="json-raw-field"
+                rows="4"
+                placeholder='["warehouse_clerk_1","warehouse_clerk_2"]'
+              >[]</textarea>
+              <div class="line-builder" data-builder="sorting-handler-names">
+                <div class="line-builder-head">
+                  <div>
+                    <strong>分拣处理人</strong>
+                    <p>一行一个人，按实际作业人填写。</p>
+                  </div>
+                  <button type="button" class="ghost-button mini-button" data-builder-add="sorting-handler-names">新增一行</button>
+                </div>
+                <div id="sortingHandlerNamesBuilder" class="line-builder-body"></div>
+              </div>
+              <input name="note" placeholder="例如：今天先完成这批夏装包裹分拣" value="今天先完成这批夏装包裹分拣" />
+              <button type="submit" class="flow-primary-action">确认创建分拣任务</button>
+            </section>
+          </div>
+        </form>
+        <div id="sortingTaskResultSummary" class="candidate-summary empty-state">
+          这里会显示刚刚创建成功的分拣任务摘要。并行任务请到下面的“分拣任务管理”统一查看。
+        </div>
+        <pre id="sortingTaskOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.1.1 分拣任务管理</h2>
+          <button data-action="load-sorting-tasks" type="button">读取分拣任务</button>
+        </div>
+        <div class="sorting-task-manager-toolbar">
+          <input id="sortingTaskManagerDateFilter" type="date" />
+        </div>
+        <div id="sortingTaskManagerSummary" class="candidate-summary empty-state">
+          这里统一查看当天并行的分拣任务。先读取任务，再决定继续哪一张。
+        </div>
+        <pre id="sortingTaskManagerOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.1.2 压缩工单管理</h2>
+          <button data-action="load-compression-task-manager" type="button">读取压缩工单</button>
+        </div>
+        <div class="sorting-task-manager-toolbar">
+          <input id="compressionTaskManagerDateFilter" type="date" />
+        </div>
+        <div id="compressionTaskManagerSummary" class="candidate-summary">
+          这里统一查看压缩 bale 任务。任务从 0.3 仓库已分拣服装里直接发起，这一页统一管理待送店 bale 和待售卖 bale；验收和打印 barcode 改成按钮弹窗处理。
+        </div>
+        <div id="compressionTaskManagerList" class="sorting-stock-list">
+          <div class="empty-state">读取后，这里会显示待验收和已完成的压缩 bale 工单。</div>
+        </div>
+        <pre id="compressionTaskOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.2 分拣确认入库</h2>
+        </div>
+        <div id="sortingResultTaskSummary" class="candidate-summary empty-state">
+          先从上一步“分拣任务管理”里点进来。这里会显示当前任务、进行时间、分拣人、包裹数量、总重，以及这张任务下在分拣哪些 bale。
+        </div>
+        <form id="sortingResultForm" class="sorting-result-workbench">
+          <input type="hidden" name="task_no" value="" />
+          <textarea
+            name="result_items_json"
+            class="json-raw-field hidden-screen"
+            rows="6"
+            placeholder='[{"category_name":"dress / short dress","grade":"P","actual_weight_kg":6.5,"qty":12,"rack_code":"A-DR-01","confirm_to_inventory":true}]'
+          >[]</textarea>
+          <div class="line-builder" data-builder="sorting-result-items">
+            <div class="line-builder-head">
+              <div>
+                <strong>分拣结果明细</strong>
+                <p>一行代表一组“大类 / 小类 + 等级 P/S + 实际分拣重量 KG + 件数 + 本次单件成本 + 锁定分拣库位”。本次单件成本按来源总成本和实际可售 KG 分摊；成本档位只用于 4.8 库位匹配，当前模式未贴码，不允许同库位混放。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-builder-add="sorting-result-items">新增一行</button>
+            </div>
+            <div id="sortingResultItemsBuilder" class="line-builder-body"></div>
+          </div>
+          <section class="candidate-summary">
+            <div class="line-builder-head">
+              <div>
+                <strong>损耗品录入</strong>
+                <p>这里单独记录这张分拣任务里的不可售损耗品。库管可以明确选择“没有损耗”；如果有损耗，必须录件数、总重量并上传照片；损耗 KG 会减少可售 KG，整批来源总成本不变，单件成本会上升。</p>
+              </div>
+            </div>
+            <div class="form-grid compact">
+              <select name="has_loss_record">
+                <option value="false">没有损耗</option>
+                <option value="true">有损耗品</option>
+              </select>
+              <input name="loss_qty" type="number" min="0" step="1" placeholder="损耗品件数，例如 3" />
+              <input name="loss_weight_kg" type="number" min="0" step="0.01" placeholder="损耗总重量(KG)，例如 1.6" />
+              <input name="loss_photo_files" type="file" accept="image/*" multiple />
+              <textarea name="loss_note" rows="2" placeholder="损耗说明，例如：污渍、破损、潮湿，不进入可售库存。"></textarea>
+            </div>
+            <div id="sortingLossRecordSummary" class="candidate-summary empty-state">
+              当前默认按“没有损耗”处理；如果这张任务里有不可售件，请在上面录件数、总重量并拍照。
+            </div>
+          </section>
+          <input name="note" placeholder="例如：这批分拣完成，按 P / S 已确认入库到对应库位" value="这批分拣完成，按 P / S 已确认入库到对应库位" />
+          <input type="hidden" name="mark_task_completed" value="true" />
+          <button type="submit" class="flow-primary-action">确认件数入库并生成商品 token</button>
+        </form>
+        <div id="sortingResultSubmitSummary" class="candidate-summary empty-state">
+          这里会显示分拣确认入库后的摘要，比如入了多少类、多少件、哪些库位。
+        </div>
+        <pre id="sortingResultOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.3 分拣库存</h2>
+          <button data-action="load-sorting-stock" type="button">读取已分拣服装</button>
+        </div>
+        <div data-warehouse-hub-nav-slot class="candidate-summary empty-state">
+          这里会显示仓库总控页的 4 个页面跳转。
+        </div>
+        <details id="sortingStockSearchDetails" class="sorting-stock-search-shell">
+          <summary>
+            <span>搜索信息</span>
+            <span id="sortingStockSearchSummaryLabel">全部大类 · 全部件数</span>
+          </summary>
+          <form id="sortingStockFilterForm" class="form-grid compact">
+            <input name="search" placeholder="按小类 / SKU / bale barcode 搜索" />
+            <select name="category_main">
+              <option value="">全部大类</option>
+            </select>
+            <select name="min_loose_qty">
+              <option value="">全部件数</option>
+              <option value="50">大于等于 50 件</option>
+              <option value="100">大于等于 100 件</option>
+              <option value="200">大于等于 200 件</option>
+            </select>
+          </form>
+        </details>
+        <div id="sortingStockNotice" class="inline-feedback hidden-screen" data-empty-text="">
+        </div>
+        <div id="sortingStockSummary" class="hidden-screen" aria-hidden="true">
+        </div>
+        <div id="sortingCompressionGroupList" class="sorting-stock-list">
+          <div class="empty-state">先读取已分拣服装。这里会按小类横向展示左侧单件、右侧已打成包的库存。</div>
+        </div>
+        <pre id="sortingStockOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>门店送货历史记录</h2>
+          <button data-action="load-warehouse-dispatch-history" type="button">读取门店送货历史</button>
+        </div>
+        <div data-warehouse-hub-nav-slot class="candidate-summary empty-state">
+          这里会显示仓库总控页的 4 个页面跳转。
+        </div>
+        <div id="warehouseDispatchHistorySummary" class="candidate-summary empty-state">
+          这里按门店配送 bale 显示送货历史，只做查看，不新建任何业务动作。
+        </div>
+        <div id="warehouseDispatchHistoryList" class="sorting-stock-list">
+          <div class="empty-state">先读取门店送货历史。这里会展示配送 bale、调拨单、门店和当前状态。</div>
+        </div>
+        <pre id="warehouseDispatchHistoryOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>已售历史包裹</h2>
+          <button data-action="load-warehouse-sold-packages" type="button">读取已售历史包裹</button>
+        </div>
+        <div data-warehouse-hub-nav-slot class="candidate-summary empty-state">
+          这里会显示仓库总控页的 4 个页面跳转。
+        </div>
+        <div id="warehouseSoldPackagesSummary" class="candidate-summary empty-state">
+          这里按整包销售池已出库 / 已结算的 bale 看历史，不展示结算细节。
+        </div>
+        <div id="warehouseSoldPackagesList" class="sorting-stock-list">
+          <div class="empty-state">先读取已售历史包裹。这里会区分原始 bale 直售和分拣后再打 bale 销售。</div>
+        </div>
+        <pre id="warehouseSoldPackagesOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>0.4 代售包裹工单</h2>
+          <div class="button-row">
+            <button data-action="load-bale-sales-workbench" type="button">读取销售池 bale</button>
+            <button id="openSelectedBaleSalesPoolButton" type="button" class="ghost-button">把所选 bale 带入 0.4 工单</button>
+          </div>
+        </div>
+        <div id="baleSalesWorkbenchSummary" class="candidate-summary empty-state">
+          这里会先显示已经进入整包销售池的 bale，并区分“原始未分拣直售”和“分拣结果再打 bale 销售”。
+        </div>
+        <div class="split-grid">
+          <div id="baleSalesPoolList" class="sorting-stock-list">
+            <div class="empty-state">先读取销售池 bale。这里会展示来源类型、来源单号 / 任务、重量、可售、出库和结算状态。</div>
+          </div>
+          <div class="candidate-summary">
+            <form id="baleSalesRebaleEntryForm" class="form-grid compact">
+              <input type="hidden" name="rebale_entry_no" />
+              <input name="bale_barcode" placeholder="再打 bale barcode，如 RS-001" />
+              <input name="source_task_no" placeholder="来源分拣任务，如 ST-009" />
+              <input name="source_order_no" placeholder="来源单号，可留空" />
+              <input name="supplier_name" placeholder="supplier / 责任来源，如 Warehouse Sort" />
+              <input name="category_main" placeholder="category main，如 tops" />
+              <input name="category_sub" placeholder="category sub，如 lady tops" />
+              <input name="weight_kg" type="number" min="0.1" step="0.1" placeholder="重量 KG，如 28" />
+              <input name="bale_count" type="number" min="1" step="1" placeholder="包数，如 1" />
+              <textarea name="note" rows="3" placeholder="补充分拣结果再打 bale 的说明，例如：ST-009 剩余 lady tops 重新打包进入销售池。"></textarea>
+              <button type="submit">登记分拣后再打 bale</button>
+            </form>
+            <div id="baleSalesRebaleEntrySummary" class="candidate-summary empty-state">
+              上游还没有正式产出“分拣结果再打 bale”的专用入口前，这里先登记进入销售池的再打 bale 记录。
+            </div>
+          </div>
+        </div>
+        <pre id="baleSalesWorkbenchOutput" class="output hidden-output"></pre>
+        <div id="consignmentBundleSummary" class="candidate-summary"></div>
+        <div class="split-grid">
+          <form id="consignmentBundleForm" class="form-grid compact">
+            <input type="hidden" name="order_no" />
+            <input type="hidden" name="selected_pool_entry_ids_json" />
+            <input type="hidden" name="source_type_summary" />
+            <input name="title" placeholder="工单名称，如：Gikomba 代售裤装混包" />
+            <input name="market_channel" placeholder="目标市场 / 渠道，如：Gikomba" />
+            <input name="grade_a_ratio" type="number" min="0" step="1" placeholder="A 类占比，如 60" />
+            <input name="grade_b_ratio" type="number" min="0" step="1" placeholder="B 类占比，如 40" />
+            <input name="target_total_weight_kg" type="number" min="0" step="0.1" placeholder="总目标重量 KG，如 240" />
+            <input name="target_bale_weight_kg" type="number" min="0" step="0.1" placeholder="单包目标重量 KG，如 30" />
+            <input name="market_sell_price_per_kg_kes" type="number" min="0" step="0.1" placeholder="市场售价 / KG（KES）" />
+            <select name="status">
+              <option value="draft">草稿</option>
+              <option value="packed">已混包待出库</option>
+              <option value="settled">已结算</option>
+            </select>
+            <textarea name="source_rule" rows="4" placeholder="补充来源规则，例如：只从 A 类 sweat pant + B 类 cargo pant 中混包，不允许混入损耗件。"></textarea>
+            <button type="submit">生成代售包裹草稿</button>
+          </form>
+          <div id="consignmentBundleList" class="oa-record-list"></div>
+        </div>
+        <pre id="consignmentBundleOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>Bales销售｜待售包裹</h2>
+          <div class="button-row">
+            <button data-action="load-bale-sales-pricing" type="button">读取待售包裹</button>
+            <button id="downloadBaleSalesPricingSheetButton" type="button" class="ghost-button">导出成本表 Excel</button>
+          </div>
+        </div>
+        <div class="candidate-summary">
+          当前处理模块：待售包裹成本与毛利编辑页。这里根据船单录入与后续成本，整理销售池 bale 的成本价、毛利率和目标售价。
+        </div>
+        <form id="baleSalesPricingFilterForm" class="form-grid compact">
+          <select name="shipment_no">
+            <option value="">全部船单</option>
+          </select>
+          <select name="status">
+            <option value="available">只看可售</option>
+            <option value="">全部状态</option>
+            <option value="sold">已售</option>
+            <option value="unavailable">不可售</option>
+          </select>
+          <select name="source_type">
+            <option value="">全部来源</option>
+            <option value="raw_direct_sale">原始未分拣 bale 直售</option>
+            <option value="sorted_rebale_sale">分拣结果再打 bale 销售</option>
+          </select>
+        </form>
+        <div id="baleSalesPricingSummary" class="candidate-summary empty-state">
+          先读取待售包裹。这里会生成成本编辑视图，并支持导出 Excel 成本表。
+        </div>
+        <div id="baleSalesPricingList" class="sorting-stock-list">
+          <div class="empty-state">读取后，这里会展示每个销售池 bale 的源成本、后续成本、毛利率和目标售价。</div>
+        </div>
+        <pre id="baleSalesPricingOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>Bales销售｜真实出库</h2>
+          <button data-action="load-bale-sales-outbound" type="button">读取真实出库页</button>
+        </div>
+        <div class="candidate-summary">
+          当前处理模块：真实出库页。这里做扫码核销、销售人 / 客户 / 联系方式 / 付款方式登记，并生成 Excel 销售单。
+        </div>
+        <div id="baleSalesOutboundSummary" class="candidate-summary empty-state">
+          先读取真实出库页。这里会显示当前可售 bale、本次待出库清单和最近销售单。
+        </div>
+        <div class="split-grid">
+          <div>
+            <form id="baleSalesOutboundScanForm" class="form-grid compact">
+              <input name="scan_barcode" placeholder="扫描或输入 bale barcode" />
+              <button type="submit">扫码加入本次出库</button>
+            </form>
+            <div id="baleSalesOutboundAvailableList" class="sorting-stock-list">
+              <div class="empty-state">读取后，这里会显示当前还可真实出库的销售池 bale。</div>
+            </div>
+          </div>
+          <div>
+            <form id="baleSalesOutboundForm" class="form-grid compact">
+              <input name="sold_by" placeholder="销售人，如 Austin" />
+              <input name="customer_name" placeholder="客户名称" />
+              <input name="customer_contact" placeholder="客户联系方式" />
+              <select name="payment_method">
+                <option value="bank_transfer">Bank transfer</option>
+                <option value="cash">Cash</option>
+                <option value="mpesa">M-Pesa</option>
+              </select>
+              <textarea name="note" rows="3" placeholder="备注，例如提货方式、尾款说明、现场要求"></textarea>
+              <button type="submit">完成真实出库</button>
+            </form>
+            <div id="baleSalesOutboundSelectedList" class="sorting-stock-list">
+              <div class="empty-state">扫码或勾选后，这里会显示本次出库明细，并允许改最终销售价。</div>
+            </div>
+          </div>
+        </div>
+        <div id="baleSalesOutboundHistoryList" class="oa-record-list"></div>
+        <pre id="baleSalesOutboundOutput" class="output hidden-output"></pre>
+      </section>
+
+      <div id="sortingRackModal" class="modal-shell hidden-screen" role="dialog" aria-modal="true" aria-labelledby="sortingRackModalTitle">
+        <div class="modal-card">
+          <div class="modal-head">
+            <h3 id="sortingRackModalTitle">编辑分拣库存货架位</h3>
+            <button id="closeSortingRackModalButton" type="button" class="ghost-button mini-button">关闭</button>
+          </div>
+          <div id="sortingRackModalSummary" class="candidate-summary empty-state">从分拣库存里点“编辑货架位”后，这里会显示当前库存信息。</div>
+          <form id="sortingRackUpdateForm" class="form-grid compact">
+            <input name="sku_code" placeholder="SKU code" readonly />
+            <input name="current_rack_code" placeholder="当前货架位" readonly />
+            <input name="new_rack_code" placeholder="新的货架位，如 WH-A-03-02-05" />
+            <input name="note" placeholder="调整备注" value="仓库主管调整分拣库存货架位" />
+            <button type="submit">保存新的货架位</button>
+          </form>
+          <div id="sortingRackUpdateResultSummary" class="candidate-summary empty-state">保存后，这里会显示货架位调整结果。</div>
+          <pre id="sortingRackUpdateOutput" class="output hidden-output"></pre>
+        </div>
+      </div>
+
+      <div id="compressionTaskAcceptanceModal" class="modal-shell hidden-screen" role="dialog" aria-modal="true" aria-labelledby="compressionTaskAcceptanceModalTitle">
+        <div class="modal-card">
+          <div class="modal-head">
+            <div>
+              <h3 id="compressionTaskAcceptanceModalTitle">压缩工单验收</h3>
+              <div class="subtle small">从压缩工单管理目录点进一张任务，在这里核验实际件数 / 重量并生成 barcode；确认后会自动弹出 bale 模版打印窗。</div>
+            </div>
+            <button id="closeCompressionTaskAcceptanceModalButton" type="button" class="ghost-button mini-button">关闭</button>
+          </div>
+          <div id="compressionTaskAcceptanceSummary" class="candidate-summary empty-state">
+            当前还没有选中压缩工单。请先从上面的目录点进一张待验收任务。
+          </div>
+          <form id="compressionTaskAcceptanceForm" class="form-grid compact">
+            <input type="hidden" name="task_no" value="" />
+            <input name="category_sub" placeholder="小类" readonly />
+            <input name="assigned_employee" placeholder="负责员工" readonly />
+            <input name="actual_qty" type="number" min="1" step="1" placeholder="实际数量核查" />
+            <div data-compression-actual-weight-row class="hidden-screen">
+              <input name="actual_weight_kg" type="number" min="0.1" step="0.1" placeholder="实际重量核验（KG）" />
+            </div>
+            <textarea name="note" rows="3" placeholder="主管备注 / 评价"></textarea>
+            <button type="submit">确认验收并生成 bale barcode</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="balePrintModal" class="modal-shell hidden-screen" role="dialog" aria-modal="true" aria-labelledby="balePrintModalTitle">
+        <div class="modal-card modal-card-wide">
+          <div class="modal-head">
+            <div>
+              <h3 id="balePrintModalTitle">Bale 条码打印窗</h3>
+              <div id="balePrintModalSubhead" class="subtle small">在这里连接打印机并直接打印，不再弹系统大打印框。</div>
+            </div>
+            <button id="closeBalePrintModalButton" type="button" class="ghost-button mini-button">关闭</button>
+          </div>
+          <div id="balePrintModalSummary" class="candidate-summary empty-state">当前还没有待打印的 bale 标签。</div>
+          <div class="bale-print-modal-layout">
+            <div class="bale-print-modal-preview">
+              <iframe id="balePrintPreviewFrame" title="Bale 打印预览" src="about:blank"></iframe>
+            </div>
+            <div class="bale-print-modal-side">
+              <div id="balePrintModalQueue" class="candidate-summary empty-state">当前类别下的打印任务会显示在这里。</div>
+              <div class="button-row">
+                <button id="balePrintModalPrevButton" type="button" class="ghost-button mini-button">上一张</button>
+                <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button">下一张</button>
+                <button id="balePrintModalRefreshButton" type="button" class="ghost-button mini-button">刷新预览</button>
+              </div>
+              <div class="button-row">
+                <button id="balePrintModalConnectButton" type="button" class="ghost-button mini-button">检测打印机</button>
+                <button id="balePrintModalDirectPrintButton" type="button" class="ghost-button mini-button">直接打印本张</button>
+                <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button">打印本轮全部</button>
+              </div>
+              <div class="button-row">
+                <button id="balePrintModalCompleteButton" type="button" class="ghost-button mini-button">确认本类已贴完</button>
+                <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button mini-button">关闭并返回当前页</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>总览 Dashboard</h2>
+          <button data-action="load-dashboard" type="button">刷新</button>
+        </div>
+        <div id="dashboardCards" class="cards"></div>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>门店经营摘要</h2>
+          <button data-action="load-store-operating-summary" type="button">刷新门店摘要</button>
+        </div>
+        <div id="storeOperatingSummary" class="store-summary-grid">
+          <div class="empty-state">这里会按门店显示今日销售、毛利、库存和待处理异常。</div>
+        </div>
+      </section>
+
+      <section class="panel" id="storeClosingPanel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>店铺结束营业检查</h2>
+          <button data-action="load-store-closing-checklist" type="button">读取关店检查表</button>
+        </div>
+        <form id="storeClosingChecklistForm" class="form-grid compact">
+          <select name="store_code" data-store-select="required">
+            <option value="UTAWALA">UTAWALA</option>
+          </select>
+          <button type="submit">查看这家店今天该先处理什么</button>
+        </form>
+        <div id="storeClosingChecklistSummary" class="candidate-summary empty-state">
+          这里会汇总该门店的待交班、待退仓、待批差异和今日经营情况。
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>红色价格预警</h2>
+          <button data-action="load-price-alerts" type="button">读取改价 / 超限价预警</button>
+        </div>
+        <div id="priceAlertSummary" class="alert-summary empty-state">先点一次上面的按钮，读取今天的红色预警。</div>
+        <div id="priceAlertList" class="alert-list"></div>
+        <pre id="priceAlertOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>线上收款 / 离线同步异常</h2>
+          <button id="refreshOpsAlertsButton" type="button">刷新线上 / 离线异常</button>
+        </div>
+        <div id="opsAlertSummary" class="alert-summary empty-state">这里会显示未匹配 M-Pesa 和离线同步失败/重复的异常。</div>
+        <div id="opsAlertList" class="alert-list"></div>
+      </section>
+
+      <section class="panel" data-workspace-panel="testing">
+        <div class="panel-head">
+          <h2>测试工具</h2>
+          <div class="inline-actions">
+            <button data-action="generate-warehouse-mainflow-demo" type="button">一键生成仓库主分拣 Demo</button>
+            <button data-action="reset-test-history" type="button">清除历史录入数据</button>
+          </div>
+        </div>
+        <div id="warehouseMainflowDemoSummary" class="candidate-summary empty-state">
+          固定模板：Youxun 大船单，50 KG / 包，summer+ 20 包，其他品类各十几包；自动推进到“一半已分拣”，但不会真实打印入仓 barcode。
+        </div>
+        <pre id="warehouseMainflowDemoOutput" class="output hidden-output"></pre>
+        <div class="button-row">
+          <button data-action="generate-store-replenishment-demo" type="button">一键生成门店补货 Demo</button>
+        </div>
+        <div id="storeReplenishmentDemoSummary" class="candidate-summary empty-state">
+          固定模板：1 个船单、10 个大类、仓库 20000 件、门店 3000 件、最近 14 天销量 2100 件；其中一部分会压成 100 件 / 包的待送店 bale，并停在“补货建议已生成”。
+        </div>
+        <pre id="storeReplenishmentDemoOutput" class="output hidden-output"></pre>
+        <div id="testResetSummary" class="candidate-summary empty-state">
+          点击后会清空测试产生的关单、包裹、bale、分拣、库存、调拨、销售、打印等历史数据；保留账号、门店、供应商和基础主数据，方便重新测试。
+        </div>
+        <div id="storeRetailSeedSummary" class="candidate-summary empty-state">
+          这里是门店零售演练样本入口。会直接给当前门店生成一批已在店、可售、可回写库存的 identity，用于后续 14 天销售和补货建议测试。
+        </div>
+        <form id="storeRetailSeedForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <input name="max_items" type="number" min="1" max="200" value="24" placeholder="最多生成多少件门店零售演练样本" />
+          <input name="note" placeholder="演练备注，例如先生成在店 identity 再跑 14 天销售" value="先生成在店 identity 再跑 14 天销售" />
+          <button type="submit">一键生成门店零售演练样本</button>
+        </form>
+        <pre id="storeRetailSeedOutput" class="output hidden-output"></pre>
+        <div id="storeRecentSalesSimulationSummary" class="candidate-summary empty-state">
+          这里是门店侧最小销售样本生成器。只按当前门店在架的商品身份证 ID 生成最近 14 天销售，生成后会同步扣减门店库存，供补货建议线程消费。
+        </div>
+        <form id="storeRecentSalesSimulationForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <input name="max_items" type="number" min="1" max="200" value="14" placeholder="最多生成多少件近 14 天销售" />
+          <input name="note" placeholder="模拟备注，例如给补货建议线程准备 14 天销售样本" value="给补货建议线程准备 14 天销售样本" />
+          <button type="submit">生成最近 14 天模拟销售</button>
+        </form>
+        <pre id="storeRecentSalesSimulationOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>作废单</h2>
+          <button data-action="load-void-requests" type="button">读取待审核作废单</button>
+        </div>
+        <div id="saleVoidSummary" class="alert-summary empty-state">
+          这里会显示收银打错、顾客临时不要、支付失败等需要作废的销售单。
+        </div>
+        <div id="saleVoidList" class="alert-list"></div>
+        <form id="saleVoidRequestForm" class="form-grid compact">
+          <input name="order_no" placeholder="Order no（销售后自动带出）" />
+          <input name="reason" placeholder="作废原因" value="顾客临时不要，撤销本单" />
+          <input name="note" placeholder="备注" value="收银纠错，等待店长审核" />
+          <button type="submit">发起作废申请</button>
+        </form>
+        <form id="saleVoidReviewForm" class="form-grid compact">
+          <input name="void_no" placeholder="Void no（读取后自动带出）" />
+          <select name="approved">
+            <option value="true">店长确认作废</option>
+            <option value="false">驳回作废申请</option>
+          </select>
+          <input name="note" placeholder="审核备注" value="已核对，允许作废并回库存" />
+          <button type="submit">审核作废单</button>
+        </form>
+        <div id="saleVoidResultSummary" class="candidate-summary empty-state">
+          这里会显示作废申请或审核后的中文结果。
+        </div>
+        <pre id="saleVoidOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-clerk" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>顾客退货 / 退款单</h2>
+          <button data-action="load-refund-requests" type="button">读取待审核退货 / 退款单</button>
+        </div>
+        <div id="saleRefundSummary" class="alert-summary empty-state">
+          这里会显示顾客买走后回来退货的退款申请，和周期退仓不是同一回事。
+        </div>
+        <div id="saleRefundList" class="alert-list"></div>
+        <form id="saleRefundRequestForm" class="form-grid">
+          <input name="order_no" placeholder="Order no（销售后自动带出）" />
+          <input name="shift_no" placeholder="Shift no（可留空，开班后会自动带出）" />
+          <input name="reason" placeholder="退货原因" value="顾客尺码不合适，申请退款" />
+          <select name="refund_method">
+            <option value="cash">现金退款</option>
+            <option value="mpesa_reversal">M-Pesa 退款</option>
+            <option value="store_credit">门店余额</option>
+          </select>
+          <textarea
+            name="items_json"
+            class="json-raw-field"
+            rows="4"
+            placeholder='[{"barcode":"生成后自动带出","qty":1,"note":"customer return"}]'
+          >[]</textarea>
+          <div class="line-builder" data-builder="refund-items">
+            <div class="line-builder-head">
+              <div>
+                <strong>退货商品明细</strong>
+                <p>一行代表顾客退回来的一种商品。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-builder-add="refund-items">新增一行</button>
+            </div>
+            <div id="refundItemsBuilder" class="line-builder-body"></div>
+          </div>
+          <input name="note" placeholder="备注" value="顾客已带商品回店，等待店长审核" />
+          <button type="submit">发起退货 / 退款申请</button>
+        </form>
+        <form id="saleRefundReviewForm" class="form-grid compact">
+          <input name="refund_no" placeholder="Refund no（读取后自动带出）" />
+          <select name="approved">
+            <option value="true">店长确认退款</option>
+            <option value="false">驳回退款申请</option>
+          </select>
+          <input name="note" placeholder="审核备注" value="已验货，允许退款并回补库存" />
+          <button type="submit">审核退货 / 退款单</button>
+        </form>
+        <div id="saleRefundResultSummary" class="candidate-summary empty-state">
+          这里会显示退款申请或审核后的中文结果。
+        </div>
+        <pre id="saleRefundOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>支付异常单</h2>
+          <button data-action="load-payment-anomalies" type="button">读取待处理支付异常</button>
+        </div>
+        <div id="paymentAnomalySummary" class="alert-summary empty-state">
+          这里会显示少付、多付、重复付款和未匹配的线上收款异常。
+        </div>
+        <div id="paymentAnomalyList" class="alert-list"></div>
+        <form id="paymentAnomalyResolveForm" class="form-grid compact">
+          <input name="anomaly_no" placeholder="Anomaly no（读取后自动带出）" />
+          <select name="action">
+            <option value="collect_balance">少付：补款完成</option>
+            <option value="approve_shortfall">少付：店长批准短款</option>
+            <option value="refund_overpayment">多付/重复：已退款</option>
+            <option value="refund_pending">多付/重复：待退款</option>
+            <option value="store_credit_issued">多付/重复：转门店余额</option>
+            <option value="mark_false_positive">重复：误报，不处理金额</option>
+            <option value="match_to_sale">M-Pesa：匹配到销售单</option>
+            <option value="internal_store_transfer">M-Pesa：转到本公司其他门店</option>
+            <option value="external_follow_up">M-Pesa：外部号码人工跟进</option>
+          </select>
+          <input name="amount" type="number" min="0" step="0.01" placeholder="处理金额（可自动带出）" />
+          <input name="order_no" placeholder="目标订单号（匹配到销售单时用）" />
+          <input name="store_code" placeholder="纠正后的门店（转店时用）" />
+          <input name="payment_method" placeholder="支付方式（cash/mpesa）" />
+          <input name="reference" placeholder="参考号 / M-Pesa receipt" />
+          <input name="customer_id" placeholder="客户ID（可留空）" />
+          <input name="note" placeholder="处理备注" value="已核实并完成处理" />
+          <button type="submit">提交支付异常处理</button>
+        </form>
+        <div id="paymentAnomalyResultSummary" class="candidate-summary empty-state">
+          这里会显示支付异常处理后的中文结果。
+        </div>
+        <pre id="paymentAnomalyOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>系统配置（先不用看）</h2>
+          <button data-action="load-config" type="button">刷新</button>
+        </div>
+        <div id="configSummary" class="candidate-summary empty-state">
+          这里会告诉你当前系统里有几家门店、条码规则和标签模板，不需要看原始 JSON。
+        </div>
+        <div class="split-grid">
+          <div>
+            <h3>Stores</h3>
+            <pre id="storesOutput" class="output hidden-output"></pre>
+          </div>
+          <div>
+            <h3>Barcode / Labels</h3>
+            <pre id="settingsOutput" class="output hidden-output"></pre>
+          </div>
+        </div>
+      </section>
+
+        <section class="panel" data-workspace-panel="admin">
+          <div class="panel-head">
+            <h2>供应商管理</h2>
+            <button data-action="load-suppliers" type="button">读取供应商</button>
+          </div>
+        <form id="supplierForm" class="form-grid compact">
+          <input name="name" data-field-label="供应商名称" data-field-help="填写统一供应商主数据名称，商品建档、包裹入仓和收货都会共用。" placeholder="供应商名称" />
+          <input name="name_zh" data-field-label="供应商中文名" data-field-help="可选。中方页面会同时显示中英，肯方页面保持英文。" placeholder="供应商中文名（可选）" />
+          <input name="code" data-field-label="供应商代码" data-field-help="可留空，系统会自动生成内部供应商代码。" placeholder="供应商代码（可留空自动生成）" />
+          <input name="contact_person" data-field-label="联系人" data-field-help="填写这个供应商的主要联系人。" placeholder="联系人" />
+          <input name="phone" data-field-label="联系电话" data-field-help="填写联系电话，后面方便仓库和采购追查。" placeholder="联系电话" />
+          <input name="note" data-field-label="供应商备注" data-field-help="补充记录这家供应商主要供什么货。" placeholder="备注" />
+          <select name="status">
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+          <button type="submit">新建供应商</button>
+        </form>
+        <div id="supplierResultSummary" class="candidate-summary empty-state">
+          这里会显示供应商创建结果，以及当前系统里一共有多少供应商。
+        </div>
+        <pre id="supplierOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>门店限价规则</h2>
+          <button data-action="load-price-rules" type="button">读取限价规则</button>
+        </div>
+        <form id="priceRuleForm" class="form-grid compact">
+          <select name="target_type">
+            <option value="category_main">按大类</option>
+            <option value="category_sub">按小类</option>
+            <option value="barcode">按单个 barcode</option>
+          </select>
+          <input name="target_value" placeholder="如 pants / sweat pant / BC00000001" value="pants" />
+          <input name="max_price" type="number" min="0" value="400" />
+          <input name="store_code" placeholder="门店代码，可留空表示全店通用" value="UTAWALA" />
+          <input name="note" placeholder="备注" value="今日门店最高限价 400" />
+          <button type="submit">创建门店限价规则</button>
+        </form>
+        <div id="priceRuleResultSummary" class="candidate-summary empty-state">
+          这里会显示门店限价规则创建结果。运营中心负责定规则，仓库和门店只执行。
+        </div>
+        <pre id="priceRuleOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>1. 区域经营驾驶舱</h2>
+        </div>
+        <div class="candidate-summary">
+          这一页先给区域经理看结果和动作，不先埋进报表里。目标是每天一打开就知道：哪个店出问题、该下什么指令、今天现金和风险有没有闭环。
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>在营门店</strong><span>18 家</span></article>
+          <article class="store-metric"><strong>本日达成率</strong><span>92%</span></article>
+          <article class="store-metric"><strong>库存周转天数</strong><span>41 天</span></article>
+          <article class="store-metric"><strong>滞销商品占比</strong><span>12%</span></article>
+          <article class="store-metric"><strong>待处理预警</strong><span>9 条</span></article>
+          <article class="store-metric"><strong>现金未闭环门店</strong><span>2 家</span></article>
+        </div>
+        <div class="split-grid">
+          <article class="data-preview-card">
+            <strong>今日区域结论</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>销售面</span><span>Jogoo / Utawala 超目标，Embakasi 下滑明显</span></div>
+              <div class="summary-breakdown-row"><span>库存面</span><span>女装上衣在 3 家店断货，童装在 2 家店滞销</span></div>
+              <div class="summary-breakdown-row"><span>动作面</span><span>建议先调货 46 件，再做 2 家店限价调整</span></div>
+            </div>
+          </article>
+          <article class="data-preview-card">
+            <strong>优先关注门店</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>Embakasi</span><span>销售下滑 18%，库存积压偏高</span></div>
+              <div class="summary-breakdown-row"><span>Utawala</span><span>断货率 9%，建议立即补货</span></div>
+              <div class="summary-breakdown-row"><span>Kayole</span><span>现金未存入，且昨日巡店整改未关闭</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>2. AI 固定分析框架</h2>
+        </div>
+        <div class="candidate-summary">
+          这一块不让 AI 随机发挥，而是固定按同一套框架输出，方便你每周看区域经理时有统一口径。
+        </div>
+        <div class="report-summary-grid">
+          <article class="data-preview-card">
+            <strong>横向门店对比</strong>
+            <div class="meta">按销售、毛利、客单价、连带率和异常数对比同区域门店。</div>
+          </article>
+          <article class="data-preview-card">
+            <strong>纵向时间轴分析</strong>
+            <div class="meta">看今日、近 7 天、近 30 天、本月和上周同日的变化幅度。</div>
+          </article>
+          <article class="data-preview-card">
+            <strong>库存周转率</strong>
+            <div class="meta">按门店、品类和价格带看库存周转天数与补货节奏是否健康。</div>
+          </article>
+          <article class="data-preview-card">
+            <strong>滞销商品分析</strong>
+            <div class="meta">识别高库存低动销 SKU，并自动给出清货、调货或退仓建议。</div>
+          </article>
+          <article class="data-preview-card">
+            <strong>异常波动归因</strong>
+            <div class="meta">把销售下滑、毛利异常、退款增多拆成天气、缺货、限价或执行问题。</div>
+          </article>
+          <article class="data-preview-card">
+            <strong>动作建议输出</strong>
+            <div class="meta">每份分析最后都必须落到动作、责任人、时限和复盘节点。</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>3. 业务动作台</h2>
+        </div>
+        <div class="candidate-summary">
+          区域经理真正有价值的是下动作和盯结果。这一页把 <code>cycle 调货</code>、限价、清货、补货和活动执行统一收口。
+        </div>
+        <div class="split-grid">
+          <article class="data-preview-card">
+            <strong>根据 cycle 下达动作</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>周二调货</span><span>从仓库调 28 件上衣到 Utawala</span></div>
+              <div class="summary-breakdown-row"><span>周三补货</span><span>Jogoo 裤装补货 18 件，优先中码</span></div>
+              <div class="summary-breakdown-row"><span>周五清货</span><span>Kayole 滞销童装 12 SKU 下发清货动作</span></div>
+            </div>
+          </article>
+          <article class="data-preview-card">
+            <strong>区域经理可执行动作</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>限价调整</span><span>在授权区间内直接调整，超限自动提报</span></div>
+              <div class="summary-breakdown-row"><span>活动执行</span><span>新品陈列、促销落地、滞销换区陈列</span></div>
+              <div class="summary-breakdown-row"><span>异常整改</span><span>把预警直接转成任务，分配到店长或仓库</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>7. 风控预警中心</h2>
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>销售异常</strong><span>3 条</span></article>
+          <article class="store-metric"><strong>价格异常</strong><span>4 条</span></article>
+          <article class="store-metric"><strong>库存差异</strong><span>2 条</span></article>
+          <article class="store-metric"><strong>现金异常</strong><span>1 条</span></article>
+        </div>
+        <div class="split-grid">
+          <article class="data-preview-card">
+            <strong>高优先级异常</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>Embakasi</span><span>昨日销售跌幅 23%，需复盘断货与客流</span></div>
+              <div class="summary-breakdown-row"><span>Jogoo</span><span>同款商品出现超限价销售 4 次</span></div>
+              <div class="summary-breakdown-row"><span>Kayole</span><span>现金未及时存入，超过规定时限 1 天</span></div>
+            </div>
+          </article>
+          <article class="data-preview-card">
+            <strong>处理规则</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>预警等级</span><span>红色 4 小时内闭环，橙色当天关闭</span></div>
+              <div class="summary-breakdown-row"><span>责任人</span><span>默认到区域经理，可转派店长或仓库负责人</span></div>
+              <div class="summary-breakdown-row"><span>关闭证据</span><span>要求备注、截图或现金凭证</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>8. 现金收取与存储</h2>
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>今日收现</strong><span>286,400</span></article>
+          <article class="store-metric"><strong>待交接门店</strong><span>2 家</span></article>
+          <article class="store-metric"><strong>待存入记录</strong><span>3 笔</span></article>
+          <article class="store-metric"><strong>差异金额</strong><span>1,200</span></article>
+        </div>
+        <div class="candidate-summary">
+          这一块建议单独做闭环：收取、交接、保管、存入、差异说明、复核人。区域经理最怕的是“钱在路上没人负责”，这里要留痕。
+        </div>
+        <div class="form-grid compact">
+          <input placeholder="门店代码，如：UTAWALA" />
+          <input placeholder="当日收现金额，如：38400" />
+          <input placeholder="交接人，如：store_manager_utawala" />
+          <input placeholder="存放位置，如：门店保险箱 / 区域经理暂存箱" />
+          <input placeholder="计划存入时间，如：今日 18:30 前" />
+          <textarea rows="4" placeholder="备注差异、未存入原因或凭证说明"></textarea>
+          <button type="button">暂存当日现金闭环记录</button>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>9. 巡店记录与评分</h2>
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>本周已巡店</strong><span>7 / 12</span></article>
+          <article class="store-metric"><strong>平均得分</strong><span>86 分</span></article>
+          <article class="store-metric"><strong>待整改问题</strong><span>18 条</span></article>
+          <article class="store-metric"><strong>复查未关闭</strong><span>4 条</span></article>
+        </div>
+        <div class="split-grid">
+          <article class="data-preview-card">
+            <strong>建议评分维度</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>陈列与整洁</span><span>20 分</span></div>
+              <div class="summary-breakdown-row"><span>库存准确与补货</span><span>20 分</span></div>
+              <div class="summary-breakdown-row"><span>价格签与促销执行</span><span>20 分</span></div>
+              <div class="summary-breakdown-row"><span>服务与收银规范</span><span>20 分</span></div>
+              <div class="summary-breakdown-row"><span>现金与安全合规</span><span>20 分</span></div>
+            </div>
+          </article>
+          <article class="data-preview-card">
+            <strong>高频问题</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>Jogoo</span><span>价格签未更新，促销海报过期</span></div>
+              <div class="summary-breakdown-row"><span>Kayole</span><span>货架空位明显，补货动作慢</span></div>
+              <div class="summary-breakdown-row"><span>Utawala</span><span>收银台现金交接记录不完整</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>10. 会议纪要与 AI 分析</h2>
+        </div>
+        <div class="candidate-summary">
+          录音入口不需要给区域经理本人，但你需要 AI 能吃进会议内容并生成摘要、决策项和追踪任务。前台只给他们看文字版行动清单。
+        </div>
+        <div class="split-grid">
+          <article class="data-preview-card">
+            <strong>会议输入</strong>
+            <div class="meta">支持总部上传录音、会议纪要或聊天整理稿，AI 自动抽取重点。</div>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>输入类型</span><span>音频 / 纪要 / 粘贴文本</span></div>
+              <div class="summary-breakdown-row"><span>参与人</span><span>区域经理、店长、仓库、财务</span></div>
+              <div class="summary-breakdown-row"><span>输出目标</span><span>决策项、责任人、截止时间</span></div>
+            </div>
+          </article>
+          <article class="data-preview-card">
+            <strong>AI 输出</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>争议点</span><span>Utawala 缺货由仓配还是门店补货节奏导致</span></div>
+              <div class="summary-breakdown-row"><span>决策项</span><span>本周内完成裤装调货与限价复核</span></div>
+              <div class="summary-breakdown-row"><span>待办</span><span>Kayole 店长周五前关闭 3 条巡店整改</span></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>11. 区域经理评分卡</h2>
+        </div>
+        <div class="candidate-summary">
+          站在你这边，这一页就是用来管理区域经理的。不要只看销售，要看结果、执行、库存、风控、现金和人员培养有没有一起跑。
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>经营结果</strong><span>88</span></article>
+          <article class="store-metric"><strong>库存效率</strong><span>74</span></article>
+          <article class="store-metric"><strong>执行闭环</strong><span>81</span></article>
+          <article class="store-metric"><strong>风控与现金</strong><span>92</span></article>
+          <article class="store-metric"><strong>巡店辅导</strong><span>69</span></article>
+        </div>
+        <div class="summary-breakdown-list">
+          <div class="summary-breakdown-row"><span>经营结果</span><span>看销售、毛利、同店增长和目标达成</span></div>
+          <div class="summary-breakdown-row"><span>库存效率</span><span>看周转率、滞销占比、断货率和调货有效性</span></div>
+          <div class="summary-breakdown-row"><span>执行闭环</span><span>看动作是否按时下发、预警是否按 SLA 关闭</span></div>
+          <div class="summary-breakdown-row"><span>风控与现金</span><span>看异常次数、现金闭环、差异说明和复核记录</span></div>
+          <div class="summary-breakdown-row"><span>巡店辅导</span><span>看巡店覆盖率、整改复查和店长培养效果</span></div>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>12. 异常流 / 例外闭环</h2>
+        </div>
+        <div id="opsExceptionDeskSummary" class="candidate-summary">
+          这里统一创建、认领、关闭异常单。仓库、门店、打印、财务都用同一套异常编号和关闭证据。
+        </div>
+        <div class="ops-exception-shell">
+          <section class="ops-exception-form-shell">
+            <form id="opsExceptionDeskForm" class="form-grid compact">
+              <input type="hidden" name="anomaly_no" />
+              <select name="domain">
+                <option value="warehouse">仓库异常</option>
+                <option value="store">门店异常</option>
+                <option value="printing">打印异常</option>
+                <option value="finance">财务异常</option>
+                <option value="operations">运营异常</option>
+              </select>
+              <select name="anomaly_type">
+                <option value="missing_items">少件</option>
+                <option value="extra_items">多件</option>
+                <option value="rejected_receipt">拒收 / 拒签</option>
+                <option value="print_failed">打印失败</option>
+                <option value="wrong_label">错贴 / 漏贴</option>
+                <option value="payment_issue">支付 / 现金异常</option>
+                <option value="approval_timeout">审批超时</option>
+                <option value="dispatch_gap">调拨 / 配送异常</option>
+              </select>
+              <select name="severity">
+                <option value="red">红色</option>
+                <option value="orange">橙色</option>
+                <option value="yellow">黄色</option>
+              </select>
+              <input name="title" placeholder="异常标题，例如 Mrma 工装裤 bale 少 2 包" />
+              <input name="reference_no" placeholder="关联单号 / bale / 船单 / 订单号" />
+              <input name="store_code" placeholder="门店 / 仓库代码，可留空" />
+              <input name="owner_role" placeholder="责任角色，例如 仓库主管 / 店长" />
+              <input name="owner_name" placeholder="责任人，可留空" />
+              <input name="due_at" type="datetime-local" />
+              <textarea name="note" rows="3" placeholder="异常说明、关闭证据要求、当前影响"></textarea>
+              <button type="submit">保存异常单</button>
+            </form>
+            <div class="ops-filter-row">
+              <label>
+                <span>状态</span>
+                <select id="opsExceptionStatusFilter">
+                  <option value="">全部</option>
+                  <option value="open" selected>待处理</option>
+                  <option value="in_progress">处理中</option>
+                  <option value="closed">已关闭</option>
+                </select>
+              </label>
+              <label>
+                <span>领域</span>
+                <select id="opsExceptionDomainFilter">
+                  <option value="">全部</option>
+                  <option value="warehouse">仓库</option>
+                  <option value="store">门店</option>
+                  <option value="printing">打印</option>
+                  <option value="finance">财务</option>
+                  <option value="operations">运营</option>
+                </select>
+              </label>
+              <label>
+                <span>等级</span>
+                <select id="opsExceptionSeverityFilter">
+                  <option value="">全部</option>
+                  <option value="red">红色</option>
+                  <option value="orange">橙色</option>
+                  <option value="yellow">黄色</option>
+                </select>
+              </label>
+            </div>
+          </section>
+          <section class="ops-exception-list-shell">
+            <div id="opsExceptionDeskList" class="ops-exception-list"></div>
+          </section>
+        </div>
+        <pre id="opsExceptionDeskOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>13. 运营数据接入框架</h2>
+        </div>
+        <div id="opsDataIntegrationSummary" class="candidate-summary">
+          这页不再只是静态说明，而是运营数据接入台。每个主题会记录当前状态、责任人、阻塞项和下一步动作。
+        </div>
+        <div class="ops-data-shell">
+          <section class="ops-data-form-shell">
+            <form id="opsDataTopicForm" class="form-grid compact">
+              <select name="topic_code">
+                <option value="pos_sales">POS 销售 / 订单 / 支付</option>
+                <option value="footfall">客流与进店人数</option>
+                <option value="attendance">员工打卡 / 出勤</option>
+                <option value="mpesa">线上收款</option>
+                <option value="inventory_dispatch">库存 / 调拨 / 门店 bale</option>
+                <option value="finance_oa">现金闭环 / 财务审批</option>
+              </select>
+              <select name="status">
+                <option value="not_started">未开始</option>
+                <option value="field_review">字段确认中</option>
+                <option value="api_joint">接口联调中</option>
+                <option value="ready_for_test">已接入待验证</option>
+                <option value="live">已接入</option>
+              </select>
+              <input name="owner_role" placeholder="责任角色，例如 财务 / 技术 / 店长" />
+              <input name="source_system" placeholder="来源系统，例如 Lark / POS / Safaricom" />
+              <input name="update_frequency" placeholder="更新频率，例如 实时 / 小时级 / 日结" />
+              <input name="last_checked_at" type="datetime-local" />
+              <input name="blocker" placeholder="当前阻塞，例如 还没拿到回调文档" />
+              <textarea name="next_action" rows="3" placeholder="下一步动作，例如 锁字段、测一轮回调、做对账样例"></textarea>
+              <button type="submit">保存主题状态</button>
+            </form>
+          </section>
+          <section class="ops-data-list-shell">
+            <div id="opsDataIntegrationList" class="ops-data-topic-list"></div>
+          </section>
+        </div>
+        <pre id="opsDataTopicOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>门店管理</h2>
+          <button data-action="load-stores" type="button">读取门店</button>
+        </div>
+        <form id="storeForm" class="form-grid compact">
+          <input name="code" placeholder="Store code" value="JOGOO" />
+          <input name="name" placeholder="Store name" value="Jogoo Road" />
+          <input name="address" placeholder="门店地址" value="Jogoo Road, Nairobi" />
+          <input name="catchment_area" placeholder="商圈/覆盖人群" value="通勤街边 + 住宅区" />
+          <input name="latitude" type="number" step="0.000001" placeholder="纬度" value="-1.283300" />
+          <input name="longitude" type="number" step="0.000001" placeholder="经度" value="36.850000" />
+          <input name="google_maps_url" placeholder="Google Maps 链接" value="https://maps.google.com/?q=Jogoo+Road+Nairobi" />
+          <input name="manager_note" placeholder="门店备注" value="候选新店，先做地图和街景观察" />
+          <select name="status">
+            <option value="active">active</option>
+            <option value="closed">closed</option>
+          </select>
+          <button type="submit">新建门店</button>
+        </form>
+        <div id="storeResultSummary" class="candidate-summary empty-state">
+          这里会显示门店创建结果，以及当前系统里有多少家门店。
+        </div>
+        <pre id="storeOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>开新店建议</h2>
+        </div>
+        <form id="siteRecommendationForm" class="form-grid compact">
+          <input name="store_name" placeholder="候选门店名称" value="Jogoo Road 候选点" />
+          <input name="address" placeholder="候选地址" value="Jogoo Road, Nairobi" />
+          <input name="google_maps_url" placeholder="Google Maps / 街景链接" value="https://maps.google.com/?q=Jogoo+Road+Nairobi" />
+          <input name="catchment_area" placeholder="目标客群 / 商圈" value="通勤与住宅混合人流" />
+          <select name="area_type">
+            <option value="mixed">混合街区</option>
+            <option value="market">市场型街区</option>
+            <option value="transit">交通枢纽</option>
+            <option value="residential">住宅区</option>
+            <option value="office">办公区</option>
+            <option value="isolated">偏僻点位</option>
+          </select>
+          <input name="estimated_hourly_footfall" type="number" min="0" placeholder="预估每小时人流" value="220" />
+          <input name="competitor_count" type="number" min="0" placeholder="100米内竞品门店数" value="3" />
+          <input name="frontage_score" type="number" min="1" max="10" placeholder="门头展示评分" value="8" />
+          <input name="visibility_score" type="number" min="1" max="10" placeholder="可见度评分" value="8" />
+          <input name="access_score" type="number" min="1" max="10" placeholder="到达性评分" value="7" />
+          <input name="rent_pressure_score" type="number" min="1" max="10" placeholder="租金压力评分" value="5" />
+          <textarea name="street_view_observation" rows="4" placeholder="街景观察：比如是否有公交站、行人密度、是否容易看到门头、竞品密度等">街边可见度较好，附近有公交与步行人流，适合做服装和快销测试。</textarea>
+          <button type="submit">生成开新店建议</button>
+        </form>
+        <div id="siteRecommendationSummary" class="candidate-summary empty-state">
+          这里会给出一个开店建议分数，并提示后续还需要接入 Google Maps / Street View 做真实街景分析。
+        </div>
+        <pre id="siteRecommendationOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>角色 / 权限矩阵</h2>
+        </div>
+        <div class="candidate-summary">
+          不再做很多“独立版本”，而是一个系统按 <strong>角色</strong>、<strong>设备</strong>、<strong>数据范围</strong> 裁剪。后面 PDA、安卓区域主管端、仓库端、收银电脑端都共用这张权限矩阵。
+        </div>
+        <div class="matrix-table-shell">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th>角色</th>
+                <th>设备</th>
+                <th>默认入口</th>
+                <th>可见范围</th>
+                <th>关键动作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>中方录入员</td>
+                <td>电脑</td>
+                <td>4.2 中方来源 Bale 录入</td>
+                <td>中方来源 / 船单</td>
+                <td>录整柜、供应商、品类、包数、单价</td>
+              </tr>
+              <tr>
+                <td>中方财务</td>
+                <td>电脑</td>
+                <td>4.3 中方来源列表 / 补填成本</td>
+                <td>成本池 / 汇率 / 付款凭证</td>
+                <td>补头程、清关、尾程，形成成本池</td>
+              </tr>
+              <tr>
+                <td>仓库主管</td>
+                <td>电脑 / 平板</td>
+                <td>运输 / 关单主档</td>
+                <td>仓库全量</td>
+                <td>总确认、分拣任务、配货、代售包裹、异常关闭</td>
+              </tr>
+              <tr>
+                <td>分拣员</td>
+                <td>PDA / 电脑</td>
+                <td>0.1 创建分拣任务 / 0.2 分拣确认入库</td>
+                <td>被分配任务</td>
+                <td>录分拣结果、件数、库位，不改成本池</td>
+              </tr>
+              <tr>
+                <td>店长 / 门店主管</td>
+                <td>PDA / 平板</td>
+                <td>5. 门店执行控制台</td>
+                <td>本店全量</td>
+                <td>验收 bale、分配店员、看进度、处理退仓与异常</td>
+              </tr>
+              <tr>
+                <td>店员</td>
+                <td>PDA</td>
+                <td>6.2 我的当前 bale</td>
+                <td>只看自己被分配的 bale</td>
+                <td>填售价、货架位、打印、上架、上报异常</td>
+              </tr>
+              <tr>
+                <td>收银员</td>
+                <td>电脑</td>
+                <td>9. 收银销售</td>
+                <td>本店收银 / 退款 / 作废</td>
+                <td>收银、退款、支付异常处理，不看仓库工单</td>
+              </tr>
+              <tr>
+                <td>区域经理</td>
+                <td>安卓 / 平板</td>
+                <td>1. 区域经营驾驶舱</td>
+                <td>本区域门店</td>
+                <td>调货、限价、巡店、现金、风控、会议动作</td>
+              </tr>
+              <tr>
+                <td>HR / 财务</td>
+                <td>电脑</td>
+                <td>OA / 审批</td>
+                <td>考勤、工资、付款与报销</td>
+                <td>打卡、工资核算、审批流、付款复核</td>
+              </tr>
+              <tr>
+                <td>总部管理员</td>
+                <td>电脑</td>
+                <td>今日总览</td>
+                <td>全局</td>
+                <td>配置主数据、账号权限、全局报表与审计</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>OA / HR / 财务审批工作台</h2>
+        </div>
+        <div id="oaWorkbenchSummary" class="candidate-summary"></div>
+        <div class="oa-shell">
+          <article class="oa-card-shell">
+            <div class="template-card-head">
+              <div>
+                <strong>HR 打卡 / 补卡</strong>
+                <div class="subtle small">Lark、PDA 和手工补卡统一在这里沉淀。</div>
+              </div>
+            </div>
+            <form id="oaAttendanceForm" class="form-grid compact">
+              <input type="hidden" name="attendance_no" />
+              <input name="employee_name" placeholder="员工姓名，如 Alice" />
+              <input name="store_code" placeholder="门店代码，如 UTAWALA" />
+              <input name="attendance_date" type="date" />
+              <input name="shift_code" placeholder="班次，如 AM / PM" />
+              <input name="check_in_at" type="datetime-local" />
+              <input name="check_out_at" type="datetime-local" />
+              <select name="attendance_status">
+                <option value="present">正常</option>
+                <option value="late">迟到</option>
+                <option value="leave">请假</option>
+                <option value="absent">缺勤</option>
+              </select>
+              <select name="source_system">
+                <option value="lark">Lark</option>
+                <option value="pda">PDA</option>
+                <option value="manual">手工补卡</option>
+              </select>
+              <input name="note" placeholder="说明，如门店断网补卡" />
+              <button type="submit">保存打卡记录</button>
+            </form>
+            <div id="oaAttendanceList" class="oa-record-list"></div>
+            <pre id="oaAttendanceOutput" class="output hidden-output"></pre>
+          </article>
+
+          <article class="oa-card-shell">
+            <div class="template-card-head">
+              <div>
+                <strong>工资核算批次</strong>
+                <div class="subtle small">先按月度批次收口应发、扣款和实发。</div>
+              </div>
+            </div>
+            <form id="oaPayrollForm" class="form-grid compact">
+              <input type="hidden" name="payroll_no" />
+              <input name="payroll_month" type="month" />
+              <input name="store_scope" placeholder="门店范围，如 ALL / UTAWALA" />
+              <input name="headcount" type="number" min="0" placeholder="人数" />
+              <input name="base_pay_total" type="number" min="0" step="0.01" placeholder="底薪汇总" />
+              <input name="commission_total" type="number" min="0" step="0.01" placeholder="提成汇总" />
+              <input name="allowance_total" type="number" min="0" step="0.01" placeholder="补贴汇总" />
+              <input name="deduction_total" type="number" min="0" step="0.01" placeholder="扣款汇总" />
+              <select name="status">
+                <option value="draft">草稿</option>
+                <option value="under_review">复核中</option>
+                <option value="released">已发放</option>
+              </select>
+              <input name="prepared_by" placeholder="制表人，如 HR_1" />
+              <button type="submit">保存工资批次</button>
+            </form>
+            <div id="oaPayrollList" class="oa-record-list"></div>
+            <pre id="oaPayrollOutput" class="output hidden-output"></pre>
+          </article>
+
+          <article class="oa-card-shell">
+            <div class="template-card-head">
+              <div>
+                <strong>财务审批单</strong>
+                <div class="subtle small">报销、付款、借款、费用预支按同一审批链走。</div>
+              </div>
+            </div>
+            <form id="oaFinanceApprovalForm" class="form-grid compact">
+              <input type="hidden" name="approval_no" />
+              <select name="form_type">
+                <option value="reimbursement">报销单</option>
+                <option value="payment">付款申请</option>
+                <option value="loan">借款单</option>
+                <option value="advance">费用预支</option>
+              </select>
+              <input name="requester" placeholder="提交人" />
+              <input name="approver" placeholder="审批人 / 财务复核人" />
+              <input name="amount" type="number" min="0" step="0.01" placeholder="金额" />
+              <select name="currency">
+                <option value="KES">肯尼亚先令</option>
+                <option value="CNY">人民币</option>
+                <option value="USD">美元</option>
+              </select>
+              <select name="payment_method">
+                <option value="kenya_public_account">肯尼亚对公账户</option>
+                <option value="wechat_alipay">微信支付宝</option>
+                <option value="domestic_public_account">国内公户</option>
+              </select>
+              <input name="reference_no" placeholder="关联单号 / 流水号" />
+              <select name="status">
+                <option value="submitted">已提交</option>
+                <option value="manager_approved">主管通过</option>
+                <option value="finance_review">财务复核</option>
+                <option value="paid">已付款</option>
+                <option value="rejected">已驳回</option>
+              </select>
+              <input name="note" placeholder="说明，如店面装修付款" />
+              <button type="submit">保存审批单</button>
+            </form>
+            <div id="oaFinanceApprovalList" class="oa-record-list"></div>
+            <pre id="oaFinanceApprovalOutput" class="output hidden-output"></pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>账号 / 用户</h2>
+          <button data-action="load-users" type="button">读取用户</button>
+        </div>
+        <form id="userForm" class="form-grid compact">
+          <input name="username" placeholder="Username" value="cashier_utawala_1" />
+          <input name="full_name" placeholder="Full name" value="Utawala Cashier 1" />
+          <input name="role_code" placeholder="Role code" value="cashier" />
+          <input name="store_code" placeholder="Store code" value="UTAWALA" />
+          <input name="password" type="password" placeholder="Temporary password" value="demo1234" />
+          <button type="submit">新建用户</button>
+        </form>
+        <div class="button-row">
+          <button data-action="load-roles" type="button">角色</button>
+          <button data-action="load-users" type="button">用户</button>
+        </div>
+        <div id="userResultSummary" class="candidate-summary empty-state">
+          这里会显示用户创建结果，或者当前系统中有哪些角色和账号。
+        </div>
+        <pre id="userOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>1. 新建商品</h2>
+        </div>
+        <form id="productForm" class="form-grid">
+          <select
+            name="supplier_name"
+            data-supplier-select="required"
+            data-supplier-new-target="productSupplierInline"
+            data-display-language="bilingual"
+            data-field-help="建商品时直接选供应商；没有就展开下面先建。"
+          >
+            <option value="">请先读取供应商</option>
+          </select>
+          <div id="productSupplierInline" class="inline-creator hidden-screen">
+            <div class="inline-creator-head">
+              <strong>当前页新建供应商</strong>
+              <span class="subtle small">新建后会自动选中，继续当前商品建档。</span>
+            </div>
+            <div class="inline-creator-grid">
+              <input name="supplier_name_new" placeholder="供应商名称" />
+              <input name="supplier_name_zh_new" placeholder="供应商中文名（可选）" />
+              <input name="supplier_code_new" placeholder="供应商代码（可留空自动生成）" />
+              <input name="supplier_contact_person_new" placeholder="联系人" />
+              <input name="supplier_phone_new" placeholder="联系电话" />
+              <input name="supplier_note_new" placeholder="备注" />
+            </div>
+            <button type="button" class="ghost-button" data-inline-supplier-submit="productForm">保存供应商并选中</button>
+          </div>
+          <select name="category_main" data-product-category-main>
+            <option value="">请先选择供应商</option>
+          </select>
+          <select name="category_sub" data-product-category-sub>
+            <option value="">请先选择商品大类</option>
+          </select>
+          <div id="productCategoryInline" class="inline-creator hidden-screen">
+            <div class="inline-creator-head">
+              <strong>当前供应商新增品类</strong>
+              <span class="subtle small">不同供应商的货不一样。先锁供应商，再给这个供应商维护自己的大类 / 小类。</span>
+            </div>
+            <div class="inline-creator-grid">
+              <input name="product_category_main_new" placeholder="商品大类，例如 pants" />
+              <input name="product_category_main_zh_new" placeholder="商品大类中文，例如 裤装" />
+              <input name="product_category_sub_new" placeholder="商品小类，例如 sweat pant" />
+              <input name="product_category_sub_zh_new" placeholder="商品小类中文，例如 卫裤" />
+              <input name="product_category_editing_key" type="hidden" />
+            </div>
+            <button type="button" class="ghost-button" data-product-category-save>保存到当前供应商并选中</button>
+          </div>
+          <button type="submit">创建商品</button>
+        </form>
+        <div id="productResultSummary" class="candidate-summary empty-state">
+          这里会显示商品建档后的中文摘要。
+        </div>
+        <div id="productCategoryScopeSummary" class="candidate-summary empty-state">
+          先锁供应商。这里会显示当前供应商可用的大类 / 小类，并支持直接编辑。
+        </div>
+        <div id="productCategoryScopeList" class="candidate-summary empty-state">
+          当前还没有选择供应商，无法显示这个供应商的品类范围。
+        </div>
+        <div class="line-builder import-workbench">
+          <div class="line-builder-head">
+            <div>
+              <strong>批量导入</strong>
+              <p>先下载 Excel 模版，按列填完后上传；系统识别后，你可以在下面继续改。</p>
+            </div>
+            <a class="ghost-button mini-button" href="./assets/product_bulk_import_template.xlsx" download>下载 Excel 模版</a>
+          </div>
+          <form id="productImportPreviewForm" class="form-grid compact">
+            <div class="field-stack">
+              <label for="productImportFile">上传 Excel / CSV</label>
+              <input id="productImportFile" name="import_file" type="file" accept=".xlsx,.csv" />
+            </div>
+            <button type="submit">上传识别</button>
+          </form>
+          <div id="productImportPreviewSummary" class="candidate-summary empty-state">
+            上传后，这里会显示识别结果；下面的识别框可以直接改，再批量创建。
+          </div>
+          <div class="line-builder-head">
+            <div>
+              <strong>识别框（可编辑）</strong>
+              <p>支持直接改供应商、大类、小类，再一键批量创建。</p>
+            </div>
+            <div class="button-row">
+              <button type="button" class="ghost-button mini-button" data-product-import-add>新增一行</button>
+              <button type="button" class="ghost-button mini-button" id="productBulkCreateButton">批量创建商品</button>
+            </div>
+          </div>
+          <div id="productImportRowsBuilder" class="line-builder-body"></div>
+        </div>
+        <pre id="productOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>2. 生成内部商品码</h2>
+        </div>
+        <form id="barcodeAssignForm" class="form-grid compact">
+          <input name="product_id" placeholder="商品 ID（创建商品后自动带出）" />
+          <input name="barcode" placeholder="留空则系统自动生成内部商品码" />
+          <button type="submit">生成并绑定内部商品码</button>
+        </form>
+        <div id="barcodeAssignResultSummary" class="candidate-summary empty-state">
+          这里是系统内部商品码，不等于最终贴到衣服上的门店销售标签。
+        </div>
+        <pre id="barcodeAssignOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>6.1 门店配货 / 配送跟踪</h2>
+          <button id="loadTransferDispatchButton" type="button">读取最近调拨单</button>
+        </div>
+        <div class="candidate-summary">
+          <div class="transfer-flow-strip">
+            <span class="store-flag">delivery batch</span>
+            <span class="store-flag">shipment session</span>
+            <span class="store-flag">差异留痕</span>
+          </div>
+          <div class="subtle small">这一页按“履约追踪台”来用。仓库 / 履约调度在这里看 `transfer_order`、`warehouseout dispatch bale` 和 `delivery_batch / shipment_session`，暂时只处理发运跟踪。</div>
+        </div>
+        <form id="transferShipForm" class="form-grid compact">
+          <input name="transfer_no" placeholder="调拨单号，例如 TO-..." />
+          <div id="transferShipTargetHint" class="flow-summary-note">输入调拨单号后，这里会显示目标门店，发运前先核对。</div>
+          <input name="driver_name" placeholder="司机，例如 Driver A" value="Driver A" />
+          <input name="vehicle_no" placeholder="车辆，例如 KDM-001A" value="KDM-001A" />
+          <textarea name="note" rows="3" placeholder="发运备注，例如 10:30 离仓，先送 Utawala。"></textarea>
+          <button type="submit">确认发运 / 建 shipment session</button>
+        </form>
+        <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
+          这里会显示发运和 shipment session。
+        </div>
+        <div id="transferDispatchSummary" class="candidate-summary empty-state">
+          先创建并审核调拨单，这里再读取最近调拨单，就能看哪些单待仓库配货、待打印和待配送。
+        </div>
+        <pre id="labelPrintOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>3. 仓库收货</h2>
+        </div>
+        <form id="receiptForm" class="form-grid">
+          <input name="receipt_no" placeholder="Receipt no" value="GR-DEMO-001" />
+          <input name="warehouse_code" placeholder="Warehouse code" value="WH1" />
+          <select
+            name="supplier_name"
+            data-supplier-select="required"
+            data-supplier-new-target="receiptSupplierInline"
+            data-field-help="仓库收货时从供应商主数据里选，避免同一个供应商写出多个名字。"
+          >
+            <option value="">请先读取供应商</option>
+          </select>
+          <div id="receiptSupplierInline" class="inline-creator hidden-screen">
+            <div class="inline-creator-head">
+              <strong>当前页新建供应商</strong>
+              <span class="subtle small">新建后会自动选中，不用离开收货页面。</span>
+            </div>
+            <div class="inline-creator-grid">
+              <input name="supplier_name_new" placeholder="供应商名称" />
+              <input name="supplier_name_zh_new" placeholder="供应商中文名（可选）" />
+              <input name="supplier_code_new" placeholder="供应商代码（可留空自动生成）" />
+              <input name="supplier_contact_person_new" placeholder="联系人" />
+              <input name="supplier_phone_new" placeholder="联系电话" />
+              <input name="supplier_note_new" placeholder="备注" />
+            </div>
+            <button type="button" class="ghost-button" data-inline-supplier-submit="receiptForm">保存供应商并选中</button>
+          </div>
+          <input name="receipt_date" placeholder="Receipt date" value="2026-04-14" />
+          <textarea
+            name="items_json"
+            class="json-raw-field"
+            rows="5"
+            placeholder='[{"barcode":"生成后自动带出","received_qty":20,"cost_price":450}]'
+          >[]</textarea>
+          <div class="line-builder" data-builder="receipt-items">
+            <div class="line-builder-head">
+              <div>
+                <strong>收货商品明细</strong>
+                <p>一行代表一个条码和本次收货数量。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-builder-add="receipt-items">新增一行</button>
+            </div>
+            <div id="receiptItemsBuilder" class="line-builder-body"></div>
+          </div>
+          <button type="submit">提交收货</button>
+        </form>
+        <div id="receiptResultSummary" class="candidate-summary empty-state">
+          这里会显示收货成功后的摘要，比如收了多少 SKU、多少件、进了哪个仓。
+        </div>
+        <pre id="receiptOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4. 货架位管理</h2>
+          <button type="button">查看货架区结构</button>
+        </div>
+        <div class="candidate-summary">
+          这里先作为仓库货架区的管理入口，后面你可以继续补货架区编码规则、容量阈值、上架优先级和异常库位治理。
+        </div>
+        <ul class="simple-list">
+          <li>维护仓区、排、列、层的编码标准，避免不同人录出不同格式。</li>
+          <li>按区域定义容量上限，后面可以接超量预警和热区平衡。</li>
+          <li>把分拣入库后的目标货架位和长期货架规划收口到这里统一维护。</li>
+        </ul>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.1 打印模版管理</h2>
+          <button data-action="load-label-templates" type="button">读取所有模版</button>
+        </div>
+        <div class="candidate-summary" id="labelTemplateManagerSummary">
+          这里只看模版样式，不在这里编辑。读取后会按商品标签、仓库 raw bale、送店 / 待送店 bale 分组显示当前系统里的模版。
+        </div>
+        <pre id="labelTemplateOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.2 中方来源 Bale 录入</h2>
+        </div>
+        <form id="chinaSourceBaleForm" class="form-grid compact">
+          <input type="hidden" name="source_pool_token" value="" />
+          <select name="container_type">
+            <option value="">请选择整柜类型</option>
+            <option value="服装整柜">服装整柜</option>
+            <option value="百货整柜">百货整柜</option>
+          </select>
+          <input name="customs_notice_no" placeholder="填写这柜船单，例如 GOSUQ I N6862022" />
+          <div id="chinaSourceBalePreviewSummary" class="report-summary">
+            <div class="report-summary-grid">
+              <article class="store-metric"><strong>当前总计包数</strong><span>0</span></article>
+              <article class="store-metric"><strong>当前总计重量</strong><span>0 KG</span></article>
+            </div>
+          </div>
+          <div class="line-builder import-workbench">
+            <div class="line-builder-head">
+              <div>
+                <strong>批量导入整柜内容</strong>
+                <p>先下载模板填供应商、包裹编码、中英大类/小类、包数、单包重量和包裹单价；上传后会自动识别到下面的录入框里，你可以继续改。</p>
+              </div>
+              <a class="ghost-button mini-button" href="./assets/china_source_bale_import_template_v改.xlsx" download>下载 Excel 模版</a>
+            </div>
+            <div id="chinaSourceImportWorkbench" class="form-grid compact">
+              <div class="field-stack">
+                <label for="chinaSourceImportFile">上传 Excel / CSV</label>
+                <input id="chinaSourceImportFile" name="import_file" type="file" accept=".xlsx,.csv" />
+              </div>
+              <button type="button" id="chinaSourceImportPreviewButton">上传识别</button>
+            </div>
+            <div id="chinaSourceImportPreviewSummary" class="candidate-summary empty-state">
+              上传后会直接写入下面的识别框；这里只保留导入状态提示。
+            </div>
+          </div>
+          <div class="line-builder">
+            <div class="line-builder-head">
+              <div>
+                <strong>柜内内容录入（识别框，可编辑）</strong>
+                <p>中方团队先录这柜的来源结构和包裹货值；后面肯方入仓时只需要选这张船单对应的来源项，不再重新手填供应商和品类。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-china-source-row-add>添加一行</button>
+            </div>
+            <div id="chinaSourceRowsBuilder" class="line-builder-body"></div>
+          </div>
+          <div class="button-row">
+            <button id="chinaSourceReceiptSheetPrintButton" type="button" class="ghost-button">打印 A4 收货对照单</button>
+          </div>
+          <div id="chinaSourceSupplierInline" class="inline-creator hidden-screen">
+            <div class="inline-creator-head">
+              <strong>当前页新建供应商</strong>
+              <span class="subtle small">保存后会自动选中，不用离开当前整柜录入。</span>
+            </div>
+            <div class="inline-creator-grid">
+              <input name="supplier_name_new" placeholder="供应商名称" />
+              <input name="supplier_code_new" placeholder="供应商代码（可留空自动生成）" />
+              <input name="supplier_contact_person_new" placeholder="联系人" />
+              <input name="supplier_phone_new" placeholder="联系电话" />
+              <input name="supplier_note_new" placeholder="备注" />
+            </div>
+            <button type="button" class="ghost-button" data-inline-supplier-submit="chinaSourceBaleForm">保存供应商并选中</button>
+          </div>
+          <div id="chinaSourceCategoryInline" class="inline-creator hidden-screen">
+            <div class="inline-creator-head">
+              <strong>当前页新建品类</strong>
+              <span class="subtle small">保存后会并入下拉选项，后续包裹入库也能直接共用。</span>
+            </div>
+            <div class="inline-creator-grid">
+              <input name="category_main_new" placeholder="商品大类，例如 dress" />
+              <input name="category_main_zh_new" placeholder="商品大类中文，例如 连衣裙" />
+              <input name="category_sub_new" placeholder="商品小类，例如 short dress" />
+              <input name="category_sub_zh_new" placeholder="商品小类中文，例如 短裙" />
+            </div>
+            <button type="button" class="ghost-button" data-china-source-category-save>保存品类并刷新下拉</button>
+          </div>
+          <div id="chinaSourceBaleNotice" class="inline-feedback hidden-screen" data-empty-text=""></div>
+          <button type="submit">完成全部录入</button>
+          <button id="chinaSourceCostListButton" type="button" class="ghost-button">查看列表 / 补填成本</button>
+        </form>
+        <pre id="chinaSourceBaleOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel china-source-cost-panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.3 中方来源列表 / 补填成本</h2>
+        </div>
+        <div class="split-grid china-source-cost-top">
+          <div id="chinaSourceCostRecordList" class="candidate-summary empty-state">
+            这里会显示已经录入的中方来源整柜记录，并按中方录入、财务补成本、肯方入仓、分拣确认的顺序显示当前状态。
+          </div>
+          <div class="report-summary" id="chinaSourceCostSummary">
+            <div class="empty-state">先从左侧选一条中方来源记录。这里会显示货值汇总、三段附加成本、成本池和下一步该由哪边团队继续处理。</div>
+          </div>
+        </div>
+        <form id="chinaSourceCostForm" class="form-grid compact china-source-cost-form">
+          <select name="source_pool_token">
+            <option value="">请选择要补填成本的中方记录</option>
+          </select>
+          <div class="line-builder china-cost-stage">
+            <div class="line-builder-head">
+              <div>
+                <strong>头程运输费用</strong>
+                <p>录运输费用和付款信息，支持上传截图凭证。</p>
+              </div>
+            </div>
+            <div class="line-builder-grid">
+              <input name="head_transport_amount" type="number" min="0" step="0.01" placeholder="金额" />
+              <select name="head_transport_currency">
+                <option value="CNY">人民币</option>
+                <option value="KES">肯尼亚先令</option>
+                <option value="USD">美元</option>
+              </select>
+              <select name="head_transport_payment_method">
+                <option value="">付款方式</option>
+                <option value="kenya_public_account">肯尼亚对公账户</option>
+                <option value="wechat_alipay">微信支付宝</option>
+                <option value="china_public_account">国内公户</option>
+              </select>
+              <input name="head_transport_payer" placeholder="付款人" />
+              <input name="head_transport_reference" placeholder="付款流水号" />
+              <div class="field-stack" style="grid-column: 1 / -1;">
+                <label for="headTransportFiles">上传头程凭证截图</label>
+                <input id="headTransportFiles" name="head_transport_files" type="file" accept="image/*" multiple />
+              </div>
+            </div>
+          </div>
+          <div class="line-builder china-cost-stage">
+            <div class="line-builder-head">
+              <div>
+                <strong>清关费用</strong>
+                <p>录清关费用和付款信息，支持上传截图凭证。</p>
+              </div>
+            </div>
+            <div class="line-builder-grid">
+              <input name="customs_clearance_amount" type="number" min="0" step="0.01" placeholder="金额" />
+              <select name="customs_clearance_currency">
+                <option value="KES">肯尼亚先令</option>
+                <option value="CNY">人民币</option>
+                <option value="USD">美元</option>
+              </select>
+              <select name="customs_clearance_payment_method">
+                <option value="">付款方式</option>
+                <option value="kenya_public_account">肯尼亚对公账户</option>
+                <option value="wechat_alipay">微信支付宝</option>
+                <option value="china_public_account">国内公户</option>
+              </select>
+              <input name="customs_clearance_payer" placeholder="付款人" />
+              <input name="customs_clearance_reference" placeholder="付款流水号" />
+              <div class="field-stack" style="grid-column: 1 / -1;">
+                <label for="customsClearanceFiles">上传清关凭证截图</label>
+                <input id="customsClearanceFiles" name="customs_clearance_files" type="file" accept="image/*" multiple />
+              </div>
+            </div>
+          </div>
+          <div class="line-builder china-cost-stage">
+            <div class="line-builder-head">
+              <div>
+                <strong>尾程费用</strong>
+                <p>录尾程费用和付款信息，支持上传截图凭证。</p>
+              </div>
+            </div>
+            <div class="line-builder-grid">
+              <input name="tail_transport_amount" type="number" min="0" step="0.01" placeholder="金额" />
+              <select name="tail_transport_currency">
+                <option value="KES">肯尼亚先令</option>
+                <option value="CNY">人民币</option>
+                <option value="USD">美元</option>
+              </select>
+              <select name="tail_transport_payment_method">
+                <option value="">付款方式</option>
+                <option value="kenya_public_account">肯尼亚对公账户</option>
+                <option value="wechat_alipay">微信支付宝</option>
+                <option value="china_public_account">国内公户</option>
+              </select>
+              <input name="tail_transport_payer" placeholder="付款人" />
+              <input name="tail_transport_reference" placeholder="付款流水号" />
+              <div class="field-stack" style="grid-column: 1 / -1;">
+                <label for="tailTransportFiles">上传尾程凭证截图</label>
+                <input id="tailTransportFiles" name="tail_transport_files" type="file" accept="image/*" multiple />
+              </div>
+            </div>
+          </div>
+          <div id="chinaSourceCostNotice" class="inline-feedback hidden-screen" data-empty-text=""></div>
+          <button type="submit">保存补填成本</button>
+        </form>
+        <pre id="chinaSourceCostOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.4 商品身份证 ID 台账</h2>
+        </div>
+        <div class="subtle small">输入商品身份证 ID、商品 barcode 或 token 号，查看这件货从来源 bale、分拣、门店配货、打印、上架到销售/退仓的完整轨迹。</div>
+        <form id="itemIdentityLedgerForm" class="form-grid compact">
+          <input name="identity_no" placeholder="输入身份证 ID / token 号 / 商品 barcode" />
+          <button type="submit">查询这件货</button>
+        </form>
+        <div id="itemIdentityLedgerSummary" class="candidate-summary empty-state">
+          这里会显示这件货当前状态、成本售价、当前位置、销售记录、退仓记录和全流程时间线。
+        </div>
+        <pre id="itemIdentityLedgerOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.5 直挂拆包计件 / 成本确认</h2>
+        </div>
+        <div class="subtle small">只给“已经分好、可直接挂店”的例外流使用。这里先按来源 bale 拆包计件，锁完单件成本后，后面门店配货直接继承这份成本。</div>
+        <div class="split-grid">
+          <form id="directHangUnpackForm" class="form-grid compact">
+            <select name="source_bale_token">
+              <option value="">请选择要拆包计件的来源 bale</option>
+            </select>
+            <input name="unpacked_package_count" type="number" min="1" step="1" placeholder="本次拆包包数，例如 1" />
+            <input name="counted_piece_qty" type="number" min="1" step="1" placeholder="实际点数，例如 400 件" />
+            <input name="opened_at" type="date" />
+            <input name="handled_by" placeholder="拆包计件人，例如 Peter" />
+            <textarea name="note" rows="3" placeholder="备注，例如 这批是 Mrma 工装裤，opening day 前拆包计数。"></textarea>
+            <div id="directHangUnpackNotice" class="inline-feedback hidden-screen" data-empty-text=""></div>
+            <button type="submit">确认拆包计件并锁单件成本</button>
+          </form>
+          <div id="directHangUnpackSummary" class="candidate-summary empty-state">
+            先选择一个中方来源 bale，再录拆包包数和实际点数，系统会自动锁这条例外直挂流的单件成本。
+          </div>
+        </div>
+        <div id="directHangUnpackRecordList" class="candidate-summary empty-state">
+          这里会显示已经确认过的直挂拆包计件记录，后面给门店配货时直接吃这份单件成本。
+        </div>
+        <pre id="directHangUnpackOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.7 默认成本价管理</h2>
+        </div>
+        <div class="subtle small">这张表先作为主分拣流的默认成本价配置页。当前只维护大类 / 小类 / 等级 P/S 对应的默认成本价，先给仓库端一个统一口径。</div>
+        <div class="split-grid">
+          <form id="apparelDefaultCostForm" class="form-grid compact">
+            <select name="category_main">
+              <option value="">请选择商品大类</option>
+            </select>
+            <select name="category_sub">
+              <option value="">请选择商品小类</option>
+            </select>
+            <select name="grade">
+              <option value="P">P</option>
+              <option value="S">S</option>
+            </select>
+            <input name="default_cost_kes" type="number" min="0.01" step="0.01" placeholder="默认成本价（KES），例如 185" />
+            <input name="note" placeholder="备注，例如 女装上衣 P 档默认成本" />
+            <button type="submit">保存默认成本价</button>
+          </form>
+          <div id="apparelDefaultCostSummary" class="candidate-summary empty-state">
+            这里会显示当前选中的默认成本价口径，以及现有 P/S 档配置数量。
+          </div>
+        </div>
+        <div id="apparelDefaultCostList" class="candidate-summary empty-state">
+          这里会显示已经保存的默认成本价配置，后面再接 0.2 分拣结果明细。
+        </div>
+        <pre id="apparelDefaultCostOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.8 分拣库位管理</h2>
+        </div>
+        <div class="subtle small">这张表锁在默认成本价管理后面。当前仓库分拣结果不贴码，所以同一库位不能混不同“大类 / 小类 / P-S 等级 / 默认成本价”档案；0.2 会直接按这里带出并锁定库位。</div>
+        <div class="split-grid">
+          <form id="apparelSortingRackForm" class="form-grid compact">
+            <select name="category_main">
+              <option value="">请选择商品大类</option>
+            </select>
+            <select name="category_sub">
+              <option value="">请选择商品小类</option>
+            </select>
+            <select name="grade">
+              <option value="P">P</option>
+              <option value="S">S</option>
+            </select>
+            <input name="default_cost_kes" type="number" min="0.01" step="0.01" placeholder="默认成本价（跟 4.7 走）" readonly />
+            <input name="rack_code" placeholder="锁定分拣库位，例如 A-TS-P-01" />
+            <input name="note" placeholder="备注，例如 女装上衣 P 档只放这格" />
+            <button type="submit">保存分拣库位</button>
+          </form>
+          <div id="apparelSortingRackSummary" class="candidate-summary empty-state">
+            这里会显示当前选中的分拣库位口径，以及同一库位不能混放的锁定规则。
+          </div>
+        </div>
+        <div id="apparelSortingRackList" class="candidate-summary empty-state">
+          这里会显示已经保存的分拣库位配置，后面 0.2 分拣确认入库直接复用，不再手填库位。
+        </div>
+        <pre id="apparelSortingRackOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>5. 耗材管理</h2>
+          <button type="button">查看耗材台账</button>
+        </div>
+        <div class="candidate-summary">
+          这里先放仓库耗材台账，后面可以继续加标签纸、碳带、缠绕膜、打包袋和办公耗材的领用记录。
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>标签纸</strong><span>12 卷</span></article>
+          <article class="store-metric"><strong>碳带</strong><span>8 卷</span></article>
+          <article class="store-metric"><strong>打包袋</strong><span>460 个</span></article>
+          <article class="store-metric"><strong>低库存项</strong><span>2 项</span></article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>6. 固定资产</h2>
+          <button type="button">查看设备清单</button>
+        </div>
+        <div class="candidate-summary">
+          这里先集中管理仓库固定资产，后面可以接打印机、PDA、称重设备、分拣台和电脑的责任人、状态与保养周期。
+        </div>
+        <ul class="simple-list">
+          <li>条码打印机：2 台，1 台在入仓区，1 台在分拣区。</li>
+          <li>手持 PDA：6 台，建议后面补充责任人和盘点签收。</li>
+          <li>电子秤：3 台，建议后面接校准日期和异常报修记录。</li>
+        </ul>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>7. 综合看板</h2>
+          <button type="button">刷新综合看板</button>
+        </div>
+        <div class="report-summary-grid">
+          <article class="store-metric"><strong>待入仓主档</strong><span>5</span></article>
+          <article class="store-metric"><strong>待分拣任务</strong><span>7</span></article>
+          <article class="store-metric"><strong>异常库位</strong><span>3</span></article>
+          <article class="store-metric"><strong>低耗材预警</strong><span>2</span></article>
+        </div>
+        <div class="candidate-summary">
+          这里先作为仓库管理层的一页总览，后面可以继续补主档状态、打印积压、分拣效率、库位热区和设备可用率。
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>8. 需求提报</h2>
+          <button type="button">查看提报列表</button>
+        </div>
+        <div class="subtle small">这里先预留给仓库团队提报系统改动、设备申请和流程优化建议。后面你可以把审批、状态流转和负责人也接进来。</div>
+        <div class="form-grid compact">
+          <input placeholder="需求标题，如：分拣任务页增加批量关闭" />
+          <select>
+            <option>高优先级</option>
+            <option>中优先级</option>
+            <option>低优先级</option>
+          </select>
+          <input placeholder="提报人，如：仓库主管" />
+          <input placeholder="期望完成时间，如：本周五" />
+          <textarea rows="4" placeholder="补充需求背景、操作步骤和预期效果"></textarea>
+          <button type="button">暂存这条提报</button>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>门店补货流程页</h2>
+        </div>
+        <div class="candidate-summary">
+          <div class="transfer-flow-strip">
+            <span class="store-flag">4. 补货建议</span>
+            <span class="store-flag">5. 调拨确认</span>
+            <span class="store-flag">5.1 补差工单</span>
+            <span class="store-flag">6. 现成包登记 / 最终打印</span>
+            <span class="store-flag">6.1 配送签收</span>
+          </div>
+          <div class="subtle small">这一页像一开始入仓那样，只做流程总览。先看当前门店补货链走到哪一步，再决定去调拨确认、补差工单，还是最终送店打印。</div>
+        </div>
+        <div id="replenishmentFlowSummary" class="candidate-summary empty-state">
+          这里会显示当前门店补货流程状态：调拨单是否已创建、现成包登记进度、补差工单进度，以及是否已经满足最终送店打印条件。
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4. 门店补货建议</h2>
+        </div>
+        <div class="candidate-summary">
+          <div class="transfer-flow-strip">
+            <span class="store-flag">14 天销售</span>
+            <span class="store-flag">门店现货 / 待上架 / 在途</span>
+            <span class="store-flag">卖多少补多少</span>
+            <span class="store-flag">进入履约链</span>
+          </div>
+          <div class="subtle small">这里先读取最近 14 天真实销售，再扣掉门店现货、待上架 token 和在途 warehouseout dispatch bale，直接按“卖多少、卖什么，就补多少、补什么”生成类目级补货建议。这页只做补货建议形成，后面继续接同一条仓库履约链。</div>
+        </div>
+        <form id="recommendationForm" class="form-grid compact form-clean-placeholders">
+          <input name="from_warehouse_code" placeholder="来源仓，例如 WH1" value="WH1" />
+          <input name="to_store_code" placeholder="目标门店，例如 UTAWALA" value="UTAWALA" />
+          <button type="submit">生成补货建议</button>
+        </form>
+        <div id="recommendationResultSummary" class="candidate-summary empty-state">
+          这里会显示系统给出的补货建议摘要。
+        </div>
+        <div class="button-row">
+          <button id="recommendationSelectAllButton" type="button">全部加入调拨草稿</button>
+          <button id="recommendationClearSelectionButton" type="button">清空当前已选</button>
+        </div>
+        <div id="recommendationCandidateList" class="candidate-list">
+          <div class="empty-state">生成建议后，这里会列出建议类目、建议件数，以及 14 天销量、现货、待上架、在途的扣减依据。直接加入或移出调拨草稿即可。</div>
+        </div>
+        <pre id="recommendationOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.1 手动生成配货单</h2>
+        </div>
+        <div class="candidate-summary">
+          <div class="transfer-flow-strip">
+            <span class="store-flag">手动配货需求</span>
+            <span class="store-flag">优先吃掉已打包待送店包裹</span>
+            <span class="store-flag">散货补差按 200 件封 bale</span>
+            <span class="store-flag">提交仓库执行</span>
+          </div>
+          <div class="subtle small">手动配货单是需求来源，不直接扣库存、不手选成本层、不手选 token。店长 / 运营只确认门店要补什么，系统再把需求拆成两段：先吃掉现成待送店包裹，不够的部分再从散货里补差，并按 200 件 / bale 形成仓库备货计划。</div>
+        </div>
+        <div class="transfer-prep-shell">
+          <article class="transfer-ops-card transfer-prep-form-card">
+            <div class="transfer-workbench-head">
+              <span class="eyebrow">Manual</span>
+              <h3>手动配货单录入</h3>
+              <p>手动录入目标门店、类目和数量；生成后仍进入仓库配货、待送店 bale 打码、门店签收这条正式履约链。</p>
+            </div>
+            <form id="transferForm" class="form-grid compact form-clean-placeholders">
+              <input name="from_warehouse_code" placeholder="来源仓，例如 WH1" value="WH1" />
+              <input name="to_store_code" placeholder="目标门店，例如 UTAWALA" value="UTAWALA" />
+              <select name="approval_required">
+                <option value="true">需要主管审核</option>
+                <option value="false">直接下发仓库</option>
+              </select>
+              <textarea
+                name="items_json"
+                class="json-raw-field hidden-screen"
+                rows="5"
+                placeholder='[{"category_main":"pants","category_sub":"jeans pant","requested_qty":5}]'
+              >[]</textarea>
+              <div class="line-builder" data-builder="transfer-items">
+                <div class="line-builder-head">
+                  <div>
+                    <strong>调拨需求类目明细</strong>
+                    <p>一行代表一个商品大类 / 小类和要发去门店的数量。这里只录需求，不选择具体 token 或成本批次，仓库执行时按 FIFO 成本层和正式 barcode 规则处理。</p>
+                  </div>
+                  <button type="button" class="ghost-button mini-button" data-builder-add="transfer-items">新增一行</button>
+                </div>
+                <div id="transferItemsBuilder" class="line-builder-body"></div>
+              </div>
+              <button type="submit">手动生成配货单</button>
+            </form>
+          </article>
+
+          <div class="transfer-prep-stack">
+            <article class="transfer-ops-card transfer-prep-summary-card">
+              <div class="transfer-workbench-head is-compact">
+                <span class="eyebrow">Draft</span>
+                <h3>当前调拨草稿</h3>
+                <p>这里实时汇总门店本次要补的类目和件数，方便先看草稿，再决定是否生成正式配货任务。</p>
+              </div>
+              <div id="transferDraftSummary" class="candidate-summary empty-state">
+                先在上一页加入建议类目，或在左侧手动补充大类、小类和件数，这里会实时显示这张门店调拨草稿。
+              </div>
+            </article>
+
+            <article class="transfer-ops-card transfer-prep-summary-card">
+              <div class="transfer-workbench-head is-compact">
+                <span class="eyebrow">Plan</span>
+                <h3>系统备货拆解结果</h3>
+                <p>系统会优先吃现成待送店包裹，不够的部分再从散货里补差，并按 200 件 / bale 规划最终送店包。</p>
+              </div>
+              <div id="transferPreparationPlanSummary" class="candidate-summary empty-state">
+                这里会把当前调拨草稿拆成仓库真实动作：先拿哪些待送店包裹，再补哪些散货、要新打几个 bale，以及这次最终预计会生成多少个送店 bale。
+              </div>
+            </article>
+          </div>
+        </div>
+        <div id="transferResultSummary" class="candidate-summary empty-state">
+          这里会显示配货任务和门店调拨单创建后的中文摘要。
+        </div>
+        <pre id="transferOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>5.1 补差打包工单</h2>
+        </div>
+        <div class="candidate-summary">
+          <div class="transfer-flow-strip">
+            <span class="store-flag">按调拨单生成</span>
+            <span class="store-flag">散货补差</span>
+            <span class="store-flag">封包上限可选</span>
+            <span class="store-flag">完成后回 6 打印</span>
+          </div>
+          <div class="subtle small">这页不是说明板，而是散货补差拣货单页。只有现成待送店包裹不够时，才在这里生成 1 张 barcode 拣货单给工人去拣货和贴包。</div>
+        </div>
+        <div class="transfer-prep-shell replenishment-workorder-shell">
+          <article class="transfer-ops-card transfer-prep-form-card">
+            <div class="transfer-workbench-head">
+              <span class="eyebrow">Step 3</span>
+              <h3>补差拣货单生成器</h3>
+              <p>输入当前调拨单号，选择封包上限，系统只生成 1 张带 barcode 的补差拣货单。工人按这张单拣货，拣完直接贴到补差包上。</p>
+            </div>
+            <form id="loosePackingTaskPlanForm" class="form-grid compact warehouse-prep-toolbar">
+              <input name="transfer_no" placeholder="调拨单号" />
+              <label class="field-control">
+                <span>封包上限</span>
+                <select name="package_limit_qty">
+                  <option value="50">小于 50 件</option>
+                  <option value="100">小于 100 件</option>
+                  <option value="200" selected>小于 200 件</option>
+                </select>
+              </label>
+              <button type="submit">生成补差拣货单 barcode</button>
+            </form>
+            <div id="loosePackingTaskPlanNotice" class="inline-notice-slot" aria-live="polite"></div>
+            <div id="loosePackingTaskPlanSummary" class="candidate-summary empty-state">
+              先读取一张门店调拨单，再决定是否需要生成补差拣货单。
+            </div>
+          </article>
+
+          <article class="transfer-ops-card transfer-prep-summary-card">
+            <div class="transfer-workbench-head">
+              <span class="eyebrow">Workorders</span>
+              <h3>当前补差拣货单</h3>
+              <p>右侧只保留一张可贴包的 barcode 拣货单。工人按单拣货，完成后点一次确认封包，最终送店打印才会放行。</p>
+            </div>
+            <div id="loosePackingTaskList" class="candidate-summary empty-state">
+              如果当前调拨单有散货补差需求，这里会生成并显示 1 张补差拣货单 barcode。
+            </div>
+          </article>
+        </div>
+        <pre id="loosePackingTaskOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>6. 仓库配货 / 出库打印</h2>
+        </div>
+        <div class="candidate-summary">
+          <div class="transfer-flow-strip">
+            <span class="store-flag">审核并锁库存</span>
+            <span class="store-flag">先找现成待送店包裹</span>
+            <span class="store-flag">散货补差封 bale</span>
+            <span class="store-flag">批量打印送店 barcode + 箱单</span>
+          </div>
+          <div class="subtle small">这一页按“仓库执行台”来用。工人先根据系统列出的待送店包裹 barcode 去找货，再把不够的散货补差打成 bale，最后统一生成门店送店 bale、箱单和门店验收 barcode。</div>
+        </div>
+        <div class="warehouse-prep-shell">
+          <article class="transfer-ops-card warehouse-prep-card warehouse-prep-overview">
+            <div class="transfer-workbench-head">
+              <span class="eyebrow">Step 2</span>
+              <h3>备货执行总览</h3>
+              <p>仓库执行台现在只做真动作：先审核并读当前执行单，再扫现成包、核补差工单完成度，最后才放行最终送店打印。</p>
+            </div>
+            <form id="approveTransferForm" class="form-grid compact warehouse-prep-toolbar">
+              <input name="transfer_no" placeholder="调拨单号" />
+              <button type="submit">审核并锁库存</button>
+            </form>
+            <div id="transferWorkbenchSummary" class="candidate-summary empty-state">
+              先填入门店调拨单号，或从 4.1 手动生成配货单后自动带入。这里会显示这单现在需要找多少现成待送店包裹、还要补多少散货、预计形成多少个最终送店 bale。
+            </div>
+          </article>
+
+          <div class="warehouse-prep-main">
+            <div class="warehouse-prep-lanes">
+              <article class="transfer-ops-card warehouse-prep-card">
+                <div class="transfer-workbench-head is-compact">
+                  <span class="eyebrow">Lane A</span>
+                  <h3>优先现成包</h3>
+                  <p>这里不让工人手录需求，只做现成待送店包裹扫码登记。系统先列清单，工人按 barcode 去找，找到就扫描确认。</p>
+                </div>
+                <form id="preparedBaleRegistrationForm" class="form-grid compact warehouse-prep-toolbar">
+                  <input name="transfer_no" placeholder="调拨单号" />
+                  <input name="prepared_bale_barcode" placeholder="扫描现成待送店包裹 barcode" />
+                  <button type="submit">扫描确认现成包</button>
+                </form>
+                <div id="preparedBaleRegistrationNotice" class="inline-notice-slot" aria-live="polite"></div>
+                <div id="transferPreparedBaleProgressSummary" class="candidate-summary empty-state">
+                  这里会显示当前调拨单还要找几包现成待送店包裹，以及哪些已经扫码登记完成。
+                </div>
+                <div id="transferPreparedBaleQueue" class="candidate-summary empty-state">
+                  这里按类目列本次优先要去找的待送店包裹。每个包都带现成 barcode，工人按 barcode 找货，找到后并入本次送店。
+                </div>
+              </article>
+
+              <article class="transfer-ops-card warehouse-prep-card">
+                <div class="transfer-workbench-head is-compact">
+                  <span class="eyebrow">Lane B</span>
+                  <h3>补差打包</h3>
+                  <p>这里不直接做打包动作。补差打包必须去 5.1 工单页执行；这一栏只看当前补差工单是否已经全部完成。</p>
+                </div>
+                <div id="transferLoosePackingProgressSummary" class="candidate-summary empty-state">
+                  这里会显示当前调拨单的补差工单进度。只有补差工单全部完成，最终送店打印才会放行。
+                </div>
+                <div id="transferLoosePackingQueue" class="candidate-summary empty-state">
+                  如果现成待送店包裹不够，这里会列出散货补差计划：从哪些库位拣多少件，按 200 件 / bale 打几个标准 bale，最后一个尾差 bale 是否未满。
+                </div>
+              </article>
+            </div>
+
+            <article class="transfer-ops-card warehouse-prep-card warehouse-prep-print-card">
+              <div class="transfer-workbench-head is-compact">
+                <span class="eyebrow">Lane C</span>
+                <h3>最终送店打印</h3>
+                <p>只有现成包登记完成、补差工单也全部完成，这里才允许批量打印最终送店 barcode 和箱单。</p>
+              </div>
+              <form id="transferBundleForm" class="form-grid compact warehouse-prep-toolbar">
+                <input name="transfer_no" placeholder="调拨单号" />
+                <input name="copies" type="hidden" value="1" />
+                <input name="label_copies_mode" type="hidden" value="approved_qty" />
+                <input name="grouping_mode" type="hidden" value="by_category" />
+                <input name="max_items_per_bale" type="hidden" value="200" />
+                <button type="submit">批量打印送店 barcode + 箱单</button>
+              </form>
+              <div id="transferDispatchPackagingSummary" class="candidate-summary empty-state">
+                这里会把本次最终送店 bale 汇总出来。无论源头是现成待送店包裹，还是散货补差封 bale，到这里都统一变成门店验收用的送店 barcode。
+              </div>
+            </article>
+          </div>
+        </div>
+        <div id="transferActionResultSummary" class="candidate-summary empty-state">
+          这里会显示审核锁库存、送店 bale 生成、箱单打印和门店验收条码结果。
+        </div>
+        <div class="hidden-screen">
+          <form id="transferPrintForm" class="form-grid compact">
+            <input name="transfer_no" placeholder="调拨单号" />
+            <input name="copies" type="number" value="1" min="1" />
+            <button type="submit">兼容：生成出库打印任务</button>
+          </form>
+          <form id="printPreviewForm" class="form-grid compact">
+            <input name="job_id" placeholder="打印任务号" />
+            <button type="submit">打开打印预览</button>
+          </form>
+        </div>
+        <pre id="transferActionOutput" class="output hidden-output"></pre>
+        <pre id="preparedBaleRegistrationOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>5. 门店执行控制台</h2>
+        </div>
+        <form id="storeManagerConsoleForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <button type="submit">刷新店长控制台</button>
+        </form>
+        <div id="storeManagerConsoleSummary" class="candidate-summary empty-state">
+          这是店长端首页。先看今天到货、待分配、进行中和异常，再决定跳去门店验收、分配店员或退仓处理。
+        </div>
+        <pre id="storeManagerConsoleOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-clerk" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>6.2 我的当前 bale</h2>
+        </div>
+        <form id="storeClerkHomeForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <input name="assigned_employee" list="storeClerkOptions" placeholder="当前店员，例如 Austin" value="Austin" />
+          <button type="submit">刷新我的任务</button>
+        </form>
+        <div id="storeClerkHomeSummary" class="candidate-summary empty-state">
+          这是店员端首页。这里只看分配给我的 bale，先确认今天处理哪一包，再进入主工作台或直挂工作台。
+        </div>
+        <pre id="storeClerkHomeOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-support-panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>6. 门店验收配货 bale</h2>
+        </div>
+        <form id="storeDispatchBaleAcceptForm" class="form-grid compact">
+          <input name="transfer_no" placeholder="先选择调拨单，例如 TO-20260425-010" />
+          <textarea name="bale_no" class="bulk-scan-input" rows="7" placeholder="连续扫描或粘贴本调拨单下全部门店配货 bale barcode；一行一个，也支持扫码枪连续输入。"></textarea>
+          <input name="note" placeholder="验收备注，如包装完好 / 少一包待查" value="门店整单验收完成" />
+          <button type="submit">验收完成：批量确认本调拨单全部 bale</button>
+        </form>
+        <div id="storeDispatchBaleNotice" class="inline-notice-slot" aria-live="polite"></div>
+        <div id="storeDispatchBaleSummary" class="candidate-summary empty-state">
+          这是店长端入口。先选择调拨单，再扫描或录入这张调拨单下的门店配货 bale barcode；如果 barcode 不属于当前调拨单或当前门店，系统直接报错。
+        </div>
+        <pre id="storeDispatchBaleOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>6.1 门店分配店员</h2>
+          <button data-action="load-store-dispatch-assignment" type="button">刷新待签收 / 待分配</button>
+        </div>
+        <form id="storeDispatchAssignmentForm" class="sorting-task-form warehouse-step-form">
+          <div class="sorting-task-flow">
+            <article class="sorting-task-flow-step is-active">
+              <span class="sorting-task-flow-no">01</span>
+              <strong>选择已验收总单</strong>
+              <p>按总单加载可分配 bale。</p>
+            </article>
+            <article class="sorting-task-flow-step is-pending">
+              <span class="sorting-task-flow-no">02</span>
+              <strong>选择店员</strong>
+              <p>一次可把本批多个包分给同一人。</p>
+            </article>
+            <article class="sorting-task-flow-step is-pending">
+              <span class="sorting-task-flow-no">03</span>
+              <strong>确认分配</strong>
+              <p>每个具体 bale 只能对应一个店员。</p>
+            </article>
+          </div>
+          <div class="sorting-task-layout">
+            <section class="sorting-task-panel">
+              <div class="sorting-task-panel-head">
+                <span class="eyebrow">Transfer</span>
+                <strong>待分配总单</strong>
+                <p>从已整单验收的调拨单开始分配。</p>
+              </div>
+              <input name="transfer_no" placeholder="总单 / 调拨单号，例如 TO-20260425-010" />
+              <textarea name="bale_no" rows="5" placeholder="系统会自动带出本单已验收未分配 bale；也可手工增减，一行一个。"></textarea>
+            </section>
+            <section class="sorting-task-panel sorting-task-panel-selected">
+              <div class="sorting-task-panel-head">
+                <span class="eyebrow">Clerk</span>
+                <strong>分配给店员</strong>
+                <p>店员从 6.2 我的当前 bale 进入处理。</p>
+              </div>
+              <input name="employee_name" list="storeClerkOptions" placeholder="分配给哪位店员，例如 Austin" value="Austin" />
+              <input name="note" placeholder="分配备注，例如这张总单下的这批 bale 交给同一店员处理" value="按总单批量分配；每个具体 bale 只对应一个店员" />
+              <button type="submit" class="flow-primary-action">确认批量分配给店员</button>
+            </section>
+          </div>
+        </form>
+        <div id="storeDispatchAssignmentSummary" class="candidate-summary empty-state">
+          这是店长端入口。店长从一张总单 / 调拨单开始，可以一次把这张单下的多个门店配货 bale 绑定给同一店员；每个具体 bale 只能对应一个店员。当前可选店员先固定为 Austin / Swahili。分配完成后，店员要先从“6.2 我的当前 bale”进入，再去自己的工作台。
+        </div>
+        <pre id="storeDispatchAssignmentOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel store-support-panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>7. 店员 PDA 上架工作台</h2>
+        </div>
+        <form id="storeTokenEditDirectoryForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <input name="bale_no" placeholder="按门店配货 bale 读取" />
+          <input name="assigned_employee" list="storeClerkOptions" placeholder="按店员筛选，例如 Austin" value="Austin" />
+          <button type="submit">进入当前 bale 工作台</button>
+        </form>
+        <div id="storeTokenEditNotice" class="inline-notice-slot" aria-live="polite"></div>
+        <div id="storeTokenEditSummary" class="candidate-summary empty-state">
+          这是店员端主工作台。系统会按当前 bale 自动分组，店员按品类成批设置默认售价、货架位，再单独补高价值例外，最后批量打印并完成上架。
+        </div>
+        <pre id="storeTokenEditOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>7.1 打印任务 / 重打（支持页）</h2>
+        </div>
+        <form id="storeBluetoothPrinterForm" class="form-grid compact">
+          <input name="bale_no" placeholder="当前处理的门店配货 bale" />
+          <input name="assigned_employee" list="storeClerkOptions" placeholder="当前店员，例如 Austin" value="Austin" />
+          <select name="printer_name">
+            <option value="Deli DL-720C">Deli DL-720C</option>
+          </select>
+          <select name="template_code"></select>
+          <button type="submit">连接蓝牙打印机 / 读取待贴码</button>
+        </form>
+        <form id="itemTokenPrintQueueForm" class="form-grid compact">
+          <input name="bale_no" placeholder="按当前门店配货 bale 加入打印队列" />
+          <input name="assigned_employee" list="storeClerkOptions" placeholder="当前店员，例如 Austin" value="Austin" />
+          <input name="printer_name" placeholder="打印机名称" value="Deli DL-720C" />
+          <select name="template_code"></select>
+          <input name="copies" type="number" min="1" max="20" value="1" />
+          <button type="submit">把当前 bale 全部加入打印队列</button>
+        </form>
+        <div id="itemTokenDirectoryNotice" class="inline-notice-slot" aria-live="polite"></div>
+        <div id="itemTokenDirectorySummary" class="candidate-summary empty-state">
+          这里是支持页，只在需要重打、看失败任务或核对打印状态时使用。门店主操作仍然以“7. 店员 PDA 上架工作台”为准。
+        </div>
+        <pre id="itemTokenDirectoryOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>7.2 直挂店员工作台</h2>
+        </div>
+        <form id="directHangStoreWorkbenchForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <input name="bale_no" placeholder="按直挂门店配货 bale 读取" />
+          <input name="assigned_employee" list="storeClerkOptions" placeholder="按店员筛选，例如 Austin" value="Austin" />
+          <button type="submit">进入当前直挂 bale 工作台</button>
+        </form>
+        <div id="directHangStoreWorkbenchNotice" class="inline-notice-slot" aria-live="polite"></div>
+        <div id="directHangStoreWorkbenchSummary" class="candidate-summary empty-state">
+          这是店员端例外工作台，只给少量“已分好、可直接挂店”的货使用。店员会先批量定默认售价和货架位，再补高价值例外，最后一次性生成商品码并上架。
+        </div>
+        <pre id="directHangStoreWorkbenchOutput" class="output hidden-output"></pre>
+      </section>
+
+      <datalist id="storeClerkOptions">
+        <option value="Austin">Austin</option>
+        <option value="Swahili">Swahili</option>
+      </datalist>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>8. 上架会话 / 异常核对（支持页）</h2>
+        </div>
+        <form id="startReceivingSessionForm" class="form-grid compact">
+          <input name="store_code" placeholder="Store code" value="UTAWALA" />
+          <input name="bale_no" placeholder="按当前门店配货 bale 开始，如 SDB-ST-20260419-001-001" />
+          <input name="note" placeholder="Session note" value="开始门店逐件贴码上架" />
+          <button type="submit">开始门店贴码上架会话</button>
+        </form>
+        <form id="receivingSuggestionForm" class="form-grid compact">
+          <input name="session_no" placeholder="Session no" />
+          <input name="token_no" placeholder="扫描商品 token 查看建议" />
+          <button type="submit">查看上次摆放建议</button>
+        </form>
+        <form id="receivingBatchForm" class="form-grid compact">
+          <input name="session_no" placeholder="Session no" />
+          <input name="token_no" placeholder="扫描已贴好的商品 token" />
+          <input name="rack_code" placeholder="Store rack code" value="PT-SW" />
+          <input name="note" placeholder="Batch note" value="这件商品已挂上货架" />
+          <button type="submit">记录一件上架</button>
+        </form>
+        <form id="finalizeReceivingSessionForm" class="form-grid compact">
+          <input name="session_no" placeholder="Session no" />
+          <input name="note" placeholder="Finalize note" value="本轮门店上架结束，核对未上架 token" />
+          <button type="submit">结束会话并核对未上架 token</button>
+        </form>
+        <div id="receivingResultSummary" class="candidate-summary empty-state">
+          这里是支持页，只在需要查看上架会话、核对未上架 token 或处理异常时使用。门店主操作仍然以“7. 店员 PDA 上架工作台”为准。
+        </div>
+        <pre id="receivingOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>10. 周期退仓</h2>
+          <button data-action="load-return-candidates" type="button">读取整店可退清单</button>
+        </div>
+        <form id="returnCandidateForm" class="form-grid compact">
+          <input name="store_code" placeholder="Store code" value="UTAWALA" />
+          <button type="submit">查看当前门店可退商品</button>
+        </form>
+        <div class="return-flow">
+          <div class="choice-row">
+            <label class="choice-pill">
+              <input type="radio" name="selection_mode" value="all" checked />
+              <span>整店退仓后取消勾选</span>
+            </label>
+            <label class="choice-pill">
+              <input type="radio" name="selection_mode" value="partial" />
+              <span>只退部分商品</span>
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="returnSelectAllButton" type="button">全选当前门店</button>
+            <button id="returnClearSelectionButton" type="button">全部取消</button>
+          </div>
+          <div id="returnCandidateSummary" class="candidate-summary empty-state">
+            先读取门店可退清单，再勾选要退的商品。
+          </div>
+          <div id="returnCandidateList" class="candidate-list"></div>
+        </div>
+        <form id="returnSelectionForm" class="form-grid">
+          <input name="from_store_code" placeholder="From store" value="UTAWALA" />
+          <input name="to_warehouse_code" placeholder="To warehouse" value="WH1" />
+          <input name="reason" placeholder="Reason" value="cycle_end_return" />
+          <input name="note" placeholder="Note" value="cycle end return batch" />
+          <button type="submit">按整店/部分选项生成退仓单</button>
+        </form>
+        <div class="subtle small">
+          这里不用手填商品。读取清单后，系统会根据上面的勾选自动生成整店退仓或部分退仓。
+        </div>
+        <form id="returnForm" class="form-grid">
+          <input name="from_store_code" placeholder="From store" value="UTAWALA" />
+          <input name="to_warehouse_code" placeholder="To warehouse" value="WH1" />
+          <input name="reason" placeholder="Reason" value="cycle_end_return" />
+          <textarea
+            name="items_json"
+            class="json-raw-field"
+            rows="5"
+            placeholder='[{"barcode":"生成后自动带出","requested_qty":1,"note":"end of cycle"}]'
+          >[]</textarea>
+          <div class="line-builder" data-builder="return-items">
+            <div class="line-builder-head">
+              <div>
+                <strong>退仓商品明细</strong>
+                <p>开发调试备用。正常优先用上面的勾选式退仓。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-builder-add="return-items">新增一行</button>
+            </div>
+            <div id="returnItemsBuilder" class="line-builder-body"></div>
+          </div>
+          <button type="submit">创建退仓单</button>
+        </form>
+        <div class="subtle small">上面这个“创建退仓单”是开发调试备用，正常测试优先用勾选式退仓。</div>
+        <form id="dispatchReturnForm" class="form-grid compact">
+          <input name="return_no" placeholder="Return no" />
+          <input name="note" placeholder="Dispatch note" value="Sent back to warehouse" />
+          <button type="submit">发出退仓</button>
+        </form>
+        <form id="receiveReturnForm" class="form-grid compact">
+          <input name="return_no" placeholder="Return no" />
+          <input name="ret_rack_code" placeholder="RET rack" value="WH-RET-01-01-01" />
+          <input name="note" placeholder="Receive note" value="Returned to RET area" />
+          <button type="submit">仓库签收退仓</button>
+        </form>
+        <div id="returnResultSummary" class="candidate-summary empty-state">
+          这里会显示整店/部分退仓的中文摘要和当前状态。
+        </div>
+        <pre id="returnOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>8. 门店货架位</h2>
+        </div>
+        <form id="initRackForm" class="form-grid compact">
+          <input name="store_code" placeholder="Store code" value="UTAWALA" />
+          <button type="submit">初始化门店货架模板</button>
+        </form>
+        <form id="assignRackForm" class="form-grid compact">
+          <input name="store_code" placeholder="Store code" value="UTAWALA" />
+          <input name="barcode" placeholder="Barcode（生成后自动带出）" />
+          <input name="rack_code" placeholder="Rack code" value="PT-SW" />
+          <button type="submit">给商品分配门店货架位</button>
+        </form>
+        <div class="button-row">
+          <button data-action="load-rack-template" type="button">查看货架模板</button>
+          <button data-action="load-store-racks" type="button">查看门店货架位</button>
+        </div>
+        <div id="rackResultSummary" class="candidate-summary empty-state">
+          这里会显示货架模板、初始化结果和门店架位分配摘要。
+        </div>
+        <pre id="rackOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel cashier-sale-panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>9. 收银销售</h2>
+        </div>
+        <div id="cashierTerminalShell" class="cashier-terminal-shell" aria-live="polite">
+          <header class="topbar">
+            <div class="brand-group">
+              <div>
+                <p class="eyebrow">BEYOND ERP</p>
+                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">高速收银终端</h3>
+                <p class="cashier-terminal-subcopy" data-terminal-copy="brandSubtitle">只为开单、收款、异常处理和商品身份证绑定服务。</p>
+              </div>
+            </div>
+            <div class="topbar-actions">
+              <div class="lang-toggle" role="group" aria-label="Language toggle">
+                <button type="button" class="lang-btn is-active" data-terminal-locale="zh">中文</button>
+                <button type="button" class="lang-btn" data-terminal-locale="en">EN</button>
+              </div>
+              <button type="button" class="secondary-ghost" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer" data-terminal-copy="openShiftCenter">班次中心</button>
+            </div>
+          </header>
+
+          <section id="cashierTerminalStatusBar" class="status-grid cashier-terminal-status"></section>
+
+          <main class="workspace-grid cashier-terminal-body">
+            <section class="flow-column cashier-terminal-main">
+              <article class="panel panel-scan cashier-terminal-card cashier-terminal-scan-card">
+                <div class="panel-head cashier-terminal-card-head">
+                  <div>
+                    <p class="panel-kicker">TERMINAL INPUT</p>
+                    <h3 data-terminal-copy="scanTitle">扫码 / 手动录入</h3>
+                  </div>
+                  <div class="shortcut-pills">
+                    <span class="pill"><kbd>Enter</kbd> <span data-terminal-copy="enterToAdd">直接加入购物篮</span></span>
+                    <span class="pill"><kbd>ESC</kbd> <span data-terminal-copy="escToClose">关闭抽屉</span></span>
+                  </div>
+                </div>
+                <form id="cashierTerminalScanForm" class="scan-grid cashier-terminal-scan-form">
+                  <label class="field scan-field main-field">
+                    <span data-terminal-copy="barcodeField">扫码枪输入 / 商品 barcode</span>
+                    <div class="field-row">
+                      <input
+                        id="cashierTerminalBarcodeInput"
+                        name="barcode"
+                        type="text"
+                        inputmode="text"
+                        autocomplete="off"
+                        placeholder="Scan barcode / 输入条码"
+                      />
+                      <button type="submit" class="primary-inline" data-terminal-submit="add" data-terminal-copy="addToBasket">加入购物篮</button>
+                    </div>
+                  </label>
+                  <label class="field search-field">
+                    <span data-terminal-copy="lookupField">手动搜索 / 只查价</span>
+                    <div class="field-row">
+                      <input
+                        id="cashierTerminalManualInput"
+                        name="manual_query"
+                        type="text"
+                        inputmode="text"
+                        autocomplete="off"
+                        placeholder="Barcode / identity / price lookup"
+                      />
+                      <button type="submit" class="secondary-inline" data-terminal-submit="lookup" data-terminal-copy="lookupOnly">只查价</button>
+                    </div>
+                  </label>
+                </form>
+                <div
+                  id="cashierTerminalInlineNotice"
+                  class="inline-feedback hidden-screen"
+                  data-empty-text=""
+                ></div>
+                <div id="cashierTerminalLookupCard" class="lookup-preview cashier-terminal-lookup empty-state">
+                  扫码后，这里显示当前商品的门店库存、建议售价、限价和架位。
+                </div>
+              </article>
+
+              <article class="panel panel-basket cashier-terminal-card cashier-terminal-cart-card">
+                <div class="panel-head basket-head cashier-terminal-card-head">
+                  <div>
+                    <p class="panel-kicker">BASKET</p>
+                    <h3 data-terminal-copy="basketTitle">当前购物篮</h3>
+                  </div>
+                  <div class="basket-tools">
+                    <label class="field compact-field note-field cashier-terminal-note-field" for="cashierTerminalSaleNote">
+                      <span data-terminal-copy="noteLabel">交易备注</span>
+                      <input id="cashierTerminalSaleNote" type="text" placeholder="正常销售 / 顾客备注 / 交接说明" />
+                    </label>
+                    <button type="button" class="secondary-ghost" data-terminal-action="clear-cart" data-terminal-copy="clearBasket">清空购物篮</button>
+                  </div>
+                </div>
+                <div id="cashierTerminalCart" class="basket-list cashier-terminal-cart"></div>
+              </article>
+            </section>
+
+            <aside class="payment-column cashier-terminal-side">
+              <section id="cashierTerminalPaymentPanel" class="panel panel-payment cashier-terminal-card cashier-terminal-payment-panel"></section>
+            </aside>
+          </main>
+
+          <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions">
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer"><span>班次</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>作废</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer"><span>退款</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>异常</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline" data-drawer="offlineDrawer"><span>离线</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>小票</span><strong>-</strong></button>
+          </section>
+          <div id="cashierTerminalDrawerBackdrop" class="drawer-backdrop" data-terminal-action="close-drawer" hidden></div>
+          <aside id="cashierTerminalDrawer" class="side-drawer cashier-terminal-drawer" hidden></aside>
+        </div>
+
+        <div id="cashierCompatShell" class="cashier-compat-shell">
+          <form id="openShiftForm" class="form-grid compact">
+            <input name="store_code" placeholder="Store code" value="UTAWALA" />
+            <input name="opening_float_cash" type="number" value="1000" min="0" />
+            <input name="note" placeholder="Open shift note" value="早班开始" />
+            <button type="submit">开班</button>
+          </form>
+          <form id="shiftReportForm" class="form-grid compact">
+            <input name="shift_no" placeholder="Shift no" />
+            <button data-report-kind="t" type="submit">查看 T-report</button>
+            <button data-report-kind="z" type="submit">查看 Z-report</button>
+          </form>
+          <form id="handoverRequestForm" class="form-grid compact">
+            <input name="shift_no" placeholder="Shift no" />
+            <input name="closing_cash_counted" type="number" value="1000" min="0" />
+            <input name="note" placeholder="Handover request note" value="申请交班，请店长确认" />
+            <button type="submit">申请交班</button>
+          </form>
+          <form id="handoverReviewForm" class="form-grid compact">
+            <input name="handover_no" placeholder="Handover no" />
+            <select name="approved">
+              <option value="true">店长确认通过</option>
+              <option value="false">店长驳回</option>
+            </select>
+            <input name="note" placeholder="Manager review note" value="核对无误，允许结班" />
+            <button type="submit">店长确认交班</button>
+          </form>
+          <form id="closeBusinessReportForm" class="form-grid compact">
+            <input name="shift_no" placeholder="Shift no（交班后自动带出）" />
+            <button type="submit">店铺结束营业并结算 Z-report</button>
+          </form>
+          <div id="shiftSummaryPanel" class="candidate-summary empty-state">
+            这里会显示开班、交班、T-report、Z-report 的中文摘要。结算完成后，你也可以直接打开日报预览。
+          </div>
+          <div class="button-row">
+            <button id="openShiftPreviewButton" type="button" class="ghost-button" disabled>打开日报 / Z-report 预览</button>
+          </div>
+          <pre id="shiftOutput" class="output hidden-output"></pre>
+          <form id="lookupForm" class="form-grid compact">
+            <input name="store_code" placeholder="Store code" value="UTAWALA" />
+            <input name="barcode" placeholder="Barcode（生成后自动带出）" />
+            <button type="submit">扫码查商品和库存</button>
+          </form>
+          <div id="lookupResultSummary" class="candidate-summary empty-state">
+            扫码后，这里会直接显示商品名、门店库存、建议售价和限价。
+          </div>
+          <pre id="lookupOutput" class="output hidden-output"></pre>
+          <form id="saleForm" class="form-grid">
+            <input name="order_no" placeholder="Order no" value="POS-DEMO-001" />
+            <input name="store_code" placeholder="Store code" value="UTAWALA" />
+            <input name="shift_no" placeholder="Shift no（开班后自动带出）" />
+            <select name="power_mode">
+              <option value="online">online</option>
+              <option value="offline">offline</option>
+              <option value="power_outage_sync">power_outage_sync</option>
+            </select>
+            <input name="note" placeholder="Sale note" value="正常销售" />
+            <textarea
+              name="items_json"
+              class="json-raw-field"
+              rows="5"
+              placeholder='[{"barcode":"生成后自动带出","qty":1,"selling_price":1000,"override_reason":"","customer_id":""}]'
+            >[]</textarea>
+            <div class="line-builder" data-builder="sale-items">
+              <div class="line-builder-head">
+                <div>
+                  <strong>销售商品明细</strong>
+                  <p>一行代表收银台卖出的一种商品。</p>
+                </div>
+                <button type="button" class="ghost-button mini-button" data-builder-add="sale-items">新增一行</button>
+              </div>
+              <div id="saleItemsBuilder" class="line-builder-body"></div>
+            </div>
+            <textarea
+              name="payments_json"
+              class="json-raw-field"
+              rows="4"
+              placeholder='[{"method":"cash","amount":1000,"reference":"","customer_id":""}]'
+            >[]</textarea>
+            <div class="line-builder" data-builder="sale-payments">
+              <div class="line-builder-head">
+                <div>
+                  <strong>收款明细</strong>
+                  <p>现金、M-Pesa 或混合支付都在这里逐行填写。</p>
+                </div>
+                <button type="button" class="ghost-button mini-button" data-builder-add="sale-payments">新增一行</button>
+              </div>
+              <div id="salePaymentsBuilder" class="line-builder-body"></div>
+            </div>
+            <button type="submit">提交销售</button>
+          </form>
+          <div id="saleResultSummary" class="candidate-summary empty-state">
+            这里会显示销售成功后的中文摘要、利润、支付状态和后续待处理事项。
+          </div>
+          <pre id="saleOutput" class="output hidden-output"></pre>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>11. Safaricom / M-Pesa</h2>
+          <div class="button-row">
+            <button data-action="load-mpesa-collections" type="button">读取 M-Pesa 流水</button>
+            <button data-action="load-mpesa-customer-insights" type="button">读取熟客汇总</button>
+          </div>
+        </div>
+        <div id="mpesaSummary" class="candidate-summary empty-state">
+          这里会汇总 Safaricom / M-Pesa 的导入金额、未匹配流水和熟客数。
+        </div>
+        <form id="mpesaImportForm" class="form-grid">
+          <input name="source_batch_no" placeholder="批次号" value="SAF-20260415-001" />
+          <textarea
+            name="items_json"
+            class="json-raw-field"
+            rows="6"
+            placeholder='[{"receipt_no":"OFFPAY001","store_code":"UTAWALA","amount":390,"collected_at":"2026-04-15T14:05:00+03:00","customer_id":"CUST-9001","phone_number":"254700000001","payer_name":"Alice N","reference":"OFFPAY001","note":"manual import"}]'
+          >[]</textarea>
+          <div class="line-builder" data-builder="mpesa-import-items">
+            <div class="line-builder-head">
+              <div>
+                <strong>M-Pesa 收款明细</strong>
+                <p>一行代表一笔线上收款流水，后面可以继续导入更多行。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-builder-add="mpesa-import-items">新增一行</button>
+            </div>
+            <div id="mpesaImportItemsBuilder" class="line-builder-body"></div>
+          </div>
+          <button type="submit">导入 Safaricom / M-Pesa 流水</button>
+        </form>
+        <div class="subtle small">如果后面直接接 Safaricom 回调，可以在下面粘贴一份回调 JSON 试跑。</div>
+        <form id="mpesaCallbackForm" class="form-grid">
+          <textarea
+            name="payload_json"
+            rows="7"
+            placeholder='{"Body":{"stkCallback":{"MerchantRequestID":"abc","CheckoutRequestID":"ws_CO_001","ResultCode":0,"ResultDesc":"The service request is processed successfully.","CallbackMetadata":{"Item":[{"Name":"Amount","Value":390},{"Name":"MpesaReceiptNumber","Value":"OFFPAY001"},{"Name":"TransactionDate","Value":"20260415140500"},{"Name":"PhoneNumber","Value":254700000001},{"Name":"AccountReference","Value":"UTAWALA"},{"Name":"BillRefNumber","Value":"CUST-9001"}]}}}}'
+          >{}</textarea>
+          <button type="submit">模拟 Safaricom 回调入账</button>
+        </form>
+        <div id="mpesaResultSummary" class="candidate-summary empty-state">
+          这里会显示最近一次 M-Pesa 导入或回调入账的结果。
+        </div>
+        <pre id="mpesaOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>12. 离线销售同步</h2>
+          <button data-action="load-offline-sync-batches" type="button">读取离线同步批次</button>
+        </div>
+        <div id="offlineSyncSummary" class="candidate-summary empty-state">
+          这里会汇总断网补同步的批次数、成功行、重复行和失败行。
+        </div>
+        <form id="offlineSyncForm" class="form-grid">
+          <input name="device_id" placeholder="设备号" value="POS-TAB-01" />
+          <input name="note" placeholder="备注" value="network outage replay" />
+          <textarea
+            name="sales_json"
+            class="json-raw-field"
+            rows="8"
+            placeholder='[{"client_sale_id":"OFF-001","order_no":"SO-OFFLINE-001","store_code":"UTAWALA","cashier_name":"cashier_1","shift_no":"","power_mode":"offline","note":"synced after blackout","items":[{"barcode":"生成后自动带出","qty":1,"selling_price":390,"override_reason":"power outage manual price","customer_id":"CUST-9001"}],"payments":[{"method":"mpesa","amount":390,"reference":"OFFPAY001","customer_id":"CUST-9001"}]}]'
+          >[]</textarea>
+          <div class="line-builder" data-builder="offline-sales">
+            <div class="line-builder-head">
+              <div>
+                <strong>离线销售补录明细</strong>
+                <p>一行代表一笔离线销售。测试阶段先支持每笔单一条商品和一条付款。</p>
+              </div>
+              <button type="button" class="ghost-button mini-button" data-builder-add="offline-sales">新增一行</button>
+            </div>
+            <div id="offlineSalesBuilder" class="line-builder-body"></div>
+          </div>
+          <button type="submit">提交离线销售同步</button>
+        </form>
+        <div id="offlineSyncResultSummary" class="candidate-summary empty-state">
+          这里会显示最近一次离线补同步成功了多少、失败了多少。
+        </div>
+        <pre id="offlineSyncOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="overview">
+        <div class="panel-head">
+          <h2>实时数据查看</h2>
+          <div class="button-row">
+            <button data-action="load-products" type="button">商品</button>
+            <button data-action="load-parcel-batches" type="button">包裹批次</button>
+            <button data-action="load-sorting-tasks" type="button">分拣任务</button>
+            <button data-action="load-sorting-stock" type="button">分拣库存</button>
+            <button data-action="load-warehouse-stock" type="button">仓库库存</button>
+            <button data-action="load-store-stock" type="button">门店库存</button>
+            <button data-action="load-transfers" type="button">调拨单</button>
+            <button data-action="load-receiving-sessions" type="button">收货会话</button>
+            <button data-action="load-returns" type="button">退仓单</button>
+            <button data-action="load-return-candidates" type="button">退仓候选</button>
+            <button data-action="load-price-rules" type="button">限价规则</button>
+            <button data-action="load-shifts" type="button">收银班次</button>
+            <button data-action="load-handovers" type="button">交接班日志</button>
+            <button data-action="load-sales" type="button">销售单</button>
+            <button data-action="load-void-requests" type="button">作废单</button>
+            <button data-action="load-refund-requests" type="button">退款单</button>
+            <button data-action="load-payment-anomalies" type="button">支付异常单</button>
+            <button data-action="load-mpesa-collections" type="button">M-Pesa 流水</button>
+            <button data-action="load-mpesa-customer-insights" type="button">M-Pesa 熟客</button>
+            <button data-action="load-offline-sync-batches" type="button">离线同步批次</button>
+            <button data-action="load-print-jobs" type="button">打印任务</button>
+            <button data-action="load-adjustments" type="button">差异调整</button>
+            <button data-action="load-movements" type="button">库存流水</button>
+            <button data-action="load-audit" type="button">操作日志</button>
+          </div>
+        </div>
+        <div id="tableSummary" class="candidate-summary empty-state">
+          点上面的按钮后，这里会告诉你当前看的是什么数据，以及一共有多少条。
+        </div>
+        <div id="tablePreview" class="data-preview-grid"></div>
+        <pre id="tableOutput" class="output large hidden-output"></pre>
+      </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./label-template-flow.js"></script>
+    <script src="./bale-print-flow.js"></script>
+    <script src="./raw-bale-stock-flow.js"></script>
+    <script src="./warehouse-stock-hub-flow.js"></script>
+    <script src="./bale-sales-app-flow.js"></script>
+    <script src="./bale-sales-workbench-flow.js"></script>
+    <script src="./barcode-resolver-flow.js"></script>
+    <script src="./sorting-task-flow.js"></script>
+    <script src="./sorting-result-flow.js"></script>
+    <script src="./sorting-stock-flow.js"></script>
+    <script src="./store-prep-bale-flow.js"></script>
+    <script src="./warehouse-mainflow-demo-flow.js"></script>
+    <script src="./china-source-receipt-sheet-flow.js"></script>
+    <script src="./store-execution-flow.js"></script>
+    <script src="./operations-fulfillment-flow.js?v=store-batch-receipt-20260426"></script>
+    <script src="./apparel-default-cost-flow.js"></script>
+    <script src="./apparel-sorting-rack-flow.js"></script>
+    <script src="./app.js?v=store-batch-receipt-20260426c"></script>
+  </body>
+</html>
