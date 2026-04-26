@@ -1,0 +1,419 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "72";
+  src: url("./assets/fonts/72-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "72";
+  src: url("./assets/fonts/72-Semibold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "72";
+  src: url("./assets/fonts/72-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --app-bg: radial-gradient(circle at top left, rgba(20, 57, 63, 0.1), transparent 22%),
+    radial-gradient(circle at top right, rgba(111, 169, 167, 0.08), transparent 22%),
+    linear-gradient(180deg, #f7f4ee 0%, #eff3f2 100%);
+  --app-text: #163036;
+  --muted: #64748b;
+  --border: #dde5e2;
+  --border-soft: #edf1ef;
+  --border-strong: #c7d3cf;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-soft: rgba(20, 57, 63, 0.03);
+  --surface-muted: #f7faf9;
+  --surface-elevated: #fbfcfb;
+  --accent-strong: #153d43;
+  --accent-soft: #e7f1ef;
+  --accent-contrast: #f6f0e5;
+  --button-primary: #153d43;
+  --button-primary-hover: #12353a;
+  --button-primary-text: #f7f4ee;
+  --button-secondary: #eef4f2;
+  --button-secondary-hover: #e4ece9;
+  --button-secondary-text: #173238;
+  --eyebrow-bg: #e7ecea;
+  --eyebrow-text: #4f6870;
+  --ring: rgba(20, 57, 63, 0.28);
+  --badge-neutral-bg: #eef3f2;
+  --badge-neutral-text: #4f6870;
+  --badge-success-bg: #e9f7ef;
+  --badge-success-text: #1f7a52;
+  --badge-warning-bg: #fff5dd;
+  --badge-warning-text: #9a6700;
+  --badge-danger-bg: #ffe9eb;
+  --badge-danger-text: #b42318;
+  --badge-info-bg: #e6f5f7;
+  --badge-info-text: #0f6d7a;
+  --header-bg: rgba(247, 244, 238, 0.82);
+  --header-border: #d9dedc;
+  --sidebar-bg: #14393f;
+  --sidebar-panel: rgba(255, 255, 255, 0.05);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-soft-border: rgba(255, 255, 255, 0.1);
+  --sidebar-text: #f7f4ee;
+  --sidebar-text-soft: rgba(247, 244, 238, 0.82);
+  --sidebar-copy: rgba(247, 244, 238, 0.6);
+  --sidebar-muted: rgba(247, 244, 238, 0.55);
+  --sidebar-faint: rgba(247, 244, 238, 0.38);
+  --sidebar-item-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.07);
+  --sidebar-item-hover-border: rgba(255, 255, 255, 0.14);
+  --sidebar-icon-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-icon-hover-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-active-bg: #f5f0e7;
+  --sidebar-active-border: rgba(158, 207, 210, 0.3);
+  --sidebar-active-text: #14393f;
+  --sidebar-active-copy: rgba(20, 57, 63, 0.68);
+  --sidebar-active-icon-bg: #14393f;
+  --sidebar-active-icon-text: #f5f0e7;
+  --sidebar-live-bg: rgba(52, 211, 153, 0.16);
+  --sidebar-live-text: #dff7ea;
+  color: var(--app-text);
+  background: #f7f4ee;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme="slate"] {
+  --app-bg: radial-gradient(circle at top left, rgba(59, 72, 95, 0.13), transparent 24%),
+    radial-gradient(circle at top right, rgba(116, 139, 174, 0.1), transparent 22%),
+    linear-gradient(180deg, #f4f6fb 0%, #edf1f7 100%);
+  --app-text: #1f2937;
+  --muted: #64748b;
+  --border: #dbe3ef;
+  --border-soft: #edf2f8;
+  --border-strong: #cbd6e5;
+  --surface: rgba(255, 255, 255, 0.94);
+  --surface-soft: rgba(52, 78, 116, 0.03);
+  --surface-muted: #f7f9fc;
+  --surface-elevated: #fbfcfe;
+  --accent-strong: #334155;
+  --accent-soft: #e9eef8;
+  --accent-contrast: #f8fafc;
+  --button-primary: #334155;
+  --button-primary-hover: #293647;
+  --button-primary-text: #f8fafc;
+  --button-secondary: #eef2f7;
+  --button-secondary-hover: #e3e9f2;
+  --button-secondary-text: #253342;
+  --eyebrow-bg: #eaf0f7;
+  --eyebrow-text: #506173;
+  --ring: rgba(51, 65, 85, 0.28);
+  --badge-neutral-bg: #eef2f7;
+  --badge-neutral-text: #506173;
+  --badge-success-bg: #e9f7ef;
+  --badge-success-text: #1f7a52;
+  --badge-warning-bg: #fff5dd;
+  --badge-warning-text: #9a6700;
+  --badge-danger-bg: #ffe9eb;
+  --badge-danger-text: #b42318;
+  --badge-info-bg: #eaf0f9;
+  --badge-info-text: #30577e;
+  --header-bg: rgba(244, 246, 251, 0.86);
+  --header-border: #d8e0eb;
+  --sidebar-bg: #243244;
+  --sidebar-panel: rgba(255, 255, 255, 0.05);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-soft-border: rgba(255, 255, 255, 0.1);
+  --sidebar-text: #f8fafc;
+  --sidebar-text-soft: rgba(248, 250, 252, 0.82);
+  --sidebar-copy: rgba(248, 250, 252, 0.58);
+  --sidebar-muted: rgba(248, 250, 252, 0.52);
+  --sidebar-faint: rgba(248, 250, 252, 0.34);
+  --sidebar-item-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-item-hover-border: rgba(255, 255, 255, 0.14);
+  --sidebar-icon-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-icon-hover-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-active-bg: #f8fafc;
+  --sidebar-active-border: rgba(191, 203, 221, 0.45);
+  --sidebar-active-text: #243244;
+  --sidebar-active-copy: rgba(36, 50, 68, 0.68);
+  --sidebar-active-icon-bg: #243244;
+  --sidebar-active-icon-text: #f8fafc;
+  --sidebar-live-bg: rgba(59, 130, 246, 0.16);
+  --sidebar-live-text: #e0ecff;
+}
+
+:root[data-theme="sand"] {
+  --app-bg: radial-gradient(circle at top left, rgba(140, 107, 69, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(192, 154, 118, 0.08), transparent 24%),
+    linear-gradient(180deg, #f8f5ef 0%, #f4f0e8 100%);
+  --app-text: #3e3024;
+  --muted: #8a7b6b;
+  --border: #e6ded1;
+  --border-soft: #f0e8dc;
+  --border-strong: #d8cdbd;
+  --surface: rgba(255, 251, 245, 0.94);
+  --surface-soft: rgba(112, 84, 53, 0.03);
+  --surface-muted: #faf6ef;
+  --surface-elevated: #fdfaf5;
+  --accent-strong: #7b5a3c;
+  --accent-soft: #efe4d4;
+  --accent-contrast: #fffaf1;
+  --button-primary: #7b5a3c;
+  --button-primary-hover: #6c4e34;
+  --button-primary-text: #fffaf1;
+  --button-secondary: #f3ebe0;
+  --button-secondary-hover: #eadfce;
+  --button-secondary-text: #4c3d2f;
+  --eyebrow-bg: #f0e8dc;
+  --eyebrow-text: #7b6754;
+  --ring: rgba(123, 90, 60, 0.24);
+  --badge-neutral-bg: #f1eadf;
+  --badge-neutral-text: #7b6754;
+  --badge-success-bg: #edf7ef;
+  --badge-success-text: #2d7d46;
+  --badge-warning-bg: #fff5dd;
+  --badge-warning-text: #9a6700;
+  --badge-danger-bg: #fde9ea;
+  --badge-danger-text: #b42318;
+  --badge-info-bg: #efe9ff;
+  --badge-info-text: #6b4db6;
+  --header-bg: rgba(248, 245, 239, 0.88);
+  --header-border: #e2dbd0;
+  --sidebar-bg: #4d3a2b;
+  --sidebar-panel: rgba(255, 255, 255, 0.05);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-soft-border: rgba(255, 255, 255, 0.1);
+  --sidebar-text: #fff7ee;
+  --sidebar-text-soft: rgba(255, 247, 238, 0.82);
+  --sidebar-copy: rgba(255, 247, 238, 0.58);
+  --sidebar-muted: rgba(255, 247, 238, 0.52);
+  --sidebar-faint: rgba(255, 247, 238, 0.34);
+  --sidebar-item-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-item-hover-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-item-hover-border: rgba(255, 255, 255, 0.14);
+  --sidebar-icon-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-icon-hover-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-active-bg: #fff7ee;
+  --sidebar-active-border: rgba(236, 216, 190, 0.45);
+  --sidebar-active-text: #4d3a2b;
+  --sidebar-active-copy: rgba(77, 58, 43, 0.68);
+  --sidebar-active-icon-bg: #4d3a2b;
+  --sidebar-active-icon-text: #fff7ee;
+  --sidebar-live-bg: rgba(234, 179, 8, 0.16);
+  --sidebar-live-text: #fff5d9;
+}
+
+.sap-horizon-preview {
+  --sap-preview-bg: #f5f6f7;
+  --sap-preview-surface: #ffffff;
+  --sap-preview-surface-soft: #f7f8f9;
+  --sap-preview-surface-selected: #ebf5ff;
+  --sap-preview-border: #d5dadd;
+  --sap-preview-border-strong: #b8c8d8;
+  --sap-preview-text: #131e29;
+  --sap-preview-muted: #556b82;
+  --sap-preview-title: #223548;
+  --sap-preview-accent: #0070f2;
+  --sap-preview-accent-soft: #ebf5ff;
+  --sap-preview-positive: #256f3a;
+  --sap-preview-positive-soft: #f1fdf6;
+  --sap-preview-warning: #9b4d00;
+  --sap-preview-warning-soft: #fff8d6;
+  --sap-preview-danger: #aa0808;
+  --sap-preview-danger-soft: #fff1f1;
+  font-family:
+    "72",
+    "72full",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--sap-preview-text);
+}
+
+.sap-horizon-preview .sap-preview-panel {
+  border: 1px solid var(--sap-preview-border);
+  background: var(--sap-preview-surface);
+  box-shadow: 0 1px 2px rgba(19, 30, 41, 0.06);
+}
+
+.sap-horizon-preview .sap-preview-panel-soft {
+  border: 1px solid var(--sap-preview-border);
+  background: var(--sap-preview-surface-soft);
+}
+
+.sap-horizon-preview .sap-preview-kicker {
+  color: var(--sap-preview-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.sap-horizon-preview .sap-preview-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.sap-horizon-preview .sap-preview-table {
+  border: 1px solid var(--sap-preview-border);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.sap-horizon-preview .sap-preview-table-header {
+  background: var(--sap-preview-surface-soft);
+  color: var(--sap-preview-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fiori-station-preview {
+  --fiori-bg: #f5f6f7;
+  --fiori-surface: #ffffff;
+  --fiori-surface-raised: #fbfcfd;
+  --fiori-surface-selected: #ebf5ff;
+  --fiori-border: #d5dadd;
+  --fiori-border-strong: #b8c8d8;
+  --fiori-text: #131e29;
+  --fiori-title: #223548;
+  --fiori-muted: #556b82;
+  --fiori-blue: #0070f2;
+  --fiori-blue-soft: #ebf5ff;
+  --fiori-positive: #256f3a;
+  --fiori-positive-soft: #f1fdf6;
+  --fiori-warning: #9b4d00;
+  --fiori-warning-soft: #fff3db;
+  --fiori-danger: #aa0808;
+  --fiori-danger-soft: #fff1f1;
+  font-family:
+    "72",
+    "72full",
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: var(--fiori-text);
+  background: var(--fiori-bg);
+}
+
+.fiori-station-preview .fiori-shell,
+.fiori-station-preview .fiori-panel {
+  background: var(--fiori-surface);
+  border: 1px solid var(--fiori-border);
+  box-shadow: 0 1px 2px rgba(19, 30, 41, 0.06);
+}
+
+.fiori-station-preview .fiori-muted-panel {
+  background: var(--fiori-surface-raised);
+  border: 1px solid var(--fiori-border);
+}
+
+.fiori-station-preview .fiori-section-label {
+  color: var(--fiori-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fiori-station-preview .fiori-table {
+  overflow: hidden;
+  border: 1px solid var(--fiori-border);
+  border-radius: 0.875rem;
+  background: var(--fiori-surface);
+}
+
+.fiori-station-preview .fiori-table-header {
+  background: #f8f9fa;
+  color: var(--fiori-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fiori-station-preview .fiori-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: var(--app-bg);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: riseIn 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-rise-delayed {
+  animation: riseIn 680ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-rise-delayed-more {
+  animation: riseIn 800ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
