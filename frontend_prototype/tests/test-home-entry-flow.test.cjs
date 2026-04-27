@@ -24,6 +24,10 @@ test("/app test home contains title and environment warning copy", () => {
   assert.match(indexHtml, /TEST ENVIRONMENT/);
   assert.match(indexHtml, /GitHub Pages[^<]*preview shell/);
   assert.match(indexHtml, /不是实际业务测试运行环境/);
+  assert.match(indexHtml, /Recommended first practical test path/i);
+  assert.match(indexHtml, /data-test-home-golden-path-copy/);
+  assert.match(indexHtml, /Golden path manual checklist/);
+  assert.match(indexHtml, /href="\.\.\/docs\/project-brain\/golden-path-manual-test-checklist\.md"/);
 });
 
 test("/app test home exposes all 11 module entries with test-home selectors", () => {
