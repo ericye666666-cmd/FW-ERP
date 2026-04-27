@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.1.1"
 HOST = "127.0.0.1"
 PORT = 8719
 ALLOWED_ORIGINS = {
@@ -67,6 +67,9 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+            # Chrome Private Network Access preflight requires this header when a
+            # public/staging page calls a localhost agent such as 127.0.0.1:8719.
+            self.send_header("Access-Control-Allow-Private-Network", "true")
         self.end_headers()
 
     def _send_json(self, payload: dict, status_code: int = 200):
