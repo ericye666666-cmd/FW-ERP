@@ -77,6 +77,8 @@ const balePrintModal = document.querySelector("#balePrintModal");
 const closeBalePrintModalButton = document.querySelector("#closeBalePrintModalButton");
 const workspaceTabs = [...document.querySelectorAll("[data-workspace-target]")];
 const workspacePanelsList = [...document.querySelectorAll("[data-workspace-panel]")];
+const testHomeLinks = [...document.querySelectorAll("[data-test-home-workspace]")];
+const TEST_HOME_TARGET_STORAGE_KEY = "retail_ops_test_home_target";
 
 let currentSession = {
   token: localStorage.getItem(STORAGE_KEYS.token) || "",
@@ -2034,6 +2036,50 @@ function getPanelKeyByTitle(workspace, panelTitlePrefix) {
     String(panel.dataset.panelTitle || "").startsWith(panelTitlePrefix),
   );
   return target?.dataset?.panelKey || "";
+}
+
+function openTestHomeTarget(workspace, panelTitlePrefix) {
+  const panelKey = panelTitlePrefix ? getPanelKeyByTitle(workspace, panelTitlePrefix) : "";
+  if (currentSession?.token) {
+    if (panelKey) {
+      setActivePanel(panelKey);
+    } else {
+      setActiveWorkspace(workspace);
+    }
+    return;
+  }
+  localStorage.setItem(TEST_HOME_TARGET_STORAGE_KEY, JSON.stringify({ workspace, panelTitlePrefix }));
+  if (panelKey) {
+    window.location.hash = `#${encodeURIComponent(panelKey)}`;
+  } else {
+    window.location.hash = "";
+  }
+  renderAuthResultSummary("notice", {
+    message: `已选择测试入口：${workspace} / ${panelTitlePrefix || "默认页"}。请先登录后进入。`,
+  });
+  document.querySelector("#loginForm")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function applyPendingTestHomeTarget() {
+  const raw = localStorage.getItem(TEST_HOME_TARGET_STORAGE_KEY);
+  if (!raw) {
+    return;
+  }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    localStorage.removeItem(TEST_HOME_TARGET_STORAGE_KEY);
+    return;
+  }
+  const workspace = String(parsed?.workspace || "").trim();
+  const panelTitlePrefix = String(parsed?.panelTitlePrefix || "").trim();
+  if (!workspace) {
+    localStorage.removeItem(TEST_HOME_TARGET_STORAGE_KEY);
+    return;
+  }
+  localStorage.removeItem(TEST_HOME_TARGET_STORAGE_KEY);
+  openTestHomeTarget(workspace, panelTitlePrefix);
 }
 
 function renderSummaryActions(actions = []) {
@@ -7639,6 +7685,11 @@ function renderAuthResultSummary(kind, data) {
   if (kind === "logout") {
     target.className = "candidate-summary";
     target.innerHTML = `<div class="alert-banner">你已经退出登录。重新登录后才能继续操作仓库、调拨和收银。</div>`;
+    return;
+  }
+  if (kind === "notice") {
+    target.className = "candidate-summary";
+    target.innerHTML = `<div class="alert-banner">${escapeHtml(data?.message || "已设置测试入口。登录后将自动进入对应模块。")}</div>`;
     return;
   }
   const user = data?.user || currentSession.user;
@@ -19152,6 +19203,7 @@ function renderSessionState() {
   syncCashierTerminalDraftsFromForms();
   renderCashierTerminal();
   primeCashierTerminalSession().catch(() => {});
+  applyPendingTestHomeTarget();
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -27591,6 +27643,17 @@ document.querySelector("#balePrintModalCloseAndRefreshButton")?.addEventListener
 workspaceTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     setActiveWorkspace(tab.dataset.workspaceTarget);
+  });
+});
+
+testHomeLinks.forEach((button) => {
+  button.addEventListener("click", () => {
+    const workspace = String(button.dataset.testHomeWorkspace || "").trim();
+    const panelTitlePrefix = String(button.dataset.testHomePanelPrefix || "").trim();
+    if (!workspace) {
+      return;
+    }
+    openTestHomeTarget(workspace, panelTitlePrefix);
   });
 });
 

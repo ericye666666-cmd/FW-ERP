@@ -8,6 +8,31 @@
   </head>
   <body>
     <section id="authPage" class="auth-page">
+      <section class="test-home-entry panel" aria-labelledby="testHomeTitle">
+        <div class="panel-head">
+          <p class="eyebrow">Direct Loop / FW-ERP</p>
+          <h2 id="testHomeTitle">Direct Loop / FW-ERP Test Home</h2>
+        </div>
+        <p class="test-home-badge">TEST ENVIRONMENT · 仅用于业务测试与演练</p>
+        <p class="subtle">
+          这里是后端服务的统一测试入口（<code>/app</code>）。请从这里进入仓库、门店、POS、退货和 B2B 流程。
+          <strong>GitHub Pages 仅是预览壳（preview shell），不是实际业务测试运行环境。</strong>
+        </p>
+        <div class="test-home-grid">
+          <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0. 运输 / 关单主档">1. Warehouse main flow</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="4.2 中方来源 Bale 录入">2. China source / inbound</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1 创建分拣任务">3. Sorting tasks</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1.2 压缩工单管理">4. Sorted stock / compression</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="6.1 门店配货 / 配送跟踪">5. Store dispatch / receiving</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="7. 店员 PDA 上架工作台">6. Store item price / rack / printing</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="9. 收银销售">7. POS</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="10. 周期退仓">8. Returns / return-to-warehouse</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="Bales销售｜真实出库">9. B2B bale sales</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="operations" data-test-home-panel-prefix="1. 区域经营驾驶舱">10. Boss analysis / operating dashboard</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="testing" data-test-home-panel-prefix="测试工具">11. System health / test data / print status</button>
+        </div>
+      </section>
+
       <div class="auth-shell">
         <section class="auth-brand">
           <p class="eyebrow">Retail Ops Prototype</p>
