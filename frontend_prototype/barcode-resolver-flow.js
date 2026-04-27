@@ -20,9 +20,10 @@
 
   function assertResolvedBarcodeContext(resolved, options = {}) {
     const allowedTypes = new Set(Array.isArray(options.allowedTypes) ? options.allowedTypes : []);
+    const rejectOnContextReject = options.rejectOnContextReject !== false;
     const barcodeType = normalizeBarcode(resolved && resolved.barcode_type);
     const rejectReason = String((resolved && resolved.reject_reason) || "").trim();
-    if (rejectReason) {
+    if (rejectOnContextReject && rejectReason) {
       throw new Error(rejectReason);
     }
     if (allowedTypes.size && !allowedTypes.has(barcodeType)) {

@@ -20824,7 +20824,7 @@ async function downloadApiFile(path, fallbackFileName = "download.xlsx") {
   URL.revokeObjectURL(objectUrl);
 }
 
-async function resolveBarcodeForContext(barcode, context, allowedTypes = []) {
+async function resolveBarcodeForContext(barcode, context, allowedTypes = [], options = {}) {
   const flow = window.barcodeResolverFlow || {};
   const normalizedBarcode = typeof flow.normalizeBarcode === "function"
     ? flow.normalizeBarcode(barcode)
@@ -20837,9 +20837,13 @@ async function resolveBarcodeForContext(barcode, context, allowedTypes = []) {
     : `/barcode/resolve/${encodeURIComponent(normalizedBarcode)}?context=${encodeURIComponent(context || "")}`;
   const resolved = await request(path);
   if (typeof flow.assertResolvedBarcodeContext === "function") {
-    return flow.assertResolvedBarcodeContext(resolved, { context, allowedTypes });
+    return flow.assertResolvedBarcodeContext(resolved, {
+      context,
+      allowedTypes,
+      rejectOnContextReject: options.rejectOnContextReject,
+    });
   }
-  if (resolved?.reject_reason) {
+  if (options.rejectOnContextReject !== false && resolved?.reject_reason) {
     throw new Error(resolved.reject_reason);
   }
   if (allowedTypes.length && !allowedTypes.includes(String(resolved?.barcode_type || "").trim().toUpperCase())) {
@@ -25063,7 +25067,7 @@ async function testBarcodeResolverAllContexts() {
   const results = [];
   for (const context of BARCODE_RESOLVER_TEST_CONTEXTS) {
     try {
-      const result = await resolveBarcodeForContext(barcode, context);
+      const result = await resolveBarcodeForContext(barcode, context, [], { rejectOnContextReject: false });
       results.push({ context, result });
     } catch (error) {
       results.push({
