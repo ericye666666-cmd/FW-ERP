@@ -199,17 +199,12 @@
         message: "",
       };
     }
-    if (completionAction.action === "print_first") {
-      return {
-        action: "keep_modal_open",
-        pendingCount: completionAction.pendingCount,
-        message: `请先点“打印本轮全部 ${completionAction.pendingCount} 张”，核对实体出纸后，再点“确认本类已贴完”。当前不能直接结束这轮贴码流程。`,
-      };
-    }
     return {
-      action: "keep_modal_open",
+      action: "allow_close",
       pendingCount: completionAction.pendingCount,
-      message: "请先点“确认本类已贴完”，再结束这轮贴码流程。",
+      message: completionAction.action === "print_first"
+        ? `当前仅关闭打印窗并返回页面，不会把这 ${completionAction.pendingCount} 包标记为已打印或已贴完。`
+        : "当前仅关闭打印窗并返回页面，不会自动确认本类已贴完。",
     };
   }
 

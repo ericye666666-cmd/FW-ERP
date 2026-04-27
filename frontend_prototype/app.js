@@ -15349,9 +15349,9 @@ function getBalePrintModalCloseAction() {
     });
   }
   return {
-    action: jobs.length ? "keep_modal_open" : "allow_close",
+    action: "allow_close",
     pendingCount: jobs.length,
-    message: jobs.length ? "请先点“确认本类已贴完”，再结束这轮贴码流程。" : "",
+    message: jobs.length ? `当前仅关闭打印窗并返回页面，不会把这 ${jobs.length} 包标记为已打印或已贴完。` : "",
   };
 }
 
@@ -15366,18 +15366,6 @@ function isBalePrintModalAlreadyComplete(completionAction = null) {
 function closeBalePrintModal(options = {}) {
   if (!(balePrintModal instanceof HTMLElement)) {
     return false;
-  }
-  const force = Boolean(options && options.force);
-  if (!force) {
-    const closeAction = getBalePrintModalCloseAction();
-    if (closeAction.action !== "allow_close") {
-      balePrinterConsoleNotice = {
-        type: "error",
-        message: closeAction.message || "请先点“确认本类已贴完”，再结束这轮贴码流程。",
-      };
-      renderBalePrintModal();
-      return false;
-    }
   }
   balePrintModal.classList.add("hidden-screen");
   const frame = document.querySelector("#balePrintPreviewFrame");
@@ -15583,10 +15571,10 @@ function renderBalePrintModal() {
     completeButton.textContent = alreadyComplete ? "这一类已完成，关闭弹窗" : "确认本类已贴完";
   }
   if (closeBalePrintModalButton instanceof HTMLButtonElement) {
-    closeBalePrintModalButton.disabled = closeAction.action !== "allow_close";
+    closeBalePrintModalButton.disabled = false;
   }
   if (closeAndRefreshButton instanceof HTMLButtonElement) {
-    closeAndRefreshButton.disabled = closeAction.action !== "allow_close";
+    closeAndRefreshButton.disabled = false;
   }
 }
 
@@ -27589,6 +27577,15 @@ balePrintModal?.addEventListener("click", (event) => {
   if (event.target === balePrintModal) {
     closeBalePrintModal();
   }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") {
+    return;
+  }
+  if (!(balePrintModal instanceof HTMLElement) || balePrintModal.classList.contains("hidden-screen")) {
+    return;
+  }
+  closeBalePrintModal();
 });
 document.querySelector("#balePrintModalPrevButton")?.addEventListener("click", () => {
   balePrintModalState.currentIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0) - 1);
