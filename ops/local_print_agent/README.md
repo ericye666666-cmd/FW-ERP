@@ -1,94 +1,117 @@
-# FW-ERP Local Print Agent (MVP)
+# FW-ERP Windows Print-Station Agent (Issue #64 MVP)
 
-This folder provides a **local print bridge** for FW-ERP. It lets a cloud/staging FW-ERP page call a tiny local service running on the print computer.
+This folder now supports the **production print path** for FW-ERP operations:
 
-- Agent URL: `http://127.0.0.1:8719`
-- It binds to `127.0.0.1` only (localhost), not LAN.
-- No printing happens automatically on startup.
+```text
+Android PDA / staff browser
+→ FW-ERP cloud backend queues print job
+→ Windows print-station agent polls cloud queue
+→ Windows print computer prints locally to Deli label printer
+→ Agent marks job complete or failed
+```
 
-## Security notes
+> Deployment model: **one Windows print-station computer per warehouse/store**.
 
-- Run this only on trusted print computers.
-- Do not change binding to `0.0.0.0` in MVP.
-- CORS is restricted to:
-  - `https://fw-erp-staging.onrender.com`
-  - `http://34.35.52.250:8000`
-  - `http://localhost:8000`
-  - `http://127.0.0.1:8000`
+Android PDAs do **not** install printer drivers and do **not** print directly. PDA screens only queue print jobs to FW-ERP cloud.
+
+---
 
 ## Files
 
-- `agent.py` — Python standard-library HTTP API (no third-party runtime dependency).
-- `requirements.txt` — Python package dependencies.
-- `start_mac.sh` — startup script for macOS/Linux.
-- `start_windows.ps1` — startup script for Windows PowerShell.
+- `agent.py` — main agent program.
+  - `local-api` mode: old localhost bridge (`/health`, `/printers`, `/print/html`).
+  - `print-station` mode: Windows poll/claim/print/complete/fail worker for cloud queue.
+- `print_station_config.example.json` — sample print-station config.
+- `start_windows.ps1` — recommended Windows startup script for print-station mode.
+- `start_mac.sh` — legacy local API startup for macOS/Linux testing.
+- `requirements.txt` — dependency list (still standard-library runtime).
 
-## API endpoints
+---
 
-1. `GET /health`
-   - Returns status, version, host, and current UTC timestamp.
+## Print-station config
 
-2. `GET /printers`
-   - macOS/Linux: uses `lpstat -a` if available.
-   - Windows: returns clear `not implemented` response for MVP.
+Create `print_station_config.json` (copy from example):
 
-3. `POST /print/html`
-   - Request body JSON:
-     - `html` (string): printable HTML text.
-     - `printer` (string): target printer name.
-   - MVP behavior:
-     - Saves HTML to a temporary file.
-     - macOS/Linux: runs `lp -d <printer> <tempfile>`.
-     - Windows: returns actionable unsupported message in MVP.
-
-4. `POST /print/raw` (experimental/disabled)
-   - Reserved for future TSPL/ZPL/EPL support.
-   - Returns clear disabled response in MVP.
-
-## Start on macOS/Linux
-
-```bash
-cd ops/local_print_agent
-chmod +x start_mac.sh
-./start_mac.sh
+```json
+{
+  "api_base_url": "https://fw-erp-34-35-52-250.nip.io/api/v1",
+  "station_id": "kikuyu-print-station-1",
+  "printer_name": "Deli DL-720C",
+  "poll_interval_seconds": 5
+}
 ```
 
-If startup succeeds, the process listens on:
+Fields:
 
-- `http://127.0.0.1:8719`
+- `api_base_url`: FW-ERP cloud API base (must include `/api/v1`).
+- `station_id`: unique ID for this Windows print-station computer.
+- `printer_name`: Windows printer queue name.
+- `poll_interval_seconds`: queue polling interval.
 
-## Start on Windows (PowerShell)
+---
+
+## Required cloud endpoints used by the agent
+
+1. Poll pending jobs:
+   - `GET /print-jobs/pending?station_id=<station_id>`
+2. Claim a job:
+   - `POST /print-jobs/{job_id}/claim`
+3. On print success:
+   - `POST /print-jobs/{job_id}/complete`
+4. On print failure:
+   - `POST /print-jobs/{job_id}/fail` with error message.
+
+---
+
+## Windows setup (non-developer steps)
+
+1. **Install Python on Windows**
+   - Install Python 3.10+ from python.org.
+   - During install, enable "Add Python to PATH".
+
+2. **Install Deli DL-720C Windows driver**
+   - Install the official driver on the print-station computer.
+
+3. **Confirm Windows can print a test page**
+   - In Windows Printer settings, print a test page to the Deli printer.
+   - Do this before running FW-ERP print-station agent.
+
+4. **Configure print-station file**
+   - In `ops\local_print_agent`, copy `print_station_config.example.json` to `print_station_config.json`.
+   - Set `api_base_url`, `station_id`, and exact `printer_name`.
+
+5. **Start print-station agent**
 
 ```powershell
 cd ops\local_print_agent
 powershell -ExecutionPolicy Bypass -File .\start_windows.ps1
 ```
 
-## Verification steps (non-developer friendly)
+6. **Verify polling**
+   - Console should log repeated polling messages.
+   - When there are no jobs: `polling ok: no pending jobs`.
+   - When a job arrives: claimed → printed → completed.
 
-1. **Start agent** using one of the scripts above.
-2. **Check health** in browser:
-   - Open `http://127.0.0.1:8719/health`
-   - You should see JSON with `"status": "ok"`.
-3. **Check printers**:
-   - Open `http://127.0.0.1:8719/printers`
-   - On macOS/Linux, printer list appears if CUPS tools are installed.
-4. **Submit a test HTML print request** (Terminal example):
+7. **Stop / restart**
+   - Press `Ctrl + C` in the PowerShell window to stop.
+   - Re-run `start_windows.ps1` to restart.
+
+---
+
+## Windows printing behavior in this MVP
+
+- The agent renders a text-based Bale label from job payload fields and prints via PowerShell `Out-Printer` to configured queue.
+- This is intentionally Windows-first and practical for operator rollout.
+- **Limitation:** advanced layout/barcode-perfect rendering for all label templates is not finalized in this pass. If driver formatting is not acceptable, the agent still performs explicit claim/fail/complete flow and reports actionable error messages.
+
+---
+
+## Legacy local API mode (optional)
+
+Legacy mode is kept for local dev/testing only:
 
 ```bash
-curl -X POST http://127.0.0.1:8719/print/html \
-  -H "Content-Type: application/json" \
-  -d '{"printer":"YOUR_PRINTER_NAME","html":"<html><body><h1>FW-ERP Test Label</h1></body></html>"}'
+python agent.py local-api
 ```
 
-If the platform/driver path is unsupported, the API returns a clear error plus fallback guidance.
-
-## Browser fallback if local agent is unavailable
-
-Continue using standard browser printing from FW-ERP pages. The local print agent is an optional bridge for direct local-printer workflows.
-
-## Known MVP limitations
-
-- Windows printer listing/HTML direct print not implemented yet.
-- Requires CUPS (`lpstat`, `lp`) tools on macOS/Linux for printer discovery and command-based print.
-- HTML rendering fidelity depends on OS print stack and printer driver.
+It serves localhost endpoints (`/health`, `/printers`, `/print/html`) and is **not** the recommended production model for warehouse/store operations.

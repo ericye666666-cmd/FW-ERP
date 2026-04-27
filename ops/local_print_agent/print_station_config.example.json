@@ -1,0 +1,6 @@
+{
+  "api_base_url": "https://fw-erp-34-35-52-250.nip.io/api/v1",
+  "station_id": "kikuyu-print-station-1",
+  "printer_name": "Deli DL-720C",
+  "poll_interval_seconds": 5
+}

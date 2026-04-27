@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""FW-ERP Local Print Agent MVP."""
+"""FW-ERP Local Print Agent + Windows print-station mode."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import platform
 import re
 import shutil
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib import error, parse, request
 from urllib.parse import urlparse
 
-APP_VERSION = "0.1.3"
+APP_VERSION = "0.2.0"
 HOST = "127.0.0.1"
 PORT = 8719
 ALLOWED_ORIGINS = {
@@ -36,6 +40,10 @@ _PRINTER_STATUS_MARKERS = [
     "disabled",
     "not accepting requests",
 ]
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _extract_printer_name(raw_line: str) -> str:
@@ -114,8 +122,217 @@ def _print_html_unix(printer: str, html_path: str) -> tuple[bool, str, str]:
     return True, message, resolved_printer
 
 
+def _sanitize_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _job_field(job: dict, *keys: str, default: str = "") -> str:
+    for key in keys:
+        value = job.get(key)
+        if value is not None and str(value).strip():
+            return str(value)
+    return default
+
+
+def _render_bale_label_text(job: dict) -> str:
+    data = job.get("payload") if isinstance(job.get("payload"), dict) else job
+    title = _job_field(data, "label_title", default="FW-ERP Bale Label")
+    lines = [
+        title,
+        "=" * 36,
+        f"Job ID: {_job_field(job, 'id', 'job_id', default='(unknown)')}",
+        f"Bale ID: {_job_field(data, 'bale_id', 'barcode', 'code', default='-')}",
+        f"Supplier: {_job_field(data, 'supplier_name', 'supplier', default='-')}",
+        f"Batch: {_job_field(data, 'batch_number', 'batch_code', default='-')}",
+        f"Category: {_job_field(data, 'category', default='-')}",
+        f"Grade: {_job_field(data, 'grade', default='-')}",
+        f"Quantity: {_job_field(data, 'quantity', 'qty', default='-')}",
+        f"Weight (kg): {_job_field(data, 'weight_kg', default='-')}",
+        f"Destination: {_job_field(data, 'warehouse_name', 'store_name', default='-')}",
+        f"Created: {_job_field(job, 'created_at', default=_utc_now())}",
+    ]
+
+    notes = _sanitize_text(_job_field(data, "notes", default=""))
+    if notes:
+        lines.extend(["-" * 36, f"Notes: {notes}"])
+
+    return "\r\n".join(lines) + "\r\n"
+
+
+def _print_text_windows(printer_name: str, text_content: str) -> tuple[bool, str, str | None]:
+    if platform.system() != "Windows":
+        return False, "Windows print-station mode must run on Windows.", None
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as temp_file:
+        temp_file.write(text_content)
+        text_path = temp_file.name
+
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-Command",
+        (
+            "$ErrorActionPreference = 'Stop'; "
+            f"Get-Content -LiteralPath '{text_path}' | "
+            f"Out-Printer -Name '{printer_name}'"
+        ),
+    ]
+
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        error_message = result.stderr.strip() or result.stdout.strip() or "unknown Out-Printer error"
+        message = (
+            "Windows print failed. Check printer name/driver and confirm Windows test page works first. "
+            f"Out-Printer error: {error_message}"
+        )
+        return False, message, text_path
+
+    return True, f"Printed via Windows Out-Printer to '{printer_name}'.", text_path
+
+
+def _http_json(method: str, url: str, payload: dict | None = None) -> tuple[int, dict]:
+    data = None
+    headers = {"Accept": "application/json"}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    req = request.Request(url=url, data=data, method=method, headers=headers)
+    try:
+        with request.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode("utf-8") if resp.length is None or resp.length > 0 else ""
+            parsed = json.loads(body) if body else {}
+            return int(resp.status), parsed if isinstance(parsed, dict) else {}
+    except error.HTTPError as exc:
+        body = exc.read().decode("utf-8") if exc.fp else ""
+        parsed: dict = {}
+        if body:
+            try:
+                raw = json.loads(body)
+                if isinstance(raw, dict):
+                    parsed = raw
+            except json.JSONDecodeError:
+                parsed = {"raw": body}
+        return int(exc.code), parsed
+
+
+def _extract_pending_jobs(response_payload: dict) -> list[dict]:
+    for key in ("items", "jobs", "results", "data"):
+        value = response_payload.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+
+    if isinstance(response_payload.get("job"), dict):
+        return [response_payload["job"]]
+
+    if response_payload.get("id"):
+        return [response_payload]
+
+    return []
+
+
+def _build_url(base_url: str, path: str) -> str:
+    return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+
+
+def run_print_station(config_path: Path):
+    if platform.system() != "Windows":
+        raise RuntimeError("Print-station mode is Windows-first. Run this mode on a Windows print computer.")
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+
+    api_base_url = _sanitize_text(config.get("api_base_url"))
+    station_id = _sanitize_text(config.get("station_id"))
+    printer_name = _sanitize_text(config.get("printer_name"))
+    poll_interval_seconds = int(config.get("poll_interval_seconds", 5) or 5)
+
+    missing = [
+        name
+        for name, value in (
+            ("api_base_url", api_base_url),
+            ("station_id", station_id),
+            ("printer_name", printer_name),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(f"Missing required config fields: {', '.join(missing)}")
+
+    print("[print-station] Starting FW-ERP Windows print-station agent")
+    print(f"[print-station] station_id={station_id} printer_name={printer_name} poll={poll_interval_seconds}s")
+    print(f"[print-station] api_base_url={api_base_url}")
+
+    while True:
+        try:
+            pending_url = _build_url(api_base_url, f"print-jobs/pending?{parse.urlencode({'station_id': station_id})}")
+            status_code, pending_payload = _http_json("GET", pending_url)
+            if status_code >= 400:
+                print(f"[{_utc_now()}] pending poll failed: status={status_code} body={pending_payload}")
+                time.sleep(poll_interval_seconds)
+                continue
+
+            jobs = _extract_pending_jobs(pending_payload)
+            if not jobs:
+                print(f"[{_utc_now()}] polling ok: no pending jobs")
+                time.sleep(poll_interval_seconds)
+                continue
+
+            job = jobs[0]
+            job_id = _job_field(job, "id", "job_id")
+            if not job_id:
+                print(f"[{_utc_now()}] skipped malformed pending job: {job}")
+                time.sleep(poll_interval_seconds)
+                continue
+
+            claim_url = _build_url(api_base_url, f"print-jobs/{job_id}/claim")
+            claim_status, claim_payload = _http_json("POST", claim_url, {"station_id": station_id})
+            if claim_status >= 400:
+                print(f"[{_utc_now()}] claim failed for job={job_id}: status={claim_status} body={claim_payload}")
+                time.sleep(poll_interval_seconds)
+                continue
+
+            print(f"[{_utc_now()}] claimed job={job_id}; printing...")
+            label_text = _render_bale_label_text(job)
+            printed, print_message, temp_path = _print_text_windows(printer_name=printer_name, text_content=label_text)
+
+            if printed:
+                complete_url = _build_url(api_base_url, f"print-jobs/{job_id}/complete")
+                complete_status, complete_payload = _http_json("POST", complete_url, {"station_id": station_id})
+                if complete_status >= 400:
+                    print(
+                        f"[{_utc_now()}] printed but complete failed job={job_id}: "
+                        f"status={complete_status} body={complete_payload}"
+                    )
+                else:
+                    print(f"[{_utc_now()}] completed job={job_id}; {print_message}; temp={temp_path}")
+            else:
+                fail_url = _build_url(api_base_url, f"print-jobs/{job_id}/fail")
+                fail_status, fail_payload = _http_json(
+                    "POST",
+                    fail_url,
+                    {
+                        "station_id": station_id,
+                        "error": print_message,
+                    },
+                )
+                print(
+                    f"[{_utc_now()}] failed job={job_id}; fail_status={fail_status}; "
+                    f"print_error={print_message}; fail_body={fail_payload}; temp={temp_path}"
+                )
+        except KeyboardInterrupt:
+            print("\n[print-station] Stopped by operator.")
+            return
+        except Exception as exc:  # noqa: BLE001
+            print(f"[{_utc_now()}] loop error: {exc}")
+
+        time.sleep(poll_interval_seconds)
+
+
 class PrintAgentHandler(BaseHTTPRequestHandler):
-    server_version = "FWERPPrintAgent/0.1"
+    server_version = "FWERPPrintAgent/0.2"
 
     def _set_headers(self, status_code: int = 200):
         self.send_response(status_code)
@@ -126,8 +343,6 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
             self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-            # Chrome Private Network Access preflight requires this header when a
-            # public/staging page calls a localhost agent such as 127.0.0.1:8719.
             self.send_header("Access-Control-Allow-Private-Network", "true")
         self.end_headers()
 
@@ -159,7 +374,7 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                     "version": APP_VERSION,
                     "host": HOST,
                     "port": PORT,
-                    "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                    "timestamp_utc": _utc_now(),
                 }
             )
             return
@@ -184,7 +399,7 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                         "platform": system_name,
                         "printers": [],
                         "count": 0,
-                        "warning": "Windows printer listing is not implemented in MVP. Use browser print fallback.",
+                        "warning": "Windows printer listing is not implemented in local API mode.",
                     },
                     501,
                 )
@@ -238,25 +453,12 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            if system_name == "Windows":
-                self._send_json(
-                    {
-                        "ok": False,
-                        "platform": system_name,
-                        "printer": printer,
-                        "message": "Windows direct HTML printing is not implemented in MVP. Use browser print fallback.",
-                        "temp_file": html_path,
-                    },
-                    501,
-                )
-                return
-
             self._send_json(
                 {
                     "ok": False,
                     "platform": system_name,
                     "printer": printer,
-                    "message": f"Unsupported platform for printing: {system_name}",
+                    "message": "Use Windows print-station mode for production. Local HTML print API is not available on Windows.",
                     "temp_file": html_path,
                 },
                 501,
@@ -280,11 +482,39 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
         return
 
 
-def run_server():
+def run_local_api_server():
     server = ThreadingHTTPServer((HOST, PORT), PrintAgentHandler)
-    print(f"FW-ERP local print agent running on http://{HOST}:{PORT}")
-    server.serve_forever()
+    print(f"FW-ERP Local Print Agent v{APP_VERSION} running on http://{HOST}:{PORT}")
+    print("Press Ctrl+C to stop.")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="FW-ERP print agent")
+    subparsers = parser.add_subparsers(dest="mode")
+
+    subparsers.add_parser("local-api", help="Run localhost HTTP print bridge (legacy MVP mode)")
+
+    station_parser = subparsers.add_parser("print-station", help="Run Windows cloud print-station poller")
+    station_parser.add_argument(
+        "--config",
+        default="print_station_config.json",
+        help="Path to print-station config JSON (default: print_station_config.json)",
+    )
+
+    args = parser.parse_args()
+    if args.mode in (None, "local-api"):
+        run_local_api_server()
+        return
+
+    if args.mode == "print-station":
+        run_print_station(Path(args.config))
 
 
 if __name__ == "__main__":
-    run_server()
+    main()
