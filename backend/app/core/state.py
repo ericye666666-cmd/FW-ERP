@@ -196,6 +196,7 @@ class InMemoryState:
         self.sorting_stock: dict[str, dict[str, Any]] = {}
         self.goods_receipts: list[dict[str, Any]] = []
         self.print_jobs: list[dict[str, Any]] = []
+        self.print_station_jobs: list[dict[str, Any]] = []
         self.warehouse_stock: dict[str, dict[str, Any]] = defaultdict(dict)
         self.warehouse_lots: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.store_stock: dict[str, dict[str, Any]] = defaultdict(dict)
@@ -259,6 +260,7 @@ class InMemoryState:
         )
         self._receipt_ids = count(max((row["id"] for row in self.goods_receipts), default=0) + 1)
         self._print_job_ids = count(max((row["id"] for row in self.print_jobs), default=0) + 1)
+        self._print_station_job_ids = count(max((row["id"] for row in self.print_station_jobs), default=0) + 1)
         self._transfer_ids = count(len(self.transfer_orders) + 1)
         self._transfer_recommendation_ids = count(len(self.transfer_recommendations) + 1)
         self._receiving_session_ids = count(len(self.transfer_receiving_sessions) + 1)
@@ -322,6 +324,7 @@ class InMemoryState:
             "sorting_stock": self.sorting_stock,
             "goods_receipts": self.goods_receipts,
             "print_jobs": self.print_jobs,
+            "print_station_jobs": self.print_station_jobs,
             "warehouse_stock": dict(self.warehouse_stock),
             "warehouse_lots": dict(self.warehouse_lots),
             "store_stock": dict(self.store_stock),
@@ -382,6 +385,7 @@ class InMemoryState:
         self.sorting_stock = payload.get("sorting_stock", {})
         self.goods_receipts = payload.get("goods_receipts", [])
         self.print_jobs = payload.get("print_jobs", [])
+        self.print_station_jobs = payload.get("print_station_jobs", [])
         self.warehouse_stock = defaultdict(dict, payload.get("warehouse_stock", {}))
         self.warehouse_lots = defaultdict(list, payload.get("warehouse_lots", {}))
         self.store_stock = defaultdict(dict, payload.get("store_stock", {}))
@@ -12034,6 +12038,82 @@ class InMemoryState:
             return self.print_jobs
         normalized = status.strip().lower()
         return [job for job in self.print_jobs if job["status"].lower() == normalized]
+
+    def create_bale_label_print_station_job(self, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(
+            payload["requested_by"],
+            {"warehouse_clerk", "warehouse_supervisor", "area_supervisor", "store_manager", "store_clerk"},
+        )
+        job = {
+            "id": next(self._print_station_job_ids),
+            "label_type": "BALE_LABEL",
+            "code": str(payload.get("code") or "").strip().upper(),
+            "supplier": str(payload.get("supplier") or "").strip(),
+            "category": str(payload.get("category") or "").strip(),
+            "subcategory": str(payload.get("subcategory") or "").strip(),
+            "batch": str(payload.get("batch") or "").strip(),
+            "ship_reference": str(payload.get("ship_reference") or "").strip(),
+            "total_number": int(payload.get("total_number") or 0),
+            "sequence_number": int(payload.get("sequence_number") or 0),
+            "requested_by": actor["username"],
+            "requested_at": now_iso(),
+            "status": "pending",
+            "station_id": "",
+            "claimed_at": None,
+            "printed_at": None,
+            "error_message": "",
+        }
+        if not job["code"]:
+            raise HTTPException(status_code=400, detail="Bale print job code is required")
+        self.print_station_jobs.append(job)
+        self._persist()
+        return job
+
+    def list_pending_print_station_jobs(self, station_id: str = "") -> list[dict[str, Any]]:
+        _ = station_id
+        return [job for job in self.print_station_jobs if str(job.get("status") or "").lower() == "pending"]
+
+    def _get_print_station_job(self, job_id: int) -> dict[str, Any]:
+        for job in self.print_station_jobs:
+            if int(job.get("id", 0)) == int(job_id):
+                return job
+        raise HTTPException(status_code=404, detail=f"Unknown print-station job {job_id}")
+
+    def claim_print_station_job(self, job_id: int, station_id: str) -> dict[str, Any]:
+        job = self._get_print_station_job(job_id)
+        if job["status"] != "pending":
+            raise HTTPException(status_code=400, detail=f"Print-station job {job_id} is not pending")
+        job["status"] = "claimed"
+        job["station_id"] = str(station_id or "").strip()
+        job["claimed_at"] = now_iso()
+        job["error_message"] = ""
+        self._persist()
+        return job
+
+    def complete_print_station_job(self, job_id: int, station_id: str) -> dict[str, Any]:
+        job = self._get_print_station_job(job_id)
+        if job["status"] not in {"pending", "claimed"}:
+            raise HTTPException(status_code=400, detail=f"Print-station job {job_id} cannot be completed")
+        job["status"] = "printed"
+        job["station_id"] = str(station_id or "").strip()
+        job["printed_at"] = now_iso()
+        if not job.get("claimed_at"):
+            job["claimed_at"] = job["printed_at"]
+        job["error_message"] = ""
+        self._persist()
+        return job
+
+    def fail_print_station_job(self, job_id: int, station_id: str, error_message: str) -> dict[str, Any]:
+        job = self._get_print_station_job(job_id)
+        if job["status"] == "printed":
+            raise HTTPException(status_code=400, detail=f"Print-station job {job_id} already printed")
+        job["status"] = "failed"
+        job["station_id"] = str(station_id or "").strip()
+        job["error_message"] = str(error_message or "").strip()
+        if not job["error_message"]:
+            raise HTTPException(status_code=400, detail="error_message is required")
+        self._persist()
+        return job
 
     def get_print_job(self, job_id: int) -> dict[str, Any]:
         for job in self.print_jobs:
