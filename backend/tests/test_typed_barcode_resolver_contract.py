@@ -227,6 +227,35 @@ def test_pos_rejects_raw_bale_dispatch_bale_and_unknown(state):
     assert unknown_result["operational_next_step"]
 
 
+def test_same_raw_bale_identity_is_preserved_across_contexts_with_contextual_rejection(state):
+    raw_bale, _, _, _ = _prepare_dispatch_and_store_item(state)
+    raw_barcode = raw_bale["bale_barcode"]
+
+    expected_contexts = {
+        "warehouse_sorting_create": False,
+        "pos": True,
+        "store_receiving": True,
+        "store_pda": True,
+        "b2b_bale_sales": True,
+    }
+
+    for context, should_reject in expected_contexts.items():
+        result = state.resolve_barcode(raw_barcode, context=context)
+        assert result["barcode_type"] == "RAW_BALE"
+        assert result["barcode_type"] != "UNKNOWN"
+        assert result["business_object"]["kind"] == "INBOUND_BALE"
+        assert result["business_object"]["id"] == raw_barcode
+        assert result["object_type"] == "raw_bale"
+        assert result["object_id"] == raw_barcode
+        assert result["template_scope"] == "bale"
+        if context == "pos":
+            assert result["pos_allowed"] is False
+        if should_reject:
+            assert result["reject_reason"]
+        else:
+            assert result["reject_reason"] == ""
+
+
 def test_rejection_messages_include_operational_direction_not_only_invalid(state):
     raw_bale, dispatch_bale, _, store_item_barcode = _prepare_dispatch_and_store_item(state)
 
