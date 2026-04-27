@@ -24,6 +24,7 @@ const STORAGE_KEYS = {
   oaAttendanceRecords: "retail_ops_oa_attendance_records",
   oaPayrollBatches: "retail_ops_oa_payroll_batches",
   oaFinanceApprovals: "retail_ops_oa_finance_approvals",
+  localPrintAgentUrl: "retail_ops_local_print_agent_url",
 };
 
 const balePrintFlow = globalThis.BalePrintFlow || {};
@@ -382,6 +383,12 @@ let balePrintModalState = {
   templateScope: "bale",
   taskType: "store_dispatch",
   preferredTemplateCode: "",
+};
+let localPrintAgentState = {
+  url: String(localStorage.getItem(STORAGE_KEYS.localPrintAgentUrl) || "http://127.0.0.1:8719").trim() || "http://127.0.0.1:8719",
+  connected: false,
+  checking: false,
+  lastMessage: "",
 };
 let baleBarcodeDirectoryNotice = null;
 let balePrinterConsoleNotice = null;
@@ -15376,6 +15383,109 @@ function closeBalePrintModal(options = {}) {
   return true;
 }
 
+function getLocalPrintAgentUrl() {
+  const current = String(localPrintAgentState.url || localStorage.getItem(STORAGE_KEYS.localPrintAgentUrl) || "http://127.0.0.1:8719").trim();
+  return current || "http://127.0.0.1:8719";
+}
+
+function setLocalPrintAgentMessage(type, message) {
+  balePrinterConsoleNotice = { type, message };
+  localPrintAgentState.lastMessage = String(message || "").trim();
+}
+
+function renderBaleLocalPrintAgentStatus() {
+  const statusArea = document.querySelector("#balePrintModalLocalAgentStatus");
+  if (!(statusArea instanceof HTMLElement)) {
+    return;
+  }
+  const agentUrl = getLocalPrintAgentUrl();
+  const statusText = localPrintAgentState.checking
+    ? "checking"
+    : (localPrintAgentState.connected ? "connected" : "not connected");
+  const suffix = localPrintAgentState.lastMessage ? ` · ${localPrintAgentState.lastMessage}` : "";
+  statusArea.className = "candidate-summary";
+  statusArea.textContent = `Local print agent: ${statusText} · URL: ${agentUrl}${suffix}`;
+}
+
+async function checkLocalPrintAgentHealth() {
+  const agentUrl = getLocalPrintAgentUrl();
+  localPrintAgentState.url = agentUrl;
+  localPrintAgentState.checking = true;
+  localPrintAgentState.lastMessage = "";
+  renderBaleLocalPrintAgentStatus();
+  try {
+    const response = await fetch(`${agentUrl}/health`, { method: "GET" });
+    if (!response.ok) {
+      throw new Error(`health check failed (${response.status})`);
+    }
+    const payload = await response.json();
+    if (String(payload?.status || "").trim().toLowerCase() !== "ok") {
+      throw new Error("agent returned unexpected health status");
+    }
+    localPrintAgentState.connected = true;
+    localPrintAgentState.checking = false;
+    localPrintAgentState.lastMessage = "health ok";
+    setLocalPrintAgentMessage("success", `本地打印代理可用：${agentUrl}`);
+    localStorage.setItem(STORAGE_KEYS.localPrintAgentUrl, agentUrl);
+    renderBalePrintModal();
+    return payload;
+  } catch (error) {
+    localPrintAgentState.connected = false;
+    localPrintAgentState.checking = false;
+    localPrintAgentState.lastMessage = "health failed";
+    setLocalPrintAgentMessage("error", `本地打印代理不可用（${agentUrl}）。请先启动 FW-ERP Local Print Agent，或改用“用浏览器打印 / Use browser print”。`);
+    renderBalePrintModal();
+    throw error;
+  }
+}
+
+function getCurrentBalePreviewHtml() {
+  const frame = document.querySelector("#balePrintPreviewFrame");
+  if (!(frame instanceof HTMLIFrameElement)) {
+    throw new Error("当前找不到打印预览窗口。");
+  }
+  if (typeof frame.srcdoc === "string" && frame.srcdoc.trim()) {
+    return frame.srcdoc;
+  }
+  const frameDocument = frame.contentDocument;
+  if (!frameDocument || !frameDocument.documentElement) {
+    throw new Error("当前预览还没加载完成，请先点“刷新预览”后重试。");
+  }
+  return `<!doctype html>\n${frameDocument.documentElement.outerHTML}`;
+}
+
+async function printCurrentBaleModalViaLocalAgent() {
+  const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
+  const currentJob = jobs[balePrintModalState.currentIndex] || null;
+  if (!currentJob) {
+    throw new Error("当前没有可打印的标签。");
+  }
+  const html = getCurrentBalePreviewHtml();
+  const printerName = String(document.querySelector("[data-bale-modal-printer-select]")?.value || document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim();
+  if (!printerName) {
+    throw new Error("请先选择打印机。");
+  }
+  const agentUrl = getLocalPrintAgentUrl();
+  const response = await fetch(`${agentUrl}/print/html`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      html,
+      printer: printerName,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(String(payload?.message || `本地代理打印失败（${response.status}）`));
+  }
+  localPrintAgentState.connected = true;
+  localPrintAgentState.lastMessage = "print submitted";
+  setLocalPrintAgentMessage("success", String(payload?.message || `已通过本地代理发送打印：${printerName}`));
+  renderBalePrintModal();
+}
+
 function renderBalePrintModal() {
   if (!(balePrintModal instanceof HTMLElement)) {
     return;
@@ -15387,6 +15497,8 @@ function renderBalePrintModal() {
   const prevButton = document.querySelector("#balePrintModalPrevButton");
   const nextButton = document.querySelector("#balePrintModalNextButton");
   const refreshButton = document.querySelector("#balePrintModalRefreshButton");
+  const checkLocalAgentButton = document.querySelector("#balePrintModalCheckLocalAgentButton");
+  const localAgentPrintButton = document.querySelector("#balePrintModalLocalAgentPrintButton");
   const connectButton = document.querySelector("#balePrintModalConnectButton");
   const directPrintButton = document.querySelector("#balePrintModalDirectPrintButton");
   const printAllButton = document.querySelector("#balePrintModalPrintAllButton");
@@ -15499,6 +15611,7 @@ function renderBalePrintModal() {
         ${selectedPrinter && usesTsplMode
           ? `<div class="flow-summary-note success">当前已切换为 TSPL 原始指令直打，不依赖 macOS 的 A4/Letter 纸张队列。请直接测试是否正常出纸。</div>`
           : ""}
+        <div class="flow-summary-note">“直接打印本张（仅本地/LAN 后端）”仅适用于本地/LAN 部署后端。Cloud staging 建议优先使用本地打印代理或浏览器打印兜底。</div>
         ${closeAction.action !== "allow_close"
           ? `<div class="flow-summary-note">当前这轮贴码流程不会因为关闭弹窗而结束。核对实体出纸后，请点“确认本类已贴完”。</div>`
           : ""}
@@ -15557,6 +15670,12 @@ function renderBalePrintModal() {
   if (refreshButton instanceof HTMLButtonElement) {
     refreshButton.disabled = !currentJob && !alreadyComplete;
   }
+  if (checkLocalAgentButton instanceof HTMLButtonElement) {
+    checkLocalAgentButton.disabled = Boolean(localPrintAgentState.checking);
+  }
+  if (localAgentPrintButton instanceof HTMLButtonElement) {
+    localAgentPrintButton.disabled = !currentJob;
+  }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
   }
@@ -15580,6 +15699,7 @@ function renderBalePrintModal() {
   if (closeAndRefreshButton instanceof HTMLButtonElement) {
     closeAndRefreshButton.disabled = false;
   }
+  renderBaleLocalPrintAgentStatus();
 }
 
 async function getBaleModalPrintContext() {
@@ -27625,6 +27745,20 @@ document.querySelector("#balePrintModalNextButton")?.addEventListener("click", (
 });
 document.querySelector("#balePrintModalRefreshButton")?.addEventListener("click", () => {
   renderBalePrintModal();
+});
+document.querySelector("#balePrintModalCheckLocalAgentButton")?.addEventListener("click", () => {
+  checkLocalPrintAgentHealth().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
+});
+document.querySelector("#balePrintModalLocalAgentPrintButton")?.addEventListener("click", () => {
+  printCurrentBaleModalViaLocalAgent().catch((error) => {
+    localPrintAgentState.connected = false;
+    localPrintAgentState.lastMessage = "print failed";
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
 });
 document.querySelector("#balePrintModalConnectButton")?.addEventListener("click", () => {
   handleConnectBalePrinter()

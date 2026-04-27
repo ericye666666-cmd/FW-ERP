@@ -1025,14 +1025,21 @@
                 <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button">下一张</button>
                 <button id="balePrintModalRefreshButton" type="button" class="ghost-button mini-button">刷新预览</button>
               </div>
+              <div id="balePrintModalLocalAgentStatus" class="candidate-summary">
+                Local print agent: not connected · URL: http://127.0.0.1:8719
+              </div>
+              <div class="button-row">
+                <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测本地打印代理 / Check local print agent</button>
+                <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button">通过本地代理打印 / Print via local agent</button>
+              </div>
               <div class="button-row">
                 <button id="balePrintModalConnectButton" type="button" class="ghost-button mini-button">检测打印机</button>
-                <button id="balePrintModalDirectPrintButton" type="button" class="ghost-button mini-button">直接打印本张</button>
+                <button id="balePrintModalDirectPrintButton" type="button" class="ghost-button mini-button">直接打印本张（仅本地/LAN 后端）</button>
                 <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button">打印本轮全部</button>
                 <button id="balePrintModalBrowserPrintButton" type="button" class="ghost-button mini-button">用浏览器打印 / Use browser print</button>
               </div>
               <div id="balePrintModalBrowserPrintHint" class="subtle small">
-                Cloud staging cannot directly control local USB printers. Use browser print and select your Deli printer in the Mac print dialog.
+                Cloud staging cannot directly access USB printers. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer.
               </div>
               <div class="button-row">
                 <button id="balePrintModalCompleteButton" type="button" class="ghost-button mini-button">确认本类已贴完</button>
