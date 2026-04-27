@@ -547,6 +547,21 @@ class SortingStockResponse(BaseModel):
     updated_at: str
 
 
+class WarehouseInventorySummaryBucket(BaseModel):
+    bale_count: int = 0
+    qty: int = 0
+
+
+class WarehouseInventorySummaryResponse(BaseModel):
+    raw_bale_status_counts: dict[str, int] = Field(default_factory=dict)
+    sorting_task_status_counts: dict[str, int] = Field(default_factory=dict)
+    sorted_stock: WarehouseInventorySummaryBucket = Field(default_factory=WarehouseInventorySummaryBucket)
+    waiting_store: WarehouseInventorySummaryBucket = Field(default_factory=WarehouseInventorySummaryBucket)
+    waiting_sale: WarehouseInventorySummaryBucket = Field(default_factory=WarehouseInventorySummaryBucket)
+    b2b_bale_sales_candidates: dict[str, int] = Field(default_factory=dict)
+    store_pos_inventory: WarehouseInventorySummaryBucket = Field(default_factory=WarehouseInventorySummaryBucket)
+
+
 class SortingStockRackUpdateRequest(BaseModel):
     sku_code: str = Field(min_length=1)
     current_rack_code: str = Field(min_length=1)

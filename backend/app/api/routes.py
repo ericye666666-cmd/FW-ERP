@@ -143,6 +143,7 @@ from app.schemas.sorting import (
     SortingStockRackUpdateResponse,
     SortingStockResponse,
     StoreReplenishmentDemoResponse,
+    WarehouseInventorySummaryResponse,
     WarehouseMainflowDemoResponse,
     StoreDispatchBaleAcceptRequest,
     StoreDispatchBaleAssignRequest,
@@ -2804,6 +2805,14 @@ def list_store_prep_bales(
 ) -> list[StorePrepBaleResponse]:
     _require_current_user(authorization=authorization)
     return [StorePrepBaleResponse(**row) for row in state.list_store_prep_bales(status=status)]
+
+
+@router.get("/warehouse/inventory-summary", response_model=WarehouseInventorySummaryResponse, tags=["warehouse"])
+def get_warehouse_inventory_summary(
+    authorization: Optional[str] = Header(default=None),
+) -> WarehouseInventorySummaryResponse:
+    _require_current_user(authorization=authorization)
+    return WarehouseInventorySummaryResponse(**state.get_warehouse_inventory_summary())
 
 
 @router.get("/warehouse/item-barcode-tokens", response_model=list[ItemBarcodeTokenResponse], tags=["warehouse"])
