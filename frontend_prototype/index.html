@@ -1123,6 +1123,25 @@
           固定模板：1 个船单、10 个大类、仓库 20000 件、门店 3000 件、最近 14 天销量 2100 件；其中一部分会压成 100 件 / 包的待送店 bale，并停在“补货建议已生成”。
         </div>
         <pre id="storeReplenishmentDemoOutput" class="output hidden-output"></pre>
+        <h3>条码识别测试 / Barcode resolver test</h3>
+        <div id="barcodeResolverTestSummary" class="candidate-summary empty-state">
+          条码识别测试：输入或扫描 barcode，选择业务场景后点击“测试条码”，即可查看系统如何识别该码及下一步操作建议。
+        </div>
+        <form id="barcodeResolverTestForm" class="form-grid compact">
+          <input name="barcode" placeholder="RB260427AAAQH" />
+          <select name="context">
+            <option value="warehouse_sorting_create">warehouse_sorting_create</option>
+            <option value="pos">pos</option>
+            <option value="store_receiving">store_receiving</option>
+            <option value="store_pda">store_pda</option>
+            <option value="b2b_bale_sales">b2b_bale_sales</option>
+          </select>
+          <div class="button-row">
+            <button type="submit">测试条码 / Test barcode</button>
+            <button type="button" data-action="barcode-resolver-test-all">一键测试全部场景 / Test all contexts</button>
+          </div>
+        </form>
+        <pre id="barcodeResolverTestOutput" class="output hidden-output"></pre>
         <div id="testResetSummary" class="candidate-summary empty-state">
           点击后会清空测试产生的关单、包裹、bale、分拣、库存、调拨、销售、打印等历史数据；保留账号、门店、供应商和基础主数据，方便重新测试。
         </div>
