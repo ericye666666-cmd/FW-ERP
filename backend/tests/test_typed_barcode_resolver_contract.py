@@ -147,7 +147,11 @@ def test_pos_accepts_only_store_item_and_requires_identity_id(state):
     assert accepted["barcode_type"] == "STORE_ITEM"
     assert accepted["object_id"] == token["token_no"]
     assert accepted["identity_id"] == token["token_no"]
+    assert accepted["business_object"]["kind"] == "STORE_ITEM"
+    assert accepted["business_object"]["id"] == token["token_no"]
+    assert accepted["pos_allowed"] is True
     assert accepted["reject_reason"] == ""
+    assert accepted["operational_next_step"] == ""
 
     dispatch_rejected = state.resolve_barcode(dispatch_bale["bale_no"], context="pos")
     assert dispatch_rejected["barcode_type"] == "DISPATCH_BALE"
@@ -219,6 +223,8 @@ def test_pos_rejects_raw_bale_dispatch_bale_and_unknown(state):
     unknown_result = state.resolve_barcode("UNKNOWN-DOES-NOT-EXIST", context="pos")
     assert unknown_result["barcode_type"] == "UNKNOWN"
     assert unknown_result["reject_reason"]
+    assert unknown_result["rejection_message"] == unknown_result["reject_reason"]
+    assert unknown_result["operational_next_step"]
 
 
 def test_rejection_messages_include_operational_direction_not_only_invalid(state):
@@ -234,8 +240,14 @@ def test_rejection_messages_include_operational_direction_not_only_invalid(state
         assert "invalid barcode" not in lowered
         assert len(message.strip()) >= 10
 
+    pos_next_step = state.resolve_barcode(raw_bale["bale_barcode"], context="pos")["operational_next_step"]
+    sorting_next_step = state.resolve_barcode(store_item_barcode, context="warehouse_sorting_create")["operational_next_step"]
+    receiving_next_step = state.resolve_barcode(raw_bale["bale_barcode"], context="store_receiving")["operational_next_step"]
+    pda_next_step = state.resolve_barcode(raw_bale["bale_barcode"], context="store_pda")["operational_next_step"]
+    for next_step in [pos_next_step, sorting_next_step, receiving_next_step, pda_next_step]:
+        assert len(next_step.strip()) >= 8
 
-@pytest.mark.xfail(reason="Resolver response does not include explicit business_object contract to prove template_scope is non-authoritative.", strict=True)
+
 def test_template_scope_is_not_business_identity_authority_contract(state):
     _, _, token, store_item_barcode = _prepare_dispatch_and_store_item(state)
     result = state.resolve_barcode(store_item_barcode, context="pos")
@@ -243,4 +255,5 @@ def test_template_scope_is_not_business_identity_authority_contract(state):
     assert result["barcode_type"] == "STORE_ITEM"
     assert result["identity_id"] == token["token_no"]
     assert result["business_object"]["kind"] == "STORE_ITEM"
+    assert result["business_object"]["id"] == token["token_no"]
     assert result["template_scope"] == "product"

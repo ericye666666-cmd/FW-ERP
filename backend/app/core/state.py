@@ -2800,9 +2800,24 @@ class InMemoryState:
             return "店员 PDA 只允许扫描本人/本店相关 DISPATCH_BALE 或 STORE_ITEM。"
         return f"{barcode_type} 不允许在 {normalized_context} 场景扫描。"
 
+    def _barcode_context_next_step(self, barcode_type: str, context: str, allowed_contexts: list[str]) -> str:
+        normalized_context = str(context or "").strip()
+        if not normalized_context or normalized_context in allowed_contexts:
+            return ""
+        if normalized_context == "pos":
+            return "请改扫 STORE_ITEM 商品码，或转到仓库/门店收货模块处理 bale 码。"
+        if normalized_context == "warehouse_sorting_create":
+            return "请回到入仓包分拣创建页面并扫描 RAW_BALE 包码。"
+        if normalized_context == "store_receiving":
+            return "请在门店签收页面扫描 DISPATCH_BALE 送店包码。"
+        if normalized_context == "store_pda":
+            return "请确认当前员工/门店后，扫描对应 DISPATCH_BALE 或 STORE_ITEM。"
+        return f"请切换到允许 {barcode_type} 的业务页面后重试。"
+
     def _build_barcode_resolve_result(
         self,
         *,
+        barcode_value: str,
         barcode_type: str,
         object_type: str,
         object_id: str,
@@ -2811,14 +2826,45 @@ class InMemoryState:
         allowed_contexts: list[str],
         context: str = "",
     ) -> dict[str, Any]:
+        normalized_allowed_contexts = [str(value or "").strip() for value in allowed_contexts if str(value or "").strip()]
+        known_contexts = [
+            "pos",
+            "warehouse_sorting_create",
+            "raw_bale_stock",
+            "bale_sales_pool",
+            "store_receiving",
+            "store_manager_assign",
+            "store_pda",
+            "identity_ledger",
+            "b2b_bale_sales",
+        ]
+        reject_reason = self._barcode_context_reject_reason(barcode_type, context, normalized_allowed_contexts)
+        operational_next_step = self._barcode_context_next_step(barcode_type, context, normalized_allowed_contexts)
+        rejected_contexts = [ctx for ctx in known_contexts if ctx not in normalized_allowed_contexts]
+        business_object_kind = {
+            "raw_bale": "INBOUND_BALE",
+            "dispatch_bale": "DISPATCH_BALE",
+            "store_item": "STORE_ITEM",
+            "bale_sales_unit": "BALE_SALES_UNIT",
+            "loose_pick_task": "LOOSE_PICK_TASK",
+        }.get(str(object_type or "").strip().lower(), str(barcode_type or "UNKNOWN").strip().upper())
         return {
+            "barcode_value": str(barcode_value or "").strip().upper(),
             "barcode_type": barcode_type,
+            "business_object": {
+                "kind": business_object_kind,
+                "id": str(object_id or "").strip().upper(),
+            },
+            "pos_allowed": "pos" in normalized_allowed_contexts,
+            "rejected_contexts": rejected_contexts,
+            "rejection_message": reject_reason,
+            "operational_next_step": operational_next_step,
             "object_type": object_type,
             "object_id": str(object_id or "").strip().upper(),
             "identity_id": str(identity_id or "").strip().upper(),
             "template_scope": str(template_scope or "").strip().lower(),
-            "allowed_contexts": allowed_contexts,
-            "reject_reason": self._barcode_context_reject_reason(barcode_type, context, allowed_contexts),
+            "allowed_contexts": normalized_allowed_contexts,
+            "reject_reason": reject_reason,
         }
 
     def resolve_barcode(self, barcode: str, context: str = "") -> dict[str, Any]:
@@ -2826,7 +2872,13 @@ class InMemoryState:
         normalized_context = str(context or "").strip()
         if not normalized_barcode:
             return {
+                "barcode_value": "",
                 "barcode_type": "UNKNOWN",
+                "business_object": {"kind": "UNKNOWN", "id": ""},
+                "pos_allowed": False,
+                "rejected_contexts": [],
+                "rejection_message": "Barcode is required",
+                "operational_next_step": "请重新扫码；若标签损坏请补打后再试。",
                 "object_type": "unknown",
                 "object_id": "",
                 "identity_id": "",
@@ -2848,6 +2900,7 @@ class InMemoryState:
                 allowed_contexts.append("pos")
             matches.append(
                 self._build_barcode_resolve_result(
+                    barcode_value=normalized_barcode,
                     barcode_type="STORE_ITEM",
                     object_type="store_item",
                     object_id=token_no,
@@ -2877,6 +2930,7 @@ class InMemoryState:
         if dispatch_bale:
             matches.append(
                 self._build_barcode_resolve_result(
+                    barcode_value=normalized_barcode,
                     barcode_type="DISPATCH_BALE",
                     object_type="dispatch_bale",
                     object_id=str(dispatch_bale.get("bale_no") or normalized_barcode).strip().upper(),
@@ -2905,6 +2959,7 @@ class InMemoryState:
             prep_bale = self._normalize_store_prep_bale(prep_bale)
             matches.append(
                 self._build_barcode_resolve_result(
+                    barcode_value=normalized_barcode,
                     barcode_type="DISPATCH_BALE",
                     object_type="dispatch_bale",
                     object_id=str(prep_bale.get("bale_barcode") or prep_bale.get("bale_no") or normalized_barcode).strip().upper(),
@@ -2919,6 +2974,7 @@ class InMemoryState:
             self._ensure_raw_bale_defaults(raw_bale)
             matches.append(
                 self._build_barcode_resolve_result(
+                    barcode_value=normalized_barcode,
                     barcode_type="RAW_BALE",
                     object_type="raw_bale",
                     object_id=str(raw_bale.get("bale_barcode") or raw_bale.get("scan_token") or normalized_barcode).strip().upper(),
@@ -2934,7 +2990,13 @@ class InMemoryState:
         }
         if len(unique) > 1:
             return {
+                "barcode_value": normalized_barcode,
                 "barcode_type": "UNKNOWN",
+                "business_object": {"kind": "UNKNOWN", "id": normalized_barcode},
+                "pos_allowed": False,
+                "rejected_contexts": [],
+                "rejection_message": f"Barcode {normalized_barcode} matched multiple object types; global resolver refuses ambiguous scans.",
+                "operational_next_step": "请联系主管核对条码来源，确认后重新打印标准标签再扫描。",
                 "object_type": "conflict",
                 "object_id": normalized_barcode,
                 "identity_id": "",
@@ -2945,7 +3007,13 @@ class InMemoryState:
         if unique:
             return next(iter(unique.values()))
         return {
+            "barcode_value": normalized_barcode,
             "barcode_type": "UNKNOWN",
+            "business_object": {"kind": "UNKNOWN", "id": normalized_barcode},
+            "pos_allowed": False,
+            "rejected_contexts": [],
+            "rejection_message": f"Unknown barcode {normalized_barcode}",
+            "operational_next_step": "请先确认标签来源与业务场景；若仍无法识别，请联系主管补打或重建条码。",
             "object_type": "unknown",
             "object_id": normalized_barcode,
             "identity_id": "",
