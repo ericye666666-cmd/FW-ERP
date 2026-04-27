@@ -89,6 +89,17 @@ class MainSortingFlowStateTest(unittest.TestCase):
             },
             created_by="warehouse_clerk_1",
         )
+        self.state.update_china_source_cost(
+            source_pool_token,
+            {
+                "cost_entries": {
+                    "head_transport": {"amount": 1200, "currency": "CNY"},
+                    "customs_clearance": {"amount": 80000, "currency": "KES"},
+                    "tail_transport": {"amount": 12000, "currency": "KES"},
+                }
+            },
+            updated_by="warehouse_supervisor_1",
+        )
 
         shipment = self.state.create_inbound_shipment(
             {
@@ -637,6 +648,38 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(task["bale_barcodes"], [bales[0]["bale_barcode"]])
         self.assertEqual(updated_bale["status"], "sorting_in_progress")
         self.assertEqual(updated_bale["occupied_by_task_no"], task["task_no"])
+
+    def test_raw_bale_without_source_cost_cannot_create_sorting_task(self):
+        _, bales = self._create_ready_bales(customs_notice_no="RAW240428")
+
+        with self.assertRaises(HTTPException) as ctx:
+            self.state.create_sorting_task(
+                {
+                    "bale_barcodes": [bales[0]["bale_barcode"]],
+                    "handler_names": ["warehouse_clerk_1"],
+                    "note": "missing source cost should be blocked",
+                    "created_by": "warehouse_supervisor_1",
+                }
+            )
+
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(ctx.exception.detail, "该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。")
+
+    def test_raw_bale_with_source_cost_can_create_sorting_task(self):
+        shipment, bales, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240429")
+
+        task = self.state.create_sorting_task(
+            {
+                "bale_barcodes": [bales[0]["bale_barcode"]],
+                "handler_names": ["warehouse_clerk_1"],
+                "note": "source cost completed",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+
+        updated_bale = self.state.list_raw_bales(shipment_no=shipment["shipment_no"])[0]
+        self.assertEqual(task["bale_barcodes"], [bales[0]["bale_barcode"]])
+        self.assertEqual(updated_bale["status"], "sorting_in_progress")
 
     def test_bale_scan_token_is_short_and_used_for_print_payload_and_sorting_lookup(self):
         shipment, bales = self._create_ready_bales(customs_notice_no="RAW240427")

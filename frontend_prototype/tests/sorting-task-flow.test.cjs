@@ -118,6 +118,19 @@ test("addBaleToSortingTaskSelection rejects occupied or non-ready bales", () => 
   assert.match(salesPool.error, /不能加入/);
 });
 
+test("addBaleToSortingTaskSelection rejects bale without completed source cost", () => {
+  const rows = [
+    { bale_barcode: "RB260421000009", status: "ready_for_sorting", occupied_by_task_no: "", source_cost_completed: false },
+  ];
+  const result = addBaleToSortingTaskSelection({
+    allBales: rows,
+    selectedBaleCodes: [],
+    baleCode: "RB260421000009",
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /来源成本未完成/);
+});
+
 test("getSortingScannerDiagnostic marks scanner ready when a keyed scan ends with enter", () => {
   const diagnostic = getSortingScannerDiagnostic({
     hidSupported: true,
@@ -166,6 +179,31 @@ test("getSortingScannerDiagnostic warns when a scan arrives without enter or tab
   assert.equal(diagnostic.canAutoAdd, false);
   assert.match(diagnostic.headline, /没有回车或 Tab 后缀/);
   assert.match(diagnostic.recommendations.join(" "), /后缀设成 Enter 或 Tab/);
+});
+
+test("getSortingScannerDiagnostic shows non-fatal copy when barcode is already in pending list", () => {
+  const diagnostic = getSortingScannerDiagnostic({
+    hidSupported: true,
+    usbSupported: false,
+    hidDeviceCount: 0,
+    usbDeviceCount: 0,
+    inputFocused: true,
+    detectionArmed: true,
+    detectionStartedAtMs: 1000,
+    nowMs: 2200,
+    lastCompletedScan: {
+      value: "RB260421000001",
+      target: "bale_lookup",
+      terminator: "none",
+      membershipStatus: "already_added",
+      durationMs: 65,
+      capturedAtMs: 2100,
+    },
+  });
+
+  assert.equal(diagnostic.status, "suffix_missing");
+  assert.equal(diagnostic.severity, "info");
+  assert.match(diagnostic.detail, /已识别条码：RB260421000001/);
 });
 
 test("getSortingScannerDiagnostic shows focus issue when no input arrives and the scan box is not focused", () => {

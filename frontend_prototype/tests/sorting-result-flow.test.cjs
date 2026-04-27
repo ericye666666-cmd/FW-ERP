@@ -43,6 +43,38 @@ test("buildSortingResultOutputRows serializes main/sub/grade rows into backend r
   ]);
 });
 
+test("buildSortingResultOutputRows keeps rack+actual KG payload without requiring default cost", () => {
+  const rows = buildSortingResultOutputRows(
+    [
+      {
+        category_main: "jacket",
+        category_sub: "jacket",
+        grade: "P",
+        actual_weight_kg: 8.4,
+        qty: 10,
+        rack_code: "A-JK-P-99",
+        confirm_to_inventory: "true",
+      },
+    ],
+    {
+      defaultCosts: [],
+      defaultRacks: [],
+    },
+  );
+
+  assert.deepEqual(rows, [
+    {
+      category_name: "jacket / jacket",
+      grade: "P",
+      actual_weight_kg: 8.4,
+      qty: 10,
+      rack_code: "A-JK-P-99",
+      confirm_to_inventory: true,
+      default_cost_kes: null,
+    },
+  ]);
+});
+
 test("inflateSortingResultRows parses existing backend rows into builder rows", () => {
   const rows = inflateSortingResultRows([
     {
