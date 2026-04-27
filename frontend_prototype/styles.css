@@ -50,8 +50,54 @@ body {
   min-height: 100vh;
   padding: 32px;
   display: flex;
+  flex-direction: column;
+  gap: 18px;
   align-items: center;
   justify-content: center;
+}
+
+.test-home-entry {
+  width: min(1200px, 100%);
+  padding: 24px;
+}
+
+.test-home-badge {
+  display: inline-flex;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 45, 45, 0.26);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.test-home-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.test-home-link {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, #fffdf8 0%, #f4ecdf 100%);
+  border-radius: 12px;
+  min-height: 72px;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent-deep);
+  cursor: pointer;
+}
+
+.test-home-link:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-soft);
 }
 
 .auth-shell {
