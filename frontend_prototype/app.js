@@ -326,6 +326,7 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
 let storeOperatingSummaryState = [];
 let storeRetailSeedState = null;
 let storeRecentSalesSimulationState = null;
+let barcodeResolverTestState = null;
 let storeReplenishmentDemoState = safeParse(localStorage.getItem(STORAGE_KEYS.latestStoreReplenishmentDemo), null);
 let inboundShipmentState = [];
 let parcelBatchState = [];
@@ -369,6 +370,13 @@ let sortingScannerHealthState = {
   inactivityTimerId: null,
   errorMessage: "",
 };
+const BARCODE_RESOLVER_TEST_CONTEXTS = [
+  "warehouse_sorting_create",
+  "pos",
+  "store_receiving",
+  "store_pda",
+  "b2b_bale_sales",
+];
 let selectedBalePrintMap = new Map();
 let expandedBaleBatchKeys = new Set();
 let activeBaleBatchKey = "";
@@ -23029,6 +23037,72 @@ function renderStoreRetailSeedSummary(result = null) {
   `;
 }
 
+function getBarcodeResolverBusinessSummary(barcodeType = "") {
+  const normalizedType = String(barcodeType || "").trim().toUpperCase();
+  if (normalizedType === "RAW_BALE") {
+    return "这是 RAW_BALE 入仓 Bale 码，不允许 POS 销售。";
+  }
+  if (normalizedType === "STORE_ITEM") {
+    return "这是 STORE_ITEM 商品码，可以进入 POS。";
+  }
+  if (normalizedType === "DISPATCH_BALE") {
+    return "这是 DISPATCH_BALE 门店收货/调拨 Bale 码，不是单件商品码。";
+  }
+  return "系统暂时无法识别这个码。";
+}
+
+function renderBarcodeResolverSingleResult(result = {}, context = "") {
+  const businessObjectKind = result?.business_object?.kind || "";
+  const businessObjectId = result?.business_object?.id || "";
+  const allowedContexts = Array.isArray(result?.allowed_contexts) ? result.allowed_contexts.join(", ") : "";
+  const rejectedContexts = Array.isArray(result?.rejected_contexts) ? result.rejected_contexts.join(", ") : "";
+  return `
+    <article class="candidate-row" style="display:block;">
+      <div><strong>场景 / Context：</strong>${escapeHtml(context || "-")}</div>
+      <div class="subtle" style="margin: 6px 0 10px;">${escapeHtml(getBarcodeResolverBusinessSummary(result?.barcode_type || ""))}</div>
+      <div class="subtle small">barcode_value: ${escapeHtml(result?.barcode_value || "-")}</div>
+      <div class="subtle small">barcode_type: ${escapeHtml(result?.barcode_type || "-")}</div>
+      <div class="subtle small">business_object.kind: ${escapeHtml(businessObjectKind || "-")}</div>
+      <div class="subtle small">business_object.id: ${escapeHtml(businessObjectId || "-")}</div>
+      <div class="subtle small">object_type: ${escapeHtml(result?.object_type || "-")}</div>
+      <div class="subtle small">object_id: ${escapeHtml(result?.object_id || "-")}</div>
+      <div class="subtle small">identity_id: ${escapeHtml(result?.identity_id || "-")}</div>
+      <div class="subtle small">template_scope: ${escapeHtml(result?.template_scope || "-")}</div>
+      <div class="subtle small">pos_allowed: ${escapeHtml(String(result?.pos_allowed ?? "-"))}</div>
+      <div class="subtle small">allowed_contexts: ${escapeHtml(allowedContexts || "-")}</div>
+      <div class="subtle small">rejected_contexts: ${escapeHtml(rejectedContexts || "-")}</div>
+      <div class="subtle small">reject_reason: ${escapeHtml(result?.reject_reason || "-")}</div>
+      <div class="subtle small">rejection_message: ${escapeHtml(result?.rejection_message || "-")}</div>
+      <div class="subtle small">operational_next_step: ${escapeHtml(result?.operational_next_step || "-")}</div>
+    </article>
+  `;
+}
+
+function renderBarcodeResolverTestSummary(state = null) {
+  const target = document.querySelector("#barcodeResolverTestSummary");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  if (!state) {
+    target.className = "candidate-summary empty-state";
+    target.textContent = "条码识别测试：输入或扫描 barcode，选择业务场景后点击“测试条码”，即可查看系统如何识别该码及下一步操作建议。";
+    return;
+  }
+  const rows = Array.isArray(state?.results) ? state.results : [];
+  if (!rows.length) {
+    target.className = "candidate-summary empty-state";
+    target.textContent = "暂无识别结果。请先输入条码并执行测试。";
+    return;
+  }
+  target.className = "report-summary";
+  target.innerHTML = `
+    <div class="alert-banner">${escapeHtml(`条码 ${state.barcode || "-"} 已完成 ${rows.length} 个场景识别。`)}</div>
+    <div class="candidate-list" style="margin-top: 10px;">
+      ${rows.map((row) => renderBarcodeResolverSingleResult(row.result || {}, row.context || "")).join("")}
+    </div>
+  `;
+}
+
 function getStoreClerkAssignedBales(storeCode = "", assignedEmployee = "") {
   const normalizedStoreCode = String(storeCode || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const normalizedEmployee = String(assignedEmployee || getCurrentStoreWorkerFallback()).trim();
@@ -23364,6 +23438,7 @@ async function loadDashboard() {
   renderStoreReplenishmentDemoSummary(storeReplenishmentDemoState);
   renderStoreRetailSeedSummary(storeRetailSeedState);
   renderStoreRecentSalesSimulationSummary(storeRecentSalesSimulationState);
+  renderBarcodeResolverTestSummary(barcodeResolverTestState);
   renderStoreClerkHomeSummary({
     store_code: getCurrentStoreCodeFallback(),
     assigned_employee: getCurrentStoreWorkerFallback(),
@@ -24961,6 +25036,51 @@ async function submitStoreRetailSeed(event) {
   if (consoleForm instanceof HTMLFormElement) {
     await submitStoreManagerConsole({ preventDefault() {}, currentTarget: consoleForm });
   }
+}
+
+async function submitBarcodeResolverTest(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const barcode = String(form.get("barcode") || "").trim().toUpperCase();
+  const context = String(form.get("context") || "").trim();
+  if (!barcode) {
+    throw new Error("请先输入或扫描要识别的条码。");
+  }
+  if (!context) {
+    throw new Error("请先选择识别场景。");
+  }
+  const result = await resolveBarcodeForContext(barcode, context);
+  barcodeResolverTestState = { barcode, results: [{ context, result }] };
+  writeOutput("#barcodeResolverTestOutput", barcodeResolverTestState);
+  renderBarcodeResolverTestSummary(barcodeResolverTestState);
+}
+
+async function testBarcodeResolverAllContexts() {
+  const barcode = String(document.querySelector("#barcodeResolverTestForm [name='barcode']")?.value || "").trim().toUpperCase();
+  if (!barcode) {
+    throw new Error("请先输入或扫描要识别的条码。");
+  }
+  const results = [];
+  for (const context of BARCODE_RESOLVER_TEST_CONTEXTS) {
+    try {
+      const result = await resolveBarcodeForContext(barcode, context);
+      results.push({ context, result });
+    } catch (error) {
+      results.push({
+        context,
+        result: {
+          barcode_value: barcode,
+          barcode_type: "UNKNOWN",
+          reject_reason: formatErrorMessage(error),
+          rejection_message: formatErrorMessage(error),
+          operational_next_step: "请按拒绝原因处理，或切换到正确场景后重试。",
+        },
+      });
+    }
+  }
+  barcodeResolverTestState = { barcode, results };
+  writeOutput("#barcodeResolverTestOutput", barcodeResolverTestState);
+  renderBarcodeResolverTestSummary(barcodeResolverTestState);
 }
 
 async function submitStoreClerkHome(event) {
@@ -27344,6 +27464,7 @@ const FORM_SUMMARY_SELECTORS = {
   "#storeManagerConsoleForm": "#storeManagerConsoleSummary",
   "#storeRetailSeedForm": "#storeRetailSeedSummary",
   "#storeRecentSalesSimulationForm": "#storeRecentSalesSimulationSummary",
+  "#barcodeResolverTestForm": "#barcodeResolverTestSummary",
   "#storeClerkHomeForm": "#storeClerkHomeSummary",
   "#inboundShipmentForm": "#inboundShipmentSummary",
   "#parcelBatchForm": "#parcelBatchResultSummary",
@@ -27464,6 +27585,7 @@ bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
 bindForm("#storeRetailSeedForm", submitStoreRetailSeed, "#storeRetailSeedOutput");
 bindForm("#storeRecentSalesSimulationForm", submitStoreRecentSalesSimulation, "#storeRecentSalesSimulationOutput");
+bindForm("#barcodeResolverTestForm", submitBarcodeResolverTest, "#barcodeResolverTestOutput");
 bindForm("#storeClerkHomeForm", submitStoreClerkHome, "#storeClerkHomeOutput");
 bindForm("#inboundShipmentForm", submitInboundShipment, "#inboundShipmentOutput");
 bindForm("#parcelBatchForm", submitParcelBatch, "#parcelBatchOutput");
@@ -31193,6 +31315,10 @@ document.querySelectorAll("[data-action]").forEach((button) => {
         await generateStoreReplenishmentDemo();
         return;
       }
+      if (action === "barcode-resolver-test-all") {
+        await testBarcodeResolverAllContexts();
+        return;
+      }
       if (action === "load-config") {
         await loadConfig();
         return;
@@ -31264,6 +31390,11 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       }
       if (action === "generate-store-replenishment-demo") {
         renderErrorSummary("#storeReplenishmentDemoSummary", formatErrorMessage(error));
+        return;
+      }
+      if (action === "barcode-resolver-test-all") {
+        writeOutput("#barcodeResolverTestOutput", "");
+        renderErrorSummary("#barcodeResolverTestSummary", formatErrorMessage(error));
         return;
       }
       if (action === "load-store-operating-summary") {
