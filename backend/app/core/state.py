@@ -6383,6 +6383,60 @@ class InMemoryState:
             rows = [row for row in rows if str(row.get("status") or "").strip().lower() == normalized_status]
         return sorted(rows, key=lambda row: str(row.get("created_at") or ""), reverse=True)
 
+    def get_warehouse_inventory_summary(self) -> dict[str, Any]:
+        raw_bale_status_counts: dict[str, int] = defaultdict(int)
+        for row in self.list_raw_bales():
+            status = str(row.get("status") or "").strip().lower() or "unknown"
+            raw_bale_status_counts[status] += 1
+
+        sorting_task_status_counts: dict[str, int] = defaultdict(int)
+        for row in self.list_sorting_tasks():
+            status = str(row.get("status") or "").strip().lower() or "unknown"
+            sorting_task_status_counts[status] += 1
+
+        sorted_stock_rows = self.list_sorting_stock()
+        sorted_stock_qty = sum(int(row.get("qty_on_hand") or 0) for row in sorted_stock_rows)
+
+        waiting_store_rows = self.list_store_prep_bales(status="waiting_store_dispatch")
+        waiting_store_qty = sum(int(row.get("qty") or 0) for row in waiting_store_rows)
+
+        waiting_sale_rows = self.list_store_prep_bales(status="waiting_bale_sale")
+        waiting_sale_qty = sum(int(row.get("qty") or 0) for row in waiting_sale_rows)
+
+        b2b_candidates = self.list_bale_sales_candidates()
+        b2b_candidate_status_counts: dict[str, int] = defaultdict(int)
+        for row in b2b_candidates:
+            status = str(row.get("status") or "").strip().lower() or "unknown"
+            b2b_candidate_status_counts[status] += 1
+
+        store_stock_rows = self.list_store_stock()
+        store_pos_qty = sum(int(row.get("qty_on_hand") or 0) for row in store_stock_rows)
+
+        return {
+            "raw_bale_status_counts": dict(raw_bale_status_counts),
+            "sorting_task_status_counts": dict(sorting_task_status_counts),
+            "sorted_stock": {
+                "bale_count": len(sorted_stock_rows),
+                "qty": sorted_stock_qty,
+            },
+            "waiting_store": {
+                "bale_count": len(waiting_store_rows),
+                "qty": waiting_store_qty,
+            },
+            "waiting_sale": {
+                "bale_count": len(waiting_sale_rows),
+                "qty": waiting_sale_qty,
+            },
+            "b2b_bale_sales_candidates": {
+                "total": len(b2b_candidates),
+                **dict(b2b_candidate_status_counts),
+            },
+            "store_pos_inventory": {
+                "bale_count": len(store_stock_rows),
+                "qty": store_pos_qty,
+            },
+        }
+
     def list_item_barcode_tokens(
         self,
         status: Optional[str] = None,

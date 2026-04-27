@@ -4,8 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
@@ -246,14 +244,61 @@ class WarehouseInventorySummaryContractTest(unittest.TestCase):
         self.assertEqual(candidates[0]["source_type"], "raw_direct_sale")
         self.assertEqual(len(store_dispatch_bales), 0)
 
-    @pytest.mark.xfail(
-        condition=not _warehouse_summary_endpoint_exists(),
-        reason=(
-            "Dedicated warehouse inventory summary endpoint is not available yet; "
-            "authoritative source rows currently come from list_raw_bales, list_sorting_tasks, "
-            "list_sorting_stock, list_store_prep_bales, and list_bale_sales_candidates."
-        ),
-        strict=False,
-    )
     def test_boss_operating_dashboard_contract_requires_backend_warehouse_summary_endpoint(self):
         self.assertTrue(_warehouse_summary_endpoint_exists())
+
+        self._create_confirmed_sorting_stock(customs_notice_no="INV-SUM-API-P", qty=200)
+        self._create_confirmed_sorting_stock(customs_notice_no="INV-SUM-API-S", qty=40)
+        self.state.upsert_apparel_piece_weight(
+            {
+                "category_main": "dress",
+                "category_sub": "2 pieces",
+                "standard_weight_kg": 2,
+            },
+            updated_by="warehouse_supervisor_1",
+        )
+        waiting_store_task = self.state.create_store_prep_bale_task(
+            {
+                "task_type": "store_dispatch",
+                "category_sub": "2 pieces",
+                "pieces_per_bale": 100,
+                "bale_count": 1,
+                "assigned_employee": "warehouse_clerk_1",
+                "note": "waiting store for summary endpoint",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+        waiting_sale_task = self.state.create_store_prep_bale_task(
+            {
+                "task_type": "sale",
+                "category_sub": "2 pieces",
+                "target_weight_kg": 20,
+                "ratio_label": "A",
+                "grade_ratios": [{"grade": "P", "ratio_pct": 100}],
+                "assigned_employee": "warehouse_clerk_2",
+                "note": "waiting sale for summary endpoint",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+        self.state.complete_store_prep_bale_task(
+            waiting_store_task["task_no"],
+            {"updated_by": "warehouse_supervisor_1", "note": "store prep done"},
+        )
+        self.state.complete_store_prep_bale_task(
+            waiting_sale_task["task_no"],
+            {"updated_by": "warehouse_supervisor_1", "actual_weight_kg": 20, "note": "sale prep done"},
+        )
+        _, bales = self._create_ready_bales(customs_notice_no="INV-SUM-API-B2B", package_count=1)
+        self.state.route_raw_bale_to_bale_sales_pool(
+            bales[0]["bale_barcode"],
+            {"updated_by": "warehouse_supervisor_1", "note": "b2b summary endpoint"},
+        )
+
+        payload = self.state.get_warehouse_inventory_summary()
+        self.assertIn("raw_bale_status_counts", payload)
+        self.assertIn("sorting_task_status_counts", payload)
+        self.assertEqual(payload["waiting_store"]["bale_count"], 1)
+        self.assertEqual(payload["waiting_store"]["qty"], 100)
+        self.assertEqual(payload["waiting_sale"]["bale_count"], 1)
+        self.assertEqual(payload["waiting_sale"]["qty"], 10)
+        self.assertEqual(payload["b2b_bale_sales_candidates"]["total"], 1)
