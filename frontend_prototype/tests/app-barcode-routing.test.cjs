@@ -47,15 +47,34 @@ test("completed inbound print modal keeps close and completion actions clickable
 
 test("bale print modal exposes browser print fallback with staging-safe copy", () => {
   assert.match(indexHtml, /id="balePrintModalBrowserPrintButton"[\s\S]*?用浏览器打印 \/ Use browser print/);
-  assert.match(indexHtml, /Cloud staging cannot directly control local USB printers\. Use browser print and select your Deli printer in the Mac print dialog\./);
+  assert.match(indexHtml, /Cloud staging cannot directly access USB printers\. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer\./);
   assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
   assert.match(appJs, /frameWindow\.print\(\)/);
+});
+
+test("bale print modal includes local print agent status and controls", () => {
+  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*Local print agent: not connected · URL: http:\/\/127\.0\.0\.1:8719/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测本地打印代理 \/ Check local print agent/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*通过本地代理打印 \/ Print via local agent/);
+  assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
+  assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/html`, \{/);
+});
+
+test("direct backend print stays visible but clearly marked as LAN-only", () => {
+  assert.match(indexHtml, /id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
+  assert.match(appJs, /仅适用于本地\/LAN 部署后端/);
 });
 
 test("browser print fallback does not auto-run bale completion confirmation", () => {
   const browserPrintFunction = appJs.match(/function browserPrintCurrentBaleModalJob\(\) \{[\s\S]*?\n\}/);
   assert.ok(browserPrintFunction, "browser print function should exist");
   assert.doesNotMatch(browserPrintFunction[0], /completeCurrentBalePrintModalJob/);
+});
+
+test("local agent print path does not auto-run bale completion confirmation", () => {
+  const localAgentPrintFunction = appJs.match(/async function printCurrentBaleModalViaLocalAgent\(\) \{[\s\S]*?\n\}/);
+  assert.ok(localAgentPrintFunction, "local agent print function should exist");
+  assert.doesNotMatch(localAgentPrintFunction[0], /completeCurrentBalePrintModalJob/);
 });
 
 test("sorting task available bale list uses compact rows instead of oversized stock cards", () => {
