@@ -259,6 +259,21 @@
     };
   }
 
+  function buildBalePrintStationJobPayload(job, options = {}) {
+    const currentIndex = Number(options && options.currentIndex ? options.currentIndex : 0);
+    const totalJobs = Number(options && options.totalJobs ? options.totalJobs : 0);
+    return {
+      code: normalizeText(job && job.print_payload && (job.print_payload.scan_token || job.print_payload.barcode_value) || job && job.barcode),
+      supplier: normalizeText(job && job.print_payload && job.print_payload.supplier_name || options && options.supplierName),
+      category: normalizeText(job && job.print_payload && (job.print_payload.category_main || job.print_payload.cat)),
+      subcategory: normalizeText(job && job.print_payload && (job.print_payload.category_sub || job.print_payload.sub)),
+      batch: normalizeText(job && job.print_payload && job.print_payload.parcel_batch_no),
+      ship_reference: normalizeText(job && job.print_payload && job.print_payload.shipment_no || options && options.shipmentNo),
+      total_number: Number(job && job.print_payload && job.print_payload.total_packages ? job.print_payload.total_packages : totalJobs || 0),
+      sequence_number: Number(job && job.print_payload && job.print_payload.serial_no ? job.print_payload.serial_no : currentIndex + 1 || 0),
+    };
+  }
+
   function getBaleScanTestResult(options) {
     const barcode = normalizeBarcode(options && options.barcode);
     if (!barcode) {
@@ -333,5 +348,6 @@
     getBaleShipmentContinuationAction,
     getBaleModalCompletionAction,
     getBaleScanTestResult,
+    buildBalePrintStationJobPayload,
   };
 });

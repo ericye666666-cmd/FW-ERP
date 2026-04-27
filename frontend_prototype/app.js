@@ -15502,6 +15502,7 @@ function renderBalePrintModal() {
   const connectButton = document.querySelector("#balePrintModalConnectButton");
   const directPrintButton = document.querySelector("#balePrintModalDirectPrintButton");
   const printAllButton = document.querySelector("#balePrintModalPrintAllButton");
+  const sendToStationButton = document.querySelector("#balePrintModalSendToStationButton");
   const browserPrintButton = document.querySelector("#balePrintModalBrowserPrintButton");
   const completeButton = document.querySelector("#balePrintModalCompleteButton");
   const closeAndRefreshButton = document.querySelector("#balePrintModalCloseAndRefreshButton");
@@ -15686,6 +15687,9 @@ function renderBalePrintModal() {
     printAllButton.disabled = !jobs.length;
     printAllButton.textContent = jobs.length ? `打印本轮全部 ${jobs.length} 张` : "当前类别没有待打印条码";
   }
+  if (sendToStationButton instanceof HTMLButtonElement) {
+    sendToStationButton.disabled = !currentJob;
+  }
   if (browserPrintButton instanceof HTMLButtonElement) {
     browserPrintButton.disabled = !currentJob;
   }
@@ -15836,6 +15840,41 @@ async function directPrintCurrentBaleModalJob() {
     currentIndex: Number(balePrintModalState.currentIndex || 0),
     totalJobs: jobs.length,
   });
+}
+
+async function sendCurrentBaleModalJobToPrintStation() {
+  const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
+  const currentIndex = Number(balePrintModalState.currentIndex || 0);
+  const currentJob = jobs[currentIndex] || null;
+  if (!currentJob) {
+    throw new Error("当前没有可发送到打印站的标签。");
+  }
+  const payload = balePrintFlow && typeof balePrintFlow.buildBalePrintStationJobPayload === "function"
+    ? balePrintFlow.buildBalePrintStationJobPayload(currentJob, {
+      currentIndex,
+      totalJobs: jobs.length,
+      supplierName: balePrintModalState.supplierName,
+      shipmentNo: balePrintModalState.shipmentNo,
+    })
+    : {
+      code: String(currentJob?.print_payload?.scan_token || currentJob?.print_payload?.barcode_value || currentJob?.barcode || "").trim(),
+      supplier: String(currentJob?.print_payload?.supplier_name || balePrintModalState.supplierName || "").trim(),
+      category: String(currentJob?.print_payload?.category_main || "").trim(),
+      subcategory: String(currentJob?.print_payload?.category_sub || "").trim(),
+      batch: String(currentJob?.print_payload?.parcel_batch_no || "").trim(),
+      ship_reference: String(currentJob?.print_payload?.shipment_no || balePrintModalState.shipmentNo || "").trim(),
+      total_number: Number(currentJob?.print_payload?.total_packages || jobs.length || 0),
+      sequence_number: Number(currentJob?.print_payload?.serial_no || currentIndex + 1),
+    };
+  const result = await request("/print-jobs/bale-label", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  balePrinterConsoleNotice = {
+    type: "success",
+    message: `已发送到打印站队列。任务 #${result?.id || "-"} · 状态 ${result?.status || "pending"}。`,
+  };
+  renderBalePrintModal();
 }
 
 function browserPrintCurrentBaleModalJob() {
@@ -27779,6 +27818,12 @@ document.querySelector("#balePrintModalPrintAllButton")?.addEventListener("click
     balePrintModalState.hasSuccessfulBatchPrint = false;
     baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
     balePrinterConsoleNotice = { type: "error", message: `${formatErrorMessage(error)}。本次打印不计数。` };
+    renderBalePrintModal();
+  });
+});
+document.querySelector("#balePrintModalSendToStationButton")?.addEventListener("click", () => {
+  sendCurrentBaleModalJobToPrintStation().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });

@@ -59,6 +59,50 @@ class PrintJobFailureRequest(BaseModel):
     note: str = ""
 
 
+class BaleLabelPrintJobCreate(BaseModel):
+    code: str = Field(min_length=1)
+    supplier: str = ""
+    category: str = ""
+    subcategory: str = ""
+    batch: str = ""
+    ship_reference: str = ""
+    total_number: int = Field(default=0, ge=0)
+    sequence_number: int = Field(default=0, ge=0)
+
+
+class PrintStationClaimRequest(BaseModel):
+    station_id: str = Field(min_length=1)
+
+
+class PrintStationCompleteRequest(BaseModel):
+    station_id: str = Field(min_length=1)
+
+
+class PrintStationFailRequest(BaseModel):
+    station_id: str = Field(min_length=1)
+    error_message: str = Field(min_length=1)
+
+
+class BaleLabelPrintJobResponse(BaseModel):
+    id: int
+    label_type: str = "BALE_LABEL"
+    code: str
+    supplier: str = ""
+    category: str = ""
+    subcategory: str = ""
+    batch: str = ""
+    ship_reference: str = ""
+    total_number: int = 0
+    sequence_number: int = 0
+    requested_by: str
+    requested_at: str
+    status: str
+    station_id: str = ""
+    claimed_at: Optional[str] = None
+    printed_at: Optional[str] = None
+    error_message: str = ""
+
+
 class PrintJobResponse(BaseModel):
     id: int
     job_type: str

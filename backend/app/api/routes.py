@@ -53,6 +53,8 @@ from app.schemas.integrations import (
 from app.schemas.movements import InventoryMovementResponse
 from app.schemas.payments import PaymentAnomalyResolveRequest, PaymentAnomalyResponse
 from app.schemas.printing import (
+    BaleLabelPrintJobCreate,
+    BaleLabelPrintJobResponse,
     BaleDirectPrintBatchRequest,
     BaleDirectPrintRequest,
     BaleBarcodePrintRequest,
@@ -62,6 +64,9 @@ from app.schemas.printing import (
     LabelCandidateBatchPrintRequest,
     LabelCandidatePrintRequest,
     LabelPrintJobCreate,
+    PrintStationClaimRequest,
+    PrintStationCompleteRequest,
+    PrintStationFailRequest,
     PrintJobFailureRequest,
     PrintJobResponse,
     StorePrepBalePrintJobCreate,
@@ -3133,6 +3138,49 @@ def assign_store_rack(
 
 
 @router.post(
+    "/print-jobs/bale-label",
+    response_model=BaleLabelPrintJobResponse,
+    tags=["printing"],
+)
+def create_bale_label_print_station_job(
+    payload: BaleLabelPrintJobCreate,
+    authorization: Optional[str] = Header(default=None),
+) -> BaleLabelPrintJobResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["requested_by"] = current_user["username"]
+    return BaleLabelPrintJobResponse(**state.create_bale_label_print_station_job(data))
+
+
+@router.get(
+    "/print-jobs/pending",
+    response_model=list[BaleLabelPrintJobResponse],
+    tags=["printing"],
+)
+def list_pending_bale_label_print_station_jobs(
+    station_id: str = Query(default=""),
+    authorization: Optional[str] = Header(default=None),
+) -> list[BaleLabelPrintJobResponse]:
+    _require_current_user(authorization=authorization)
+    jobs = state.list_pending_print_station_jobs(station_id=station_id)
+    return [BaleLabelPrintJobResponse(**job) for job in jobs]
+
+
+@router.post(
+    "/print-jobs/{job_id}/claim",
+    response_model=BaleLabelPrintJobResponse,
+    tags=["printing"],
+)
+def claim_bale_label_print_station_job(
+    job_id: int,
+    payload: PrintStationClaimRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> BaleLabelPrintJobResponse:
+    _require_current_user(authorization=authorization)
+    return BaleLabelPrintJobResponse(**state.claim_print_station_job(job_id, station_id=payload.station_id))
+
+
+@router.post(
     "/print-jobs/labels",
     response_model=PrintJobResponse,
     tags=["printing"],
@@ -4191,28 +4239,41 @@ def create_transfer_dispatch_bundle(
 
 @router.post(
     "/print-jobs/{job_id}/complete",
-    response_model=PrintJobResponse,
+    response_model=PrintJobResponse | BaleLabelPrintJobResponse,
     tags=["printing"],
 )
 def mark_print_job_printed(
     job_id: int,
+    payload: Optional[PrintStationCompleteRequest] = None,
     authorization: Optional[str] = Header(default=None),
-) -> PrintJobResponse:
+) -> PrintJobResponse | BaleLabelPrintJobResponse:
     current_user = _require_current_user(authorization=authorization)
+    if payload is not None:
+        return BaleLabelPrintJobResponse(
+            **state.complete_print_station_job(job_id, station_id=payload.station_id)
+        )
     return PrintJobResponse(**state.mark_print_job_printed(job_id, printed_by=current_user["username"]))
 
 
 @router.post(
     "/print-jobs/{job_id}/fail",
-    response_model=PrintJobResponse,
+    response_model=PrintJobResponse | BaleLabelPrintJobResponse,
     tags=["printing"],
 )
 def mark_print_job_failed(
     job_id: int,
-    payload: PrintJobFailureRequest,
+    payload: PrintJobFailureRequest | PrintStationFailRequest,
     authorization: Optional[str] = Header(default=None),
-) -> PrintJobResponse:
+) -> PrintJobResponse | BaleLabelPrintJobResponse:
     current_user = _require_current_user(authorization=authorization)
+    if isinstance(payload, PrintStationFailRequest):
+        return BaleLabelPrintJobResponse(
+            **state.fail_print_station_job(
+                job_id,
+                station_id=payload.station_id,
+                error_message=payload.error_message,
+            )
+        )
     return PrintJobResponse(
         **state.mark_print_job_failed(
             job_id,
