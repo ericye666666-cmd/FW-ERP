@@ -12,12 +12,14 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.1.2"
 HOST = "127.0.0.1"
 PORT = 8719
 ALLOWED_ORIGINS = {
     "https://fw-erp-staging.onrender.com",
     "http://34.35.52.250:8000",
+    "https://fw-erp-34-35-52-250.nip.io",
+    "http://fw-erp-34-35-52-250.nip.io",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 }
