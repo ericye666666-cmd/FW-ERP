@@ -1,0 +1,51 @@
+# FW-ERP Golden Path Manual Test Checklist
+
+Audience: non-developer business testers (operations, warehouse, store, finance, management)
+
+## Test entrypoint and scope guardrails
+
+- Use backend-served `/app` as the real test runtime entrypoint.
+- Use GitHub Pages only as UI preview; do not treat it as business-valid runtime.
+- Validate the warehouse-led flow (sorting-first), not POS-first and not direct-hang-first.
+- Treat **Step 11: Sorting confirmation / cost lock** as the cost lock checkpoint (`0.2 Sorting confirmation / cost lock`).
+- Confirm POS sells only `STORE_ITEM`.
+- Confirm B2B bale sales is a separate thread from retail POS.
+- Confirm store staff can edit sale price / rack / print output, but cannot change item cost.
+- Confirm return-to-warehouse is the end of the store thread (downstream warehouse handling is out of scope for this checklist).
+
+## How to mark this checklist
+
+- In **Pass / Fail**, write: `PASS`, `FAIL`, or `BLOCKED`.
+- In **Notes**, include screenshot path, barcode sample, order/task IDs, and any mismatch evidence.
+
+## Golden path checklist (end-to-end)
+
+| Step # | User role | Page / module | Action to perform | Required input | Expected visible result | Expected backend state change | Barcode type involved | Failure cases to test | Pass / Fail | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | Admin / Ops | `/app` Login | Open backend-served `/app`, sign in with valid business account. | Valid username/password, tenant/site if required. | Redirect to authenticated app home/dashboard; user identity and role visible. | Auth session created; login audit/event recorded. | None | Wrong password, expired account, unauthorized role, `/app` unreachable. |  |  |
+| 2 | Source Ops | China source bale input | Register new source bales from China supplier batch. | Source supplier, bale count, gross/net weight, source reference/date. | New bale records listed with pending downstream status. | Source bale master and initial inventory entries created. | Source bale barcode (if generated at input). | Missing supplier, invalid quantity/weight, duplicate external ref. |  |  |
+| 3 | Source Ops / Finance | China source list / cost fill | Fill or update source list attributes and landed cost fields. | SKU/category assumptions, purchase cost, freight/customs allocation basis. | Cost fields shown on source list; rows marked complete/ready. | Cost attributes saved on source lot records (pre-lock editable). | None | Negative/zero cost where forbidden, missing mandatory cost dimensions. |  |  |
+| 4 | Logistics / Import | Shipment / customs master | Create shipment and customs master tied to source bales. | Shipment ID, container/BL, customs declaration data, ETA/arrival date. | Shipment master appears with linked source bales and status timeline. | Shipment/customs master created and linked to source lots. | Shipment label barcode (if used). | Duplicate shipment ID, unlinked bale, invalid customs number/date. |  |  |
+| 5 | Warehouse Inbound | Parcel inbound | Receive physical parcels/cartons against shipment master. | Shipment reference, received parcel count, scan/manual parcel IDs. | Inbound receipt list shows received vs expected counts. | Inbound transactions created; parcel status set to received. | Parcel barcode | Over-receipt, unknown parcel barcode, partial inbound with no reason. |  |  |
+| 6 | Warehouse Supervisor | Total confirmation / discrepancy check | Confirm totals and resolve discrepancy between source, shipment, and inbound. | Expected totals, actual counted totals, discrepancy reason code. | Confirmation screen displays matched totals or flagged discrepancy case. | Confirmation record saved; discrepancy status and reason persisted. | Parcel/bale barcode (as reconciliation evidence) | Confirm without reason on mismatch, tolerance breach, forced close not allowed. |  |  |
+| 7 | Warehouse Inbound | `warehouse_in` barcode / print confirmation | Generate or confirm `warehouse_in` barcodes and print labels. | Inbound batch ID, print quantity, printer target, label template. | Printable labels generated; print log and barcode preview visible. | Warehouse-in barcode IDs reserved/issued; print event logged. | `WAREHOUSE_IN` barcode | Duplicate barcode print, printer offline, wrong template/quantity. |  |  |
+| 8 | Warehouse Planner | Raw bale stock | Verify raw bale stock ledger after inbound confirmation. | Date/site filter, stock query parameters. | Raw bale stock list shows newly inbound quantities and locations. | Stock ledger reflects available raw bale units. | Raw bale / warehouse-in barcode | Stock not updated, wrong location bucket, negative availability. |  |  |
+| 9 | Sorting Lead | Sorting task creation | Create sorting tasks from available raw bale stock. | Selected raw bales, target categories/grades, assigned operators/date. | New sorting task IDs appear with `created/planned` state. | Sorting task master/detail created; raw stock reserved if applicable. | Raw bale barcode for task binding | Create task with unavailable stock, duplicate assignment/time collision. |  |  |
+| 10 | Sorting Lead / QA | Sorting task management | Start/manage sorting tasks; record progress and interim outputs. | Task ID, progress quantities by category/grade, operator updates. | Task board updates by status (`in progress`, `paused`, etc.). | Task progress events stored; WIP quantities tracked. | Task/bale scan barcode (if required by station) | Invalid quantity split totals, unauthorized status transition. |  |  |
+| 11 | Sorting Lead / Finance Control | Sorting confirmation / cost lock | Confirm sorting result and execute cost lock checkpoint. | Final sorted quantities, wastage, final confirmation approval. | Task marked confirmed/closed; UI clearly indicates cost locked. | **Cost locked at this point**; post-lock cost edits blocked in later modules. | Sorted bale/item barcode (new IDs if generated) | Attempt to edit cost after lock, confirm with unbalanced totals, missing approver. |  |  |
+| 12 | Warehouse / Inventory Control | Sorted stock | Validate sorted stock availability for downstream operations. | Stock view filter by item grade/category/site. | Sorted stock appears with quantities available for compression/store flow. | Finished sorted stock ledger updated from confirmed tasks. | Sorted stock barcode | Stock missing after confirmation, wrong grade/category mapping. |  |  |
+| 13 | Warehouse Compression Team | Compression task | Create and complete compression task for sorted stock bales. | Source sorted stock IDs, target compressed bale spec, operator/time. | Compression tasks and resulting compressed bale outputs visible. | Compression records created; sorted stock decremented, compressed stock incremented. | Compressed bale barcode | Compression with insufficient input, duplicate output bale IDs. |  |  |
+| 14 | Warehouse Dispatch Planner | Waiting-store bale | Move eligible compressed/ready bales to waiting-store queue. | Destination store, transfer batch plan, scheduled ship date. | Waiting-store list shows bales queued per store. | Inventory state changed to waiting-dispatch/store allocation queue. | Transfer bale barcode | Queue wrong store, allocate more than available stock. |  |  |
+| 15 | Warehouse + Store Receiver | Store dispatch / receiving | Dispatch to store and complete store-side receiving confirmation. | Dispatch order, scanned bale IDs, receiving confirmation user/time. | Dispatch and receiving statuses both visible and matched. | Transfer-out + transfer-in transactions posted between locations. | Dispatch/receiving bale barcode | Store receives unknown bale, partial receive without exception reason. |  |  |
+| 16 | Store Staff | Store item price / rack / printing | Set/edit sale price, rack location, and print store labels for sellable items. | Store item ID, sale price, rack code, print quantity/template. | Store item card updates price/rack; print preview/log appears. | Store-level merch attributes updated; **cost remains unchanged (locked)**. | `STORE_ITEM` barcode / shelf label barcode | Attempt cost edit by store role (must fail), invalid price/rack format. |  |  |
+| 17 | Cashier / Store Staff | POS sale | Sell items through POS by scanning store item barcodes. | POS session, `STORE_ITEM` barcode scan, quantity/payment. | Receipt generated; sold lines match scanned items and pricing. | Sales transaction posted; store item stock decremented. | **`STORE_ITEM` barcode only** | Try selling non-`STORE_ITEM` barcode (must fail), insufficient stock. |  |  |
+| 18 | Store Staff / Store Manager | Return-to-warehouse | Create return request and dispatch goods back to warehouse. | Return reason, returned item/bale IDs, quantity, return shipment info. | Return document completed; status shows returned/in-transit to warehouse. | Return transaction recorded; store thread closed at return event. | Return item/bale barcode | Return without original stock linkage, excessive quantity, invalid reason code. |  |  |
+| 19 | B2B Sales / Warehouse | B2B bale sales | Execute bale wholesale flow separate from retail POS. | B2B customer, bale IDs, negotiated wholesale price, invoice terms. | B2B order/invoice view shows bale-level wholesale sale records. | B2B sale transaction posted in dedicated channel; not mixed with POS sales. | B2B bale barcode | Attempt B2B through POS screen, incorrect channel/account mapping. |  |  |
+| 20 | Boss / Management | Boss analysis / operating dashboard | Review end-to-end operational KPIs and financial/stock outcomes. | Date range, site/store filters, KPI widgets/drill-down selection. | Dashboard shows latest operational throughput, stock, sales, and return KPIs. | Aggregated reporting snapshots/queries reflect completed flow transactions. | None | KPI mismatch vs source transactions, missing channel separation (POS vs B2B). |  |  |
+
+## Sign-off checklist
+
+- [ ] Full 20-step flow completed in sequence from `/app` login to boss dashboard.
+- [ ] Evidence captured for each step (IDs, screenshots, barcode samples, and notes).
+- [ ] Any `FAIL` or `BLOCKED` item linked to defect ticket with reproduction details.
+- [ ] Business owners confirm warehouse-led flow and cost-lock behavior are correct.
