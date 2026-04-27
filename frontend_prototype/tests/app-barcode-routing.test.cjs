@@ -45,6 +45,19 @@ test("completed inbound print modal keeps close and completion actions clickable
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
 
+test("bale print modal exposes browser print fallback with staging-safe copy", () => {
+  assert.match(indexHtml, /id="balePrintModalBrowserPrintButton"[\s\S]*?用浏览器打印 \/ Use browser print/);
+  assert.match(indexHtml, /Cloud staging cannot directly control local USB printers\. Use browser print and select your Deli printer in the Mac print dialog\./);
+  assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
+  assert.match(appJs, /frameWindow\.print\(\)/);
+});
+
+test("browser print fallback does not auto-run bale completion confirmation", () => {
+  const browserPrintFunction = appJs.match(/function browserPrintCurrentBaleModalJob\(\) \{[\s\S]*?\n\}/);
+  assert.ok(browserPrintFunction, "browser print function should exist");
+  assert.doesNotMatch(browserPrintFunction[0], /completeCurrentBalePrintModalJob/);
+});
+
 test("sorting task available bale list uses compact rows instead of oversized stock cards", () => {
   assert.match(appJs, /class="sorting-task-item sorting-task-item-compact"/);
   assert.match(appJs, /class="sorting-task-item-kicker"/);
