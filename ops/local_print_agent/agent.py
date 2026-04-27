@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -12,15 +13,47 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.1.3"
 HOST = "127.0.0.1"
 PORT = 8719
 ALLOWED_ORIGINS = {
     "https://fw-erp-staging.onrender.com",
     "http://34.35.52.250:8000",
+    "https://fw-erp-34-35-52-250.nip.io",
+    "http://fw-erp-34-35-52-250.nip.io",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 }
+
+_PRINTER_STATUS_MARKERS = [
+    "正在接受请求",
+    "接受请求",
+    "is accepting requests",
+    "accepting requests",
+    "is idle",
+    "idle",
+    "已禁用",
+    "disabled",
+    "not accepting requests",
+]
+
+
+def _extract_printer_name(raw_line: str) -> str:
+    """Extract a stable CUPS queue name from localized lpstat output."""
+    line = str(raw_line or "").strip()
+    if not line:
+        return ""
+    first_token = line.split()[0].strip()
+    for marker in _PRINTER_STATUS_MARKERS:
+        if marker in first_token:
+            return first_token.split(marker, 1)[0].strip()
+        if marker in line:
+            return line.split(marker, 1)[0].strip().split()[0].strip()
+    return first_token
+
+
+def _normalize_printer_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
 
 def _list_printers_unix() -> tuple[list[str], str | None]:
@@ -33,26 +66,52 @@ def _list_printers_unix() -> tuple[list[str], str | None]:
 
     printers: list[str] = []
     for line in result.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        printer_name = line.split()[0]
-        if printer_name not in printers:
+        printer_name = _extract_printer_name(line)
+        if printer_name and printer_name not in printers:
             printers.append(printer_name)
 
     return printers, None
 
 
-def _print_html_unix(printer: str, html_path: str) -> tuple[bool, str]:
-    if not shutil.which("lp"):
-        return False, "lp command is not available. Install CUPS or use browser print fallback."
+def _resolve_printer_name_unix(requested_printer: str) -> tuple[str, str | None]:
+    requested = str(requested_printer or "").strip()
+    if not requested:
+        return requested, "No printer name was provided."
 
-    result = subprocess.run(["lp", "-d", printer, html_path], capture_output=True, text=True, check=False)
+    printers, warning = _list_printers_unix()
+    if requested in printers:
+        return requested, warning
+
+    requested_norm = _normalize_printer_name(requested)
+    for printer in printers:
+        printer_norm = _normalize_printer_name(printer)
+        if not printer_norm:
+            continue
+        if printer_norm == requested_norm:
+            return printer, warning
+        if printer_norm.startswith(requested_norm) or requested_norm.startswith(printer_norm):
+            return printer, f"Matched requested printer '{requested}' to local queue '{printer}'."
+
+    if printers:
+        return requested, f"Requested printer '{requested}' was not found. Available printers: {', '.join(printers)}"
+    return requested, warning or "No local printers were found by lpstat."
+
+
+def _print_html_unix(printer: str, html_path: str) -> tuple[bool, str, str]:
+    if not shutil.which("lp"):
+        return False, "lp command is not available. Install CUPS or use browser print fallback.", printer
+
+    resolved_printer, warning = _resolve_printer_name_unix(printer)
+    result = subprocess.run(["lp", "-d", resolved_printer, html_path], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         err = result.stderr.strip() or result.stdout.strip() or "unknown error"
-        return False, f"Print command failed: {err}"
+        prefix = f"{warning} " if warning else ""
+        return False, f"{prefix}Print command failed for '{resolved_printer}': {err}", resolved_printer
 
-    return True, result.stdout.strip() or "Print job submitted."
+    message = result.stdout.strip() or "Print job submitted."
+    if warning:
+        message = f"{warning} {message}"
+    return True, message, resolved_printer
 
 
 class PrintAgentHandler(BaseHTTPRequestHandler):
@@ -165,12 +224,13 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
 
             system_name = platform.system()
             if system_name in {"Darwin", "Linux"}:
-                success, message = _print_html_unix(printer=printer, html_path=html_path)
+                success, message, resolved_printer = _print_html_unix(printer=printer, html_path=html_path)
                 self._send_json(
                     {
                         "ok": success,
                         "platform": system_name,
                         "printer": printer,
+                        "resolved_printer": resolved_printer,
                         "message": message,
                         "temp_file": html_path,
                     },
