@@ -7,3 +7,10 @@ output/
 .DS_Store
 .vscode/
 .idea/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.log
+backend/data/runtime_state.json
+backend/data/*.json
