@@ -15402,6 +15402,7 @@ function renderBalePrintModal() {
   const connectButton = document.querySelector("#balePrintModalConnectButton");
   const directPrintButton = document.querySelector("#balePrintModalDirectPrintButton");
   const printAllButton = document.querySelector("#balePrintModalPrintAllButton");
+  const browserPrintButton = document.querySelector("#balePrintModalBrowserPrintButton");
   const completeButton = document.querySelector("#balePrintModalCompleteButton");
   const closeAndRefreshButton = document.querySelector("#balePrintModalCloseAndRefreshButton");
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
@@ -15578,6 +15579,9 @@ function renderBalePrintModal() {
     printAllButton.disabled = !jobs.length;
     printAllButton.textContent = jobs.length ? `打印本轮全部 ${jobs.length} 张` : "当前类别没有待打印条码";
   }
+  if (browserPrintButton instanceof HTMLButtonElement) {
+    browserPrintButton.disabled = !currentJob;
+  }
   if (completeButton instanceof HTMLButtonElement) {
     completeButton.disabled = completionAction.action !== "complete_group" && !alreadyComplete;
     completeButton.textContent = alreadyComplete ? "这一类已完成，关闭弹窗" : "确认本类已贴完";
@@ -15724,6 +15728,29 @@ async function directPrintCurrentBaleModalJob() {
     currentIndex: Number(balePrintModalState.currentIndex || 0),
     totalJobs: jobs.length,
   });
+}
+
+function browserPrintCurrentBaleModalJob() {
+  const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
+  const currentJob = jobs[balePrintModalState.currentIndex] || null;
+  if (!currentJob) {
+    throw new Error("当前没有可打印的标签。");
+  }
+  const frame = document.querySelector("#balePrintPreviewFrame");
+  if (!(frame instanceof HTMLIFrameElement)) {
+    throw new Error("当前找不到打印预览窗口。");
+  }
+  const frameWindow = frame.contentWindow;
+  if (!frameWindow) {
+    throw new Error("当前预览还没加载完成，请先点“刷新预览”后重试。");
+  }
+  frameWindow.focus();
+  frameWindow.print();
+  balePrinterConsoleNotice = {
+    type: "success",
+    message: "已打开浏览器打印对话框。Cloud staging 不能直接控制本地 USB 打印机，请在 Mac 对话框里选择 Deli_DL_720C。",
+  };
+  renderBalePrintModal();
 }
 
 async function directPrintAllBaleModalJobs() {
@@ -27623,6 +27650,14 @@ document.querySelector("#balePrintModalPrintAllButton")?.addEventListener("click
     balePrinterConsoleNotice = { type: "error", message: `${formatErrorMessage(error)}。本次打印不计数。` };
     renderBalePrintModal();
   });
+});
+document.querySelector("#balePrintModalBrowserPrintButton")?.addEventListener("click", () => {
+  try {
+    browserPrintCurrentBaleModalJob();
+  } catch (error) {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  }
 });
 document.querySelector("#balePrintModalCompleteButton")?.addEventListener("click", () => {
   completeCurrentBalePrintModalJob().catch((error) => {
