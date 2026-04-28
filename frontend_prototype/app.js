@@ -16756,8 +16756,24 @@ function queueTransferShipTargetHintLoad(transferNo = "") {
   }, 250);
 }
 
+function isWaveSelectionValue(value = "") {
+  return String(value || "").trim().toUpperCase().startsWith("WAVE:");
+}
+
+function parseWaveSelectionValue(value = "") {
+  const raw = String(value || "").trim();
+  return isWaveSelectionValue(raw) ? raw.split(":").slice(1).join(":").trim().toUpperCase() : "";
+}
+
+function getWaveSummaryByNo(waveNo = "") {
+  const normalized = String(waveNo || "").trim().toUpperCase();
+  const waves = Array.isArray(window.__pickingWaveCache) ? window.__pickingWaveCache : [];
+  return waves.find((wave) => String(wave?.wave_no || "").trim().toUpperCase() === normalized) || null;
+}
+
 function populateTransferOrderSelectors() {
   const rows = Array.isArray(transferOrderState) ? transferOrderState.map((row) => normalizeTransferForOperationsSummary(row)) : [];
+  const waves = Array.isArray(window.__pickingWaveCache) ? window.__pickingWaveCache : [];
   const selectorConfigs = [
     { selector: "#loosePackingTaskPlanForm [name='transfer_no']", empty: "请选择补货申请单", mode: "lpk" },
     { selector: "#approveTransferForm [name='transfer_no']", empty: "请选择补货申请单", mode: "exec" },
@@ -16781,7 +16797,11 @@ function populateTransferOrderSelectors() {
       }
       return `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / 缺口 ${shortage} 件`;
     });
-    select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("")}`;
+    const requestOptions = rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("");
+    const waveOptions = mode === "ship" ? "" : waves
+      .map((wave) => `<option value="WAVE:${escapeHtml(wave.wave_no || "")}">${escapeHtml(`${wave.wave_no || "-"} / ${(wave.stores_included || []).length} stores / ${Number(wave.total_requested_qty || 0)} 件 / 缺口 ${Number(wave.total_shortage_qty || 0)} 件`)}</option>`)
+      .join("");
+    select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${requestOptions}${waveOptions}`;
     if (previousValue && rows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue)) {
       select.value = previousValue;
     }
@@ -16803,6 +16823,7 @@ async function refreshPickingWavePanel() {
   if (!(list instanceof HTMLElement)) return;
   try {
     const waves = await request("/picking-waves");
+    window.__pickingWaveCache = Array.isArray(waves) ? waves : [];
     if (!Array.isArray(waves) || !waves.length) {
       list.className = "candidate-summary empty-state";
       list.textContent = "暂无波次。";
