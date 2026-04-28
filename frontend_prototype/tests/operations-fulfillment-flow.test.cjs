@@ -727,13 +727,12 @@ test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1"
   assert.match(indexHtml, /Step 1 创建补货申请/);
   assert.match(indexHtml, /Step 2 系统配货建议/);
   assert.match(indexHtml, /Step 3 下一步动作/);
-  assert.match(appJs, /补货申请单号（内部调拨单号）/);
+  assert.match(appJs, /补货申请单号：\$\{escapeHtml\(result\.transfer_no \|\| "-"\)\}/);
   assert.match(appJs, /const nextActionLabel = hasLooseShortage \? "去 5\.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";/);
 });
 
 test("phase 2A page 5.1 copy uses request number label and warehouse-only LPK guidance", () => {
-  assert.match(indexHtml, /补货申请单号（来自 4\.1）/);
-  assert.match(indexHtml, /例如 TO-20260428-001，可从 4\.1 补货申请单复制/);
+  assert.match(indexHtml, /选择补货申请单/);
   assert.match(indexHtml, /本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货\/补差打包工单码，不是门店收货码。/);
   assert.match(appJs, /该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。/);
 });
@@ -746,9 +745,9 @@ test("phase 2A copy keeps package count and piece count separated on 4.1", () =>
   assert.match(appJs, /最终预计送店包：\$\{escapeHtml\(row\.finalDispatchBaleCount \|\| 0\)\} 个/);
 });
 
-test("phase 2B page 6 copy clarifies approval lock semantics and warehouse-only verification", () => {
-  assert.match(indexHtml, /审核配货计划并锁定库存/);
-  assert.match(indexHtml, /锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；核对完成后可生成正式门店送货执行单 barcode。/);
+test("phase 2B page 6 copy clarifies warehouse verification and warehouse-only barcode boundary", () => {
+  assert.match(indexHtml, /仓库执行核对 \/ 出库打印/);
+  assert.match(indexHtml, /按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。/);
   assert.match(indexHtml, /SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。/);
   assert.match(indexHtml, /这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。/);
   assert.match(indexHtml, /Lane A：现成待送店包核对/);
@@ -760,12 +759,10 @@ test("phase 2B page 6 copy clarifies approval lock semantics and warehouse-only 
 });
 
 test("phase 2B page 6 state labels and gating copy are visible in workbench summary", () => {
-  assert.match(appJs, /<strong>配货计划<\/strong><span>\$\{escapeHtml\(planApprovalLabel\)\}<\/span>/);
-  assert.match(appJs, /<strong>库存锁定<\/strong><span>\$\{escapeHtml\(inventoryLockLabel\)\}<\/span>/);
+  assert.match(appJs, /<strong>执行阶段<\/strong><span>仓库核对 \/ 出库打印<\/span>/);
   assert.match(appJs, /<strong>现成 SDB 包<\/strong><span>\$\{escapeHtml\(readiness\.foundPreparedCount \|\| 0\)\} \/ \$\{escapeHtml\(readiness\.requiredPreparedCount \|\| 0\)\} 已核对<\/span>/);
   assert.match(appJs, /<strong>补差工单<\/strong><span>\$\{escapeHtml\(readiness\.completedLooseTaskCount \|\| 0\)\} \/ \$\{escapeHtml\(readiness\.requiredLooseTaskCount \|\| 0\)\} 已完成<\/span>/);
   assert.match(appJs, /<strong>正式送货执行码<\/strong><span>\$\{escapeHtml\(officialDeliveryCodeLabel\)\}<\/span>/);
-  assert.match(appJs, /该补货申请尚未审核，不能锁定库存。请先完成主管审核。/);
   assert.match(appJs, /仓库核对尚未完成：现成待送店包 \$\{readiness\.foundPreparedCount \|\| 0\}\/\$\{readiness\.requiredPreparedCount \|\| 0\}，补差工单 \$\{readiness\.completedLooseTaskCount \|\| 0\}\/\$\{readiness\.requiredLooseTaskCount \|\| 0\}。/);
   assert.match(appJs, /仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。/);
   assert.doesNotMatch(indexHtml, /打印后给店长扫码验收/);
@@ -775,7 +772,7 @@ test("phase 2B page 6 state labels and gating copy are visible in workbench summ
 test("phase 2C page 6.1 copy clarifies shipment batch scope and barcode boundary", () => {
   assert.match(indexHtml, /6\.1 配送批次 \/ 门店收货跟踪/);
   assert.match(indexHtml, /一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。/);
-  assert.match(indexHtml, /当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。/);
+  assert.match(indexHtml, /选择仓库送货执行单 \/ SDO/);
   assert.match(indexHtml, /配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。/);
   assert.match(indexHtml, /该配送批次会展示已生成的正式门店送货执行单 \/ barcode。/);
   assert.doesNotMatch(indexHtml, /SDB can be scanned by store/i);
