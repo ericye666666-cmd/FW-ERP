@@ -10332,7 +10332,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const transfer = getTransferExecutionAnchor(transferOrNo);
   if (!transfer?.transfer_no) {
     summaryTarget.className = "candidate-summary empty-state";
-    summaryTarget.textContent = "先填入门店调拨单号，或从 4.1 手动补货需求后自动带入。这里会显示这单现在需要找多少现成待送店包裹、是否需要一张补差拣货单、预计形成多少个最终送店 bale。";
+    summaryTarget.textContent = "先填入补货申请单号（来自 4.1），这里会显示配货计划审核、库存锁定和仓库核对进度。";
     preparedProgressTarget.className = "candidate-summary empty-state";
     preparedProgressTarget.textContent = "这里会显示当前调拨单还要找几包现成待送店包裹，以及哪些已经扫码登记完成。";
     preparedTarget.className = "candidate-summary empty-state";
@@ -10342,7 +10342,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
     looseTarget.className = "candidate-summary empty-state";
     looseTarget.textContent = "如果现成待送店包裹不够，这里会提示去 5.1 生成一张带 barcode 的补差拣货单，工人按单捡货并贴标。";
     dispatchTarget.className = "candidate-summary empty-state";
-    dispatchTarget.textContent = "这里用于仓库核对现成待送店包与补差包。后续将生成正式门店送货 barcode；SDB 和 LPK 不是门店可扫 barcode。";
+    dispatchTarget.textContent = "这里仅显示本单仓库核对进度。正式门店送货 barcode 将由后续仓库送货执行单阶段生成。";
     if (printButton instanceof HTMLButtonElement) {
       printButton.disabled = true;
     }
@@ -10353,6 +10353,17 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const normalized = normalizeTransferForOperationsSummary(transfer);
   const executionRecord = getTransferExecutionRecord(transfer.transfer_no, { create: false, plan });
   const readiness = summarizeTransferExecutionState(transfer.transfer_no, plan);
+  const approvalStatus = String(transfer.approval_status || "").trim().toLowerCase();
+  const isPlanReviewed = ["approved", "not_required"].includes(approvalStatus);
+  const planApprovalLabel = isPlanReviewed ? "已审核" : "待审核";
+  const inventoryLockLabel = isPlanReviewed ? "已锁定" : "未锁定";
+  const officialDeliveryCodeLabel = "未生成（后续阶段生成）";
+  const verificationPending = Number(readiness.pendingPreparedCount || 0) > 0 || Number(readiness.pendingLooseTaskCount || 0) > 0;
+  const verificationHint = !isPlanReviewed
+    ? "该补货申请尚未审核，不能锁定库存。请先完成主管审核。"
+    : (verificationPending
+      ? `仓库核对尚未完成：现成待送店包 ${readiness.foundPreparedCount || 0}/${readiness.requiredPreparedCount || 0}，补差工单 ${readiness.completedLooseTaskCount || 0}/${readiness.requiredLooseTaskCount || 0}。`
+      : "仓库核对已完成。下一阶段将生成正式门店送货执行单和送货 barcode。");
   const dispatchRows = typeof operationsFulfillmentFlow.buildTransferDispatchRows === "function"
     ? operationsFulfillmentFlow.buildTransferDispatchRows({ plan, looseTasks: executionRecord.looseTasks })
     : plan.finalDispatchRows;
@@ -10361,15 +10372,18 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">这里用于仓库核对现成待送店包和补差包，后续将生成正式门店送货 barcode。SDB 和 LPK 不是门店可扫 barcode。</div>
+    <div class="alert-banner">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；正式门店送货 barcode 将在后续仓库送货执行单阶段生成。</div>
+    <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(transfer.from_warehouse_code || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
       <article class="store-metric"><strong>状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
-      <article class="store-metric"><strong>审核</strong><span>${escapeHtml(getTransferApprovalLabel(transfer.approval_status || ""))}</span></article>
+      <article class="store-metric"><strong>配货计划</strong><span>${escapeHtml(planApprovalLabel)}</span></article>
+      <article class="store-metric"><strong>库存锁定</strong><span>${escapeHtml(inventoryLockLabel)}</span></article>
       <article class="store-metric"><strong>现成待送店包裹</strong><span>${escapeHtml(summary.selectedPreparedBaleCount || 0)} 包</span></article>
-      <article class="store-metric"><strong>已登记现成包</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} / ${escapeHtml(readiness.requiredPreparedCount || 0)}</span></article>
-      <article class="store-metric"><strong>补差拣货单</strong><span>${escapeHtml(readiness.completedLooseTaskCount || 0)} / ${escapeHtml(readiness.requiredLooseTaskCount || 0)}</span></article>
+      <article class="store-metric"><strong>现成 SDB 包</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} / ${escapeHtml(readiness.requiredPreparedCount || 0)} 已核对</span></article>
+      <article class="store-metric"><strong>补差工单</strong><span>${escapeHtml(readiness.completedLooseTaskCount || 0)} / ${escapeHtml(readiness.requiredLooseTaskCount || 0)} 已完成</span></article>
+      <article class="store-metric"><strong>正式送货执行码</strong><span>${escapeHtml(officialDeliveryCodeLabel)}</span></article>
       <article class="store-metric"><strong>预计送店 bale</strong><span>${escapeHtml(dispatchRows.length || 0)} 个</span></article>
       <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${escapeHtml(normalized.dispatch_bales?.length || 0)}</span></article>
     </div>
@@ -10381,7 +10395,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>已扫码登记</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} 包</span></article>
       <article class="store-metric"><strong>还差</strong><span>${escapeHtml(readiness.pendingPreparedCount || 0)} 包</span></article>
     </div>
-    <div class="subtle small">工人只要扫现成待送店包裹 barcode，不需要再手工录需求。系统会按调拨单清单自动核对是不是当前这单要找的包。</div>
+    <div class="subtle small">扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。</div>
   `;
   if (plan.preparedPickRows.length) {
     preparedTarget.className = "candidate-list transfer-draft-list";
@@ -10422,7 +10436,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>待完成</strong><span>${escapeHtml(readiness.pendingLooseTaskCount || 0)}</span></article>
     </div>
     ${renderSummaryActions([
-      { panelKey: getPanelKeyByTitle("warehouse", "5.1 补差打包工单"), label: "去 5.1 执行补差拣货单" },
+      { panelKey: getPanelKeyByTitle("warehouse", "5.1 补差打包工单"), label: "去 5.1 跟进补差工单" },
     ])}
   `;
   if (plan.loosePickRows.length) {
@@ -10463,9 +10477,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${escapeHtml(normalized.dispatch_bales?.length || 0)}</span></article>
     </div>
     <div class="subtle small">${escapeHtml(
-      readiness.canPrint
-        ? "现成包登记和补差拣货单已完成。正式门店送货执行单 barcode 将在 Phase 2 提供。"
-        : `还不能打印：现成包待登记 ${readiness.pendingPreparedCount || 0} 包，补差拣货单待完成 ${readiness.pendingLooseTaskCount || 0} 张。`,
+      verificationHint,
     )}</div>
     <div class="candidate-list transfer-draft-list">
       ${dispatchRows.length
@@ -10479,7 +10491,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
                   <span class="meta-pill">${escapeHtml(row.finalType === "prepared_dispatch" ? "源头：现成待送店包裹" : "源头：补差拣货单")}</span>
                   ${row.baleBarcode ? `<span class="meta-pill">源 barcode ${escapeHtml(row.baleBarcode)}</span>` : ""}
                   ${row.plannedPackageCount ? `<span class="meta-pill">建议补差包 ${escapeHtml(row.plannedPackageCount)} 个</span>` : ""}
-                  <span class="meta-pill">待后续正式送货执行单 barcode（Phase 2）</span>
+                  <span class="meta-pill">正式送货执行码：后续阶段生成</span>
                 </div>
               </div>
               <div class="candidate-side-actions">
@@ -10492,7 +10504,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
     </div>
   `;
   if (printButton instanceof HTMLButtonElement) {
-    printButton.disabled = !readiness.canPrint;
+    printButton.disabled = !isPlanReviewed || !readiness.canPrint;
   }
 }
 
@@ -16388,7 +16400,7 @@ function renderTransferActionResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示审核锁库存、送店 bale 生成、箱单打印和门店验收条码结果。";
+    target.textContent = "这里会显示配货计划审核、库存锁定与仓库核对进度。";
     return;
   }
   if (result.transfer_no && result.transfer_print_job) {
@@ -16403,7 +16415,7 @@ function renderTransferActionResultSummary(result) {
       : "-";
     target.className = "report-summary";
     target.innerHTML = `
-      <div class="alert-banner">调拨单 ${escapeHtml(result.transfer_no)} 的送店 bale、箱单和门店验收条码已经生成。</div>
+      <div class="alert-banner">调拨单 ${escapeHtml(result.transfer_no)} 已完成仓库执行输出。正式门店送货执行码仍由后续阶段生成。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>履约状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
         <article class="store-metric"><strong>delivery batch</strong><span>${escapeHtml(normalized.delivery_batch?.delivery_batch_no || "待生成")}</span></article>
@@ -16447,8 +16459,8 @@ function renderTransferActionResultSummary(result) {
           : ""
       }
       ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "查看配送批次 / 收货跟踪" },
-        { panelKey: getPanelKeyByTitle("store", "6. 门店验收配货 bale"), label: "下一步：去门店签收配货 bale" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "下一阶段：仓库送货执行单 / 配送批次" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "返回仓库执行单" },
       ])}
     `;
     return;
@@ -16457,7 +16469,7 @@ function renderTransferActionResultSummary(result) {
     const normalized = normalizeTransferForOperationsSummary(result);
     target.className = "report-summary";
     target.innerHTML = `
-      <div class="alert-banner">调拨单 ${escapeHtml(result.transfer_no)} 已完成仓库审核，现成待送店包裹和散货补差都可以继续执行。</div>
+      <div class="alert-banner">调拨单 ${escapeHtml(result.transfer_no)} 已审核配货计划并锁定库存，可继续仓库核对。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>履约状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
         <article class="store-metric"><strong>审核状态</strong><span>${escapeHtml(result.approval_status || "-")}</span></article>

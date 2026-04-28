@@ -746,6 +746,32 @@ test("phase 2A copy keeps package count and piece count separated on 4.1", () =>
   assert.match(appJs, /最终预计送店包：\$\{escapeHtml\(row\.finalDispatchBaleCount \|\| 0\)\} 个/);
 });
 
+test("phase 2B page 6 copy clarifies approval lock semantics and warehouse-only verification", () => {
+  assert.match(indexHtml, /审核配货计划并锁定库存/);
+  assert.match(indexHtml, /锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；正式门店送货 barcode 将在后续仓库送货执行单阶段生成。/);
+  assert.match(indexHtml, /SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。/);
+  assert.match(indexHtml, /Lane A：现成待送店包核对/);
+  assert.match(indexHtml, /扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。/);
+  assert.match(indexHtml, /Lane B：补差包核对/);
+  assert.match(indexHtml, /LPK 是仓库补差拣货工单码。补差完成后形成仓库内部补差包，用于本单后续送货执行。/);
+  assert.match(indexHtml, /Lane C：正式送货执行码（后续阶段）/);
+  assert.match(indexHtml, /现阶段仅显示本单仓库核对进度。正式门店送货 barcode 将由后续仓库送货执行单生成。/);
+});
+
+test("phase 2B page 6 state labels and gating copy are visible in workbench summary", () => {
+  assert.match(appJs, /<strong>配货计划<\/strong><span>\$\{escapeHtml\(planApprovalLabel\)\}<\/span>/);
+  assert.match(appJs, /<strong>库存锁定<\/strong><span>\$\{escapeHtml\(inventoryLockLabel\)\}<\/span>/);
+  assert.match(appJs, /<strong>现成 SDB 包<\/strong><span>\$\{escapeHtml\(readiness\.foundPreparedCount \|\| 0\)\} \/ \$\{escapeHtml\(readiness\.requiredPreparedCount \|\| 0\)\} 已核对<\/span>/);
+  assert.match(appJs, /<strong>补差工单<\/strong><span>\$\{escapeHtml\(readiness\.completedLooseTaskCount \|\| 0\)\} \/ \$\{escapeHtml\(readiness\.requiredLooseTaskCount \|\| 0\)\} 已完成<\/span>/);
+  assert.match(appJs, /<strong>正式送货执行码<\/strong><span>\$\{escapeHtml\(officialDeliveryCodeLabel\)\}<\/span>/);
+  assert.match(appJs, /该补货申请尚未审核，不能锁定库存。请先完成主管审核。/);
+  assert.match(appJs, /仓库核对尚未完成：现成待送店包 \$\{readiness\.foundPreparedCount \|\| 0\}\/\$\{readiness\.requiredPreparedCount \|\| 0\}，补差工单 \$\{readiness\.completedLooseTaskCount \|\| 0\}\/\$\{readiness\.requiredLooseTaskCount \|\| 0\}。/);
+  assert.match(appJs, /仓库核对已完成。下一阶段将生成正式门店送货执行单和送货 barcode。/);
+  assert.doesNotMatch(indexHtml, /打印后给店长扫码验收/);
+  assert.doesNotMatch(indexHtml, /SDB\/LPK can be scanned by store/i);
+});
+
+
 test("warehouse access profiles keep 门店补货 visible for admin and warehouse manager roles", () => {
   assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "general"\]/);
   assert.match(
