@@ -748,14 +748,15 @@ test("phase 2A copy keeps package count and piece count separated on 4.1", () =>
 
 test("phase 2B page 6 copy clarifies approval lock semantics and warehouse-only verification", () => {
   assert.match(indexHtml, /审核配货计划并锁定库存/);
-  assert.match(indexHtml, /锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；正式门店送货 barcode 将在后续仓库送货执行单阶段生成。/);
+  assert.match(indexHtml, /锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；核对完成后可生成正式门店送货执行单 barcode。/);
   assert.match(indexHtml, /SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。/);
+  assert.match(indexHtml, /这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。/);
   assert.match(indexHtml, /Lane A：现成待送店包核对/);
   assert.match(indexHtml, /扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。/);
   assert.match(indexHtml, /Lane B：补差包核对/);
   assert.match(indexHtml, /LPK 是仓库补差拣货工单码。补差完成后形成仓库内部补差包，用于本单后续送货执行。/);
-  assert.match(indexHtml, /Lane C：正式送货执行码（后续阶段）/);
-  assert.match(indexHtml, /现阶段仅显示本单仓库核对进度。正式门店送货 barcode 将由后续仓库送货执行单生成。/);
+  assert.match(indexHtml, /Lane C：正式门店送货执行单/);
+  assert.match(indexHtml, /生成正式门店送货执行单 barcode/);
 });
 
 test("phase 2B page 6 state labels and gating copy are visible in workbench summary", () => {
@@ -766,7 +767,7 @@ test("phase 2B page 6 state labels and gating copy are visible in workbench summ
   assert.match(appJs, /<strong>正式送货执行码<\/strong><span>\$\{escapeHtml\(officialDeliveryCodeLabel\)\}<\/span>/);
   assert.match(appJs, /该补货申请尚未审核，不能锁定库存。请先完成主管审核。/);
   assert.match(appJs, /仓库核对尚未完成：现成待送店包 \$\{readiness\.foundPreparedCount \|\| 0\}\/\$\{readiness\.requiredPreparedCount \|\| 0\}，补差工单 \$\{readiness\.completedLooseTaskCount \|\| 0\}\/\$\{readiness\.requiredLooseTaskCount \|\| 0\}。/);
-  assert.match(appJs, /仓库核对已完成。下一阶段将生成正式门店送货执行单和送货 barcode。/);
+  assert.match(appJs, /仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。/);
   assert.doesNotMatch(indexHtml, /打印后给店长扫码验收/);
   assert.doesNotMatch(indexHtml, /SDB\/LPK can be scanned by store/i);
 });
@@ -776,7 +777,7 @@ test("phase 2C page 6.1 copy clarifies shipment batch scope and barcode boundary
   assert.match(indexHtml, /一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。/);
   assert.match(indexHtml, /当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。/);
   assert.match(indexHtml, /配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。/);
-  assert.match(indexHtml, /该配送批次下的正式门店收货 barcode 尚未生成；后续需由仓库送货执行单生成。/);
+  assert.match(indexHtml, /该配送批次会展示已生成的正式门店送货执行单 \/ barcode。/);
   assert.doesNotMatch(indexHtml, /SDB can be scanned by store/i);
   assert.doesNotMatch(indexHtml, /LPK can be scanned by store/i);
 });

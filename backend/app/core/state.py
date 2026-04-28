@@ -193,6 +193,7 @@ class InMemoryState:
         self.store_prep_bale_tasks: dict[str, dict[str, Any]] = {}
         self.store_prep_bales: dict[str, dict[str, Any]] = {}
         self.store_dispatch_bales: dict[str, dict[str, Any]] = {}
+        self.store_delivery_execution_orders: dict[str, dict[str, Any]] = {}
         self.sorting_stock: dict[str, dict[str, Any]] = {}
         self.goods_receipts: list[dict[str, Any]] = []
         self.print_jobs: list[dict[str, Any]] = []
@@ -262,6 +263,7 @@ class InMemoryState:
         self._print_job_ids = count(max((row["id"] for row in self.print_jobs), default=0) + 1)
         self._print_station_job_ids = count(max((row["id"] for row in self.print_station_jobs), default=0) + 1)
         self._transfer_ids = count(len(self.transfer_orders) + 1)
+        self._store_delivery_execution_order_ids = count(len(self.store_delivery_execution_orders) + 1)
         self._transfer_recommendation_ids = count(len(self.transfer_recommendations) + 1)
         self._receiving_session_ids = count(len(self.transfer_receiving_sessions) + 1)
         self._store_token_receiving_session_ids = count(len(self.store_token_receiving_sessions) + 1)
@@ -321,6 +323,7 @@ class InMemoryState:
             "store_prep_bale_tasks": self.store_prep_bale_tasks,
             "store_prep_bales": self.store_prep_bales,
             "store_dispatch_bales": self.store_dispatch_bales,
+            "store_delivery_execution_orders": self.store_delivery_execution_orders,
             "sorting_stock": self.sorting_stock,
             "goods_receipts": self.goods_receipts,
             "print_jobs": self.print_jobs,
@@ -382,6 +385,7 @@ class InMemoryState:
         self.store_prep_bale_tasks = payload.get("store_prep_bale_tasks", {})
         self.store_prep_bales = payload.get("store_prep_bales", {})
         self.store_dispatch_bales = payload.get("store_dispatch_bales", {})
+        self.store_delivery_execution_orders = payload.get("store_delivery_execution_orders", {})
         self.sorting_stock = payload.get("sorting_stock", {})
         self.goods_receipts = payload.get("goods_receipts", [])
         self.print_jobs = payload.get("print_jobs", [])
@@ -1186,6 +1190,52 @@ class InMemoryState:
     def _transfer_shipment_session_no(self, transfer_no: str) -> str:
         transfer_code = self._normalize_code_fragment(transfer_no, "SHIP")
         return f"SHIP-{transfer_code}"
+
+    def _store_delivery_execution_order_no(self) -> str:
+        serial = next(self._store_delivery_execution_order_ids)
+        return f"SDO{datetime.now(timezone.utc).strftime('%y%m%d')}{serial:03d}"
+
+    def _normalize_store_delivery_execution_order(self, row: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(row or {})
+        execution_order_no = str(
+            normalized.get("execution_order_no")
+            or normalized.get("official_delivery_barcode")
+            or self._store_delivery_execution_order_no()
+        ).strip().upper()
+        source_transfer_no = str(
+            normalized.get("source_transfer_no")
+            or normalized.get("replenishment_request_no")
+            or normalized.get("transfer_no")
+            or ""
+        ).strip().upper()
+        source_bales = normalized.get("source_store_prep_bale_codes") or normalized.get("source_bale_codes") or []
+        source_gap_tasks = normalized.get("source_gap_fill_task_codes") or normalized.get("source_loose_pick_task_codes") or []
+        status = str(normalized.get("status") or "pending_print").strip().lower() or "pending_print"
+        created_at = normalized.get("created_at") or now_iso()
+        normalized.update(
+            {
+                "execution_order_no": execution_order_no,
+                "official_delivery_barcode": execution_order_no,
+                "source_transfer_no": source_transfer_no,
+                "replenishment_request_no": source_transfer_no,
+                "from_warehouse_code": str(normalized.get("from_warehouse_code") or "").strip().upper(),
+                "to_store_code": str(normalized.get("to_store_code") or "").strip().upper(),
+                "source_store_prep_bale_codes": [
+                    str(value or "").strip().upper() for value in source_bales if str(value or "").strip()
+                ],
+                "source_gap_fill_task_codes": [
+                    str(value or "").strip().upper() for value in source_gap_tasks if str(value or "").strip()
+                ],
+                "package_count": max(0, int(normalized.get("package_count") or 0)),
+                "status": status,
+                "created_by": str(normalized.get("created_by") or "").strip(),
+                "created_at": str(created_at),
+                "printed_at": normalized.get("printed_at"),
+                "received_at": normalized.get("received_at"),
+                "notes": str(normalized.get("notes") or "").strip(),
+            }
+        )
+        return normalized
 
     def _default_store_price_kes(self, unit_cost_kes: Optional[float]) -> Optional[float]:
         if unit_cost_kes is None:
@@ -2811,7 +2861,7 @@ class InMemoryState:
             if normalized_context == "pos":
                 return "POS 只允许扫描 STORE_ITEM 商品码，不能扫描仓库待送店压缩包码。"
             if normalized_context == "store_receiving":
-                return "门店收货只能扫描仓库执行单/送货单打印的正式送店 barcode，不能直接扫描待送店压缩包码。"
+                return "这是仓库待送店压缩包码，不是正式送货执行码。请让仓库先生成送货执行单并打印正式送店 barcode。"
             if normalized_context == "store_pda":
                 return "店员 PDA 只能扫描已收货/已分配流程中的正式送店执行码或 STORE_ITEM，不能直接扫描仓库待送店压缩包码。"
             if normalized_context == "b2b_bale_sales":
@@ -2821,7 +2871,7 @@ class InMemoryState:
         if normalized_context == "warehouse_sorting_create":
             return "仓库分拣创建只允许扫描 RAW_BALE 入仓包码，不能扫描商品码或送店包码。"
         if normalized_context == "store_receiving":
-            return "门店签收只允许扫描 DISPATCH_BALE 送店包码。"
+            return "门店签收只允许扫描正式门店送货执行码。"
         if normalized_context == "store_pda":
             return "店员 PDA 只允许扫描本人/本店相关 DISPATCH_BALE 或 STORE_ITEM。"
         return f"{barcode_type} 不允许在 {normalized_context} 场景扫描。"
@@ -2845,7 +2895,7 @@ class InMemoryState:
         if normalized_context == "warehouse_sorting_create":
             return "请回到入仓包分拣创建页面并扫描 RAW_BALE 包码。"
         if normalized_context == "store_receiving":
-            return "请在门店签收页面扫描 DISPATCH_BALE 送店包码。"
+            return "请在门店签收页面扫描正式门店送货执行码。"
         if normalized_context == "store_pda":
             return "请确认当前员工/门店后，扫描对应 DISPATCH_BALE 或 STORE_ITEM。"
         return f"请切换到允许 {barcode_type} 的业务页面后重试。"
@@ -2884,6 +2934,7 @@ class InMemoryState:
             "store_item": "STORE_ITEM",
             "bale_sales_unit": "BALE_SALES_UNIT",
             "loose_pick_task": "LOOSE_PICK_TASK",
+            "store_delivery_execution": "STORE_DELIVERY_EXECUTION",
         }.get(str(object_type or "").strip().lower(), str(barcode_type or "UNKNOWN").strip().upper())
         return {
             "barcode_value": str(barcode_value or "").strip().upper(),
@@ -2973,6 +3024,35 @@ class InMemoryState:
                     object_id=str(dispatch_bale.get("bale_no") or normalized_barcode).strip().upper(),
                     template_scope="warehouseout_bale",
                     allowed_contexts=["store_receiving", "store_manager_assign", "store_pda", "identity_ledger"],
+                    context=normalized_context,
+                )
+            )
+
+        delivery_execution_order = self.store_delivery_execution_orders.get(normalized_barcode)
+        if not delivery_execution_order:
+            delivery_execution_order = next(
+                (
+                    row
+                    for row in self.store_delivery_execution_orders.values()
+                    if normalized_barcode
+                    in {
+                        str(row.get("execution_order_no") or "").strip().upper(),
+                        str(row.get("official_delivery_barcode") or "").strip().upper(),
+                    }
+                ),
+                None,
+            )
+        if delivery_execution_order:
+            normalized_execution_order = self._normalize_store_delivery_execution_order(delivery_execution_order)
+            self.store_delivery_execution_orders[normalized_execution_order["execution_order_no"]] = normalized_execution_order
+            matches.append(
+                self._build_barcode_resolve_result(
+                    barcode_value=normalized_barcode,
+                    barcode_type="STORE_DELIVERY_EXECUTION",
+                    object_type="store_delivery_execution",
+                    object_id=str(normalized_execution_order.get("execution_order_no") or normalized_barcode).strip().upper(),
+                    template_scope="store_delivery_execution",
+                    allowed_contexts=["store_receiving", "identity_ledger"],
                     context=normalized_context,
                 )
             )
@@ -12074,6 +12154,108 @@ class InMemoryState:
             "generated_bale_count": len(dispatch_bales),
         }
 
+    def list_store_delivery_execution_orders(self, transfer_no: Optional[str] = None) -> list[dict[str, Any]]:
+        rows = [
+            self._normalize_store_delivery_execution_order(row)
+            for row in self.store_delivery_execution_orders.values()
+        ]
+        if transfer_no:
+            normalized_transfer_no = str(transfer_no or "").strip().upper()
+            rows = [
+                row
+                for row in rows
+                if str(row.get("source_transfer_no") or "").strip().upper() == normalized_transfer_no
+            ]
+        rows.sort(
+            key=lambda row: (
+                str(row.get("created_at") or ""),
+                str(row.get("execution_order_no") or ""),
+            ),
+            reverse=True,
+        )
+        return rows
+
+    def create_store_delivery_execution_order(self, transfer_no: str, payload: dict[str, Any]) -> dict[str, Any]:
+        order = self.get_transfer_order(transfer_no)
+        actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})
+        if order["approval_status"] != "approved" and order["status"] not in {"approved", "dispatched", "received", "receiving_in_progress"}:
+            raise HTTPException(status_code=400, detail="Transfer must be approved before creating store delivery execution order")
+
+        transfer_no_upper = str(transfer_no or "").strip().upper()
+        existing = next(
+            (
+                row
+                for row in self.store_delivery_execution_orders.values()
+                if str(row.get("source_transfer_no") or "").strip().upper() == transfer_no_upper
+                and str(row.get("status") or "").strip().lower() != "cancelled"
+            ),
+            None,
+        )
+        if existing:
+            return self._normalize_store_delivery_execution_order(existing)
+
+        self._rebuild_store_dispatch_bales()
+        dispatch_rows = [
+            row
+            for row in self.store_dispatch_bales.values()
+            if str(row.get("transfer_no") or "").strip().upper() == transfer_no_upper
+        ]
+        source_store_prep_codes = sorted(
+            {
+                str(code or "").strip().upper()
+                for row in dispatch_rows
+                for code in (row.get("source_bales") if isinstance(row.get("source_bales"), list) else [])
+                if str(code or "").strip().upper().startswith("SDB")
+            }
+        )
+        source_gap_fill_codes = sorted(
+            {
+                str(code or "").strip().upper()
+                for row in dispatch_rows
+                for code in (row.get("source_bales") if isinstance(row.get("source_bales"), list) else [])
+                if str(code or "").strip().upper().startswith("LPK")
+            }
+        )
+        execution_order_no = self._store_delivery_execution_order_no()
+        created_at = now_iso()
+        created = self._normalize_store_delivery_execution_order(
+            {
+                "execution_order_no": execution_order_no,
+                "official_delivery_barcode": execution_order_no,
+                "source_transfer_no": transfer_no_upper,
+                "replenishment_request_no": transfer_no_upper,
+                "from_warehouse_code": str(order.get("from_warehouse_code") or "").strip().upper(),
+                "to_store_code": str(order.get("to_store_code") or "").strip().upper(),
+                "source_store_prep_bale_codes": source_store_prep_codes,
+                "source_gap_fill_task_codes": source_gap_fill_codes,
+                "package_count": len(dispatch_rows),
+                "status": "printed" if payload.get("mark_as_printed") else "pending_print",
+                "created_by": actor["username"],
+                "created_at": created_at,
+                "printed_at": created_at if payload.get("mark_as_printed") else None,
+                "notes": str(payload.get("notes") or payload.get("note") or "").strip(),
+            }
+        )
+        self.store_delivery_execution_orders[execution_order_no] = created
+        order["store_delivery_execution_order_no"] = execution_order_no
+        order["official_delivery_barcode"] = execution_order_no
+        order["store_delivery_execution_status"] = created["status"]
+        order["store_delivery_execution_created_at"] = created_at
+        self._log_event(
+            event_type="transfer.store_delivery_execution.created",
+            entity_type="store_delivery_execution_order",
+            entity_id=execution_order_no,
+            actor=actor["username"],
+            summary=f"Store delivery execution order {execution_order_no} created for {transfer_no_upper}",
+            details={
+                "source_transfer_no": transfer_no_upper,
+                "package_count": created["package_count"],
+                "official_delivery_barcode": execution_order_no,
+            },
+        )
+        self._persist()
+        return created
+
     def list_print_jobs(self, status: Optional[str] = None) -> list[dict[str, Any]]:
         if not status:
             return self.print_jobs
@@ -12312,6 +12494,10 @@ class InMemoryState:
             "delivery_batch_no": "",
             "shipment_session_no": "",
             "store_receipt_status": "not_started",
+            "store_delivery_execution_order_no": "",
+            "official_delivery_barcode": "",
+            "store_delivery_execution_status": "",
+            "store_delivery_execution_created_at": None,
             "discrepancy_approval_status": None,
             "discrepancy_approved_by": None,
             "discrepancy_approved_at": None,

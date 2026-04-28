@@ -55,6 +55,10 @@ class TransferOrderResponse(BaseModel):
     delivery_batch_no: str = ""
     shipment_session_no: str = ""
     store_receipt_status: str = ""
+    store_delivery_execution_order_no: str = ""
+    official_delivery_barcode: str = ""
+    store_delivery_execution_status: str = ""
+    store_delivery_execution_created_at: Optional[str] = None
     dispatch_grouping_mode: str = ""
     dispatch_max_items_per_bale: int = 0
     dispatch_bale_nos: List[str] = Field(default_factory=list)
@@ -139,3 +143,27 @@ class RecommendationTransferCreateRequest(BaseModel):
     approval_required: bool = True
     selected_demand_keys: List[str] = Field(default_factory=list)
     selected_barcodes: List[str] = Field(default_factory=list)
+
+
+class StoreDeliveryExecutionOrderCreateRequest(BaseModel):
+    created_by: str = Field(min_length=1, default="warehouse_clerk_1")
+    mark_as_printed: bool = False
+    notes: str = ""
+
+
+class StoreDeliveryExecutionOrderResponse(BaseModel):
+    execution_order_no: str
+    official_delivery_barcode: str
+    source_transfer_no: str = ""
+    replenishment_request_no: str = ""
+    from_warehouse_code: str = ""
+    to_store_code: str = ""
+    source_store_prep_bale_codes: List[str] = Field(default_factory=list)
+    source_gap_fill_task_codes: List[str] = Field(default_factory=list)
+    package_count: int = 0
+    status: str = "pending_print"
+    created_by: str = ""
+    created_at: str
+    printed_at: Optional[str] = None
+    received_at: Optional[str] = None
+    notes: str = ""

@@ -2117,7 +2117,7 @@
           </div>
           <div class="subtle small">一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。</div>
           <div class="subtle small">配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。</div>
-          <div class="subtle small">该配送批次下的正式门店收货 barcode 尚未生成；后续需由仓库送货执行单生成。</div>
+          <div class="subtle small">该配送批次会展示已生成的正式门店送货执行单 / barcode。</div>
           <div class="subtle small">当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。</div>
         </div>
         <div class="candidate-summary">
@@ -2141,7 +2141,7 @@
           <button type="submit">确认发运 / 建 shipment session</button>
         </form>
         <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
-          这里会显示发运和 shipment session。该调拨单还未生成正式门店送货执行单 barcode。
+          这里会显示发运和 shipment session，并展示已关联的正式门店送货执行单 barcode（如已生成）。
         </div>
         <div id="transferDispatchSummary" class="candidate-summary empty-state">
           先创建并审核调拨单，这里再读取最近调拨单，就能看哪些单待仓库配货、待打印和待配送。
@@ -2783,10 +2783,11 @@
             <span class="store-flag">审核配货计划并锁定库存</span>
             <span class="store-flag">仓库核对现成 SDB 包</span>
             <span class="store-flag">仓库核对补差工单</span>
-            <span class="store-flag">正式送货执行码后续阶段生成</span>
+            <span class="store-flag">生成正式门店送货执行单 barcode</span>
           </div>
-          <div class="subtle small">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；正式门店送货 barcode 将在后续仓库送货执行单阶段生成。</div>
+          <div class="subtle small">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；核对完成后可生成正式门店送货执行单 barcode。</div>
           <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
+          <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
         </div>
         <div class="warehouse-prep-shell">
           <article class="transfer-ops-card warehouse-prep-card warehouse-prep-overview">
@@ -2843,9 +2844,9 @@
 
             <article class="transfer-ops-card warehouse-prep-card warehouse-prep-print-card">
               <div class="transfer-workbench-head is-compact">
-                <span class="eyebrow">Lane C：正式送货执行码（后续阶段）</span>
-                <h3>本单仓库核对进度</h3>
-                <p>现阶段仅显示本单仓库核对进度。正式门店送货 barcode 将由后续仓库送货执行单生成。</p>
+                <span class="eyebrow">Lane C：正式门店送货执行单</span>
+                <h3>生成正式门店送货执行单 barcode</h3>
+                <p>仓库核对完成后，在这里生成并打印正式门店送货执行单 barcode（60x40）。</p>
               </div>
               <form id="transferBundleForm" class="form-grid compact warehouse-prep-toolbar">
                 <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
@@ -2853,10 +2854,10 @@
                 <input name="label_copies_mode" type="hidden" value="approved_qty" />
                 <input name="grouping_mode" type="hidden" value="by_category" />
                 <input name="max_items_per_bale" type="hidden" value="200" />
-                <button type="submit">生成仓库内部出库打印（非门店收货码）</button>
+                <button type="submit">生成正式门店送货执行单 barcode</button>
               </form>
               <div id="transferDispatchPackagingSummary" class="candidate-summary empty-state">
-                这里会显示本单仓库核对进度和待送货汇总；正式门店送货执行码将在后续阶段生成。
+                这里会显示本单仓库核对进度、正式送货执行单号和门店唯一可扫 barcode。
               </div>
             </article>
           </div>
@@ -2914,13 +2915,13 @@
         </div>
         <form id="storeDispatchBaleAcceptForm" class="form-grid compact">
           <input name="transfer_no" placeholder="先选择调拨单，例如 TO-20260425-010" />
-          <textarea name="bale_no" class="bulk-scan-input" rows="7" placeholder="连续扫描或粘贴本调拨单下全部门店配货 bale barcode；一行一个，也支持扫码枪连续输入。"></textarea>
+          <textarea name="bale_no" class="bulk-scan-input" rows="7" placeholder="优先扫描正式门店送货执行单 barcode（SDO...）；如需兼容旧流程，也可逐行输入本调拨单下全部门店配货 bale barcode。"></textarea>
           <input name="note" placeholder="验收备注，如包装完好 / 少一包待查" value="门店整单验收完成" />
           <button type="submit">验收完成：批量确认本调拨单全部 bale</button>
         </form>
         <div id="storeDispatchBaleNotice" class="inline-notice-slot" aria-live="polite"></div>
         <div id="storeDispatchBaleSummary" class="candidate-summary empty-state">
-          这是店长端入口。先选择调拨单，再扫描或录入这张调拨单下的门店配货 bale barcode；如果 barcode 不属于当前调拨单或当前门店，系统直接报错。
+          这是店长端入口。门店收货应先扫描正式门店送货执行单 barcode（SDO...）；SDB/LPK 不是门店收货码。当前版本保留逐包验收兼容。
         </div>
         <pre id="storeDispatchBaleOutput" class="output hidden-output"></pre>
       </section>
