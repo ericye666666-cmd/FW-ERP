@@ -10125,7 +10125,7 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
   target.innerHTML = `
     <div class="alert-banner">当前以调拨单 ${escapeHtml(transfer.transfer_no || "-")} 为主线：现成包扫码登记和补差拣货单都完成后，才允许批量打印最终送店 barcode。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>调拨单号</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>补货申请单号（来自 4.1）</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
       <article class="store-metric"><strong>审批</strong><span>${escapeHtml(getTransferApprovalLabel(transfer.approval_status || ""))}</span></article>
       <article class="store-metric"><strong>流程状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
@@ -10158,7 +10158,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
   const transfer = transferOrNo && typeof transferOrNo === "object" ? transferOrNo : getTransferPreparationOrder(transferOrNo || activeTransferPreparationNo);
   if (!transfer?.transfer_no) {
     summaryTarget.className = "candidate-summary empty-state";
-    summaryTarget.textContent = "先读取一张门店调拨单，再决定是否需要生成补差拣货单。";
+    summaryTarget.textContent = "先读取一张补货申请单号（来自 4.1），再决定是否需要生成补差拣货单。";
     listTarget.className = "candidate-summary empty-state";
     listTarget.textContent = "如果当前调拨单有散货补差需求，这里会生成并显示补差打包工单。";
     return;
@@ -10172,9 +10172,9 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
     || (plan.summary?.looseQtyToPick ? Math.max(1, Math.ceil(Number(plan.summary.looseQtyToPick || 0) / packageLimitQty)) : 0);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">补差打包工单只处理现成待送店包不足的散货缺口。LPK barcode 是仓库拣货工单码，不是门店收货码。</div>
+    <div class="alert-banner">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差打包工单码，不是门店收货码。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>调拨单号</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>补货申请单号（来自 4.1）</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>散货补差件数</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)}</span></article>
       <article class="store-metric"><strong>封包上限</strong><span>小于 ${escapeHtml(packageLimitQty)} 件 / 包</span></article>
       <article class="store-metric"><strong>建议补差包</strong><span>${escapeHtml(plannedPackageCount)} 个</span></article>
@@ -10185,13 +10185,16 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
     ])}
   `;
   if (!plan.loosePickRows.length) {
+    summaryTarget.innerHTML += renderSummaryActions([
+      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "无需补差，去 6 仓库执行单继续" },
+    ]);
     listTarget.className = "candidate-summary empty-state";
-    listTarget.textContent = "这张调拨单已经被现成待送店包裹完全覆盖，不需要生成补差打包工单。";
+    listTarget.textContent = "该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。";
     return;
   }
   if (!tasks.length) {
     listTarget.className = "candidate-summary empty-state";
-    listTarget.textContent = "这张调拨单存在散货补差需求，但还没有生成拣货单。先选封包上限，再点左侧“生成补差拣货单 barcode”。";
+    listTarget.textContent = "该补货申请有散货缺口。请确认封包上限后，生成补差拣货单 barcode。";
     return;
   }
   listTarget.className = "candidate-list transfer-draft-list";
@@ -16321,24 +16324,31 @@ function renderTransferResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示配货任务和门店调拨单创建后的中文摘要。";
+    target.textContent = "这里会显示补货申请单创建后的摘要，以及 Step 3 下一步动作。";
     return;
   }
   const items = Array.isArray(result.items) ? result.items : [];
   const totalRequested = items.reduce((sum, row) => sum + Number(row.requested_qty || 0), 0);
   const normalized = normalizeTransferForOperationsSummary(result);
   const demandLines = Array.isArray(normalized.demand_lines) ? normalized.demand_lines : [];
+  const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(result));
+  const hasLooseShortage = Number(plan.summary?.looseQtyToPick || 0) > 0;
+  const nextActionLabel = hasLooseShortage ? "去 5.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";
+  const nextActionPanel = hasLooseShortage
+    ? getPanelKeyByTitle("warehouse", "5.1 补差打包工单")
+    : getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印");
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">门店调拨单 ${escapeHtml(result.transfer_no)} 已创建，仓库可以按这张单继续备货执行。</div>
+    <div class="alert-banner">Step 1 已创建补货申请单，下一步请按 Step 2 配货建议和 Step 3 动作继续执行。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(result.from_warehouse_code || "-")}</span></article>
+      <article class="store-metric"><strong>补货申请单号（内部调拨单号）</strong><span>${escapeHtml(result.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(getTransferOrderStatusLabel(result.status || normalized.lifecycle || ""))}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(result.to_store_code || "-")}</span></article>
+      <article class="store-metric"><strong>申请总件数</strong><span>${totalRequested} 件</span></article>
       <article class="store-metric"><strong>需求行</strong><span>${demandLines.length || items.length}</span></article>
-      <article class="store-metric"><strong>申请总件数</strong><span>${totalRequested}</span></article>
-      <article class="store-metric"><strong>涉及类目</strong><span>${demandLines.length || items.length}</span></article>
-      <article class="store-metric"><strong>履约状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
-      <article class="store-metric"><strong>store receipt status</strong><span>${escapeHtml(normalized.store_receipt_label || "-")}</span></article>
+      <article class="store-metric"><strong>散货缺口</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)} 件</span></article>
+      <article class="store-metric"><strong>建议补差包</strong><span>${escapeHtml(plan.summary?.plannedLooseBaleCount || 0)} 个</span></article>
+      <article class="store-metric"><strong>Step 3 下一步动作</strong><span>${escapeHtml(nextActionLabel)}</span></article>
     </div>
     ${
       demandLines.length
@@ -16350,7 +16360,7 @@ function renderTransferResultSummary(result) {
                   <article class="candidate-row transfer-draft-row">
                     <div>
                       <strong>${escapeHtml([row.category_main, row.category_sub].filter(Boolean).join(" / ") || "-")}</strong>
-                      <div class="subtle small">这张调拨草稿已经落成正式调拨单；仓库接下来按现成待送店包裹优先、散货补差随后 的规则执行。</div>
+                      <div class="subtle small">该需求已归属补货申请单 ${escapeHtml(result.transfer_no || "-")}，仓库会先核对现成 SDB 待送店包，再处理散货补差。</div>
                     </div>
                     <div class="candidate-side-actions">
                       <span class="store-flag">${escapeHtml(Number(row.requested_qty || 0))} 件</span>
@@ -16364,11 +16374,12 @@ function renderTransferResultSummary(result) {
         : ""
     }
     ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "下一步：去仓库执行台" },
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "后续：去履约追踪台看发运" },
+      { panelKey: nextActionPanel, label: nextActionLabel },
+      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "去 6 仓库执行单" },
     ])}
   `;
 }
+
 
 function renderTransferActionResultSummary(result) {
   const target = document.querySelector("#transferActionResultSummary");
@@ -26842,7 +26853,7 @@ async function submitLoosePackingTaskPlan(event) {
   const form = new FormData(event.currentTarget);
   const transferNo = String(form.get("transfer_no") || "").trim().toUpperCase();
   if (!transferNo) {
-    throw new Error("请先填写调拨单号。");
+    throw new Error("请先填写补货申请单号（来自 4.1）。");
   }
   const transfer = getTransferPreparationOrder(transferNo);
   if (!transfer?.transfer_no) {

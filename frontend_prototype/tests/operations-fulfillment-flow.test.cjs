@@ -723,14 +723,22 @@ test("warehouse nav exposes 门店补货 and operations nav drops the replenishm
 
 
 
-test("phase 1 copy clarifies SDB/LPK warehouse-only and delivery barcode guidance", () => {
-  assert.match(indexHtml, /LPK barcode 是仓库拣货工单码，不是门店收货码/);
-  assert.match(indexHtml, /SDB 和 LPK 不是门店可扫 barcode/);
-  assert.match(indexHtml, /该调拨单还未生成正式门店送货执行单 barcode/);
-  assert.match(appJs, /SDB 是仓库内部待送店包码，不是门店收货 barcode。门店收货需等待后续正式送货执行单 barcode。/);
+test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1", () => {
+  assert.match(indexHtml, /Step 1 创建补货申请/);
+  assert.match(indexHtml, /Step 2 系统配货建议/);
+  assert.match(indexHtml, /Step 3 下一步动作/);
+  assert.match(appJs, /补货申请单号（内部调拨单号）/);
+  assert.match(appJs, /const nextActionLabel = hasLooseShortage \? "去 5\.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";/);
 });
 
-test("phase 1 copy separates package count and piece count on 4.1", () => {
+test("phase 2A page 5.1 copy uses request number label and warehouse-only LPK guidance", () => {
+  assert.match(indexHtml, /补货申请单号（来自 4\.1）/);
+  assert.match(indexHtml, /例如 TO-20260428-001，可从 4\.1 补货申请单复制/);
+  assert.match(indexHtml, /本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货\/补差打包工单码，不是门店收货码。/);
+  assert.match(appJs, /该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。/);
+});
+
+test("phase 2A copy keeps package count and piece count separated on 4.1", () => {
   assert.match(appJs, /需求：\$\{row\.requestedQty \|\| 0\} 件/);
   assert.match(appJs, /现成待送店包：\$\{escapeHtml\(row\.selectedPreparedBales\.length \|\| 0\)\} 包 \/ 覆盖 \$\{escapeHtml\(row\.preparedQty \|\| 0\)\} 件/);
   assert.match(appJs, /散货补差：\$\{escapeHtml\(row\.looseQtyNeeded \|\| 0\)\} 件/);

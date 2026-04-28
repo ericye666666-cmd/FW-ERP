@@ -2634,10 +2634,9 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">手动配货需求</span>
-            <span class="store-flag">优先吃掉已打包待送店包裹</span>
-            <span class="store-flag">散货补差按 200 件封 bale</span>
-            <span class="store-flag">提交仓库执行</span>
+            <span class="store-flag">Step 1 创建补货申请</span>
+            <span class="store-flag">Step 2 系统配货建议</span>
+            <span class="store-flag">Step 3 下一步动作</span>
           </div>
           <div class="subtle small">手动补货需求只定义门店需要补什么，不直接扣库存、不手选成本层。系统会拆分成仓库动作：先用现成待送店包，不足再走散货补差。</div>
         </div>
@@ -2645,7 +2644,7 @@
           <article class="transfer-ops-card transfer-prep-form-card">
             <div class="transfer-workbench-head">
               <span class="eyebrow">Manual</span>
-              <h3>补货需求录入</h3>
+              <h3>Step 1 创建补货申请</h3>
               <p>手动录入目标门店、类目和数量；生成后进入仓库侧执行流程。门店收货 barcode 以后续正式送货执行单为准。</p>
             </div>
             <form id="transferForm" class="form-grid compact form-clean-placeholders">
@@ -2671,7 +2670,7 @@
                 </div>
                 <div id="transferItemsBuilder" class="line-builder-body"></div>
               </div>
-              <button type="submit">手动生成补货申请</button>
+              <button type="submit">生成补货申请单</button>
             </form>
           </article>
 
@@ -2690,7 +2689,7 @@
             <article class="transfer-ops-card transfer-prep-summary-card">
               <div class="transfer-workbench-head is-compact">
                 <span class="eyebrow">Plan</span>
-                <h3>系统配货建议</h3>
+                <h3>Step 2 系统配货建议</h3>
                 <p>系统优先使用现成待送店包，不足部分转为散货补差，并计算新打补差包与最终预计送店包。</p>
               </div>
               <div id="transferPreparationPlanSummary" class="candidate-summary empty-state">
@@ -2700,7 +2699,7 @@
           </div>
         </div>
         <div id="transferResultSummary" class="candidate-summary empty-state">
-          下一步动作：确认补货需求后进入 5.1 补差打包工单与 6 仓库执行单流程。SDB 是仓库内部待送店包码，不是门店收货 barcode。门店收货需等待后续正式送货执行单 barcode。
+          Step 3 下一步动作会在生成补货申请单后显示：有散货缺口去 5.1 生成补差工单；无散货缺口则直接去 6 仓库执行单继续。
         </div>
         <pre id="transferOutput" class="output hidden-output"></pre>
       </section>
@@ -2711,22 +2710,25 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">按调拨单生成</span>
+            <span class="store-flag">按补货申请单号生成</span>
             <span class="store-flag">散货补差</span>
             <span class="store-flag">封包上限可选</span>
             <span class="store-flag">完成后回 6 打印</span>
           </div>
-          <div class="subtle small">补差打包工单只处理现成待送店包不足的散货缺口。LPK barcode 是仓库拣货工单码，不是门店收货码。</div>
+          <div class="subtle small">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差打包工单码，不是门店收货码。</div>
         </div>
         <div class="transfer-prep-shell replenishment-workorder-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
             <div class="transfer-workbench-head">
               <span class="eyebrow">Step 3</span>
               <h3>补差拣货单生成器</h3>
-              <p>输入当前调拨单号，选择封包上限，系统只生成 1 张带 barcode 的补差拣货单。工人按这张单拣货，拣完直接贴到补差包上。</p>
+              <p>输入当前补货申请单号，选择封包上限，系统只在有散货缺口时生成 1 张带 barcode 的补差拣货单。工人按这张单拣货，拣完直接贴到补差包上。</p>
             </div>
             <form id="loosePackingTaskPlanForm" class="form-grid compact warehouse-prep-toolbar">
-              <input name="transfer_no" placeholder="调拨单号" />
+              <label class="field-control">
+                <span>补货申请单号（来自 4.1）</span>
+                <input name="transfer_no" placeholder="例如 TO-20260428-001，可从 4.1 补货申请单复制" />
+              </label>
               <label class="field-control">
                 <span>封包上限</span>
                 <select name="package_limit_qty">
@@ -2739,7 +2741,7 @@
             </form>
             <div id="loosePackingTaskPlanNotice" class="inline-notice-slot" aria-live="polite"></div>
             <div id="loosePackingTaskPlanSummary" class="candidate-summary empty-state">
-              先读取一张门店调拨单，再决定是否需要生成补差拣货单。
+              先读取一张补货申请单，再决定是否需要生成补差拣货单。
             </div>
           </article>
 
