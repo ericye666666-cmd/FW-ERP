@@ -185,6 +185,8 @@ from app.schemas.stores import (
 from app.schemas.suppliers import SupplierCreate, SupplierResponse
 from app.schemas.transfers import (
     DiscrepancyApprovalRequest,
+    PickingWaveCreate,
+    PickingWaveResponse,
     RecommendationTransferCreateRequest,
     StoreDeliveryExecutionOrderCreateRequest,
     StoreDeliveryExecutionOrderResponse,
@@ -3697,6 +3699,32 @@ def get_transfer_order(
 ) -> TransferOrderResponse:
     _require_current_user(authorization=authorization)
     return TransferOrderResponse(**state.get_transfer_order(transfer_no))
+
+
+@router.post("/picking-waves", response_model=PickingWaveResponse, tags=["transfers"])
+def create_picking_wave(
+    payload: PickingWaveCreate,
+    authorization: Optional[str] = Header(default=None),
+) -> PickingWaveResponse:
+    _require_current_user(authorization=authorization)
+    return PickingWaveResponse(**state.create_picking_wave(payload.model_dump()))
+
+
+@router.get("/picking-waves", response_model=list[PickingWaveResponse], tags=["transfers"])
+def list_picking_waves(
+    authorization: Optional[str] = Header(default=None),
+) -> list[PickingWaveResponse]:
+    _require_current_user(authorization=authorization)
+    return [PickingWaveResponse(**row) for row in state.list_picking_waves()]
+
+
+@router.get("/picking-waves/{wave_no}", response_model=PickingWaveResponse, tags=["transfers"])
+def get_picking_wave(
+    wave_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PickingWaveResponse:
+    _require_current_user(authorization=authorization)
+    return PickingWaveResponse(**state.get_picking_wave(wave_no))
 
 
 @router.get(

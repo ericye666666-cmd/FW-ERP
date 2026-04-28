@@ -2717,9 +2717,19 @@
           下一步：可【单独执行该申请】或【加入备货波次】；有缺口去 5.1 生成补差工单，无缺口直接去 6。
         </div>
         <div class="candidate-summary">
-          <strong>备货波次（MVP）</strong>
-          <div class="subtle small">波次日期 / 波次名称 / 可单选或多选补货申请 / 总门店数 / 总件数 / 总缺口。</div>
-          <div class="subtle small">当前为前端备货波次预览；正式波次保存将在 Phase B2 实现。</div>
+          <strong>备货波次 / Picking Wave</strong>
+          <div class="subtle small">备货波次是可选工具；补货申请也可以单独执行。</div>
+          <form id="pickingWaveForm" class="form-grid compact warehouse-prep-toolbar">
+            <input name="wave_name" type="text" placeholder="波次名称（如 WAVE-20260503-A）" />
+            <input name="warehouse_code" type="text" placeholder="仓库代码（WH1）" value="WH1" />
+            <input name="planned_picking_date" type="date" />
+            <input name="required_arrival_date" type="date" />
+            <select name="selected_replenishment_request_nos" multiple size="4"></select>
+            <input name="notes" type="text" placeholder="备注（可选）" />
+            <button type="submit">创建备货波次</button>
+          </form>
+          <div id="pickingWaveSummary" class="subtle small">当前版本先保存备货波次并汇总多张补货申请。实际 LPK / SDO 仍按单张补货申请执行；Phase B3 将接入波次执行。</div>
+          <div id="pickingWaveList" class="candidate-summary empty-state">暂无波次。</div>
         </div>
         <pre id="transferOutput" class="output hidden-output"></pre>
       </section>
