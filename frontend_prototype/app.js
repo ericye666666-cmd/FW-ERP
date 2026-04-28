@@ -16771,6 +16771,15 @@ function getWaveSummaryByNo(waveNo = "") {
   return waves.find((wave) => String(wave?.wave_no || "").trim().toUpperCase() === normalized) || null;
 }
 
+function getTransferRequestedQtyForDisplay(transfer = {}) {
+  const demandLines = Array.isArray(transfer.demand_lines) ? transfer.demand_lines : [];
+  if (demandLines.length) {
+    return demandLines.reduce((sum, row) => sum + Number(row?.requested_qty || 0), 0);
+  }
+  const items = Array.isArray(transfer.items) ? transfer.items : [];
+  return items.reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0);
+}
+
 
 function buildWaveRequestRows(wave = null) {
   if (!wave) return [];
@@ -16782,7 +16791,7 @@ function buildWaveRequestRows(wave = null) {
   return requestNos.map((requestNoRaw) => {
     const requestNo = String(requestNoRaw || "").trim().toUpperCase();
     const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === requestNo) || {};
-    const total = Number(transfer.requested_qty || (Array.isArray(transfer.items) ? transfer.items.reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0) : 0));
+    const total = Number(transfer.requested_qty || getTransferRequestedQtyForDisplay(transfer));
     const shortage = Number(buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer)).summary?.looseQtyToPick || 0);
     return { requestNo, transfer, total, shortage };
   }).filter((row) => row.requestNo);
