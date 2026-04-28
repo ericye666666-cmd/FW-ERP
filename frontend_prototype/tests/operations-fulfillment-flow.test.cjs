@@ -771,6 +771,46 @@ test("phase 2B page 6 state labels and gating copy are visible in workbench summ
   assert.doesNotMatch(indexHtml, /SDB\/LPK can be scanned by store/i);
 });
 
+test("phase 2C page 6.1 copy clarifies shipment batch scope and barcode boundary", () => {
+  assert.match(indexHtml, /6\.1 配送批次 \/ 门店收货跟踪/);
+  assert.match(indexHtml, /一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。/);
+  assert.match(indexHtml, /当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。/);
+  assert.match(indexHtml, /配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。/);
+  assert.match(indexHtml, /该配送批次下的正式门店收货 barcode 尚未生成；后续需由仓库送货执行单生成。/);
+  assert.doesNotMatch(indexHtml, /SDB can be scanned by store/i);
+  assert.doesNotMatch(indexHtml, /LPK can be scanned by store/i);
+});
+
+test("phase 2C page 6.1 shows required shipment-batch fields and statuses", () => {
+  assert.match(indexHtml, /配送批次号 \/ shipment_batch_no/);
+  assert.match(indexHtml, /司机 \/ driver/);
+  assert.match(indexHtml, /车辆 \/ vehicle/);
+  assert.match(indexHtml, /预计出发时间 \/ departure time/);
+  assert.match(indexHtml, /路线 \/ stops/);
+  assert.match(indexHtml, /关联仓库执行单 \/ linked execution orders/);
+  assert.match(indexHtml, /目标门店 \/ target stores/);
+  assert.match(indexHtml, /每个门店收货状态 \/ per-store receiving status/);
+  assert.match(appJs, /return "待发车";/);
+  assert.match(appJs, /return "运输中";/);
+  assert.match(appJs, /return "部分门店已收货";/);
+  assert.match(appJs, /return "全部收货完成";/);
+  assert.match(appJs, /return "异常 \/ 退回";/);
+});
+
+test("phase 2C page 6.1 summary cards and per-store grouping copy are present", () => {
+  assert.match(appJs, /<strong>配送批次数量<\/strong>/);
+  assert.match(appJs, /<strong>待发车批次<\/strong>/);
+  assert.match(appJs, /<strong>运输中批次<\/strong>/);
+  assert.match(appJs, /<strong>已完成批次<\/strong>/);
+  assert.match(appJs, /<strong>涉及门店数<\/strong>/);
+  assert.match(appJs, /<strong>总包数<\/strong>/);
+  assert.match(appJs, /<strong>待收货包数<\/strong>/);
+  assert.match(appJs, /<strong>异常数<\/strong>/);
+  assert.match(appJs, /<strong>配送批次：\$\{escapeHtml\(group\.shipmentBatchNo \|\| "-"\)\}<\/strong>/);
+  assert.match(appJs, /<strong>门店站点：\$\{escapeHtml\(String\(row\.to_store_code \|\| "-"\)\.toUpperCase\(\) \|\| "-"\)\}<\/strong>/);
+  assert.match(appJs, /当前还没有多个仓库执行单可加入同一配送批次。Phase 2C 先建立配送批次视图；正式多单绑定将在后续执行单模型完善后接入。/);
+});
+
 
 test("warehouse access profiles keep 门店补货 visible for admin and warehouse manager roles", () => {
   assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "general"\]/);

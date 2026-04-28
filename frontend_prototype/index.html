@@ -2115,14 +2115,29 @@
             <span class="store-flag">shipment session</span>
             <span class="store-flag">差异留痕</span>
           </div>
-          <div class="subtle small">这里跟踪司机、车辆、配送批次和门店收货状态。正式门店收货 barcode 应来自仓库送货执行单。</div>
+          <div class="subtle small">一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。</div>
+          <div class="subtle small">配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。</div>
+          <div class="subtle small">该配送批次下的正式门店收货 barcode 尚未生成；后续需由仓库送货执行单生成。</div>
+          <div class="subtle small">当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。</div>
+        </div>
+        <div class="candidate-summary">
+          <div class="subtle small">配送批次号 / shipment_batch_no</div>
+          <div class="subtle small">司机 / driver</div>
+          <div class="subtle small">车辆 / vehicle</div>
+          <div class="subtle small">预计出发时间 / departure time</div>
+          <div class="subtle small">路线 / stops</div>
+          <div class="subtle small">关联仓库执行单 / linked execution orders</div>
+          <div class="subtle small">目标门店 / target stores</div>
+          <div class="subtle small">每个门店收货状态 / per-store receiving status</div>
         </div>
         <form id="transferShipForm" class="form-grid compact">
-          <input name="transfer_no" placeholder="调拨单号，例如 TO-..." />
+          <input name="transfer_no" placeholder="补货申请单号（临时），例如 TO-..." />
           <div id="transferShipTargetHint" class="flow-summary-note">输入调拨单号后，这里会显示目标门店，发运前先核对。</div>
           <input name="driver_name" placeholder="司机，例如 Driver A" value="Driver A" />
           <input name="vehicle_no" placeholder="车辆，例如 KDM-001A" value="KDM-001A" />
-          <textarea name="note" rows="3" placeholder="发运备注，例如 10:30 离仓，先送 Utawala。"></textarea>
+          <input name="departure_time" placeholder="预计出发时间，例如 2026-04-28 10:30" />
+          <input name="route_stops" placeholder="路线 / stops，例如 WH1 → Utawala → Kawangware" />
+          <textarea name="note" rows="3" placeholder="发运备注，例如 本批次包含多个仓库执行单。"></textarea>
           <button type="submit">确认发运 / 建 shipment session</button>
         </form>
         <div id="transferTrackingResultSummary" class="candidate-summary empty-state">

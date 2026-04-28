@@ -16602,6 +16602,24 @@ function getOperationsStoreReceiptStatusLabel(status = "") {
   return String(status || "-").trim() || "-";
 }
 
+function getShipmentBatchProgressLabel(row = {}) {
+  const lifecycle = String(row.lifecycle_status || row.status || "").trim().toLowerCase();
+  const receipt = String(row.store_receipt_status || "").trim().toLowerCase();
+  if (lifecycle.includes("return") || lifecycle.includes("exception") || lifecycle.includes("reject")) {
+    return "异常 / 退回";
+  }
+  if (receipt === "received" || lifecycle === "received" || lifecycle === "closed") {
+    return "全部收货完成";
+  }
+  if (receipt === "partial" || lifecycle === "partially_received") {
+    return "部分门店已收货";
+  }
+  if (lifecycle === "shipped" || lifecycle === "in_transit") {
+    return "运输中";
+  }
+  return "待发车";
+}
+
 function renderTransferTrackingResultSummary(result) {
   const target = document.querySelector("#transferTrackingResultSummary");
   if (!(target instanceof HTMLElement)) {
@@ -16609,22 +16627,29 @@ function renderTransferTrackingResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示发运和 shipment session。";
+    target.textContent = "这里会显示配送批次和门店站点收货状态。";
     return;
   }
   const normalized = normalizeTransferForOperationsSummary(result);
   const deliveryBatch = normalized.delivery_batch || {};
+  const batchLabel = getShipmentBatchProgressLabel(normalized);
+  const storeLabel = String(normalized.to_store_code || normalized.to_store_name || "-").trim() || "-";
+  const linkedExecutionOrder = normalized.transfer_no || "-";
+  const routeLabel = String(result.route_stops || "").trim() || "WH1 → 待补充站点";
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">调拨单 ${escapeHtml(normalized.transfer_no || "-")} 已更新到 ${escapeHtml(normalized.lifecycle_label || "-")}。</div>
+    <div class="alert-banner">配送批次 ${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")} 已更新：${escapeHtml(batchLabel)}。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
-      <article class="store-metric"><strong>store receipt status</strong><span>${escapeHtml(normalized.store_receipt_label || "-")}</span></article>
-      <article class="store-metric"><strong>delivery batch</strong><span>${escapeHtml(deliveryBatch.delivery_batch_no || "待生成")}</span></article>
-      <article class="store-metric"><strong>shipment session</strong><span>${escapeHtml(deliveryBatch.shipment_session_no || "待发运")}</span></article>
-      <article class="store-metric"><strong>warehouseout dispatch bale</strong><span>${escapeHtml(deliveryBatch.bale_count || 0)}</span></article>
-      <article class="store-metric"><strong>门店已签收 bale</strong><span>${escapeHtml(normalized.accepted_dispatch_bale_count || 0)}</span></article>
+      <article class="store-metric"><strong>配送批次号 / shipment_batch_no</strong><span>${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")}</span></article>
+      <article class="store-metric"><strong>司机 / driver</strong><span>${escapeHtml(result.driver_name || "待填写")}</span></article>
+      <article class="store-metric"><strong>车辆 / vehicle</strong><span>${escapeHtml(result.vehicle_no || "待填写")}</span></article>
+      <article class="store-metric"><strong>预计出发时间 / departure time</strong><span>${escapeHtml(result.departure_time || "待填写")}</span></article>
+      <article class="store-metric"><strong>路线 / stops</strong><span>${escapeHtml(routeLabel)}</span></article>
+      <article class="store-metric"><strong>关联仓库执行单 / linked execution orders</strong><span>${escapeHtml(linkedExecutionOrder)}</span></article>
+      <article class="store-metric"><strong>目标门店 / target stores</strong><span>${escapeHtml(storeLabel)}</span></article>
+      <article class="store-metric"><strong>每个门店收货状态 / per-store receiving status</strong><span>${escapeHtml(batchLabel)}</span></article>
     </div>
+    <div class="subtle small">当前还没有多个仓库执行单可加入同一配送批次。Phase 2C 先建立配送批次视图；正式多单绑定将在后续执行单模型完善后接入。</div>
   `;
 }
 
@@ -16638,7 +16663,7 @@ function renderTransferShipTargetHint(transferNo = "") {
   ).trim().toUpperCase();
   if (!normalizedTransferNo) {
     target.className = "flow-summary-note";
-    target.textContent = "输入调拨单号后，这里会显示目标门店，发运前先核对。";
+    target.textContent = "当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。";
     return;
   }
   const transfer = findTransferOrderStateRow(normalizedTransferNo);
@@ -16652,7 +16677,7 @@ function renderTransferShipTargetHint(transferNo = "") {
   const deliveryBatch = String(transfer.delivery_batch_no || "").trim().toUpperCase();
   const baleCount = Number(transfer.dispatch_bale_count || transfer.delivery_batch?.bale_count || 0);
   target.className = "flow-summary-note success";
-  target.textContent = `目标门店：${storeCode || "-"}${storeName && storeName !== storeCode ? ` / ${storeName}` : ""}；当前状态：${getTransferOrderStatusLabel(transfer.status)}；dispatch bale：${baleCount} 个${deliveryBatch ? `；delivery batch：${deliveryBatch}` : ""}。`;
+  target.textContent = `目标门店：${storeCode || "-"}${storeName && storeName !== storeCode ? ` / ${storeName}` : ""}；关联仓库执行单（临时）：${normalizedTransferNo}；当前状态：${getShipmentBatchProgressLabel(transfer)}；总包数：${baleCount}${deliveryBatch ? `；配送批次：${deliveryBatch}` : ""}。`;
 }
 
 function findTransferOrderStateRow(transferNo = "") {
@@ -16729,19 +16754,76 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
     return;
   }
   const summary = summarizeOperationsTransferRows(baseList);
+  const uniqueStores = new Set(list.map((row) => String(row.to_store_code || "").trim().toUpperCase()).filter(Boolean));
+  const pendingBales = list.reduce(
+    (sum, row) => sum + Math.max(Number(row.delivery_batch?.bale_count || 0) - Number(row.accepted_dispatch_bale_count || 0), 0),
+    0,
+  );
+  const exceptionCount = list.filter((row) => getShipmentBatchProgressLabel(row) === "异常 / 退回").length;
+  const batchRowsByNo = list.reduce((acc, row) => {
+    const batchNo = String(row.delivery_batch?.delivery_batch_no || row.delivery_batch?.shipment_session_no || "").trim().toUpperCase();
+    const key = batchNo || `TEMP-${String(row.transfer_no || "").trim().toUpperCase()}`;
+    if (!acc[key]) {
+      acc[key] = {
+        shipmentBatchNo: batchNo || "待生成（临时）",
+        driver: String(row.driver_name || "").trim() || "Driver A",
+        vehicle: String(row.vehicle_no || "").trim() || "KDM-001A",
+        route: String(row.route_stops || "").trim() || "WH1 → 待补充站点",
+        rows: [],
+      };
+    }
+    acc[key].rows.push(row);
+    return acc;
+  }, {});
+  const batchGroups = Object.values(batchRowsByNo);
+  const waitingCount = batchGroups.filter((group) => group.rows.some((row) => getShipmentBatchProgressLabel(row) === "待发车")).length;
+  const inTransitCount = batchGroups.filter((group) => group.rows.some((row) => getShipmentBatchProgressLabel(row) === "运输中")).length;
+  const completedCount = batchGroups.filter(
+    (group) => group.rows.length && group.rows.every((row) => getShipmentBatchProgressLabel(row) === "全部收货完成"),
+  ).length;
   target.className = "report-summary";
   target.innerHTML = `
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>调拨单数量</strong><span>${summary.transfer_count || 0}</span></article>
-      <article class="store-metric"><strong>已提交待审核</strong><span>${summary.submitted_count || 0}</span></article>
-      <article class="store-metric"><strong>已打包待发运</strong><span>${summary.packed_count || 0}</span></article>
-      <article class="store-metric"><strong>已发运待签收</strong><span>${summary.shipped_count || 0}</span></article>
-      <article class="store-metric"><strong>门店部分签收</strong><span>${summary.partially_received_count || 0}</span></article>
-      <article class="store-metric"><strong>门店已签收</strong><span>${summary.received_count || 0}</span></article>
-      <article class="store-metric"><strong>待门店签收</strong><span>${summary.pending_receipt_count || 0}</span></article>
-      <article class="store-metric"><strong>warehouseout dispatch bale</strong><span>${summary.total_dispatch_bales || 0}</span></article>
+      <article class="store-metric"><strong>配送批次数量</strong><span>${batchGroups.length || 0}</span></article>
+      <article class="store-metric"><strong>待发车批次</strong><span>${waitingCount || 0}</span></article>
+      <article class="store-metric"><strong>运输中批次</strong><span>${inTransitCount || 0}</span></article>
+      <article class="store-metric"><strong>已完成批次</strong><span>${completedCount || 0}</span></article>
+      <article class="store-metric"><strong>涉及门店数</strong><span>${uniqueStores.size || 0}</span></article>
+      <article class="store-metric"><strong>总包数</strong><span>${summary.total_dispatch_bales || 0}</span></article>
+      <article class="store-metric"><strong>待收货包数</strong><span>${pendingBales || 0}</span></article>
+      <article class="store-metric"><strong>异常数</strong><span>${exceptionCount || 0}</span></article>
     </div>
+    <div class="subtle small">配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。</div>
+    <div class="subtle small">该配送批次下的正式门店收货 barcode 尚未生成；后续需由仓库送货执行单生成。</div>
     <div class="candidate-list transfer-draft-list">
+      ${
+        batchGroups.length
+          ? batchGroups
+              .map((group) => `
+                <article class="candidate-row transfer-draft-row">
+                  <div>
+                    <strong>配送批次：${escapeHtml(group.shipmentBatchNo || "-")}</strong>
+                    <div class="subtle small">司机：${escapeHtml(group.driver || "-")}</div>
+                    <div class="subtle small">车辆：${escapeHtml(group.vehicle || "-")}</div>
+                    <div class="subtle small">路线：${escapeHtml(group.route || "-")}</div>
+                    <div class="candidate-list transfer-draft-list">
+                      ${group.rows.map((row) => `
+                        <article class="candidate-row transfer-draft-row">
+                          <div>
+                            <strong>门店站点：${escapeHtml(String(row.to_store_code || "-").toUpperCase() || "-")}</strong>
+                            <div class="subtle small">- 执行单：${escapeHtml(row.transfer_no || "-")}</div>
+                            <div class="subtle small">- 包数：${escapeHtml(row.delivery_batch?.bale_count || 0)}</div>
+                            <div class="subtle small">- 状态：${escapeHtml(getShipmentBatchProgressLabel(row))}</div>
+                          </div>
+                        </article>
+                      `).join("")}
+                    </div>
+                  </div>
+                </article>
+              `)
+              .join("")
+          : '<div class="empty-state">当前还没有多个仓库执行单可加入同一配送批次。Phase 2C 先建立配送批次视图；正式多单绑定将在后续执行单模型完善后接入。</div>'
+      }
       ${list
         .map((row) => {
           const items = Array.isArray(row.items) ? row.items : [];
@@ -27165,6 +27247,16 @@ async function submitTransferShipment(event) {
   if (!transferNo) {
     throw new Error("请先填写调拨单号。");
   }
+  const departureTime = String(payload.departure_time || "").trim();
+  const routeStops = String(payload.route_stops || "").trim();
+  const existingNote = String(payload.note || "").trim();
+  if (departureTime || routeStops) {
+    payload.note = [existingNote, departureTime ? `预计出发：${departureTime}` : "", routeStops ? `路线：${routeStops}` : ""]
+      .filter(Boolean)
+      .join("；");
+  }
+  delete payload.departure_time;
+  delete payload.route_stops;
   delete payload.transfer_no;
   const result = await request(`/transfers/${transferNo}/ship`, {
     method: "POST",
