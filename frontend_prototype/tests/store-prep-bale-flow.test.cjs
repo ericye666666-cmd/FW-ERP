@@ -124,7 +124,7 @@ test("store prep bale workbench is a dedicated warehouse panel", () => {
     path.join(__dirname, "../app.js"),
     "utf8",
   );
-  assert.match(html, /<h2>0\.1\.2 压缩工单管理<\/h2>/);
+  assert.match(html, /<h2>0\.1\.2 压缩工单管理 \/ Bale compression work orders<\/h2>/);
   assert.doesNotMatch(html, /id="compressionTaskAcceptanceWindow"/);
   assert.match(html, /id="compressionTaskAcceptanceModal"/);
   assert.match(html, /name="actual_qty"/);

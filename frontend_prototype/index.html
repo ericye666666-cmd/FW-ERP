@@ -577,10 +577,10 @@
           </div>
         </div>
         <div id="warehouseSortedInventorySummary" class="candidate-summary empty-state">
-          这里同步显示仓库已分拣服装，并和 0.3 分拣库存页面保持一致。
+          这里同步显示仓库已分拣服装，并和 0.3 分拣库存 / 中转区库存页面保持一致。
         </div>
         <div id="warehouseSortedInventoryList" class="sorting-stock-list">
-          <div class="empty-state">这里会同步显示已分拣服装库存；顶部入口也可以直接跳到 0.3 分拣库存页面。</div>
+          <div class="empty-state">这里会同步显示已分拣服装库存；顶部入口也可以直接跳到 0.3 分拣库存 / 中转区库存页面。</div>
         </div>
         <pre id="rawBaleStockOutput" class="output hidden-output"></pre>
       </section>
@@ -678,14 +678,14 @@
 
       <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>0.1.2 压缩工单管理</h2>
+          <h2>0.1.2 压缩工单管理 / Bale compression work orders</h2>
           <button data-action="load-compression-task-manager" type="button">读取压缩工单</button>
         </div>
         <div class="sorting-task-manager-toolbar">
           <input id="compressionTaskManagerDateFilter" type="date" />
         </div>
         <div id="compressionTaskManagerSummary" class="candidate-summary">
-          这里统一查看压缩 bale 任务。任务从 0.3 仓库已分拣服装里直接发起，这一页统一管理待送店 bale 和待售卖 bale；验收和打印 barcode 改成按钮弹窗处理。
+          这里管理仓库内部压缩工单。验收后生成仓库待送店包或待售包 barcode；仓库待送店包不是门店收货码。
         </div>
         <div id="compressionTaskManagerList" class="sorting-stock-list">
           <div class="empty-state">读取后，这里会显示待验收和已完成的压缩 bale 工单。</div>
@@ -751,9 +751,10 @@
 
       <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>0.3 分拣库存</h2>
+          <h2>0.3 分拣库存 / 中转区库存</h2>
           <button data-action="load-sorting-stock" type="button">读取已分拣服装</button>
         </div>
+        <div class="subtle small">分拣完成后的散件先进入中转区库存池。这里按大类/小类/等级汇总，可根据经营需求压成仓库待送店包或待售包。</div>
         <div data-warehouse-hub-nav-slot class="candidate-summary empty-state">
           这里会显示仓库总控页的 4 个页面跳转。
         </div>
@@ -787,7 +788,7 @@
 
       <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>门店送货历史记录</h2>
+          <h2>门店送货执行单</h2>
           <button data-action="load-warehouse-dispatch-history" type="button">读取门店送货历史</button>
         </div>
         <div data-warehouse-hub-nav-slot class="candidate-summary empty-state">
@@ -804,8 +805,8 @@
 
       <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>已售历史包裹</h2>
-          <button data-action="load-warehouse-sold-packages" type="button">读取已售历史包裹</button>
+          <h2>B2B 已售包裹</h2>
+          <button data-action="load-warehouse-sold-packages" type="button">读取B2B 已售包裹</button>
         </div>
         <div data-warehouse-hub-nav-slot class="candidate-summary empty-state">
           这里会显示仓库总控页的 4 个页面跳转。
@@ -814,14 +815,14 @@
           这里按整包销售池已出库 / 已结算的 bale 看历史，不展示结算细节。
         </div>
         <div id="warehouseSoldPackagesList" class="sorting-stock-list">
-          <div class="empty-state">先读取已售历史包裹。这里会区分原始 bale 直售和分拣后再打 bale 销售。</div>
+          <div class="empty-state">先读取B2B 已售包裹。这里会区分原始 bale 直售和分拣后再打 bale 销售。</div>
         </div>
         <pre id="warehouseSoldPackagesOutput" class="output hidden-output"></pre>
       </section>
 
       <section class="panel warehouse-workbench-panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>0.4 代售包裹工单</h2>
+          <h2>0.4 待售包裹工单</h2>
           <div class="button-row">
             <button data-action="load-bale-sales-workbench" type="button">读取销售池 bale</button>
             <button id="openSelectedBaleSalesPoolButton" type="button" class="ghost-button">把所选 bale 带入 0.4 工单</button>
