@@ -26,9 +26,9 @@ test("warehouse stock hub exposes four jump targets with a dedicated sorted inve
     })),
     [
       { key: "current_bales", panelTitle: "0.1 原始 Bale 总库存", loadAction: "load-raw-bales" },
-      { key: "sorted_inventory", panelTitle: "0.3 分拣库存", loadAction: "load-sorting-stock" },
-      { key: "dispatch_history", panelTitle: "门店送货历史记录", loadAction: "load-warehouse-dispatch-history" },
-      { key: "sold_history", panelTitle: "已售历史包裹", loadAction: "load-warehouse-sold-packages" },
+      { key: "sorted_inventory", panelTitle: "0.3 分拣库存 / 中转区库存", loadAction: "load-sorting-stock" },
+      { key: "dispatch_history", panelTitle: "门店送货执行单", loadAction: "load-warehouse-dispatch-history" },
+      { key: "sold_history", panelTitle: "B2B 已售包裹", loadAction: "load-warehouse-sold-packages" },
     ],
   );
 });
@@ -59,6 +59,19 @@ test("warehouse stock hub nav slot exists at the top of all four warehouse hub p
   );
   const slotCount = (html.match(/data-warehouse-hub-nav-slot/g) || []).length;
   assert.equal(slotCount, 4);
+});
+
+test("warehouse wording uses transit inventory and avoids old transtoshop copy in visible HTML", () => {
+  const html = fs.readFileSync(
+    path.join(__dirname, "../index.html"),
+    "utf8",
+  );
+  assert.match(html, /0\.3 分拣库存 \/ 中转区库存/);
+  assert.match(html, /压成仓库待送店包/);
+  assert.match(html, /压成待售包/);
+  assert.match(html, /门店送货执行单/);
+  assert.match(html, /B2B 已售包裹/);
+  assert.doesNotMatch(html, /wait for transtoshop/i);
 });
 
 test("summarizeWarehouseDispatchHistory counts dispatch history by status and store", () => {

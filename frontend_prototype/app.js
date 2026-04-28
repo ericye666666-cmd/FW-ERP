@@ -1083,33 +1083,33 @@ const WAREHOUSE_PANEL_NAV_META = [
     navTitle: "0.2 分拣确认入库",
   },
   {
-    match: "0.3 分拣库存",
+    match: "0.3 分拣库存 / 中转区库存",
     section: "workorder",
     order: 120,
     icon: "位",
-    navTitle: "0.3 分拣库存",
+    navTitle: "0.3 分拣库存 / 中转区库存",
     hiddenInNav: true,
   },
   {
-    match: "门店送货历史记录",
+    match: "门店送货执行单",
     section: "workorder",
     order: 121,
     icon: "送",
-    navTitle: "门店送货历史记录",
+    navTitle: "门店送货执行单",
   },
   {
-    match: "已售历史包裹",
+    match: "B2B 已售包裹",
     section: "workorder",
     order: 122,
     icon: "售",
-    navTitle: "已售历史包裹",
+    navTitle: "B2B 已售包裹",
   },
   {
-    match: "0.4 代售包裹工单",
+    match: "0.4 待售包裹工单",
     section: "workorder",
     order: 125,
     icon: "售",
-    navTitle: "0.4 代售包裹工单",
+    navTitle: "0.4 待售包裹工单",
   },
   {
     match: "门店补货流程页",
@@ -3489,7 +3489,7 @@ function renderWarehouseBaleHubNav() {
   const markup = `
     <div class="warehouse-hub-nav-head">
       <strong>仓库总控页</strong>
-      <span class="subtle small">上方 4 个入口分别对应当前 bale 总库存、已分拣服装、门店送货历史和已售历史包裹。</span>
+      <span class="subtle small">上方 4 个入口分别对应当前 bale 总库存、已分拣服装、门店送货历史和B2B 已售包裹。</span>
     </div>
     <div class="warehouse-hub-jump-grid">
       ${cards.map((action) => `
@@ -12323,9 +12323,9 @@ function buildCompressionTargetOptions(maxQty = 0) {
 function getCompressionTaskTypeLabel(taskType = "") {
   const normalized = String(taskType || "").trim().toLowerCase();
   if (normalized === "sale") {
-    return "待售卖 bale";
+    return "待售包";
   }
-  return "待送店 bale";
+  return "仓库待送店包";
 }
 
 function getCompressionBaleStatusLabel(status = "") {
@@ -12670,7 +12670,7 @@ function renderStorePrepBaleTaskSummary(message = "") {
   const visibleRows = [...openRows, ...completedRows];
   if (!rows.length) {
     summaryTarget.className = "candidate-summary empty-state";
-    summaryTarget.textContent = message || "当前还没有压缩工单。先去 0.3 仓库已分拣服装里点“压缩待送店 bale / 压缩待售卖 bale”创建。";
+    summaryTarget.textContent = message || "当前还没有压缩工单。先去 0.3 仓库已分拣服装里点“压成仓库待送店包 / 压成待售包”创建。";
     listTarget.innerHTML = '<div class="empty-state">创建后，这里会显示待验收和已完成的压缩工单。</div>';
     return;
   }
@@ -12682,7 +12682,7 @@ function renderStorePrepBaleTaskSummary(message = "") {
       <article class="store-metric"><strong>待验收</strong><span>${openRows.length}</span></article>
       <article class="store-metric"><strong>已完成（当日）</strong><span>${completedRows.length}</span></article>
       <article class="store-metric"><strong>已生成 bale</strong><span>${baleSummary.baleCount}</span></article>
-      <article class="store-metric"><strong>待送店 bale</strong><span>${baleSummary.dispatchBaleCount || 0}</span></article>
+      <article class="store-metric"><strong>仓库待送店包</strong><span>${baleSummary.dispatchBaleCount || 0}</span></article>
       <article class="store-metric"><strong>待售卖 bale</strong><span>${baleSummary.saleBaleCount || 0}</span></article>
       <article class="store-metric"><strong>压缩件数</strong><span>${baleSummary.totalQty}</span></article>
       <article class="store-metric"><strong>压缩总成本</strong><span>${escapeHtml(formatKesAmount(baleSummary.totalCostKes || 0, "KES 0.00"))}</span></article>
@@ -13157,19 +13157,19 @@ function renderWarehouseSortedInventorySection(message = "") {
   if (!rows.length && !prepRows.length) {
     summaryTarget.className = "candidate-summary empty-state";
     summaryTarget.textContent = message || "当前还没有已分拣服装库存。先完成 0.2 分拣确认入库。";
-    listTarget.innerHTML = '<div class="empty-state">分拣确认入库后，这里会同步显示已分拣服装库存；顶部入口也可以直接跳到 0.3 分拣库存页面。</div>';
+    listTarget.innerHTML = '<div class="empty-state">分拣确认入库后，这里会同步显示已分拣服装库存；顶部入口也可以直接跳到 0.3 分拣库存 / 中转区库存页面。</div>';
     return;
   }
   const summary = summarizeWarehouseSortedInventoryRows(rows);
   const prepSummary = summarizeStorePrepBales(prepRows);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(message || "这里同步显示仓库已分拣服装，和 0.3 分拣库存页面保持一致。待送店 / 待售卖 bale 都仍算仓库已分拣服装库存，只是列示形态改成包裹。")}</div>
+    <div class="alert-banner">${escapeHtml(message || "这里同步显示仓库已分拣服装，和 0.3 分拣库存 / 中转区库存页面保持一致。待送店 / 待售卖 bale 都仍算仓库已分拣服装库存，只是列示形态改成包裹。")}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>库存行数</strong><span>${summary.totalRowCount}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${summary.totalQty + prepSummary.totalQty}</span></article>
       <article class="store-metric"><strong>货架位数</strong><span>${summary.rackCount}</span></article>
-      <article class="store-metric"><strong>待送店 bale</strong><span>${prepSummary.dispatchBaleCount || 0}</span></article>
+      <article class="store-metric"><strong>仓库待送店包</strong><span>${prepSummary.dispatchBaleCount || 0}</span></article>
       <article class="store-metric"><strong>待售卖 bale</strong><span>${prepSummary.saleBaleCount || 0}</span></article>
       <article class="store-metric"><strong>最近更新时间</strong><span>${escapeHtml(formatLocalDateTime(summary.latestUpdatedAt) || "-")}</span></article>
     </div>
@@ -13240,7 +13240,7 @@ function renderWarehouseDispatchHistorySummary(message = "") {
   const summary = summarizeWarehouseDispatchRows(warehouseDispatchHistoryState);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(message || "这里只看门店送货历史记录，不回头管理当前总库存。")}</div>
+    <div class="alert-banner">${escapeHtml(message || "这里只看门店送货执行单，不回头管理当前总库存。")}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>送货 bale 数</strong><span>${summary.totalCount}</span></article>
       <article class="store-metric"><strong>涉及门店</strong><span>${summary.storeCount}</span></article>
@@ -13284,7 +13284,7 @@ function renderWarehouseSoldPackagesSummary(message = "") {
   const rows = buildWarehouseSoldPackageRows(warehouseSoldPackageHistoryState);
   if (!rows.length) {
     summaryTarget.className = "candidate-summary empty-state";
-    summaryTarget.textContent = message || "当前还没有已售历史包裹。等销售池 bale 出库或结算后，这里会显示历史。";
+    summaryTarget.textContent = message || "当前还没有B2B 已售包裹。等销售池 bale 出库或结算后，这里会显示历史。";
     listTarget.innerHTML = '<div class="empty-state">读取后，这里会区分原始 bale 直售和分拣后再打 bale 销售。</div>';
     return;
   }
@@ -13457,7 +13457,7 @@ function renderSortingStockSummary(data) {
                 data-sorting-compress-task-type="store_dispatch"
                 ${(Number(group.availableLooseQty || 0) <= 0) ? "disabled" : ""}
               >
-                压缩待送店 bale
+                压成仓库待送店包
               </button>
               <button
                 type="button"
@@ -13469,7 +13469,7 @@ function renderSortingStockSummary(data) {
                 data-sorting-compress-task-type="sale"
                 ${(Number(group.availableLooseQty || 0) <= 0) ? "disabled" : ""}
               >
-                压缩待售卖 bale
+                压成待售包
               </button>
             </div>
           </div>
@@ -13514,7 +13514,7 @@ function renderSortingStockSummary(data) {
                   <section class="sorting-stock-inline-creator">
                     <div class="sorting-stock-row-head">
                       <div>
-                        <strong>${escapeHtml(creatorTaskType === "sale" ? "创建待售卖 bale 压缩任务" : "创建待送店 bale 压缩任务")}</strong>
+                        <strong>${escapeHtml(creatorTaskType === "sale" ? "创建待售包任务" : "创建仓库待送店包任务")}</strong>
                         <div class="subtle small">创建任务后系统会立刻悬挂这批件数；只有验收完成时才扣减库存。其他操作人如果已有未完成任务，会显示所在状态并不可选。</div>
                       </div>
                       <button id="sortingCompressionCreatorClose" type="button" class="ghost-button mini-button">取消</button>
@@ -13547,7 +13547,7 @@ function renderSortingStockSummary(data) {
                             <select name="assigned_employee">
                               ${employeeOptions}
                             </select>
-                            <button type="submit"${standardPieceWeightKg > 0 ? "" : " disabled"}>创建压缩待售卖 bale 任务</button>
+                            <button type="submit"${standardPieceWeightKg > 0 ? "" : " disabled"}>创建待售包任务</button>
                             <div class="subtle small" data-sale-bale-estimate-summary="true">${escapeHtml(saleEstimateLabel)}</div>
                           </form>
                         `
@@ -13562,14 +13562,14 @@ function renderSortingStockSummary(data) {
                           >
                             <input type="hidden" name="task_type" value="store_dispatch" />
                             <input type="hidden" name="category_sub" value="${escapeHtml(group.categorySub || "")}" />
-                            <input type="hidden" name="note" value="货架挂不下，先压成待送店 bale 堆放一旁" />
+                            <input type="hidden" name="note" value="货架挂不下，先压成仓库待送店包堆放一旁" />
                             <label class="field-with-hint">
                               <span>每包件数</span>
                               <select name="pieces_per_bale">
                                 <option value="100" selected>100 件 / 包</option>
                                 <option value="200">200 件 / 包</option>
                               </select>
-                              <small>只能选择 100 或 200 件，用来决定每个待送店 bale 的装包数量。</small>
+                              <small>只能选择 100 或 200 件，用来决定每个仓库待送店包的装包数量。</small>
                             </label>
                             <label class="field-with-hint">
                               <span>本次压缩包数</span>
@@ -13600,7 +13600,7 @@ function renderSortingStockSummary(data) {
                             <select name="assigned_employee">
                               ${employeeOptions}
                             </select>
-                            <button type="submit"${(gradeAvailability.P || 0) + (gradeAvailability.S || 0) > 0 ? "" : " disabled"}>创建压缩待送店 bale 任务</button>
+                            <button type="submit"${(gradeAvailability.P || 0) + (gradeAvailability.S || 0) > 0 ? "" : " disabled"}>创建仓库待送店包任务</button>
                           </form>
                         `
                     }
@@ -13689,7 +13689,7 @@ function renderSortingStockSummary(data) {
                       <div class="sorting-stock-row-head">
                         <div>
                           <strong>${escapeHtml(taskCard.taskType === "sale" ? "待售卖成品包" : "待送店成品包")}</strong>
-                          <div class="subtle small">${escapeHtml(taskCard.taskType === "sale" ? "货架挂不下先压成售卖 bale" : "为门店补货压成待送店 bale")}</div>
+                          <div class="subtle small">${escapeHtml(taskCard.taskType === "sale" ? "货架挂不下先压成待售包" : "任务类型：仓库待送店包；门店可扫：否，需后续生成 SDO 正式送货执行码")}</div>
                         </div>
                         <span class="meta-pill">${escapeHtml(taskCard.baleCount || 0)} 包</span>
                       </div>
@@ -23826,7 +23826,7 @@ async function loadWarehouseSoldPackages(notice = "") {
   warehouseSoldPackageHistoryState = getBaleSalesPoolRows();
   writeOutput(
     "#warehouseSoldPackagesOutput",
-    warehouseSoldPackageHistoryState.length ? warehouseSoldPackageHistoryState : "当前还没有已售历史包裹。",
+    warehouseSoldPackageHistoryState.length ? warehouseSoldPackageHistoryState : "当前还没有B2B 已售包裹。",
   );
   renderWarehouseSoldPackagesSummary(notice);
   return warehouseSoldPackageHistoryState;
