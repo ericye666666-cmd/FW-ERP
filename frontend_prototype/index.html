@@ -26,7 +26,7 @@
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="4.2 中方来源 Bale 录入">2. China source / inbound</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1 创建分拣任务">3. Sorting tasks</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1.2 压缩工单管理">4. Sorted stock / compression</button>
-          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="6.1 门店配货 / 配送跟踪">5. Store dispatch / receiving</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="6.1 配送批次 / 门店收货跟踪">5. Store dispatch / receiving</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="7. 店员 PDA 上架工作台">6. Store item price / rack / printing</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="9. 收银销售">7. POS</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="10. 周期退仓">8. Returns / return-to-warehouse</button>
@@ -2106,7 +2106,7 @@
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>6.1 门店配货 / 配送跟踪</h2>
+          <h2>6.1 配送批次 / 门店收货跟踪</h2>
           <button id="loadTransferDispatchButton" type="button">读取最近调拨单</button>
         </div>
         <div class="candidate-summary">
@@ -2115,7 +2115,7 @@
             <span class="store-flag">shipment session</span>
             <span class="store-flag">差异留痕</span>
           </div>
-          <div class="subtle small">这一页按“履约追踪台”来用。仓库 / 履约调度在这里看 `transfer_order`、`warehouseout dispatch bale` 和 `delivery_batch / shipment_session`，暂时只处理发运跟踪。</div>
+          <div class="subtle small">这里跟踪司机、车辆、配送批次和门店收货状态。正式门店收货 barcode 应来自仓库送货执行单。</div>
         </div>
         <form id="transferShipForm" class="form-grid compact">
           <input name="transfer_no" placeholder="调拨单号，例如 TO-..." />
@@ -2126,7 +2126,7 @@
           <button type="submit">确认发运 / 建 shipment session</button>
         </form>
         <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
-          这里会显示发运和 shipment session。
+          这里会显示发运和 shipment session。该调拨单还未生成正式门店送货执行单 barcode。
         </div>
         <div id="transferDispatchSummary" class="candidate-summary empty-state">
           先创建并审核调拨单，这里再读取最近调拨单，就能看哪些单待仓库配货、待打印和待配送。
@@ -2630,7 +2630,7 @@
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>4.1 手动生成配货单</h2>
+          <h2>4.1 手动补货需求 / Manual replenishment request</h2>
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
@@ -2639,14 +2639,14 @@
             <span class="store-flag">散货补差按 200 件封 bale</span>
             <span class="store-flag">提交仓库执行</span>
           </div>
-          <div class="subtle small">手动配货单是需求来源，不直接扣库存、不手选成本层、不手选 token。店长 / 运营只确认门店要补什么，系统再把需求拆成两段：先吃掉现成待送店包裹，不够的部分再从散货里补差，并按 200 件 / bale 形成仓库备货计划。</div>
+          <div class="subtle small">手动补货需求只定义门店需要补什么，不直接扣库存、不手选成本层。系统会拆分成仓库动作：先用现成待送店包，不足再走散货补差。</div>
         </div>
         <div class="transfer-prep-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
             <div class="transfer-workbench-head">
               <span class="eyebrow">Manual</span>
-              <h3>手动配货单录入</h3>
-              <p>手动录入目标门店、类目和数量；生成后仍进入仓库配货、待送店 bale 打码、门店签收这条正式履约链。</p>
+              <h3>补货需求录入</h3>
+              <p>手动录入目标门店、类目和数量；生成后进入仓库侧执行流程。门店收货 barcode 以后续正式送货执行单为准。</p>
             </div>
             <form id="transferForm" class="form-grid compact form-clean-placeholders">
               <input name="from_warehouse_code" placeholder="来源仓，例如 WH1" value="WH1" />
@@ -2671,7 +2671,7 @@
                 </div>
                 <div id="transferItemsBuilder" class="line-builder-body"></div>
               </div>
-              <button type="submit">手动生成配货单</button>
+              <button type="submit">手动生成补货申请</button>
             </form>
           </article>
 
@@ -2679,8 +2679,8 @@
             <article class="transfer-ops-card transfer-prep-summary-card">
               <div class="transfer-workbench-head is-compact">
                 <span class="eyebrow">Draft</span>
-                <h3>当前调拨草稿</h3>
-                <p>这里实时汇总门店本次要补的类目和件数，方便先看草稿，再决定是否生成正式配货任务。</p>
+                <h3>补货需求草稿</h3>
+                <p>这里实时汇总本次门店需求件数与类目，先确认草稿再进入系统建议与仓库动作。</p>
               </div>
               <div id="transferDraftSummary" class="candidate-summary empty-state">
                 先在上一页加入建议类目，或在左侧手动补充大类、小类和件数，这里会实时显示这张门店调拨草稿。
@@ -2690,8 +2690,8 @@
             <article class="transfer-ops-card transfer-prep-summary-card">
               <div class="transfer-workbench-head is-compact">
                 <span class="eyebrow">Plan</span>
-                <h3>系统备货拆解结果</h3>
-                <p>系统会优先吃现成待送店包裹，不够的部分再从散货里补差，并按 200 件 / bale 规划最终送店包。</p>
+                <h3>系统配货建议</h3>
+                <p>系统优先使用现成待送店包，不足部分转为散货补差，并计算新打补差包与最终预计送店包。</p>
               </div>
               <div id="transferPreparationPlanSummary" class="candidate-summary empty-state">
                 这里会把当前调拨草稿拆成仓库真实动作：先拿哪些待送店包裹，再补哪些散货、要新打几个 bale，以及这次最终预计会生成多少个送店 bale。
@@ -2700,7 +2700,7 @@
           </div>
         </div>
         <div id="transferResultSummary" class="candidate-summary empty-state">
-          这里会显示配货任务和门店调拨单创建后的中文摘要。
+          下一步动作：确认补货需求后进入 5.1 补差打包工单与 6 仓库执行单流程。SDB 是仓库内部待送店包码，不是门店收货 barcode。门店收货需等待后续正式送货执行单 barcode。
         </div>
         <pre id="transferOutput" class="output hidden-output"></pre>
       </section>
@@ -2716,7 +2716,7 @@
             <span class="store-flag">封包上限可选</span>
             <span class="store-flag">完成后回 6 打印</span>
           </div>
-          <div class="subtle small">这页不是说明板，而是散货补差拣货单页。只有现成待送店包裹不够时，才在这里生成 1 张 barcode 拣货单给工人去拣货和贴包。</div>
+          <div class="subtle small">补差打包工单只处理现成待送店包不足的散货缺口。LPK barcode 是仓库拣货工单码，不是门店收货码。</div>
         </div>
         <div class="transfer-prep-shell replenishment-workorder-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
@@ -2759,7 +2759,7 @@
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>6. 仓库配货 / 出库打印</h2>
+          <h2>6. 仓库执行单 / 出库打印</h2>
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
@@ -2768,7 +2768,7 @@
             <span class="store-flag">散货补差封 bale</span>
             <span class="store-flag">批量打印送店 barcode + 箱单</span>
           </div>
-          <div class="subtle small">这一页按“仓库执行台”来用。工人先根据系统列出的待送店包裹 barcode 去找货，再把不够的散货补差打成 bale，最后统一生成门店送店 bale、箱单和门店验收 barcode。</div>
+          <div class="subtle small">这里用于仓库核对现成待送店包和补差包，后续将生成正式门店送货 barcode。SDB 和 LPK 不是门店可扫 barcode。</div>
         </div>
         <div class="warehouse-prep-shell">
           <article class="transfer-ops-card warehouse-prep-card warehouse-prep-overview">
@@ -2782,7 +2782,7 @@
               <button type="submit">审核并锁库存</button>
             </form>
             <div id="transferWorkbenchSummary" class="candidate-summary empty-state">
-              先填入门店调拨单号，或从 4.1 手动生成配货单后自动带入。这里会显示这单现在需要找多少现成待送店包裹、还要补多少散货、预计形成多少个最终送店 bale。
+              先填入门店调拨单号，或从 4.1 手动补货需求后自动带入。这里会显示这单现在需要找多少现成待送店包裹、还要补多少散货、预计形成多少个最终送店 bale。
             </div>
           </article>
 
@@ -2838,7 +2838,7 @@
                 <button type="submit">批量打印送店 barcode + 箱单</button>
               </form>
               <div id="transferDispatchPackagingSummary" class="candidate-summary empty-state">
-                这里会把本次最终送店 bale 汇总出来。无论源头是现成待送店包裹，还是散货补差封 bale，到这里都统一变成门店验收用的送店 barcode。
+                这里会把本次最终送店 bale 汇总出来。当前仅用于仓库核对现成待送店包与补差包；正式门店收货 barcode 待后续仓库送货执行单。
               </div>
             </article>
           </div>
