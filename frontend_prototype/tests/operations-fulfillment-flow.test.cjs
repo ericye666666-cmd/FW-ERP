@@ -744,16 +744,16 @@ test("warehouse nav exposes 门店补货 and operations nav drops the replenishm
 
 
 test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1", () => {
-  assert.match(indexHtml, /Step 1 创建补货申请/);
-  assert.match(indexHtml, /Step 2 系统配货建议/);
-  assert.match(indexHtml, /Step 3 下一步动作/);
+  assert.match(indexHtml, /1 选申请/);
+  assert.match(indexHtml, /2 看建议/);
+  assert.match(indexHtml, /3 生成任务/);
   assert.match(appJs, /补货申请单号：\$\{escapeHtml\(result\.transfer_no \|\| "-"\)\}/);
   assert.match(appJs, /const nextActionLabel = hasLooseShortage \? "去 5\.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";/);
 });
 
 test("phase 2A page 5.1 copy uses request number label and warehouse-only LPK guidance", () => {
-  assert.match(indexHtml, /选择补货申请单/);
-  assert.match(indexHtml, /本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货\/补差打包工单码，不是门店收货码。/);
+  assert.match(indexHtml, /选择补货申请 \/ 选择备货波次/);
+  assert.match(indexHtml, /LPK = 仓库补差工单码；门店不可扫。/);
   assert.match(appJs, /该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。/);
 });
 
@@ -768,7 +768,7 @@ test("phase 2A copy keeps package count and piece count separated on 4.1", () =>
 test("phase 2B page 6 copy clarifies warehouse verification and warehouse-only barcode boundary", () => {
   assert.match(indexHtml, /仓库执行核对 \/ 出库打印/);
   assert.match(indexHtml, /按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。/);
-  assert.match(indexHtml, /SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。/);
+  assert.match(indexHtml, /SDB\/LPK = 仓库核对码；门店只扫 SDO。/);
   assert.match(indexHtml, /这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。/);
   assert.match(indexHtml, /Lane A：现成待送店包核对/);
   assert.match(indexHtml, /扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。/);
@@ -791,7 +791,7 @@ test("phase 2B page 6 state labels and gating copy are visible in workbench summ
 
 test("phase 2C page 6.1 copy clarifies shipment batch scope and barcode boundary", () => {
   assert.match(indexHtml, /6\.1 配送批次 \/ 门店收货跟踪/);
-  assert.match(indexHtml, /一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。/);
+  assert.match(indexHtml, /配送批次 = 一辆车 \+ 一个或多个门店 \+ 一张或多张 SDO。/);
   assert.match(indexHtml, /选择仓库送货执行单 \/ SDO/);
   assert.match(indexHtml, /配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。/);
   assert.match(indexHtml, /该配送批次会展示已生成的正式门店送货执行单 \/ barcode。/);

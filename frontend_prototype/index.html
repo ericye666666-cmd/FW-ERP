@@ -2111,14 +2111,14 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">delivery batch</span>
-            <span class="store-flag">shipment session</span>
-            <span class="store-flag">差异留痕</span>
+            <span class="store-flag">1 选 SDO</span>
+            <span class="store-flag">2 建配送批次</span>
+            <span class="store-flag">3 看门店站点</span>
           </div>
-          <div class="subtle small">一辆车可以同时配送多个门店。这里创建和跟踪的是配送批次，不是单个门店调拨单。配送批次可以包含多个仓库执行单，按门店站点跟踪签收状态。</div>
+          <div class="subtle small">配送批次 = 一辆车 + 一个或多个门店 + 一张或多张 SDO。</div>
           <div class="subtle small">配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。</div>
           <div class="subtle small">该配送批次会展示已生成的正式门店送货执行单 / barcode。</div>
-          <div class="subtle small">当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。</div>
+          <div class="subtle small">当前版本先按已生成 SDO 展示配送批次视图；后续会支持把多个 SDO 绑定到同一车次。</div>
         </div>
         <div class="candidate-summary">
           <div class="subtle small">配送批次号 / shipment_batch_no</div>
@@ -2651,11 +2651,12 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">Step 1 创建补货申请</span>
-            <span class="store-flag">Step 2 系统配货建议</span>
-            <span class="store-flag">Step 3 下一步动作</span>
+            <span class="store-flag">1 选申请</span>
+            <span class="store-flag">2 看建议</span>
+            <span class="store-flag">3 生成任务</span>
+            <span class="store-flag">4 执行/打印</span>
           </div>
-          <div class="subtle small">手动补货需求只定义门店需要补什么，不直接扣库存、不手选成本层。系统会拆分成仓库动作：先用现成待送店包，不足再走散货补差。</div>
+          <div class="subtle small">创建申请后可单独执行，也可加入备货波次（可选）。</div>
         </div>
         <div class="transfer-prep-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
@@ -2677,7 +2678,7 @@
               <div class="line-builder" data-builder="transfer-items">
                 <div class="line-builder-head">
                   <div>
-                    <strong>调拨需求类目明细</strong>
+                    <strong>补货明细</strong>
                     <p>一行代表一个商品大类 / 小类 / 分级（P/S）和要发去门店的数量。这里只录需求，不选择具体 token 或成本批次，仓库执行时按 FIFO 成本层和正式 barcode 规则处理。</p>
                   </div>
                   <button type="button" class="ghost-button mini-button" data-builder-add="transfer-items">新增一行</button>
@@ -2713,7 +2714,12 @@
           </div>
         </div>
         <div id="transferResultSummary" class="candidate-summary empty-state">
-          Step 3 下一步动作会在生成补货申请单后显示：有散货缺口去 5.1 生成补差工单；无散货缺口则直接去 6 仓库执行单继续。
+          下一步：可【单独执行该申请】或【加入备货波次】；有缺口去 5.1 生成补差工单，无缺口直接去 6。
+        </div>
+        <div class="candidate-summary">
+          <strong>备货波次（MVP）</strong>
+          <div class="subtle small">波次日期 / 波次名称 / 可单选或多选补货申请 / 总门店数 / 总件数 / 总缺口。</div>
+          <div class="subtle small">当前为前端备货波次预览；正式波次保存将在 Phase B2 实现。</div>
         </div>
         <pre id="transferOutput" class="output hidden-output"></pre>
       </section>
@@ -2724,12 +2730,12 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">按补货申请单号生成</span>
-            <span class="store-flag">散货补差</span>
-            <span class="store-flag">封包上限可选</span>
-            <span class="store-flag">完成后回 6 打印</span>
+            <span class="store-flag">1 选申请/波次</span>
+            <span class="store-flag">2 看缺口</span>
+            <span class="store-flag">3 生成任务</span>
+            <span class="store-flag">4 执行/打印</span>
           </div>
-          <div class="subtle small">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差打包工单码，不是门店收货码。</div>
+          <div class="subtle small">LPK = 仓库补差工单码；门店不可扫。</div>
         </div>
         <div class="transfer-prep-shell replenishment-workorder-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
@@ -2740,7 +2746,7 @@
             </div>
             <form id="loosePackingTaskPlanForm" class="form-grid compact warehouse-prep-toolbar">
               <label class="field-control">
-                <span>选择补货申请单</span>
+                <span>选择补货申请 / 选择备货波次</span>
                 <select name="transfer_no">
                   <option value="">请选择补货申请单</option>
                 </select>
@@ -2781,13 +2787,13 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">仓库执行核对 / 出库打印</span>
-            <span class="store-flag">仓库核对现成 SDB 包</span>
-            <span class="store-flag">仓库核对补差工单</span>
-            <span class="store-flag">生成正式门店送货执行单 barcode</span>
+            <span class="store-flag">1 选申请/波次</span>
+            <span class="store-flag">2 SDB 核对</span>
+            <span class="store-flag">3 LPK 核对</span>
+            <span class="store-flag">4 生成 SDO</span>
           </div>
           <div class="subtle small">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
-          <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
+          <div class="subtle small">SDB/LPK = 仓库核对码；门店只扫 SDO。</div>
           <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
         </div>
         <div class="warehouse-prep-shell">
