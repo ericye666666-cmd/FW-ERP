@@ -16756,8 +16756,84 @@ function queueTransferShipTargetHintLoad(transferNo = "") {
   }, 250);
 }
 
+function isWaveSelectionValue(value = "") {
+  return String(value || "").trim().toUpperCase().startsWith("WAVE:");
+}
+
+function parseWaveSelectionValue(value = "") {
+  const raw = String(value || "").trim();
+  return isWaveSelectionValue(raw) ? raw.split(":").slice(1).join(":").trim().toUpperCase() : "";
+}
+
+function getWaveSummaryByNo(waveNo = "") {
+  const normalized = String(waveNo || "").trim().toUpperCase();
+  const waves = Array.isArray(window.__pickingWaveCache) ? window.__pickingWaveCache : [];
+  return waves.find((wave) => String(wave?.wave_no || "").trim().toUpperCase() === normalized) || null;
+}
+
+function getTransferRequestedQtyForDisplay(transfer = {}) {
+  const demandLines = Array.isArray(transfer.demand_lines) ? transfer.demand_lines : [];
+  if (demandLines.length) {
+    return demandLines.reduce((sum, row) => sum + Number(row?.requested_qty || 0), 0);
+  }
+  const items = Array.isArray(transfer.items) ? transfer.items : [];
+  return items.reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0);
+}
+
+
+function buildWaveRequestRows(wave = null) {
+  if (!wave) return [];
+  const requestNos = Array.isArray(wave.selected_replenishment_request_nos)
+    ? wave.selected_replenishment_request_nos
+    : Array.isArray(wave.replenishment_request_nos)
+      ? wave.replenishment_request_nos
+      : [];
+  return requestNos.map((requestNoRaw) => {
+    const requestNo = String(requestNoRaw || "").trim().toUpperCase();
+    const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === requestNo) || {};
+    const total = Number(transfer.requested_qty || getTransferRequestedQtyForDisplay(transfer));
+    const shortage = Number(buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer)).summary?.looseQtyToPick || 0);
+    return { requestNo, transfer, total, shortage };
+  }).filter((row) => row.requestNo);
+}
+
+function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
+  const waveNo = parseWaveSelectionValue(selectedValue);
+  const targetId = mode === "ship" ? "#transferShipWaveSummary" : mode === "exec" ? "#transferWaveSummary" : "#loosePackingWaveSummary";
+  const target = document.querySelector(targetId);
+  if (!(target instanceof HTMLElement)) return;
+  if (!waveNo) {
+    target.className = "candidate-summary empty-state";
+    target.textContent = mode === "ship"
+      ? "选择波次后，这里展示波次内可配送 SDO 与未生成 SDO 的申请。"
+      : mode === "exec"
+        ? "选择波次后，这里展示每张申请的 SDB/LPK/SDO 执行状态。"
+        : "选择波次后，这里展示波次上下文与申请列表。";
+    return;
+  }
+  const wave = getWaveSummaryByNo(waveNo);
+  const rows = buildWaveRequestRows(wave);
+  target.className = "candidate-summary";
+  target.innerHTML = `
+    <div class="alert-banner">已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。</div>
+    <div class="subtle small">${escapeHtml(`${waveNo} / ${(wave?.stores_included || []).length} stores / ${Number(wave?.total_requested_qty || 0)} 件`)}</div>
+    <div class="candidate-list transfer-draft-list">
+      ${rows.map((row) => {
+        const required = String(row.transfer?.required_arrival_date || row.transfer?.required_arrival_on || "-");
+        const sdo = String(row.transfer?.store_delivery_execution_order_no || "").trim();
+        if (mode === "ship") {
+          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || "SDO 未生成")} / ${escapeHtml(row.transfer?.to_store_code || "-")} / ${escapeHtml(String(row.transfer?.delivery_batch?.bale_count || 0))} 包 / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : "待生成")}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? "可进入发运" : "SDO 未生成，请先去 6 仓库执行核对"}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">查看 SDO</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">进入该申请仓库执行</button>`}</div></article>`;
+        }
+        if (mode === "exec") {
+          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} / ${row.transfer?.to_store_code || '-'} / SDB ${row.transfer?.delivery_batch?.bale_count || 0} / LPK ${row.shortage > 0 ? '1/1' : '0/0'} / SDO ${sdo ? '已生成' : '未生成'}`)}</strong><div class="subtle small">${escapeHtml(`required ${required} / total ${row.total} 件 / shortage ${row.shortage} 件`)}</div></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${sdo ? '查看/生成 SDO' : '进入执行'}</button></div></article>`;
+        }
+        return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} | ${row.transfer?.to_store_code || '-'} | required ${required} | total ${row.total} 件 | shortage ${row.shortage} 件`)}</strong></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="lpk">${row.shortage > 0 ? '进入该申请补差' : '无缺口，去仓库执行'}</button></div></article>`;
+      }).join("") || '<div class="empty-state">该波次暂无可展示的补货申请。</div>'}
+    </div>`;
+}
 function populateTransferOrderSelectors() {
   const rows = Array.isArray(transferOrderState) ? transferOrderState.map((row) => normalizeTransferForOperationsSummary(row)) : [];
+  const waves = Array.isArray(window.__pickingWaveCache) ? window.__pickingWaveCache : [];
   const selectorConfigs = [
     { selector: "#loosePackingTaskPlanForm [name='transfer_no']", empty: "请选择补货申请单", mode: "lpk" },
     { selector: "#approveTransferForm [name='transfer_no']", empty: "请选择补货申请单", mode: "exec" },
@@ -16781,10 +16857,15 @@ function populateTransferOrderSelectors() {
       }
       return `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / 缺口 ${shortage} 件`;
     });
-    select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("")}`;
-    if (previousValue && rows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue)) {
+    const requestOptions = rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("");
+    const waveOptions = waves
+      .map((wave) => `<option value="WAVE:${escapeHtml(wave.wave_no || "")}">${escapeHtml(`${wave.wave_no || "-"} / ${(wave.stores_included || []).length} stores / ${Number(wave.total_requested_qty || 0)} 件 / 缺口 ${Number(wave.total_shortage_qty || 0)} 件`)}</option>`)
+      .join("");
+    select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${requestOptions}${waveOptions}`;
+    if (previousValue && (rows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue) || (isWaveSelectionValue(previousValue) && waves.some((wave) => `WAVE:${String(wave?.wave_no || "").trim().toUpperCase()}` === previousValue)))) {
       select.value = previousValue;
     }
+    renderWaveExecutionEntrySummary(select.value, mode);
   });
 }
 
@@ -16803,6 +16884,7 @@ async function refreshPickingWavePanel() {
   if (!(list instanceof HTMLElement)) return;
   try {
     const waves = await request("/picking-waves");
+    window.__pickingWaveCache = Array.isArray(waves) ? waves : [];
     if (!Array.isArray(waves) || !waves.length) {
       list.className = "candidate-summary empty-state";
       list.textContent = "暂无波次。";
@@ -27055,6 +27137,10 @@ async function submitTransferApproval(event) {
   if (!transferNo) {
     throw new Error("请先选择补货申请单。");
   }
+  if (isWaveSelectionValue(transferNo)) {
+    renderWaveExecutionEntrySummary(transferNo, "exec");
+    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+  }
   const result = getTransferPreparationOrder(transferNo) || await request(`/transfers/${transferNo}`);
   activeTransferPreparationNo = String(transferNo || "").trim().toUpperCase();
   writeOutput("#transferActionOutput", result);
@@ -27071,6 +27157,10 @@ async function submitLoosePackingTaskPlan(event) {
   const transferNo = String(form.get("transfer_no") || "").trim().toUpperCase();
   if (!transferNo) {
     throw new Error("请先填写补货申请单号（来自 4.1）。");
+  }
+  if (isWaveSelectionValue(transferNo)) {
+    renderWaveExecutionEntrySummary(transferNo, "lpk");
+    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const transfer = getTransferPreparationOrder(transferNo);
   if (!transfer?.transfer_no) {
@@ -27107,6 +27197,10 @@ async function submitPreparedBaleRegistration(event) {
   const barcode = String(form.get("prepared_bale_barcode") || "").trim().toUpperCase();
   if (!transferNo) {
     throw new Error("请先填写调拨单号。");
+  }
+  if (isWaveSelectionValue(transferNo)) {
+    renderWaveExecutionEntrySummary(transferNo, "exec");
+    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const transfer = getTransferPreparationOrder(transferNo);
   if (!transfer?.transfer_no) {
@@ -27313,6 +27407,10 @@ async function submitTransferBundle(event) {
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
   const transferNo = String(payload.transfer_no || "").trim().toUpperCase();
+  if (isWaveSelectionValue(transferNo)) {
+    renderWaveExecutionEntrySummary(transferNo, "exec");
+    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+  }
   const transfer = getTransferPreparationOrder(transferNo);
   const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer || transferNo));
   const readiness = summarizeTransferExecutionState(transferNo, plan);
@@ -27381,6 +27479,10 @@ async function submitTransferShipment(event) {
   const transferNo = String(payload.transfer_no || "").trim();
   if (!transferNo) {
     throw new Error("请先填写调拨单号。");
+  }
+  if (isWaveSelectionValue(transferNo)) {
+    renderWaveExecutionEntrySummary(transferNo, "ship");
+    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const departureTime = String(payload.departure_time || "").trim();
   const routeStops = String(payload.route_stops || "").trim();
@@ -28562,8 +28664,44 @@ document.querySelector("#transferDispatchSummary")?.addEventListener("click", (e
   }
 });
 
+
+
+document.querySelector("#loosePackingWaveSummary")?.addEventListener("click", (event) => {
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
+  if (!(button instanceof HTMLElement)) return;
+  const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
+  if (!transferNo) return;
+  setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transferNo);
+  setInputValue("#approveTransferForm [name='transfer_no']", transferNo);
+  setInputValue("#transferBundleForm [name='transfer_no']", transferNo);
+  renderLoosePackingTaskWorkbench(transferNo);
+  renderTransferExecutionWorkbench(transferNo);
+});
+
+document.querySelector("#transferWaveSummary")?.addEventListener("click", (event) => {
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
+  if (!(button instanceof HTMLElement)) return;
+  const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
+  if (!transferNo) return;
+  hydrateTransferForms({ transfer_no: transferNo });
+  renderTransferExecutionWorkbench(transferNo);
+});
+
+document.querySelector("#transferShipWaveSummary")?.addEventListener("click", (event) => {
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
+  if (!(button instanceof HTMLElement)) return;
+  const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
+  if (!transferNo) return;
+  setInputValue("#transferShipForm [name='transfer_no']", transferNo);
+  queueTransferShipTargetHintLoad(transferNo);
+  renderWaveExecutionEntrySummary("", "ship");
+});
 document.querySelector("#transferShipForm [name='transfer_no']")?.addEventListener("change", (event) => {
   queueTransferShipTargetHintLoad(event.target?.value || "");
+});
+
+document.querySelector("#transferShipForm [name='transfer_no']")?.addEventListener("change", (event) => {
+  renderWaveExecutionEntrySummary(event.target?.value || "", "ship");
 });
 
 const initialTransferShipNo = String(document.querySelector("#transferShipForm [name='transfer_no']")?.value || "").trim();
@@ -28624,6 +28762,8 @@ document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")?.add
     setInputValue("#transferPrintForm [name='transfer_no']", transferNo);
     setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transferNo);
     setInputValue("#preparedBaleRegistrationForm [name='transfer_no']", transferNo);
+    renderWaveExecutionEntrySummary(transferNo, "exec");
+    renderWaveExecutionEntrySummary(transferNo, "lpk");
     renderReplenishmentFlowSummary(transferNo);
     renderLoosePackingTaskWorkbench(transferNo);
     renderTransferExecutionWorkbench(transferNo);
