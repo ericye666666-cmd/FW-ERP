@@ -24697,9 +24697,8 @@ async function submitSortingResults(event) {
     if (String(row?.confirm_to_inventory) === "false" || row?.confirm_to_inventory === false) {
       return;
     }
-if (!String(row?.rack_code || "").trim()) {
-  throw new Error(`第 ${index + 1} 行还没有绑定分拣库位，请先去 4.8 配置。`);
-}
+    if (!String(row?.rack_code || "").trim()) {
+      throw new Error(`第 ${index + 1} 行还没有绑定分拣库位，请先去 4.8 配置。`);
     }
   });
   const costMeta = getSortingTaskFormalCostPayload(task, payload.result_items, payload.loss_record);
