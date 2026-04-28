@@ -2765,12 +2765,13 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">审核并锁库存</span>
-            <span class="store-flag">先找现成待送店包裹</span>
-            <span class="store-flag">散货补差封 bale</span>
-            <span class="store-flag">批量打印送店 barcode + 箱单</span>
+            <span class="store-flag">审核配货计划并锁定库存</span>
+            <span class="store-flag">仓库核对现成 SDB 包</span>
+            <span class="store-flag">仓库核对补差工单</span>
+            <span class="store-flag">正式送货执行码后续阶段生成</span>
           </div>
-          <div class="subtle small">这里用于仓库核对现成待送店包和补差包，后续将生成正式门店送货 barcode。SDB 和 LPK 不是门店可扫 barcode。</div>
+          <div class="subtle small">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；正式门店送货 barcode 将在后续仓库送货执行单阶段生成。</div>
+          <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
         </div>
         <div class="warehouse-prep-shell">
           <article class="transfer-ops-card warehouse-prep-card warehouse-prep-overview">
@@ -2780,11 +2781,11 @@
               <p>仓库执行台现在只做真动作：先审核并读当前执行单，再扫现成包、核补差工单完成度，最后才放行最终送店打印。</p>
             </div>
             <form id="approveTransferForm" class="form-grid compact warehouse-prep-toolbar">
-              <input name="transfer_no" placeholder="调拨单号" />
-              <button type="submit">审核并锁库存</button>
+              <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
+              <button type="submit">审核配货计划并锁定库存</button>
             </form>
             <div id="transferWorkbenchSummary" class="candidate-summary empty-state">
-              先填入门店调拨单号，或从 4.1 手动补货需求后自动带入。这里会显示这单现在需要找多少现成待送店包裹、还要补多少散货、预计形成多少个最终送店 bale。
+              先填入补货申请单号（来自 4.1），这里会显示配货计划审核、库存锁定和仓库核对进度。
             </div>
           </article>
 
@@ -2792,12 +2793,12 @@
             <div class="warehouse-prep-lanes">
               <article class="transfer-ops-card warehouse-prep-card">
                 <div class="transfer-workbench-head is-compact">
-                  <span class="eyebrow">Lane A</span>
-                  <h3>优先现成包</h3>
-                  <p>这里不让工人手录需求，只做现成待送店包裹扫码登记。系统先列清单，工人按 barcode 去找，找到就扫描确认。</p>
+                  <span class="eyebrow">Lane A：现成待送店包核对</span>
+                  <h3>现成 SDB 包仓库核对</h3>
+                  <p>扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。</p>
                 </div>
                 <form id="preparedBaleRegistrationForm" class="form-grid compact warehouse-prep-toolbar">
-                  <input name="transfer_no" placeholder="调拨单号" />
+                  <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
                   <input name="prepared_bale_barcode" placeholder="扫描现成待送店包裹 barcode" />
                   <button type="submit">扫描确认现成包</button>
                 </form>
@@ -2812,9 +2813,9 @@
 
               <article class="transfer-ops-card warehouse-prep-card">
                 <div class="transfer-workbench-head is-compact">
-                  <span class="eyebrow">Lane B</span>
-                  <h3>补差打包</h3>
-                  <p>这里不直接做打包动作。补差打包必须去 5.1 工单页执行；这一栏只看当前补差工单是否已经全部完成。</p>
+                  <span class="eyebrow">Lane B：补差包核对</span>
+                  <h3>LPK 补差工单仓库核对</h3>
+                  <p>LPK 是仓库补差拣货工单码。补差完成后形成仓库内部补差包，用于本单后续送货执行。</p>
                 </div>
                 <div id="transferLoosePackingProgressSummary" class="candidate-summary empty-state">
                   这里会显示当前调拨单的补差工单进度。只有补差工单全部完成，最终送店打印才会放行。
@@ -2827,30 +2828,30 @@
 
             <article class="transfer-ops-card warehouse-prep-card warehouse-prep-print-card">
               <div class="transfer-workbench-head is-compact">
-                <span class="eyebrow">Lane C</span>
-                <h3>最终送店打印</h3>
-                <p>只有现成包登记完成、补差工单也全部完成，这里才允许批量打印最终送店 barcode 和箱单。</p>
+                <span class="eyebrow">Lane C：正式送货执行码（后续阶段）</span>
+                <h3>本单仓库核对进度</h3>
+                <p>现阶段仅显示本单仓库核对进度。正式门店送货 barcode 将由后续仓库送货执行单生成。</p>
               </div>
               <form id="transferBundleForm" class="form-grid compact warehouse-prep-toolbar">
-                <input name="transfer_no" placeholder="调拨单号" />
+                <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
                 <input name="copies" type="hidden" value="1" />
                 <input name="label_copies_mode" type="hidden" value="approved_qty" />
                 <input name="grouping_mode" type="hidden" value="by_category" />
                 <input name="max_items_per_bale" type="hidden" value="200" />
-                <button type="submit">批量打印送店 barcode + 箱单</button>
+                <button type="submit">生成仓库内部出库打印（非门店收货码）</button>
               </form>
               <div id="transferDispatchPackagingSummary" class="candidate-summary empty-state">
-                这里会把本次最终送店 bale 汇总出来。当前仅用于仓库核对现成待送店包与补差包；正式门店收货 barcode 待后续仓库送货执行单。
+                这里会显示本单仓库核对进度和待送货汇总；正式门店送货执行码将在后续阶段生成。
               </div>
             </article>
           </div>
         </div>
         <div id="transferActionResultSummary" class="candidate-summary empty-state">
-          这里会显示审核锁库存、送店 bale 生成、箱单打印和门店验收条码结果。
+          这里会显示配货计划审核、库存锁定与仓库核对进度。
         </div>
         <div class="hidden-screen">
           <form id="transferPrintForm" class="form-grid compact">
-            <input name="transfer_no" placeholder="调拨单号" />
+            <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
             <input name="copies" type="number" value="1" min="1" />
             <button type="submit">兼容：生成出库打印任务</button>
           </form>
