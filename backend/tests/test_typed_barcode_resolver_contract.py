@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -153,6 +154,35 @@ def _seed_store_prep_bale(state: InMemoryState, bale_no: str = "SDB260428AAB") -
     )
     state.store_prep_bales[bale["bale_no"]] = bale
     return bale
+
+
+def _seed_transfer_with_dispatch_for_execution(state: InMemoryState, transfer_no: str = "TO-20260428-001") -> None:
+    state.transfer_orders[transfer_no] = {
+        "transfer_no": transfer_no,
+        "from_warehouse_code": "WH1",
+        "to_store_code": "UTAWALA",
+        "created_by": "store_manager_1",
+        "approval_required": True,
+        "status": "approved",
+        "approval_status": "approved",
+        "created_at": "2026-04-28T00:00:00+00:00",
+        "submitted_at": "2026-04-28T00:00:00+00:00",
+        "approved_at": "2026-04-28T00:01:00+00:00",
+        "approved_by": "warehouse_supervisor_1",
+        "received_at": None,
+        "received_by": None,
+        "closed_at": None,
+        "store_receipt_status": "not_started",
+        "demand_lines": [],
+        "items": [],
+    }
+    state.store_dispatch_bales["SDB-TRF20260428001-001"] = {
+        "bale_no": "SDB-TRF20260428001-001",
+        "transfer_no": transfer_no,
+        "source_bales": ["SDB260428AAB", "LPKTO20260428001PICK"],
+        "status": "ready_dispatch",
+        "token_nos": [],
+    }
 
 
 def test_pos_accepts_only_store_item_and_requires_identity_id(state):
@@ -335,9 +365,53 @@ def test_store_prep_bale_is_rejected_in_store_receiving_but_dispatch_execution_s
     prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
     receiving_result = state.resolve_barcode(prep_bale["bale_barcode"], context="store_receiving")
     assert receiving_result["barcode_type"] == "STORE_PREP_BALE"
-    assert receiving_result["reject_reason"] == "门店收货只能扫描仓库执行单/送货单打印的正式送店 barcode，不能直接扫描待送店压缩包码。"
+    assert receiving_result["reject_reason"] == "这是仓库待送店压缩包码，不是正式送货执行码。请让仓库先生成送货执行单并打印正式送店 barcode。"
 
     _, dispatch_bale, _, _ = _prepare_dispatch_and_store_item(state)
     dispatch_result = state.resolve_barcode(dispatch_bale["bale_no"], context="store_receiving")
     assert dispatch_result["barcode_type"] == "DISPATCH_BALE"
     assert dispatch_result["reject_reason"] == ""
+
+
+def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(state):
+    _seed_transfer_with_dispatch_for_execution(state)
+
+    created = state.create_store_delivery_execution_order(
+        "TO-20260428-001",
+        {"created_by": "warehouse_clerk_1", "notes": "warehouse verified"},
+    )
+    assert created["execution_order_no"].startswith("SDO")
+    assert created["official_delivery_barcode"] == created["execution_order_no"]
+    assert created["source_transfer_no"] == "TO-20260428-001"
+    assert created["package_count"] == 1
+
+    receiving_result = state.resolve_barcode(created["official_delivery_barcode"], context="store_receiving")
+    assert receiving_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
+    assert receiving_result["business_object"]["kind"] == "STORE_DELIVERY_EXECUTION"
+    assert receiving_result["object_type"] == "store_delivery_execution"
+    assert receiving_result["reject_reason"] == ""
+
+    pos_result = state.resolve_barcode(created["official_delivery_barcode"], context="pos")
+    assert pos_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
+    assert pos_result["reject_reason"]
+
+
+def test_create_store_delivery_execution_order_rejects_when_transfer_has_no_dispatch_rows(state):
+    _seed_transfer_with_dispatch_for_execution(state, transfer_no="TO-20260428-EMPTY")
+    state.store_dispatch_bales.clear()
+
+    with pytest.raises(HTTPException) as exc_info:
+        state.create_store_delivery_execution_order(
+            "TO-20260428-EMPTY",
+            {"created_by": "warehouse_clerk_1", "notes": "warehouse verified"},
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "该补货申请还没有可送店包裹，不能生成正式门店送货执行单 barcode。请先完成仓库核对和打包。"
+
+
+def test_store_prep_bale_rejection_message_in_store_receiving_mentions_official_execution_barcode(state):
+    prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
+    receiving_result = state.resolve_barcode(prep_bale["bale_barcode"], context="store_receiving")
+    assert receiving_result["barcode_type"] == "STORE_PREP_BALE"
+    assert receiving_result["reject_reason"] == "这是仓库待送店压缩包码，不是正式送货执行码。请让仓库先生成送货执行单并打印正式送店 barcode。"

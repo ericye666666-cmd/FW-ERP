@@ -10357,13 +10357,15 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const isPlanReviewed = ["approved", "not_required"].includes(approvalStatus);
   const planApprovalLabel = isPlanReviewed ? "已审核" : "待审核";
   const inventoryLockLabel = isPlanReviewed ? "已锁定" : "未锁定";
-  const officialDeliveryCodeLabel = "未生成（后续阶段生成）";
+  const officialDeliveryCodeLabel = String(
+    normalized.official_delivery_barcode || normalized.store_delivery_execution_order_no || "",
+  ).trim() || "未生成";
   const verificationPending = Number(readiness.pendingPreparedCount || 0) > 0 || Number(readiness.pendingLooseTaskCount || 0) > 0;
   const verificationHint = !isPlanReviewed
     ? "该补货申请尚未审核，不能锁定库存。请先完成主管审核。"
     : (verificationPending
       ? `仓库核对尚未完成：现成待送店包 ${readiness.foundPreparedCount || 0}/${readiness.requiredPreparedCount || 0}，补差工单 ${readiness.completedLooseTaskCount || 0}/${readiness.requiredLooseTaskCount || 0}。`
-      : "仓库核对已完成。下一阶段将生成正式门店送货执行单和送货 barcode。");
+      : "仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。");
   const dispatchRows = typeof operationsFulfillmentFlow.buildTransferDispatchRows === "function"
     ? operationsFulfillmentFlow.buildTransferDispatchRows({ plan, looseTasks: executionRecord.looseTasks })
     : plan.finalDispatchRows;
@@ -10372,8 +10374,9 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；正式门店送货 barcode 将在后续仓库送货执行单阶段生成。</div>
+    <div class="alert-banner">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；核对完成后可生成正式门店送货执行单 barcode。</div>
     <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
+    <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(transfer.from_warehouse_code || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
@@ -10491,7 +10494,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
                   <span class="meta-pill">${escapeHtml(row.finalType === "prepared_dispatch" ? "源头：现成待送店包裹" : "源头：补差拣货单")}</span>
                   ${row.baleBarcode ? `<span class="meta-pill">源 barcode ${escapeHtml(row.baleBarcode)}</span>` : ""}
                   ${row.plannedPackageCount ? `<span class="meta-pill">建议补差包 ${escapeHtml(row.plannedPackageCount)} 个</span>` : ""}
-                  <span class="meta-pill">正式送货执行码：后续阶段生成</span>
+                  <span class="meta-pill">正式送货执行码：${escapeHtml(officialDeliveryCodeLabel)}</span>
                 </div>
               </div>
               <div class="candidate-side-actions">
@@ -16414,8 +16417,9 @@ function renderTransferActionResultSummary(result) {
         : (String(storeDispatchRows?.[0]?.category_count || 0) > 1 ? "混装" : "按大类"))
       : "-";
     target.className = "report-summary";
+    const officialBarcode = String(result.official_delivery_barcode || result.store_delivery_execution_order_no || "").trim();
     target.innerHTML = `
-      <div class="alert-banner">调拨单 ${escapeHtml(result.transfer_no)} 已完成仓库执行输出。正式门店送货执行码仍由后续阶段生成。</div>
+      <div class="alert-banner">调拨单 ${escapeHtml(result.transfer_no)} 已完成仓库执行输出。${officialBarcode ? `正式门店送货执行码已生成：${escapeHtml(officialBarcode)}。` : "正式门店送货执行码仍未生成。"}这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>履约状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
         <article class="store-metric"><strong>delivery batch</strong><span>${escapeHtml(normalized.delivery_batch?.delivery_batch_no || "待生成")}</span></article>
@@ -16425,6 +16429,8 @@ function renderTransferActionResultSummary(result) {
         <article class="store-metric"><strong>送店来源入口</strong><span>${escapeHtml(result.display_generated_bale_count ?? storeDispatchRows.length ?? 0)}</span></article>
         <article class="store-metric"><strong>后台生成 bale</strong><span>${escapeHtml(result.generated_bale_count || 0)}</span></article>
         <article class="store-metric"><strong>汇总规则</strong><span>${escapeHtml(storeDispatchRows.length ? groupingLabel : "-")}</span></article>
+        <article class="store-metric"><strong>正式送货执行单号</strong><span>${escapeHtml(result.store_delivery_execution_order_no || "-")}</span></article>
+        <article class="store-metric"><strong>正式门店送货 barcode</strong><span>${escapeHtml(officialBarcode || "-")}</span></article>
         <article class="store-metric"><strong>打印机</strong><span>${escapeHtml(result.transfer_print_job.printer_name || "-")}</span></article>
       </div>
       ${
@@ -16635,6 +16641,7 @@ function renderTransferTrackingResultSummary(result) {
   const batchLabel = getShipmentBatchProgressLabel(normalized);
   const storeLabel = String(normalized.to_store_code || normalized.to_store_name || "-").trim() || "-";
   const linkedExecutionOrder = normalized.transfer_no || "-";
+  const officialBarcode = String(normalized.official_delivery_barcode || normalized.store_delivery_execution_order_no || "").trim() || "-";
   const routeLabel = String(result.route_stops || "").trim() || "WH1 → 待补充站点";
   target.className = "report-summary";
   target.innerHTML = `
@@ -16646,6 +16653,8 @@ function renderTransferTrackingResultSummary(result) {
       <article class="store-metric"><strong>预计出发时间 / departure time</strong><span>${escapeHtml(result.departure_time || "待填写")}</span></article>
       <article class="store-metric"><strong>路线 / stops</strong><span>${escapeHtml(routeLabel)}</span></article>
       <article class="store-metric"><strong>关联仓库执行单 / linked execution orders</strong><span>${escapeHtml(linkedExecutionOrder)}</span></article>
+      <article class="store-metric"><strong>正式门店送货执行单 / official execution order</strong><span>${escapeHtml(normalized.store_delivery_execution_order_no || "-")}</span></article>
+      <article class="store-metric"><strong>正式门店送货 barcode</strong><span>${escapeHtml(officialBarcode)}</span></article>
       <article class="store-metric"><strong>目标门店 / target stores</strong><span>${escapeHtml(storeLabel)}</span></article>
       <article class="store-metric"><strong>每个门店收货状态 / per-store receiving status</strong><span>${escapeHtml(batchLabel)}</span></article>
     </div>
@@ -16794,7 +16803,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
       <article class="store-metric"><strong>异常数</strong><span>${exceptionCount || 0}</span></article>
     </div>
     <div class="subtle small">配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。</div>
-    <div class="subtle small">该配送批次下的正式门店收货 barcode 尚未生成；后续需由仓库送货执行单生成。</div>
+    <div class="subtle small">该配送批次会展示已生成的正式门店送货执行单 / barcode。</div>
     <div class="candidate-list transfer-draft-list">
       ${
         batchGroups.length
@@ -25266,11 +25275,41 @@ async function submitStoreDispatchBaleAccept(event) {
   const rawScanText = String(payload.bale_no || "").trim().toUpperCase();
   payload.transfer_no = String(payload.transfer_no || "").trim().toUpperCase();
   if (!rawScanText) {
-    throw new Error("请先连续扫描或粘贴本调拨单下全部门店配货 bale barcode。");
+    throw new Error("请先扫描正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
   }
   if (!payload.transfer_no) {
     throw new Error("请先选择调拨单，再验收这张调拨单下的门店配货 bale。");
   }
+  const scannedCodes = rawScanText.split(/\r?\n+/).map((row) => String(row || "").trim().toUpperCase()).filter(Boolean);
+  if (scannedCodes.length === 1) {
+    const resolved = await resolveBarcodeForContext(scannedCodes[0], "store_receiving", ["STORE_DELIVERY_EXECUTION"]);
+    if (String(resolved?.barcode_type || "").trim().toUpperCase() === "STORE_DELIVERY_EXECUTION") {
+      const orders = await request(`/transfers/${encodeURIComponent(payload.transfer_no)}/store-delivery-execution-orders`);
+      const matched = Array.isArray(orders)
+        ? orders.find((row) => String(row?.official_delivery_barcode || "").trim().toUpperCase() === scannedCodes[0])
+        : null;
+      writeOutput("#storeDispatchBaleOutput", matched || resolved);
+      const summaryTarget = document.querySelector("#storeDispatchBaleSummary");
+      if (summaryTarget instanceof HTMLElement) {
+        summaryTarget.className = "report-summary";
+        summaryTarget.innerHTML = `
+          <div class="alert-banner">已识别正式门店送货执行码：${escapeHtml(scannedCodes[0])}。</div>
+          <div class="report-summary-grid">
+            <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(matched?.from_warehouse_code || "-")}</span></article>
+            <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(matched?.to_store_code || "-")}</span></article>
+            <article class="store-metric"><strong>关联补货申请单</strong><span>${escapeHtml(matched?.source_transfer_no || payload.transfer_no || "-")}</span></article>
+            <article class="store-metric"><strong>包数</strong><span>${escapeHtml(matched?.package_count || 0)}</span></article>
+            <article class="store-metric"><strong>状态</strong><span>${escapeHtml(getStoreDispatchBaleStatusLabel(matched?.status || "pending_print"))}</span></article>
+          </div>
+          <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
+        `;
+      }
+      showTransientInlineNotice("#storeDispatchBaleNotice", "已识别正式门店送货执行码。当前版本先完成识别与信息展示；收货回写将在后续版本补充。", "success", 2400);
+      return;
+    }
+    throw new Error("门店收货只扫正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
+  }
+  const usingLegacyDispatchBaleCompatibilityPath = true;
   payload.store_code = String(payload.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const rows = await refreshStoreDispatchBaleDirectoryFromForm({ store_code: payload.store_code, transfer_no: payload.transfer_no });
   const plan = buildStoreReceiptBatchPlan(payload.transfer_no, rawScanText, rows);
@@ -25299,7 +25338,14 @@ async function submitStoreDispatchBaleAccept(event) {
     bale_no: results.map((row) => row.bale_no).join("\n"),
   });
   await refreshStoreDispatchBaleDirectoryFromForm({ lastAccepted: payload.transfer_no, store_code: payload.store_code, transfer_no: payload.transfer_no });
-  showTransientInlineNotice("#storeDispatchBaleNotice", `调拨单 ${payload.transfer_no} 已整单验收 ${results.length} 包，下一步按总单批量分配店员。`, "success", 2400);
+  showTransientInlineNotice(
+    "#storeDispatchBaleNotice",
+    usingLegacyDispatchBaleCompatibilityPath
+      ? `调拨单 ${payload.transfer_no} 已通过 legacy 兼容流程整单验收 ${results.length} 包。正式流程请改扫 STORE_DELIVERY_EXECUTION（SDO...）。`
+      : `调拨单 ${payload.transfer_no} 已整单验收 ${results.length} 包，下一步按总单批量分配店员。`,
+    "success",
+    2400,
+  );
   setInputValue("#storeDispatchAssignmentForm [name='transfer_no']", payload.transfer_no);
   setInputValue("#storeDispatchAssignmentForm [name='bale_no']", results.map((row) => row.bale_no).join("\n"));
   renderStoreDispatchAssignmentResultSummary(null);
@@ -26123,7 +26169,7 @@ async function submitItemIdentityLedger(event) {
   }
   let ledgerLookupValue = identityNo;
   try {
-    const resolved = await resolveBarcodeForContext(identityNo, "identity_ledger", ["RAW_BALE", "DISPATCH_BALE", "STORE_ITEM"]);
+    const resolved = await resolveBarcodeForContext(identityNo, "identity_ledger", ["RAW_BALE", "DISPATCH_BALE", "STORE_DELIVERY_EXECUTION", "STORE_ITEM"]);
     if (window.barcodeResolverFlow && typeof window.barcodeResolverFlow.getIdentityLedgerLookupValue === "function") {
       ledgerLookupValue = window.barcodeResolverFlow.getIdentityLedgerLookupValue(identityNo, resolved);
     } else {
@@ -27210,6 +27256,12 @@ async function submitTransferBundle(event) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+  const storeDeliveryExecutionOrder = await request(`/transfers/${transferNo}/store-delivery-execution-orders`, {
+    method: "POST",
+    body: JSON.stringify({
+      notes: "仓库核对完成后生成正式门店送货执行单。",
+    }),
+  });
   activeTransferPreparationNo = String(transferNo || "").trim().toUpperCase();
   const executionRecord = getTransferExecutionRecord(transferNo, { create: false, plan });
   const displayStoreDispatchBales = typeof operationsFulfillmentFlow.buildTransferDispatchResultDisplayRows === "function"
@@ -27221,6 +27273,9 @@ async function submitTransferBundle(event) {
     : result.store_dispatch_bales;
   const displayResult = {
     ...result,
+    store_delivery_execution_order: storeDeliveryExecutionOrder,
+    store_delivery_execution_order_no: storeDeliveryExecutionOrder.execution_order_no,
+    official_delivery_barcode: storeDeliveryExecutionOrder.official_delivery_barcode,
     display_store_dispatch_bales: displayStoreDispatchBales,
     display_generated_bale_count: Array.isArray(displayStoreDispatchBales) ? displayStoreDispatchBales.length : result.generated_bale_count,
   };
@@ -27231,6 +27286,8 @@ async function submitTransferBundle(event) {
   renderLabelPrintResultSummary(result.label_print_jobs || []);
   renderReplenishmentFlowSummary(transferNo);
   renderLoosePackingTaskWorkbench(transferNo);
+  const latestTransfer = await request(`/transfers/${transferNo}`);
+  upsertTransferOrderStateRow(latestTransfer);
   openTransferDispatchPrintTemplateModal({
     transferNo,
     transfer: transfer || getTransferPreparationOrder(transferNo) || {},

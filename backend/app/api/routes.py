@@ -186,6 +186,8 @@ from app.schemas.suppliers import SupplierCreate, SupplierResponse
 from app.schemas.transfers import (
     DiscrepancyApprovalRequest,
     RecommendationTransferCreateRequest,
+    StoreDeliveryExecutionOrderCreateRequest,
+    StoreDeliveryExecutionOrderResponse,
     TransferApprovalRequest,
     TransferOrderCreate,
     TransferOrderResponse,
@@ -3695,6 +3697,36 @@ def get_transfer_order(
 ) -> TransferOrderResponse:
     _require_current_user(authorization=authorization)
     return TransferOrderResponse(**state.get_transfer_order(transfer_no))
+
+
+@router.get(
+    "/transfers/{transfer_no}/store-delivery-execution-orders",
+    response_model=list[StoreDeliveryExecutionOrderResponse],
+    tags=["transfers"],
+)
+def list_store_delivery_execution_orders(
+    transfer_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> list[StoreDeliveryExecutionOrderResponse]:
+    _require_current_user(authorization=authorization)
+    rows = state.list_store_delivery_execution_orders(transfer_no=transfer_no)
+    return [StoreDeliveryExecutionOrderResponse(**row) for row in rows]
+
+
+@router.post(
+    "/transfers/{transfer_no}/store-delivery-execution-orders",
+    response_model=StoreDeliveryExecutionOrderResponse,
+    tags=["transfers"],
+)
+def create_store_delivery_execution_order(
+    transfer_no: str,
+    payload: StoreDeliveryExecutionOrderCreateRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryExecutionOrderResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["created_by"] = current_user["username"]
+    return StoreDeliveryExecutionOrderResponse(**state.create_store_delivery_execution_order(transfer_no, data))
 
 
 @router.get(
