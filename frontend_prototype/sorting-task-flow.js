@@ -115,6 +115,23 @@
     );
   }
 
+  function hasCompletedSourceCost(row) {
+    if (!row || typeof row !== "object") {
+      return false;
+    }
+    if (typeof row.source_cost_completed === "boolean") {
+      return row.source_cost_completed;
+    }
+    const amount = Number(
+      row.source_cost_kes
+      ?? row.source_cost_amount
+      ?? row.source_total_cost_kes
+      ?? row.source_allocated_cost_kes
+      ?? 0,
+    );
+    return amount > 0;
+  }
+
   function findSortingTaskLookupMatches(rows, options) {
     const searchValue = normalizeSearchValue(options && options.searchValue);
     const selectedBaleCodeSet = new Set((options && options.selectedBaleCodes || []).map((item) => normalizeShipmentNo(item)).filter(Boolean));
@@ -178,6 +195,13 @@
       return {
         ok: false,
         error: `${baleCode} 当前状态不能加入分拣任务。`,
+        selectedBaleCodes,
+      };
+    }
+    if (!hasCompletedSourceCost(matchedRow)) {
+      return {
+        ok: false,
+        error: "该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。",
         selectedBaleCodes,
       };
     }
@@ -259,15 +283,26 @@
     }
 
     if (scanValue && scanTarget === "bale_lookup" && terminator === "none") {
+      const membershipStatus = normalizeSearchValue(lastCompletedScan && lastCompletedScan.membershipStatus);
+      const isAlreadyAdded = membershipStatus === "already_added";
+      const isPendingBind = membershipStatus === "pending_handler_bind";
       return {
         ...base,
         status: "suffix_missing",
-        severity: "warning",
-        headline: "已经收到条码，但没有回车或 Tab 后缀",
-        detail: "页面能看到扫码输入，但当前不会自动提交到分拣任务。",
+        severity: isAlreadyAdded || isPendingBind ? "info" : "warning",
+        headline: isAlreadyAdded || isPendingBind ? "已识别条码" : "已经收到条码，但没有回车或 Tab 后缀",
+        detail: isAlreadyAdded
+          ? `已识别条码：${scanValue}，状态：已加入待分拣列表`
+          : isPendingBind
+            ? `已识别条码：${scanValue}，状态：等待绑定分拣人`
+            : "页面能看到扫码输入，但当前不会自动提交到分拣任务。",
         recommendations: [
-          "把扫码枪后缀设成 Enter 或 Tab，这样扫完会自动加入任务。",
-          "在改设置前，也可以先扫进输入框，再手动点“加入任务”。",
+          isAlreadyAdded || isPendingBind
+            ? "这条码已识别成功，可继续扫码下一包。"
+            : "把扫码枪后缀设成 Enter 或 Tab，这样扫完会自动加入任务。",
+          isAlreadyAdded || isPendingBind
+            ? (inputFocused ? "保持焦点留在扫码框里，继续连续扫码。" : "先把焦点切回扫码框，再继续连续扫码。")
+            : "在改设置前，也可以先扫进输入框，再手动点“加入任务”。",
         ],
         canAutoAdd: false,
       };

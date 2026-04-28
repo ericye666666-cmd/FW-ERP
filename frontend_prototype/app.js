@@ -4603,6 +4603,22 @@ function getChinaSourceFinanceCompletion(record) {
   return { completedCount, stageKeys, statusLabel };
 }
 
+function hasCompletedSourceCostForBale(row) {
+  const sourceBaleToken = String(row?.source_bale_token || "").trim();
+  if (!sourceBaleToken) {
+    return false;
+  }
+  const sourceLine = getChinaSourceLineByToken(sourceBaleToken);
+  if (!sourceLine) {
+    return false;
+  }
+  const sourceRecord = getChinaSourceRecordByPoolToken(sourceLine.source_pool_token || "");
+  if (!sourceRecord) {
+    return false;
+  }
+  return getChinaSourceCostPerKgKes(sourceRecord) > 0;
+}
+
 function getInboundShipmentByCustomsNotice(customsNoticeNo = "") {
   const normalized = String(customsNoticeNo || "").trim().toUpperCase();
   if (!normalized) {
@@ -8455,7 +8471,7 @@ function setSortingScannerError(message = "") {
   renderSortingScannerHealthSummary();
 }
 
-function recordSortingScannerCompletedScan({ value = "", terminator = "none", target = "bale_lookup" } = {}) {
+function recordSortingScannerCompletedScan({ value = "", terminator = "none", target = "bale_lookup", membershipStatus = "" } = {}) {
   const capturedAtMs = Date.now();
   const startedAtMs = Number(sortingScannerHealthState.burstStartedAtMs || capturedAtMs);
   if (sortingScannerHealthState.detectionTimerId) {
@@ -8466,6 +8482,7 @@ function recordSortingScannerCompletedScan({ value = "", terminator = "none", ta
     value: String(value || "").trim().toUpperCase(),
     target: String(target || "bale_lookup").trim().toLowerCase(),
     terminator: String(terminator || "none").trim().toLowerCase(),
+    membershipStatus: String(membershipStatus || "").trim().toLowerCase(),
     durationMs: Math.max(0, capturedAtMs - startedAtMs),
     capturedAtMs,
   };
@@ -8703,6 +8720,7 @@ function refreshSortingShipmentOptions() {
   });
   const searchValue = String(document.querySelector("#sortingTaskForm [name='bale_search']")?.value || "").trim();
   const selectedRows = readyRows.filter((row) => selectedSortingBales.has(row.bale_barcode));
+  const selectedRowsWithoutSourceCost = selectedRows.filter((row) => !hasCompletedSourceCostForBale(row));
   const selectedShipmentCount = new Set(selectedRows.map((row) => String(row.shipment_no || "").trim()).filter(Boolean)).size;
   selectedSortingBatchNos = new Set(selectedRows.map((row) => String(row.parcel_batch_no || "").trim()).filter(Boolean));
   const selectedTotalWeight = roundToTwo(selectedRows.reduce((sum, row) => sum + Number(row.weight_kg || 0), 0));
@@ -8722,7 +8740,7 @@ function refreshSortingShipmentOptions() {
       <span class="sorting-task-flow-no">01</span>
       <div>
         <strong>扫码 / 检索加入包裹</strong>
-        <p>${selectedRows.length ? `已加入 ${selectedRows.length} 个 bale，涉及 ${selectedShipmentCount || 0} 张船单。` : "先扫描 bale barcode，或在左侧检索当前可加入的 bale。"}</p>
+        <p>${selectedRows.length ? `本次任务已加入 Bale：${selectedRows.length} 包（涉及 ${selectedShipmentCount || 0} 张船单）。` : "先扫描 bale barcode，或在左侧检索当前可加入的 bale。"}</p>
       </div>
     </article>
     <article class="sorting-task-flow-step ${selectedRows.length ? "is-active" : "is-pending"} ${selectedRows.length && handlerRows.length ? "is-done" : ""}">
@@ -8746,7 +8764,10 @@ function refreshSortingShipmentOptions() {
               </div>
               <div class="sorting-task-item-line">${escapeHtml(`${row.supplier_name || "-"} · ${row.category_main || "-"} / ${row.category_sub || "-"}`)}</div>
               <div class="sorting-task-item-line">${escapeHtml(`船单 ${row.shipment_no || "-"} · 批次 ${row.parcel_batch_no || "-"}`)}</div>
-              <div class="sorting-task-item-meta">${renderSortingWeightBadge(row.weight_kg || meta.perPackageWeight)}</div>
+              <div class="sorting-task-item-meta">
+                ${renderSortingWeightBadge(row.weight_kg || meta.perPackageWeight)}
+                <span class="meta-pill">${escapeHtml(`来源成本：${hasCompletedSourceCostForBale(row) ? "已完成" : "未完成"}`)}</span>
+              </div>
             </div>
             <button type="button" class="ghost-button mini-button" data-sorting-add-bale="${escapeHtml(row.bale_barcode || "")}">加入</button>
           </article>
@@ -8758,7 +8779,7 @@ function refreshSortingShipmentOptions() {
   selectedSummary.innerHTML = selectedRows.length
     ? `
         <div class="sorting-task-selected-meta">
-          <span class="meta-pill">已加入 ${selectedRows.length} 个 bale</span>
+          <span class="meta-pill">本次任务已加入 Bale：${selectedRows.length} 包</span>
           <span class="meta-pill">涉及船单 ${selectedShipmentCount}</span>
           <span class="meta-pill">包裹批次 ${selectedSortingBatchNos.size}</span>
           <span class="meta-pill">总计重量 ${selectedTotalWeight ? `${formatCurrency(selectedTotalWeight)} KG` : "待补录"}</span>
@@ -8778,7 +8799,10 @@ function refreshSortingShipmentOptions() {
                     </div>
                     <div class="sorting-task-item-line">${escapeHtml(`${row.supplier_name || "-"} · ${row.category_main || "-"} / ${row.category_sub || "-"}`)}</div>
                     <div class="sorting-task-item-line">${escapeHtml(`船单 ${row.shipment_no || "-"} · 批次 ${row.parcel_batch_no || "-"}`)}</div>
-                    <div class="sorting-task-item-meta">${renderSortingWeightBadge(row.weight_kg || meta.perPackageWeight)}</div>
+                    <div class="sorting-task-item-meta">
+                      ${renderSortingWeightBadge(row.weight_kg || meta.perPackageWeight)}
+                      <span class="meta-pill">${escapeHtml(`来源成本：${hasCompletedSourceCostForBale(row) ? "已完成" : "未完成"}`)}</span>
+                    </div>
                   </div>
                   <button type="button" class="ghost-button mini-button" data-sorting-remove-bale="${escapeHtml(row.bale_barcode || "")}">移除</button>
                 </article>
@@ -8789,6 +8813,13 @@ function refreshSortingShipmentOptions() {
         </div>
       `
     : '<div class="empty-state">先扫描 bale barcode，或从左侧检索结果里加入本次任务要分拣的 bale。</div>';
+  const createButton = document.querySelector("#sortingTaskForm .flow-primary-action");
+  if (createButton instanceof HTMLButtonElement) {
+    createButton.disabled = selectedRowsWithoutSourceCost.length > 0;
+    createButton.title = selectedRowsWithoutSourceCost.length > 0
+      ? "该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。"
+      : "";
+  }
   renderSortingScannerHealthSummary();
 }
 
@@ -9216,7 +9247,7 @@ function getSortingTaskFormalCostPayload(task = {}, resultItems = [], lossRecord
     return {
       cost_status: "cost_locked",
       label: "已锁成本",
-      detail: `本次按实际分拣重量正式锁成本：来源总重 ${formatCurrency(totalSourceWeightKg)} KG，${lossRecord.has_loss ? `扣除损耗后可售重 ${formatCurrency(sellableWeightKg)} KG，` : `当前已录分拣重 ${formatCurrency(resultWeightBaseKg)} KG，`}来源总成本不变；任务均价 ${formatKesAmount(weightedTaskUnitCostKes, "KES 0.00")}（v3 按可售 KG 成本和结果行实际重量分摊）。`,
+      detail: `本次成本将按来源 Bale 成本和实际分拣 KG 自动分摊并锁定。来源总重 ${formatCurrency(totalSourceWeightKg)} KG，${lossRecord.has_loss ? `扣除损耗后可售重 ${formatCurrency(sellableWeightKg)} KG，` : `当前已录分拣重 ${formatCurrency(resultWeightBaseKg)} KG，`}任务均价 ${formatKesAmount(weightedTaskUnitCostKes, "KES 0.00")}。`,
       tone: "success",
       estimated_unit_cost_kes: weightedTaskUnitCostKes,
       cost_model_code: "sorting_actual_weight_v3",
@@ -24550,6 +24581,7 @@ async function addSortingLookupBaleToSelection() {
       value: baleCode,
       terminator: "none",
       target: "bale_lookup",
+      membershipStatus: result.duplicate ? "already_added" : "pending_handler_bind",
     });
   }
   setInputValue("#sortingTaskForm [name='bale_lookup']", "");
@@ -24616,6 +24648,9 @@ async function submitSortingTask(event) {
   if (!payload.bale_barcodes.length) {
     throw new Error("请先通过扫码或检索，把至少一个当前可分拣的 bale 加入右侧任务清单。");
   }
+  if (selectedRows.some((row) => !hasCompletedSourceCostForBale(row))) {
+    throw new Error("该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。");
+  }
   if (!payload.handler_names.length) {
     throw new Error("请至少填写一个分拣处理人。");
   }
@@ -24662,11 +24697,9 @@ async function submitSortingResults(event) {
     if (String(row?.confirm_to_inventory) === "false" || row?.confirm_to_inventory === false) {
       return;
     }
-    if (!(Number(row?.default_cost_kes || 0) > 0)) {
-      throw new Error(`第 ${index + 1} 行还没有绑定默认成本价，请先去 4.7 配置。`);
-    }
-    if (!String(row?.rack_code || "").trim()) {
-      throw new Error(`第 ${index + 1} 行还没有绑定分拣库位，请先去 4.8 配置。`);
+if (!String(row?.rack_code || "").trim()) {
+  throw new Error(`第 ${index + 1} 行还没有绑定分拣库位，请先去 4.8 配置。`);
+}
     }
   });
   const costMeta = getSortingTaskFormalCostPayload(task, payload.result_items, payload.loss_record);

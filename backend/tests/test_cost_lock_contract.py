@@ -161,6 +161,41 @@ class CostLockContractTest(unittest.TestCase):
         self.assertEqual(stored_task["cost_status"], "cost_locked")
         self.assertIsNotNone(stored_task["cost_locked_at"])
 
+    def test_sorting_confirmation_with_actual_kg_does_not_require_default_category_cost(self):
+        _, bales = self._create_ready_bales_with_source_cost(customs_notice_no="RAWCOSTNODEFAULT240427")
+        task = self.state.create_sorting_task(
+            {
+                "bale_barcodes": [bales[0]["bale_barcode"]],
+                "handler_names": ["warehouse_clerk_1"],
+                "note": "no default cost required when actual source allocation exists",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+
+        result = self.state.submit_sorting_task_results(
+            task["task_no"],
+            {
+                "created_by": "warehouse_supervisor_1",
+                "result_items": [
+                    {
+                        "category_name": "tops / lady tops",
+                        "grade": "P",
+                        "actual_weight_kg": 9,
+                        "qty": 3,
+                        "rack_code": "A-TS-P-MANUAL",
+                        "default_cost_kes": None,
+                        "confirm_to_inventory": True,
+                    }
+                ],
+                "note": "no default cost",
+                "mark_task_completed": True,
+            },
+        )
+
+        self.assertEqual(result["cost_status"], "cost_locked")
+        self.assertEqual(result["cost_model_code"], "sorting_actual_weight_v3")
+        self.assertEqual(result["result_items"][0]["rack_code"], "A-TS-P-MANUAL")
+
     def test_cost_lock_is_backend_authoritative_not_frontend_only_display_state(self):
         _, _, result = self._create_locked_sorting_context(customs_notice_no="RAWAUTH240427")
 

@@ -1602,6 +1602,16 @@ class InMemoryState:
                 source_pool_tokens.append(source_pool_token)
         return source_bale_tokens, source_pool_tokens
 
+    def _raw_bale_has_completed_source_cost(self, bale: dict[str, Any]) -> bool:
+        source_bale_token = str(bale.get("source_bale_token") or "").strip()
+        if not source_bale_token:
+            return False
+        raw_record, source_line = self._find_china_source_line_by_token(source_bale_token)
+        if not raw_record or not source_line:
+            return False
+        source_record = self._build_china_source_record_response(raw_record)
+        return self._china_source_cost_per_kg_kes(source_record) > 0
+
     def _china_source_combined_cost_kes(self, record: dict[str, Any]) -> float:
         goods_cost_kes = round(
             sum(
@@ -5469,6 +5479,8 @@ class InMemoryState:
             legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
             if bale["status"] not in {"ready_for_sorting"}:
                 raise HTTPException(status_code=409, detail=f"{bale_reference} 当前状态是 {bale['status']}，不能再加入新分拣单")
+            if not self._raw_bale_has_completed_source_cost(bale):
+                raise HTTPException(status_code=409, detail="该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。")
             if category_filters:
                 category_key = f"{bale.get('category_main', '')} / {bale.get('category_sub', '')}".strip()
                 if category_key not in category_filters:
@@ -7164,12 +7176,17 @@ class InMemoryState:
             grade = item["grade"].strip()
             normalized_grade = grade.upper()
             confirm_to_inventory = bool(item.get("confirm_to_inventory", True))
+            requires_default_cost_profile = not (
+                cost_status == "cost_locked"
+                and int(item.get("qty") or 0) > 0
+                and float((row_estimate_map.get(row_index) or {}).get("actual_weight_kg") or 0) > 0
+            )
             default_cost_kes = self._resolve_sorting_result_default_cost_kes(
                 category_name,
                 grade,
                 item.get("default_cost_kes"),
             )
-            if confirm_to_inventory and default_cost_kes in {None, ""}:
+            if confirm_to_inventory and requires_default_cost_profile and default_cost_kes in {None, ""}:
                 raise HTTPException(
                     status_code=400,
                     detail=f"{category_name} / {normalized_grade} 还没有配置默认成本价，请先完成 4.7 默认成本价管理",
@@ -7181,9 +7198,10 @@ class InMemoryState:
                 item.get("rack_code"),
             )
             if confirm_to_inventory and not rack_code:
+                default_cost_label = f"{float(default_cost_kes):.2f}" if default_cost_kes not in {None, ""} else "-"
                 raise HTTPException(
                     status_code=400,
-                    detail=f"{category_name} / {normalized_grade} / {default_cost_kes:.2f} 还没有配置分拣库位，请先完成 4.8 分拣库位管理",
+                    detail=f"{category_name} / {normalized_grade} / {default_cost_label} 还没有配置分拣库位，请先完成 4.8 分拣库位管理",
                 )
             sku_code = self._sorting_sku_code(category_name, grade, default_cost_kes)
             row_token_preview: list[str] = []
