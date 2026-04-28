@@ -26914,6 +26914,7 @@ async function submitTransfer(event) {
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
   payload.items = parseJsonField(payload.items_json, []);
+  payload.approval_required = false;
   const demandRows = buildTransferDemandDraftRows(payload.items);
   delete payload.items_json;
   const result = await request("/transfers", {

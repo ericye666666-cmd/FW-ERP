@@ -27,6 +27,26 @@ const warehouseNavSectionJs = (appJs.match(/const WAREHOUSE_NAV_SECTIONS = \[[\s
 const warehousePanelMetaJs = (appJs.match(/const WAREHOUSE_PANEL_NAV_META = \[[\s\S]*?\n\];/) || [""])[0];
 const operationsPanelMetaJs = (appJs.match(/const OPERATIONS_PANEL_NAV_META = \[[\s\S]*?\n\];/) || [""])[0];
 
+test("submitTransfer sends explicit approval_required false for Phase A no-approval path", () => {
+  assert.match(appJs, /payload\.approval_required\s*=\s*false;/);
+});
+
+test("transfer selectors use persisted required arrival date fields", () => {
+  assert.match(appJs, /row\.required_arrival_date\s*\|\|\s*row\.required_arrival_on/);
+});
+
+test("buildTransferDemandLines groups by grade dimension", () => {
+  const result = buildTransferDemandLines([
+    { category_main: "tops", category_sub: "lady tops", grade: "P", requested_qty: 2 },
+    { category_main: "tops", category_sub: "lady tops", grade: "S", requested_qty: 3 },
+    { category_main: "tops", category_sub: "lady tops", grade: "P", requested_qty: 1 },
+  ]);
+  assert.deepEqual(result, [
+    { category_main: "tops", category_sub: "lady tops", grade: "P", requested_qty: 3, source_count: 2 },
+    { category_main: "tops", category_sub: "lady tops", grade: "S", requested_qty: 3, source_count: 1 },
+  ]);
+});
+
 test("buildTransferDemandLines groups recommendation rows by category and sums requested qty", () => {
   const result = buildTransferDemandLines([
     { barcode: "OPS-001", category_main: "pants", category_sub: "jeans pant", suggested_qty: 2 },
