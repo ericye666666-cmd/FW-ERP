@@ -1126,11 +1126,11 @@ const WAREHOUSE_PANEL_NAV_META = [
     navTitle: "4. 门店补货建议",
   },
   {
-    match: "4.1 手动生成配货单",
+    match: "4.1 手动补货需求",
     section: "replenishment",
     order: 127,
     icon: "单",
-    navTitle: "4.1 手动生成配货单",
+    navTitle: "4.1 手动补货需求",
   },
   {
     match: "5.1 补差打包工单",
@@ -1140,18 +1140,18 @@ const WAREHOUSE_PANEL_NAV_META = [
     navTitle: "5.1 补差打包工单",
   },
   {
-    match: "6. 仓库配货 / 出库打印",
+    match: "6. 仓库执行单 / 出库打印",
     section: "replenishment",
     order: 128,
     icon: "配",
-    navTitle: "6. 仓库配货 / 出库打印",
+    navTitle: "6. 仓库执行单 / 出库打印",
   },
   {
-    match: "6.1 门店配货 / 配送跟踪",
+    match: "6.1 配送批次 / 门店收货跟踪",
     section: "replenishment",
     order: 128.5,
     icon: "送",
-    navTitle: "6.1 门店配货 / 配送跟踪",
+    navTitle: "6.1 配送批次 / 门店收货跟踪",
   },
   {
     match: "Bales销售｜待售包裹",
@@ -2259,9 +2259,9 @@ function setActivePanel(panelKey, options = {}) {
     currentSession?.token
     && [
       getPanelKeyByTitle("warehouse", "门店补货流程页"),
-      getPanelKeyByTitle("warehouse", "4.1 手动生成配货单"),
+      getPanelKeyByTitle("warehouse", "4.1 手动补货需求"),
       getPanelKeyByTitle("warehouse", "5.1 补差打包工单"),
-      getPanelKeyByTitle("warehouse", "6. 仓库配货 / 出库打印"),
+      getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"),
     ].includes(panelKey)
   ) {
     loadTransferPlanningContext({ force: true }).catch(() => {});
@@ -9497,7 +9497,7 @@ function renderTransferDraftSummary() {
   const totalRequested = rows.reduce((sum, row) => sum + Number(row.requested_qty || 0), 0);
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="flow-summary-note">这张门店调拨草稿确认成正式调拨单后，下一步就进入仓库配货 / 出库打印；门店签收暂时不在这页回写。</div>
+    <div class="flow-summary-note">这张门店调拨草稿确认成正式调拨单后，下一步就进入仓库执行单 / 出库打印；门店签收暂时不在这页回写。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(fromWarehouseCode || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(toStoreCode || "-")}</span></article>
@@ -10070,13 +10070,13 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
         <article class="candidate-row transfer-draft-row">
           <div>
             <strong>门店补货流程怎么走</strong>
-            <div class="subtle small">先从 4 生成建议，或在 4.1 手动生成配货单；如果需要散货补差，就进 5.1 生成一张 barcode 拣货单并完成封包；最后回 6 做现成包扫码登记、合并最终送店 bale 和打印箱单。</div>
+            <div class="subtle small">先从 4 生成建议，或在 4.1 手动补货需求；如果需要散货补差，就进 5.1 生成一张 barcode 拣货单并完成封包；最后回 6 做现成包扫码登记、合并最终送店 bale 和打印箱单。</div>
           </div>
         </article>
       </div>
       ${renderSummaryActions([
         { panelKey: getPanelKeyByTitle("warehouse", "4. 门店补货建议"), label: "从补货建议开始" },
-        { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动生成配货单"), label: "直接去手动配货" },
+        { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "直接去手动补货需求" },
       ])}
     `;
     return;
@@ -10142,9 +10142,9 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
     </div>
     ${renderSummaryActions([
       { panelKey: getPanelKeyByTitle("warehouse", "4. 门店补货建议"), label: "从补货建议开始" },
-      { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动生成配货单"), label: "去手动配货" },
+      { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "去手动补货需求" },
       { panelKey: getPanelKeyByTitle("warehouse", "5.1 补差打包工单"), label: "去补差打包工单" },
-      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库配货 / 出库打印"), label: "去仓库执行台" },
+      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "去仓库执行台" },
     ])}
   `;
 }
@@ -10172,7 +10172,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
     || (plan.summary?.looseQtyToPick ? Math.max(1, Math.ceil(Number(plan.summary.looseQtyToPick || 0) / packageLimitQty)) : 0);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">补差打包只处理“现成包不够”的散货缺口。这里生成 1 张带 barcode 的拣货单，工人拿单去拣货，拣完后直接贴在补差包上并一次确认封包。</div>
+    <div class="alert-banner">补差打包工单只处理现成待送店包不足的散货缺口。LPK barcode 是仓库拣货工单码，不是门店收货码。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>调拨单号</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>散货补差件数</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)}</span></article>
@@ -10181,7 +10181,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
       <article class="store-metric"><strong>拣货单状态</strong><span>${escapeHtml(readiness.pendingLooseTaskCount ? "待完成" : "已完成")}</span></article>
     </div>
     ${renderSummaryActions([
-      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库配货 / 出库打印"), label: "补差完成后回仓库执行台" },
+      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "补差完成后回仓库执行台" },
     ])}
   `;
   if (!plan.loosePickRows.length) {
@@ -10255,22 +10255,22 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
   const demandRows = Array.isArray(rows) ? rows : [];
   if (!demandRows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会把当前调拨草稿拆成仓库真实动作：先拿哪些待送店包裹，再补哪些散货、要新打几个 bale，以及这次最终预计会生成多少个送店 bale。";
+    target.textContent = "这里会按“补货需求草稿 / 系统配货建议 / 下一步动作”展示仓库执行拆解。";
     return;
   }
   const plan = buildTransferPreparationPlan(demandRows);
   const summary = plan.summary || {};
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">系统已把当前调拨草稿拆成仓库备货动作。优先使用现成待送店包裹，剩余缺口进入 5.1 生成一张带 barcode 的补差拣货单。</div>
+    <div class="alert-banner">系统已把当前补货需求拆成仓库动作。SDB 是仓库内部待送店包码，不是门店收货 barcode。门店收货需等待后续正式送货执行单 barcode。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>需求类目</strong><span>${escapeHtml(plan.demandLineCount || 0)}</span></article>
       <article class="store-metric"><strong>申请总件数</strong><span>${escapeHtml(summary.totalRequestedQty || 0)}</span></article>
       <article class="store-metric"><strong>现成待送店包裹</strong><span>${escapeHtml(summary.selectedPreparedBaleCount || 0)} 包</span></article>
-      <article class="store-metric"><strong>现成包覆盖</strong><span>${escapeHtml(summary.selectedPreparedQty || 0)} 件</span></article>
+      <article class="store-metric"><strong>现成待送店包覆盖</strong><span>${escapeHtml(summary.selectedPreparedQty || 0)} 件</span></article>
       <article class="store-metric"><strong>散货补差</strong><span>${escapeHtml(summary.looseQtyToPick || 0)} 件</span></article>
-      <article class="store-metric"><strong>新打补差 bale</strong><span>${escapeHtml(summary.plannedLooseBaleCount || 0)} 个</span></article>
-      <article class="store-metric"><strong>最终送店 bale</strong><span>${escapeHtml(summary.totalFinalDispatchBaleCount || 0)} 个</span></article>
+      <article class="store-metric"><strong>新打补差包</strong><span>${escapeHtml(summary.plannedLooseBaleCount || 0)} 个</span></article>
+      <article class="store-metric"><strong>最终预计送店包</strong><span>${escapeHtml(summary.totalFinalDispatchBaleCount || 0)} 个</span></article>
       <article class="store-metric"><strong>缺口</strong><span>${escapeHtml(summary.shortageQty || 0)} 件</span></article>
     </div>
     <div class="candidate-list transfer-draft-list">
@@ -10279,12 +10279,13 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
           <article class="candidate-row transfer-draft-row">
             <div>
               <strong>${escapeHtml([row.categoryMain, row.categorySub].filter(Boolean).join(" / ") || "-")}</strong>
-              <div class="subtle small">${escapeHtml(`需求 ${row.requestedQty || 0} 件 · ${getTransferPreparationModeLabel(row.planMode)}`)}</div>
+              <div class="subtle small">${escapeHtml(`需求：${row.requestedQty || 0} 件 · ${getTransferPreparationModeLabel(row.planMode)}`)}</div>
               <div class="meta-row">
-                <span class="meta-pill">现成待送店 ${escapeHtml(row.selectedPreparedBales.length || 0)} 包 / ${escapeHtml(row.preparedQty || 0)} 件</span>
-                <span class="meta-pill">散货补差 ${escapeHtml(row.looseQtyNeeded || 0)} 件</span>
-                <span class="meta-pill">补差 bale ${escapeHtml(row.plannedLooseBales.length || 0)} 个</span>
+                <span class="meta-pill">现成待送店包：${escapeHtml(row.selectedPreparedBales.length || 0)} 包 / 覆盖 ${escapeHtml(row.preparedQty || 0)} 件</span>
+                <span class="meta-pill">散货补差：${escapeHtml(row.looseQtyNeeded || 0)} 件</span>
+                <span class="meta-pill">新打补差包：${escapeHtml(row.plannedLooseBales.length || 0)} 个</span>
                 <span class="meta-pill">缺口 ${escapeHtml(row.shortageQty || 0)} 件</span>
+                <span class="meta-pill">最终预计送店包：${escapeHtml(row.finalDispatchBaleCount || 0)} 个</span>
               </div>
               ${
                 row.selectedPreparedBales.length
@@ -10328,7 +10329,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const transfer = getTransferExecutionAnchor(transferOrNo);
   if (!transfer?.transfer_no) {
     summaryTarget.className = "candidate-summary empty-state";
-    summaryTarget.textContent = "先填入门店调拨单号，或从 4.1 手动生成配货单后自动带入。这里会显示这单现在需要找多少现成待送店包裹、是否需要一张补差拣货单、预计形成多少个最终送店 bale。";
+    summaryTarget.textContent = "先填入门店调拨单号，或从 4.1 手动补货需求后自动带入。这里会显示这单现在需要找多少现成待送店包裹、是否需要一张补差拣货单、预计形成多少个最终送店 bale。";
     preparedProgressTarget.className = "candidate-summary empty-state";
     preparedProgressTarget.textContent = "这里会显示当前调拨单还要找几包现成待送店包裹，以及哪些已经扫码登记完成。";
     preparedTarget.className = "candidate-summary empty-state";
@@ -10338,7 +10339,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
     looseTarget.className = "candidate-summary empty-state";
     looseTarget.textContent = "如果现成待送店包裹不够，这里会提示去 5.1 生成一张带 barcode 的补差拣货单，工人按单捡货并贴标。";
     dispatchTarget.className = "candidate-summary empty-state";
-    dispatchTarget.textContent = "这里会把本次最终送店 bale 汇总出来。无论源头是现成待送店包裹，还是补差拣货单，到这里都统一变成门店验收用的送店 barcode。";
+    dispatchTarget.textContent = "这里用于仓库核对现成待送店包与补差包。后续将生成正式门店送货 barcode；SDB 和 LPK 不是门店可扫 barcode。";
     if (printButton instanceof HTMLButtonElement) {
       printButton.disabled = true;
     }
@@ -10357,7 +10358,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">当前执行单 ${escapeHtml(transfer.transfer_no)} 已进入仓库备货视角。现成包先扫码登记，散货补差要在 5.1 工单页完成，最后才允许统一打印门店验收用送店 barcode。</div>
+    <div class="alert-banner">这里用于仓库核对现成待送店包和补差包，后续将生成正式门店送货 barcode。SDB 和 LPK 不是门店可扫 barcode。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(transfer.from_warehouse_code || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
@@ -10460,7 +10461,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
     </div>
     <div class="subtle small">${escapeHtml(
       readiness.canPrint
-        ? "现成包登记和补差拣货单都已完成，现在可以批量打印最终送店 barcode + 箱单。"
+        ? "现成包登记和补差拣货单已完成。正式门店送货执行单 barcode 将在 Phase 2 提供。"
         : `还不能打印：现成包待登记 ${readiness.pendingPreparedCount || 0} 包，补差拣货单待完成 ${readiness.pendingLooseTaskCount || 0} 张。`,
     )}</div>
     <div class="candidate-list transfer-draft-list">
@@ -10475,7 +10476,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
                   <span class="meta-pill">${escapeHtml(row.finalType === "prepared_dispatch" ? "源头：现成待送店包裹" : "源头：补差拣货单")}</span>
                   ${row.baleBarcode ? `<span class="meta-pill">源 barcode ${escapeHtml(row.baleBarcode)}</span>` : ""}
                   ${row.plannedPackageCount ? `<span class="meta-pill">建议补差包 ${escapeHtml(row.plannedPackageCount)} 个</span>` : ""}
-                  <span class="meta-pill">打印后给店长扫码验收</span>
+                  <span class="meta-pill">待后续正式送货执行单 barcode（Phase 2）</span>
                 </div>
               </div>
               <div class="candidate-side-actions">
@@ -16229,7 +16230,7 @@ function renderReceiptResultSummary(result) {
     <div class="subtle small">收货日期：${escapeHtml(result.receipt_date || "-")}；状态：${escapeHtml(result.status || "-")}。</div>
     ${renderSummaryActions([
         { panelKey: getPanelKeyByTitle("warehouse", "4. 门店补货建议"), label: "下一步：去做建议调拨" },
-        { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动生成配货单"), label: "直接去手动配货" },
+        { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "直接去手动补货需求" },
     ])}
   `;
 }
@@ -16262,7 +16263,7 @@ function renderRecommendationResultSummary(result) {
     </div>
     <div class="subtle small">建议来源：近 14 天销售、当前门店现货、待上架 token、在途 warehouseout dispatch bale。系统先算最近卖掉多少，再扣掉门店手上已有和路上在来的数量，剩下多少就建议补多少。</div>
     ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动生成配货单"), label: "下一步：去手动生成配货单" },
+        { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "下一步：去手动补货需求" },
     ])}
   `;
 }
@@ -16363,8 +16364,8 @@ function renderTransferResultSummary(result) {
         : ""
     }
     ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库配货 / 出库打印"), label: "下一步：去仓库执行台" },
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 门店配货 / 配送跟踪"), label: "后续：去履约追踪台看发运" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "下一步：去仓库执行台" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "后续：去履约追踪台看发运" },
     ])}
   `;
 }
@@ -16435,7 +16436,7 @@ function renderTransferActionResultSummary(result) {
           : ""
       }
       ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 门店配货 / 配送跟踪"), label: "查看门店配货 / 配送跟踪" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "查看配送批次 / 收货跟踪" },
         { panelKey: getPanelKeyByTitle("store", "6. 门店验收配货 bale"), label: "下一步：去门店签收配货 bale" },
       ])}
     `;
@@ -16453,8 +16454,8 @@ function renderTransferActionResultSummary(result) {
         <article class="store-metric"><strong>门店</strong><span>${escapeHtml(result.to_store_code || "-")}</span></article>
       </div>
       ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 门店配货 / 配送跟踪"), label: "查看门店配货 / 配送跟踪" },
-        { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库配货 / 出库打印"), label: "继续：去仓库执行台" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "查看配送批次 / 收货跟踪" },
+        { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "继续：去仓库执行台" },
       ])}
     `;
     return;
@@ -16701,7 +16702,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   const list = baseList.map((row) => normalizeTransferForOperationsSummary(row));
   if (!list.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先创建并审核门店调拨单，这里再读取最近调拨单，就能看调拨、delivery batch 和 shipment session。";
+    target.textContent = "先创建并审核门店调拨单，这里再读取最近调拨单，就能看配送批次、driver/vehicle 与收货跟踪。";
     return;
   }
   const summary = summarizeOperationsTransferRows(baseList);
@@ -16742,6 +16743,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
                   <span class="meta-pill">审核 ${escapeHtml(approvalLabel)}</span>
                   <span class="meta-pill">delivery batch ${escapeHtml(deliveryBatch.delivery_batch_no || "待生成")}</span>
                   <span class="meta-pill">shipment ${escapeHtml(deliveryBatch.shipment_session_no || "待发运")}</span>
+                  <span class="meta-pill">正式收货码：仓库执行单生成（Phase 2）</span>
                 </div>
                 ${
                   relatedBales.length
@@ -18989,7 +18991,7 @@ function renderStoreReplenishmentDemoSummary(
     </div>
     ${renderSummaryActions([
       { panelKey: getPanelKeyByTitle("warehouse", "4. 门店补货建议"), label: "直接去补货建议" },
-      { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动生成配货单"), label: "去手动配货" },
+      { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "去手动补货需求" },
     ])}
   `;
 }
@@ -28302,7 +28304,7 @@ document.querySelector("#transferDispatchSummary")?.addEventListener("click", (e
     setInputValue("#transferForm [name='to_store_code']", row.to_store_code || "UTAWALA");
     setInputValue("#transferForm [name='approval_required']", row.approval_status === "approved" ? "false" : String(row.approval_required));
   }
-  const panelKey = getPanelKeyByTitle("warehouse", "6. 仓库配货 / 出库打印");
+  const panelKey = getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印");
   if (panelKey) {
     setActivePanel(panelKey);
     focusElement("#approveTransferForm");
