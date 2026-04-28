@@ -352,9 +352,9 @@ LABEL_TEMPLATES = [
     },
     {
         "template_code": "wait_for_transtoshop",
-        "name": "wait for transtoshop",
+        "name": "WAITING FOR STORE DISPATCH",
         "template_scope": "warehouseout_bale",
-        "description": "待送店 60x40 正式模板，锁定当前 WF-A wait for transtoshop 版式。",
+        "description": "待送店 60x40 正式模板，锁定当前 WF-A WAITING FOR STORE DISPATCH 版式。",
         "paper_preset": "60x40",
         "width_mm": 60,
         "height_mm": 40,

@@ -419,7 +419,7 @@ class BaleBatchTsplTest(unittest.TestCase):
                     "template_scope": "warehouseout_bale",
                     "barcode_value": "240423000018",
                     "dispatch_bale_no": "240423000018",
-                    "status": "wait for transtoshop",
+                    "status": "WAITING FOR STORE DISPATCH",
                     "cat": "pants",
                     "sub": "jeans pant",
                     "grade": "P",
@@ -432,7 +432,7 @@ class BaleBatchTsplTest(unittest.TestCase):
         self.assertEqual(payload["template_code"], "wait_for_transtoshop")
         self.assertEqual(payload["template_scope"], "warehouseout_bale")
         self.assertEqual(payload["paper_preset"], "60x40")
-        self.assertEqual(payload["status"], "wait for transtoshop")
+        self.assertEqual(payload["status"], "WAITING FOR STORE DISPATCH")
         self.assertEqual(payload["dispatch_bale_no"], "240423000018")
 
     def test_build_tspl_barcode_payload_supports_product_template_fields_for_department_retail(self):

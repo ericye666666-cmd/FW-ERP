@@ -140,6 +140,21 @@ def _prepare_dispatch_and_store_item(state: InMemoryState):
     return raw_bale, dispatch_bale, token, store_item_barcode
 
 
+def _seed_store_prep_bale(state: InMemoryState, bale_no: str = "SDB260428AAB") -> dict:
+    bale = state._normalize_store_prep_bale(
+        {
+            "id": 1,
+            "bale_no": bale_no,
+            "task_no": "SPT260428001",
+            "task_type": "store_dispatch",
+            "status": "waiting_store_dispatch",
+            "qty": 100,
+        }
+    )
+    state.store_prep_bales[bale["bale_no"]] = bale
+    return bale
+
+
 def test_pos_accepts_only_store_item_and_requires_identity_id(state):
     _, dispatch_bale, token, store_item_barcode = _prepare_dispatch_and_store_item(state)
 
@@ -286,3 +301,43 @@ def test_template_scope_is_not_business_identity_authority_contract(state):
     assert result["business_object"]["kind"] == "STORE_ITEM"
     assert result["business_object"]["id"] == token["token_no"]
     assert result["template_scope"] == "product"
+
+
+def test_store_prep_bale_resolves_as_warehouse_side_waiting_dispatch_object(state):
+    prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
+    result = state.resolve_barcode(prep_bale["bale_barcode"], context="identity_ledger")
+
+    assert result["barcode_type"] == "STORE_PREP_BALE"
+    assert result["business_object"]["kind"] == "STORE_PREP_BALE"
+    assert result["object_type"] == "store_prep_bale"
+    assert result["template_scope"] == "warehouse_store_prep_bale"
+    assert result["reject_reason"] == ""
+
+
+def test_store_prep_bale_is_rejected_in_store_pda_pos_and_b2b_sales(state):
+    prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
+    barcode = prep_bale["bale_barcode"]
+
+    store_pda_result = state.resolve_barcode(barcode, context="store_pda")
+    assert store_pda_result["barcode_type"] == "STORE_PREP_BALE"
+    assert store_pda_result["reject_reason"] == "店员 PDA 只能扫描已收货/已分配流程中的正式送店执行码或 STORE_ITEM，不能直接扫描仓库待送店压缩包码。"
+
+    pos_result = state.resolve_barcode(barcode, context="pos")
+    assert pos_result["barcode_type"] == "STORE_PREP_BALE"
+    assert pos_result["reject_reason"] == "POS 只允许扫描 STORE_ITEM 商品码，不能扫描仓库待送店压缩包码。"
+
+    b2b_result = state.resolve_barcode(barcode, context="b2b_bale_sales")
+    assert b2b_result["barcode_type"] == "STORE_PREP_BALE"
+    assert b2b_result["reject_reason"] == "这是待送店压缩包，不是待售卖 Bale。请切换到待售 Bale 业务页面后重试。"
+
+
+def test_store_prep_bale_is_rejected_in_store_receiving_but_dispatch_execution_stays_allowed(state):
+    prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
+    receiving_result = state.resolve_barcode(prep_bale["bale_barcode"], context="store_receiving")
+    assert receiving_result["barcode_type"] == "STORE_PREP_BALE"
+    assert receiving_result["reject_reason"] == "门店收货只能扫描仓库执行单/送货单打印的正式送店 barcode，不能直接扫描待送店压缩包码。"
+
+    _, dispatch_bale, _, _ = _prepare_dispatch_and_store_item(state)
+    dispatch_result = state.resolve_barcode(dispatch_bale["bale_no"], context="store_receiving")
+    assert dispatch_result["barcode_type"] == "DISPATCH_BALE"
+    assert dispatch_result["reject_reason"] == ""

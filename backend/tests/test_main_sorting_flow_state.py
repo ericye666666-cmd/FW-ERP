@@ -1529,7 +1529,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(job["print_payload"]["parcel_batch_no"], completed["prepared_bale_no"])
         self.assertEqual(job["template_code"], "wait_for_transtoshop")
         self.assertEqual(job["print_payload"]["template_scope"], "warehouseout_bale")
-        self.assertEqual(job["print_payload"]["status"], "wait for transtoshop")
+        self.assertEqual(job["print_payload"]["status"], "WAITING FOR STORE DISPATCH")
         self.assertEqual(job["print_payload"]["qty"], "5")
         self.assertEqual(job["print_payload"]["dispatch_bale_no"], completed["prepared_bale_barcode"])
 
@@ -1738,7 +1738,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
         sale_wait = self.state.get_label_template("wait_for_sale", template_scope="warehouseout_bale")
 
         self.assertEqual(transtoshop_wait["template_code"], "wait_for_transtoshop")
-        self.assertEqual(transtoshop_wait["name"], "wait for transtoshop")
+        self.assertEqual(transtoshop_wait["name"], "WAITING FOR STORE DISPATCH")
         self.assertEqual(transtoshop_wait["template_scope"], "warehouseout_bale")
         self.assertEqual(transtoshop_wait["paper_preset"], "60x40")
         self.assertEqual(sale_wait["template_code"], "wait_for_sale")

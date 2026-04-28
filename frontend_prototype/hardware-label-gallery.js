@@ -46,7 +46,7 @@
       sub: "jeans pant",
       grade: "P",
       qty: "50",
-      status: "wait for transtoshop",
+      status: "WAITING FOR STORE DISPATCH",
       code: "240423000018",
     },
     waitForSale: {
@@ -104,10 +104,10 @@
       key: "wait_for_transtoshop",
       title: "D. wait labels 60x40",
       short_title: "wait labels",
-      purpose: "wait for transtoshop / wait for sale 两种 60x40 商品包标签预览，先看字段层级和条码比例。",
+      purpose: "WAITING FOR STORE DISPATCH / wait for sale 两种 60x40 商品包标签预览，先看字段层级和条码比例。",
       design_rule: "只用 CAT / SUB / GRADE / QTY / STATUS / CODE + 1D barcode；wait for sale 额外带 WEIGHT，不额外加业务字段。",
       recommended_candidate_id: "wait_for_transtoshop__wf_main",
-      recommended_title: "WF-A wait for transtoshop",
+      recommended_title: "WF-A WAITING FOR STORE DISPATCH",
       recommended_reason: "上半区先给英文状态和分类，底部完整给 CODE 和 Code128；第二版再额外测试 wait for sale 的 GRADE A/B 和 WEIGHT。",
       required_fields: ["CAT", "SUB", "GRADE", "QTY", "STATUS", "CODE", "Code128", "WEIGHT(optional)"],
       system_only_fields: ["supplier_name", "store_name", "transfer_order_no", "operator_name", "internal_identity_no"],
@@ -413,7 +413,7 @@
       {
         id: "wait_for_transtoshop__wf_main",
         key: "wf_main",
-        title: "WF-A wait for transtoshop",
+        title: "WF-A WAITING FOR STORE DISPATCH",
         blurb: "60x40 单版预览，先看英文状态栏 + CAT / SUB / GRADE / QTY / CODE 的纸面层级。",
         tags: ["预览", "60x40", "Code128"],
         recommended: true,
@@ -793,7 +793,7 @@
         <header class="hero">
           <div class="hero-kicker">打印｜PDA与门店硬件</div>
           <h1>wait labels 60x40 lab</h1>
-          <p><strong>warehousein 已冻结</strong>。本页现在只看 wait for transtoshop / wait for sale 两种 60x40 预览标签，先确认 STATUS / CAT / SUB / GRADE / QTY / WEIGHT / CODE 和 Code128 的纸面层级。</p>
+          <p><strong>warehousein 已冻结</strong>。本页现在只看 WAITING FOR STORE DISPATCH / wait for sale 两种 60x40 预览标签，先确认 STATUS / CAT / SUB / GRADE / QTY / WEIGHT / CODE 和 Code128 的纸面层级。</p>
           <div class="hero-strip">
             <div><span>标签组</span><strong>${groups.length}</strong></div>
             <div><span>候选版式</span><strong>${countHardwareLabelCandidates(groups)}</strong></div>

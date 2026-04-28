@@ -2802,8 +2802,20 @@ class InMemoryState:
 
     def _barcode_context_reject_reason(self, barcode_type: str, context: str, allowed_contexts: list[str]) -> str:
         normalized_context = str(context or "").strip()
+        normalized_type = str(barcode_type or "").strip().upper()
         if not normalized_context or normalized_context in allowed_contexts:
             return ""
+        if normalized_type == "STORE_PREP_BALE":
+            if normalized_context == "warehouse_sorting_create":
+                return "这是仓库待送店压缩包码，不是 RAW_BALE 入仓包，不能创建分拣任务。"
+            if normalized_context == "pos":
+                return "POS 只允许扫描 STORE_ITEM 商品码，不能扫描仓库待送店压缩包码。"
+            if normalized_context == "store_receiving":
+                return "门店收货只能扫描仓库执行单/送货单打印的正式送店 barcode，不能直接扫描待送店压缩包码。"
+            if normalized_context == "store_pda":
+                return "店员 PDA 只能扫描已收货/已分配流程中的正式送店执行码或 STORE_ITEM，不能直接扫描仓库待送店压缩包码。"
+            if normalized_context == "b2b_bale_sales":
+                return "这是待送店压缩包，不是待售卖 Bale。请切换到待售 Bale 业务页面后重试。"
         if normalized_context == "pos":
             return "POS 只允许扫描已激活的 STORE_ITEM 商品码，不能扫描仓库/送店 bale 码。"
         if normalized_context == "warehouse_sorting_create":
@@ -2816,8 +2828,18 @@ class InMemoryState:
 
     def _barcode_context_next_step(self, barcode_type: str, context: str, allowed_contexts: list[str]) -> str:
         normalized_context = str(context or "").strip()
+        normalized_type = str(barcode_type or "").strip().upper()
         if not normalized_context or normalized_context in allowed_contexts:
             return ""
+        if normalized_type == "STORE_PREP_BALE":
+            if normalized_context in {"store_receiving", "store_pda"}:
+                return "请先在仓库执行单/送货单完成正式送店并打印执行码，再由门店扫码。"
+            if normalized_context == "warehouse_sorting_create":
+                return "请改扫 RAW_BALE 入仓包码创建分拣任务。"
+            if normalized_context == "pos":
+                return "请改扫 STORE_ITEM 商品码。"
+            if normalized_context == "b2b_bale_sales":
+                return "请切换到待售 Bale 页面并扫描 BS/待售 Bale 条码。"
         if normalized_context == "pos":
             return "请改扫 STORE_ITEM 商品码，或转到仓库/门店收货模块处理 bale 码。"
         if normalized_context == "warehouse_sorting_create":
@@ -2858,6 +2880,7 @@ class InMemoryState:
         business_object_kind = {
             "raw_bale": "INBOUND_BALE",
             "dispatch_bale": "DISPATCH_BALE",
+            "store_prep_bale": "STORE_PREP_BALE",
             "store_item": "STORE_ITEM",
             "bale_sales_unit": "BALE_SALES_UNIT",
             "loose_pick_task": "LOOSE_PICK_TASK",
@@ -2974,11 +2997,11 @@ class InMemoryState:
             matches.append(
                 self._build_barcode_resolve_result(
                     barcode_value=normalized_barcode,
-                    barcode_type="DISPATCH_BALE",
-                    object_type="dispatch_bale",
+                    barcode_type="STORE_PREP_BALE",
+                    object_type="store_prep_bale",
                     object_id=str(prep_bale.get("bale_barcode") or prep_bale.get("bale_no") or normalized_barcode).strip().upper(),
-                    template_scope="warehouseout_bale",
-                    allowed_contexts=["store_receiving", "store_manager_assign", "store_pda", "identity_ledger"],
+                    template_scope="warehouse_store_prep_bale",
+                    allowed_contexts=["warehouse_dispatch_planning", "identity_ledger"],
                     context=normalized_context,
                 )
             )
@@ -6315,7 +6338,7 @@ class InMemoryState:
         package_label = f"{int(bale.get('qty') or 0)} 件"
         if bale.get("actual_weight_kg") not in {None, ""} and float(bale.get("actual_weight_kg") or 0) > 0:
             package_label = f"{package_label} · {float(bale.get('actual_weight_kg') or 0):g} KG"
-        status_text = "wait for sale" if task_type == "sale" else "wait for transtoshop"
+        status_text = "WAIT FOR SALE" if task_type == "sale" else "WAITING FOR STORE DISPATCH"
         barcode_value = str(bale.get("scan_token") or bale.get("bale_barcode") or "").strip().upper()
         job = {
             "id": next(self._print_job_ids),
