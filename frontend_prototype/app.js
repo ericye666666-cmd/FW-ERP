@@ -9862,7 +9862,7 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
 }
 
 function openLoosePickSheetPrintTemplateModal(task = {}, transfer = {}) {
-  const templateCode = getPreferredWarehouseoutTemplateCode("store_loose_pick_60x40", "store_dispatch");
+  const templateCode = getPreferredWarehouseoutTemplateCode("store_loose_pick_60x40", "lpk_shortage_pick");
   const payload = {
     ...buildLoosePickSheetPrinterPayloadForTask(task, transfer, { printerName: "" }),
     template_code: templateCode,
@@ -9874,16 +9874,16 @@ function openLoosePickSheetPrintTemplateModal(task = {}, transfer = {}) {
   });
   balePrinterConsoleNotice = {
     type: "success",
-    message: "已打开 PDA/标签机模板选择页。先选 warehouseout_bale 模板，再打印补差拣货单。",
+    message: "已打开 LPK 补差工单打印页。当前模板固定为补差拣货工单 60x40。",
   };
   openBalePrintModal({
     shipmentNo: String(task.transferNo || transfer?.transfer_no || "").trim().toUpperCase(),
     groupKey: String(task.taskNo || task.taskBarcode || "").trim().toUpperCase(),
     jobs: [job],
-    supplierName: "STORE REPLENISHMENT",
-    categoryDisplay: `${getTransferStoreDisplayName(transfer)} / 补差拣货单`,
+    supplierName: "LPK SHORTAGE PICK",
+    categoryDisplay: `${getTransferStoreDisplayName(transfer)} / 补差拣货工单`,
     templateScope: "warehouseout_bale",
-    taskType: "store_dispatch",
+    taskType: "lpk_shortage_pick",
     preferredTemplateCode: templateCode,
   });
   return job;
@@ -15239,6 +15239,60 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     .filter(Boolean)
     .slice(0, 8);
   const selectedTemplateCode = String(selectedTemplate.template_code || payload.template_code || job.template_code || "").trim().toLowerCase();
+  const isLpkTemplate = selectedTemplateCode === "store_loose_pick_60x40";
+  if (isLpkTemplate) {
+    const svgBars = Array.from(barcodeValue || "NO BARCODE")
+      .map((char, index) => {
+        const weight = ((char.charCodeAt(0) + index * 7) % 4) + 1;
+        const gap = (index % 2) + 1;
+        return `${"1".repeat(weight)}${"0".repeat(gap)}`;
+      })
+      .join("")
+      .slice(0, 220);
+    let cursorX = 8;
+    const bars = svgBars
+      .split("")
+      .map((bit) => {
+        if (bit !== "1") {
+          cursorX += 1;
+          return "";
+        }
+        const rect = `<rect x="${cursorX}" y="6" width="1" height="58" fill="#111"></rect>`;
+        cursorX += 1;
+        return rect;
+      })
+      .join("");
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f1e6; color: #111; font-family: Arial, sans-serif; }
+    .label { width: 420px; min-height: 280px; padding: 20px; border: 2px solid #c6dadd; border-radius: 16px; background: #fffaf1; }
+    .kicker { font-size: 13px; font-weight: 800; color: #0b6268; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0 6px; font-size: 25px; line-height: 1.15; }
+    .meta { margin: 0 0 10px; font-size: 14px; color: #5e564d; }
+    .barcode-wrap { padding: 8px; border-radius: 10px; background: #fff; border: 1px solid #d7c8b2; }
+    .code { margin-top: 8px; font-size: 20px; font-weight: 900; letter-spacing: .07em; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}">
+    <div class="kicker">LPK 补差拣货工单 · 60x40</div>
+    <h1>${escapeHtml(title || "LPK SHORTAGE PICK")}</h1>
+    <p class="meta">${escapeHtml([storeName, categoryDisplay, qty].filter(Boolean).join(" · "))}</p>
+    <div class="barcode-wrap">
+      <svg viewBox="0 0 240 70" role="img" aria-label="${escapeHtml(`LPK barcode ${barcodeValue}`)}" data-barcode-renderer="svg-code128">
+        <rect x="0" y="0" width="240" height="70" fill="#fff"></rect>
+        ${bars}
+      </svg>
+      <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>
+    </div>
+  </section>
+</body>
+</html>`;
+  }
   if (selectedTemplateCode === "transtoshop") {
     const transferNo = String(payload.transfer_order_no || payload.shipment_no || job.document_no || "").trim().toUpperCase();
     const packageLabel = String(payload.package_position_label || payload.bale_piece_summary || "").trim();
@@ -15555,6 +15609,9 @@ function renderBalePrintModal() {
   const summary = document.querySelector("#balePrintModalSummary");
   const queue = document.querySelector("#balePrintModalQueue");
   const subhead = document.querySelector("#balePrintModalSubhead");
+  const title = document.querySelector("#balePrintModalTitle");
+  const scopeNote = document.querySelector("#balePrintModalScopeNote");
+  const browserPrintHint = document.querySelector("#balePrintModalBrowserPrintHint");
   const frame = document.querySelector("#balePrintPreviewFrame");
   const prevButton = document.querySelector("#balePrintModalPrevButton");
   const nextButton = document.querySelector("#balePrintModalNextButton");
@@ -15574,6 +15631,7 @@ function renderBalePrintModal() {
   const currentJob = jobs[currentIndex] || null;
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
+  const isLpkPrint = templateScope === "warehouseout_bale" && activeTaskType === "lpk_shortage_pick";
   const completionAction = templateScope !== "bale"
     ? {
       action: jobs.length ? "complete_group" : "already_complete",
@@ -15625,6 +15683,19 @@ function renderBalePrintModal() {
     subhead.textContent = currentJob
       ? `${displayParts?.primaryIdentity || balePrintModalState.supplierName || "-"} · ${displayParts?.packageCompact || `第 ${currentIndex + 1} 包`} · ${displayParts?.shipmentDate || ""}`.replace(/ · $/, "")
       : `${balePrintModalState.supplierName || "-"} · ${balePrintModalState.categoryDisplay || "-"} · 当前类别已经全部打印完成`;
+  }
+  if (title) {
+    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : "Bale 条码打印窗";
+  }
+  if (scopeNote) {
+    scopeNote.textContent = isLpkPrint
+      ? "LPK 只用于仓库补差拣货和打包。门店收货请扫描后续生成的 SDO 正式送货执行码。"
+      : "";
+  }
+  if (browserPrintHint) {
+    browserPrintHint.textContent = isLpkPrint
+      ? "浏览器打印/PDF会输出与预览一致的 LPK 标签 HTML（含条码值），可直接用于仓库工单留档。"
+      : "Cloud staging cannot directly access USB printers. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer.";
   }
 
   if (summary) {
@@ -15715,7 +15786,7 @@ function renderBalePrintModal() {
     if (!currentJob) {
       frame.removeAttribute("srcdoc");
       frame.src = "about:blank";
-    } else if (isBaleModalDirectOnlyJob(currentJob)) {
+    } else if (isLpkPrint || isBaleModalDirectOnlyJob(currentJob)) {
       frame.src = "about:blank";
       frame.srcdoc = renderDirectOnlyBaleModalPreview(currentJob, selectedTemplate);
     } else {
@@ -17308,6 +17379,23 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
       : [{
         template_code: "transtoshop",
         name: "transtoshop",
+        width_mm: 60,
+        height_mm: 40,
+        template_scope: "warehouseout_bale",
+        disabled: false,
+        selected: true,
+      }];
+  }
+  if (normalizedScope === "warehouseout_bale" && getActiveBaleModalTaskType() === "lpk_shortage_pick" && labelTemplateFlow.buildLockedTemplateOptions) {
+    const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
+      allowedCodes: ["store_loose_pick_60x40"],
+      selectedCode: selectedTemplateCode || "store_loose_pick_60x40",
+    });
+    return rows.length
+      ? rows
+      : [{
+        template_code: "store_loose_pick_60x40",
+        name: "补差拣货工单 60x40",
         width_mm: 60,
         height_mm: 40,
         template_scope: "warehouseout_bale",
