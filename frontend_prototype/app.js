@@ -2665,7 +2665,7 @@ const JSON_BUILDERS = {
   "transfer-items": {
     fieldSelector: "#transferForm [name='items_json']",
     bodySelector: "#transferItemsBuilder",
-    emptyRow: () => ({ category_main: "", category_sub: "", requested_qty: 1 }),
+    emptyRow: () => ({ category_main: "", category_sub: "", grade: "P", requested_qty: 1 }),
     fields: [
       {
         key: "category_main",
@@ -2679,12 +2679,14 @@ const JSON_BUILDERS = {
         type: "select",
         options: (row) => getSortingResultCategorySubOptions(row?.category_main || ""),
       },
+      { key: "grade", label: "分级 / Demand type", type: "select", options: SORTING_GRADE_OPTIONS },
       { key: "requested_qty", label: "调拨件数", type: "number", min: "1", step: "1" },
     ],
     toOutputValue: (rows) =>
       buildTransferDemandDraftRows(rows).map((row) => ({
         category_main: row.category_main,
         category_sub: row.category_sub,
+        grade: row.grade,
         requested_qty: row.requested_qty,
       })),
     fromOutputValue: (value) => buildTransferDemandDraftRows(value),
@@ -7837,12 +7839,14 @@ function hydrateTransferForms(transfer) {
     return;
   }
   activeTransferPreparationNo = String(transfer.transfer_no || "").trim().toUpperCase();
+  populateTransferOrderSelectors();
   [
     "#approveTransferForm [name='transfer_no']",
     "#transferPrintForm [name='transfer_no']",
     "#transferBundleForm [name='transfer_no']",
     "#loosePackingTaskPlanForm [name='transfer_no']",
     "#preparedBaleRegistrationForm [name='transfer_no']",
+    "#transferShipForm [name='transfer_no']",
   ].forEach((selector) => {
     const input = document.querySelector(selector);
     if (input) {
@@ -9450,14 +9454,16 @@ function buildTransferDemandDraftRows(rows = []) {
   (Array.isArray(rows) ? rows : []).forEach((row) => {
     const categoryMain = String(row?.category_main || "").trim();
     const categorySub = String(row?.category_sub || "").trim();
+    const grade = String(row?.grade || "P").trim().toUpperCase() || "P";
     const requestedQty = Number(row?.requested_qty ?? row?.suggested_qty ?? 0);
     if (!categoryMain || !categorySub || requestedQty <= 0) {
       return;
     }
-    const key = `${categoryMain.toLowerCase()}||${categorySub.toLowerCase()}`;
+    const key = `${categoryMain.toLowerCase()}||${categorySub.toLowerCase()}||${grade.toLowerCase()}`;
     const current = grouped.get(key) || {
       category_main: categoryMain,
       category_sub: categorySub,
+      grade,
       requested_qty: 0,
       source_count: 0,
     };
@@ -9466,7 +9472,7 @@ function buildTransferDemandDraftRows(rows = []) {
     grouped.set(key, current);
   });
   return Array.from(grouped.values()).sort((left, right) =>
-    `${left.category_main}||${left.category_sub}`.localeCompare(`${right.category_main}||${right.category_sub}`),
+    `${left.category_main}||${left.category_sub}||${left.grade}`.localeCompare(`${right.category_main}||${right.category_sub}||${right.grade}`),
   );
 }
 
@@ -9493,7 +9499,7 @@ function renderTransferDraftSummary() {
   }
   const fromWarehouseCode = String(document.querySelector("#transferForm [name='from_warehouse_code']")?.value || "WH1").trim();
   const toStoreCode = String(document.querySelector("#transferForm [name='to_store_code']")?.value || "UTAWALA").trim();
-  const approvalRequired = String(document.querySelector("#transferForm [name='approval_required']")?.value || "true") === "true";
+  const requiredArrivalDate = String(document.querySelector("#transferForm [name='required_arrival_date']")?.value || "").trim();
   const totalRequested = rows.reduce((sum, row) => sum + Number(row.requested_qty || 0), 0);
   target.className = "report-summary";
   target.innerHTML = `
@@ -9503,7 +9509,7 @@ function renderTransferDraftSummary() {
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(toStoreCode || "-")}</span></article>
       <article class="store-metric"><strong>草稿行</strong><span>${rows.length}</span></article>
       <article class="store-metric"><strong>申请总件数</strong><span>${totalRequested}</span></article>
-      <article class="store-metric"><strong>审批方式</strong><span>${escapeHtml(approvalRequired ? "需要主管审核" : "直接下发仓库")}</span></article>
+      <article class="store-metric"><strong>需到货时间 / Required arrival date</strong><span>${escapeHtml(requiredArrivalDate || "-")}</span></article>
       <article class="store-metric"><strong>涉及类目</strong><span>${escapeHtml(rows.length)}</span></article>
     </div>
     <div class="candidate-list transfer-draft-list">
@@ -9512,8 +9518,8 @@ function renderTransferDraftSummary() {
           return `
             <article class="candidate-row transfer-draft-row">
               <div>
-                <strong>${escapeHtml([row.category_main, row.category_sub].filter(Boolean).join(" / ") || "未命名类目")}</strong>
-                <div class="subtle small">${escapeHtml(`${row.category_main || "-"} / ${row.category_sub || "-"}`)}</div>
+                <strong>${escapeHtml([row.category_main, row.category_sub, row.grade].filter(Boolean).join(" / ") || "未命名类目")}</strong>
+                <div class="subtle small">${escapeHtml(`${row.category_main || "-"} / ${row.category_sub || "-"} / ${row.grade || "-"}`)}</div>
                 <div class="meta-row">
                   <span class="meta-pill">调拨草稿按类目录入</span>
                   ${row.source_count ? `<span class="meta-pill">建议来源 ${escapeHtml(row.source_count)} 条</span>` : ""}
@@ -10127,7 +10133,7 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
     <div class="report-summary-grid">
       <article class="store-metric"><strong>补货申请单号（来自 4.1）</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
-      <article class="store-metric"><strong>审批</strong><span>${escapeHtml(getTransferApprovalLabel(transfer.approval_status || ""))}</span></article>
+      <article class="store-metric"><strong>执行模式</strong><span>直接仓库规划</span></article>
       <article class="store-metric"><strong>流程状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
       <article class="store-metric"><strong>现成包待登记</strong><span>${escapeHtml(readiness.pendingPreparedCount || 0)}</span></article>
       <article class="store-metric"><strong>补差拣货单待完成</strong><span>${escapeHtml(readiness.pendingLooseTaskCount || 0)}</span></article>
@@ -10174,7 +10180,10 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
   summaryTarget.innerHTML = `
     <div class="alert-banner">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差打包工单码，不是门店收货码。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>补货申请单号（来自 4.1）</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>补货申请单号</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
+      <article class="store-metric"><strong>需到货时间</strong><span>${escapeHtml(transfer.required_arrival_date || transfer.required_arrival_on || "-")}</span></article>
+      <article class="store-metric"><strong>申请总件数</strong><span>${escapeHtml(plan.summary?.totalRequestedQty || 0)} 件</span></article>
       <article class="store-metric"><strong>散货补差件数</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)}</span></article>
       <article class="store-metric"><strong>封包上限</strong><span>小于 ${escapeHtml(packageLimitQty)} 件 / 包</span></article>
       <article class="store-metric"><strong>建议补差包</strong><span>${escapeHtml(plannedPackageCount)} 个</span></article>
@@ -10332,7 +10341,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const transfer = getTransferExecutionAnchor(transferOrNo);
   if (!transfer?.transfer_no) {
     summaryTarget.className = "candidate-summary empty-state";
-    summaryTarget.textContent = "先填入补货申请单号（来自 4.1），这里会显示配货计划审核、库存锁定和仓库核对进度。";
+    summaryTarget.textContent = "先选择补货申请单（来自 4.1），这里会显示仓库执行核对进度。";
     preparedProgressTarget.className = "candidate-summary empty-state";
     preparedProgressTarget.textContent = "这里会显示当前调拨单还要找几包现成待送店包裹，以及哪些已经扫码登记完成。";
     preparedTarget.className = "candidate-summary empty-state";
@@ -10353,19 +10362,14 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const normalized = normalizeTransferForOperationsSummary(transfer);
   const executionRecord = getTransferExecutionRecord(transfer.transfer_no, { create: false, plan });
   const readiness = summarizeTransferExecutionState(transfer.transfer_no, plan);
-  const approvalStatus = String(transfer.approval_status || "").trim().toLowerCase();
-  const isPlanReviewed = ["approved", "not_required"].includes(approvalStatus);
-  const planApprovalLabel = isPlanReviewed ? "已审核" : "待审核";
-  const inventoryLockLabel = isPlanReviewed ? "已锁定" : "未锁定";
+  const isPlanReviewed = true;
   const officialDeliveryCodeLabel = String(
     normalized.official_delivery_barcode || normalized.store_delivery_execution_order_no || "",
   ).trim() || "未生成";
   const verificationPending = Number(readiness.pendingPreparedCount || 0) > 0 || Number(readiness.pendingLooseTaskCount || 0) > 0;
-  const verificationHint = !isPlanReviewed
-    ? "该补货申请尚未审核，不能锁定库存。请先完成主管审核。"
-    : (verificationPending
-      ? `仓库核对尚未完成：现成待送店包 ${readiness.foundPreparedCount || 0}/${readiness.requiredPreparedCount || 0}，补差工单 ${readiness.completedLooseTaskCount || 0}/${readiness.requiredLooseTaskCount || 0}。`
-      : "仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。");
+  const verificationHint = verificationPending
+    ? `仓库核对尚未完成：现成待送店包 ${readiness.foundPreparedCount || 0}/${readiness.requiredPreparedCount || 0}，补差工单 ${readiness.completedLooseTaskCount || 0}/${readiness.requiredLooseTaskCount || 0}。`
+    : "仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。";
   const dispatchRows = typeof operationsFulfillmentFlow.buildTransferDispatchRows === "function"
     ? operationsFulfillmentFlow.buildTransferDispatchRows({ plan, looseTasks: executionRecord.looseTasks })
     : plan.finalDispatchRows;
@@ -10374,15 +10378,14 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；核对完成后可生成正式门店送货执行单 barcode。</div>
+    <div class="alert-banner">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
     <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
     <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(transfer.from_warehouse_code || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
       <article class="store-metric"><strong>状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
-      <article class="store-metric"><strong>配货计划</strong><span>${escapeHtml(planApprovalLabel)}</span></article>
-      <article class="store-metric"><strong>库存锁定</strong><span>${escapeHtml(inventoryLockLabel)}</span></article>
+      <article class="store-metric"><strong>执行阶段</strong><span>仓库核对 / 出库打印</span></article>
       <article class="store-metric"><strong>现成待送店包裹</strong><span>${escapeHtml(summary.selectedPreparedBaleCount || 0)} 包</span></article>
       <article class="store-metric"><strong>现成 SDB 包</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} / ${escapeHtml(readiness.requiredPreparedCount || 0)} 已核对</span></article>
       <article class="store-metric"><strong>补差工单</strong><span>${escapeHtml(readiness.completedLooseTaskCount || 0)} / ${escapeHtml(readiness.requiredLooseTaskCount || 0)} 已完成</span></article>
@@ -16348,6 +16351,7 @@ function renderTransferResultSummary(result) {
   const demandLines = Array.isArray(normalized.demand_lines) ? normalized.demand_lines : [];
   const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(result));
   const hasLooseShortage = Number(plan.summary?.looseQtyToPick || 0) > 0;
+  const requiredArrivalDate = String(result.required_arrival_date || result.required_arrival_on || "").trim();
   const nextActionLabel = hasLooseShortage ? "去 5.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";
   const nextActionPanel = hasLooseShortage
     ? getPanelKeyByTitle("warehouse", "5.1 补差打包工单")
@@ -16356,9 +16360,10 @@ function renderTransferResultSummary(result) {
   target.innerHTML = `
     <div class="alert-banner">Step 1 已创建补货申请单，下一步请按 Step 2 配货建议和 Step 3 动作继续执行。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>补货申请单号（内部调拨单号）</strong><span>${escapeHtml(result.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>补货申请单号</strong><span>补货申请单号：${escapeHtml(result.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>状态</strong><span>${escapeHtml(getTransferOrderStatusLabel(result.status || normalized.lifecycle || ""))}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(result.to_store_code || "-")}</span></article>
+      <article class="store-metric"><strong>需到货时间</strong><span>${escapeHtml(requiredArrivalDate || "-")}</span></article>
       <article class="store-metric"><strong>申请总件数</strong><span>${totalRequested} 件</span></article>
       <article class="store-metric"><strong>需求行</strong><span>${demandLines.length || items.length}</span></article>
       <article class="store-metric"><strong>散货缺口</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)} 件</span></article>
@@ -16374,7 +16379,7 @@ function renderTransferResultSummary(result) {
                 (row) => `
                   <article class="candidate-row transfer-draft-row">
                     <div>
-                      <strong>${escapeHtml([row.category_main, row.category_sub].filter(Boolean).join(" / ") || "-")}</strong>
+                      <strong>${escapeHtml([row.category_main, row.category_sub, row.grade].filter(Boolean).join(" / ") || "-")}</strong>
                       <div class="subtle small">该需求已归属补货申请单 ${escapeHtml(result.transfer_no || "-")}，仓库会先核对现成 SDB 待送店包，再处理散货补差。</div>
                     </div>
                     <div class="candidate-side-actions">
@@ -16403,7 +16408,7 @@ function renderTransferActionResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示配货计划审核、库存锁定与仓库核对进度。";
+    target.textContent = "这里会显示仓库执行核对与出库打印进度。";
     return;
   }
   if (result.transfer_no && result.transfer_print_job) {
@@ -16672,7 +16677,7 @@ function renderTransferShipTargetHint(transferNo = "") {
   ).trim().toUpperCase();
   if (!normalizedTransferNo) {
     target.className = "flow-summary-note";
-    target.textContent = "当前版本可先输入一个补货申请单号；后续将支持一个配送批次挂多个仓库执行单。";
+    target.textContent = "请选择仓库送货执行单 / SDO；后续将支持一个配送批次挂多个仓库执行单。";
     return;
   }
   const transfer = findTransferOrderStateRow(normalizedTransferNo);
@@ -16750,6 +16755,38 @@ function queueTransferShipTargetHintLoad(transferNo = "") {
   }, 250);
 }
 
+function populateTransferOrderSelectors() {
+  const rows = Array.isArray(transferOrderState) ? transferOrderState.map((row) => normalizeTransferForOperationsSummary(row)) : [];
+  const selectorConfigs = [
+    { selector: "#loosePackingTaskPlanForm [name='transfer_no']", empty: "请选择补货申请单", mode: "lpk" },
+    { selector: "#approveTransferForm [name='transfer_no']", empty: "请选择补货申请单", mode: "exec" },
+    { selector: "#preparedBaleRegistrationForm [name='transfer_no']", empty: "请选择补货申请单", mode: "exec" },
+    { selector: "#transferBundleForm [name='transfer_no']", empty: "请选择补货申请单", mode: "exec" },
+    { selector: "#transferShipForm [name='transfer_no']", empty: "选择仓库送货执行单 / SDO", mode: "ship" },
+  ];
+  selectorConfigs.forEach(({ selector, empty, mode }) => {
+    const select = document.querySelector(selector);
+    if (!(select instanceof HTMLSelectElement)) return;
+    const previousValue = String(select.value || "").trim().toUpperCase();
+    const options = rows.map((row) => {
+      const total = Number(row.requested_qty || (Array.isArray(row.items) ? row.items.reduce((s, i) => s + Number(i.requested_qty || 0), 0) : 0));
+      const shortage = Number(buildTransferPreparationPlan(getTransferPreparationPlanRows(row)).summary?.looseQtyToPick || 0);
+      const requiredDate = String(row.required_arrival_date || row.required_arrival_on || "-").trim() || "-";
+      if (mode === "ship") {
+        return `${row.store_delivery_execution_order_no || "SDO 未生成"} / ${row.to_store_code || "-"} / ${requiredDate} / ${row.delivery_batch?.bale_count || 0} 包 / ${getShipmentBatchProgressLabel(row)}`;
+      }
+      if (mode === "exec") {
+        return `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / SDB ${row.delivery_batch?.bale_count || 0} / LPK ${shortage > 0 ? 1 : 0} / SDO ${row.store_delivery_execution_order_no ? "已生成" : "未生成"}`;
+      }
+      return `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / 缺口 ${shortage} 件`;
+    });
+    select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("")}`;
+    if (previousValue && rows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue)) {
+      select.value = previousValue;
+    }
+  });
+}
+
 function renderTransferDispatchSummary(rows = transferOrderState) {
   const target = document.querySelector("#transferDispatchSummary");
   if (!(target instanceof HTMLElement)) {
@@ -16759,7 +16796,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   const list = baseList.map((row) => normalizeTransferForOperationsSummary(row));
   if (!list.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先创建并审核门店调拨单，这里再读取最近调拨单，就能看配送批次、driver/vehicle 与收货跟踪。";
+    target.textContent = "先创建门店补货申请并生成仓库执行单，这里再读取最近数据，就能看配送批次、driver/vehicle 与收货跟踪。";
     return;
   }
   const summary = summarizeOperationsTransferRows(baseList);
@@ -26876,8 +26913,8 @@ async function submitTransfer(event) {
   syncJsonBuilderToField("transfer-items");
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  payload.approval_required = payload.approval_required === "true";
   payload.items = parseJsonField(payload.items_json, []);
+  payload.approval_required = false;
   const demandRows = buildTransferDemandDraftRows(payload.items);
   delete payload.items_json;
   const result = await request("/transfers", {
@@ -26972,13 +27009,11 @@ async function submitTransferApproval(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const transferNo = payload.transfer_no;
-  payload.approved = true;
-  delete payload.transfer_no;
-  const result = await request(`/transfers/${transferNo}/approve`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  const transferNo = String(payload.transfer_no || "").trim().toUpperCase();
+  if (!transferNo) {
+    throw new Error("请先选择补货申请单。");
+  }
+  const result = getTransferPreparationOrder(transferNo) || await request(`/transfers/${transferNo}`);
   activeTransferPreparationNo = String(transferNo || "").trim().toUpperCase();
   writeOutput("#transferActionOutput", result);
   renderTransferActionResultSummary(result);
@@ -27105,6 +27140,7 @@ async function loadTransferOrders() {
     storeDispatchBaleState = [];
     filteredStoreDispatchBaleState = [];
   }
+  populateTransferOrderSelectors();
   renderTransferDispatchSummary(transferOrderState);
   renderStoreManagerConsoleSummary({ store_code: getCurrentStoreCodeFallback() });
   renderStoreClerkHomeSummary({
@@ -28443,7 +28479,7 @@ document.querySelector("#transferForm")?.addEventListener("input", (event) => {
   if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
     return;
   }
-  if (target.matches("[name='from_warehouse_code'], [name='to_store_code'], [name='approval_required']")) {
+  if (target.matches("[name='from_warehouse_code'], [name='to_store_code'], [name='required_arrival_date']")) {
     renderTransferDraftSummary();
   }
 });
@@ -28474,7 +28510,7 @@ document.querySelector("#transferDispatchSummary")?.addEventListener("click", (e
   if (row) {
     setInputValue("#transferForm [name='from_warehouse_code']", row.from_warehouse_code || "WH1");
     setInputValue("#transferForm [name='to_store_code']", row.to_store_code || "UTAWALA");
-    setInputValue("#transferForm [name='approval_required']", row.approval_status === "approved" ? "false" : String(row.approval_required));
+    setInputValue("#transferForm [name='required_arrival_date']", row.required_arrival_date || row.required_arrival_on || "");
   }
   const panelKey = getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印");
   if (panelKey) {
@@ -28483,7 +28519,7 @@ document.querySelector("#transferDispatchSummary")?.addEventListener("click", (e
   }
 });
 
-document.querySelector("#transferShipForm [name='transfer_no']")?.addEventListener("input", (event) => {
+document.querySelector("#transferShipForm [name='transfer_no']")?.addEventListener("change", (event) => {
   queueTransferShipTargetHintLoad(event.target?.value || "");
 });
 
@@ -28530,7 +28566,7 @@ document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")?.add
 });
 
 ["#approveTransferForm", "#transferBundleForm", "#loosePackingTaskPlanForm", "#preparedBaleRegistrationForm"].forEach((selector) => {
-  document.querySelector(selector)?.addEventListener("input", (event) => {
+  document.querySelector(selector)?.addEventListener("change", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
       return;

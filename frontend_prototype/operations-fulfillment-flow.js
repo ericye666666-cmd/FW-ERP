@@ -174,14 +174,16 @@
     (Array.isArray(rows) ? rows : []).forEach((row) => {
       const category_main = String(row && row.category_main || "").trim();
       const category_sub = String(row && row.category_sub || "").trim();
+      const grade = String(row && row.grade || "").trim().toUpperCase();
       const requested_qty = Number(row && (row.requested_qty ?? row.suggested_qty) || 0);
       if (!category_main || !category_sub || requested_qty <= 0) {
         return;
       }
-      const key = `${normalizeKey(category_main)}||${normalizeKey(category_sub)}`;
+      const key = `${normalizeKey(category_main)}||${normalizeKey(category_sub)}||${normalizeKey(grade)}`;
       const current = grouped.get(key) || {
         category_main,
         category_sub,
+        grade,
         requested_qty: 0,
         source_count: 0,
       };
@@ -190,8 +192,8 @@
       grouped.set(key, current);
     });
     return Array.from(grouped.values()).sort((left, right) => {
-      const leftKey = `${normalizeKey(left.category_main)}||${normalizeKey(left.category_sub)}`;
-      const rightKey = `${normalizeKey(right.category_main)}||${normalizeKey(right.category_sub)}`;
+      const leftKey = `${normalizeKey(left.category_main)}||${normalizeKey(left.category_sub)}||${normalizeKey(left.grade)}`;
+      const rightKey = `${normalizeKey(right.category_main)}||${normalizeKey(right.category_sub)}||${normalizeKey(right.grade)}`;
       return leftKey.localeCompare(rightKey);
     });
   }

@@ -2131,8 +2131,10 @@
           <div class="subtle small">每个门店收货状态 / per-store receiving status</div>
         </div>
         <form id="transferShipForm" class="form-grid compact">
-          <input name="transfer_no" placeholder="补货申请单号（临时），例如 TO-..." />
-          <div id="transferShipTargetHint" class="flow-summary-note">输入调拨单号后，这里会显示目标门店，发运前先核对。</div>
+          <select name="transfer_no">
+            <option value="">选择仓库送货执行单 / SDO</option>
+          </select>
+          <div id="transferShipTargetHint" class="flow-summary-note">选择执行单后，这里会显示目标门店与配送上下文，发运前先核对。</div>
           <input name="driver_name" placeholder="司机，例如 Driver A" value="Driver A" />
           <input name="vehicle_no" placeholder="车辆，例如 KDM-001A" value="KDM-001A" />
           <input name="departure_time" placeholder="预计出发时间，例如 2026-04-28 10:30" />
@@ -2665,10 +2667,7 @@
             <form id="transferForm" class="form-grid compact form-clean-placeholders">
               <input name="from_warehouse_code" placeholder="来源仓，例如 WH1" value="WH1" />
               <input name="to_store_code" placeholder="目标门店，例如 UTAWALA" value="UTAWALA" />
-              <select name="approval_required">
-                <option value="true">需要主管审核</option>
-                <option value="false">直接下发仓库</option>
-              </select>
+              <input name="required_arrival_date" type="date" value="2026-05-03" />
               <textarea
                 name="items_json"
                 class="json-raw-field hidden-screen"
@@ -2679,7 +2678,7 @@
                 <div class="line-builder-head">
                   <div>
                     <strong>调拨需求类目明细</strong>
-                    <p>一行代表一个商品大类 / 小类和要发去门店的数量。这里只录需求，不选择具体 token 或成本批次，仓库执行时按 FIFO 成本层和正式 barcode 规则处理。</p>
+                    <p>一行代表一个商品大类 / 小类 / 分级（P/S）和要发去门店的数量。这里只录需求，不选择具体 token 或成本批次，仓库执行时按 FIFO 成本层和正式 barcode 规则处理。</p>
                   </div>
                   <button type="button" class="ghost-button mini-button" data-builder-add="transfer-items">新增一行</button>
                 </div>
@@ -2737,12 +2736,14 @@
             <div class="transfer-workbench-head">
               <span class="eyebrow">Step 3</span>
               <h3>补差拣货单生成器</h3>
-              <p>输入当前补货申请单号，选择封包上限，系统只在有散货缺口时生成 1 张带 barcode 的补差拣货单。工人按这张单拣货，拣完直接贴到补差包上。</p>
+              <p>先从下拉框选择补货申请单，再选择封包上限。系统只在有散货缺口时生成 1 张带 barcode 的补差拣货单。工人按这张单拣货，拣完直接贴到补差包上。</p>
             </div>
             <form id="loosePackingTaskPlanForm" class="form-grid compact warehouse-prep-toolbar">
               <label class="field-control">
-                <span>补货申请单号（来自 4.1）</span>
-                <input name="transfer_no" placeholder="例如 TO-20260428-001，可从 4.1 补货申请单复制" />
+                <span>选择补货申请单</span>
+                <select name="transfer_no">
+                  <option value="">请选择补货申请单</option>
+                </select>
               </label>
               <label class="field-control">
                 <span>封包上限</span>
@@ -2780,12 +2781,12 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">审核配货计划并锁定库存</span>
+            <span class="store-flag">仓库执行核对 / 出库打印</span>
             <span class="store-flag">仓库核对现成 SDB 包</span>
             <span class="store-flag">仓库核对补差工单</span>
             <span class="store-flag">生成正式门店送货执行单 barcode</span>
           </div>
-          <div class="subtle small">锁定后，本单选中的 SDB 待送店包和补差包将被占用，其他补货申请不能再使用。锁定后才允许进入仓库执行核对；核对完成后可生成正式门店送货执行单 barcode。</div>
+          <div class="subtle small">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
           <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
           <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
         </div>
@@ -2794,14 +2795,16 @@
             <div class="transfer-workbench-head">
               <span class="eyebrow">Step 2</span>
               <h3>备货执行总览</h3>
-              <p>仓库执行台现在只做真动作：先审核并读当前执行单，再扫现成包、核补差工单完成度，最后才放行最终送店打印。</p>
+              <p>仓库执行台现在只做真动作：先读取当前执行单，再扫现成包、核补差工单完成度，最后生成最终送店执行码并打印。</p>
             </div>
             <form id="approveTransferForm" class="form-grid compact warehouse-prep-toolbar">
-              <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
-              <button type="submit">审核配货计划并锁定库存</button>
+              <select name="transfer_no">
+                <option value="">请选择补货申请单</option>
+              </select>
+              <button type="submit">读取仓库执行单</button>
             </form>
             <div id="transferWorkbenchSummary" class="candidate-summary empty-state">
-              先填入补货申请单号（来自 4.1），这里会显示配货计划审核、库存锁定和仓库核对进度。
+              先选择补货申请单，这里会显示仓库执行核对进度。
             </div>
           </article>
 
@@ -2814,7 +2817,9 @@
                   <p>扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。</p>
                 </div>
                 <form id="preparedBaleRegistrationForm" class="form-grid compact warehouse-prep-toolbar">
-                  <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
+                  <select name="transfer_no">
+                    <option value="">请选择补货申请单</option>
+                  </select>
                   <input name="prepared_bale_barcode" placeholder="扫描现成待送店包裹 barcode" />
                   <button type="submit">扫描确认现成包</button>
                 </form>
@@ -2849,7 +2854,9 @@
                 <p>仓库核对完成后，在这里生成并打印正式门店送货执行单 barcode（60x40）。</p>
               </div>
               <form id="transferBundleForm" class="form-grid compact warehouse-prep-toolbar">
-                <input name="transfer_no" placeholder="补货申请单号（来自 4.1）" />
+                <select name="transfer_no">
+                  <option value="">请选择补货申请单</option>
+                </select>
                 <input name="copies" type="hidden" value="1" />
                 <input name="label_copies_mode" type="hidden" value="approved_qty" />
                 <input name="grouping_mode" type="hidden" value="by_category" />
@@ -2863,7 +2870,7 @@
           </div>
         </div>
         <div id="transferActionResultSummary" class="candidate-summary empty-state">
-          这里会显示配货计划审核、库存锁定与仓库核对进度。
+          这里会显示仓库执行核对进度。
         </div>
         <div class="hidden-screen">
           <form id="transferPrintForm" class="form-grid compact">

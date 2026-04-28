@@ -11891,14 +11891,17 @@ class InMemoryState:
         demand_lines: list[dict[str, Any]],
         category_main: str,
         category_sub: str,
+        grade: str,
         requested_qty: int,
     ) -> None:
         normalized_main = self._normalize_transfer_category_value(category_main)
         normalized_sub = self._normalize_transfer_category_value(category_sub)
+        normalized_grade = self._normalize_transfer_category_value(grade)
         for row in demand_lines:
             if (
                 self._normalize_transfer_category_value(row.get("category_main")) == normalized_main
                 and self._normalize_transfer_category_value(row.get("category_sub")) == normalized_sub
+                and self._normalize_transfer_category_value(row.get("grade")) == normalized_grade
             ):
                 row["requested_qty"] += requested_qty
                 return
@@ -11906,6 +11909,7 @@ class InMemoryState:
             {
                 "category_main": str(category_main or "").strip(),
                 "category_sub": str(category_sub or "").strip(),
+                "grade": str(grade or "").strip().upper(),
                 "requested_qty": requested_qty,
             }
         )
@@ -11914,18 +11918,22 @@ class InMemoryState:
         self,
         merged_items: dict[str, dict[str, Any]],
         product: dict[str, Any],
+        grade: str,
         requested_qty: int,
     ) -> None:
         barcode = product["barcode"]
-        existing = merged_items.get(barcode)
+        normalized_grade = str(grade or "").strip().upper()
+        merged_key = f"{barcode}||{normalized_grade}"
+        existing = merged_items.get(merged_key)
         if existing:
             existing["requested_qty"] += requested_qty
             return
-        merged_items[barcode] = {
+        merged_items[merged_key] = {
             "barcode": barcode,
             "product_name": product["product_name"],
             "category_main": product.get("category_main", ""),
             "category_sub": product.get("category_sub", ""),
+            "grade": normalized_grade,
             "requested_qty": requested_qty,
             "approved_qty": 0,
             "received_qty": 0,
@@ -11980,6 +11988,7 @@ class InMemoryState:
             requested_qty = int(raw_item.get("requested_qty", 0) or 0)
             if requested_qty <= 0:
                 raise HTTPException(status_code=400, detail="Transfer requested_qty must be greater than 0")
+            grade = str(raw_item.get("grade") or "").strip().upper()
 
             barcode = str(raw_item.get("barcode") or "").strip().upper()
             if barcode:
@@ -12000,9 +12009,10 @@ class InMemoryState:
                     demand_lines,
                     product.get("category_main", ""),
                     product.get("category_sub", ""),
+                    grade,
                     requested_qty,
                 )
-                self._merge_transfer_resolved_item(merged_items, product, requested_qty)
+                self._merge_transfer_resolved_item(merged_items, product, grade, requested_qty)
                 continue
 
             category_main = str(raw_item.get("category_main") or "").strip()
@@ -12013,7 +12023,7 @@ class InMemoryState:
                     detail="Each transfer demand line must include barcode or category_main/category_sub",
                 )
 
-            self._merge_transfer_demand_line(demand_lines, category_main, category_sub, requested_qty)
+            self._merge_transfer_demand_line(demand_lines, category_main, category_sub, grade, requested_qty)
             candidates = self._list_warehouse_transfer_candidates(warehouse_code, category_main, category_sub)
             remaining_qty = requested_qty
             for candidate in candidates:
@@ -12022,7 +12032,7 @@ class InMemoryState:
                     continue
                 take_qty = min(remaining_qty, free_qty)
                 pending_usage[candidate["barcode"]] += take_qty
-                self._merge_transfer_resolved_item(merged_items, candidate["product"], take_qty)
+                self._merge_transfer_resolved_item(merged_items, candidate["product"], grade, take_qty)
                 remaining_qty -= take_qty
                 if remaining_qty <= 0:
                     break
@@ -12032,6 +12042,7 @@ class InMemoryState:
             key=lambda row: (
                 str(row.get("category_main") or "").lower(),
                 str(row.get("category_sub") or "").lower(),
+                str(row.get("grade") or "").lower(),
                 str(row.get("barcode") or ""),
             ),
         )
@@ -12039,6 +12050,7 @@ class InMemoryState:
             key=lambda row: (
                 self._normalize_transfer_category_value(row.get("category_main")),
                 self._normalize_transfer_category_value(row.get("category_sub")),
+                self._normalize_transfer_category_value(row.get("grade")),
             )
         )
         return demand_lines, items
@@ -12485,6 +12497,7 @@ class InMemoryState:
             "transfer_no": transfer_no,
             "from_warehouse_code": payload["from_warehouse_code"],
             "to_store_code": store["code"],
+            "required_arrival_date": str(payload.get("required_arrival_date") or "").strip(),
             "created_by": payload["created_by"],
             "approval_required": payload["approval_required"],
             "status": "submitted" if payload["approval_required"] else "approved",

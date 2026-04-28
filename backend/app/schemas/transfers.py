@@ -7,12 +7,14 @@ class TransferItemCreate(BaseModel):
     barcode: Optional[str] = Field(default=None, min_length=1)
     category_main: Optional[str] = Field(default=None, min_length=1)
     category_sub: Optional[str] = Field(default=None, min_length=1)
+    grade: Optional[str] = Field(default=None, min_length=1)
     requested_qty: int = Field(ge=1)
 
 
 class TransferOrderCreate(BaseModel):
     from_warehouse_code: str = Field(min_length=1)
     to_store_code: str = Field(min_length=1)
+    required_arrival_date: Optional[str] = Field(default=None, min_length=1)
     created_by: str = Field(min_length=1, default="warehouse_clerk_1")
     approval_required: bool = True
     items: List[TransferItemCreate]
@@ -21,6 +23,7 @@ class TransferOrderCreate(BaseModel):
 class TransferDemandLineResponse(BaseModel):
     category_main: str
     category_sub: str
+    grade: str = ""
     requested_qty: int
 
 
@@ -29,6 +32,7 @@ class TransferOrderItemResponse(BaseModel):
     product_name: str
     category_main: str = ""
     category_sub: str = ""
+    grade: str = ""
     requested_qty: int
     approved_qty: int
     received_qty: int
@@ -39,6 +43,7 @@ class TransferOrderResponse(BaseModel):
     transfer_no: str
     from_warehouse_code: str
     to_store_code: str
+    required_arrival_date: str = ""
     created_by: str
     approval_required: bool
     status: str

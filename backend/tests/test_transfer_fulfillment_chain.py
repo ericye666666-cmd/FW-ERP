@@ -155,7 +155,10 @@ class TransferFulfillmentChainTest(unittest.TestCase):
         )
 
         self.assertEqual(order["status"], "submitted")
-        self.assertEqual(order["demand_lines"], [{"category_main": "tops", "category_sub": "lady tops", "requested_qty": 5}])
+        self.assertEqual(
+            order["demand_lines"],
+            [{"category_main": "tops", "category_sub": "lady tops", "grade": "", "requested_qty": 5}],
+        )
         self.assertEqual(sum(item["requested_qty"] for item in order["items"]), 5)
         self.assertEqual({item["category_main"] for item in order["items"]}, {"tops"})
         self.assertEqual({item["category_sub"] for item in order["items"]}, {"lady tops"})
@@ -181,7 +184,10 @@ class TransferFulfillmentChainTest(unittest.TestCase):
         self.assertTrue(order["transfer_no"].startswith("TO-"))
         self.assertEqual(order["status"], "submitted")
         self.assertEqual(order["approval_status"], "pending")
-        self.assertEqual(order["demand_lines"], [{"category_main": "pants", "category_sub": "cargo pant", "requested_qty": 120}])
+        self.assertEqual(
+            order["demand_lines"],
+            [{"category_main": "pants", "category_sub": "cargo pant", "grade": "", "requested_qty": 120}],
+        )
         self.assertEqual(order["items"], [])
 
     def test_manual_category_transfer_order_can_ship_after_auto_dispatch_bales(self):
@@ -225,6 +231,75 @@ class TransferFulfillmentChainTest(unittest.TestCase):
         self.assertEqual([row["item_count"] for row in related_bales], [100, 20])
         self.assertEqual({row["store_code"] for row in related_bales}, {"UTAWALA"})
         self.assertEqual({row["status"] for row in related_bales}, {"in_transit"})
+
+    def test_transfer_create_persists_required_arrival_date_and_grade(self):
+        self._seed_transfer_product(barcode="OPS-GRADE-001", qty=4, product_name="Ops Grade Tee A")
+        self._seed_transfer_product(barcode="OPS-GRADE-002", qty=4, product_name="Ops Grade Tee B")
+
+        created = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "required_arrival_date": "2026-05-02",
+                "created_by": "store_manager_1",
+                "approval_required": False,
+                "items": [
+                    {
+                        "category_main": "tops",
+                        "category_sub": "lady tops",
+                        "grade": "P",
+                        "requested_qty": 6,
+                    }
+                ],
+            }
+        )
+
+        fetched = self.state.get_transfer_order(created["transfer_no"])
+        self.assertEqual(fetched["required_arrival_date"], "2026-05-02")
+        self.assertEqual(fetched["demand_lines"], [
+            {"category_main": "tops", "category_sub": "lady tops", "grade": "P", "requested_qty": 6},
+        ])
+        self.assertTrue(all(item.get("grade") == "P" for item in fetched["items"]))
+        self.assertEqual(sum(item["requested_qty"] for item in fetched["items"]), 6)
+
+    def test_no_approval_transfer_can_create_dispatch_bundle_and_store_delivery_execution(self):
+        barcode = self._seed_transfer_product(barcode="OPS-NO-APPROVAL-001", qty=3, product_name="Ops No Approval Tee")
+        order = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "required_arrival_date": "2026-05-03",
+                "created_by": "store_manager_1",
+                "approval_required": False,
+                "items": [{"barcode": barcode, "requested_qty": 3, "grade": "S"}],
+            }
+        )
+        self.assertEqual(order["approval_status"], "approved")
+        self.assertEqual(order["status"], "approved")
+
+        bundle = self.state.create_transfer_dispatch_bundle(
+            order["transfer_no"],
+            {
+                "copies": 1,
+                "printer_name": "Deli DL-720C",
+                "label_copies_mode": "single",
+                "grouping_mode": "by_category",
+                "max_items_per_bale": 2,
+                "requested_by": "warehouse_supervisor_1",
+            },
+        )
+        self.assertGreaterEqual(bundle["generated_bale_count"], 1)
+
+        execution = self.state.create_store_delivery_execution_order(
+            order["transfer_no"],
+            {
+                "created_by": "warehouse_clerk_1",
+                "mark_as_printed": False,
+                "notes": "phase-a no approval path",
+            },
+        )
+        self.assertEqual(execution["source_transfer_no"], order["transfer_no"])
+        self.assertTrue(execution["execution_order_no"].startswith("SDO"))
 
     def test_recommendation_uses_recent_sales_store_supply_and_creates_category_replenishment_order(self):
         barcode = self._seed_transfer_product(barcode="OPS-FLOW-REC-001", qty=12, product_name="Ops Flow Replenishment Tee")
@@ -334,7 +409,10 @@ class TransferFulfillmentChainTest(unittest.TestCase):
             },
         )
         self.assertEqual(order["status"], "submitted")
-        self.assertEqual(order["demand_lines"], [{"category_main": "tops", "category_sub": "lady tops", "requested_qty": 3}])
+        self.assertEqual(
+            order["demand_lines"],
+            [{"category_main": "tops", "category_sub": "lady tops", "grade": "", "requested_qty": 3}],
+        )
         self.assertEqual(sum(item["requested_qty"] for item in order["items"]), 3)
 
     def test_recommendation_counts_dispatchable_token_pool_as_warehouse_supply(self):
