@@ -2746,6 +2746,7 @@
             <span class="store-flag">4 执行/打印</span>
           </div>
           <div class="subtle small">LPK = 仓库补差工单码；门店不可扫。</div>
+          <div class="subtle small">当前波次已保存；实际 LPK / SDO 仍按单张补货申请执行，Phase B3 将接入波次执行。</div>
         </div>
         <div class="transfer-prep-shell replenishment-workorder-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
@@ -2756,7 +2757,7 @@
             </div>
             <form id="loosePackingTaskPlanForm" class="form-grid compact warehouse-prep-toolbar">
               <label class="field-control">
-                <span>选择补货申请 / 选择备货波次</span>
+                <span>选择补货申请（波次仅展示，暂不直接执行）</span>
                 <select name="transfer_no">
                   <option value="">请选择补货申请单</option>
                 </select>
@@ -2803,6 +2804,7 @@
             <span class="store-flag">4 生成 SDO</span>
           </div>
           <div class="subtle small">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
+          <div class="subtle small">当前波次已保存；实际 LPK / SDO 仍按单张补货申请执行，Phase B3 将接入波次执行。</div>
           <div class="subtle small">SDB/LPK = 仓库核对码；门店只扫 SDO。</div>
           <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
         </div>

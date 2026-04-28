@@ -341,6 +341,37 @@ class TransferFulfillmentChainTest(unittest.TestCase):
                 {"wave_name": "invalid", "warehouse_code": "WH1", "planned_picking_date": "2026-05-03", "selected_replenishment_request_nos": []}
             )
 
+    def test_picking_wave_requested_qty_uses_demand_lines_when_items_empty(self):
+        order = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "created_by": "store_manager_1",
+                "approval_required": False,
+                "items": [
+                    {
+                        "category_main": "dress",
+                        "category_sub": "long dress",
+                        "grade": "P",
+                        "requested_qty": 100,
+                    }
+                ],
+            }
+        )
+        self.assertEqual(order["items"], [])
+        self.assertEqual(sum(int(row.get("requested_qty") or 0) for row in order["demand_lines"]), 100)
+
+        wave = self.state.create_picking_wave(
+            {
+                "wave_name": "Wave demand-only",
+                "warehouse_code": "WH1",
+                "planned_picking_date": "2026-05-03",
+                "selected_replenishment_request_nos": [order["transfer_no"]],
+            }
+        )
+        self.assertEqual(wave["total_requested_qty"], 100)
+        self.assertEqual(wave["total_shortage_qty"], 100)
+
     def test_recommendation_uses_recent_sales_store_supply_and_creates_category_replenishment_order(self):
         barcode = self._seed_transfer_product(barcode="OPS-FLOW-REC-001", qty=12, product_name="Ops Flow Replenishment Tee")
         now = datetime.now(timezone.utc)

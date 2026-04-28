@@ -7840,7 +7840,7 @@ function hydrateTransferForms(transfer) {
   }
   activeTransferPreparationNo = String(transfer.transfer_no || "").trim().toUpperCase();
   populateTransferOrderSelectors();
-  await refreshPickingWavePanel();
+  refreshPickingWavePanel().catch(() => {});
   [
     "#approveTransferForm [name='transfer_no']",
     "#transferPrintForm [name='transfer_no']",

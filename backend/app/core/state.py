@@ -12552,6 +12552,14 @@ class InMemoryState:
             raise HTTPException(status_code=404, detail=f"Unknown transfer order {transfer_no}")
         return order
 
+    def _transfer_requested_qty(self, order: Optional[dict[str, Any]]) -> int:
+        if not order:
+            return 0
+        demand_lines = order.get("demand_lines") or []
+        if demand_lines:
+            return sum(int(row.get("requested_qty") or 0) for row in demand_lines)
+        return sum(int(row.get("requested_qty") or 0) for row in order.get("items", []))
+
     def create_picking_wave(self, payload: dict[str, Any]) -> dict[str, Any]:
         selected_request_nos = [
             str(no or "").strip().upper() for no in payload.get("selected_replenishment_request_nos", [])
@@ -12565,13 +12573,8 @@ class InMemoryState:
             raise HTTPException(status_code=404, detail=f"Unknown transfer order(s): {', '.join(missing)}")
 
         stores_included = sorted({str(order["to_store_code"]) for order in transfer_orders if order})
-        total_requested_qty = sum(
-            int(item.get("requested_qty") or 0) for order in transfer_orders if order for item in order.get("items", [])
-        )
-        total_shortage_qty = sum(
-            max(int(item.get("requested_qty") or 0) - int(item.get("approved_qty") or 0), 0)
-            for order in transfer_orders if order for item in order.get("items", [])
-        )
+        total_requested_qty = sum(self._transfer_requested_qty(order) for order in transfer_orders)
+        total_shortage_qty = total_requested_qty
         wave_no = f"WAVE-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{next(self._picking_wave_ids):03d}"
         wave = {
             "wave_no": wave_no,
