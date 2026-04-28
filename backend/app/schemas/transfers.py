@@ -172,3 +172,30 @@ class StoreDeliveryExecutionOrderResponse(BaseModel):
     printed_at: Optional[str] = None
     received_at: Optional[str] = None
     notes: str = ""
+
+
+class PickingWaveCreate(BaseModel):
+    wave_name: str = Field(min_length=1)
+    warehouse_code: str = Field(min_length=1)
+    planned_picking_date: str = Field(min_length=1)
+    required_arrival_date: Optional[str] = Field(default=None, min_length=1)
+    selected_replenishment_request_nos: List[str] = Field(default_factory=list)
+    notes: str = ""
+
+
+class PickingWaveResponse(BaseModel):
+    wave_no: str
+    wave_name: str
+    warehouse_code: str
+    planned_picking_date: str
+    required_arrival_date: str = ""
+    selected_replenishment_request_nos: List[str] = Field(default_factory=list)
+    stores_included: List[str] = Field(default_factory=list)
+    total_requested_qty: int = 0
+    total_shortage_qty: int = 0
+    sdb_count: int = 0
+    lpk_count: int = 0
+    status: str = "draft"
+    created_by: str = ""
+    created_at: str
+    notes: str = ""

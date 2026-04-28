@@ -301,6 +301,77 @@ class TransferFulfillmentChainTest(unittest.TestCase):
         self.assertEqual(execution["source_transfer_no"], order["transfer_no"])
         self.assertTrue(execution["execution_order_no"].startswith("SDO"))
 
+    def test_can_create_picking_wave_with_one_request(self):
+        barcode = self._seed_transfer_product(barcode="OPS-WAVE-001", qty=5)
+        order = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "created_by": "store_manager_1",
+                "approval_required": False,
+                "items": [{"barcode": barcode, "requested_qty": 3}],
+            }
+        )
+        wave = self.state.create_picking_wave(
+            {
+                "wave_name": "Wave A",
+                "warehouse_code": "WH1",
+                "planned_picking_date": "2026-05-02",
+                "required_arrival_date": "2026-05-03",
+                "selected_replenishment_request_nos": [order["transfer_no"]],
+                "notes": "single request",
+            }
+        )
+        self.assertEqual(wave["stores_included"], ["UTAWALA"])
+        self.assertEqual(wave["total_requested_qty"], 3)
+
+    def test_can_create_picking_wave_with_multiple_store_requests_and_same_date_multiple_waves(self):
+        barcode = self._seed_transfer_product(barcode="OPS-WAVE-002", qty=12)
+        first = self.state.create_transfer_order({"from_warehouse_code": "WH1", "to_store_code": "UTAWALA", "created_by": "store_manager_1", "approval_required": False, "items": [{"barcode": barcode, "requested_qty": 4}]})
+        second = self.state.create_transfer_order({"from_warehouse_code": "WH1", "to_store_code": "PAIPLINE", "created_by": "warehouse_supervisor_1", "approval_required": False, "items": [{"barcode": barcode, "requested_qty": 2}]})
+        wave_a = self.state.create_picking_wave({"wave_name": "Wave Fri A", "warehouse_code": "WH1", "planned_picking_date": "2026-05-03", "selected_replenishment_request_nos": [first["transfer_no"], second["transfer_no"]]})
+        wave_b = self.state.create_picking_wave({"wave_name": "Wave Fri B", "warehouse_code": "WH1", "planned_picking_date": "2026-05-03", "selected_replenishment_request_nos": [first["transfer_no"]]})
+        self.assertEqual(set(wave_a["stores_included"]), {"UTAWALA", "PAIPLINE"})
+        self.assertEqual(wave_a["total_requested_qty"], 6)
+        self.assertNotEqual(wave_a["wave_no"], wave_b["wave_no"])
+
+    def test_cannot_create_picking_wave_with_empty_request_list(self):
+        with self.assertRaisesRegex(HTTPException, "selected_replenishment_request_nos must not be empty"):
+            self.state.create_picking_wave(
+                {"wave_name": "invalid", "warehouse_code": "WH1", "planned_picking_date": "2026-05-03", "selected_replenishment_request_nos": []}
+            )
+
+    def test_picking_wave_requested_qty_uses_demand_lines_when_items_empty(self):
+        order = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "created_by": "store_manager_1",
+                "approval_required": False,
+                "items": [
+                    {
+                        "category_main": "dress",
+                        "category_sub": "long dress",
+                        "grade": "P",
+                        "requested_qty": 100,
+                    }
+                ],
+            }
+        )
+        self.assertEqual(order["items"], [])
+        self.assertEqual(sum(int(row.get("requested_qty") or 0) for row in order["demand_lines"]), 100)
+
+        wave = self.state.create_picking_wave(
+            {
+                "wave_name": "Wave demand-only",
+                "warehouse_code": "WH1",
+                "planned_picking_date": "2026-05-03",
+                "selected_replenishment_request_nos": [order["transfer_no"]],
+            }
+        )
+        self.assertEqual(wave["total_requested_qty"], 100)
+        self.assertEqual(wave["total_shortage_qty"], 100)
+
     def test_recommendation_uses_recent_sales_store_supply_and_creates_category_replenishment_order(self):
         barcode = self._seed_transfer_product(barcode="OPS-FLOW-REC-001", qty=12, product_name="Ops Flow Replenishment Tee")
         now = datetime.now(timezone.utc)

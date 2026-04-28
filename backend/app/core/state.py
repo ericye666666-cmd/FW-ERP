@@ -204,6 +204,7 @@ class InMemoryState:
         self.store_lots: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.price_rules: dict[str, dict[str, Any]] = {}
         self.transfer_orders: dict[str, dict[str, Any]] = {}
+        self.picking_waves: dict[str, dict[str, Any]] = {}
         self.transfer_recommendations: dict[str, dict[str, Any]] = {}
         self.transfer_receiving_sessions: dict[str, dict[str, Any]] = {}
         self.store_token_receiving_sessions: dict[str, dict[str, Any]] = {}
@@ -263,6 +264,7 @@ class InMemoryState:
         self._print_job_ids = count(max((row["id"] for row in self.print_jobs), default=0) + 1)
         self._print_station_job_ids = count(max((row["id"] for row in self.print_station_jobs), default=0) + 1)
         self._transfer_ids = count(len(self.transfer_orders) + 1)
+        self._picking_wave_ids = count(len(self.picking_waves) + 1)
         self._store_delivery_execution_order_ids = count(len(self.store_delivery_execution_orders) + 1)
         self._transfer_recommendation_ids = count(len(self.transfer_recommendations) + 1)
         self._receiving_session_ids = count(len(self.transfer_receiving_sessions) + 1)
@@ -334,6 +336,7 @@ class InMemoryState:
             "store_lots": dict(self.store_lots),
             "price_rules": self.price_rules,
             "transfer_orders": self.transfer_orders,
+            "picking_waves": self.picking_waves,
             "transfer_recommendations": self.transfer_recommendations,
             "transfer_receiving_sessions": self.transfer_receiving_sessions,
             "store_token_receiving_sessions": self.store_token_receiving_sessions,
@@ -396,6 +399,7 @@ class InMemoryState:
         self.store_lots = defaultdict(list, payload.get("store_lots", {}))
         self.price_rules = payload.get("price_rules", {})
         self.transfer_orders = payload.get("transfer_orders", {})
+        self.picking_waves = payload.get("picking_waves", {})
         self.transfer_recommendations = payload.get("transfer_recommendations", {})
         self.transfer_receiving_sessions = payload.get("transfer_receiving_sessions", {})
         self.store_token_receiving_sessions = payload.get("store_token_receiving_sessions", {})
@@ -12547,6 +12551,60 @@ class InMemoryState:
         if not order:
             raise HTTPException(status_code=404, detail=f"Unknown transfer order {transfer_no}")
         return order
+
+    def _transfer_requested_qty(self, order: Optional[dict[str, Any]]) -> int:
+        if not order:
+            return 0
+        demand_lines = order.get("demand_lines") or []
+        if demand_lines:
+            return sum(int(row.get("requested_qty") or 0) for row in demand_lines)
+        return sum(int(row.get("requested_qty") or 0) for row in order.get("items", []))
+
+    def create_picking_wave(self, payload: dict[str, Any]) -> dict[str, Any]:
+        selected_request_nos = [
+            str(no or "").strip().upper() for no in payload.get("selected_replenishment_request_nos", [])
+            if str(no or "").strip()
+        ]
+        if not selected_request_nos:
+            raise HTTPException(status_code=400, detail="selected_replenishment_request_nos must not be empty")
+        transfer_orders = [self.transfer_orders.get(no) for no in selected_request_nos]
+        missing = [selected_request_nos[idx] for idx, row in enumerate(transfer_orders) if not row]
+        if missing:
+            raise HTTPException(status_code=404, detail=f"Unknown transfer order(s): {', '.join(missing)}")
+
+        stores_included = sorted({str(order["to_store_code"]) for order in transfer_orders if order})
+        total_requested_qty = sum(self._transfer_requested_qty(order) for order in transfer_orders)
+        total_shortage_qty = total_requested_qty
+        wave_no = f"WAVE-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{next(self._picking_wave_ids):03d}"
+        wave = {
+            "wave_no": wave_no,
+            "wave_name": str(payload.get("wave_name") or "").strip(),
+            "warehouse_code": str(payload.get("warehouse_code") or "").strip().upper(),
+            "planned_picking_date": str(payload.get("planned_picking_date") or "").strip(),
+            "required_arrival_date": str(payload.get("required_arrival_date") or "").strip(),
+            "selected_replenishment_request_nos": selected_request_nos,
+            "stores_included": stores_included,
+            "total_requested_qty": total_requested_qty,
+            "total_shortage_qty": total_shortage_qty,
+            "sdb_count": 0,
+            "lpk_count": 0,
+            "status": "planned",
+            "created_by": "warehouse_clerk_1",
+            "created_at": now_iso(),
+            "notes": str(payload.get("notes") or "").strip(),
+        }
+        self.picking_waves[wave_no] = wave
+        self._persist()
+        return wave
+
+    def list_picking_waves(self) -> list[dict[str, Any]]:
+        return sorted(self.picking_waves.values(), key=lambda row: row["created_at"], reverse=True)
+
+    def get_picking_wave(self, wave_no: str) -> dict[str, Any]:
+        wave = self.picking_waves.get(wave_no.strip().upper())
+        if not wave:
+            raise HTTPException(status_code=404, detail=f"Unknown picking wave {wave_no}")
+        return wave
 
     def list_transfer_receiving_sessions(self, transfer_no: Optional[str] = None) -> list[dict[str, Any]]:
         rows = list(self.transfer_receiving_sessions.values())

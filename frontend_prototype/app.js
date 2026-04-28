@@ -7840,6 +7840,7 @@ function hydrateTransferForms(transfer) {
   }
   activeTransferPreparationNo = String(transfer.transfer_no || "").trim().toUpperCase();
   populateTransferOrderSelectors();
+  refreshPickingWavePanel().catch(() => {});
   [
     "#approveTransferForm [name='transfer_no']",
     "#transferPrintForm [name='transfer_no']",
@@ -16785,6 +16786,31 @@ function populateTransferOrderSelectors() {
       select.value = previousValue;
     }
   });
+}
+
+async function refreshPickingWavePanel() {
+  const select = document.querySelector("#pickingWaveForm [name='selected_replenishment_request_nos']");
+  if (select instanceof HTMLSelectElement) {
+    select.innerHTML = transferOrderState.map((row) => {
+      const total = Number((row?.items || []).reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0));
+      const shortage = Number((row?.items || []).reduce((sum, item) => sum + Math.max(Number(item?.requested_qty || 0) - Number(item?.approved_qty || 0), 0), 0));
+      const required = String(row?.required_arrival_date || "-");
+      const label = `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / required ${required} / total ${total} 件 / shortage ${shortage} 件`;
+      return `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(label)}</option>`;
+    }).join("");
+  }
+  const list = document.querySelector("#pickingWaveList");
+  if (!(list instanceof HTMLElement)) return;
+  try {
+    const waves = await request("/picking-waves");
+    if (!Array.isArray(waves) || !waves.length) {
+      list.className = "candidate-summary empty-state";
+      list.textContent = "暂无波次。";
+      return;
+    }
+    list.className = "candidate-summary";
+    list.innerHTML = waves.map((wave) => `${escapeHtml(wave.wave_no || "-")} | ${(wave.stores_included || []).length} stores | ${Number(wave.total_requested_qty || 0)} 件 | 缺口 ${Number(wave.total_shortage_qty || 0)} 件 | ${Number(wave.sdb_count || 0)} SDB | ${Number(wave.lpk_count || 0)} LPK`).map((line) => `<div>${line}</div>`).join("");
+  } catch (_error) {}
 }
 
 function renderTransferDispatchSummary(rows = transferOrderState) {
@@ -26945,6 +26971,22 @@ async function submitTransfer(event) {
   await loadDashboard();
 }
 
+async function submitPickingWave(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const requestNos = [...form.querySelectorAll("[name='selected_replenishment_request_nos'] option:checked")].map((option) => option.value);
+  const payload = {
+    wave_name: String(form.querySelector("[name='wave_name']")?.value || "").trim(),
+    warehouse_code: String(form.querySelector("[name='warehouse_code']")?.value || "").trim(),
+    planned_picking_date: String(form.querySelector("[name='planned_picking_date']")?.value || "").trim(),
+    required_arrival_date: String(form.querySelector("[name='required_arrival_date']")?.value || "").trim(),
+    selected_replenishment_request_nos: requestNos,
+    notes: String(form.querySelector("[name='notes']")?.value || "").trim(),
+  };
+  await request("/picking-waves", { method: "POST", body: JSON.stringify(payload) });
+  await refreshPickingWavePanel();
+}
+
 async function submitTransferRecommendation(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -27956,6 +27998,7 @@ bindForm("#printJobFailForm", submitPrintJobFail, "#labelPrintOutput");
 bindForm("#receiptForm", submitReceipt, "#receiptOutput");
 bindForm("#recommendationForm", submitTransferRecommendation, "#recommendationOutput");
 bindForm("#transferForm", submitTransfer, "#transferOutput");
+bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
 bindForm("#loosePackingTaskPlanForm", submitLoosePackingTaskPlan, "#loosePackingTaskOutput");
 bindForm("#returnCandidateForm", submitReturnCandidates, "#returnOutput");
 bindForm("#returnSelectionForm", submitReturnSelection, "#returnOutput");

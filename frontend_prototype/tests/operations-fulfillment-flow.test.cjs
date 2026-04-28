@@ -757,6 +757,15 @@ test("phase 2A page 5.1 copy uses request number label and warehouse-only LPK gu
   assert.match(appJs, /该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。/);
 });
 
+test("phase B2 picking wave panel supports optional wave creation and request multi-select", () => {
+  assert.match(indexHtml, /备货波次是可选工具；补货申请也可以单独执行。/);
+  assert.match(indexHtml, /id="pickingWaveForm"/);
+  assert.match(indexHtml, /name="selected_replenishment_request_nos"[\s\S]*multiple/);
+  assert.match(indexHtml, /创建备货波次/);
+  assert.match(appJs, /await request\("\/picking-waves", \{ method: "POST"/);
+  assert.match(appJs, /await request\("\/picking-waves"\)/);
+});
+
 test("phase 2A copy keeps package count and piece count separated on 4.1", () => {
   assert.match(appJs, /需求：\$\{row\.requestedQty \|\| 0\} 件/);
   assert.match(appJs, /现成待送店包：\$\{escapeHtml\(row\.selectedPreparedBales\.length \|\| 0\)\} 包 \/ 覆盖 \$\{escapeHtml\(row\.preparedQty \|\| 0\)\} 件/);
