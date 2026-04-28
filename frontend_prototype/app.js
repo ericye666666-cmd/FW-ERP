@@ -9862,7 +9862,7 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
 }
 
 function openLoosePickSheetPrintTemplateModal(task = {}, transfer = {}) {
-  const templateCode = getPreferredWarehouseoutTemplateCode("store_loose_pick_60x40", "store_dispatch");
+  const templateCode = getPreferredWarehouseoutTemplateCode("store_loose_pick_60x40", "lpk_shortage_pick");
   const payload = {
     ...buildLoosePickSheetPrinterPayloadForTask(task, transfer, { printerName: "" }),
     template_code: templateCode,
@@ -9874,16 +9874,16 @@ function openLoosePickSheetPrintTemplateModal(task = {}, transfer = {}) {
   });
   balePrinterConsoleNotice = {
     type: "success",
-    message: "已打开 PDA/标签机模板选择页。先选 warehouseout_bale 模板，再打印补差拣货单。",
+    message: "已打开 LPK 补差工单打印页。当前模板固定为补差拣货工单 60x40。",
   };
   openBalePrintModal({
     shipmentNo: String(task.transferNo || transfer?.transfer_no || "").trim().toUpperCase(),
     groupKey: String(task.taskNo || task.taskBarcode || "").trim().toUpperCase(),
     jobs: [job],
-    supplierName: "STORE REPLENISHMENT",
-    categoryDisplay: `${getTransferStoreDisplayName(transfer)} / 补差拣货单`,
+    supplierName: "LPK SHORTAGE PICK",
+    categoryDisplay: `${getTransferStoreDisplayName(transfer)} / 补差拣货工单`,
     templateScope: "warehouseout_bale",
-    taskType: "store_dispatch",
+    taskType: "lpk_shortage_pick",
     preferredTemplateCode: templateCode,
   });
   return job;
@@ -15555,6 +15555,9 @@ function renderBalePrintModal() {
   const summary = document.querySelector("#balePrintModalSummary");
   const queue = document.querySelector("#balePrintModalQueue");
   const subhead = document.querySelector("#balePrintModalSubhead");
+  const title = document.querySelector("#balePrintModalTitle");
+  const scopeNote = document.querySelector("#balePrintModalScopeNote");
+  const browserPrintHint = document.querySelector("#balePrintModalBrowserPrintHint");
   const frame = document.querySelector("#balePrintPreviewFrame");
   const prevButton = document.querySelector("#balePrintModalPrevButton");
   const nextButton = document.querySelector("#balePrintModalNextButton");
@@ -15574,6 +15577,7 @@ function renderBalePrintModal() {
   const currentJob = jobs[currentIndex] || null;
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
+  const isLpkPrint = templateScope === "warehouseout_bale" && activeTaskType === "lpk_shortage_pick";
   const completionAction = templateScope !== "bale"
     ? {
       action: jobs.length ? "complete_group" : "already_complete",
@@ -15625,6 +15629,19 @@ function renderBalePrintModal() {
     subhead.textContent = currentJob
       ? `${displayParts?.primaryIdentity || balePrintModalState.supplierName || "-"} · ${displayParts?.packageCompact || `第 ${currentIndex + 1} 包`} · ${displayParts?.shipmentDate || ""}`.replace(/ · $/, "")
       : `${balePrintModalState.supplierName || "-"} · ${balePrintModalState.categoryDisplay || "-"} · 当前类别已经全部打印完成`;
+  }
+  if (title) {
+    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : "Bale 条码打印窗";
+  }
+  if (scopeNote) {
+    scopeNote.textContent = isLpkPrint
+      ? "LPK 只用于仓库补差拣货和打包。门店收货请扫描后续生成的 SDO 正式送货执行码。"
+      : "";
+  }
+  if (browserPrintHint) {
+    browserPrintHint.textContent = isLpkPrint
+      ? "浏览器打印/PDF会输出与预览一致的 LPK 标签 HTML（含条码值），可直接用于仓库工单留档。"
+      : "Cloud staging cannot directly access USB printers. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer.";
   }
 
   if (summary) {
@@ -17308,6 +17325,23 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
       : [{
         template_code: "transtoshop",
         name: "transtoshop",
+        width_mm: 60,
+        height_mm: 40,
+        template_scope: "warehouseout_bale",
+        disabled: false,
+        selected: true,
+      }];
+  }
+  if (normalizedScope === "warehouseout_bale" && getActiveBaleModalTaskType() === "lpk_shortage_pick" && labelTemplateFlow.buildLockedTemplateOptions) {
+    const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
+      allowedCodes: ["store_loose_pick_60x40"],
+      selectedCode: selectedTemplateCode || "store_loose_pick_60x40",
+    });
+    return rows.length
+      ? rows
+      : [{
+        template_code: "store_loose_pick_60x40",
+        name: "补差拣货工单 60x40",
         width_mm: 60,
         height_mm: 40,
         template_scope: "warehouseout_bale",
