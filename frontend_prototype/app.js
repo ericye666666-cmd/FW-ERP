@@ -25275,14 +25275,14 @@ async function submitStoreDispatchBaleAccept(event) {
   const rawScanText = String(payload.bale_no || "").trim().toUpperCase();
   payload.transfer_no = String(payload.transfer_no || "").trim().toUpperCase();
   if (!rawScanText) {
-    throw new Error("请先连续扫描或粘贴本调拨单下全部门店配货 bale barcode。");
+    throw new Error("请先扫描正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
   }
   if (!payload.transfer_no) {
     throw new Error("请先选择调拨单，再验收这张调拨单下的门店配货 bale。");
   }
   const scannedCodes = rawScanText.split(/\r?\n+/).map((row) => String(row || "").trim().toUpperCase()).filter(Boolean);
   if (scannedCodes.length === 1) {
-    const resolved = await resolveBarcodeForContext(scannedCodes[0], "store_receiving", ["DISPATCH_BALE", "STORE_DELIVERY_EXECUTION"]);
+    const resolved = await resolveBarcodeForContext(scannedCodes[0], "store_receiving", ["STORE_DELIVERY_EXECUTION"]);
     if (String(resolved?.barcode_type || "").trim().toUpperCase() === "STORE_DELIVERY_EXECUTION") {
       const orders = await request(`/transfers/${encodeURIComponent(payload.transfer_no)}/store-delivery-execution-orders`);
       const matched = Array.isArray(orders)
@@ -25307,7 +25307,9 @@ async function submitStoreDispatchBaleAccept(event) {
       showTransientInlineNotice("#storeDispatchBaleNotice", "已识别正式门店送货执行码。当前版本先完成识别与信息展示；收货回写将在后续版本补充。", "success", 2400);
       return;
     }
+    throw new Error("门店收货只扫正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
   }
+  const usingLegacyDispatchBaleCompatibilityPath = true;
   payload.store_code = String(payload.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const rows = await refreshStoreDispatchBaleDirectoryFromForm({ store_code: payload.store_code, transfer_no: payload.transfer_no });
   const plan = buildStoreReceiptBatchPlan(payload.transfer_no, rawScanText, rows);
@@ -25318,7 +25320,7 @@ async function submitStoreDispatchBaleAccept(event) {
   const results = [];
   for (const item of plan.matched) {
     const baleNo = item.canonical;
-    await resolveBarcodeForContext(baleNo, "store_receiving", ["DISPATCH_BALE", "STORE_DELIVERY_EXECUTION"]);
+    await resolveBarcodeForContext(baleNo, "store_receiving", ["DISPATCH_BALE"]);
     const result = await request(`/stores/dispatch-bales/${encodeURIComponent(baleNo)}/accept`, {
       method: "POST",
       body: JSON.stringify({
@@ -25336,7 +25338,14 @@ async function submitStoreDispatchBaleAccept(event) {
     bale_no: results.map((row) => row.bale_no).join("\n"),
   });
   await refreshStoreDispatchBaleDirectoryFromForm({ lastAccepted: payload.transfer_no, store_code: payload.store_code, transfer_no: payload.transfer_no });
-  showTransientInlineNotice("#storeDispatchBaleNotice", `调拨单 ${payload.transfer_no} 已整单验收 ${results.length} 包，下一步按总单批量分配店员。`, "success", 2400);
+  showTransientInlineNotice(
+    "#storeDispatchBaleNotice",
+    usingLegacyDispatchBaleCompatibilityPath
+      ? `调拨单 ${payload.transfer_no} 已通过 legacy 兼容流程整单验收 ${results.length} 包。正式流程请改扫 STORE_DELIVERY_EXECUTION（SDO...）。`
+      : `调拨单 ${payload.transfer_no} 已整单验收 ${results.length} 包，下一步按总单批量分配店员。`,
+    "success",
+    2400,
+  );
   setInputValue("#storeDispatchAssignmentForm [name='transfer_no']", payload.transfer_no);
   setInputValue("#storeDispatchAssignmentForm [name='bale_no']", results.map((row) => row.bale_no).join("\n"));
   renderStoreDispatchAssignmentResultSummary(null);

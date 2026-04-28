@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -393,6 +394,20 @@ def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(st
     pos_result = state.resolve_barcode(created["official_delivery_barcode"], context="pos")
     assert pos_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
     assert pos_result["reject_reason"]
+
+
+def test_create_store_delivery_execution_order_rejects_when_transfer_has_no_dispatch_rows(state):
+    _seed_transfer_with_dispatch_for_execution(state, transfer_no="TO-20260428-EMPTY")
+    state.store_dispatch_bales.clear()
+
+    with pytest.raises(HTTPException) as exc_info:
+        state.create_store_delivery_execution_order(
+            "TO-20260428-EMPTY",
+            {"created_by": "warehouse_clerk_1", "notes": "warehouse verified"},
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "该补货申请还没有可送店包裹，不能生成正式门店送货执行单 barcode。请先完成仓库核对和打包。"
 
 
 def test_store_prep_bale_rejection_message_in_store_receiving_mentions_official_execution_barcode(state):

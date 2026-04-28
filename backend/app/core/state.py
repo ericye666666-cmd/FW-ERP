@@ -12200,6 +12200,11 @@ class InMemoryState:
             for row in self.store_dispatch_bales.values()
             if str(row.get("transfer_no") or "").strip().upper() == transfer_no_upper
         ]
+        if not dispatch_rows:
+            raise HTTPException(
+                status_code=409,
+                detail="该补货申请还没有可送店包裹，不能生成正式门店送货执行单 barcode。请先完成仓库核对和打包。",
+            )
         source_store_prep_codes = sorted(
             {
                 str(code or "").strip().upper()
