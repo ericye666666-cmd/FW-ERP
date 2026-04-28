@@ -15819,7 +15819,7 @@ function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = 
     packing_list: String(job?.print_payload?.packing_list || "").trim(),
     dispatch_bale_no: String(job?.print_payload?.dispatch_bale_no || job?.print_payload?.scan_token || job?.print_payload?.barcode_value || job?.barcode || "").trim(),
     outbound_time: String(job?.print_payload?.outbound_time || "").trim(),
-    status: String(job?.print_payload?.status || (activeTaskType === "sale" ? "wait for sale" : "wait for transtoshop")).trim(),
+    status: String(job?.print_payload?.status || (activeTaskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH")).trim(),
     cat: String(job?.print_payload?.cat || job?.print_payload?.category_main || "").trim(),
     sub: String(job?.print_payload?.sub || job?.print_payload?.category_sub || "").trim(),
     grade: String(job?.print_payload?.grade || job?.print_payload?.grade_summary || "").trim(),
@@ -18073,7 +18073,7 @@ function getSelectedBaleTemplate(preferredValue = "", scope = "bale", taskType =
   if (normalizedScope === "warehouseout_bale") {
     return getLabelTemplateByCode(resolvedCode) || {
       template_code: String(resolvedCode || "wait_for_transtoshop").trim().toLowerCase() || "wait_for_transtoshop",
-      name: "wait for transtoshop",
+      name: "WAITING FOR STORE DISPATCH",
       width_mm: 60,
       height_mm: 40,
       barcode_type: "Code128",
@@ -24861,7 +24861,7 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
       unload_date: String(row?.updated_at || row?.created_at || "").trim(),
       template_scope: "warehouseout_bale",
       dispatch_bale_no: barcodeValue,
-      status: taskType === "sale" ? "wait for sale" : "wait for transtoshop",
+      status: taskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH",
       cat: String(row?.category_main || "").trim(),
       sub: String(row?.category_sub || "").trim(),
       grade: String(row?.grade_summary || "").trim(),

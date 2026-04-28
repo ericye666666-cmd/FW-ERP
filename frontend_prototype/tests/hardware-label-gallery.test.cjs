@@ -146,14 +146,14 @@ test("department 40x30 preview candidates stay in the lab only and preserve comp
   });
 });
 
-test("hardware label lab page now only shows wait for transtoshop 60x40 candidates", () => {
+test("hardware label lab page now only shows waiting-for-store-dispatch 60x40 candidates", () => {
   const groups = buildVisibleHardwareLabelGroups();
 
   assert.deepEqual(groups.map((group) => group.key), ["wait_for_transtoshop"]);
   assert.equal(groups[0].candidates.length, 2);
 });
 
-test("wait for transtoshop preview uses the requested CAT SUB GRADE QTY STATUS CODE fields on 60x40", () => {
+test("waiting-for-store-dispatch preview uses the requested CAT SUB GRADE QTY STATUS CODE fields on 60x40", () => {
   const groups = buildHardwareLabelGroups();
   const waitGroup = groups.find((group) => group.key === "wait_for_transtoshop");
   const candidate = waitGroup.candidates.find((row) => row.id === "wait_for_transtoshop__wf_main");
@@ -167,7 +167,7 @@ test("wait for transtoshop preview uses the requested CAT SUB GRADE QTY STATUS C
   assert.ok(candidate.blocks.some((block) => block.value === "SUB: jeans pant"));
   assert.ok(candidate.blocks.some((block) => block.value === "GRADE: P"));
   assert.ok(candidate.blocks.some((block) => block.value === "QTY: 50"));
-  assert.ok(candidate.blocks.some((block) => block.value === "STATUS: wait for transtoshop"));
+  assert.ok(candidate.blocks.some((block) => block.value === "STATUS: WAITING FOR STORE DISPATCH"));
   assert.ok(candidate.blocks.some((block) => block.value === "CODE: 240423000018"));
   assert.ok(statusBlock);
   assert.ok(Number(statusBlock.y_mm) <= 2.6);

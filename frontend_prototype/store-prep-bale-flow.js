@@ -191,7 +191,7 @@
       unload_date: normalizeText(row && (row.updated_at || row.created_at)),
       template_scope: "warehouseout_bale",
       dispatch_bale_no: barcodeValue,
-      status: taskType === "sale" ? "wait for sale" : "wait for transtoshop",
+      status: taskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH",
       cat: categoryMain,
       sub: categorySub,
       grade: normalizeText(row && row.grade_summary),
