@@ -674,6 +674,10 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /LPK 补差工单条码打印/);
   assert.match(appJs, /LPK 只用于仓库补差拣货和打包/);
   assert.match(appJs, /allowedCodes:\s*\["store_loose_pick_60x40"\]/);
+  assert.match(appJs, /isLpkPrint \|\| isBaleModalDirectOnlyJob\(currentJob\)/);
+  assert.match(appJs, /data-print-template="store_loose_pick_60x40"/);
+  assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
+  assert.match(appJs, /data-barcode-renderer="svg-code128"/);
   assert.doesNotMatch(appJs, /lpk_shortage_pick[\s\S]*allowedCodes:\s*\["transtoshop"/);
   assert.match(indexHtml, /id="balePrintModalScopeNote"/);
 });

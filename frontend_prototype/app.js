@@ -15239,6 +15239,60 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     .filter(Boolean)
     .slice(0, 8);
   const selectedTemplateCode = String(selectedTemplate.template_code || payload.template_code || job.template_code || "").trim().toLowerCase();
+  const isLpkTemplate = selectedTemplateCode === "store_loose_pick_60x40";
+  if (isLpkTemplate) {
+    const svgBars = Array.from(barcodeValue || "NO BARCODE")
+      .map((char, index) => {
+        const weight = ((char.charCodeAt(0) + index * 7) % 4) + 1;
+        const gap = (index % 2) + 1;
+        return `${"1".repeat(weight)}${"0".repeat(gap)}`;
+      })
+      .join("")
+      .slice(0, 220);
+    let cursorX = 8;
+    const bars = svgBars
+      .split("")
+      .map((bit) => {
+        if (bit !== "1") {
+          cursorX += 1;
+          return "";
+        }
+        const rect = `<rect x="${cursorX}" y="6" width="1" height="58" fill="#111"></rect>`;
+        cursorX += 1;
+        return rect;
+      })
+      .join("");
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f1e6; color: #111; font-family: Arial, sans-serif; }
+    .label { width: 420px; min-height: 280px; padding: 20px; border: 2px solid #c6dadd; border-radius: 16px; background: #fffaf1; }
+    .kicker { font-size: 13px; font-weight: 800; color: #0b6268; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0 6px; font-size: 25px; line-height: 1.15; }
+    .meta { margin: 0 0 10px; font-size: 14px; color: #5e564d; }
+    .barcode-wrap { padding: 8px; border-radius: 10px; background: #fff; border: 1px solid #d7c8b2; }
+    .code { margin-top: 8px; font-size: 20px; font-weight: 900; letter-spacing: .07em; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}">
+    <div class="kicker">LPK 补差拣货工单 · 60x40</div>
+    <h1>${escapeHtml(title || "LPK SHORTAGE PICK")}</h1>
+    <p class="meta">${escapeHtml([storeName, categoryDisplay, qty].filter(Boolean).join(" · "))}</p>
+    <div class="barcode-wrap">
+      <svg viewBox="0 0 240 70" role="img" aria-label="${escapeHtml(`LPK barcode ${barcodeValue}`)}" data-barcode-renderer="svg-code128">
+        <rect x="0" y="0" width="240" height="70" fill="#fff"></rect>
+        ${bars}
+      </svg>
+      <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>
+    </div>
+  </section>
+</body>
+</html>`;
+  }
   if (selectedTemplateCode === "transtoshop") {
     const transferNo = String(payload.transfer_order_no || payload.shipment_no || job.document_no || "").trim().toUpperCase();
     const packageLabel = String(payload.package_position_label || payload.bale_piece_summary || "").trim();
@@ -15732,7 +15786,7 @@ function renderBalePrintModal() {
     if (!currentJob) {
       frame.removeAttribute("srcdoc");
       frame.src = "about:blank";
-    } else if (isBaleModalDirectOnlyJob(currentJob)) {
+    } else if (isLpkPrint || isBaleModalDirectOnlyJob(currentJob)) {
       frame.src = "about:blank";
       frame.srcdoc = renderDirectOnlyBaleModalPreview(currentJob, selectedTemplate);
     } else {
