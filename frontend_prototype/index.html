@@ -2912,14 +2912,14 @@
 
       <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
         <div class="panel-head">
-          <h2>5. 门店执行控制台</h2>
+          <h2>5. 门店收货主控台</h2>
         </div>
         <form id="storeManagerConsoleForm" class="form-grid compact">
           <input name="store_code" placeholder="门店代码" value="UTAWALA" />
           <button type="submit">刷新店长控制台</button>
         </form>
         <div id="storeManagerConsoleSummary" class="candidate-summary empty-state">
-          这是店长端首页。先看今天到货、待分配、进行中和异常，再决定跳去门店验收、分配店员或退仓处理。
+          这是门店收货主控台。先看今天到货 SDO，再在同一页内完成验收和店员分配。
         </div>
         <pre id="storeManagerConsoleOutput" class="output hidden-output"></pre>
       </section>
@@ -2941,7 +2941,7 @@
 
       <section class="panel store-support-panel" data-workspace-panel="store">
         <div class="panel-head">
-          <h2>6. 门店验收配货 bale</h2>
+          <h2>5.1 收货明细（内嵌）</h2>
         </div>
         <form id="storeDispatchBaleAcceptForm" class="form-grid compact">
           <input name="transfer_no" placeholder="先选择调拨单，例如 TO-20260425-010" />
@@ -2958,7 +2958,7 @@
 
       <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
         <div class="panel-head">
-          <h2>6.1 门店分配店员</h2>
+          <h2>5.2 店员分配（内嵌）</h2>
           <button data-action="load-store-dispatch-assignment" type="button">刷新待签收 / 待分配</button>
         </div>
         <form id="storeDispatchAssignmentForm" class="sorting-task-form warehouse-step-form">
