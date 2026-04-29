@@ -23561,7 +23561,9 @@ function renderStoreManagerConsoleSummary(context = {}) {
               <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>` : ""}
               ${commandCenter.step === "completed" ? `<span class="meta-pill">本单已完成</span>` : ""}
             </div>
-          </div>` : `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`}
+          </div>` : commandCenter.step === "list"
+            ? `<div class="empty-state" style="margin-top:10px;">请在上方列表中选择一张 SDO 卡片，进入 receiving 步骤。</div>`
+            : `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`}
       </section>
       <section class="manager-console-panel">
         <div class="manager-console-head">
