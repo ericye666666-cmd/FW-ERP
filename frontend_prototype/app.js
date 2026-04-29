@@ -1356,7 +1356,7 @@ const STORE_PANEL_NAV_META = [
     section: "manager",
     order: 20,
     icon: "派",
-    navTitle: "6.1 门店分配店员",
+    navTitle: "内部兼容：门店分配店员",
     hiddenInNav: true,
   },
   {
@@ -23568,22 +23568,20 @@ function renderStoreManagerConsoleSummary(context = {}) {
       <section class="manager-console-panel">
         <div class="manager-console-head">
           <span class="eyebrow">Assignment</span>
-          <strong>待分配 / 处理中</strong>
+          <strong>步骤跟进 / 待分配与处理中</strong>
         </div>
         <div class="manager-console-list">${renderQueue(acceptedRows.length ? acceptedRows : activeRows, acceptedRows.length ? "assign" : "active")}</div>
       </section>
       <section class="manager-console-panel">
         <div class="manager-console-head">
           <span class="eyebrow">Attention</span>
-          <strong>异常 / 例外</strong>
+          <strong>步骤4：异常与完成后动作</strong>
         </div>
         <div class="manager-console-flags">
           ${(exceptionFlags.length ? exceptionFlags : ["当前没有异常或例外待处理"]).map((flag) => `<span class="store-flag ${flag === "当前没有异常或例外待处理" ? "" : "danger"}">${escapeHtml(flag)}</span>`).join("")}
         </div>
         <div class="manager-console-actions">
           ${renderSummaryActions([
-            { panelKey: getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail"), label: "去送货单验收详情" },
-            { panelKey: getPanelKeyByTitle("store", "6.1 门店分配店员"), label: "去分配店员" },
             { panelKey: getPanelKeyByTitle("store", "10. 周期退仓"), label: "去处理退仓" },
           ])}
         </div>
