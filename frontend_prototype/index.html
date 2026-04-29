@@ -2912,14 +2912,14 @@
 
       <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
         <div class="panel-head">
-          <h2>5. 门店执行控制台</h2>
+          <h2>门店收货主控台</h2>
         </div>
         <form id="storeManagerConsoleForm" class="form-grid compact">
           <input name="store_code" placeholder="门店代码" value="UTAWALA" />
           <button type="submit">刷新店长控制台</button>
         </form>
         <div id="storeManagerConsoleSummary" class="candidate-summary empty-state">
-          这是店长端首页。先看今天到货、待分配、进行中和异常，再决定跳去门店验收、分配店员或退仓处理。
+          这是唯一门店收货入口：先选 SDO，再在本页内完成验收明细与店员分配。
         </div>
         <pre id="storeManagerConsoleOutput" class="output hidden-output"></pre>
       </section>
@@ -2941,7 +2941,7 @@
 
       <section class="panel store-support-panel" data-workspace-panel="store">
         <div class="panel-head">
-          <h2>6. 门店验收配货 bale</h2>
+          <h2>6. 送货单验收详情 / Store Receiving Detail</h2>
         </div>
         <form id="storeDispatchBaleAcceptForm" class="form-grid compact">
           <input name="transfer_no" placeholder="先选择调拨单，例如 TO-20260425-010" />
