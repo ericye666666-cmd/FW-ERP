@@ -9682,6 +9682,16 @@ function buildLoosePickSheetLabelForTask(task = {}, transfer = {}) {
   };
 }
 
+function buildLpkMachineCode(transferNo = "") {
+  const normalizedTransfer = String(transferNo || "").trim().toUpperCase();
+  const match = normalizedTransfer.match(/^TO-?(\d{4})(\d{2})(\d{2})-?(\d{3})$/);
+  if (!match) {
+    return "";
+  }
+  const [, year, month, day, serial] = match;
+  return `3${year.slice(2)}${month}${day}${serial}`;
+}
+
 function buildLoosePickSheetPrinterPayloadForTask(task = {}, transfer = {}, { printerName = "" } = {}) {
   if (typeof operationsFulfillmentFlow.buildLoosePickSheetDirectPrintPayload === "function") {
     return operationsFulfillmentFlow.buildLoosePickSheetDirectPrintPayload({
@@ -9693,7 +9703,8 @@ function buildLoosePickSheetPrinterPayloadForTask(task = {}, transfer = {}, { pr
     });
   }
   const label = buildLoosePickSheetLabelForTask(task, transfer);
-  const barcodeValue = String(label.barcodeValue || label.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const machineCode = buildLpkMachineCode(label.transferNo || transfer?.transfer_no || task?.transferNo);
+  const barcodeValue = String(machineCode || label.barcodeValue || label.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   const pickQty = Number(label.pickQty || 0);
   return {
     printer_name: String(printerName || "").trim(),

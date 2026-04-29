@@ -508,6 +508,16 @@
     return "";
   }
 
+  function buildLpkMachineCode(transferNo = "") {
+    const normalizedTransfer = normalizeText(transferNo).toUpperCase();
+    const match = normalizedTransfer.match(/^TO-?(\d{4})(\d{2})(\d{2})-?(\d{3})$/);
+    if (!match) {
+      return "";
+    }
+    const [, year, month, day, serial] = match;
+    return `3${year.slice(2)}${month}${day}${serial}`;
+  }
+
   function buildLoosePackingTasks({
     transferNo = "",
     plan = {},
@@ -613,7 +623,8 @@
     printerName = "",
   } = {}) {
     const label = buildLoosePickSheetLabel({ task, transfer, storeName, categoryLabel });
-    const barcodeValue = normalizeText(label.barcodeValue || label.taskNo).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const machineCode = buildLpkMachineCode(label.transferNo || transfer?.transfer_no || task?.transferNo);
+    const barcodeValue = normalizeText(machineCode || label.barcodeValue || label.taskNo).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     const pickQty = Number(label.pickQty || 0);
     const packageLimitQty = normalizeLoosePackageLimitQty(label.packageLimitQty);
     const statusText = `${label.storeName || "STORE"} - ${label.categoryLabel || "服装"}`;
@@ -622,6 +633,8 @@
       template_code: "store_loose_pick_60x40",
       template_scope: "warehouseout_bale",
       copies: 1,
+      display_code: normalizeText(label.barcodeValue || label.taskNo).toUpperCase(),
+      machine_code: machineCode,
       barcode_value: barcodeValue,
       scan_token: barcodeValue,
       bale_barcode: barcodeValue,

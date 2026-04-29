@@ -323,8 +323,12 @@ test("loose pick sheet prints through warehouseout template payload instead of b
   assert.equal(payload.cat, "PICK SHEET");
   assert.equal(payload.sub, "LOOSE GAP");
   assert.equal(payload.qty, "55");
-  assert.equal(payload.code, "LPK260423003");
-  assert.equal(payload.dispatch_bale_no, "LPK260423003");
+  assert.equal(payload.display_code, "LPK260423003");
+  assert.equal(payload.machine_code, "3260423003");
+  assert.equal(payload.barcode_value, "3260423003");
+  assert.equal(payload.scan_token, "3260423003");
+  assert.equal(payload.code, "3260423003");
+  assert.equal(payload.dispatch_bale_no, "3260423003");
   assert.equal(payload.transfer_order_no, "TO-20260423-003");
   assert.match(payload.packing_list, /dress \/ 2 pieces · 50 件/);
   assert.match(payload.packing_list, /tops \/ lady tops · 5 件/);
@@ -332,6 +336,28 @@ test("loose pick sheet prints through warehouseout template payload instead of b
   assert.equal(payload.copies, 1);
 });
 
+
+
+test("loose pick sheet print payload uses numeric machine code for TO-20260428-001", () => {
+  const task = buildLoosePackingTasks({
+    transferNo: "TO-20260428-001",
+    plan: {
+      loosePickRows: [
+        { categoryMain: "服装", categorySub: "上衣", qty: 120, rackCodes: ["A-TS-LT-P-01"] },
+      ],
+    },
+  })[0];
+
+  const payload = buildLoosePickSheetDirectPrintPayload({
+    task,
+    transfer: { transfer_no: "TO-20260428-001", to_store_code: "UTAWALA" },
+    storeName: "Utawala",
+  });
+
+  assert.equal(payload.display_code, "LPK260428001");
+  assert.equal(payload.machine_code, "3260428001");
+  assert.equal(payload.barcode_value, "3260428001");
+});
 test("final dispatch rows collapse loose gaps into one pick-sheet source row", () => {
   const plan = buildTransferPreparationPlan({
     demandLines: [
