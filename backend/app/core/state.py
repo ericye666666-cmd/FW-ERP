@@ -1199,6 +1199,34 @@ class InMemoryState:
         serial = next(self._store_delivery_execution_order_ids)
         return f"SDO{datetime.now(timezone.utc).strftime('%y%m%d')}{serial:03d}"
 
+    def _physical_label_machine_code(
+        self,
+        display_code: str,
+        code_type: str,
+        source_reference: str = "",
+    ) -> str:
+        normalized_display = str(display_code or "").strip().upper()
+        normalized_type = str(code_type or "").strip().upper()
+        normalized_source_reference = str(source_reference or "").strip().upper()
+        type_digit_map = {
+            "RAW_BALE": "1",
+            "SDB": "2",
+            "STORE_PREP_BALE": "2",
+            "LPK": "3",
+            "SDO": "4",
+            "STORE_ITEM": "5",
+        }
+        type_digit = type_digit_map.get(normalized_type, "")
+        if not normalized_display or not type_digit:
+            return normalized_display
+        digits_source = normalized_display
+        if normalized_type == "LPK" and normalized_source_reference:
+            digits_source = normalized_source_reference
+        compact_digits = "".join(ch for ch in digits_source if ch.isdigit())
+        if len(compact_digits) >= 9:
+            return f"{type_digit}{compact_digits[-9:]}"
+        return normalized_display
+
     def _normalize_store_delivery_execution_order(self, row: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(row or {})
         execution_order_no = str(
@@ -1216,10 +1244,12 @@ class InMemoryState:
         source_gap_tasks = normalized.get("source_gap_fill_task_codes") or normalized.get("source_loose_pick_task_codes") or []
         status = str(normalized.get("status") or "pending_print").strip().lower() or "pending_print"
         created_at = normalized.get("created_at") or now_iso()
+        machine_code = self._physical_label_machine_code(execution_order_no, "SDO")
         normalized.update(
             {
                 "execution_order_no": execution_order_no,
                 "official_delivery_barcode": execution_order_no,
+                "machine_code": machine_code,
                 "source_transfer_no": source_transfer_no,
                 "replenishment_request_no": source_transfer_no,
                 "from_warehouse_code": str(normalized.get("from_warehouse_code") or "").strip().upper(),
@@ -1237,6 +1267,13 @@ class InMemoryState:
                 "printed_at": normalized.get("printed_at"),
                 "received_at": normalized.get("received_at"),
                 "notes": str(normalized.get("notes") or "").strip(),
+                "print_payload": {
+                    "symbology": "Code128",
+                    "display_code": execution_order_no,
+                    "human_readable": execution_order_no,
+                    "machine_code": machine_code,
+                    "barcode_value": machine_code,
+                },
             }
         )
         return normalized
@@ -3042,6 +3079,7 @@ class InMemoryState:
                     in {
                         str(row.get("execution_order_no") or "").strip().upper(),
                         str(row.get("official_delivery_barcode") or "").strip().upper(),
+                        str(row.get("machine_code") or "").strip().upper(),
                     }
                 ),
                 None,
@@ -6424,6 +6462,7 @@ class InMemoryState:
             package_label = f"{package_label} · {float(bale.get('actual_weight_kg') or 0):g} KG"
         status_text = "WAIT FOR SALE" if task_type == "sale" else "WAITING FOR STORE DISPATCH"
         barcode_value = str(bale.get("scan_token") or bale.get("bale_barcode") or "").strip().upper()
+        machine_code = barcode_value
         job = {
             "id": next(self._print_job_ids),
             "job_type": "bale_barcode_label",
@@ -6443,11 +6482,13 @@ class InMemoryState:
             "error_message": "",
             "print_payload": {
                 "symbology": "Code128",
-                "barcode_value": barcode_value,
-                "scan_token": barcode_value,
+                "barcode_value": machine_code,
+                "scan_token": machine_code,
                 "bale_barcode": str(bale.get("bale_barcode") or "").strip().upper(),
                 "legacy_bale_barcode": "",
                 "human_readable": barcode_value,
+                "display_code": barcode_value,
+                "machine_code": machine_code,
                 "supplier_name": "SORTED STOCK",
                 "category_main": str(bale.get("category_main") or "").strip(),
                 "category_sub": str(bale.get("category_sub") or "").strip(),
@@ -6459,7 +6500,7 @@ class InMemoryState:
                 "parcel_batch_no": normalized_bale_no,
                 "unload_date": str(bale.get("updated_at") or bale.get("created_at") or "").strip(),
                 "received_at": str(bale.get("created_at") or "").strip(),
-                "dispatch_bale_no": barcode_value,
+                "dispatch_bale_no": machine_code,
                 "status": status_text,
                 "cat": str(bale.get("category_main") or "").strip(),
                 "sub": str(bale.get("category_sub") or "").strip(),
