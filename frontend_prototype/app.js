@@ -14402,7 +14402,7 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const normalizedSdoCode = String(transferNo || "").trim().toUpperCase();
   if (!normalizedSdoCode) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先从 Page 5 选择一张 SDO 送货单，或直接扫描/输入 SDO 码后查看验收详情。";
+    target.textContent = "先在“门店收货主控台”选择一张 SDO，或直接扫描/输入 SDO 码后查看验收详情。";
     return;
   }
   const transferRows = (Array.isArray(rows) ? rows : storeDispatchBaleState)
@@ -14410,7 +14410,7 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   target.className = "report-summary";
   if (!transferRows.length) {
     target.innerHTML = `
-      <div class="alert-banner">SDO ${escapeHtml(normalizedSdoCode)} 还没加载到本页。先回 Page 5 读取最近送货单，或确认仓库已生成 SDO。</div>
+      <div class="alert-banner">SDO ${escapeHtml(normalizedSdoCode)} 还没加载到主控台。先刷新最近送货单，或确认仓库已生成 SDO。</div>
       <div class="empty-state">加载后这里会显示该 SDO 的包裹明细（来源码，仅供核对）。</div>
     `;
     return;
@@ -14543,7 +14543,7 @@ function renderStoreDispatchAssignmentOverview(target) {
   }
   if (!acceptedGroups.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "当前没有“已验收待分配”的 SDO。请先在 Page 6 完成整单验收。";
+    target.textContent = "当前没有“已验收待分配”的 SDO。请先在本页上方完成整单验收。";
     return;
   }
   const selectedSdo = String(document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")?.value || acceptedGroups[0].sdo_display_code || "").trim().toUpperCase();
@@ -29470,6 +29470,7 @@ document.addEventListener("click", async (event) => {
           store_code: getCurrentStoreCodeFallback(),
           last_action_message: `SDO ${sdoCode}：${baleNo} 已标记为${action === "received" ? "已收到" : "异常"}。`,
         });
+        renderStoreDispatchAssignmentResultSummary(null);
       }
       return;
     }
@@ -29481,9 +29482,10 @@ document.addEventListener("click", async (event) => {
         renderStoreReceiptTransferBaleList(sdoCode);
         renderStoreManagerConsoleSummary({
           store_code: getCurrentStoreCodeFallback(),
-          last_action_message: "本送货单已完成验收，下一步请进入店员分配。",
+          last_action_message: "本送货单已完成验收，请在同一页下方完成店员分配。",
         });
-        showTransientInlineNotice("#storeDispatchBaleNotice", "本送货单已完成验收，下一步请进入店员分配。", "success", 2400);
+        renderStoreDispatchAssignmentResultSummary(null);
+        showTransientInlineNotice("#storeDispatchBaleNotice", "本送货单已完成验收，请在同一页下方完成店员分配。", "success", 2400);
       }
       return;
     }
