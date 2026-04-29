@@ -16258,11 +16258,9 @@ async function completeCurrentBalePrintModalJob() {
   }
   if (templateScope !== "bale") {
     const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
+    const completedIndexes = jobsToComplete.length ? [currentModalIndex] : [];
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
-      const completedIndexes = jobsToComplete
-        .map((job) => jobs.findIndex((candidate) => candidate === job || String(candidate?.id || "") === String(job?.id || "")))
-        .filter((index) => index >= 0);
       if (transfer && Array.isArray(transfer.display_store_dispatch_bales) && completedIndexes.length) {
         transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row, index) => (
           completedIndexes.includes(index) ? { ...row, status: "labelled" } : row
