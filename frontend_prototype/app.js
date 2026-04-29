@@ -448,6 +448,7 @@ let filteredItemBarcodeTokenState = [];
 let itemTokenPrintJobState = [];
 let storeDispatchBaleState = [];
 let filteredStoreDispatchBaleState = [];
+let storeReceiptPackageStatusState = {};
 let warehouseDispatchHistoryState = [];
 let warehouseSoldPackageHistoryState = [];
 let baleSalesPricingCandidateState = [];
@@ -14368,6 +14369,25 @@ function normalizeStoreReceiptBaleInputFromForm({ showNotice = true } = {}) {
   return canonicalBaleNo || rawBaleNo;
 }
 
+function getStoreReceiptPackageStatusLabel(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "received") return "已收到";
+  if (normalized === "exception") return "异常";
+  return "待验收";
+}
+
+function getStoreReceiptSdoStatusText(packageRows = [], completed = false) {
+  const rows = Array.isArray(packageRows) ? packageRows : [];
+  if (!rows.length) return "待验收";
+  const statuses = rows.map((row) => String(row?.receipt_status || "pending").trim().toLowerCase());
+  const hasException = statuses.includes("exception");
+  const handledCount = statuses.filter((status) => status === "received" || status === "exception").length;
+  if (completed && handledCount === rows.length) return "已验收待分配";
+  if (hasException && handledCount === rows.length) return "异常";
+  if (handledCount === 0) return "待验收";
+  return "部分验收";
+}
+
 function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const target = document.querySelector("#storeDispatchBaleSummary");
   if (!(target instanceof HTMLElement)) {
@@ -14389,44 +14409,51 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
     `;
     return;
   }
-  const pendingRows = transferRows.filter((row) => {
-    const status = String(row?.status || "").trim().toLowerCase();
-    return !row?.accepted_at && !["received", "accepted", "partially_received", "assigned", "processing", "completed"].includes(status);
-  });
-  const shownRows = pendingRows.length ? pendingRows : transferRows;
+  const packageStatus = storeReceiptPackageStatusState[normalizedSdoCode] || {};
+  const shownRows = transferRows.map((row) => ({
+    ...row,
+    receipt_status: String(packageStatus[String(row?.bale_no || "").trim().toUpperCase()] || "pending").toLowerCase(),
+  }));
+  const handledCount = shownRows.filter((row) => ["received", "exception"].includes(String(row?.receipt_status || "").trim().toLowerCase())).length;
+  const allHandled = shownRows.length > 0 && handledCount === shownRows.length;
+  const isCompleted = Boolean(packageStatus.completed_at);
   const totalItems = transferRows.reduce((sum, row) => sum + Number(row?.item_count || 0), 0);
   const normalizedTransferNo = String(transferRows[0]?.transfer_no || "").trim().toUpperCase();
   const sdoMachineCode = String(transferRows[0]?.machine_code || "").replace(/[^0-9]/g, "").trim() || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(normalizedSdoCode) ? `4${normalizedSdoCode.slice(3)}` : "-");
   target.innerHTML = `
-    <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedSdoCode)}。本页为只读演示，按钮暂不做持久化回写。</div>
+    <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedSdoCode)}。请逐包标记“已收到”或“异常”；全部处理后可点击“整单验收完成”。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>SDO 显示码</strong><span>${escapeHtml(normalizedSdoCode)}</span></article>
       <article class="store-metric"><strong>SDO 机报码</strong><span>${escapeHtml(sdoMachineCode)}</span></article>
       <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(normalizedTransferNo || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transferRows[0]?.store_code || getCurrentStoreCodeFallback() || "-")}</span></article>
       <article class="store-metric"><strong>总包裹数</strong><span>${escapeHtml(transferRows.length)}</span></article>
-      <article class="store-metric"><strong>验收状态</strong><span>${escapeHtml(pendingRows.length > 0 ? "待验收" : "已完成/处理中")}</span></article>
+      <article class="store-metric"><strong>验收状态</strong><span>${escapeHtml(getStoreReceiptSdoStatusText(shownRows, isCompleted))}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${escapeHtml(totalItems)}</span></article>
     </div>
     <div class="subtle small">本页仅展示送货单包裹明细；SDB / LPK 作为来源码，仅供核对。</div>
     <div class="candidate-list compact-list">
-      ${shownRows.map((row) => `
+      ${shownRows.map((row) => {
+        const badge = getStoreReceiptPackageStatusLabel(row.receipt_status);
+        const baleNo = String(row.bale_no || "").trim().toUpperCase();
+        return `
         <article class="candidate-row">
           <div class="candidate-main">
             <strong>${escapeHtml(`第 ${getStoreReceiptBaleSequence(row.bale_no || "") || "-"} 包 / 共 ${transferRows.length} 包`)}</strong>
             <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
             <div class="subtle small">${escapeHtml(`来源 ${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${row.bale_no || "-"}（来源码，仅供核对）`)}</div>
-            <div class="subtle small">${escapeHtml(`验收状态 ${getStoreDispatchBaleStatusLabel(row.status || "")}`)}</div>
+            <div class="subtle small">${escapeHtml(`验收状态 ${badge}`)}</div>
           </div>
           <div class="candidate-side">
-            <button type="button" class="ghost-button mini-button" disabled>确认收到此包</button>
-            <button type="button" class="ghost-button mini-button" disabled>上报异常</button>
+            <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(normalizedSdoCode)}" data-store-receipt-package="${escapeHtml(baleNo)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
+            <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(normalizedSdoCode)}" data-store-receipt-package="${escapeHtml(baleNo)}" ${row.receipt_status === "exception" ? "disabled" : ""}>上报异常</button>
           </div>
         </article>
-      `).join("")}
+      `;
+      }).join("")}
     </div>
     <div class="button-row" style="margin-top:10px;">
-      <button type="button" class="ghost-button" disabled>整单验收完成</button>
+      <button type="button" class="ghost-button" data-store-receipt-complete-sdo="${escapeHtml(normalizedSdoCode)}" ${allHandled ? "" : "disabled"}>整单验收完成</button>
     </div>
   `;
 }
@@ -23298,7 +23325,18 @@ function renderStoreManagerConsoleSummary(context = {}) {
       return `<div class="empty-state">当前没有待验收的 SDO 送货单。</div>`;
     }
     return groups.slice(0, 6).map((group) => {
-      const currentStatus = getStoreDispatchBaleStatusLabel(group.rows[0]?.status || "");
+      const packageStatusMap = storeReceiptPackageStatusState[group.sdo_display_code] || {};
+      const packageStatuses = group.rows.map((row) => String(packageStatusMap[String(row?.bale_no || "").trim().toUpperCase()] || "pending").toLowerCase());
+      const handledCount = packageStatuses.filter((status) => status === "received" || status === "exception").length;
+      const hasException = packageStatuses.includes("exception");
+      const isCompleted = Boolean(packageStatusMap.completed_at);
+      const currentStatus = isCompleted
+        ? "已验收待分配"
+        : handledCount === 0
+          ? "待验收"
+          : handledCount < group.rows.length
+            ? "部分验收"
+            : (hasException ? "异常" : "部分验收");
       return `
         <article class="manager-console-row">
           <div class="manager-console-row-main">
@@ -25598,7 +25636,7 @@ async function submitStoreDispatchBaleAccept(event) {
   renderStoreReceiptTransferBaleList(payload.transfer_no, rows);
   showTransientInlineNotice(
     "#storeDispatchBaleNotice",
-    "当前版本的 Page 6 为只读 SDO 明细页，不执行整单验收回写。",
+    "已进入 Page 6，请逐包标记收货状态；全部处理后再点“整单验收完成”。",
     "success",
     2400,
   );
@@ -29284,7 +29322,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill]")
+    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -29358,6 +29396,35 @@ document.addEventListener("click", async (event) => {
       if (panelKey) {
         setActivePanel(panelKey);
         focusElement("#storeDispatchAssignmentForm");
+      }
+      return;
+    }
+    if (button.dataset.storeReceiptPackageAction) {
+      const sdoCode = String(button.dataset.storeReceiptSdo || "").trim().toUpperCase();
+      const baleNo = String(button.dataset.storeReceiptPackage || "").trim().toUpperCase();
+      const action = String(button.dataset.storeReceiptPackageAction || "").trim().toLowerCase();
+      if (sdoCode && baleNo && ["received", "exception"].includes(action)) {
+        const previous = storeReceiptPackageStatusState[sdoCode] || {};
+        storeReceiptPackageStatusState[sdoCode] = { ...previous, [baleNo]: action };
+        renderStoreReceiptTransferBaleList(sdoCode);
+        renderStoreManagerConsoleSummary({
+          store_code: getCurrentStoreCodeFallback(),
+          last_action_message: `SDO ${sdoCode}：${baleNo} 已标记为${action === "received" ? "已收到" : "异常"}。`,
+        });
+      }
+      return;
+    }
+    if (button.dataset.storeReceiptCompleteSdo) {
+      const sdoCode = String(button.dataset.storeReceiptCompleteSdo || "").trim().toUpperCase();
+      if (sdoCode) {
+        const previous = storeReceiptPackageStatusState[sdoCode] || {};
+        storeReceiptPackageStatusState[sdoCode] = { ...previous, completed_at: new Date().toISOString() };
+        renderStoreReceiptTransferBaleList(sdoCode);
+        renderStoreManagerConsoleSummary({
+          store_code: getCurrentStoreCodeFallback(),
+          last_action_message: "本送货单已完成验收，下一步请进入店员分配。",
+        });
+        showTransientInlineNotice("#storeDispatchBaleNotice", "本送货单已完成验收，下一步请进入店员分配。", "success", 2400);
       }
       return;
     }
