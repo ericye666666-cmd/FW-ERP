@@ -23206,8 +23206,23 @@ function getTransferDerivedStoreDispatchRows() {
     if (!sdoCode || existingSdoCodes.has(sdoCode)) return;
     const targetStoreCode = String(transfer?.to_store_code || transfer?.store_code || "").trim().toUpperCase();
     const packageCount = Math.max(0, Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
+    const upstreamPackageRows = [
+      ...(Array.isArray(transfer?.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : []),
+      ...(Array.isArray(transfer?.store_dispatch_bales) ? transfer.store_dispatch_bales : []),
+      ...(Array.isArray(transfer?.delivery_batch?.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : []),
+      ...(Array.isArray(transfer?.shipment_session?.packages) ? transfer.shipment_session.packages : []),
+    ];
+    const explicitItemCounts = upstreamPackageRows
+      .map((row) => {
+        const rawCount = row?.item_count;
+        if (rawCount === null || rawCount === undefined || rawCount === "") return null;
+        const parsed = Number(rawCount);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+      })
+      .filter((count) => count !== null);
     for (let index = 0; index < packageCount; index += 1) {
       const packageLabel = String(index + 1).padStart(3, "0");
+      const knownItemCount = explicitItemCounts[index] ?? null;
       derivedRows.push({
         bale_no: `${sdoCode}-PKG${packageLabel}`,
         transfer_no: String(transfer?.transfer_no || "").trim().toUpperCase(),
@@ -23215,7 +23230,7 @@ function getTransferDerivedStoreDispatchRows() {
         to_store_code: targetStoreCode,
         target_store_code: targetStoreCode,
         status: transfer?.status || "shipped",
-        item_count: 0,
+        item_count: knownItemCount,
         updated_at: transfer?.updated_at || transfer?.created_at || nowIso,
         created_at: transfer?.created_at || nowIso,
         store_delivery_execution_order_no: sdoCode,
@@ -23289,12 +23304,22 @@ function groupStoreDispatchRowsBySdo(rows = []) {
         store_code: String(row?.store_code || row?.to_store_code || row?.target_store_code || "").trim().toUpperCase(),
         rows: [],
         item_count: 0,
+        known_item_count: 0,
+        unknown_item_count: 0,
         latest_at: "",
       });
     }
     const group = groups.get(sdoDisplayCode);
     group.rows.push(row);
-    group.item_count += Number(row?.item_count || 0);
+    const rawItemCount = row?.item_count;
+    const parsedItemCount = Number(rawItemCount);
+    const hasKnownItemCount = rawItemCount !== null && rawItemCount !== undefined && rawItemCount !== "" && Number.isFinite(parsedItemCount) && parsedItemCount >= 0;
+    if (hasKnownItemCount) {
+      group.item_count += parsedItemCount;
+      group.known_item_count += parsedItemCount;
+    } else {
+      group.unknown_item_count += 1;
+    }
     const rowTime = row?.updated_at || row?.accepted_at || row?.created_at || "";
     if (!group.latest_at || new Date(rowTime || 0).getTime() > new Date(group.latest_at || 0).getTime()) {
       group.latest_at = rowTime;
@@ -23458,12 +23483,15 @@ function renderStoreManagerConsoleSummary(context = {}) {
           : handledCount < group.rows.length
             ? "部分验收"
             : (hasException ? "异常" : "部分验收");
+      const itemCountLabel = group.unknown_item_count > 0
+        ? "件数待确认"
+        : `${group.known_item_count} 件`;
       return `
         <article class="manager-console-row">
           <div class="manager-console-row-main">
             <strong>${escapeHtml(group.sdo_display_code || "-")}</strong>
             <div class="subtle small">${escapeHtml(`机报码 ${group.sdo_machine_code || "-"} · TO ${group.transfer_no || "-"}`)}</div>
-            <div class="subtle small">${escapeHtml(`${group.store_code || storeCode || "-"} · ${group.rows.length} 包 · ${group.item_count || 0} 件`)}</div>
+            <div class="subtle small">${escapeHtml(`${group.store_code || storeCode || "-"} · ${group.rows.length} 包 · ${itemCountLabel}`)}</div>
             <div class="subtle small">${escapeHtml(group.latest_at ? formatLocalDateTime(group.latest_at) : "待更新时间")}</div>
             <div class="subtle small">${escapeHtml("来源码，仅供核对")}</div>
           </div>
@@ -23535,7 +23563,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
               <article class="store-metric"><strong>TO 参考</strong><span>${escapeHtml(commandCenter.selected.transfer_no || "-")}</span></article>
               <article class="store-metric"><strong>门店</strong><span>${escapeHtml(commandCenter.selected.store_code || storeCode || "-")}</span></article>
               <article class="store-metric"><strong>包裹</strong><span>${escapeHtml(commandCenter.selected.packages.length)}</span></article>
-              <article class="store-metric"><strong>件数</strong><span>${commandCenter.selected.item_count > 0 ? escapeHtml(commandCenter.selected.item_count) : "件数待确认"}</span></article>
+              <article class="store-metric"><strong>件数</strong><span>${commandCenter.selected.unknown_item_count > 0 ? "件数待确认" : `${escapeHtml(commandCenter.selected.known_item_count)} 件`}</span></article>
             </div>
             ${commandCenter.step === "receiving" ? `
               <div class="candidate-list compact-list" style="margin-top:10px;">
@@ -23543,7 +23571,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
                   <article class="candidate-row">
                     <div class="candidate-main">
                       <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
-                      <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${Number(row.item_count || 0) > 0 ? `${row.item_count} 件` : "件数待确认"}`)}</div>
+                      <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count === null || row.item_count === undefined || row.item_count === "" ? "件数待确认" : `${Number(row.item_count)} 件`}`)}</div>
                       <div class="subtle small">${escapeHtml(`${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${row.bale_no || "-"}（来源码，仅供核对）`)}</div>
                       <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)}`)}</div>
                     </div>
@@ -23571,7 +23599,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
                   <article class="candidate-row">
                     <div class="candidate-main">
                       <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
-                      <div class="subtle small">${escapeHtml(`${row.bale_no || "-"} · ${Number(row.item_count || 0) > 0 ? `${row.item_count} 件` : "件数待确认"}`)}</div>
+                      <div class="subtle small">${escapeHtml(`${row.bale_no || "-"} · ${row.item_count === null || row.item_count === undefined || row.item_count === "" ? "件数待确认" : `${Number(row.item_count)} 件`}`)}</div>
                       <div class="subtle small">${escapeHtml(`当前分配：${row.assigned_clerk || "未分配"}`)}</div>
                     </div>
                     <div class="candidate-side"><label><input type="checkbox" data-store-assignment-pkg="${escapeHtml(row.bale_no)}"> 选择</label></div>
