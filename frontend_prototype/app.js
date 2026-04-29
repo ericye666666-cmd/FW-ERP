@@ -29571,7 +29571,9 @@ document.addEventListener("click", async (event) => {
       setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", transferNo);
       setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", "");
       renderStoreReceiptTransferBaleList(transferNo);
-      const completed = Boolean((storeReceiptPackageStatusState[transferNo] || {}).completed_at);
+      renderStoreManagerConsoleSummary({
+        store_code: getCurrentStoreCodeFallback(),
+      });
       return;
     }
     if (button.dataset.storeAssignmentSdoFill) {
