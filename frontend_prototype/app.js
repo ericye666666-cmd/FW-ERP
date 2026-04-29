@@ -16157,6 +16157,7 @@ async function directPrintAllBaleModalJobs() {
   renderBalePrintModal();
 }
 
+
 function openBalePrintModal(state = {}) {
   if (!(balePrintModal instanceof HTMLElement)) {
     return;
@@ -16227,7 +16228,10 @@ async function completeCurrentBalePrintModalJob() {
   if (completionAction.action !== "complete_group") {
     throw new Error(`请先点“打印本轮全部 ${completionAction.pendingCount} 张”，确认实体出纸后，再确认本类已贴完。`);
   }
-  const jobsToComplete = [...jobs];
+  const currentModalIndex = Math.max(0, Math.min(Number(balePrintModalState.currentIndex || 0), Math.max(jobs.length - 1, 0)));
+  const jobsToComplete = templateScope !== "bale"
+    ? (jobs[currentModalIndex] ? [jobs[currentModalIndex]] : [])
+    : [...jobs];
   for (const job of jobsToComplete) {
     if (!isBaleModalDirectOnlyJob(job)) {
       try {
@@ -16256,25 +16260,19 @@ async function completeCurrentBalePrintModalJob() {
     const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
-      const completedBaleSet = new Set(
-        jobsToComplete
-          .map((job) => String(job?.print_payload?.dispatch_bale_no || job?.print_payload?.barcode_value || job?.barcode || "").trim().toUpperCase())
-          .filter(Boolean),
-      );
-      if (transfer && Array.isArray(transfer.display_store_dispatch_bales)) {
-        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => {
-          const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
-          if (!completedBaleSet.has(baleNo)) return row;
-          return { ...row, status: "labelled" };
-        });
+      const completedIndexes = jobsToComplete
+        .map((job) => jobs.findIndex((candidate) => candidate === job || String(candidate?.id || "") === String(job?.id || "")))
+        .filter((index) => index >= 0);
+      if (transfer && Array.isArray(transfer.display_store_dispatch_bales) && completedIndexes.length) {
+        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row, index) => (
+          completedIndexes.includes(index) ? { ...row, status: "labelled" } : row
+        ));
       }
       const transferOutput = readOutput("#transferActionOutput");
-      if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales)) {
-        transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row) => {
-          const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
-          if (!completedBaleSet.has(baleNo)) return row;
-          return { ...row, status: "labelled" };
-        });
+      if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales) && completedIndexes.length) {
+        transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row, index) => (
+          completedIndexes.includes(index) ? { ...row, status: "labelled" } : row
+        ));
         writeOutput("#transferActionOutput", transferOutput);
         renderTransferActionResultSummary(transferOutput);
       }
