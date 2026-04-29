@@ -24,8 +24,8 @@
     if (managerRoles.has(normalizedRole)) {
       return {
         workspace: "store",
-        panelTitle: "5. 门店执行控制台",
-        label: "店长端 / 门店执行控制台",
+        panelTitle: "5. 门店到货工作台 / Store Receiving Dashboard",
+        label: "店长端 / 门店到货工作台",
       };
     }
     if (clerkRoles.has(normalizedRole)) {
