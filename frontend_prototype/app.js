@@ -14439,17 +14439,18 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
-  if (!normalizedTransferNo) {
+  const normalizedSdoCode = String(transferNo || "").trim().toUpperCase();
+  if (!normalizedSdoCode) {
     target.className = "candidate-summary empty-state";
     target.textContent = "先从 Page 5 选择一张 SDO 送货单，或直接扫描/输入 SDO 码后查看验收详情。";
     return;
   }
-  const transferRows = getStoreReceiptTransferRows(normalizedTransferNo, rows);
+  const transferRows = (Array.isArray(rows) ? rows : storeDispatchBaleState)
+    .filter((row) => String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase() === normalizedSdoCode);
   target.className = "report-summary";
   if (!transferRows.length) {
     target.innerHTML = `
-      <div class="alert-banner">SDO ${escapeHtml(normalizedTransferNo)} 还没加载到本页。先回 Page 5 读取最近送货单，或确认仓库已生成 SDO。</div>
+      <div class="alert-banner">SDO ${escapeHtml(normalizedSdoCode)} 还没加载到本页。先回 Page 5 读取最近送货单，或确认仓库已生成 SDO。</div>
       <div class="empty-state">加载后这里会显示该 SDO 的包裹明细（来源码，仅供核对）。</div>
     `;
     return;
@@ -14461,7 +14462,9 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const shownRows = pendingRows.length ? pendingRows : transferRows;
   const totalItems = transferRows.reduce((sum, row) => sum + Number(row?.item_count || 0), 0);
   const scanText = String(document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")?.value || "");
+  const normalizedTransferNo = String(transferRows[0]?.transfer_no || "").trim().toUpperCase();
   const plan = buildStoreReceiptBatchPlan(normalizedTransferNo, scanText, transferRows);
+  const sdoMachineCode = String(transferRows[0]?.machine_code || "").replace(/[^0-9]/g, "").trim() || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(normalizedSdoCode) ? `4${normalizedSdoCode.slice(3)}` : "-");
   const renderDiff = () => {
     if (!scanText.trim()) {
       return `<div class="empty-state">先把本调拨单下所有 bale barcode 连续扫描到上面的框里。扫齐后这里会显示匹配结果和差异。</div>`;
@@ -14478,8 +14481,11 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
     return `<div class="receipt-diff-list">${diffItems.join("") || '<span class="store-flag">等待继续扫描。</span>'}</div>`;
   };
   target.innerHTML = `
-    <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedTransferNo)}。本页为只读演示，按钮暂不做持久化回写。</div>
+    <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedSdoCode)}。本页为只读演示，按钮暂不做持久化回写。</div>
     <div class="report-summary-grid">
+      <article class="store-metric"><strong>SDO 显示码</strong><span>${escapeHtml(normalizedSdoCode)}</span></article>
+      <article class="store-metric"><strong>SDO 机报码</strong><span>${escapeHtml(sdoMachineCode)}</span></article>
+      <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(normalizedTransferNo || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transferRows[0]?.store_code || getCurrentStoreCodeFallback() || "-")}</span></article>
       <article class="store-metric"><strong>总包裹数</strong><span>${escapeHtml(transferRows.length)}</span></article>
       <article class="store-metric"><strong>验收状态</strong><span>${escapeHtml(pendingRows.length > 0 ? "待验收" : "已完成/处理中")}</span></article>
@@ -14498,7 +14504,7 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
             <div class="subtle small">${escapeHtml(`验收状态 ${getStoreDispatchBaleStatusLabel(row.status || "")}`)}</div>
           </div>
           <div class="candidate-side">
-            <button type="button" class="ghost-button mini-button" data-store-receipt-bale-fill="${escapeHtml(row.bale_no || "")}" data-store-receipt-transfer="${escapeHtml(normalizedTransferNo)}">确认收到此包</button>
+            <button type="button" class="ghost-button mini-button" disabled>确认收到此包</button>
             <button type="button" class="ghost-button mini-button" disabled>上报异常</button>
           </div>
         </article>
@@ -23272,6 +23278,33 @@ function groupStoreDispatchRowsByTransfer(rows = []) {
   return [...groups.values()].sort((left, right) => new Date(right.latest_at || 0).getTime() - new Date(left.latest_at || 0).getTime());
 }
 
+function groupStoreDispatchRowsBySdo(rows = []) {
+  const groups = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const sdoDisplayCode = String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase();
+    if (!sdoDisplayCode) return;
+    if (!groups.has(sdoDisplayCode)) {
+      groups.set(sdoDisplayCode, {
+        sdo_display_code: sdoDisplayCode,
+        sdo_machine_code: String(row?.machine_code || "").replace(/[^0-9]/g, "").trim() || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(sdoDisplayCode) ? `4${sdoDisplayCode.slice(3)}` : ""),
+        transfer_no: String(row?.transfer_no || "").trim().toUpperCase(),
+        store_code: String(row?.store_code || "").trim().toUpperCase(),
+        rows: [],
+        item_count: 0,
+        latest_at: "",
+      });
+    }
+    const group = groups.get(sdoDisplayCode);
+    group.rows.push(row);
+    group.item_count += Number(row?.item_count || 0);
+    const rowTime = row?.updated_at || row?.accepted_at || row?.created_at || "";
+    if (!group.latest_at || new Date(rowTime || 0).getTime() > new Date(group.latest_at || 0).getTime()) {
+      group.latest_at = rowTime;
+    }
+  });
+  return [...groups.values()].sort((left, right) => new Date(right.latest_at || 0).getTime() - new Date(left.latest_at || 0).getTime());
+}
+
 function getStoreManagerOperatingMeta(storeCode = "") {
   const normalizedStoreCode = String(storeCode || "").trim().toUpperCase();
   return storeOperatingSummaryState.find(
@@ -23310,7 +23343,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
   const activeRows = queueBuckets.activeQueue;
   const completedRows = queueBuckets.completedQueue;
   const attentionRows = rows.filter((row) => row?.flow_type === "direct_hang" || String(row?.status || "").trim() === "printing_in_progress");
-  const inTransitTransferGroups = groupStoreDispatchRowsByTransfer(inTransitRows);
+  const inTransitSdoGroups = groupStoreDispatchRowsBySdo(inTransitRows);
 
   const renderQueue = (queueRows = [], kind = "accept") => {
     if (!queueRows.length) {
@@ -23347,22 +23380,22 @@ function renderStoreManagerConsoleSummary(context = {}) {
   };
   const renderArrivalTransferQueue = (groups = []) => {
     if (!groups.length) {
-      return `<div class="empty-state">当前没有待整单验收的调拨单。</div>`;
+      return `<div class="empty-state">当前没有待验收的 SDO 送货单。</div>`;
     }
     return groups.slice(0, 6).map((group) => {
-      const baleNos = group.rows.map((row) => String(row?.bale_no || "").trim().toUpperCase()).filter(Boolean);
       const currentStatus = getStoreDispatchBaleStatusLabel(group.rows[0]?.status || "");
       return `
         <article class="manager-console-row">
           <div class="manager-console-row-main">
-            <strong>${escapeHtml(group.transfer_no || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${storeCode || "-"} · ${group.rows.length} 包 · ${group.item_count || 0} 件`)}</div>
+            <strong>${escapeHtml(group.sdo_display_code || "-")}</strong>
+            <div class="subtle small">${escapeHtml(`机报码 ${group.sdo_machine_code || "-"} · TO ${group.transfer_no || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`${group.store_code || storeCode || "-"} · ${group.rows.length} 包 · ${group.item_count || 0} 件`)}</div>
             <div class="subtle small">${escapeHtml(group.latest_at ? formatLocalDateTime(group.latest_at) : "待更新时间")}</div>
-            <div class="subtle small">${escapeHtml(group.warehouse_note || "暂无发运备注")}</div>
+            <div class="subtle small">${escapeHtml("来源码，仅供核对")}</div>
           </div>
           <div class="manager-console-row-side">
             <span class="meta-pill">${escapeHtml(currentStatus || "待验收")}</span>
-            <button type="button" class="ghost-button mini-button" data-store-receipt-transfer-fill="${escapeHtml(group.transfer_no)}" data-store-receipt-bales="${escapeHtml(baleNos.join("\\n"))}">开始验收</button>
+            <button type="button" class="ghost-button mini-button" data-store-receipt-transfer-fill="${escapeHtml(group.sdo_display_code)}">开始验收</button>
           </div>
         </article>
       `;
@@ -23396,7 +23429,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
     <div class="alert-banner">${escapeHtml(context.last_action_message || `${storeCode || "当前门店"} 到货工作台已加载。请扫描送货单上的 SDO 条码。SDB / LPK 只是来源码，仅供核对。`)}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCode || operating?.store_code || "-")}</span></article>
-      <article class="store-metric"><strong>待验收</strong><span>${inTransitTransferGroups.length}</span></article>
+      <article class="store-metric"><strong>待验收</strong><span>${inTransitSdoGroups.length}</span></article>
       <article class="store-metric"><strong>待分配</strong><span>${acceptedRows.length}</span></article>
       <article class="store-metric"><strong>异常</strong><span>${attentionRows.length + exceptionFlags.length}</span></article>
     </div>
@@ -23407,7 +23440,8 @@ function renderStoreManagerConsoleSummary(context = {}) {
           <strong>扫描 SDO 送货单</strong>
         </div>
         <div class="subtle small">扫描或输入 SDO 码，或从下面最近送货单卡片中直接开始验收。</div>
-        <div class="manager-console-list">${renderArrivalTransferQueue(inTransitTransferGroups)}</div>
+        <div class="button-row" style="margin:8px 0 6px;"><button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单 / Load recent deliveries</button></div>
+        <div class="manager-console-list">${renderArrivalTransferQueue(inTransitSdoGroups)}</div>
       </section>
       <section class="manager-console-panel">
         <div class="manager-console-head">
@@ -29371,7 +29405,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-receipt-bale-fill], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open]")
+    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -29412,6 +29446,13 @@ document.addEventListener("click", async (event) => {
       }
       return;
     }
+    if (button.dataset.storeReceiptLoadRecent !== undefined) {
+      renderStoreManagerConsoleSummary({
+        store_code: getCurrentStoreCodeFallback(),
+        last_action_message: "已读取最近 SDO 送货单。请扫描 SDO 码或点击卡片上的“开始验收”。",
+      });
+      return;
+    }
     if (button.dataset.storeDispatchFill) {
       const baleNo = String(button.dataset.storeDispatchFill || "").trim().toUpperCase();
       const row = storeDispatchBaleState.find((item) => String(item?.bale_no || "").trim().toUpperCase() === baleNo);
@@ -29439,16 +29480,6 @@ document.addEventListener("click", async (event) => {
         setActivePanel(panelKey);
         focusElement("#storeDispatchAssignmentForm");
       }
-      return;
-    }
-    if (button.dataset.storeReceiptBaleFill) {
-      const baleNo = String(button.dataset.storeReceiptBaleFill || "").trim().toUpperCase();
-      const transferNo = String(button.dataset.storeReceiptTransfer || "").trim().toUpperCase();
-      setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", transferNo);
-      const currentText = String(document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")?.value || "").trim();
-      setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", [currentText, baleNo].filter(Boolean).join("\n"));
-      renderStoreReceiptTransferBaleList(transferNo);
-      focusElement("#storeDispatchBaleAcceptForm");
       return;
     }
     if (button.dataset.storeReceiptTransferFill) {
