@@ -1249,7 +1249,17 @@ class InMemoryState:
                 continue
             source_type = str(package.get("source_type") or "").strip().upper()
             source_code = str(package.get("source_code") or package.get("bale_no") or "").strip().upper()
-            raw_item_count = package.get("item_count")
+            raw_item_count = (
+                package.get("item_count")
+                if package.get("item_count") not in {None, ""}
+                else package.get("qty")
+                if package.get("qty") not in {None, ""}
+                else package.get("quantity")
+                if package.get("quantity") not in {None, ""}
+                else package.get("piece_count")
+                if package.get("piece_count") not in {None, ""}
+                else package.get("pieces")
+            )
             item_count: Optional[int] = None
             if raw_item_count is not None and raw_item_count != "":
                 try:
@@ -1263,8 +1273,8 @@ class InMemoryState:
                     "source_type": source_type,
                     "source_code": source_code,
                     "item_count": item_count,
-                    "category_summary": str(package.get("category_summary") or "").strip(),
-                    "category_name": str(package.get("category_name") or "").strip(),
+                    "category_summary": str(package.get("category_summary") or package.get("category_name") or "").strip(),
+                    "category_name": str(package.get("category_name") or package.get("category_summary") or "").strip(),
                 }
             )
         explicit_total_item_count = normalized.get("total_item_count")
@@ -12323,9 +12333,11 @@ class InMemoryState:
         )
         execution_order_no = self._store_delivery_execution_order_no()
         created_at = now_iso()
+        payload_packages = payload.get("packages") if isinstance(payload.get("packages"), list) else []
+        package_source_rows = payload_packages if payload_packages else dispatch_rows
         sdo_packages: list[dict[str, Any]] = []
         known_package_item_counts: list[int] = []
-        for row in dispatch_rows:
+        for row in package_source_rows:
             raw_item_count = row.get("item_count")
             parsed_item_count: Optional[int] = None
             if raw_item_count is not None and raw_item_count != "":
@@ -12339,8 +12351,9 @@ class InMemoryState:
                 known_package_item_counts.append(parsed_item_count)
             sdo_packages.append(
                 {
-                    "source_type": "LPK" if str(row.get("bale_no") or "").strip().upper().startswith("LPK") else "SDB",
-                    "source_code": str(row.get("bale_no") or "").strip().upper(),
+                    "source_type": str(row.get("source_type") or "").strip().upper()
+                    or ("LPK" if str(row.get("bale_no") or row.get("source_code") or "").strip().upper().startswith("LPK") else "SDB"),
+                    "source_code": str(row.get("source_code") or row.get("bale_no") or "").strip().upper(),
                     "item_count": parsed_item_count,
                     "category_summary": str(row.get("category_summary") or row.get("category_name") or "").strip(),
                     "category_name": str(row.get("category_name") or "").strip(),

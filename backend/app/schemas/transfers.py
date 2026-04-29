@@ -154,6 +154,7 @@ class StoreDeliveryExecutionOrderCreateRequest(BaseModel):
     created_by: str = Field(min_length=1, default="warehouse_clerk_1")
     mark_as_printed: bool = False
     notes: str = ""
+    packages: List[dict[str, Any]] = Field(default_factory=list)
 
 
 class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
