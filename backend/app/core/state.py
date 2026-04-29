@@ -12323,6 +12323,32 @@ class InMemoryState:
         )
         execution_order_no = self._store_delivery_execution_order_no()
         created_at = now_iso()
+        sdo_packages: list[dict[str, Any]] = []
+        known_package_item_counts: list[int] = []
+        for row in dispatch_rows:
+            raw_item_count = row.get("item_count")
+            parsed_item_count: Optional[int] = None
+            if raw_item_count is not None and raw_item_count != "":
+                try:
+                    candidate = int(float(raw_item_count))
+                    if candidate >= 0:
+                        parsed_item_count = candidate
+                except (TypeError, ValueError):
+                    parsed_item_count = None
+            if parsed_item_count is not None:
+                known_package_item_counts.append(parsed_item_count)
+            sdo_packages.append(
+                {
+                    "source_type": "LPK" if str(row.get("bale_no") or "").strip().upper().startswith("LPK") else "SDB",
+                    "source_code": str(row.get("bale_no") or "").strip().upper(),
+                    "item_count": parsed_item_count,
+                    "category_summary": str(row.get("category_summary") or row.get("category_name") or "").strip(),
+                    "category_name": str(row.get("category_name") or "").strip(),
+                }
+            )
+        total_item_count: Optional[int] = None
+        if sdo_packages and len(known_package_item_counts) == len(sdo_packages):
+            total_item_count = sum(known_package_item_counts)
         created = self._normalize_store_delivery_execution_order(
             {
                 "execution_order_no": execution_order_no,
@@ -12334,17 +12360,8 @@ class InMemoryState:
                 "source_store_prep_bale_codes": source_store_prep_codes,
                 "source_gap_fill_task_codes": source_gap_fill_codes,
                 "package_count": len(dispatch_rows),
-                "total_item_count": sum(int(row.get("item_count") or 0) for row in dispatch_rows),
-                "packages": [
-                    {
-                        "source_type": "LPK" if str(row.get("bale_no") or "").strip().upper().startswith("LPK") else "SDB",
-                        "source_code": str(row.get("bale_no") or "").strip().upper(),
-                        "item_count": int(row.get("item_count") or 0),
-                        "category_summary": str(row.get("category_summary") or row.get("category_name") or "").strip(),
-                        "category_name": str(row.get("category_name") or "").strip(),
-                    }
-                    for row in dispatch_rows
-                ],
+                "total_item_count": total_item_count,
+                "packages": sdo_packages,
                 "status": "printed" if payload.get("mark_as_printed") else "pending_print",
                 "created_by": actor["username"],
                 "created_at": created_at,
