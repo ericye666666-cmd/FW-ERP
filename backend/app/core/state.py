@@ -6444,7 +6444,7 @@ class InMemoryState:
             package_label = f"{package_label} · {float(bale.get('actual_weight_kg') or 0):g} KG"
         status_text = "WAIT FOR SALE" if task_type == "sale" else "WAITING FOR STORE DISPATCH"
         barcode_value = str(bale.get("scan_token") or bale.get("bale_barcode") or "").strip().upper()
-        machine_code = self._physical_label_machine_code(barcode_value, "LPK")
+        machine_code = barcode_value
         job = {
             "id": next(self._print_job_ids),
             "job_type": "bale_barcode_label",
