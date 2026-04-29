@@ -449,6 +449,7 @@ let itemTokenPrintJobState = [];
 let storeDispatchBaleState = [];
 let filteredStoreDispatchBaleState = [];
 let storeReceiptPackageStatusState = {};
+let storeReceiptPackageAssignmentState = {};
 let warehouseDispatchHistoryState = [];
 let warehouseSoldPackageHistoryState = [];
 let baleSalesPricingCandidateState = [];
@@ -14388,6 +14389,11 @@ function getStoreReceiptSdoStatusText(packageRows = [], completed = false) {
   return "部分验收";
 }
 
+function getStoreReceiptPackageAssignmentMap(sdoCode = "") {
+  const normalizedSdoCode = String(sdoCode || "").trim().toUpperCase();
+  return storeReceiptPackageAssignmentState[normalizedSdoCode] || {};
+}
+
 function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const target = document.querySelector("#storeDispatchBaleSummary");
   if (!(target instanceof HTMLElement)) {
@@ -14525,67 +14531,65 @@ function renderStoreDispatchAssignmentResultSummary(result) {
 function renderStoreDispatchAssignmentOverview(target) {
   const storeCode = getCurrentStoreCodeFallback();
   const rows = getStoreManagerConsoleRows(storeCode);
-  const pendingRows = rows.filter((row) => ["in_transit", "ready_dispatch", "labelled", "packed"].includes(String(row?.status || "").trim().toLowerCase()));
-  const assignableRows = rows.filter((row) => {
-    const status = String(row?.status || "").trim().toLowerCase();
-    return (row?.accepted_at || ["received", "accepted", "partially_received"].includes(status))
-      && !String(row?.assigned_employee || "").trim();
+  const sdoGroups = groupStoreDispatchRowsBySdo(rows);
+  const acceptedGroups = sdoGroups.filter((group) => {
+    const statusMap = storeReceiptPackageStatusState[group.sdo_display_code] || {};
+    return Boolean(statusMap.completed_at);
   });
   if (!rows.length) {
     target.className = "candidate-summary empty-state";
     target.textContent = "当前门店还没有配送到店的 bale。先刷新待签收 / 待分配，或回 6.1 配送跟踪确认是否已经发运。";
     return;
   }
-  const groupByTransfer = (list = []) => list.reduce((groups, row) => {
-    const key = String(row?.transfer_no || row?.task_no || "未关联总单").trim().toUpperCase() || "未关联总单";
-    if (!groups[key]) {
-      groups[key] = [];
-    }
-    groups[key].push(row);
-    return groups;
-  }, {});
-  const pendingGroups = groupByTransfer(pendingRows);
-  const assignableGroups = groupByTransfer(assignableRows);
-  const renderGroupCards = (groups, mode) => {
-    const entries = Object.entries(groups);
-    if (!entries.length) {
-      return `<div class="empty-state">${mode === "pending" ? "当前没有待签收 bale。" : "当前没有已签收未分配 bale。"}</div>`;
-    }
-    return entries.map(([transferNo, groupRows]) => {
-      const totalItems = groupRows.reduce((sum, row) => sum + Number(row?.item_count || 0), 0);
-      const baleNos = groupRows.map((row) => String(row?.bale_no || "").trim().toUpperCase()).filter(Boolean);
-      const action = mode === "pending"
-        ? `<button type="button" class="ghost-button mini-button" data-store-receipt-transfer-fill="${escapeHtml(transferNo)}" data-store-receipt-bales="${escapeHtml(baleNos.join("\\n"))}">先去门店验收</button>`
-        : `<button type="button" class="ghost-button mini-button" data-store-assignment-transfer-fill="${escapeHtml(transferNo)}" data-store-assignment-bales="${escapeHtml(baleNos.join("\\n"))}">填入总单批量分配</button>`;
+  if (!acceptedGroups.length) {
+    target.className = "candidate-summary empty-state";
+    target.textContent = "当前没有“已验收待分配”的 SDO。请先在 Page 6 完成整单验收。";
+    return;
+  }
+  const selectedSdo = String(document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")?.value || acceptedGroups[0].sdo_display_code || "").trim().toUpperCase();
+  const group = acceptedGroups.find((row) => row.sdo_display_code === selectedSdo) || acceptedGroups[0];
+  const assignmentMap = getStoreReceiptPackageAssignmentMap(group.sdo_display_code);
+  const assignedCount = group.rows.filter((row) => String(assignmentMap[String(row?.bale_no || "").trim().toUpperCase()] || "").trim()).length;
+  target.className = "report-summary";
+  target.innerHTML = `
+    <div class="alert-banner">分配给店员：先选店员，再勾选包裹。SDB / LPK 仅作来源码核对。</div>
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>SDO 显示码</strong><span>${escapeHtml(group.sdo_display_code)}</span></article>
+      <article class="store-metric"><strong>SDO 机报码</strong><span>${escapeHtml(group.sdo_machine_code || "-")}</span></article>
+      <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(group.transfer_no || "-")}</span></article>
+      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(group.store_code || storeCode || "-")}</span></article>
+      <article class="store-metric"><strong>已验收包数</strong><span>${group.rows.length}</span></article>
+      <article class="store-metric"><strong>未分配</strong><span>${Math.max(group.rows.length - assignedCount, 0)}</span></article>
+      <article class="store-metric"><strong>已分配</strong><span>${assignedCount}</span></article>
+    </div>
+    <div class="button-row" style="margin:8px 0;">
+      ${acceptedGroups.map((item) => `<button type="button" class="ghost-button mini-button" data-store-assignment-sdo-fill="${escapeHtml(item.sdo_display_code)}">${escapeHtml(item.sdo_display_code)}</button>`).join("")}
+    </div>
+    <div class="candidate-list compact-list">
+      ${group.rows.map((row, index) => {
+      const baleNo = String(row?.bale_no || "").trim().toUpperCase();
+      const receiveStatus = getStoreReceiptPackageStatusLabel((storeReceiptPackageStatusState[group.sdo_display_code] || {})[baleNo] || "pending");
+      const assigned = String(assignmentMap[baleNo] || "").trim();
       return `
         <article class="manager-console-row">
           <div class="manager-console-row-main">
-            <strong>${escapeHtml(transferNo)}</strong>
-            <div class="subtle small">${escapeHtml(`${groupRows.length} 包 · ${totalItems} 件`)}</div>
-            <div class="subtle small">${escapeHtml(baleNos.slice(0, 5).join("、") || "-")}${baleNos.length > 5 ? "..." : ""}</div>
+            <strong>${escapeHtml(`第 ${index + 1} 包 / 共 ${group.rows.length} 包`)}</strong>
+            <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
+            <div class="subtle small">${escapeHtml(`来源 ${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${baleNo}（来源码，仅供核对）`)}</div>
+            <div class="subtle small">${escapeHtml(`验收状态：${receiveStatus}${receiveStatus === "异常" ? "（异常包）" : ""}`)}</div>
+            <div class="subtle small">${escapeHtml(assigned ? `已分配：${assigned}` : "未分配")}</div>
           </div>
           <div class="manager-console-row-side">
-            <span class="meta-pill">${mode === "pending" ? "待签收" : "待分配"}</span>
-            ${action}
+            <label><input type="checkbox" data-store-assignment-pkg="${escapeHtml(baleNo)}"> 选择</label>
           </div>
         </article>
       `;
-    }).join("");
-  };
-  target.className = "report-summary";
-  target.innerHTML = `
-    <div class="alert-banner">先按总单完成门店验收；验收后，这张总单下的多个 bale 可以一次批量分配给同一店员。</div>
-    <div class="split-grid">
-      <section>
-        <h3>待签收总单 / bale</h3>
-        <div class="candidate-list compact-list">${renderGroupCards(pendingGroups, "pending")}</div>
-      </section>
-      <section>
-        <h3>已签收，待批量分配</h3>
-        <div class="candidate-list compact-list">${renderGroupCards(assignableGroups, "assignable")}</div>
-      </section>
+    }).join("")}
     </div>
-  `;
+    <div class="button-row" style="margin-top:10px;">
+      <button type="button" class="ghost-button" data-store-assignment-fill-selected="${escapeHtml(group.sdo_display_code)}">分配选中包给店员</button>
+      <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(group.sdo_display_code)}">一键分配整单给店员</button>
+    </div>`;
 }
 
 function renderDirectHangTemplateOptions(selectedCode = "") {
@@ -23326,11 +23330,15 @@ function renderStoreManagerConsoleSummary(context = {}) {
     }
     return groups.slice(0, 6).map((group) => {
       const packageStatusMap = storeReceiptPackageStatusState[group.sdo_display_code] || {};
+      const assignmentMap = storeReceiptPackageAssignmentState[group.sdo_display_code] || {};
       const packageStatuses = group.rows.map((row) => String(packageStatusMap[String(row?.bale_no || "").trim().toUpperCase()] || "pending").toLowerCase());
+      const assignedCount = group.rows.filter((row) => String(assignmentMap[String(row?.bale_no || "").trim().toUpperCase()] || "").trim()).length;
       const handledCount = packageStatuses.filter((status) => status === "received" || status === "exception").length;
       const hasException = packageStatuses.includes("exception");
       const isCompleted = Boolean(packageStatusMap.completed_at);
-      const currentStatus = isCompleted
+      const currentStatus = isCompleted && assignedCount === group.rows.length
+        ? "已完成"
+        : isCompleted
         ? "已验收待分配"
         : handledCount === 0
           ? "待验收"
@@ -23348,7 +23356,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
           </div>
           <div class="manager-console-row-side">
             <span class="meta-pill">${escapeHtml(currentStatus || "待验收")}</span>
-            <button type="button" class="ghost-button mini-button" data-store-receipt-transfer-fill="${escapeHtml(group.sdo_display_code)}">开始验收</button>
+            <button type="button" class="ghost-button mini-button" data-store-receipt-transfer-fill="${escapeHtml(group.sdo_display_code)}">${currentStatus === "已验收待分配" ? "分配店员" : currentStatus === "已完成" ? "查看分配" : "开始验收"}</button>
           </div>
         </article>
       `;
@@ -25662,7 +25670,13 @@ async function submitStoreDispatchAssignment(event) {
   if (conflicts.length) {
     throw new Error(`这些 bale 已经对应其他店员，不能批量改派：${conflicts.map((row) => `${row.bale_no} -> ${row.assigned_employee}`).join("、")}`);
   }
-  const results = await Promise.all(targets.map((row) => assignOneStoreDispatchBaleToClerk(row, payload)));
+  const assignmentState = storeReceiptPackageAssignmentState[transferNo] || {};
+  const results = targets.map((row) => {
+    const baleNo = String(row?.bale_no || "").trim().toUpperCase();
+    assignmentState[baleNo] = String(payload.employee_name || "").trim();
+    return { ...row, assigned_employee: assignmentState[baleNo], status: "assigned" };
+  });
+  storeReceiptPackageAssignmentState[transferNo] = assignmentState;
   writeOutput("#storeDispatchAssignmentOutput", results);
   const firstResult = results[0] || {};
   populateStoreFlowFormsFromContext({
@@ -25693,23 +25707,23 @@ function parseStoreDispatchAssignmentBaleNos(value = "") {
 }
 
 async function resolveStoreDispatchAssignmentTargets({ transferNo = "", baleNos = [] } = {}) {
-  await refreshStoreDispatchBaleDirectoryFromForm();
   const allRows = [
     ...storeDispatchBaleState,
     ...ensureDirectHangDispatchBaleState(),
   ];
   if (transferNo) {
     const transferRows = allRows.filter(
-      (row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo,
+      (row) => String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase() === transferNo,
     );
-    const acceptedRows = transferRows.filter((row) => (
-      row?.accepted_at || ["received", "accepted", "partially_received"].includes(String(row?.status || "").trim().toLowerCase())
-    ));
-    const unassignedRows = acceptedRows.filter((row) => !String(row?.assigned_employee || "").trim());
-    if (!unassignedRows.length) {
-      throw new Error(`总单 ${transferNo} 下没有可分配的已验收未分配 bale。请先完成门店验收，或确认这些 bale 是否已经分给店员。`);
+    const packageStatus = storeReceiptPackageStatusState[transferNo] || {};
+    const assignmentMap = storeReceiptPackageAssignmentState[transferNo] || {};
+    if (!packageStatus.completed_at) {
+      throw new Error(`SDO ${transferNo} 还未完成验收，不能分配店员。`);
     }
-    return unassignedRows;
+    const selectedRows = baleNos.length
+      ? transferRows.filter((row) => baleNos.includes(String(row?.bale_no || "").trim().toUpperCase()))
+      : transferRows;
+    return selectedRows.filter((row) => !String(assignmentMap[String(row?.bale_no || "").trim().toUpperCase()] || "").trim());
   }
   const targets = baleNos.map((baleNo) => {
     const row = allRows.find((item) => String(item?.bale_no || "").trim().toUpperCase() === baleNo);
@@ -29322,7 +29336,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo]")
+    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -29433,10 +29447,29 @@ document.addEventListener("click", async (event) => {
       setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", transferNo);
       setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", "");
       renderStoreReceiptTransferBaleList(transferNo);
-      const panelKey = getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail");
+      const completed = Boolean((storeReceiptPackageStatusState[transferNo] || {}).completed_at);
+      const panelKey = getPanelKeyByTitle("store", completed ? "6.1 门店分配店员" : "6. 送货单验收详情 / Store Receiving Detail");
       if (panelKey) {
         setActivePanel(panelKey);
-              }
+      }
+      return;
+    }
+    if (button.dataset.storeAssignmentSdoFill) {
+      const sdoCode = String(button.dataset.storeAssignmentSdoFill || "").trim().toUpperCase();
+      setInputValue("#storeDispatchAssignmentForm [name='transfer_no']", sdoCode);
+      setInputValue("#storeDispatchAssignmentForm [name='bale_no']", "");
+      renderStoreDispatchAssignmentResultSummary(null);
+      return;
+    }
+    if (button.dataset.storeAssignmentFillSelected || button.dataset.storeAssignmentFillAll) {
+      const sdoCode = String(button.dataset.storeAssignmentFillSelected || button.dataset.storeAssignmentFillAll || "").trim().toUpperCase();
+      const rows = groupStoreDispatchRowsBySdo(getStoreManagerConsoleRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)?.rows || [];
+      const selected = button.dataset.storeAssignmentFillAll
+        ? rows.map((row) => String(row?.bale_no || "").trim().toUpperCase())
+        : Array.from(document.querySelectorAll("input[data-store-assignment-pkg]:checked")).map((el) => String(el.getAttribute("data-store-assignment-pkg") || "").trim().toUpperCase()).filter(Boolean);
+      setInputValue("#storeDispatchAssignmentForm [name='transfer_no']", sdoCode);
+      setInputValue("#storeDispatchAssignmentForm [name='bale_no']", selected.join("\n"));
+      showTransientInlineNotice("#storeDispatchAssignmentNotice", `已选择 ${selected.length} 包，点击表单“提交”即可分配。`, "success", 1800);
       return;
     }
     if (button.dataset.storeDispatchAssignmentFill) {
