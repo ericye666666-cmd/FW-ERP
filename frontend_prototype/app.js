@@ -23515,10 +23515,10 @@ function renderStoreManagerConsoleSummary(context = {}) {
         </div>
         <div class="subtle small">扫描或输入 SDO 码后，按步骤在本页完成收货。</div>
         <div class="transfer-flow-strip" style="margin:8px 0 6px;">
-          <span class="store-flag ${commandCenter.step === "list" ? "is-active" : ""}">1 list</span>
-          <span class="store-flag ${commandCenter.step === "receiving" ? "is-active" : ""}">2 receiving</span>
-          <span class="store-flag ${commandCenter.step === "assignment" ? "is-active" : ""}">3 assignment</span>
-          <span class="store-flag ${commandCenter.step === "completed" ? "is-active" : ""}">4 completed</span>
+          <span class="store-flag ${commandCenter.step === "list" ? "is-active" : ""}">1 到货列表</span>
+          <span class="store-flag ${commandCenter.step === "receiving" ? "is-active" : ""}">2 验收详情</span>
+          <span class="store-flag ${commandCenter.step === "assignment" ? "is-active" : ""}">3 分配店员</span>
+          <span class="store-flag ${commandCenter.step === "completed" ? "is-active" : ""}">4 已完成</span>
         </div>
         <div class="button-row" style="margin:8px 0 6px;"><button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单 / Load recent deliveries</button></div>
         <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
@@ -23561,9 +23561,9 @@ function renderStoreManagerConsoleSummary(context = {}) {
               <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>` : ""}
               ${commandCenter.step === "completed" ? `<span class="meta-pill">本单已完成</span>` : ""}
             </div>
-          </div>` : commandCenter.step === "list"
-            ? `<div class="empty-state" style="margin-top:10px;">请在上方列表中选择一张 SDO 卡片，进入 receiving 步骤。</div>`
-            : `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`}
+          </div>` : commandCenter.step !== "list"
+            ? `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`
+            : ""}
       </section>
       <section class="manager-console-panel">
         <div class="manager-console-head">
