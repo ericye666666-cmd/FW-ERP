@@ -1249,7 +1249,17 @@ class InMemoryState:
                 continue
             source_type = str(package.get("source_type") or "").strip().upper()
             source_code = str(package.get("source_code") or package.get("bale_no") or "").strip().upper()
-            raw_item_count = package.get("item_count")
+            raw_item_count = (
+                package.get("item_count")
+                if package.get("item_count") not in {None, ""}
+                else package.get("qty")
+                if package.get("qty") not in {None, ""}
+                else package.get("quantity")
+                if package.get("quantity") not in {None, ""}
+                else package.get("piece_count")
+                if package.get("piece_count") not in {None, ""}
+                else package.get("pieces")
+            )
             item_count: Optional[int] = None
             if raw_item_count is not None and raw_item_count != "":
                 try:
@@ -1263,8 +1273,8 @@ class InMemoryState:
                     "source_type": source_type,
                     "source_code": source_code,
                     "item_count": item_count,
-                    "category_summary": str(package.get("category_summary") or "").strip(),
-                    "category_name": str(package.get("category_name") or "").strip(),
+                    "category_summary": str(package.get("category_summary") or package.get("category_name") or "").strip(),
+                    "category_name": str(package.get("category_name") or package.get("category_summary") or "").strip(),
                 }
             )
         explicit_total_item_count = normalized.get("total_item_count")
