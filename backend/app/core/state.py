@@ -12338,7 +12338,17 @@ class InMemoryState:
         sdo_packages: list[dict[str, Any]] = []
         known_package_item_counts: list[int] = []
         for row in package_source_rows:
-            raw_item_count = row.get("item_count")
+            raw_item_count = (
+                row.get("item_count")
+                if row.get("item_count") not in {None, ""}
+                else row.get("qty")
+                if row.get("qty") not in {None, ""}
+                else row.get("quantity")
+                if row.get("quantity") not in {None, ""}
+                else row.get("piece_count")
+                if row.get("piece_count") not in {None, ""}
+                else row.get("pieces")
+            )
             parsed_item_count: Optional[int] = None
             if raw_item_count is not None and raw_item_count != "":
                 try:
