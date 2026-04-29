@@ -740,6 +740,10 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /const machineCode = String\(row\.machine_code \|\| ""\)/);
   assert.match(appJs, /const derivedMachineCode = \/\^SDO/);
   assert.match(appJs, /`4\$\{displayCode\.slice\(3\)\}`/);
+  assert.match(appJs, /const sdoDisplayCode = String\(\s*transfer\?\.store_delivery_execution_order_no\s*\|\|\s*transfer\?\.store_delivery_execution_order\?\.execution_order_no\s*\|\|\s*transfer\?\.execution_order_no\s*\|\|\s*transfer\?\.official_delivery_barcode/);
+  assert.match(appJs, /const sdoMachineCode = sdoMachineCodeFromTransfer\s*\|\|\s*\(\/\^SDO/);
+  assert.match(appJs, /const sdoBoundRow = \{[\s\S]*?store_delivery_execution_order_no:\s*sdoDisplayCode \|\| row\.store_delivery_execution_order_no,[\s\S]*?display_code:\s*sdoDisplayCode \|\| row\.display_code,[\s\S]*?machine_code:\s*sdoMachineCode \|\| row\.machine_code/);
+  assert.doesNotMatch(appJs, /store_delivery_execution_order_no:\s*row\.store_delivery_execution_order_no,\s*execution_order_no:\s*row\.execution_order_no,\s*official_delivery_barcode:\s*row\.official_delivery_barcode,\s*display_code:\s*row\.display_code,\s*machine_code:\s*row\.machine_code/);
   assert.match(appJs, /display_code:\s*displayCode \|\| ""/);
   assert.match(appJs, /machine_code:\s*machineCode \|\| derivedMachineCode \|\| ""/);
   assert.match(appJs, /barcode_value:\s*barcodeValue/);

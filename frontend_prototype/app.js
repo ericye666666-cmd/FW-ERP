@@ -9921,8 +9921,30 @@ function openTransferDispatchPrintTemplateModal({
     throw new Error("当前没有可打印的送店 barcode。");
   }
   const templateCode = getTransferDispatchTemplateCode();
+  const sdoDisplayCode = String(
+    transfer?.store_delivery_execution_order_no
+    || transfer?.store_delivery_execution_order?.execution_order_no
+    || transfer?.execution_order_no
+    || transfer?.official_delivery_barcode
+    || "",
+  ).trim().toUpperCase();
+  const sdoMachineCodeFromTransfer = String(
+    transfer?.machine_code
+    || transfer?.store_delivery_execution_order?.machine_code
+    || "",
+  ).replace(/[^0-9]/g, "").trim();
+  const sdoMachineCode = sdoMachineCodeFromTransfer
+    || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(sdoDisplayCode) ? `4${sdoDisplayCode.slice(3)}` : "");
   const jobs = rows.map((row, index) => {
-    const payload = buildTransferDispatchPrinterPayloadForRow(row, transfer, {
+    const sdoBoundRow = {
+      ...row,
+      store_delivery_execution_order_no: sdoDisplayCode || row.store_delivery_execution_order_no,
+      execution_order_no: sdoDisplayCode || row.execution_order_no,
+      official_delivery_barcode: sdoDisplayCode || row.official_delivery_barcode,
+      display_code: sdoDisplayCode || row.display_code,
+      machine_code: sdoMachineCode || row.machine_code,
+    };
+    const payload = buildTransferDispatchPrinterPayloadForRow(sdoBoundRow, transfer, {
       templateCode,
       rowIndex: index,
       totalRows: rows.length,
