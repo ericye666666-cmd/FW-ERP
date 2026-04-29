@@ -16256,8 +16256,27 @@ async function completeCurrentBalePrintModalJob() {
     const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
+      const completedBaleSet = new Set(
+        jobsToComplete
+          .map((job) => String(job?.print_payload?.dispatch_bale_no || job?.print_payload?.barcode_value || job?.barcode || "").trim().toUpperCase())
+          .filter(Boolean),
+      );
       if (transfer && Array.isArray(transfer.display_store_dispatch_bales)) {
-        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => ({ ...row, status: "labelled" }));
+        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => {
+          const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
+          if (!completedBaleSet.has(baleNo)) return row;
+          return { ...row, status: "labelled" };
+        });
+      }
+      const transferOutput = readOutput("#transferActionOutput");
+      if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales)) {
+        transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row) => {
+          const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
+          if (!completedBaleSet.has(baleNo)) return row;
+          return { ...row, status: "labelled" };
+        });
+        writeOutput("#transferActionOutput", transferOutput);
+        renderTransferActionResultSummary(transferOutput);
       }
       renderTransferExecutionWorkbench(transferNo);
       renderReplenishmentFlowSummary(transferNo);
@@ -16596,7 +16615,8 @@ function renderTransferActionResultSummary(result) {
                   const rackCodes = Array.isArray(row.rack_codes) ? row.rack_codes.filter(Boolean) : [];
                   const sourceStatusRaw = String(row?.source_status || row?.status || "").trim().toLowerCase();
                   const sourceStatusLabel = sourceStatusRaw ? getOperationsDispatchBaleStatusLabel(sourceStatusRaw) : "";
-                  const mainStatus = mainDeliveryStatus || String(row?.status || "").trim().toLowerCase();
+                  const mainStatus = mainDeliveryStatus
+                    || (officialBarcode ? "pending_acceptance" : String(row?.status || "").trim().toLowerCase());
                   return `
                     <article class="candidate-row transfer-draft-row">
                       <div>
@@ -23294,11 +23314,48 @@ function getTransferDerivedStoreDispatchRows() {
 
 function getStoreManagerConsoleRows(storeCode = "") {
   const normalizedStoreCode = String(storeCode || "").trim().toUpperCase();
-  const rows = [
+  const rawRows = [
     ...storeDispatchBaleState,
     ...getTransferDerivedStoreDispatchRows(),
     ...ensureDirectHangDispatchBaleState(),
   ];
+  const packageMetaBySdoAndBale = new Map();
+  (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
+    const sdoCode = String(
+      transfer?.store_delivery_execution_order_no
+      || transfer?.store_delivery_execution_order?.execution_order_no
+      || transfer?.official_delivery_barcode
+      || "",
+    ).trim().toUpperCase();
+    if (!sdoCode) return;
+    const packageRows = Array.isArray(transfer?.store_delivery_execution_order?.packages) ? transfer.store_delivery_execution_order.packages : [];
+    packageRows.forEach((pkgRow) => {
+      const baleNo = String(pkgRow?.source_code || pkgRow?.bale_no || "").trim().toUpperCase();
+      if (!baleNo) return;
+      packageMetaBySdoAndBale.set(`${sdoCode}::${baleNo}`, {
+        item_count: parseKnownDispatchItemCount(pkgRow),
+        category_summary: String(pkgRow?.category_summary || pkgRow?.category_name || "").trim(),
+        category_name: String(pkgRow?.category_name || pkgRow?.category_summary || "").trim(),
+      });
+    });
+  });
+  const rows = rawRows.map((row) => {
+    const sdoCode = String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase();
+    const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
+    const meta = packageMetaBySdoAndBale.get(`${sdoCode}::${baleNo}`);
+    const assignmentMap = sdoCode ? (storeReceiptPackageAssignmentState[sdoCode] || {}) : {};
+    const assignedEmployee = String(assignmentMap[baleNo] || row?.assigned_employee || "").trim();
+    return {
+      ...row,
+      item_count: meta?.item_count !== null && meta?.item_count !== undefined ? meta.item_count : row?.item_count,
+      category_summary: meta?.category_summary || row?.category_summary || "",
+      category_name: meta?.category_name || row?.category_name || "",
+      assigned_employee: assignedEmployee,
+      status: assignedEmployee && ["received", "accepted", "partially_received", "assigned"].includes(String(row?.status || "").trim().toLowerCase())
+        ? "assigned"
+        : row?.status,
+    };
+  });
   return rows
     .filter((row) => {
       if (!normalizedStoreCode) return true;
