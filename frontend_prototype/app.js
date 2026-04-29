@@ -9661,7 +9661,7 @@ function buildLoosePickSheetLabelForTask(task = {}, transfer = {}) {
       categoryLabel: "服装",
     });
   }
-  const barcodeValue = String(task?.taskBarcode || task?.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const barcodeValue = String(task?.printableBarcode || task?.taskBarcode || task?.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   return {
     templateCode: "store_loose_pick_60x40",
     templateName: "门店补差拣货单 60x40",
@@ -10221,7 +10221,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
         <div class="loose-pick-sheet-main">
           <div class="loose-pick-barcode">
             <span class="barcode-stripes" aria-hidden="true"></span>
-            <strong>${escapeHtml(task.taskBarcode || task.taskNo || "-")}</strong>
+            <strong>${escapeHtml(task.printableBarcode || task.taskBarcode || task.taskNo || "-")}</strong>
           </div>
           <strong>${escapeHtml(task.taskNo || "-")}</strong>
           <div class="subtle small">${escapeHtml(`补差总量 ${task.totalQty || task.qty || 0} 件 · 小于 ${task.packageLimitQty || 200} 件 / 包 · 建议 ${task.plannedPackageCount || 0} 个补差包`)}</div>

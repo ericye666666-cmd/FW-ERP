@@ -205,6 +205,7 @@ test("loose packing task is one barcode pick sheet and print stays blocked until
   assert.equal(tasks.length, 1);
   assert.match(tasks[0].taskNo, /^LPK-TO20260423003-PICK$/);
   assert.match(tasks[0].taskBarcode, /^LPKTO20260423003PICK$/);
+  assert.equal(tasks[0].printableBarcode, "LPK260423003");
   assert.equal(tasks[0].totalQty, 180);
   assert.equal(tasks[0].packageLimitQty, 50);
   assert.equal(tasks[0].plannedPackageCount, 4);
@@ -282,7 +283,7 @@ test("loose pick sheet label uses a dedicated 60x40 Code128 template", () => {
   assert.equal(label.storeName, "Umoja Store");
   assert.equal(label.categoryLabel, "服装");
   assert.equal(label.pickQty, 55);
-  assert.equal(label.barcodeValue, "LPKTO20260423003PICK");
+  assert.equal(label.barcodeValue, "LPK260423003");
 });
 
 test("loose pick sheet prints through warehouseout template payload instead of browser window", () => {
@@ -322,8 +323,8 @@ test("loose pick sheet prints through warehouseout template payload instead of b
   assert.equal(payload.cat, "PICK SHEET");
   assert.equal(payload.sub, "LOOSE GAP");
   assert.equal(payload.qty, "55");
-  assert.equal(payload.code, "LPKTO20260423003PICK");
-  assert.equal(payload.dispatch_bale_no, "LPKTO20260423003PICK");
+  assert.equal(payload.code, "LPK260423003");
+  assert.equal(payload.dispatch_bale_no, "LPK260423003");
   assert.equal(payload.transfer_order_no, "TO-20260423-003");
   assert.match(payload.packing_list, /dress \/ 2 pieces · 50 件/);
   assert.match(payload.packing_list, /tops \/ lady tops · 5 件/);
@@ -370,7 +371,7 @@ test("final dispatch rows collapse loose gaps into one pick-sheet source row", (
   assert.equal(rows.filter((row) => row.finalType === "loose_pick_sheet_dispatch").length, 1);
   const looseRow = rows.find((row) => row.finalType === "loose_pick_sheet_dispatch");
   assert.equal(looseRow.qty, 10);
-  assert.equal(looseRow.baleBarcode, "LPKTO20260423003PICK");
+  assert.equal(looseRow.baleBarcode, "LPK260423003");
   assert.match(looseRow.finalLabel, /补差拣货单/);
   assert.equal(looseRow.categoryMain, "多类目补差");
 });
@@ -403,7 +404,7 @@ test("transfer dispatch result display collapses category loose bales into one p
   assert.equal(rows[0].bale_no, "LPK-TO20260423003-PICK");
   assert.equal(rows[0].category_summary, "多类目补差 · 2 个类目");
   assert.equal(rows[0].item_count, 10);
-  assert.deepEqual(rows[0].source_bales, ["LPKTO20260423003PICK"]);
+  assert.deepEqual(rows[0].source_bales, ["LPK260423003"]);
   assert.equal(rows[0].source_type, "loose_pick_sheet");
 });
 
@@ -683,6 +684,8 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /isLpkPrint \|\| isBaleModalDirectOnlyJob\(currentJob\)/);
   assert.match(appJs, /data-print-template="store_loose_pick_60x40"/);
   assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
+  assert.match(appJs, /printableBarcode/);
+  assert.match(appJs, /Store: \$\{escapeHtml\(storeName \|\| "-"\)\}<br>Request: \$\{escapeHtml\(requestNo \|\| "-"\)\}/);
   assert.match(appJs, /data-barcode-renderer="svg-code128"/);
   assert.match(appJs, /LPK SHORTAGE PICK/);
   assert.doesNotMatch(appJs, /lpk_shortage_pick[\s\S]*allowedCodes:\s*\["transtoshop"/);
