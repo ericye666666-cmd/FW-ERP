@@ -1330,11 +1330,11 @@ const OPERATIONS_PANEL_NAV_META = [
 
 const STORE_PANEL_NAV_META = [
   {
-    match: "5. 门店到货工作台 / Store Receiving Dashboard",
+    match: "门店收货主控台",
     section: "manager",
     order: 5,
     icon: "控",
-    navTitle: "5. 门店到货工作台 / Store Receiving Dashboard",
+    navTitle: "门店收货主控台",
   },
   {
     match: "6.2 我的当前 bale",
@@ -1349,6 +1349,7 @@ const STORE_PANEL_NAV_META = [
     order: 10,
     icon: "验",
     navTitle: "6. 送货单验收详情 / Store Receiving Detail",
+    hiddenInNav: true,
   },
   {
     match: "6.1 门店分配店员",
@@ -1356,6 +1357,7 @@ const STORE_PANEL_NAV_META = [
     order: 20,
     icon: "派",
     navTitle: "6.1 门店分配店员",
+    hiddenInNav: true,
   },
   {
     match: "7. 店员 PDA 上架工作台",
@@ -1785,7 +1787,7 @@ function getUserRoleLanding(user = currentSession.user) {
     return null;
   }
   return roleCode === "store_manager"
-    ? { workspace: "store", panelTitle: "5. 门店到货工作台 / Store Receiving Dashboard", label: "店长端 / 门店到货工作台" }
+    ? { workspace: "store", panelTitle: "门店收货主控台", label: "店长端 / 门店到货工作台" }
     : roleCode === "store_clerk"
       ? { workspace: "store", panelTitle: "6.2 我的当前 bale", label: "店员端 / 我的当前 bale" }
       : CASHIER_ROLE_CODES.has(roleCode)
@@ -1836,7 +1838,7 @@ async function autoLoadRoleHome(user = currentSession.user) {
   if (!landing) {
     return;
   }
-  if (landing.panelTitle === "5. 门店到货工作台 / Store Receiving Dashboard") {
+  if (landing.panelTitle === "门店收货主控台") {
     const form = document.querySelector("#storeManagerConsoleForm");
     if (!(form instanceof HTMLFormElement)) {
       return;
