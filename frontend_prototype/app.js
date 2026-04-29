@@ -9783,10 +9783,11 @@ function buildWarehouseoutModalPrintJobFromPayload(payload = {}, {
 
 function getTransferDispatchTemplateCode() {
   const templates = getSelectableLabelTemplatesByScope("warehouseout_bale");
-  if (templates.some((row) => String(row?.template_code || "").trim().toLowerCase() === "store_dispatch_60x40")) {
+  const availableCodes = new Set(templates.map((row) => String(row?.template_code || "").trim().toLowerCase()).filter(Boolean));
+  if (availableCodes.has("store_dispatch_60x40") || availableCodes.has("transtoshop") || availableCodes.has("wait_for_transtoshop")) {
     return "store_dispatch_60x40";
   }
-  return getPreferredWarehouseoutTemplateCode("store_dispatch_60x40", "store_dispatch");
+  return "store_dispatch_60x40";
 }
 
 function normalizeWarehouseoutDispatchBarcode(value = "") {
@@ -15350,7 +15351,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
 </body>
 </html>`;
   }
-  if (selectedTemplateCode === "store_dispatch_60x40" || selectedTemplateCode === "transtoshop") {
+  if (selectedTemplateCode === "store_dispatch_60x40" || selectedTemplateCode === "transtoshop" || selectedTemplateCode === "wait_for_transtoshop") {
     const transferNo = String(payload.transfer_order_no || payload.shipment_no || job.document_no || "").trim().toUpperCase();
     const packageLabel = String(payload.package_position_label || payload.bale_piece_summary || "").trim();
     const displayCode = String(payload.display_code || payload.parcel_batch_no || payload.dispatch_bale_no || "").trim().toUpperCase();
@@ -17437,7 +17438,7 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
   if (normalizedScope === "warehouseout_bale" && getActiveBaleModalTaskType() === "transfer_dispatch" && labelTemplateFlow.buildLockedTemplateOptions) {
     const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
       allowedCodes: ["store_dispatch_60x40"],
-      selectedCode: selectedTemplateCode || "store_dispatch_60x40",
+      selectedCode: ["store_dispatch_60x40", "transtoshop", "wait_for_transtoshop"].includes(String(selectedTemplateCode || "").trim().toLowerCase()) ? "store_dispatch_60x40" : (selectedTemplateCode || "store_dispatch_60x40"),
     });
     return rows.length
       ? rows

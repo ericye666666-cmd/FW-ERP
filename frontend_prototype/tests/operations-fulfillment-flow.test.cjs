@@ -731,6 +731,10 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /getTransferDispatchTemplateCode\(\)[\s\S]*?return "store_dispatch_60x40"/);
   assert.match(appJs, /taskType:\s*"transfer_dispatch"/);
   assert.match(appJs, /allowedCodes:\s*\["store_dispatch_60x40"\]/);
+  assert.match(appJs, /selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop" \|\| selectedTemplateCode === "wait_for_transtoshop"/);
+  assert.match(appJs, /availableCodes\.has\("wait_for_transtoshop"\)/);
+  assert.match(appJs, /selectedCode:\s*\["store_dispatch_60x40", "transtoshop", "wait_for_transtoshop"\]\.includes/);
+  assert.doesNotMatch(appJs, /门店送货执行单 60x40[\s\S]*wait for transtoshop/);
   assert.match(appJs, /function isWarehouseoutDispatchBarcode/);
   assert.match(appJs, /const displayCode = String\(row\.store_delivery_execution_order_no \|\| row\.display_code \|\| ""\)/);
   assert.match(appJs, /const machineCode = String\(row\.machine_code \|\| ""\)/);
