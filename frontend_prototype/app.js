@@ -23188,6 +23188,30 @@ function renderStoreOperatingSummary(rows) {
     .join("");
 }
 
+
+function parseKnownDispatchItemCount(row = {}) {
+  const candidates = [
+    row?.item_count,
+    row?.itemCount,
+    row?.qty,
+    row?.quantity,
+    row?.piece_count,
+    row?.pieces,
+    row?.total_item_count,
+  ];
+  const totalQuantity = String(row?.total_quantity || row?.totalQuantity || "").trim();
+  if (totalQuantity) {
+    const matched = totalQuantity.match(/-?\d+(?:\.\d+)?/);
+    if (matched) candidates.push(Number(matched[0]));
+  }
+  for (const raw of candidates) {
+    if (raw === null || raw === undefined || raw === "") continue;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
+}
+
 function getTransferDerivedStoreDispatchRows() {
   const derivedRows = [];
   const nowIso = new Date().toISOString();
@@ -23213,12 +23237,7 @@ function getTransferDerivedStoreDispatchRows() {
       ...(Array.isArray(transfer?.shipment_session?.packages) ? transfer.shipment_session.packages : []),
     ];
     const explicitItemCounts = upstreamPackageRows
-      .map((row) => {
-        const rawCount = row?.item_count;
-        if (rawCount === null || rawCount === undefined || rawCount === "") return null;
-        const parsed = Number(rawCount);
-        return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-      })
+      .map((row) => parseKnownDispatchItemCount(row))
       .filter((count) => count !== null);
     for (let index = 0; index < packageCount; index += 1) {
       const packageLabel = String(index + 1).padStart(3, "0");
@@ -23311,12 +23330,10 @@ function groupStoreDispatchRowsBySdo(rows = []) {
     }
     const group = groups.get(sdoDisplayCode);
     group.rows.push(row);
-    const rawItemCount = row?.item_count;
-    const parsedItemCount = Number(rawItemCount);
-    const hasKnownItemCount = rawItemCount !== null && rawItemCount !== undefined && rawItemCount !== "" && Number.isFinite(parsedItemCount) && parsedItemCount >= 0;
-    if (hasKnownItemCount) {
-      group.item_count += parsedItemCount;
-      group.known_item_count += parsedItemCount;
+    const knownItemCount = parseKnownDispatchItemCount(row);
+    if (knownItemCount !== null) {
+      group.item_count += knownItemCount;
+      group.known_item_count += knownItemCount;
     } else {
       group.unknown_item_count += 1;
     }
