@@ -14368,72 +14368,6 @@ function normalizeStoreReceiptBaleInputFromForm({ showNotice = true } = {}) {
   return canonicalBaleNo || rawBaleNo;
 }
 
-function buildStoreReceiptBatchPlan(transferNo = "", scanText = "", rows = null) {
-  const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
-  const transferRows = getStoreReceiptTransferRows(normalizedTransferNo, rows);
-  const pendingRows = transferRows.filter((row) => {
-    const status = String(row?.status || "").trim().toLowerCase();
-    return !row?.accepted_at && !["received", "accepted", "partially_received", "assigned", "processing", "completed"].includes(status);
-  });
-  const expectedRows = pendingRows.length ? pendingRows : transferRows.filter((row) => {
-    const status = String(row?.status || "").trim().toLowerCase();
-    return !["assigned", "processing", "completed"].includes(status);
-  });
-  const expectedSet = new Set(expectedRows.map((row) => String(row?.bale_no || "").trim().toUpperCase()).filter(Boolean));
-  const acceptedSet = new Set(transferRows
-    .filter((row) => row?.accepted_at || ["received", "accepted", "partially_received", "assigned", "processing", "completed"].includes(String(row?.status || "").trim().toLowerCase()))
-    .map((row) => String(row?.bale_no || "").trim().toUpperCase())
-    .filter(Boolean));
-  const scans = parseStoreReceiptScannedBaleNos(scanText, normalizedTransferNo, transferRows);
-  const seen = new Set();
-  const matched = [];
-  const unexpected = [];
-  const duplicates = [];
-  const alreadyAccepted = [];
-  scans.forEach((raw) => {
-    let canonical = resolveStoreReceiptBaleNo(raw, normalizedTransferNo, transferRows);
-    if (canonical === raw && String(raw || "").trim().toUpperCase() === "SDB") {
-      const unresolvedRows = expectedRows.filter((row) => {
-        const baleNo = String(row?.bale_no || "").trim().toUpperCase();
-        return baleNo && !seen.has(baleNo);
-      });
-      if (unresolvedRows.length === 1) {
-        canonical = String(unresolvedRows[0]?.bale_no || "").trim().toUpperCase();
-      }
-    }
-    if (seen.has(canonical)) {
-      duplicates.push({ raw, canonical });
-      return;
-    }
-    seen.add(canonical);
-    if (expectedSet.has(canonical)) {
-      const row = expectedRows.find((item) => String(item?.bale_no || "").trim().toUpperCase() === canonical);
-      matched.push({ raw, canonical, row });
-      return;
-    }
-    if (acceptedSet.has(canonical)) {
-      alreadyAccepted.push({ raw, canonical });
-      return;
-    }
-    unexpected.push({ raw, canonical });
-  });
-  const matchedSet = new Set(matched.map((item) => item.canonical));
-  const missing = expectedRows
-    .filter((row) => !matchedSet.has(String(row?.bale_no || "").trim().toUpperCase()))
-    .map((row) => ({ canonical: String(row?.bale_no || "").trim().toUpperCase(), row }));
-  return {
-    transfer_no: normalizedTransferNo,
-    transferRows,
-    expectedRows,
-    matched,
-    missing,
-    unexpected,
-    duplicates,
-    alreadyAccepted,
-    isComplete: Boolean(normalizedTransferNo) && expectedRows.length > 0 && matched.length === expectedRows.length && !missing.length && !unexpected.length && !duplicates.length,
-  };
-}
-
 function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const target = document.querySelector("#storeDispatchBaleSummary");
   if (!(target instanceof HTMLElement)) {
@@ -14461,25 +14395,8 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   });
   const shownRows = pendingRows.length ? pendingRows : transferRows;
   const totalItems = transferRows.reduce((sum, row) => sum + Number(row?.item_count || 0), 0);
-  const scanText = String(document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")?.value || "");
   const normalizedTransferNo = String(transferRows[0]?.transfer_no || "").trim().toUpperCase();
-  const plan = buildStoreReceiptBatchPlan(normalizedTransferNo, scanText, transferRows);
   const sdoMachineCode = String(transferRows[0]?.machine_code || "").replace(/[^0-9]/g, "").trim() || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(normalizedSdoCode) ? `4${normalizedSdoCode.slice(3)}` : "-");
-  const renderDiff = () => {
-    if (!scanText.trim()) {
-      return `<div class="empty-state">先把本调拨单下所有 bale barcode 连续扫描到上面的框里。扫齐后这里会显示匹配结果和差异。</div>`;
-    }
-    const diffItems = [
-      ...plan.missing.map((item) => `<span class="store-flag danger">少扫 ${escapeHtml(item.canonical)}</span>`),
-      ...plan.unexpected.map((item) => `<span class="store-flag danger">非本单 / 未匹配 ${escapeHtml(item.raw)}${item.canonical !== item.raw ? ` -> ${escapeHtml(item.canonical)}` : ""}</span>`),
-      ...plan.duplicates.map((item) => `<span class="store-flag danger">重复扫描 ${escapeHtml(item.canonical)}</span>`),
-      ...plan.alreadyAccepted.map((item) => `<span class="store-flag">已验收 ${escapeHtml(item.canonical)}</span>`),
-    ];
-    if (!diffItems.length && plan.isComplete) {
-      return `<div class="receipt-diff-list"><span class="store-flag">已扫齐 ${escapeHtml(plan.matched.length)} 包，可以点击“验收完成”。</span></div>`;
-    }
-    return `<div class="receipt-diff-list">${diffItems.join("") || '<span class="store-flag">等待继续扫描。</span>'}</div>`;
-  };
   target.innerHTML = `
     <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedSdoCode)}。本页为只读演示，按钮暂不做持久化回写。</div>
     <div class="report-summary-grid">
@@ -14489,11 +14406,9 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transferRows[0]?.store_code || getCurrentStoreCodeFallback() || "-")}</span></article>
       <article class="store-metric"><strong>总包裹数</strong><span>${escapeHtml(transferRows.length)}</span></article>
       <article class="store-metric"><strong>验收状态</strong><span>${escapeHtml(pendingRows.length > 0 ? "待验收" : "已完成/处理中")}</span></article>
-      <article class="store-metric"><strong>已匹配</strong><span>${escapeHtml(plan.matched.length)}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${escapeHtml(totalItems)}</span></article>
     </div>
-    <div class="subtle small">请扫描送货单上的 SDO 条码。SDB / LPK 只是来源码，仅供核对。</div>
-    ${renderDiff()}
+    <div class="subtle small">本页仅展示送货单包裹明细；SDB / LPK 作为来源码，仅供核对。</div>
     <div class="candidate-list compact-list">
       ${shownRows.map((row) => `
         <article class="candidate-row">
@@ -25678,51 +25593,15 @@ async function submitStoreDispatchBaleAccept(event) {
     }
     throw new Error("门店收货只扫正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
   }
-  const usingLegacyDispatchBaleCompatibilityPath = true;
   payload.store_code = String(payload.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const rows = await refreshStoreDispatchBaleDirectoryFromForm({ store_code: payload.store_code, transfer_no: payload.transfer_no });
-  const plan = buildStoreReceiptBatchPlan(payload.transfer_no, rawScanText, rows);
   renderStoreReceiptTransferBaleList(payload.transfer_no, rows);
-  if (!plan.isComplete) {
-    throw new Error(`本调拨单还不能整单验收：少扫 ${plan.missing.length} 个，非本单/未匹配 ${plan.unexpected.length} 个，重复 ${plan.duplicates.length} 个。请先处理差异。`);
-  }
-  const results = [];
-  for (const item of plan.matched) {
-    const baleNo = item.canonical;
-    await resolveBarcodeForContext(baleNo, "store_receiving", ["DISPATCH_BALE"]);
-    const result = await request(`/stores/dispatch-bales/${encodeURIComponent(baleNo)}/accept`, {
-      method: "POST",
-      body: JSON.stringify({
-        ...payload,
-        note: String(payload.note || "门店整单验收完成").trim(),
-      }),
-    });
-    results.push(result);
-  }
-  writeOutput("#storeDispatchBaleOutput", results);
-  const firstResult = results[0] || {};
-  populateStoreFlowFormsFromContext({
-    ...firstResult,
-    transfer_no: payload.transfer_no,
-    bale_no: results.map((row) => row.bale_no).join("\n"),
-  });
-  await refreshStoreDispatchBaleDirectoryFromForm({ lastAccepted: payload.transfer_no, store_code: payload.store_code, transfer_no: payload.transfer_no });
   showTransientInlineNotice(
     "#storeDispatchBaleNotice",
-    usingLegacyDispatchBaleCompatibilityPath
-      ? `调拨单 ${payload.transfer_no} 已通过 legacy 兼容流程整单验收 ${results.length} 包。正式流程请改扫 STORE_DELIVERY_EXECUTION（SDO...）。`
-      : `调拨单 ${payload.transfer_no} 已整单验收 ${results.length} 包，下一步按总单批量分配店员。`,
+    "当前版本的 Page 6 为只读 SDO 明细页，不执行整单验收回写。",
     "success",
     2400,
   );
-  setInputValue("#storeDispatchAssignmentForm [name='transfer_no']", payload.transfer_no);
-  setInputValue("#storeDispatchAssignmentForm [name='bale_no']", results.map((row) => row.bale_no).join("\n"));
-  renderStoreDispatchAssignmentResultSummary(null);
-  const panelKey = getPanelKeyByTitle("store", "6.1 门店分配店员");
-  if (panelKey) {
-    setActivePanel(panelKey);
-    focusElement("#storeDispatchAssignmentForm");
-  }
 }
 
 async function submitStoreDispatchAssignment(event) {
@@ -29490,8 +29369,7 @@ document.addEventListener("click", async (event) => {
       const panelKey = getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail");
       if (panelKey) {
         setActivePanel(panelKey);
-        focusElement("#storeDispatchBaleAcceptForm");
-      }
+              }
       return;
     }
     if (button.dataset.storeDispatchAssignmentFill) {
