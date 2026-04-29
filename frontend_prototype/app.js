@@ -1498,6 +1498,7 @@ const WORKSPACE_PANEL_NAV_META_MAP = {
 };
 const storeCommandCenterState = {
   selected_sdo_code: "",
+  step: "list",
   selected_clerk_by_sdo: {},
 };
 
@@ -23345,6 +23346,8 @@ function buildStoreReceivingCommandCenterViewModel(storeCode = "", preferredSdoC
   if (selected) {
     storeCommandCenterState.selected_sdo_code = selected.sdo_display_code;
   }
+  const validSteps = new Set(["list", "receiving", "assignment", "completed"]);
+  storeCommandCenterState.step = selected && validSteps.has(storeCommandCenterState.step) ? storeCommandCenterState.step : "list";
   const selectedClerk = selected
     ? String(storeCommandCenterState.selected_clerk_by_sdo?.[selected.sdo_display_code] || "").trim()
     : "";
@@ -23353,6 +23356,7 @@ function buildStoreReceivingCommandCenterViewModel(storeCode = "", preferredSdoC
   return {
     sdo_groups: sdoGroups,
     selected,
+    step: storeCommandCenterState.step,
     clerk_options: clerkOptions,
     selected_clerk: selectedClerk || fallbackClerk,
   };
@@ -23509,10 +23513,16 @@ function renderStoreManagerConsoleSummary(context = {}) {
           <span class="eyebrow">SDO</span>
           <strong>门店收货主控台 / Store Receiving Command Center</strong>
         </div>
-        <div class="subtle small">扫描或输入 SDO 码，点击卡片后在本页完成验收和店员分配。</div>
+        <div class="subtle small">扫描或输入 SDO 码后，按步骤在本页完成收货。</div>
+        <div class="transfer-flow-strip" style="margin:8px 0 6px;">
+          <span class="store-flag ${commandCenter.step === "list" ? "is-active" : ""}">1 到货列表</span>
+          <span class="store-flag ${commandCenter.step === "receiving" ? "is-active" : ""}">2 验收详情</span>
+          <span class="store-flag ${commandCenter.step === "assignment" ? "is-active" : ""}">3 分配店员</span>
+          <span class="store-flag ${commandCenter.step === "completed" ? "is-active" : ""}">4 已完成</span>
+        </div>
         <div class="button-row" style="margin:8px 0 6px;"><button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单 / Load recent deliveries</button></div>
         <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
-        ${commandCenter.selected ? `
+        ${commandCenter.selected && commandCenter.step !== "list" ? `
           <div class="report-summary" style="margin-top:10px;">
             <div class="alert-banner">已选择 ${escapeHtml(commandCenter.selected.sdo_display_code)}，请在本页继续处理。</div>
             <div class="report-summary-grid">
@@ -23523,7 +23533,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
               <article class="store-metric"><strong>包裹</strong><span>${escapeHtml(commandCenter.selected.packages.length)}</span></article>
               <article class="store-metric"><strong>件数</strong><span>${commandCenter.selected.item_count > 0 ? escapeHtml(commandCenter.selected.item_count) : "件数待确认"}</span></article>
             </div>
-            <div class="candidate-list compact-list">
+            <div class="candidate-list compact-list" style="${commandCenter.step === "completed" ? "display:none;" : ""}">
               ${commandCenter.selected.packages.map((row) => `
                 <article class="candidate-row">
                   <div class="candidate-main">
@@ -23533,9 +23543,9 @@ function renderStoreManagerConsoleSummary(context = {}) {
                     <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)} · ${row.assigned_clerk ? `已分配：${row.assigned_clerk}` : "未分配"}`)}</div>
                   </div>
                   <div class="candidate-side">
-                    <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
-                    <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "exception" ? "disabled" : ""}>上报异常</button>
-                    <label><input type="checkbox" data-store-assignment-pkg="${escapeHtml(row.bale_no)}"> 选择</label>
+                    <button type="button" class="ghost-button mini-button" style="${commandCenter.step === "receiving" ? "" : "display:none;"}" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
+                    <button type="button" class="ghost-button mini-button" style="${commandCenter.step === "receiving" ? "" : "display:none;"}" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "exception" ? "disabled" : ""}>上报异常</button>
+                    <label style="${commandCenter.step === "assignment" ? "" : "display:none;"}"><input type="checkbox" data-store-assignment-pkg="${escapeHtml(row.bale_no)}"> 选择</label>
                   </div>
                 </article>`).join("")}
             </div>
@@ -23546,11 +23556,14 @@ function renderStoreManagerConsoleSummary(context = {}) {
                   ${commandCenter.clerk_options.map((name) => `<option value="${escapeHtml(name)}" ${name === commandCenter.selected_clerk ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
                 </select>
               </label>
-              <button type="button" class="ghost-button" data-store-receipt-complete-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.handled_count === commandCenter.selected.packages.length && commandCenter.selected.packages.length ? "" : "disabled"}>整单验收完成</button>
-              <button type="button" class="ghost-button" data-store-assignment-fill-selected="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>分配选中包给店员</button>
-              <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>
+              ${commandCenter.step === "receiving" ? `<button type="button" class="ghost-button" data-store-receipt-complete-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.handled_count === commandCenter.selected.packages.length && commandCenter.selected.packages.length ? "" : "disabled"}>整单验收完成</button>` : ""}
+              ${commandCenter.step === "assignment" ? `<button type="button" class="ghost-button" data-store-assignment-fill-selected="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>分配选中包给店员</button>
+              <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>` : ""}
+              ${commandCenter.step === "completed" ? `<span class="meta-pill">本单已完成</span>` : ""}
             </div>
-          </div>` : `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`}
+          </div>` : commandCenter.step !== "list"
+            ? `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`
+            : ""}
       </section>
       <section class="manager-console-panel">
         <div class="manager-console-head">
@@ -29580,6 +29593,7 @@ document.addEventListener("click", async (event) => {
       if (sdoCode && baleNo && ["received", "exception"].includes(action)) {
         const previous = storeReceiptPackageStatusState[sdoCode] || {};
         storeReceiptPackageStatusState[sdoCode] = { ...previous, [baleNo]: action };
+        storeCommandCenterState.step = "receiving";
         renderStoreReceiptTransferBaleList(sdoCode);
         renderStoreManagerConsoleSummary({
           store_code: getCurrentStoreCodeFallback(),
@@ -29593,6 +29607,7 @@ document.addEventListener("click", async (event) => {
       if (sdoCode) {
         const previous = storeReceiptPackageStatusState[sdoCode] || {};
         storeReceiptPackageStatusState[sdoCode] = { ...previous, completed_at: new Date().toISOString() };
+        storeCommandCenterState.step = "assignment";
         renderStoreReceiptTransferBaleList(sdoCode);
         renderStoreManagerConsoleSummary({
           store_code: getCurrentStoreCodeFallback(),
@@ -29605,6 +29620,15 @@ document.addEventListener("click", async (event) => {
     if (button.dataset.storeReceiptTransferFill) {
       const transferNo = String(button.dataset.storeReceiptTransferFill || "").trim().toUpperCase();
       storeCommandCenterState.selected_sdo_code = transferNo;
+      const statusMap = storeReceiptPackageStatusState[transferNo] || {};
+      const assignmentMap = storeReceiptPackageAssignmentState[transferNo] || {};
+      const selectedRows = groupStoreDispatchRowsBySdo(getStoreManagerConsoleRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === transferNo)?.rows || [];
+      const assignedCount = selectedRows.filter((row) => String(assignmentMap[String(row?.bale_no || "").trim().toUpperCase()] || "").trim()).length;
+      if (statusMap.completed_at) {
+        storeCommandCenterState.step = selectedRows.length && assignedCount === selectedRows.length ? "completed" : "assignment";
+      } else {
+        storeCommandCenterState.step = "receiving";
+      }
       setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", transferNo);
       setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", "");
       renderStoreReceiptTransferBaleList(transferNo);
@@ -29641,6 +29665,8 @@ document.addEventListener("click", async (event) => {
       });
       storeReceiptPackageAssignmentState[sdoCode] = assignmentState;
       storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = clerkName;
+      const totalAssigned = rows.filter((row) => String(assignmentState[String(row?.bale_no || "").trim().toUpperCase()] || "").trim()).length;
+      storeCommandCenterState.step = rows.length && totalAssigned === rows.length ? "completed" : "assignment";
       renderStoreManagerConsoleSummary({
         store_code: getCurrentStoreCodeFallback(),
         selected_sdo_code: sdoCode,
