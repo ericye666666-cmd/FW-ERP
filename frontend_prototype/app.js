@@ -13815,6 +13815,14 @@ function getStoreDispatchBaleStatusLabel(status = "") {
   return labels[normalized] || String(status || "-").trim() || "-";
 }
 
+function getTransferDeliveryMainDispatchStatus(transfer = {}) {
+  const lifecycle = String(transfer?.lifecycle_status || transfer?.status || "").trim().toLowerCase();
+  if (lifecycle === "received" || lifecycle === "closed") return "accepted";
+  if (lifecycle === "partially_received") return "pending_acceptance";
+  if (lifecycle === "shipped" || lifecycle === "in_transit") return "in_transit";
+  return "";
+}
+
 function getStoreAssignmentNavigationPlan(flowType = "", assignedEmployee = "") {
   if (typeof storeExecutionFlow.getStoreAssignmentNavigation === "function") {
     return storeExecutionFlow.getStoreAssignmentNavigation({ flowType, assignedEmployee });
@@ -16245,6 +16253,16 @@ async function completeCurrentBalePrintModalJob() {
     balePrinterJobState = balePrinterJobState.filter((queuedJob) => !completedJobIds.has(String(queuedJob.id)));
   }
   if (templateScope !== "bale") {
+    const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
+    if (transferNo) {
+      const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
+      if (transfer && Array.isArray(transfer.display_store_dispatch_bales)) {
+        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => ({ ...row, status: "labelled" }));
+      }
+      renderTransferExecutionWorkbench(transferNo);
+      renderReplenishmentFlowSummary(transferNo);
+      renderTransferDispatchSummary(transferOrderState);
+    }
     balePrinterConsoleNotice = {
       type: "success",
       message: `${jobsToComplete.length} 张 warehouseout barcode 已确认贴完。`,
@@ -16542,6 +16560,7 @@ function renderTransferActionResultSummary(result) {
   }
   if (result.transfer_no && result.transfer_print_job) {
     const normalized = normalizeTransferForOperationsSummary(result);
+    const mainDeliveryStatus = getTransferDeliveryMainDispatchStatus(normalized);
     const storeDispatchRows = Array.isArray(result.display_store_dispatch_bales)
       ? result.display_store_dispatch_bales
       : (Array.isArray(result.store_dispatch_bales) ? result.store_dispatch_bales : []);
@@ -16575,13 +16594,17 @@ function renderTransferActionResultSummary(result) {
                 .map((row) => {
                   const sourceBales = Array.isArray(row.source_bales) ? row.source_bales.filter(Boolean) : [];
                   const rackCodes = Array.isArray(row.rack_codes) ? row.rack_codes.filter(Boolean) : [];
+                  const sourceStatusRaw = String(row?.source_status || row?.status || "").trim().toLowerCase();
+                  const sourceStatusLabel = sourceStatusRaw ? getOperationsDispatchBaleStatusLabel(sourceStatusRaw) : "";
+                  const mainStatus = mainDeliveryStatus || String(row?.status || "").trim().toLowerCase();
                   return `
                     <article class="candidate-row transfer-draft-row">
                       <div>
                         <strong>${escapeHtml(row.bale_no || "-")}</strong>
-                        <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件 · ${getOperationsDispatchBaleStatusLabel(row.status || "")}`)}</div>
+                        <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件 · ${getOperationsDispatchBaleStatusLabel(mainStatus)}`)}</div>
                         <div class="meta-row">
                           ${row.source_label ? `<span class="meta-pill">来源：${escapeHtml(row.source_label)}</span>` : ""}
+                          ${sourceStatusLabel && mainDeliveryStatus ? `<span class="meta-pill">来源状态：${escapeHtml(sourceStatusLabel)}</span>` : ""}
                           ${sourceBales.length ? `<span class="meta-pill">来源 bales ${escapeHtml(sourceBales.join("、"))}</span>` : ""}
                           ${rackCodes.length ? `<span class="meta-pill">库位 ${escapeHtml(rackCodes.join("、"))}</span>` : ""}
                           ${Array.isArray(row.collapsed_bale_nos) && row.collapsed_bale_nos.length ? `<span class="meta-pill">后台类目行已合并 ${escapeHtml(row.collapsed_bale_nos.length)} 条</span>` : ""}
