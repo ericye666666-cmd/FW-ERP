@@ -1328,11 +1328,11 @@ const OPERATIONS_PANEL_NAV_META = [
 
 const STORE_PANEL_NAV_META = [
   {
-    match: "5. 门店执行控制台",
+    match: "5. 门店到货工作台 / Store Receiving Dashboard",
     section: "manager",
     order: 5,
     icon: "控",
-    navTitle: "5. 门店执行控制台",
+    navTitle: "5. 门店到货工作台 / Store Receiving Dashboard",
   },
   {
     match: "6.2 我的当前 bale",
@@ -1342,11 +1342,11 @@ const STORE_PANEL_NAV_META = [
     navTitle: "6.2 我的当前 bale",
   },
   {
-    match: "6. 门店验收配货 bale",
+    match: "6. 送货单验收详情 / Store Receiving Detail",
     section: "manager",
     order: 10,
     icon: "验",
-    navTitle: "6. 门店验收配货 bale",
+    navTitle: "6. 送货单验收详情 / Store Receiving Detail",
   },
   {
     match: "6.1 门店分配店员",
@@ -1783,7 +1783,7 @@ function getUserRoleLanding(user = currentSession.user) {
     return null;
   }
   return roleCode === "store_manager"
-    ? { workspace: "store", panelTitle: "5. 门店执行控制台", label: "店长端 / 门店执行控制台" }
+    ? { workspace: "store", panelTitle: "5. 门店到货工作台 / Store Receiving Dashboard", label: "店长端 / 门店到货工作台" }
     : roleCode === "store_clerk"
       ? { workspace: "store", panelTitle: "6.2 我的当前 bale", label: "店员端 / 我的当前 bale" }
       : CASHIER_ROLE_CODES.has(roleCode)
@@ -1834,7 +1834,7 @@ async function autoLoadRoleHome(user = currentSession.user) {
   if (!landing) {
     return;
   }
-  if (landing.panelTitle === "5. 门店执行控制台") {
+  if (landing.panelTitle === "5. 门店到货工作台 / Store Receiving Dashboard") {
     const form = document.querySelector("#storeManagerConsoleForm");
     if (!(form instanceof HTMLFormElement)) {
       return;
@@ -12956,7 +12956,7 @@ function renderSortingResultSubmitSummary(result) {
       }
     </div>
     ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("store", "6. 门店验收配货 bale"), label: "下一步：去门店验收配货 bale" },
+        { panelKey: getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail"), label: "下一步：去送货单验收详情" },
         { panelKey: getPanelKeyByTitle("warehouse", "0.1 原始 Bale 总库存"), label: "下一步：查看总控页里的已分拣服装" },
       { panelKey: getPanelKeyByTitle("warehouse", "1. 新建商品"), label: "继续：进入仓库建货" },
     ])}
@@ -14442,15 +14442,15 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
   if (!normalizedTransferNo) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先选择调拨单，再验收这张调拨单下的门店配货 bale。";
+    target.textContent = "先从 Page 5 选择一张 SDO，或直接输入/扫描 SDO 码后查看验收详情。";
     return;
   }
   const transferRows = getStoreReceiptTransferRows(normalizedTransferNo, rows);
   target.className = "report-summary";
   if (!transferRows.length) {
     target.innerHTML = `
-      <div class="alert-banner">调拨单 ${escapeHtml(normalizedTransferNo)} 还没加载到本页。先点“读取最近调拨单”，或确认仓库已经发运到当前门店。</div>
-      <div class="empty-state">选完调拨单后，这里会列出可验收的 SDB 包；扫描短码例如 SDB026042500005 时，会按当前调拨单尾号 005 映射到第 5 包。</div>
+      <div class="alert-banner">SDO ${escapeHtml(normalizedTransferNo)} 还没加载到本页。先回 Page 5 读取最近送货单，或确认仓库已生成 SDO。</div>
+      <div class="empty-state">加载后这里会显示该 SDO 的包裹明细（来源 SDB/LPK 仅作参考）。</div>
     `;
     return;
   }
@@ -14478,29 +14478,33 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
     return `<div class="receipt-diff-list">${diffItems.join("") || '<span class="store-flag">等待继续扫描。</span>'}</div>`;
   };
   target.innerHTML = `
-    <div class="alert-banner">当前验收调拨单 ${escapeHtml(normalizedTransferNo)}。下面这些包才允许验收；扫枪短码会在这张调拨单内按尾号映射。</div>
+    <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedTransferNo)}。本页仅展示验收布局；按钮暂不做持久化回写。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transferRows[0]?.store_code || getCurrentStoreCodeFallback() || "-")}</span></article>
-      <article class="store-metric"><strong>本单 bale</strong><span>${escapeHtml(transferRows.length)}</span></article>
-      <article class="store-metric"><strong>待验收</strong><span>${escapeHtml(pendingRows.length)}</span></article>
+      <article class="store-metric"><strong>总包裹数</strong><span>${escapeHtml(transferRows.length)}</span></article>
+      <article class="store-metric"><strong>验收状态</strong><span>${escapeHtml(pendingRows.length > 0 ? "待验收" : "已完成/处理中")}</span></article>
       <article class="store-metric"><strong>已匹配</strong><span>${escapeHtml(plan.matched.length)}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${escapeHtml(totalItems)}</span></article>
     </div>
-    <div class="subtle small">短码兼容：例如 SDB026042500005 会按 ${escapeHtml(normalizedTransferNo)} 的尾号 005 映射到第 5 包正式码。</div>
+    <div class="subtle small">提示：SDB / LPK 仅作为来源包参考信息；门店正式验收入口是 SDO。</div>
     ${renderDiff()}
     <div class="candidate-list compact-list">
       ${shownRows.map((row) => `
         <article class="candidate-row">
           <div class="candidate-main">
-            <strong>${escapeHtml(row.bale_no || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件 · 第 ${getStoreReceiptBaleSequence(row.bale_no || "") || "-"} 包`)}</div>
-            <div class="subtle small">${escapeHtml(`状态 ${getStoreDispatchBaleStatusLabel(row.status || "")}`)}</div>
+            <strong>${escapeHtml(`包裹 #${getStoreReceiptBaleSequence(row.bale_no || "") || "-"}`)}</strong>
+            <div class="subtle small">${escapeHtml(`来源 ${String(row.bale_no || "").startsWith("LPK") ? "LPK" : "SDB"} · ${row.bale_no || "-"} · ${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
+            <div class="subtle small">${escapeHtml(`验收状态 ${getStoreDispatchBaleStatusLabel(row.status || "")}`)}</div>
           </div>
           <div class="candidate-side">
-            <button type="button" class="ghost-button mini-button" data-store-receipt-bale-fill="${escapeHtml(row.bale_no || "")}" data-store-receipt-transfer="${escapeHtml(normalizedTransferNo)}">填入验收</button>
+            <button type="button" class="ghost-button mini-button" data-store-receipt-bale-fill="${escapeHtml(row.bale_no || "")}" data-store-receipt-transfer="${escapeHtml(normalizedTransferNo)}">确认收到此包</button>
+            <button type="button" class="ghost-button mini-button" disabled>标记异常</button>
           </div>
         </article>
       `).join("")}
+    </div>
+    <div class="button-row" style="margin-top:10px;">
+      <button type="button" class="ghost-button" disabled>整单验收完成</button>
     </div>
   `;
 }
@@ -23288,7 +23292,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
   const operating = getStoreManagerOperatingMeta(storeCode);
   if (!rows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "当前门店还没有待处理配货 bale。先去运营中心完成调拨和仓库配货，再回店长端首页看执行进度。";
+    target.textContent = "当前门店还没有可验收的送货单（SDO）。请先点击“读取最近送货单 / Load recent deliveries”。";
     return;
   }
 
@@ -23387,10 +23391,10 @@ function renderStoreManagerConsoleSummary(context = {}) {
 
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">${escapeHtml(context.last_action_message || `${storeCode || "当前门店"} 的今日执行任务已经汇总到这里。先看待验收、待分配和进行中，再决定跳到哪个详细页处理。`)}</div>
+    <div class="alert-banner">${escapeHtml(context.last_action_message || `${storeCode || "当前门店"} 的门店到货工作台已加载。以 SDO 为主进行到货验收，SDB/LPK 仅作为来源参考。`)}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCode || operating?.store_code || "-")}</span></article>
-      <article class="store-metric"><strong>待验收总单</strong><span>${inTransitTransferGroups.length}</span></article>
+      <article class="store-metric"><strong>最近 SDO 送货单</strong><span>${inTransitTransferGroups.length}</span></article>
       <article class="store-metric"><strong>待分配</strong><span>${acceptedRows.length}</span></article>
       <article class="store-metric"><strong>处理中</strong><span>${activeRows.length}</span></article>
       <article class="store-metric"><strong>已完成</strong><span>${completedRows.length}</span></article>
@@ -23400,7 +23404,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
       <section class="manager-console-panel">
         <div class="manager-console-head">
           <span class="eyebrow">Receipt</span>
-          <strong>待验收 / 到货队列</strong>
+          <strong>读取最近送货单 / Load recent deliveries</strong>
         </div>
         <div class="manager-console-list">${renderArrivalTransferQueue(inTransitTransferGroups)}</div>
       </section>
@@ -23421,7 +23425,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
         </div>
         <div class="manager-console-actions">
           ${renderSummaryActions([
-            { panelKey: getPanelKeyByTitle("store", "6. 门店验收配货 bale"), label: "去验收配货 bale" },
+            { panelKey: getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail"), label: "去送货单验收详情" },
             { panelKey: getPanelKeyByTitle("store", "6.1 门店分配店员"), label: "去分配店员" },
             { panelKey: getPanelKeyByTitle("store", "10. 周期退仓"), label: "去处理退仓" },
           ])}
@@ -29451,7 +29455,7 @@ document.addEventListener("click", async (event) => {
       setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", transferNo);
       setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", "");
       renderStoreReceiptTransferBaleList(transferNo);
-      const panelKey = getPanelKeyByTitle("store", "6. 门店验收配货 bale");
+      const panelKey = getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail");
       if (panelKey) {
         setActivePanel(panelKey);
         focusElement("#storeDispatchBaleAcceptForm");
