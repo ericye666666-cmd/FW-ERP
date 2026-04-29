@@ -1498,6 +1498,7 @@ const WORKSPACE_PANEL_NAV_META_MAP = {
 };
 const storeCommandCenterState = {
   selected_sdo_code: "",
+  selected_clerk_by_sdo: {},
 };
 
 const LEGACY_WORKSPACE_MAP = {
@@ -23344,7 +23345,25 @@ function buildStoreReceivingCommandCenterViewModel(storeCode = "", preferredSdoC
   if (selected) {
     storeCommandCenterState.selected_sdo_code = selected.sdo_display_code;
   }
-  return { sdo_groups: sdoGroups, selected };
+  const selectedClerk = selected
+    ? String(storeCommandCenterState.selected_clerk_by_sdo?.[selected.sdo_display_code] || "").trim()
+    : "";
+  const clerkOptions = getStoreCommandCenterClerkOptions();
+  const fallbackClerk = clerkOptions.includes("Austin") ? "Austin" : (clerkOptions[0] || "");
+  return {
+    sdo_groups: sdoGroups,
+    selected,
+    clerk_options: clerkOptions,
+    selected_clerk: selectedClerk || fallbackClerk,
+  };
+}
+
+function getStoreCommandCenterClerkOptions() {
+  const fallback = ["Austin", "Swahili", "Josephine"];
+  const options = Array.from(document.querySelectorAll("#storeClerkOptions option"))
+    .map((option) => String(option?.value || "").trim())
+    .filter(Boolean);
+  return [...new Set([...options, ...fallback])];
 }
 
 function renderStoreManagerConsoleSummary(context = {}) {
@@ -23521,6 +23540,12 @@ function renderStoreManagerConsoleSummary(context = {}) {
                 </article>`).join("")}
             </div>
             <div class="button-row" style="margin-top:8px;">
+              <label class="subtle small" style="display:flex; align-items:center; gap:6px;">
+                分配店员
+                <select data-store-command-center-clerk="${escapeHtml(commandCenter.selected.sdo_display_code)}">
+                  ${commandCenter.clerk_options.map((name) => `<option value="${escapeHtml(name)}" ${name === commandCenter.selected_clerk ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+                </select>
+              </label>
               <button type="button" class="ghost-button" data-store-receipt-complete-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.handled_count === commandCenter.selected.packages.length && commandCenter.selected.packages.length ? "" : "disabled"}>整单验收完成</button>
               <button type="button" class="ghost-button" data-store-assignment-fill-selected="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>分配选中包给店员</button>
               <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>
@@ -28871,6 +28896,18 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("change", (event) => {
+  const select = event.target instanceof HTMLElement ? event.target.closest("[data-store-command-center-clerk]") : null;
+  if (!(select instanceof HTMLSelectElement)) {
+    return;
+  }
+  const sdoCode = String(select.dataset.storeCommandCenterClerk || "").trim().toUpperCase();
+  if (!sdoCode) {
+    return;
+  }
+  storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = String(select.value || "").trim();
+});
+
 document.querySelector("#recommendationCandidateList")?.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-recommendation-toggle]") : null;
   if (!(button instanceof HTMLElement)) {
@@ -29589,9 +29626,27 @@ document.addEventListener("click", async (event) => {
       const selected = button.dataset.storeAssignmentFillAll
         ? rows.map((row) => String(row?.bale_no || "").trim().toUpperCase())
         : Array.from(document.querySelectorAll("input[data-store-assignment-pkg]:checked")).map((el) => String(el.getAttribute("data-store-assignment-pkg") || "").trim().toUpperCase()).filter(Boolean);
-      setInputValue("#storeDispatchAssignmentForm [name='transfer_no']", sdoCode);
-      setInputValue("#storeDispatchAssignmentForm [name='bale_no']", selected.join("\n"));
-      showTransientInlineNotice("#storeDispatchAssignmentNotice", `已选择 ${selected.length} 包，点击表单“提交”即可分配。`, "success", 1800);
+      const clerkSelect = Array.from(document.querySelectorAll("[data-store-command-center-clerk]"))
+        .find((el) => String(el.getAttribute("data-store-command-center-clerk") || "").trim().toUpperCase() === sdoCode);
+      const clerkName = String(clerkSelect?.value || storeCommandCenterState.selected_clerk_by_sdo?.[sdoCode] || "").trim();
+      if (!clerkName) {
+        throw new Error("请先在主控台选择店员。");
+      }
+      if (!selected.length) {
+        throw new Error("请先勾选至少一个包裹，或使用“一键分配整单给店员”。");
+      }
+      const assignmentState = { ...(storeReceiptPackageAssignmentState[sdoCode] || {}) };
+      selected.forEach((baleNo) => {
+        assignmentState[baleNo] = clerkName;
+      });
+      storeReceiptPackageAssignmentState[sdoCode] = assignmentState;
+      storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = clerkName;
+      renderStoreManagerConsoleSummary({
+        store_code: getCurrentStoreCodeFallback(),
+        selected_sdo_code: sdoCode,
+        last_action_message: `SDO ${sdoCode} 已将 ${selected.length} 包分配给 ${clerkName}。`,
+      });
+      showTransientInlineNotice("#storeDispatchAssignmentNotice", `已在主控台分配 ${selected.length} 包给 ${clerkName}。`, "success", 1800);
       return;
     }
     if (button.dataset.storeDispatchAssignmentFill) {
