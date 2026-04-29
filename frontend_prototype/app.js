@@ -23181,10 +23181,51 @@ function renderStoreOperatingSummary(rows) {
     .join("");
 }
 
+function getTransferDerivedStoreDispatchRows() {
+  const derivedRows = [];
+  const nowIso = new Date().toISOString();
+  const existingSdoCodes = new Set(
+    (Array.isArray(storeDispatchBaleState) ? storeDispatchBaleState : [])
+      .map((row) => String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase())
+      .filter(Boolean),
+  );
+  (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
+    const sdoCode = String(
+      transfer?.store_delivery_execution_order_no
+      || transfer?.store_delivery_execution_order?.execution_order_no
+      || transfer?.official_delivery_barcode
+      || "",
+    ).trim().toUpperCase();
+    if (!sdoCode || existingSdoCodes.has(sdoCode)) return;
+    const targetStoreCode = String(transfer?.to_store_code || transfer?.store_code || "").trim().toUpperCase();
+    const packageCount = Math.max(0, Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
+    for (let index = 0; index < packageCount; index += 1) {
+      const packageLabel = String(index + 1).padStart(3, "0");
+      derivedRows.push({
+        bale_no: `${sdoCode}-PKG${packageLabel}`,
+        transfer_no: String(transfer?.transfer_no || "").trim().toUpperCase(),
+        store_code: targetStoreCode,
+        to_store_code: targetStoreCode,
+        target_store_code: targetStoreCode,
+        status: transfer?.status || "shipped",
+        item_count: 0,
+        updated_at: transfer?.updated_at || transfer?.created_at || nowIso,
+        created_at: transfer?.created_at || nowIso,
+        store_delivery_execution_order_no: sdoCode,
+        execution_order_no: sdoCode,
+        official_delivery_barcode: sdoCode,
+        machine_code: String(transfer?.machine_code || transfer?.store_delivery_execution_order?.machine_code || "").trim(),
+      });
+    }
+  });
+  return derivedRows;
+}
+
 function getStoreManagerConsoleRows(storeCode = "") {
   const normalizedStoreCode = String(storeCode || "").trim().toUpperCase();
   const rows = [
     ...storeDispatchBaleState,
+    ...getTransferDerivedStoreDispatchRows(),
     ...ensureDirectHangDispatchBaleState(),
   ];
   return rows
