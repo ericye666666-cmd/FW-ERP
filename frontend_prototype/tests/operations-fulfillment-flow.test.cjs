@@ -736,11 +736,14 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /selectedCode:\s*\["store_dispatch_60x40", "transtoshop", "wait_for_transtoshop"\]\.includes/);
   assert.doesNotMatch(appJs, /门店送货执行单 60x40[\s\S]*wait for transtoshop/);
   assert.match(appJs, /function isWarehouseoutDispatchBarcode/);
-  assert.match(appJs, /const displayCode = String\(row\.store_delivery_execution_order_no \|\| row\.display_code \|\| ""\)/);
+  assert.match(appJs, /const displayCode = String\(\s*row\.store_delivery_execution_order_no\s*\|\|\s*row\.execution_order_no\s*\|\|\s*row\.official_delivery_barcode\s*\|\|\s*row\.display_code\s*\|\|\s*""/);
   assert.match(appJs, /const machineCode = String\(row\.machine_code \|\| ""\)/);
-  assert.match(appJs, /display_code:\s*displayCode \|\| normalizedFinal/);
-  assert.match(appJs, /machine_code:\s*machineCode \|\| ""/);
+  assert.match(appJs, /const derivedMachineCode = \/\^SDO/);
+  assert.match(appJs, /`4\$\{displayCode\.slice\(3\)\}`/);
+  assert.match(appJs, /display_code:\s*displayCode \|\| ""/);
+  assert.match(appJs, /machine_code:\s*machineCode \|\| derivedMachineCode \|\| ""/);
   assert.match(appJs, /barcode_value:\s*barcodeValue/);
+  assert.doesNotMatch(appJs, /display_code:\s*displayCode \|\| normalizedFinal/);
   assert.match(appJs, /package_count:\s*packageCount/);
   assert.match(appJs, /package_position_label:\s*`第 \$\{packageIndex\} 包 \/ 共 \$\{packageCount\} 包`/);
   assert.match(appJs, /const barcodeSvg = renderCode128Svg\(barcodeValue, \{ width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1\.7 \}\);/);
@@ -749,6 +752,8 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /<div class="code">\$\{escapeHtml\(barcodeValue \|\| "NO BARCODE"\)\}<\/div>/);
   assert.match(appJs, /STORE DISPATCH \/ SDO/);
   assert.match(appJs, /正式门店送货执行码/);
+  assert.match(appJs, /Display: \$\{displayCode \|\| "-"\}/);
+  assert.match(appJs, /Request: \$\{transferNo \|\| "-"\}/);
 });
 
 test("warehouse dispatch tracking removes temporary store receipt writeback step", () => {

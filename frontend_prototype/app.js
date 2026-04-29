@@ -9815,12 +9815,22 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
   const sourceBales = Array.isArray(row.source_bales) ? row.source_bales.filter(Boolean) : [];
   const packageIndex = Math.max(1, Number(row.package_index || row.packageIndex || rowIndex + 1) || 1);
   const packageCount = Math.max(packageIndex, Number(row.package_count || row.packageCount || totalRows || 1) || 1);
-  const displayCode = String(row.store_delivery_execution_order_no || row.display_code || "").trim().toUpperCase();
+  const displayCode = String(
+    row.store_delivery_execution_order_no
+    || row.execution_order_no
+    || row.official_delivery_barcode
+    || row.display_code
+    || "",
+  ).trim().toUpperCase();
   const machineCode = String(row.machine_code || "").replace(/[^0-9]/g, "").trim();
+  const derivedMachineCode = /^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(displayCode)
+    ? `4${displayCode.slice(3)}`
+    : "";
   const finalBaleNo = String(row.dispatch_bale_no || row.dispatchBaleNo || row.bale_no || row.baleNo || "").trim();
   const normalizedFinal = normalizeWarehouseoutDispatchBarcode(finalBaleNo || displayCode);
   const sourceSet = new Set(sourceBales.map((item) => normalizeWarehouseoutDispatchBarcode(item)).filter(Boolean));
   const barcodeValue = machineCode
+    || derivedMachineCode
     || (isWarehouseoutDispatchBarcode(normalizedFinal) && !sourceSet.has(normalizedFinal)
       ? normalizedFinal
       : buildTransferDispatchFallbackBarcode(transfer, packageIndex));
@@ -9834,8 +9844,8 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     template_scope: "warehouseout_bale",
     copies: 1,
     barcode_value: barcodeValue,
-    display_code: displayCode || normalizedFinal,
-    machine_code: machineCode || "",
+    display_code: displayCode || "",
+    machine_code: machineCode || derivedMachineCode || "",
     scan_token: barcodeValue,
     bale_barcode: barcodeValue,
     legacy_bale_barcode: "",
