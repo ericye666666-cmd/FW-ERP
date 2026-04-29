@@ -23508,7 +23508,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
       <article class="store-metric"><strong>异常</strong><span>${attentionRows.length + exceptionFlags.length}</span></article>
     </div>
     <div class="manager-console-grid">
-      <section class="manager-console-panel">
+      <section class="manager-console-panel" style="grid-column: 1 / -1;">
         <div class="manager-console-head">
           <span class="eyebrow">SDO</span>
           <strong>门店收货主控台 / Store Receiving Command Center</strong>
@@ -23520,9 +23520,13 @@ function renderStoreManagerConsoleSummary(context = {}) {
           <span class="store-flag ${commandCenter.step === "assignment" ? "is-active" : ""}">3 分配店员</span>
           <span class="store-flag ${commandCenter.step === "completed" ? "is-active" : ""}">4 已完成</span>
         </div>
-        <div class="button-row" style="margin:8px 0 6px;"><button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单 / Load recent deliveries</button></div>
-        <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
-        ${commandCenter.selected && commandCenter.step !== "list" ? `
+        <div class="button-row" style="margin:8px 0 6px;">
+          <button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单 / Load recent deliveries</button>
+          ${commandCenter.step !== "list" ? '<button type="button" class="ghost-button mini-button" data-store-receipt-step="list">返回到货列表</button>' : ""}
+        </div>
+        ${commandCenter.step === "list" ? `
+          <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
+        ` : commandCenter.selected ? `
           <div class="report-summary" style="margin-top:10px;">
             <div class="alert-banner">已选择 ${escapeHtml(commandCenter.selected.sdo_display_code)}，请在本页继续处理。</div>
             <div class="report-summary-grid">
@@ -23533,57 +23537,76 @@ function renderStoreManagerConsoleSummary(context = {}) {
               <article class="store-metric"><strong>包裹</strong><span>${escapeHtml(commandCenter.selected.packages.length)}</span></article>
               <article class="store-metric"><strong>件数</strong><span>${commandCenter.selected.item_count > 0 ? escapeHtml(commandCenter.selected.item_count) : "件数待确认"}</span></article>
             </div>
-            <div class="candidate-list compact-list" style="${commandCenter.step === "completed" ? "display:none;" : ""}">
-              ${commandCenter.selected.packages.map((row) => `
-                <article class="candidate-row">
-                  <div class="candidate-main">
-                    <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
-                    <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${Number(row.item_count || 0) > 0 ? `${row.item_count} 件` : "件数待确认"}`)}</div>
-                    <div class="subtle small">${escapeHtml(`${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${row.bale_no || "-"}（来源码，仅供核对）`)}</div>
-                    <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)} · ${row.assigned_clerk ? `已分配：${row.assigned_clerk}` : "未分配"}`)}</div>
-                  </div>
-                  <div class="candidate-side">
-                    <button type="button" class="ghost-button mini-button" style="${commandCenter.step === "receiving" ? "" : "display:none;"}" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
-                    <button type="button" class="ghost-button mini-button" style="${commandCenter.step === "receiving" ? "" : "display:none;"}" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "exception" ? "disabled" : ""}>上报异常</button>
-                    <label style="${commandCenter.step === "assignment" ? "" : "display:none;"}"><input type="checkbox" data-store-assignment-pkg="${escapeHtml(row.bale_no)}"> 选择</label>
-                  </div>
-                </article>`).join("")}
-            </div>
-            <div class="button-row" style="margin-top:8px;">
-              <label class="subtle small" style="display:flex; align-items:center; gap:6px;">
-                分配店员
-                <select data-store-command-center-clerk="${escapeHtml(commandCenter.selected.sdo_display_code)}">
-                  ${commandCenter.clerk_options.map((name) => `<option value="${escapeHtml(name)}" ${name === commandCenter.selected_clerk ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
-                </select>
-              </label>
-              ${commandCenter.step === "receiving" ? `<button type="button" class="ghost-button" data-store-receipt-complete-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.handled_count === commandCenter.selected.packages.length && commandCenter.selected.packages.length ? "" : "disabled"}>整单验收完成</button>` : ""}
-              ${commandCenter.step === "assignment" ? `<button type="button" class="ghost-button" data-store-assignment-fill-selected="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>分配选中包给店员</button>
-              <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>` : ""}
-              ${commandCenter.step === "completed" ? `<span class="meta-pill">本单已完成</span>` : ""}
-            </div>
-          </div>` : commandCenter.step !== "list"
-            ? `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`
-            : ""}
-      </section>
-      <section class="manager-console-panel">
-        <div class="manager-console-head">
-          <span class="eyebrow">Assignment</span>
-          <strong>步骤跟进 / 待分配与处理中</strong>
-        </div>
-        <div class="manager-console-list">${renderQueue(acceptedRows.length ? acceptedRows : activeRows, acceptedRows.length ? "assign" : "active")}</div>
-      </section>
-      <section class="manager-console-panel">
-        <div class="manager-console-head">
-          <span class="eyebrow">Attention</span>
-          <strong>步骤4：异常与完成后动作</strong>
-        </div>
-        <div class="manager-console-flags">
-          ${(exceptionFlags.length ? exceptionFlags : ["当前没有异常或例外待处理"]).map((flag) => `<span class="store-flag ${flag === "当前没有异常或例外待处理" ? "" : "danger"}">${escapeHtml(flag)}</span>`).join("")}
-        </div>
-        <div class="manager-console-actions">
-          ${renderSummaryActions([
-            { panelKey: getPanelKeyByTitle("store", "10. 周期退仓"), label: "去处理退仓" },
-          ])}
+            ${commandCenter.step === "receiving" ? `
+              <div class="candidate-list compact-list" style="margin-top:10px;">
+                ${commandCenter.selected.packages.map((row) => `
+                  <article class="candidate-row">
+                    <div class="candidate-main">
+                      <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
+                      <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${Number(row.item_count || 0) > 0 ? `${row.item_count} 件` : "件数待确认"}`)}</div>
+                      <div class="subtle small">${escapeHtml(`${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${row.bale_no || "-"}（来源码，仅供核对）`)}</div>
+                      <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)}`)}</div>
+                    </div>
+                    <div class="candidate-side">
+                      <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
+                      <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "exception" ? "disabled" : ""}>上报异常</button>
+                    </div>
+                  </article>`).join("")}
+              </div>
+              <div class="button-row" style="margin-top:10px;">
+                <button type="button" class="ghost-button" data-store-receipt-complete-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.handled_count === commandCenter.selected.packages.length && commandCenter.selected.packages.length ? "" : "disabled"}>整单验收完成</button>
+              </div>
+            ` : ""}
+            ${commandCenter.step === "assignment" ? `
+              <div class="button-row" style="margin-top:10px;">
+                <label class="subtle small" style="display:flex; align-items:center; gap:6px;">
+                  分配店员
+                  <select data-store-command-center-clerk="${escapeHtml(commandCenter.selected.sdo_display_code)}">
+                    ${commandCenter.clerk_options.map((name) => `<option value="${escapeHtml(name)}" ${name === commandCenter.selected_clerk ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <div class="candidate-list compact-list" style="margin-top:10px;">
+                ${commandCenter.selected.packages.map((row) => `
+                  <article class="candidate-row">
+                    <div class="candidate-main">
+                      <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
+                      <div class="subtle small">${escapeHtml(`${row.bale_no || "-"} · ${Number(row.item_count || 0) > 0 ? `${row.item_count} 件` : "件数待确认"}`)}</div>
+                      <div class="subtle small">${escapeHtml(`当前分配：${row.assigned_clerk || "未分配"}`)}</div>
+                    </div>
+                    <div class="candidate-side"><label><input type="checkbox" data-store-assignment-pkg="${escapeHtml(row.bale_no)}"> 选择</label></div>
+                  </article>`).join("")}
+              </div>
+              <div class="button-row" style="margin-top:10px;">
+                <button type="button" class="ghost-button" data-store-assignment-fill-selected="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>分配选中包给店员</button>
+                <button type="button" class="ghost-button" data-store-assignment-fill-all="${escapeHtml(commandCenter.selected.sdo_display_code)}" ${commandCenter.selected.completed ? "" : "disabled"}>一键分配整单给店员</button>
+              </div>
+            ` : ""}
+            ${commandCenter.step === "completed" ? `
+              <div class="alert-banner" style="margin-top:10px;">本单已完成：验收与分配均已完成。</div>
+              <div class="candidate-list compact-list" style="margin-top:10px;">
+                ${commandCenter.selected.packages.map((row) => `
+                  <article class="candidate-row">
+                    <div class="candidate-main">
+                      <strong>${escapeHtml(row.bale_no || "-")}</strong>
+                      <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)} · 店员：${row.assigned_clerk || "未分配"}`)}</div>
+                    </div>
+                    <div class="candidate-side"><span class="meta-pill">已完成</span></div>
+                  </article>`).join("")}
+              </div>
+              <div class="button-row" style="margin-top:10px;">
+                <button type="button" class="ghost-button mini-button" data-store-receipt-step="list">返回到货列表</button>
+              </div>
+            ` : ""}
+          </div>
+        ` : `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`}
+        <div style="margin-top:12px;">
+          <div class="manager-console-flags">
+            ${(exceptionFlags.length ? exceptionFlags : ["当前没有异常或例外待处理"]).map((flag) => `<span class="store-flag ${flag === "当前没有异常或例外待处理" ? "" : "danger"}">${escapeHtml(flag)}</span>`).join("")}
+          </div>
+          <div class="manager-console-actions">
+            ${renderSummaryActions([{ panelKey: getPanelKeyByTitle("store", "10. 周期退仓"), label: "去处理退仓" }])}
+          </div>
         </div>
       </section>
     </div>
@@ -29507,7 +29530,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
+    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -29630,6 +29653,16 @@ document.addEventListener("click", async (event) => {
       setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", transferNo);
       setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", "");
       renderStoreReceiptTransferBaleList(transferNo);
+      renderStoreManagerConsoleSummary({
+        store_code: getCurrentStoreCodeFallback(),
+      });
+      return;
+    }
+    if (button.dataset.storeReceiptStep) {
+      const step = String(button.dataset.storeReceiptStep || "").trim().toLowerCase();
+      if (["list", "receiving", "assignment", "completed"].includes(step)) {
+        storeCommandCenterState.step = step;
+      }
       renderStoreManagerConsoleSummary({
         store_code: getCurrentStoreCodeFallback(),
       });
