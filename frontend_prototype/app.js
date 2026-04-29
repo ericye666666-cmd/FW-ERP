@@ -16157,6 +16157,51 @@ async function directPrintAllBaleModalJobs() {
   renderBalePrintModal();
 }
 
+
+function normalizeDispatchIdentityValue(value = "") {
+  return String(value || "").trim().toUpperCase();
+}
+
+function collectDispatchIdentityCandidates(source = {}) {
+  const values = [
+    source?.dispatch_bale_no,
+    source?.barcode_value,
+    source?.barcode,
+    source?.bale_barcode,
+    source?.scan_token,
+    source?.source_code,
+    source?.bale_no,
+    source?.parcel_batch_no,
+  ];
+  return new Set(values.map((item) => normalizeDispatchIdentityValue(item)).filter(Boolean));
+}
+
+function getDispatchPackageSerial(source = {}) {
+  const candidates = [source?.serial_no, source?.package_index, source?.packageIndex];
+  for (const value of candidates) {
+    const num = Number(value);
+    if (Number.isFinite(num) && num > 0) return Math.trunc(num);
+  }
+  const label = String(source?.package_position_label || source?.package_position || "");
+  const match = label.match(/第\s*(\d+)\s*包/);
+  return match ? Number(match[1]) : 0;
+}
+
+function doesDispatchRowMatchPrintJob(row = {}, job = {}) {
+  const rowIds = collectDispatchIdentityCandidates(row);
+  const payload = job?.print_payload || {};
+  const jobIds = collectDispatchIdentityCandidates({ ...payload, barcode: job?.barcode });
+  const rowSerial = getDispatchPackageSerial(row);
+  const jobSerial = getDispatchPackageSerial(payload);
+  if (rowSerial > 0 && jobSerial > 0 && rowSerial === jobSerial) {
+    return true;
+  }
+  for (const id of rowIds) {
+    if (jobIds.has(id)) return true;
+  }
+  return false;
+}
+
 function openBalePrintModal(state = {}) {
   if (!(balePrintModal instanceof HTMLElement)) {
     return;
@@ -16256,23 +16301,18 @@ async function completeCurrentBalePrintModalJob() {
     const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
-      const completedBaleSet = new Set(
-        jobsToComplete
-          .map((job) => String(job?.print_payload?.dispatch_bale_no || job?.print_payload?.barcode_value || job?.barcode || "").trim().toUpperCase())
-          .filter(Boolean),
-      );
       if (transfer && Array.isArray(transfer.display_store_dispatch_bales)) {
         transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => {
-          const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
-          if (!completedBaleSet.has(baleNo)) return row;
+          const matched = jobsToComplete.some((job) => doesDispatchRowMatchPrintJob(row, job));
+          if (!matched) return row;
           return { ...row, status: "labelled" };
         });
       }
       const transferOutput = readOutput("#transferActionOutput");
       if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales)) {
         transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row) => {
-          const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
-          if (!completedBaleSet.has(baleNo)) return row;
+          const matched = jobsToComplete.some((job) => doesDispatchRowMatchPrintJob(row, job));
+          if (!matched) return row;
           return { ...row, status: "labelled" };
         });
         writeOutput("#transferActionOutput", transferOutput);
