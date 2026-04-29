@@ -23252,25 +23252,14 @@ function getTransferDerivedStoreDispatchRows() {
     ).trim().toUpperCase();
     if (!sdoCode || existingSdoCodes.has(sdoCode)) return;
     const targetStoreCode = String(transfer?.to_store_code || transfer?.store_code || "").trim().toUpperCase();
-    const executionPackages = Array.isArray(transfer?.store_delivery_execution_order?.packages)
-      ? transfer.store_delivery_execution_order.packages
-      : [];
-    const packageCount = Math.max(0, Number(executionPackages.length || transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
+    const packageCount = Math.max(0, Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
     const upstreamPackageRows = [
-      ...executionPackages,
+      ...(Array.isArray(transfer?.store_delivery_execution_order?.packages) ? transfer.store_delivery_execution_order.packages : []),
       ...(Array.isArray(transfer?.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : []),
       ...(Array.isArray(transfer?.store_dispatch_bales) ? transfer.store_dispatch_bales : []),
       ...(Array.isArray(transfer?.delivery_batch?.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : []),
       ...(Array.isArray(transfer?.shipment_session?.packages) ? transfer.shipment_session.packages : []),
     ];
-    const lifecycle = String(transfer?.lifecycle_status || transfer?.status || "").trim().toLowerCase();
-    const deliveryStatus = ["shipped", "in_transit"].includes(lifecycle)
-      ? "in_transit"
-      : lifecycle === "partially_received"
-        ? "pending_acceptance"
-        : lifecycle === "received" || lifecycle === "closed"
-          ? "accepted"
-          : "";
     const explicitItemCounts = upstreamPackageRows
       .map((row) => parseKnownDispatchItemCount(row))
       .filter((count) => count !== null);
@@ -23287,12 +23276,10 @@ function getTransferDerivedStoreDispatchRows() {
         store_code: targetStoreCode,
         to_store_code: targetStoreCode,
         target_store_code: targetStoreCode,
-        status: deliveryStatus || transfer?.status || "shipped",
+        status: transfer?.status || "shipped",
         item_count: knownItemCount,
-        source_type: String(upstreamPackageRows[index]?.source_type || "").trim().toUpperCase(),
         category_summary: String(upstreamPackageRows[index]?.category_summary || upstreamPackageRows[index]?.category_name || "").trim(),
         category_name: String(upstreamPackageRows[index]?.category_name || "").trim(),
-        source_status: String(upstreamPackageRows[index]?.status || "").trim().toLowerCase(),
         updated_at: transfer?.updated_at || transfer?.created_at || nowIso,
         created_at: transfer?.created_at || nowIso,
         store_delivery_execution_order_no: sdoCode,
