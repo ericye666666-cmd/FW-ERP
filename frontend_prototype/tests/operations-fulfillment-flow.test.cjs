@@ -743,6 +743,10 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /barcode_value:\s*barcodeValue/);
   assert.match(appJs, /package_count:\s*packageCount/);
   assert.match(appJs, /package_position_label:\s*`第 \$\{packageIndex\} 包 \/ 共 \$\{packageCount\} 包`/);
+  assert.match(appJs, /const barcodeSvg = renderCode128Svg\(barcodeValue, \{ width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1\.7 \}\);/);
+  assert.match(appJs, /<div class="barcode-wrap">[\s\S]*?\$\{barcodeSvg\}[\s\S]*?<div class="code">\$\{escapeHtml\(barcodeValue \|\| "NO BARCODE"\)\}<\/div>/);
+  assert.match(appJs, /const machineCode = String\(payload\.machine_code \|\| payload\.barcode_value \|\| payload\.scan_token \|\| defaultBarcodeValue\)\.replace\(\/\[\^0-9\]\/g, ""\)\.trim\(\)/);
+  assert.match(appJs, /<div class="code">\$\{escapeHtml\(barcodeValue \|\| "NO BARCODE"\)\}<\/div>/);
   assert.match(appJs, /STORE DISPATCH \/ SDO/);
   assert.match(appJs, /正式门店送货执行码/);
 });

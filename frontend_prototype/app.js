@@ -15357,6 +15357,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     const displayCode = String(payload.display_code || payload.parcel_batch_no || payload.dispatch_bale_no || "").trim().toUpperCase();
     const machineCode = String(payload.machine_code || payload.barcode_value || payload.scan_token || defaultBarcodeValue).replace(/[^0-9]/g, "").trim();
     const barcodeValue = machineCode || defaultBarcodeValue;
+    const barcodeSvg = renderCode128Svg(barcodeValue, { width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1.7 });
     return `<!doctype html>
 <html>
 <head>
@@ -15389,12 +15390,8 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     h1 { margin: 0; font-size: 28px; line-height: 1.05; }
     .meta { margin: 0; font-size: 15px; color: #5e564d; }
     .badge { display: inline-block; padding: 5px 8px; border-radius: 8px; background: #eef5f2; color: #0b6268; font-weight: 800; font-size: 12px; }
-    .barcode {
-      height: 82px;
-      border-radius: 10px;
-      background:
-        repeating-linear-gradient(90deg, #111 0 5px, transparent 5px 9px, #111 9px 12px, transparent 12px 18px);
-    }
+    .barcode-wrap { display: grid; gap: 6px; align-content: start; }
+    .barcode-wrap svg { width: 100%; max-width: 340px; height: 96px; display: block; }
     .code { font-size: 24px; font-weight: 900; letter-spacing: .06em; word-break: break-all; }
     .right strong { font-size: 13px; }
     .right div { font-size: 12px; line-height: 1.25; color: #5e564d; word-break: break-word; }
@@ -15409,8 +15406,10 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       <p class="meta">${escapeHtml("正式门店送货执行码")}</p>
       <p class="meta">${escapeHtml(`Display: ${displayCode || "-"}`)}<br>${escapeHtml(`Store: ${storeName || "-"}`)}<br>${escapeHtml(`Request: ${transferNo || "-"}`)}<br>${escapeHtml(`Packages: ${String(payload.package_count || payload.total_packages || "").trim() || "-"}`)}</p>
       <div><span class="badge">${escapeHtml(packageLabel || qty || "送店包")}</span></div>
-      <div class="barcode" aria-label="${escapeHtml(barcodeValue)}"></div>
-      <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>
+      <div class="barcode-wrap">
+        ${barcodeSvg}
+        <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>
+      </div>
       <div class="foot">
         <span>${escapeHtml(title || "STORE DISPATCH")}</span>
         <span>${escapeHtml(qty || "")}</span>
