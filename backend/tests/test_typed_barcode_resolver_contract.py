@@ -385,8 +385,13 @@ def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(st
     assert created["machine_code"].isdigit()
     assert len(created["machine_code"]) == 10
     assert created["machine_code"].startswith("4")
+    expected_machine_code = state._physical_label_machine_code(created["execution_order_no"], "SDO")
+    assert created["machine_code"] == expected_machine_code
     assert created["source_transfer_no"] == "TO-20260428-001"
     assert created["package_count"] == 1
+    assert created["print_payload"]["display_code"] == created["execution_order_no"]
+    assert created["print_payload"]["human_readable"] == created["execution_order_no"]
+    assert created["print_payload"]["barcode_value"] == created["machine_code"]
 
     receiving_result = state.resolve_barcode(created["official_delivery_barcode"], context="store_receiving")
     assert receiving_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
@@ -418,3 +423,33 @@ def test_store_prep_bale_rejection_message_in_store_receiving_mentions_official_
     receiving_result = state.resolve_barcode(prep_bale["bale_barcode"], context="store_receiving")
     assert receiving_result["barcode_type"] == "STORE_PREP_BALE"
     assert receiving_result["reject_reason"] == "这是仓库待送店压缩包码，不是正式送货执行码。请让仓库先生成送货执行单并打印正式送店 barcode。"
+
+
+def test_machine_code_mapping_rules_for_lpk_and_sdo(state):
+    assert state._physical_label_machine_code("TO-20260428-001", "LPK", source_reference="TO-20260428-001") == "3260428001"
+    assert state._physical_label_machine_code("SDO260428001", "SDO") == "4260428001"
+
+
+def test_lpk_machine_code_uses_related_to_number_to_avoid_collision(state):
+    machine_code_1 = state._physical_label_machine_code(
+        "LPKTO20260428001PICK",
+        "LPK",
+        source_reference="TO-20260428-001",
+    )
+    machine_code_2 = state._physical_label_machine_code(
+        "LPKTO20260428002PICK",
+        "LPK",
+        source_reference="TO-20260428-002",
+    )
+    assert machine_code_1 == "3260428001"
+    assert machine_code_2 == "3260428002"
+    assert machine_code_1 != machine_code_2
+
+
+def test_store_prep_print_payload_stays_in_sdb_namespace(state):
+    prep_bale = _seed_store_prep_bale(state, "SDB-TRF20260428001-001")
+    job = state.queue_store_prep_bale_print_job(prep_bale["bale_no"], requested_by="warehouse_clerk_1")
+    payload = job["print_payload"]
+    assert payload["barcode_value"] == prep_bale["scan_token"]
+    assert payload["machine_code"] == prep_bale["scan_token"]
+    assert not payload["machine_code"].startswith("3")
