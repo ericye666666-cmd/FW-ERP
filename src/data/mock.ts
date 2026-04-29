@@ -56,6 +56,11 @@ export const navigationGroups: NavigationGroup[] = [
         href: "/location-inventory",
         description: "货架级库存与库位调整",
       },
+      {
+        label: "门店收货",
+        href: "/store-receiving",
+        description: "Page 5/6：SDO 卡片与包级验收状态",
+      },
     ],
   },
   {
@@ -106,6 +111,11 @@ export const pageMeta = {
     eyebrow: "库位可视化",
     title: "库位库存",
     description: "查看实时货架密度、异常区域和最后一段的库位修正。",
+  },
+  "/store-receiving": {
+    eyebrow: "门店收货",
+    title: "SDO 验收",
+    description: "先看 Page 5 送货单状态，再进入 Page 6 完成包级验收。",
   },
   "/bale-sales/pricing": {
     eyebrow: "Bales 销售",

@@ -8,6 +8,7 @@ import { BaleSalesPricingPage } from "./pages/bale-sales-pricing";
 import { LocationInventoryPage } from "./pages/location-inventory";
 import { SortingStationPreviewPage } from "./pages/sorting-station-preview";
 import { SortingTasksPage } from "./pages/sorting-tasks";
+import { StoreReceivingPage } from "./pages/store-receiving";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/sorting-tasks" element={<SortingTasksPage />} />
         <Route path="/sorting-station-preview" element={<SortingStationPreviewPage />} />
         <Route path="/location-inventory" element={<LocationInventoryPage />} />
+        <Route path="/store-receiving" element={<StoreReceivingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
