@@ -726,17 +726,21 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(indexHtml, /id="balePrintModalScopeNote"/);
 });
 
-test("final transfer dispatch print is pinned to transtoshop and does not encode source bales", () => {
+test("final transfer dispatch print uses SDO 60x40 payload and machine barcode fields", () => {
   assert.match(appJs, /function getTransferDispatchTemplateCode/);
-  assert.match(appJs, /getTransferDispatchTemplateCode\(\)[\s\S]*?return "transtoshop"/);
+  assert.match(appJs, /getTransferDispatchTemplateCode\(\)[\s\S]*?return "store_dispatch_60x40"/);
   assert.match(appJs, /taskType:\s*"transfer_dispatch"/);
-  assert.match(appJs, /allowedCodes:\s*\["transtoshop"\]/);
+  assert.match(appJs, /allowedCodes:\s*\["store_dispatch_60x40"\]/);
   assert.match(appJs, /function isWarehouseoutDispatchBarcode/);
-  assert.match(appJs, /const finalBaleNo = String\([\s\S]*?row\.dispatch_bale_no[\s\S]*?row\.bale_no/);
-  assert.match(appJs, /const normalizedFinal = normalizeWarehouseoutDispatchBarcode\(finalBaleNo/);
-  assert.match(appJs, /const barcodeValue = isWarehouseoutDispatchBarcode\(normalizedFinal\) && !sourceSet\.has\(normalizedFinal\)/);
-  assert.doesNotMatch(appJs, /String\(row\.bale_no \|\| sourceBales\[0\] \|\| row\.task_no/);
+  assert.match(appJs, /const displayCode = String\(row\.store_delivery_execution_order_no \|\| row\.display_code \|\| ""\)/);
+  assert.match(appJs, /const machineCode = String\(row\.machine_code \|\| ""\)/);
+  assert.match(appJs, /display_code:\s*displayCode \|\| normalizedFinal/);
+  assert.match(appJs, /machine_code:\s*machineCode \|\| ""/);
+  assert.match(appJs, /barcode_value:\s*barcodeValue/);
+  assert.match(appJs, /package_count:\s*packageCount/);
   assert.match(appJs, /package_position_label:\s*`第 \$\{packageIndex\} 包 \/ 共 \$\{packageCount\} 包`/);
+  assert.match(appJs, /STORE DISPATCH \/ SDO/);
+  assert.match(appJs, /正式门店送货执行码/);
 });
 
 test("warehouse dispatch tracking removes temporary store receipt writeback step", () => {
