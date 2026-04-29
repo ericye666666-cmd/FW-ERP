@@ -23188,7 +23188,11 @@ function getStoreManagerConsoleRows(storeCode = "") {
     ...ensureDirectHangDispatchBaleState(),
   ];
   return rows
-    .filter((row) => !normalizedStoreCode || String(row?.store_code || "").trim().toUpperCase() === normalizedStoreCode)
+    .filter((row) => {
+      if (!normalizedStoreCode) return true;
+      const rowStore = String(row?.store_code || row?.to_store_code || row?.target_store_code || "").trim().toUpperCase();
+      return rowStore === normalizedStoreCode;
+    })
     .sort((left, right) => {
       const rightAt = new Date(right?.updated_at || right?.assigned_at || right?.accepted_at || right?.created_at || 0).getTime();
       const leftAt = new Date(left?.updated_at || left?.assigned_at || left?.accepted_at || left?.created_at || 0).getTime();
@@ -23234,7 +23238,7 @@ function groupStoreDispatchRowsBySdo(rows = []) {
         sdo_display_code: sdoDisplayCode,
         sdo_machine_code: String(row?.machine_code || "").replace(/[^0-9]/g, "").trim() || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(sdoDisplayCode) ? `4${sdoDisplayCode.slice(3)}` : ""),
         transfer_no: String(row?.transfer_no || "").trim().toUpperCase(),
-        store_code: String(row?.store_code || "").trim().toUpperCase(),
+        store_code: String(row?.store_code || row?.to_store_code || row?.target_store_code || "").trim().toUpperCase(),
         rows: [],
         item_count: 0,
         latest_at: "",
