@@ -494,6 +494,20 @@
     return 200;
   }
 
+  function buildShortLpkBarcodeValue(transferNo = "", fallback = "") {
+    const normalizedTransfer = normalizeText(transferNo).toUpperCase();
+    const match = normalizedTransfer.match(/^TO-?(\d{4})(\d{2})(\d{2})-?(\d{3})$/);
+    if (match) {
+      const [, year, month, day, serial] = match;
+      return `LPK${year.slice(2)}${month}${day}${serial}`;
+    }
+    const fallbackCompact = normalizeText(fallback).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (/^LPK[A-Z0-9]+$/.test(fallbackCompact)) {
+      return fallbackCompact.slice(0, 18);
+    }
+    return "";
+  }
+
   function buildLoosePackingTasks({
     transferNo = "",
     plan = {},
@@ -519,9 +533,11 @@
     }
     const normalizedPackageLimitQty = normalizeLoosePackageLimitQty(packageLimitQty);
     const taskNo = `LPK-${prefix}-PICK`;
+    const shortBarcodeValue = buildShortLpkBarcodeValue(transferNo, taskNo);
     return [{
       taskNo,
       taskBarcode: taskNo.replace(/[^A-Za-z0-9]/g, "").toUpperCase(),
+      printableBarcode: shortBarcodeValue || "",
       taskType: "loose_pick_sheet",
       transferNo: normalizeText(transferNo).toUpperCase(),
       categoryMain: "多类目补差",
@@ -562,7 +578,7 @@
     storeName = "",
     categoryLabel = "服装",
   } = {}) {
-    const barcodeValue = normalizeText(task?.taskBarcode || task?.taskNo).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    const barcodeValue = normalizeText(task?.printableBarcode || task?.taskBarcode || task?.taskNo).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     const resolvedStoreName = normalizeText(storeName)
       || normalizeText(transfer?.to_store_name)
       || normalizeText(transfer?.to_store_code)
