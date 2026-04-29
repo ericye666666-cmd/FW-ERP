@@ -15283,7 +15283,7 @@ function renderCode128Svg(value, { width = 320, height = 84, quietZoneModules = 
 
 function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   const payload = job.print_payload || {};
-  const barcodeValue = String(
+  const defaultBarcodeValue = String(
     payload.dispatch_bale_no
     || payload.scan_token
     || payload.barcode_value
@@ -15305,6 +15305,8 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   if (isLpkTemplate) {
     const lpkTitle = "LPK SHORTAGE PICK";
     const subtitle = "仓库补差拣货工单 / 门店不可扫";
+    const displayCode = String(payload.display_code || payload.human_readable || payload.dispatch_bale_no || "").trim().toUpperCase();
+    const barcodeValue = String(payload.machine_code || payload.barcode_value || payload.scan_token || job.barcode || "").trim().toUpperCase();
     const barcodeSvg = renderCode128Svg(barcodeValue, { width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1.7 });
     const requestNo = String(payload.transfer_order_no || payload.shipment_no || "").trim().toUpperCase();
     const qtyLabel = String(payload.qty || payload.total_quantity || "").trim();
@@ -15328,7 +15330,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
     <h1>${escapeHtml(lpkTitle)}</h1>
     <p class="sub">${escapeHtml(subtitle)}</p>
-    <p class="meta">Store: ${escapeHtml(storeName || "-")}<br>Request: ${escapeHtml(requestNo || "-")}<br>Category: ${escapeHtml(categoryDisplay || "-")}<br>Qty: ${escapeHtml(qtyLabel || qty || "-")} pcs${arrivalDate ? `<br>需到货时间: ${escapeHtml(arrivalDate)}` : ""}</p>
+    <p class="meta">Display: ${escapeHtml(displayCode || "-")}<br>Store: ${escapeHtml(storeName || "-")}<br>Request: ${escapeHtml(requestNo || "-")}<br>Category: ${escapeHtml(categoryDisplay || "-")}<br>Qty: ${escapeHtml(qtyLabel || qty || "-")} pcs${arrivalDate ? `<br>需到货时间: ${escapeHtml(arrivalDate)}` : ""}</p>
     <div class="barcode-wrap">
       ${barcodeSvg}
       <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>

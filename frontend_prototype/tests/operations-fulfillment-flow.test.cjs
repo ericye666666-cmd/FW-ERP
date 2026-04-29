@@ -684,6 +684,14 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /isLpkPrint \|\| isBaleModalDirectOnlyJob\(currentJob\)/);
   assert.match(appJs, /data-print-template="store_loose_pick_60x40"/);
   assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
+  assert.match(appJs, /const displayCode = String\(payload\.display_code \|\| payload\.human_readable \|\| payload\.dispatch_bale_no \|\| ""\)\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(appJs, /const barcodeValue = String\(payload\.machine_code \|\| payload\.barcode_value \|\| payload\.scan_token \|\| job\.barcode \|\| ""\)\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(appJs, /Display: \$\{escapeHtml\(displayCode \|\| "-"\)\}/);
+  assert.match(appJs, /Request: \$\{escapeHtml\(requestNo \|\| "-"\)\}/);
+  assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
+  assert.match(appJs, /<div class="code">\$\{escapeHtml\(barcodeValue \|\| "NO BARCODE"\)\}<\/div>/);
+  assert.doesNotMatch(appJs, /const barcodeValue = String\(payload\.display_code/);
+  assert.doesNotMatch(appJs, /const barcodeValue = String\(payload\.dispatch_bale_no\s*\|\|\s*payload\.scan_token\s*\|\|\s*payload\.barcode_value/);
   assert.match(appJs, /printableBarcode/);
   assert.match(appJs, /Store: \$\{escapeHtml\(storeName \|\| "-"\)\}<br>Request: \$\{escapeHtml\(requestNo \|\| "-"\)\}/);
   assert.match(appJs, /data-barcode-renderer="svg-code128"/);
