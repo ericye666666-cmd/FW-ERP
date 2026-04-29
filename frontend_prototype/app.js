@@ -23336,18 +23336,44 @@ function groupStoreDispatchRowsBySdo(rows = []) {
       });
     }
     const group = groups.get(sdoDisplayCode);
-    group.rows.push(row);
-    const knownItemCount = parseKnownDispatchItemCount(row);
-    if (knownItemCount !== null) {
-      group.item_count += knownItemCount;
-      group.known_item_count += knownItemCount;
+    const packageKey = String(row?.bale_no || row?.source_code || "").trim().toUpperCase()
+      || `__PKG_${group.rows.length + 1}`;
+    const incomingKnownItemCount = parseKnownDispatchItemCount(row);
+    const existingIndex = group.rows.findIndex(
+      (existing) => String(existing?.bale_no || existing?.source_code || "").trim().toUpperCase() === packageKey,
+    );
+    if (existingIndex >= 0) {
+      const existingRow = group.rows[existingIndex];
+      const existingKnownItemCount = parseKnownDispatchItemCount(existingRow);
+      const shouldReplace = existingKnownItemCount === null && incomingKnownItemCount !== null;
+      if (shouldReplace) {
+        group.rows[existingIndex] = {
+          ...existingRow,
+          ...row,
+          bale_no: String(row?.bale_no || existingRow?.bale_no || packageKey).trim().toUpperCase(),
+        };
+      }
     } else {
-      group.unknown_item_count += 1;
+      group.rows.push(row);
     }
     const rowTime = row?.updated_at || row?.accepted_at || row?.created_at || "";
     if (!group.latest_at || new Date(rowTime || 0).getTime() > new Date(group.latest_at || 0).getTime()) {
       group.latest_at = rowTime;
     }
+  });
+  groups.forEach((group) => {
+    group.item_count = 0;
+    group.known_item_count = 0;
+    group.unknown_item_count = 0;
+    group.rows.forEach((row) => {
+      const knownItemCount = parseKnownDispatchItemCount(row);
+      if (knownItemCount !== null) {
+        group.item_count += knownItemCount;
+        group.known_item_count += knownItemCount;
+      } else {
+        group.unknown_item_count += 1;
+      }
+    });
   });
   return [...groups.values()].sort((left, right) => new Date(right.latest_at || 0).getTime() - new Date(left.latest_at || 0).getTime());
 }
