@@ -23231,6 +23231,7 @@ function getTransferDerivedStoreDispatchRows() {
     const targetStoreCode = String(transfer?.to_store_code || transfer?.store_code || "").trim().toUpperCase();
     const packageCount = Math.max(0, Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
     const upstreamPackageRows = [
+      ...(Array.isArray(transfer?.store_delivery_execution_order?.packages) ? transfer.store_delivery_execution_order.packages : []),
       ...(Array.isArray(transfer?.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : []),
       ...(Array.isArray(transfer?.store_dispatch_bales) ? transfer.store_dispatch_bales : []),
       ...(Array.isArray(transfer?.delivery_batch?.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : []),
@@ -23243,13 +23244,19 @@ function getTransferDerivedStoreDispatchRows() {
       const packageLabel = String(index + 1).padStart(3, "0");
       const knownItemCount = explicitItemCounts[index] ?? null;
       derivedRows.push({
-        bale_no: `${sdoCode}-PKG${packageLabel}`,
+        bale_no: String(
+          upstreamPackageRows[index]?.source_code
+          || upstreamPackageRows[index]?.bale_no
+          || `${sdoCode}-PKG${packageLabel}`,
+        ).trim().toUpperCase(),
         transfer_no: String(transfer?.transfer_no || "").trim().toUpperCase(),
         store_code: targetStoreCode,
         to_store_code: targetStoreCode,
         target_store_code: targetStoreCode,
         status: transfer?.status || "shipped",
         item_count: knownItemCount,
+        category_summary: String(upstreamPackageRows[index]?.category_summary || upstreamPackageRows[index]?.category_name || "").trim(),
+        category_name: String(upstreamPackageRows[index]?.category_name || "").trim(),
         updated_at: transfer?.updated_at || transfer?.created_at || nowIso,
         created_at: transfer?.created_at || nowIso,
         store_delivery_execution_order_no: sdoCode,

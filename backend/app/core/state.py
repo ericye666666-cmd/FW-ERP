@@ -1242,6 +1242,44 @@ class InMemoryState:
         ).strip().upper()
         source_bales = normalized.get("source_store_prep_bale_codes") or normalized.get("source_bale_codes") or []
         source_gap_tasks = normalized.get("source_gap_fill_task_codes") or normalized.get("source_loose_pick_task_codes") or []
+        raw_packages = normalized.get("packages") if isinstance(normalized.get("packages"), list) else []
+        normalized_packages: list[dict[str, Any]] = []
+        for package in raw_packages:
+            if not isinstance(package, dict):
+                continue
+            source_type = str(package.get("source_type") or "").strip().upper()
+            source_code = str(package.get("source_code") or package.get("bale_no") or "").strip().upper()
+            raw_item_count = package.get("item_count")
+            item_count: Optional[int] = None
+            if raw_item_count is not None and raw_item_count != "":
+                try:
+                    parsed_count = int(float(raw_item_count))
+                    if parsed_count >= 0:
+                        item_count = parsed_count
+                except (TypeError, ValueError):
+                    item_count = None
+            normalized_packages.append(
+                {
+                    "source_type": source_type,
+                    "source_code": source_code,
+                    "item_count": item_count,
+                    "category_summary": str(package.get("category_summary") or "").strip(),
+                    "category_name": str(package.get("category_name") or "").strip(),
+                }
+            )
+        explicit_total_item_count = normalized.get("total_item_count")
+        total_item_count: Optional[int] = None
+        if explicit_total_item_count is not None and explicit_total_item_count != "":
+            try:
+                parsed_total = int(float(explicit_total_item_count))
+                if parsed_total >= 0:
+                    total_item_count = parsed_total
+            except (TypeError, ValueError):
+                total_item_count = None
+        if total_item_count is None and normalized_packages:
+            package_counts = [pkg.get("item_count") for pkg in normalized_packages if pkg.get("item_count") is not None]
+            if len(package_counts) == len(normalized_packages):
+                total_item_count = sum(int(value) for value in package_counts)
         status = str(normalized.get("status") or "pending_print").strip().lower() or "pending_print"
         created_at = normalized.get("created_at") or now_iso()
         machine_code = self._physical_label_machine_code(execution_order_no, "SDO")
@@ -1260,7 +1298,12 @@ class InMemoryState:
                 "source_gap_fill_task_codes": [
                     str(value or "").strip().upper() for value in source_gap_tasks if str(value or "").strip()
                 ],
-                "package_count": max(0, int(normalized.get("package_count") or 0)),
+                "package_count": max(
+                    len(normalized_packages),
+                    max(0, int(normalized.get("package_count") or 0)),
+                ),
+                "total_item_count": total_item_count,
+                "packages": normalized_packages,
                 "status": status,
                 "created_by": str(normalized.get("created_by") or "").strip(),
                 "created_at": str(created_at),
@@ -12291,6 +12334,17 @@ class InMemoryState:
                 "source_store_prep_bale_codes": source_store_prep_codes,
                 "source_gap_fill_task_codes": source_gap_fill_codes,
                 "package_count": len(dispatch_rows),
+                "total_item_count": sum(int(row.get("item_count") or 0) for row in dispatch_rows),
+                "packages": [
+                    {
+                        "source_type": "LPK" if str(row.get("bale_no") or "").strip().upper().startswith("LPK") else "SDB",
+                        "source_code": str(row.get("bale_no") or "").strip().upper(),
+                        "item_count": int(row.get("item_count") or 0),
+                        "category_summary": str(row.get("category_summary") or row.get("category_name") or "").strip(),
+                        "category_name": str(row.get("category_name") or "").strip(),
+                    }
+                    for row in dispatch_rows
+                ],
                 "status": "printed" if payload.get("mark_as_printed") else "pending_print",
                 "created_by": actor["username"],
                 "created_at": created_at,

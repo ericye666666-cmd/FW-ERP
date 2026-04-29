@@ -156,6 +156,14 @@ class StoreDeliveryExecutionOrderCreateRequest(BaseModel):
     notes: str = ""
 
 
+class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
+    source_type: str = ""
+    source_code: str = ""
+    item_count: Optional[int] = None
+    category_summary: str = ""
+    category_name: str = ""
+
+
 class StoreDeliveryExecutionOrderResponse(BaseModel):
     execution_order_no: str
     official_delivery_barcode: str
@@ -166,6 +174,8 @@ class StoreDeliveryExecutionOrderResponse(BaseModel):
     source_store_prep_bale_codes: List[str] = Field(default_factory=list)
     source_gap_fill_task_codes: List[str] = Field(default_factory=list)
     package_count: int = 0
+    total_item_count: Optional[int] = None
+    packages: List[StoreDeliveryExecutionPackageDetailResponse] = Field(default_factory=list)
     status: str = "pending_print"
     created_by: str = ""
     created_at: str
