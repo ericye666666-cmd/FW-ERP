@@ -670,6 +670,12 @@ test("page 5.1 and page 6 print actions open the warehouseout template selector 
 });
 
 test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template", () => {
+  assert.match(appJs, /const CODE128_PATTERNS = \[/);
+  assert.match(appJs, /function renderCode128Svg/);
+  assert.match(appJs, /data-barcode-standard="CODE128"/);
+  assert.match(appJs, /data-code128-start="104"/);
+  assert.match(appJs, /data-code128-stop="106"/);
+  assert.doesNotMatch(appJs, /char\.charCodeAt\(0\) \+ index \* 7/);
   assert.match(appJs, /taskType:\s*"lpk_shortage_pick"/);
   assert.match(appJs, /LPK 补差工单条码打印/);
   assert.match(appJs, /LPK 只用于仓库补差拣货和打包/);
@@ -678,6 +684,7 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /data-print-template="store_loose_pick_60x40"/);
   assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
   assert.match(appJs, /data-barcode-renderer="svg-code128"/);
+  assert.match(appJs, /LPK SHORTAGE PICK/);
   assert.doesNotMatch(appJs, /lpk_shortage_pick[\s\S]*allowedCodes:\s*\["transtoshop"/);
   assert.match(indexHtml, /id="balePrintModalScopeNote"/);
 });

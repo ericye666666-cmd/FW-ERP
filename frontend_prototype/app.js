@@ -15219,6 +15219,68 @@ function isBaleModalDirectOnlyJob(job = {}) {
   return !normalizedId || normalizedId === "null" || normalizedId === "undefined";
 }
 
+const CODE128_PATTERNS = [
+  "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213",
+  "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132",
+  "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211",
+  "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313",
+  "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331",
+  "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111",
+  "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214",
+  "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111",
+  "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141",
+  "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141",
+  "114131", "311141", "411131", "211412", "211214", "211232", "2331112",
+];
+
+function getCode128BCodeValue(char = "") {
+  const codePoint = String(char || "").charCodeAt(0);
+  if (Number.isNaN(codePoint) || codePoint < 32 || codePoint > 126) {
+    throw new Error("LPK 条码含有 Code128-B 不支持的字符。");
+  }
+  return codePoint - 32;
+}
+
+function renderCode128Svg(value, { width = 320, height = 84, quietZoneModules = 10, moduleWidth = 1.6 } = {}) {
+  const source = String(value || "").trim();
+  if (!source) {
+    return "";
+  }
+  const dataCodes = Array.from(source).map((char) => getCode128BCodeValue(char));
+  const startCode = 104;
+  const checksum = dataCodes.reduce((sum, code, index) => sum + code * (index + 1), startCode) % 103;
+  const codeSequence = [startCode, ...dataCodes, checksum, 106];
+  const moduleRuns = codeSequence
+    .map((code) => CODE128_PATTERNS[code])
+    .join("")
+    .split("")
+    .map((digit) => Number(digit) || 0);
+  const totalModules = quietZoneModules * 2 + moduleRuns.reduce((sum, run) => sum + run, 0);
+  const moduleSize = Math.max(1, Math.min(moduleWidth, width / totalModules));
+  const drawWidth = Math.max(width, Math.ceil(totalModules * moduleSize));
+  const drawHeight = Math.max(48, height);
+  let x = quietZoneModules * moduleSize;
+  let isBar = true;
+  const bars = moduleRuns
+    .map((run) => {
+      const segmentWidth = run * moduleSize;
+      if (segmentWidth <= 0) {
+        return "";
+      }
+      if (!isBar) {
+        x += segmentWidth;
+        isBar = !isBar;
+        return "";
+      }
+      const rect = `<rect x="${x.toFixed(2)}" y="0" width="${segmentWidth.toFixed(2)}" height="${drawHeight}" fill="#000"></rect>`;
+      x += segmentWidth;
+      isBar = !isBar;
+      return rect;
+    })
+    .join("");
+  return `<svg viewBox="0 0 ${drawWidth} ${drawHeight}" width="100%" height="${drawHeight}" role="img" aria-label="${escapeHtml(`Code128 barcode ${source}`)}" data-barcode-standard="CODE128" data-code128-start="${startCode}" data-code128-checksum="${checksum}" data-code128-stop="106" data-barcode-renderer="svg-code128"><rect x="0" y="0" width="${drawWidth}" height="${drawHeight}" fill="#fff"></rect>${bars}</svg>`;
+}
+
 function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   const payload = job.print_payload || {};
   const barcodeValue = String(
@@ -15241,27 +15303,12 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   const selectedTemplateCode = String(selectedTemplate.template_code || payload.template_code || job.template_code || "").trim().toLowerCase();
   const isLpkTemplate = selectedTemplateCode === "store_loose_pick_60x40";
   if (isLpkTemplate) {
-    const svgBars = Array.from(barcodeValue || "NO BARCODE")
-      .map((char, index) => {
-        const weight = ((char.charCodeAt(0) + index * 7) % 4) + 1;
-        const gap = (index % 2) + 1;
-        return `${"1".repeat(weight)}${"0".repeat(gap)}`;
-      })
-      .join("")
-      .slice(0, 220);
-    let cursorX = 8;
-    const bars = svgBars
-      .split("")
-      .map((bit) => {
-        if (bit !== "1") {
-          cursorX += 1;
-          return "";
-        }
-        const rect = `<rect x="${cursorX}" y="6" width="1" height="58" fill="#111"></rect>`;
-        cursorX += 1;
-        return rect;
-      })
-      .join("");
+    const lpkTitle = "LPK SHORTAGE PICK";
+    const subtitle = "仓库补差拣货工单 / 门店不可扫";
+    const barcodeSvg = renderCode128Svg(barcodeValue, { width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1.7 });
+    const requestNo = String(payload.transfer_order_no || payload.shipment_no || "").trim().toUpperCase();
+    const qtyLabel = String(payload.qty || payload.total_quantity || "").trim();
+    const arrivalDate = String(payload.required_arrival_date || "").trim();
     return `<!doctype html>
 <html>
 <head>
@@ -15269,24 +15316,21 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f1e6; color: #111; font-family: Arial, sans-serif; }
-    .label { width: 420px; min-height: 280px; padding: 20px; border: 2px solid #c6dadd; border-radius: 16px; background: #fffaf1; }
-    .kicker { font-size: 13px; font-weight: 800; color: #0b6268; letter-spacing: .08em; text-transform: uppercase; }
-    h1 { margin: 8px 0 6px; font-size: 25px; line-height: 1.15; }
-    .meta { margin: 0 0 10px; font-size: 14px; color: #5e564d; }
-    .barcode-wrap { padding: 8px; border-radius: 10px; background: #fff; border: 1px solid #d7c8b2; }
-    .code { margin-top: 8px; font-size: 20px; font-weight: 900; letter-spacing: .07em; word-break: break-all; }
+    .label { width: 420px; min-height: 280px; padding: 18px; border: 2px solid #c6dadd; border-radius: 16px; background: #fffaf1; }
+    h1 { margin: 4px 0 4px; font-size: 26px; line-height: 1.05; letter-spacing: .03em; }
+    .sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #0b6268; }
+    .meta { margin: 0 0 8px; font-size: 12px; color: #463f37; line-height: 1.4; }
+    .barcode-wrap { padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid #d7c8b2; }
+    .code { margin-top: 6px; font-size: 16px; font-weight: 900; letter-spacing: .07em; word-break: break-all; text-align: center; }
   </style>
 </head>
 <body>
-  <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}">
-    <div class="kicker">LPK 补差拣货工单 · 60x40</div>
-    <h1>${escapeHtml(title || "LPK SHORTAGE PICK")}</h1>
-    <p class="meta">${escapeHtml([storeName, categoryDisplay, qty].filter(Boolean).join(" · "))}</p>
+  <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
+    <h1>${escapeHtml(lpkTitle)}</h1>
+    <p class="sub">${escapeHtml(subtitle)}</p>
+    <p class="meta">Store: ${escapeHtml(storeName || "-")}<br>Request: ${escapeHtml(requestNo || "-")}<br>Category: ${escapeHtml(categoryDisplay || "-")}<br>Qty: ${escapeHtml(qtyLabel || qty || "-")} pcs${arrivalDate ? `<br>需到货时间: ${escapeHtml(arrivalDate)}` : ""}</p>
     <div class="barcode-wrap">
-      <svg viewBox="0 0 240 70" role="img" aria-label="${escapeHtml(`LPK barcode ${barcodeValue}`)}" data-barcode-renderer="svg-code128">
-        <rect x="0" y="0" width="240" height="70" fill="#fff"></rect>
-        ${bars}
-      </svg>
+      ${barcodeSvg}
       <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>
     </div>
   </section>
