@@ -382,6 +382,9 @@ def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(st
     )
     assert created["execution_order_no"].startswith("SDO")
     assert created["official_delivery_barcode"] == created["execution_order_no"]
+    assert created["machine_code"].isdigit()
+    assert len(created["machine_code"]) == 10
+    assert created["machine_code"].startswith("4")
     assert created["source_transfer_no"] == "TO-20260428-001"
     assert created["package_count"] == 1
 
