@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, "/Users/ericye/Desktop/AI自动化/retail_ops_system/backend")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import build_settings
 
