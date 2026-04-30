@@ -2057,6 +2057,121 @@ h3 {
   gap: 10px;
 }
 
+.user-management-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.user-management-list.empty-state {
+  display: block;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.86);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.user-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(248, 240, 228, 0.82));
+  border: 1px solid rgba(205, 191, 165, 0.68);
+  box-shadow: 0 12px 26px rgba(17, 53, 58, 0.06);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.user-card.is-inactive {
+  opacity: 0.68;
+}
+
+.user-card-head,
+.user-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.user-card-head strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.user-card-label,
+.user-card-grid span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.user-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.user-card-grid > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.54);
+  border: 1px solid rgba(205, 191, 165, 0.46);
+}
+
+.user-card-grid strong,
+.user-card-grid small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.user-card-wide {
+  grid-column: 1 / -1;
+}
+
+.user-binding-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.user-binding-tags span,
+.user-status-pill {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(10, 91, 96, 0.09);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.user-status-pill.is-inactive {
+  background: rgba(140, 90, 63, 0.12);
+  color: #7b4a31;
+}
+
+.user-card-actions button {
+  width: auto;
+  min-width: 88px;
+}
+
+.user-card-actions .danger {
+  border-color: rgba(156, 72, 52, 0.34);
+  color: #8f402e;
+}
+
 .warehouse-stage-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -6302,6 +6417,28 @@ body.cashier-terminal-mode .topbar-actions {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 430px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip span {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  max-width: 100%;
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 body.cashier-terminal-mode .lang-toggle {

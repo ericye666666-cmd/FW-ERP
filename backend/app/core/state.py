@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from app.core.config import settings
 from app.core.persistence import load_json, save_json
 from app.core.security import generate_session_token, hash_password, verify_password
-from app.core.seed_data import ACTIVE_STORES, DEFAULT_CARGO_TYPES, DEFAULT_USERS, LABEL_TEMPLATES, STORE_RACK_TEMPLATE
+from app.core.seed_data import ACTIVE_STORES, DEFAULT_CARGO_TYPES, DEFAULT_USERS, LABEL_TEMPLATES, ROLE_DEFINITIONS, STORE_RACK_TEMPLATE
 
 NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
 LOCKED_BALE_TEMPLATE_CODE = "warehouse_in"
@@ -4035,6 +4035,13 @@ class InMemoryState:
                 if row.get("store_code") and not current.get("store_code"):
                     current["store_code"] = row["store_code"]
                     updated = True
+                for field_name in ("warehouse_code", "area_code", "managed_store_codes"):
+                    if row.get(field_name) and not current.get(field_name):
+                        current[field_name] = row[field_name]
+                        updated = True
+                if not current.get("status"):
+                    current["status"] = "active" if current.get("is_active", True) else "inactive"
+                    updated = True
                 continue
             user_id = next(self._user_ids)
             credentials = hash_password(row.get("password", "demo1234"))
@@ -4316,12 +4323,23 @@ class InMemoryState:
         return cargo_type
 
     def _public_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        role_code = str(user.get("role_code") or "").strip()
+        role = next((row for row in ROLE_DEFINITIONS if row.get("code") == role_code), None)
+        status = str(user.get("status") or ("active" if user.get("is_active", True) else "inactive")).strip().lower() or "active"
+        managed_store_codes = user.get("managed_store_codes") or []
+        if isinstance(managed_store_codes, str):
+            managed_store_codes = [value.strip().upper() for value in managed_store_codes.split(",") if value.strip()]
         return {
             "id": user["id"],
             "username": user["username"],
             "full_name": user["full_name"],
-            "role_code": user["role_code"],
+            "role_code": role_code,
+            "role_label": role.get("name") if role else role_code,
             "store_code": user.get("store_code"),
+            "warehouse_code": user.get("warehouse_code"),
+            "area_code": user.get("area_code"),
+            "managed_store_codes": managed_store_codes,
+            "status": status,
             "is_active": user.get("is_active", True),
             "created_at": user["created_at"],
         }
@@ -10646,19 +10664,18 @@ class InMemoryState:
 
     def create_user(self, payload: dict[str, Any]) -> dict[str, Any]:
         actor = self._require_user_role(payload["created_by"], {"admin", "area_supervisor"})
-        if any(user["username"] == payload["username"] for user in self.users.values()):
-            raise HTTPException(status_code=409, detail=f"Username {payload['username']} already exists")
-        if payload.get("store_code"):
-            self._ensure_store_exists(payload["store_code"])
+        username = str(payload.get("username") or "").strip()
+        if any(user["username"] == username for user in self.users.values()):
+            raise HTTPException(status_code=409, detail=f"Username {username} already exists")
+        normalized_org = self._normalize_user_org_payload(payload)
 
         user = {
             "id": next(self._user_ids),
             "created_at": now_iso(),
-            "username": payload["username"],
-            "full_name": payload["full_name"],
-            "role_code": payload["role_code"],
-            "store_code": payload.get("store_code"),
-            "is_active": payload.get("is_active", True),
+            "username": username,
+            "full_name": str(payload.get("full_name") or "").strip(),
+            "role_code": str(payload.get("role_code") or "").strip(),
+            **normalized_org,
             **hash_password(payload["password"]),
         }
         self.users[user["id"]] = user
@@ -10674,7 +10691,96 @@ class InMemoryState:
         return self._public_user(user)
 
     def list_users(self) -> list[dict[str, Any]]:
-        return [self._public_user(user) for user in self.users.values()]
+        return sorted(
+            [self._public_user(user) for user in self.users.values()],
+            key=lambda row: (row.get("status") != "active", str(row.get("role_code") or ""), str(row.get("username") or "")),
+        )
+
+    def _normalize_managed_store_codes(self, value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            raw_values = value.split(",")
+        elif isinstance(value, list):
+            raw_values = value
+        else:
+            raw_values = []
+        return [str(item).strip().upper() for item in raw_values if str(item).strip()]
+
+    def _normalize_user_org_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        store_code = str(payload.get("store_code") or "").strip().upper() or None
+        warehouse_code = str(payload.get("warehouse_code") or "").strip().upper() or None
+        area_code = str(payload.get("area_code") or "").strip().upper() or None
+        managed_store_codes = self._normalize_managed_store_codes(payload.get("managed_store_codes"))
+        if store_code:
+            self._ensure_store_exists(store_code)
+        for managed_store_code in managed_store_codes:
+            if managed_store_code in self.stores:
+                continue
+        status = str(payload.get("status") or "").strip().lower()
+        if not status:
+            status = "active" if payload.get("is_active", True) else "inactive"
+        if status not in {"active", "inactive"}:
+            raise HTTPException(status_code=400, detail="User status must be active or inactive")
+        is_active = status == "active"
+        if "is_active" in payload and payload.get("is_active") is False:
+            is_active = False
+            status = "inactive"
+        return {
+            "store_code": store_code,
+            "warehouse_code": warehouse_code,
+            "area_code": area_code,
+            "managed_store_codes": managed_store_codes,
+            "status": status,
+            "is_active": is_active,
+        }
+
+    def update_user(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload["updated_by"], {"admin", "area_supervisor"})
+        target = self.users.get(int(user_id))
+        if not target:
+            raise HTTPException(status_code=404, detail=f"Unknown user id {user_id}")
+
+        incoming_username = str(payload.get("username") or target.get("username") or "").strip()
+        if incoming_username != target.get("username") and any(user["username"] == incoming_username for user in self.users.values()):
+            raise HTTPException(status_code=409, detail=f"Username {incoming_username} already exists")
+
+        normalized_org = self._normalize_user_org_payload({**target, **payload})
+        if actor["username"] == target["username"] and normalized_org["is_active"] is False:
+            raise HTTPException(status_code=400, detail="不能停用当前登录账号。")
+
+        target["username"] = incoming_username
+        if payload.get("full_name") is not None:
+            target["full_name"] = str(payload.get("full_name") or "").strip()
+        if payload.get("role_code") is not None:
+            target["role_code"] = str(payload.get("role_code") or "").strip()
+        target.update(normalized_org)
+        password = str(payload.get("password") or "").strip()
+        if password:
+            if len(password) < 6:
+                raise HTTPException(status_code=400, detail="Password must contain at least 6 characters")
+            target.update(hash_password(password))
+
+        self._log_event(
+            event_type="user.updated",
+            entity_type="user",
+            entity_id=target["username"],
+            actor=actor["username"],
+            summary=f"User {target['username']} updated",
+            details={"role_code": target["role_code"], "status": target["status"]},
+        )
+        self._persist()
+        return self._public_user(target)
+
+    def deactivate_user(self, user_id: int, actor_username: str) -> dict[str, Any]:
+        return self.update_user(
+            user_id,
+            {
+                "updated_by": actor_username,
+                "status": "inactive",
+                "is_active": False,
+            },
+        )
 
     def reset_test_history(self, actor_username: str) -> dict[str, Any]:
         self._require_user_role(actor_username, {"admin"})

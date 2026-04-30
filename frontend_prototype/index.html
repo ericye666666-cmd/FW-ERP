@@ -70,7 +70,7 @@
           </div>
           <form id="loginForm" class="form-grid compact auth-form">
             <input name="username" placeholder="用户名" value="admin_1" />
-            <input name="password" type="password" placeholder="密码" value="demo1234" />
+            <input name="password" type="password" placeholder="密码" autocomplete="current-password" />
             <button type="submit">登录并进入终端 / 工作区</button>
           </form>
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
@@ -1980,13 +1980,30 @@
           <h2>账号 / 用户</h2>
           <button data-action="load-users" type="button">读取用户</button>
         </div>
-        <form id="userForm" class="form-grid compact">
+        <form id="userForm" class="form-grid compact user-management-form">
+          <input name="user_id" type="hidden" />
           <input name="username" placeholder="Username" value="cashier_utawala_1" />
           <input name="full_name" placeholder="Full name" value="Utawala Cashier 1" />
-          <input name="role_code" placeholder="Role code" value="cashier" />
-          <input name="store_code" placeholder="Store code" value="UTAWALA" />
-          <input name="password" type="password" placeholder="Temporary password" value="demo1234" />
-          <button type="submit">新建用户</button>
+          <select name="role_code">
+            <option value="store_clerk">店员 / Store Clerk</option>
+            <option value="store_manager">店长 / Store Manager</option>
+            <option value="cashier" selected>收银员 / Cashier</option>
+            <option value="area_supervisor">区域主管 / Area Supervisor</option>
+            <option value="warehouse_clerk">仓库员工 / Warehouse Clerk</option>
+            <option value="warehouse_manager">仓库主管 / Warehouse Manager</option>
+            <option value="admin">系统管理员 / Admin</option>
+          </select>
+          <input name="store_code" placeholder="Store code，如 UTAWALA" value="UTAWALA" />
+          <input name="warehouse_code" placeholder="Warehouse code，如 WH1" />
+          <input name="area_code" placeholder="Area code，如 NAIROBI-EAST" />
+          <input name="managed_store_codes" placeholder="Managed stores，如 UTAWALA,KAWANGWARE" />
+          <select name="status">
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+          <input name="password" type="password" placeholder="Temporary password，编辑时可留空" autocomplete="new-password" />
+          <button type="submit">保存用户</button>
+          <button data-action="reset-user-form" type="button" class="ghost-button">清空 / 新增</button>
         </form>
         <div class="button-row">
           <button data-action="load-roles" type="button">角色</button>
@@ -1995,6 +2012,7 @@
         <div id="userResultSummary" class="candidate-summary empty-state">
           这里会显示用户创建结果，或者当前系统中有哪些角色和账号。
         </div>
+        <div id="userList" class="user-management-list"></div>
         <pre id="userOutput" class="output hidden-output"></pre>
       </section>
 
@@ -3224,11 +3242,13 @@
               </div>
             </div>
             <div class="topbar-actions">
+              <div id="cashierTerminalSessionStrip" class="cashier-terminal-session-strip"></div>
               <div class="lang-toggle" role="group" aria-label="Language toggle">
                 <button type="button" class="lang-btn is-active" data-terminal-locale="zh">中文</button>
                 <button type="button" class="lang-btn" data-terminal-locale="en">EN</button>
               </div>
               <button type="button" class="secondary-ghost" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer" data-terminal-copy="openShiftCenter">班次中心</button>
+              <button type="button" class="secondary-ghost cashier-terminal-logout" data-terminal-action="logout">退出登录</button>
             </div>
           </header>
 

@@ -119,6 +119,58 @@ def test_contract_cost_fill_denies_store_role(isolated_state: InMemoryState):
     assert exc.value.status_code == 403
 
 
+def test_user_management_update_and_soft_deactivate_preserve_org_binding(isolated_state: InMemoryState):
+    state = isolated_state
+    created = state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "cashier_edit_1",
+            "full_name": "Cashier Edit 1",
+            "password": "demo1234",
+            "role_code": "cashier",
+            "store_code": "UTAWALA",
+            "is_active": True,
+        }
+    )
+
+    updated = state.update_user(
+        created["id"],
+        {
+            "updated_by": "admin_1",
+            "full_name": "Edited Area Supervisor",
+            "role_code": "area_supervisor",
+            "store_code": "",
+            "warehouse_code": "",
+            "area_code": "NAIROBI-EAST",
+            "managed_store_codes": ["UTAWALA", "KAWANGWARE"],
+            "status": "active",
+        },
+    )
+
+    assert updated["full_name"] == "Edited Area Supervisor"
+    assert updated["role_code"] == "area_supervisor"
+    assert updated["store_code"] is None
+    assert updated["area_code"] == "NAIROBI-EAST"
+    assert updated["managed_store_codes"] == ["UTAWALA", "KAWANGWARE"]
+    assert updated["status"] == "active"
+    assert updated["is_active"] is True
+
+    deactivated = state.deactivate_user(created["id"], "admin_1")
+
+    assert deactivated["status"] == "inactive"
+    assert deactivated["is_active"] is False
+
+
+def test_user_management_cannot_deactivate_self(isolated_state: InMemoryState):
+    state = isolated_state
+    admin = next(row for row in state.list_users() if row["username"] == "admin_1")
+
+    with pytest.raises(HTTPException) as exc:
+        state.deactivate_user(admin["id"], "admin_1")
+
+    assert exc.value.status_code == 400
+
+
 @pytest.mark.xfail(reason="Role matrix requires finance/owner style cost-fill authority, but finance/owner roles are not modeled or enforced yet.")
 def test_contract_cost_fill_finance_role_expected(isolated_state: InMemoryState):
     state = isolated_state

@@ -59,6 +59,7 @@ const workspaceNextButton = document.querySelector("#workspaceNextButton");
 const workspacePageSearch = document.querySelector("#workspacePageSearch");
 const workspaceSidePanel = document.querySelector(".workspace-side-panel");
 const cashierTerminalShell = document.querySelector("#cashierTerminalShell");
+const cashierTerminalSessionStrip = document.querySelector("#cashierTerminalSessionStrip");
 const cashierTerminalStatusBar = document.querySelector("#cashierTerminalStatusBar");
 const cashierTerminalBarcodeInput = document.querySelector("#cashierTerminalBarcodeInput");
 const cashierTerminalManualInput = document.querySelector("#cashierTerminalManualInput");
@@ -81,9 +82,12 @@ const workspacePanelsList = [...document.querySelectorAll("[data-workspace-panel
 const testHomeLinks = [...document.querySelectorAll("[data-test-home-workspace]")];
 const TEST_HOME_TARGET_STORAGE_KEY = "retail_ops_test_home_target";
 
+localStorage.removeItem(STORAGE_KEYS.token);
+localStorage.removeItem(STORAGE_KEYS.user);
+
 let currentSession = {
-  token: localStorage.getItem(STORAGE_KEYS.token) || "",
-  user: safeParse(localStorage.getItem(STORAGE_KEYS.user), null),
+  token: "",
+  user: null,
 };
 let priceAlertState = [];
 let returnCandidatesState = [];
@@ -94,7 +98,17 @@ let offlineSyncBatchState = [];
 let saleVoidState = [];
 let saleRefundState = [];
 let paymentAnomalyState = [];
+let userDirectoryState = [];
 const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier"]);
+const USER_ROLE_LABELS = {
+  store_clerk: "店员",
+  store_manager: "店长",
+  cashier: "收银员",
+  area_supervisor: "区域主管",
+  warehouse_clerk: "仓库员工",
+  warehouse_manager: "仓库主管",
+  admin: "系统管理员",
+};
 const CASHIER_TERMINAL_LOCALE_COPY = {
   zh: {
     brandTitle: "高速收银终端",
@@ -19205,6 +19219,163 @@ function renderSiteRecommendationSummary(data) {
   `;
 }
 
+function getUserRoleLabel(user = {}) {
+  const roleCode = String(user?.role_code || "").trim();
+  return String(user?.role_label || USER_ROLE_LABELS[roleCode] || roleCode || "-");
+}
+
+function normalizeManagedStoreCodesInput(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim().toUpperCase()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function renderUserBindingTags(user = {}) {
+  const tags = [];
+  if (user.store_code) {
+    tags.push(`门店 ${user.store_code}`);
+  }
+  if (user.warehouse_code) {
+    tags.push(`仓库 ${user.warehouse_code}`);
+  }
+  if (user.area_code) {
+    tags.push(`区域 ${user.area_code}`);
+  }
+  normalizeManagedStoreCodesInput(user.managed_store_codes).forEach((storeCode) => {
+    tags.push(`管辖 ${storeCode}`);
+  });
+  const visibleTags = tags.length ? tags : ["全局"];
+  return visibleTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
+}
+
+function renderUserList(rows = []) {
+  const target = document.querySelector("#userList");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  userDirectoryState = Array.isArray(rows) ? rows : [];
+  if (!userDirectoryState.length) {
+    target.className = "user-management-list empty-state";
+    target.innerHTML = "当前还没有读取到用户。";
+    return;
+  }
+  target.className = "user-management-list";
+  target.innerHTML = userDirectoryState
+    .map((user) => {
+      const userId = String(user?.id || "").trim();
+      const username = String(user?.username || "-").trim() || "-";
+      const isCurrentUser = currentSession.user?.username && username === currentSession.user.username;
+      const status = String(user?.status || (user?.is_active ? "active" : "inactive")).trim() || "inactive";
+      return `
+        <article class="user-card ${status === "inactive" ? "is-inactive" : ""}">
+          <div class="user-card-head">
+            <div>
+              <span class="user-card-label">用户名</span>
+              <strong>${escapeHtml(username)}</strong>
+            </div>
+            <span class="user-status-pill ${status === "active" ? "is-active" : "is-inactive"}">${escapeHtml(status)}</span>
+          </div>
+          <div class="user-card-grid">
+            <div><span>姓名</span><strong>${escapeHtml(user?.full_name || "-")}</strong></div>
+            <div><span>角色</span><strong>${escapeHtml(getUserRoleLabel(user))}</strong><small>${escapeHtml(user?.role_code || "-")}</small></div>
+            <div class="user-card-wide"><span>组织绑定</span><div class="user-binding-tags">${renderUserBindingTags(user)}</div></div>
+          </div>
+          <div class="user-card-actions">
+            <button type="button" class="secondary-inline" data-user-edit-id="${escapeHtml(userId)}">编辑</button>
+            <button type="button" class="secondary-inline danger" data-user-deactivate-id="${escapeHtml(userId)}" ${isCurrentUser || status === "inactive" ? "disabled" : ""}>停用</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function getUserManagementForm() {
+  return document.querySelector("#userForm");
+}
+
+function hydrateUserFormForEdit(user = {}) {
+  const form = getUserManagementForm();
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  setInputValue("#userForm [name='user_id']", user.id || "");
+  setInputValue("#userForm [name='username']", user.username || "");
+  setInputValue("#userForm [name='full_name']", user.full_name || "");
+  setInputValue("#userForm [name='role_code']", user.role_code || "store_clerk");
+  setInputValue("#userForm [name='store_code']", user.store_code || "");
+  setInputValue("#userForm [name='warehouse_code']", user.warehouse_code || "");
+  setInputValue("#userForm [name='area_code']", user.area_code || "");
+  setInputValue("#userForm [name='managed_store_codes']", normalizeManagedStoreCodesInput(user.managed_store_codes).join(","));
+  setInputValue("#userForm [name='status']", user.status || (user.is_active === false ? "inactive" : "active"));
+  setInputValue("#userForm [name='password']", "");
+  focusElement("#userForm");
+}
+
+function resetUserForm() {
+  const form = getUserManagementForm();
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  form.reset();
+  setInputValue("#userForm [name='user_id']", "");
+  setInputValue("#userForm [name='username']", "");
+  setInputValue("#userForm [name='full_name']", "");
+  setInputValue("#userForm [name='role_code']", "store_clerk");
+  setInputValue("#userForm [name='store_code']", "");
+  setInputValue("#userForm [name='warehouse_code']", "");
+  setInputValue("#userForm [name='area_code']", "");
+  setInputValue("#userForm [name='managed_store_codes']", "");
+  setInputValue("#userForm [name='status']", "active");
+  setInputValue("#userForm [name='password']", "");
+  renderUserResultSummary(null);
+}
+
+function buildUserPayloadFromForm(formElement, options = {}) {
+  const { isUpdate = false } = options;
+  const form = new FormData(formElement);
+  const payload = Object.fromEntries(form.entries());
+  payload.username = String(payload.username || "").trim();
+  payload.full_name = String(payload.full_name || "").trim();
+  payload.role_code = String(payload.role_code || "").trim();
+  payload.store_code = String(payload.store_code || "").trim().toUpperCase();
+  payload.warehouse_code = String(payload.warehouse_code || "").trim().toUpperCase();
+  payload.area_code = String(payload.area_code || "").trim().toUpperCase();
+  payload.managed_store_codes = normalizeManagedStoreCodesInput(payload.managed_store_codes);
+  payload.status = String(payload.status || "active").trim().toLowerCase();
+  payload.is_active = payload.status !== "inactive";
+  payload.password = String(payload.password || "").trim();
+  if (isUpdate && !payload.password) {
+    delete payload.password;
+  }
+  if (!isUpdate && !payload.password) {
+    payload.password = "demo1234";
+  }
+  delete payload.user_id;
+  return payload;
+}
+
+async function deactivateUserFromList(userId) {
+  const normalizedId = String(userId || "").trim();
+  const user = userDirectoryState.find((row) => String(row?.id || "") === normalizedId);
+  if (!normalizedId || !user) {
+    throw new Error("请先读取用户列表，再选择要停用的账号。");
+  }
+  if (currentSession.user?.username && user.username === currentSession.user.username) {
+    throw new Error("不能停用当前登录账号。");
+  }
+  const result = await request(`/users/${encodeURIComponent(normalizedId)}`, {
+    method: "DELETE",
+  });
+  await loadTable("load-users");
+  writeOutput("#userOutput", result);
+  renderUserResultSummary("deactivate", result);
+}
+
 function renderUserResultSummary(kind, data) {
   const target = document.querySelector("#userResultSummary");
   if (!target) {
@@ -19242,13 +19413,18 @@ function renderUserResultSummary(kind, data) {
     return;
   }
   target.className = "report-summary";
+  const actionLabel = kind === "update"
+    ? "用户账号已经更新成功。"
+    : kind === "deactivate"
+      ? "用户账号已经停用。"
+      : "用户账号已经创建成功。";
   target.innerHTML = `
-    <div class="alert-banner">用户账号已经创建成功。</div>
+    <div class="alert-banner">${actionLabel}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>账号</strong><span>${escapeHtml(data.username || "-")}</span></article>
       <article class="store-metric"><strong>姓名</strong><span>${escapeHtml(data.full_name || "-")}</span></article>
-      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(data.role_code || "-")}</span></article>
-      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(data.store_code || "全局")}</span></article>
+      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(getUserRoleLabel(data))}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(data.status || (data.is_active ? "active" : "inactive"))}</span></article>
     </div>
   `;
 }
@@ -19846,10 +20022,15 @@ function setSession(session) {
     token: session.access_token,
     user: session.user,
   };
-  localStorage.setItem(STORAGE_KEYS.token, session.access_token);
-  localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(session.user));
   renderSessionState();
   applyUserDefaultLanding(session.user, { force: true });
+}
+
+function clearLoginPasswordField() {
+  const passwordInput = document.querySelector("#loginForm [name='password']");
+  if (passwordInput instanceof HTMLInputElement) {
+    passwordInput.value = "";
+  }
 }
 
 function clearSession(message = "Not signed in.") {
@@ -19870,6 +20051,7 @@ function clearSession(message = "Not signed in.") {
   }
   workspacePanels.classList.add("locked");
   logoutButton.disabled = true;
+  clearLoginPasswordField();
   authPage?.classList.remove("hidden-screen");
   appShell?.classList.add("hidden-screen");
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -20267,6 +20449,22 @@ function applyCashierTerminalChromeCopy() {
   if (cashierTerminalSaleNoteInput) {
     cashierTerminalSaleNoteInput.placeholder = copy.notePlaceholder;
   }
+}
+
+function renderCashierTerminalSessionStrip() {
+  if (!(cashierTerminalSessionStrip instanceof HTMLElement)) {
+    return;
+  }
+  const user = currentSession.user || {};
+  const username = String(user.full_name || user.username || "未登录").trim() || "未登录";
+  const roleCode = String(user.role_code || "-").trim() || "-";
+  const roleLabel = String(user.role_label || USER_ROLE_LABELS[roleCode] || roleCode || "-").trim() || "-";
+  const orgCode = String(user.store_code || user.warehouse_code || user.area_code || "全局").trim() || "全局";
+  cashierTerminalSessionStrip.innerHTML = `
+    <span>${escapeHtml(username)}</span>
+    <span>${escapeHtml(roleLabel)} / ${escapeHtml(roleCode)}</span>
+    <span>${escapeHtml(orgCode)}</span>
+  `;
 }
 
 function renderCashierTerminalStatusBar() {
@@ -20835,6 +21033,7 @@ function renderCashierTerminal() {
     return;
   }
   applyCashierTerminalChromeCopy();
+  renderCashierTerminalSessionStrip();
   renderCashierTerminalStatusBar();
   renderCashierTerminalLookupPanel();
   renderCashierTerminalCart();
@@ -21143,6 +21342,9 @@ function handleCashierTerminalNetworkChange() {
 
 async function handleCashierTerminalAction(action, target) {
   switch (action) {
+    case "logout":
+      await submitLogout();
+      return;
     case "clear-lookup":
       cashierTerminalState.currentLookupResult = null;
       clearCashierTerminalLookupInputs();
@@ -24630,6 +24832,9 @@ async function loadTable(kind) {
   const data = await request(map[kind]);
   if (kind === "load-roles" || kind === "load-users") {
     writeOutput("#userOutput", data);
+    if (kind === "load-users") {
+      renderUserList(Array.isArray(data) ? data : []);
+    }
     renderUserResultSummary(kind === "load-roles" ? "roles" : "list", data);
     return;
   }
@@ -24838,10 +25043,15 @@ async function submitLogin(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const result = await request("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  let result;
+  try {
+    result = await request("/auth/login", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  } finally {
+    clearLoginPasswordField();
+  }
   setSession(result);
   renderAuthResultSummary("login", result);
   await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
@@ -24867,7 +25077,6 @@ async function refreshSession() {
   try {
     const user = await request("/auth/me");
     currentSession.user = user;
-    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
     renderSessionState();
     await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
   } catch (error) {
@@ -26389,17 +26598,24 @@ async function submitBarcodeAssignment(event) {
 
 async function submitUser(event) {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  const payload = Object.fromEntries(form.entries());
-  if (!payload.store_code) {
-    delete payload.store_code;
-  }
-  const result = await request("/users", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  const userId = String(new FormData(event.currentTarget).get("user_id") || "").trim();
+  const payload = buildUserPayloadFromForm(event.currentTarget, { isUpdate: Boolean(userId) });
+  const result = userId
+    ? await request(`/users/${encodeURIComponent(userId)}`, {
+      method: `PATCH`,
+      body: JSON.stringify(payload),
+    })
+    : await request("/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  await loadTable("load-users");
   writeOutput("#userOutput", result);
-  renderUserResultSummary("create", result);
+  renderUserResultSummary(userId ? "update" : "create", result);
+  if (!userId) {
+    resetUserForm();
+    renderUserResultSummary("create", result);
+  }
 }
 
 async function submitStore(event) {
@@ -28728,6 +28944,32 @@ cashierTerminalShell?.addEventListener("click", async (event) => {
     await handleCashierTerminalAction(target.dataset.terminalAction || "", target);
   } catch (error) {
     showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
+  }
+});
+
+document.querySelector("#userList")?.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-user-edit-id], [data-user-deactivate-id]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    if (target.dataset.userEditId) {
+      const row = userDirectoryState.find((user) => String(user?.id || "") === String(target.dataset.userEditId));
+      if (!row) {
+        throw new Error("请先读取用户列表，再编辑账号。");
+      }
+      hydrateUserFormForEdit(row);
+      renderUserResultSummary("update", row);
+      return;
+    }
+    if (target.dataset.userDeactivateId) {
+      await deactivateUserFromList(target.dataset.userDeactivateId);
+    }
+  } catch (error) {
+    writeOutput("#userOutput", "");
+    renderErrorSummary("#userResultSummary", formatErrorMessage(error));
   }
 });
 
@@ -32388,6 +32630,10 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       }
       if (action === "load-config") {
         await loadConfig();
+        return;
+      }
+      if (action === "reset-user-form") {
+        resetUserForm();
         return;
       }
       if (action === "load-rack-template" || action === "load-store-racks") {
