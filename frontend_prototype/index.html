@@ -4,9 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>店铺进销存工作台</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=pos-hidden-drawer-20260430" />
   </head>
   <body>
+    <div id="globalLanguageSwitch" class="global-language-switch" role="group" aria-label="Language switch" data-locale-static>
+      <button type="button" data-locale-option="zh" class="is-active" aria-pressed="true">中文</button>
+      <button type="button" data-locale-option="en" aria-pressed="false">EN</button>
+    </div>
     <section id="authPage" class="auth-page">
       <section class="test-home-entry panel" aria-labelledby="testHomeTitle">
         <div class="panel-head">
@@ -27,7 +31,7 @@
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1 创建分拣任务">3. Sorting tasks</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1.2 压缩工单管理">4. Sorted stock / compression</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="5. 门店收货主控台 / Store Receiving Command Center">5. Store dispatch / receiving</button>
-          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="7. 店员 PDA 上架工作台">6. Store item price / rack / printing</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="6.2 我的当前 bale">6. Store item price / rack / printing</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="9. 收银销售">7. POS</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="10. 周期退仓">8. Returns / return-to-warehouse</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="Bales销售｜真实出库">9. B2B bale sales</button>
@@ -98,6 +102,10 @@
           <div class="workspace-session-strip">
             <div id="sessionSummary" class="session-summary">未登录</div>
             <div id="appSessionMeta" class="session-meta-inline">登录后显示角色和默认门店</div>
+            <div class="workspace-language-switch" role="group" aria-label="Language switch" data-locale-static>
+              <button type="button" data-locale-option="zh" class="is-active" aria-pressed="true">中文</button>
+              <button type="button" data-locale-option="en" aria-pressed="false">EN</button>
+            </div>
             <button id="logoutButton" type="button" class="ghost-button mini-button">退出登录</button>
           </div>
         </div>
@@ -1069,6 +1077,10 @@
         <div id="storeOperatingSummary" class="store-summary-grid">
           <div class="empty-state">这里会按门店显示今日销售、毛利、库存和待处理异常。</div>
         </div>
+        <div id="posSalesAnalyticsSummary" class="store-summary-grid">
+          <div class="empty-state">POS 完成 STORE_ITEM 销售后，这里会按门店显示今日销售额、件数、订单、客单价和支付方式。</div>
+        </div>
+        <div id="posSalesAnalyticsRecords" class="data-preview-grid"></div>
       </section>
 
       <section class="panel" id="storeClosingPanel" data-workspace-panel="overview">
@@ -1370,6 +1382,10 @@
           <article class="store-metric"><strong>待处理预警</strong><span>9 条</span></article>
           <article class="store-metric"><strong>现金未闭环门店</strong><span>2 家</span></article>
         </div>
+        <div id="operationsPosSalesAnalyticsSummary" class="store-summary-grid">
+          <div class="empty-state">POS 完成 STORE_ITEM 销售后，这里会同步显示多店销售汇总。</div>
+        </div>
+        <div id="operationsPosSalesAnalyticsRecords" class="data-preview-grid"></div>
         <div class="split-grid">
           <article class="data-preview-card">
             <strong>今日区域结论</strong>
@@ -1387,6 +1403,36 @@
               <div class="summary-breakdown-row"><span>Kayole</span><span>现金未存入，且昨日巡店整改未关闭</span></div>
             </div>
           </article>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>2. 全部销售数据 / 简要分析</h2>
+        </div>
+        <div class="candidate-summary">
+          这里集中看 POS 已完成的 STORE_ITEM 销售数据，包含全量销售额、门店汇总、支付结构、商品来源链路和简要经营结论。
+        </div>
+        <div id="operationsAllSalesOverview" class="report-summary-grid">
+          <article class="store-metric"><strong>全量销售额</strong><span>KES 0.00</span></article>
+          <article class="store-metric"><strong>销售件数</strong><span>0</span></article>
+          <article class="store-metric"><strong>订单数</strong><span>0</span></article>
+          <article class="store-metric"><strong>覆盖门店</strong><span>0</span></article>
+        </div>
+        <div id="operationsAllSalesAnalysis" class="candidate-summary empty-state">
+          完成 POS 销售后，这里会自动生成销售简要分析。
+        </div>
+        <div class="panel-subhead">
+          <strong>按门店汇总</strong>
+        </div>
+        <div id="operationsAllSalesByStore" class="store-summary-grid">
+          <div class="empty-state">暂无门店销售汇总。</div>
+        </div>
+        <div class="panel-subhead">
+          <strong>全部销售明细 / 来源链路</strong>
+        </div>
+        <div id="operationsAllSalesRecords" class="data-preview-grid">
+          <div class="empty-state">完成 POS 销售后，这里会显示全部 STORE_ITEM 销售记录。</div>
         </div>
       </section>
 
@@ -1980,11 +2026,26 @@
           <h2>账号 / 用户</h2>
           <button data-action="load-users" type="button">读取用户</button>
         </div>
-        <form id="userForm" class="form-grid compact">
+        <form id="userForm" class="form-grid compact user-role-binding-form">
           <input name="username" placeholder="Username" value="cashier_utawala_1" />
           <input name="full_name" placeholder="Full name" value="Utawala Cashier 1" />
-          <input name="role_code" placeholder="Role code" value="cashier" />
-          <input name="store_code" placeholder="Store code" value="UTAWALA" />
+          <select name="role_code" data-user-role-select>
+            <option value="store_clerk">店员 / Store Clerk</option>
+            <option value="store_manager">店长 / Store Manager</option>
+            <option value="cashier" selected>收银员 / Cashier</option>
+            <option value="area_supervisor">区域主管 / Area Supervisor</option>
+            <option value="warehouse_clerk">仓库员工 / Warehouse Clerk</option>
+            <option value="warehouse_manager">仓库主管 / Warehouse Manager</option>
+            <option value="admin">系统管理员 / Admin</option>
+          </select>
+          <input name="store_code" data-user-org-field="store" placeholder="Store code，例如 UTAWALA" value="UTAWALA" />
+          <input name="warehouse_code" data-user-org-field="warehouse" placeholder="Warehouse code，例如 WH1" value="WH1" />
+          <input name="area_code" data-user-org-field="area" placeholder="Area code，例如 NAIROBI-EAST" value="NAIROBI-EAST" />
+          <input name="managed_store_codes" data-user-org-field="area" placeholder="Managed stores，例如 UTAWALA,KAWANGWARE" value="UTAWALA,KAWANGWARE" />
+          <select name="status">
+            <option value="active" selected>active</option>
+            <option value="inactive">inactive</option>
+          </select>
           <input name="password" type="password" placeholder="Temporary password" value="demo1234" />
           <button type="submit">新建用户</button>
         </form>
@@ -1996,6 +2057,47 @@
           这里会显示用户创建结果，或者当前系统中有哪些角色和账号。
         </div>
         <pre id="userOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>数据管理 / Test Data Tools</h2>
+          <button data-action="load-test-data-tools" type="button">刷新数据统计</button>
+        </div>
+        <div id="testDataEnvironmentSummary" class="candidate-summary empty-state">
+          当前环境读取后，会显示 local / staging / production 以及可执行动作。
+        </div>
+        <div class="stats-grid compact">
+          <article class="metric-card">
+            <span>demo seed data</span>
+            <strong>随代码存在</strong>
+            <small>用于初始化演示环境，不在这里编辑业务规则。</small>
+          </article>
+          <article class="metric-card">
+            <span>runtime test data</span>
+            <strong>本地测试生成</strong>
+            <small>可以清空、导出、导入；不能进入 GitHub。</small>
+          </article>
+          <article class="metric-card">
+            <span>production business data</span>
+            <strong>正式业务数据</strong>
+            <small>正式环境禁止执行测试数据清理操作。</small>
+          </article>
+        </div>
+        <div id="testDataStatsSummary" class="candidate-summary empty-state">
+          点击刷新后显示 users / SDO / packages / STORE_ITEM / sales / assignments。
+        </div>
+        <div class="button-row">
+          <button data-action="clear-local-test-data" type="button">一键清空本地测试数据</button>
+          <button data-action="reset-demo-seed" type="button">重置 demo seed</button>
+          <button data-action="export-test-data-json" type="button">导出当前测试数据 JSON</button>
+          <button data-action="import-test-data-json" type="button">导入测试数据 JSON</button>
+        </div>
+        <label class="form-label" for="testDataExportText">导出 JSON</label>
+        <textarea id="testDataExportText" rows="8" placeholder="导出的 runtime test data JSON 会显示在这里"></textarea>
+        <label class="form-label" for="testDataImportText">导入 JSON</label>
+        <textarea id="testDataImportText" rows="8" placeholder="把之前导出的 runtime test data JSON 粘贴到这里"></textarea>
+        <pre id="testDataOutput" class="output hidden-output"></pre>
       </section>
 
       <section class="panel" data-workspace-panel="warehouse">
@@ -2137,6 +2239,10 @@
             <option value="">选择仓库送货执行单 / SDO</option>
           </select>
           <div id="transferShipTargetHint" class="flow-summary-note">选择执行单后，这里会显示目标门店与配送上下文，发运前先核对。</div>
+          <div id="transferShipLinkedOrdersSummary" class="candidate-summary empty-state">
+            默认会带入当前仓库执行单；如同一辆车配送多店，可添加更多已生成 SDO 的调拨单。
+          </div>
+          <button id="addTransferShipRowButton" type="button" class="ghost-button">添加调拨单 / 加一行</button>
           <input name="driver_name" placeholder="司机，例如 Driver A" value="Driver A" />
           <input name="vehicle_no" placeholder="车辆，例如 KDM-001A" value="KDM-001A" />
           <input name="departure_time" placeholder="预计出发时间，例如 2026-04-28 10:30" />
@@ -2529,6 +2635,28 @@
           这里会显示已经保存的分拣库位配置，后面 0.2 分拣确认入库直接复用，不再手填库位。
         </div>
         <pre id="apparelSortingRackOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="warehouse">
+        <div class="panel-head">
+          <h2>4.9 默认售价管理</h2>
+        </div>
+        <div class="subtle small">这里维护店员 PDA 上架页的默认售价 1 / 默认售价 2。店员选择默认售价后，会写入 STORE_ITEM token 的 selected_price。</div>
+        <div class="split-grid">
+          <form id="storeDefaultSalePriceForm" class="form-grid compact">
+            <input name="default_price_1_kes" type="number" min="1" step="1" placeholder="默认售价 1，例如 150" value="150" />
+            <input name="default_price_2_kes" type="number" min="1" step="1" placeholder="默认售价 2，例如 200" value="200" />
+            <input name="note" placeholder="备注，例如 PDA 默认零售价" value="店员 PDA 上架默认售价" />
+            <button type="submit">保存默认售价</button>
+          </form>
+          <div id="storeDefaultSalePriceSummary" class="candidate-summary empty-state">
+            这里会显示当前生效的两档默认售价，并同步到店员 PDA 的价格选择。
+          </div>
+        </div>
+        <div id="storeDefaultSalePriceList" class="candidate-summary empty-state">
+          保存后，6.2 我的当前 bale 的包上架页面会读取这两档默认售价。
+        </div>
+        <pre id="storeDefaultSalePriceOutput" class="output hidden-output"></pre>
       </section>
 
       <section class="panel" data-workspace-panel="warehouse">
@@ -3558,6 +3686,6 @@
     <script src="./operations-fulfillment-flow.js?v=store-batch-receipt-20260426"></script>
     <script src="./apparel-default-cost-flow.js"></script>
     <script src="./apparel-sorting-rack-flow.js"></script>
-    <script src="./app.js?v=store-batch-receipt-20260426c"></script>
+    <script src="./app.js?v=operations-sales-page-20260430"></script>
   </body>
 </html>

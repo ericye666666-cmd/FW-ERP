@@ -810,7 +810,7 @@ test("warehouse nav exposes 门店补货 and operations nav drops the replenishm
   assert.match(warehousePanelMetaJs, /match: "门店补货流程页"/);
   assert.match(warehousePanelMetaJs, /match: "4\. 门店补货建议"/);
   assert.match(warehousePanelMetaJs, /match: "4\.1 手动补货需求"/);
-  assert.match(warehousePanelMetaJs, /match: "5\.1 补差打包工单"/);
+  assert.match(warehousePanelMetaJs, /match: "5\.1 补差打包工单",\n\s*section: "replenishment"/);
   assert.match(warehousePanelMetaJs, /match: "6\. 仓库执行单 \/ 出库打印"/);
   assert.match(warehousePanelMetaJs, /match: "6\.1 配送批次 \/ 门店收货跟踪"/);
   assert.doesNotMatch(operationsPanelMetaJs, /4\. 门店补货建议/);
@@ -916,11 +916,36 @@ test("phase 2C page 6.1 summary cards and per-store grouping copy are present", 
   assert.match(appJs, /当前还没有多个仓库执行单可加入同一配送批次。Phase 2C 先建立配送批次视图；正式多单绑定将在后续执行单模型完善后接入。/);
 });
 
-
-test("warehouse access profiles keep 门店补货 visible for admin and warehouse manager roles", () => {
-  assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "general"\]/);
+test("page 6 to 6.1 carries current transfer and shipment draft uses real SDO package counts", () => {
+  assert.match(indexHtml, /id="transferShipLinkedOrdersSummary"/);
+  assert.match(indexHtml, /id="addTransferShipRowButton"[\s\S]*添加调拨单 \/ 加一行/);
+  assert.match(appJs, /function getTransferShipmentPackageCount/);
   assert.match(
     appJs,
-    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["overview", "warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder", "replenishment", "general"\]/,
+    /store_delivery_execution_order\?\.packages[\s\S]*display_store_dispatch_bales[\s\S]*store_dispatch_bales[\s\S]*delivery_batch\?\.bale_count[\s\S]*dispatch_bale_count/,
+  );
+  assert.match(appJs, /getTransferShipmentPackageCount\(row\)/);
+  assert.match(appJs, /function openTransferShipmentPanelForTransfer/);
+  assert.match(appJs, /data-transfer-ship-fill="\$\{escapeHtml\(action\.transferShipNo\)\}"/);
+  assert.match(appJs, /ensureTransferShipmentDraftRows\(transferNo\)/);
+  assert.match(appJs, /function renderTransferShipmentDraftSummary/);
+  assert.match(appJs, /涉及门店数/);
+  assert.match(appJs, /总包数/);
+  assert.match(appJs, /总件数/);
+  assert.match(appJs, /stops \/ 路线/);
+  assert.match(appJs, /data-transfer-ship-row-select/);
+  assert.match(appJs, /data-transfer-ship-row-remove/);
+});
+
+
+test("warehouse access profiles follow the approved six warehouse menu groups", () => {
+  assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "general", "china", "admin"\]/);
+  assert.match(
+    appJs,
+    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder", "replenishment", "general", "china", "admin"\]/,
+  );
+  assert.match(
+    appJs,
+    /warehouseWorkerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["workorder"\]/,
   );
 });

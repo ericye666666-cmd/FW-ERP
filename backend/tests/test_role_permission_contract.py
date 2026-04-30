@@ -119,6 +119,58 @@ def test_contract_cost_fill_denies_store_role(isolated_state: InMemoryState):
     assert exc.value.status_code == 403
 
 
+def test_user_org_binding_persists_role_label_scope_and_status(isolated_state: InMemoryState):
+    state = isolated_state
+
+    warehouse_manager = state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "warehouse_manager_wh1",
+            "full_name": "Warehouse Manager WH1",
+            "role_code": "warehouse_manager",
+            "warehouse_code": "WH1",
+            "password": "demo1234",
+        }
+    )
+    assert warehouse_manager["role_label"] == "仓库主管"
+    assert warehouse_manager["warehouse_code"] == "WH1"
+    assert warehouse_manager["status"] == "active"
+    assert state._require_user_role("warehouse_manager_wh1", {"warehouse_supervisor"})["username"] == "warehouse_manager_wh1"
+
+    area_supervisor = state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "area_supervisor_east",
+            "full_name": "Area Supervisor East",
+            "role_code": "area_supervisor",
+            "area_code": "EAST",
+            "managed_store_codes": ["UTAWALA", "KAWANGWARE"],
+            "password": "demo1234",
+        }
+    )
+    assert area_supervisor["role_label"] == "区域主管"
+    assert area_supervisor["area_code"] == "EAST"
+    assert area_supervisor["managed_store_codes"] == ["UTAWALA", "KAWANGWARE"]
+
+
+def test_user_org_binding_requires_store_for_cashier(isolated_state: InMemoryState):
+    state = isolated_state
+
+    with pytest.raises(HTTPException) as exc:
+        state.create_user(
+            {
+                "created_by": "admin_1",
+                "username": "cashier_missing_store",
+                "full_name": "Cashier Missing Store",
+                "role_code": "cashier",
+                "password": "demo1234",
+            }
+        )
+
+    assert exc.value.status_code == 400
+    assert "store_code" in str(exc.value.detail)
+
+
 @pytest.mark.xfail(reason="Role matrix requires finance/owner style cost-fill authority, but finance/owner roles are not modeled or enforced yet.")
 def test_contract_cost_fill_finance_role_expected(isolated_state: InMemoryState):
     state = isolated_state
