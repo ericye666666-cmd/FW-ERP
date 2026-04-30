@@ -23,6 +23,21 @@ SALES_FX_RATES_TO_KES = {
     "USD": 129.1531,
     "CNY": 17.8097,
 }
+DIRECT_LOOP_ROLE_LABELS = {
+    "store_clerk": "店员",
+    "store_manager": "店长",
+    "cashier": "收银员",
+    "area_supervisor": "区域主管",
+    "warehouse_clerk": "仓库员工",
+    "warehouse_manager": "仓库主管",
+    "warehouse_supervisor": "仓库主管",
+    "admin": "系统管理员",
+}
+ROLE_CODE_ALIASES = {
+    "warehouse_manager": "warehouse_supervisor",
+}
+STORE_BOUND_ROLE_CODES = {"store_clerk", "store_manager", "cashier"}
+WAREHOUSE_BOUND_ROLE_CODES = {"warehouse_clerk", "warehouse_manager", "warehouse_supervisor"}
 DEFAULT_APPAREL_CATEGORY_PRESETS = [
     {"category_main": "tops", "category_sub": "lady tops", "label": "女装上衣", "rack_prefix": "A-TS-LT", "cost_p": 185, "cost_s": 138},
     {"category_main": "tops", "category_sub": "unisex T-shirt", "label": "中性T恤", "rack_prefix": "A-TS-UT", "cost_p": 165, "cost_s": 126},
@@ -4316,13 +4331,20 @@ class InMemoryState:
         return cargo_type
 
     def _public_user(self, user: dict[str, Any]) -> dict[str, Any]:
+        is_active = bool(user.get("is_active", True))
+        role_code = str(user.get("role_code") or "").strip().lower()
         return {
             "id": user["id"],
             "username": user["username"],
             "full_name": user["full_name"],
             "role_code": user["role_code"],
+            "role_label": user.get("role_label") or DIRECT_LOOP_ROLE_LABELS.get(role_code, user["role_code"]),
             "store_code": user.get("store_code"),
-            "is_active": user.get("is_active", True),
+            "warehouse_code": user.get("warehouse_code") or "",
+            "area_code": user.get("area_code") or "",
+            "managed_store_codes": list(user.get("managed_store_codes") or []),
+            "status": "active" if is_active else "inactive",
+            "is_active": is_active,
             "created_at": user["created_at"],
         }
 
@@ -8656,7 +8678,8 @@ class InMemoryState:
         user = self._get_user_by_username(username)
         if not user.get("is_active", True):
             raise HTTPException(status_code=403, detail=f"Inactive user {username}")
-        if user["role_code"] != "admin" and user["role_code"] not in allowed_roles:
+        effective_role = ROLE_CODE_ALIASES.get(user["role_code"], user["role_code"])
+        if effective_role != "admin" and effective_role not in allowed_roles:
             raise HTTPException(
                 status_code=403,
                 detail=f"User {username} does not have permission for this action",
@@ -10648,17 +10671,43 @@ class InMemoryState:
         actor = self._require_user_role(payload["created_by"], {"admin", "area_supervisor"})
         if any(user["username"] == payload["username"] for user in self.users.values()):
             raise HTTPException(status_code=409, detail=f"Username {payload['username']} already exists")
-        if payload.get("store_code"):
-            self._ensure_store_exists(payload["store_code"])
+        role_code = str(payload["role_code"]).strip().lower()
+        store_code = str(payload.get("store_code") or "").strip().upper()
+        warehouse_code = str(payload.get("warehouse_code") or "").strip().upper()
+        area_code = str(payload.get("area_code") or "").strip().upper()
+        raw_managed_stores = payload.get("managed_store_codes") or []
+        if isinstance(raw_managed_stores, str):
+            raw_managed_stores = raw_managed_stores.split(",")
+        managed_store_codes = [
+            str(code).strip().upper()
+            for code in raw_managed_stores
+            if str(code).strip()
+        ]
+        if role_code in STORE_BOUND_ROLE_CODES and not store_code:
+            raise HTTPException(status_code=400, detail=f"store_code is required for {role_code}")
+        if role_code in WAREHOUSE_BOUND_ROLE_CODES and not warehouse_code:
+            raise HTTPException(status_code=400, detail=f"warehouse_code is required for {role_code}")
+        if role_code == "area_supervisor" and not area_code and not managed_store_codes:
+            raise HTTPException(status_code=400, detail="area_code or managed_store_codes is required for area_supervisor")
+        if store_code:
+            self._ensure_store_exists(store_code)
+        status = str(payload.get("status") or "").strip().lower()
+        is_active = payload.get("is_active", True)
+        if status:
+            is_active = status != "inactive"
 
         user = {
             "id": next(self._user_ids),
             "created_at": now_iso(),
             "username": payload["username"],
             "full_name": payload["full_name"],
-            "role_code": payload["role_code"],
-            "store_code": payload.get("store_code"),
-            "is_active": payload.get("is_active", True),
+            "role_code": role_code,
+            "role_label": payload.get("role_label") or DIRECT_LOOP_ROLE_LABELS.get(role_code, role_code),
+            "store_code": store_code or None,
+            "warehouse_code": warehouse_code,
+            "area_code": area_code,
+            "managed_store_codes": managed_store_codes,
+            "is_active": bool(is_active),
             **hash_password(payload["password"]),
         }
         self.users[user["id"]] = user

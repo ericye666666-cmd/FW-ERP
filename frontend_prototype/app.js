@@ -13,10 +13,13 @@ const STORAGE_KEYS = {
   apparelPieceWeights: "retail_ops_apparel_piece_weights",
   apparelDefaultCosts: "retail_ops_apparel_default_costs",
   apparelSortingRacks: "retail_ops_apparel_sorting_racks",
+  storeDefaultSalePrices: "retail_ops_store_default_sale_prices",
   directHangUnpacks: "retail_ops_direct_hang_unpacks",
   directHangDispatchOrders: "retail_ops_direct_hang_dispatch_orders",
   directHangDispatchBales: "retail_ops_direct_hang_dispatch_bales",
   directHangStoreItems: "retail_ops_direct_hang_store_items",
+  storeSdoPackageItemTokens: "retail_ops_store_sdo_package_item_tokens",
+  posStoreItemSaleRecords: "retail_ops_pos_store_item_sale_records",
   baleSalesRebaleEntries: "retail_ops_bale_sales_rebale_entries",
   consignmentBundleOrders: "retail_ops_consignment_bundle_orders",
   opsExceptionTickets: "retail_ops_exception_tickets",
@@ -25,6 +28,9 @@ const STORAGE_KEYS = {
   oaPayrollBatches: "retail_ops_oa_payroll_batches",
   oaFinanceApprovals: "retail_ops_oa_finance_approvals",
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
+  appLocale: "retail_ops_app_locale",
+  pendingRedirect: "retail_ops_pending_redirect",
+  runtimeEnvironment: "retail_ops_runtime_environment",
 };
 
 const balePrintFlow = globalThis.BalePrintFlow || {};
@@ -79,12 +85,186 @@ const closeBalePrintModalButton = document.querySelector("#closeBalePrintModalBu
 const workspaceTabs = [...document.querySelectorAll("[data-workspace-target]")];
 const workspacePanelsList = [...document.querySelectorAll("[data-workspace-panel]")];
 const testHomeLinks = [...document.querySelectorAll("[data-test-home-workspace]")];
+const globalLanguageSwitch = document.querySelector("#globalLanguageSwitch");
+const globalLanguageButtons = [...document.querySelectorAll("[data-locale-option]")];
 const TEST_HOME_TARGET_STORAGE_KEY = "retail_ops_test_home_target";
+
+const APP_LOCALE_PHRASE_DICTIONARY = {
+  zhToEn: {
+    "店铺进销存工作台": "Retail Inventory Workspace",
+    "登录系统": "Sign in",
+    "登录并进入终端 / 工作区": "Sign in to Terminal / Workspace",
+    "用户名": "Username",
+    "密码": "Password",
+    "保存地址": "Save API URL",
+    "API 地址（先不要改）": "API URL (do not change yet)",
+    "默认测试密码：": "Default test password: ",
+    "登录后，这里会显示当前账号、角色和可操作范围。": "After sign-in, this area shows the current account, role, and allowed scope.",
+    "先登录，再按角色进入系统。收银员会直接进入高速交易终端，其他角色仍进入各自工作区。": "Sign in first, then enter the system by role. Cashiers go directly to the fast POS terminal; other roles stay in their own workspaces.",
+    "今日总览": "Today Overview",
+    "测试工具": "Test Tools",
+    "仓库功能区": "Warehouse",
+    "运营中心": "Operations Center",
+    "门店功能区": "Store",
+    "系统管理": "System Admin",
+    "未登录": "Not signed in",
+    "登录后显示角色和默认门店": "Role and default store appear after sign-in",
+    "退出登录": "Sign out",
+    "当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。": "Current view: Today Overview. Use it for store status, red alerts, and closing checks.",
+    "上一页": "Previous",
+    "下一页": "Next",
+    "搜索当前页面...": "Search current page...",
+    "先这样测试": "Test This First",
+    "全链路流程 / 角色分工": "End-to-End Flow / Role Split",
+    "当前业务主线（主分拣流）": "Current Main Business Flow (Sorting Flow)",
+    "例外直挂流": "Exception Direct-Hang Flow",
+    "门店经营摘要": "Store Operating Summary",
+    "刷新门店摘要": "Refresh Store Summary",
+    "今日销售额": "Today Sales",
+    "今日销售件数": "Today Items Sold",
+    "今日订单数": "Today Orders",
+    "平均客单价": "Average Ticket",
+    "现金销售额": "Cash Sales",
+    "M-Pesa 销售额": "M-Pesa Sales",
+    "混合支付销售额": "Mixed Payment Sales",
+    "已售 STORE_ITEM 数量": "Sold STORE_ITEM Count",
+    "最近一笔销售时间": "Latest Sale Time",
+    "完成 POS 销售后，这里会显示 STORE_ITEM 销售记录和来源链路。": "After POS sales, STORE_ITEM sale records and source chain appear here.",
+    "今日还没有 POS STORE_ITEM 销售记录。": "No POS STORE_ITEM sales today.",
+    "POS 完成 STORE_ITEM 销售后，这里会按门店显示今日销售额、件数、订单、客单价和支付方式。": "After POS STORE_ITEM sales, this shows today sales, items, orders, ticket average, and payment split by store.",
+    "POS 完成 STORE_ITEM 销售后，这里会同步显示多店销售汇总。": "After POS STORE_ITEM sales, this shows multi-store sales summaries.",
+    "门店代码": "Store Code",
+    "门店 / 收银员": "Store / Cashier",
+    "商品码": "Item Code",
+    "销售额 / 支付": "Sales / Payment",
+    "销售时间": "Sale Time",
+    "来源 SDO": "Source SDO",
+    "来源包 / 类型": "Source Package / Type",
+    "店员 / 货架": "Clerk / Rack",
+    "品类": "Category",
+    "门店收货主控台": "Store Receiving Command Center",
+    "门店验收": "Store Acceptance",
+    "分配店员": "Assign Clerk",
+    "本店货架位管理": "Store Rack Management",
+    "我的当前 bale": "My Current Bale",
+    "我的待上架包列表": "My Packages to Shelve",
+    "去上架": "Shelve",
+    "包上架 / 商品码打印": "Package Shelving / Item Label Printing",
+    "货架位": "Rack",
+    "选择货架位": "Select Rack",
+    "售价": "Sale Price",
+    "默认售价": "Default Price",
+    "默认售价管理": "Default Sale Price Management",
+    "默认售价 1": "Default Price 1",
+    "默认售价 2": "Default Price 2",
+    "自定义售价": "Custom Price",
+    "保存默认售价": "Save Default Prices",
+    "生成 STORE_ITEM 商品码": "Generate STORE_ITEM Codes",
+    "打印商品码": "Print Item Labels",
+    "预览本次商品码": "Preview This Batch",
+    "打印本次数量": "Print This Batch",
+    "标记本次已打印": "Mark This Batch Printed",
+    "已生成": "Generated",
+    "已打印": "Printed",
+    "未打印": "Unprinted",
+    "待打印": "Pending Print",
+    "本类已贴完": "This Group Labelled",
+    "确认本类已贴完": "Confirm This Group Labelled",
+    "仓库执行单 / 出库打印": "Warehouse Dispatch / Outbound Print",
+    "下一阶段：仓库送货执行单 / 配送批次": "Next Stage: Store Delivery Order / Shipment Batch",
+    "配送批次 / 门店收货跟踪": "Shipment Batch / Store Receiving Tracking",
+    "添加调拨单 / 加一行": "Add Transfer Order / Add Row",
+    "调拨单号": "Transfer Order No.",
+    "目标门店": "Target Store",
+    "包数": "Packages",
+    "件数": "Pieces",
+    "状态": "Status",
+    "删除行": "Delete Row",
+    "涉及门店数": "Stores Involved",
+    "总包数": "Total Packages",
+    "总件数": "Total Pieces",
+    "收银功能区": "POS",
+    "收银销售": "POS Sales",
+    "只有收银员可以进入收银区": "Only cashiers can enter POS.",
+    "扫码 / 手动录入": "Scan / Manual Entry",
+    "加入购物篮": "Add to Cart",
+    "购物篮": "Cart",
+    "完成销售": "Complete Sale",
+    "现金": "Cash",
+    "混合支付": "Mixed Payment",
+    "商品": "Item",
+    "价格": "Price",
+    "数量": "Qty",
+    "总价": "Total",
+    "删除": "Remove",
+    "作废单": "Void Request",
+    "退款单": "Refund Request",
+    "支付异常单": "Payment Anomaly",
+    "账号 / 用户": "Accounts / Users",
+    "角色 / 职位": "Role / Position",
+    "所属门店": "Store",
+    "所属仓库": "Warehouse",
+    "权限范围": "Permission Scope",
+    "店员": "Store Clerk",
+    "店长": "Store Manager",
+    "收银员": "Cashier",
+    "区域主管": "Area Supervisor",
+    "仓库员工": "Warehouse Clerk",
+    "仓库主管": "Warehouse Manager",
+    "系统管理员": "Admin",
+    "状态 active / inactive": "Status active / inactive",
+    "角色中文名": "Role Label",
+    "绑定门店 / 仓库 / 区域": "Bound Store / Warehouse / Area",
+    "运输 / 关单主档": "Shipment / Customs Master",
+    "中方来源 Bale 录入": "China Source Bale Entry",
+    "创建分拣任务": "Create Sorting Task",
+    "分拣确认入库": "Sorting Confirmation",
+    "压缩工单管理": "Compression Work Orders",
+    "仓库配货": "Warehouse Picking",
+    "打包": "Packing",
+    "打印标签": "Print Labels",
+    "出库": "Outbound",
+    "生成 SDO": "Generate SDO",
+    "配送批次": "Shipment Batch",
+    "仓库库存": "Warehouse Stock",
+    "仓库异常处理": "Warehouse Exceptions",
+    "销售数据": "Sales Data",
+    "门店收货进度": "Store Receiving Progress",
+    "经营分析": "Business Analytics",
+    "异常跟踪": "Exception Tracking",
+    "保存": "Save",
+    "刷新": "Refresh",
+    "提交": "Submit",
+    "确认": "Confirm",
+    "取消": "Cancel",
+    "返回": "Back",
+    "关闭": "Close",
+    "暂无": "None",
+    "全局账号": "Global Account",
+    "角色：": "Role: ",
+    "当前显示：": "Current view: ",
+    "这里主要看": "Mainly for",
+    "门店状态": "store status",
+    "红色预警": "red alerts",
+    "关店检查": "closing checks",
+  },
+};
+const APP_LOCALE_TRANSLATABLE_ATTRIBUTES = ["placeholder", "title", "aria-label"];
+const APP_LOCALE_SKIP_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "PRE", "CODE", "TEXTAREA"]);
+const APP_LOCALE_SORTED_TRANSLATIONS = Object.entries(APP_LOCALE_PHRASE_DICTIONARY.zhToEn)
+  .sort((left, right) => right[0].length - left[0].length);
 
 let currentSession = {
   token: localStorage.getItem(STORAGE_KEYS.token) || "",
   user: safeParse(localStorage.getItem(STORAGE_KEYS.user), null),
 };
+let appLocale = localStorage.getItem(STORAGE_KEYS.appLocale) === "en" ? "en" : "zh";
+let appLocaleApplying = false;
+let appLocaleApplyFrame = 0;
+let appLanguageObserver = null;
+let latestAuthRouteNotice = "";
+const appLocaleOriginalTextNodes = new WeakMap();
+const appLocaleOriginalAttributes = new WeakMap();
 let priceAlertState = [];
 let returnCandidatesState = [];
 let selectedReturnBarcodes = new Set();
@@ -94,7 +274,52 @@ let offlineSyncBatchState = [];
 let saleVoidState = [];
 let saleRefundState = [];
 let paymentAnomalyState = [];
+let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
+let testDataBackendStats = {
+  users: null,
+  last_error: "",
+};
+const DIRECT_LOOP_ROLE_OPTIONS = [
+  { role_code: "store_clerk", role_label: "店员", binding: "store", workspace_label: "店员端 / 我的当前 bale" },
+  { role_code: "store_manager", role_label: "店长", binding: "store", workspace_label: "门店功能区 / 门店收货主控台" },
+  { role_code: "cashier", role_label: "收银员", binding: "store", workspace_label: "收银功能区 / POS" },
+  { role_code: "area_supervisor", role_label: "区域主管", binding: "area", workspace_label: "运营中心 / 多店数据" },
+  { role_code: "warehouse_clerk", role_label: "仓库员工", binding: "warehouse", workspace_label: "仓库功能区 / 配货打包" },
+  { role_code: "warehouse_manager", role_label: "仓库主管", binding: "warehouse", workspace_label: "仓库功能区 / 入仓到配送" },
+  { role_code: "admin", role_label: "系统管理员", binding: "global", workspace_label: "全部功能区" },
+];
 const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier"]);
+const DATA_BOUNDARY_LABELS = Object.freeze({
+  demo_seed_data: "demo seed data",
+  runtime_test_data: "runtime test data",
+  production_business_data: "production business data",
+});
+const TEST_DATA_RUNTIME_STORAGE_KEYS = [
+  { key: STORAGE_KEYS.latestWarehouseMainflowDemo, label: "warehouse mainflow demo runtime" },
+  { key: STORAGE_KEYS.latestStoreReplenishmentDemo, label: "store replenishment demo runtime" },
+  { key: STORAGE_KEYS.transferPrepExecution, label: "transfer preparation execution runtime" },
+  { key: STORAGE_KEYS.storeSdoPackageItemTokens, label: "STORE_ITEM tokens generated in PDA" },
+  { key: STORAGE_KEYS.posStoreItemSaleRecords, label: "POS STORE_ITEM sale records" },
+  { key: STORAGE_KEYS.chinaSourceBales, label: "China source bale test records" },
+  { key: STORAGE_KEYS.chinaSourceCategories, label: "China source category test records" },
+  { key: STORAGE_KEYS.supplierCategories, label: "supplier category test records" },
+  { key: STORAGE_KEYS.supplierCategoryLabels, label: "supplier category label test records" },
+  { key: STORAGE_KEYS.apparelPieceWeights, label: "apparel piece weight test records" },
+  { key: STORAGE_KEYS.apparelDefaultCosts, label: "apparel default cost test records" },
+  { key: STORAGE_KEYS.apparelSortingRacks, label: "apparel sorting rack test records" },
+  { key: STORAGE_KEYS.directHangUnpacks, label: "direct-hang unpack test records" },
+  { key: STORAGE_KEYS.directHangDispatchOrders, label: "direct-hang dispatch order test records" },
+  { key: STORAGE_KEYS.directHangDispatchBales, label: "direct-hang dispatch bale test records" },
+  { key: STORAGE_KEYS.directHangStoreItems, label: "direct-hang STORE_ITEM test records" },
+  { key: STORAGE_KEYS.baleSalesRebaleEntries, label: "bale sales rebale test records" },
+  { key: STORAGE_KEYS.consignmentBundleOrders, label: "consignment bundle order test records" },
+  { key: STORAGE_KEYS.opsExceptionTickets, label: "ops exception test tickets" },
+  { key: STORAGE_KEYS.opsDataTopics, label: "ops data topic test records" },
+  { key: STORAGE_KEYS.oaAttendanceRecords, label: "OA attendance test records" },
+  { key: STORAGE_KEYS.oaPayrollBatches, label: "OA payroll test records" },
+  { key: STORAGE_KEYS.oaFinanceApprovals, label: "OA finance approval test records" },
+];
+const TEST_DATA_RUNTIME_STORAGE_KEY_SET = new Set(TEST_DATA_RUNTIME_STORAGE_KEYS.map((entry) => entry.key));
 const CASHIER_TERMINAL_LOCALE_COPY = {
   zh: {
     brandTitle: "高速收银终端",
@@ -342,6 +567,7 @@ let sortingStockSearchText = "";
 let cashierTerminalClockTimer = null;
 let cashierTerminalPrimedStoreCode = "";
 let cashierTerminalState = createCashierTerminalState();
+cashierTerminalState.locale = appLocale;
 let sortingStockMinLooseQtyFilter = "";
 let activeSortingCompressionGroupKey = "";
 let activeSortingCompressionTaskType = "";
@@ -426,6 +652,7 @@ const jsonBuilderState = {};
 let recommendationCandidatesState = [];
 let selectedRecommendationKeys = new Set();
 let transferOrderState = [];
+let transferShipmentDraftRows = [];
 let transferShipTargetHintTimer = null;
 let transferShipTargetHintRequestSeq = 0;
 let activeTransferPreparationNo = "";
@@ -450,6 +677,7 @@ let storeDispatchBaleState = [];
 let filteredStoreDispatchBaleState = [];
 let storeReceiptPackageStatusState = {};
 let storeReceiptPackageAssignmentState = {};
+let storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), {});
 let warehouseDispatchHistoryState = [];
 let warehouseSoldPackageHistoryState = [];
 let baleSalesPricingCandidateState = [];
@@ -473,6 +701,16 @@ let storePdaWorkbenchState = {
 let storeClerkHomeState = {
   assigned_employee: "",
   store_code: "",
+  step: "list",
+  selected_package_key: "",
+  selected_rack_code: "",
+  selected_price_mode: "",
+  selected_price: "",
+  custom_price: "",
+  print_quantity: "",
+  print_preview_token_nos: [],
+  last_action_message: "",
+  last_action_type: "success",
 };
 let parcelBatchRowState = [];
 let chinaSourceBaleState = safeParse(localStorage.getItem(STORAGE_KEYS.chinaSourceBales), []);
@@ -556,6 +794,7 @@ let devTrackerState = safeParse(localStorage.getItem(STORAGE_KEYS.devTracker), n
 let apparelPieceWeightState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelPieceWeights), []);
 let apparelDefaultCostState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelDefaultCosts), []);
 let apparelSortingRackState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelSortingRacks), []);
+let storeDefaultSalePriceState = safeParse(localStorage.getItem(STORAGE_KEYS.storeDefaultSalePrices), null);
 
 const DEFAULT_APPAREL_PIECE_WEIGHTS = [
   { category_main: "tops", category_sub: "lady tops", standard_weight_kg: 0.24, note: "默认轻薄上衣口径" },
@@ -599,6 +838,11 @@ const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SOR
   { category_main: "jacket", category_sub: "jacket", grade: "P", default_cost_kes: 260, rack_code: "A-JK-P-01", note: "外套 P 档默认分拣库位" },
   { category_main: "jacket", category_sub: "jacket", grade: "S", default_cost_kes: 198, rack_code: "A-JK-S-01", note: "外套 S 档默认分拣库位" },
 ];
+const DEFAULT_STORE_SALE_PRICE_SETTINGS = Object.freeze({
+  default_price_1_kes: 150,
+  default_price_2_kes: 200,
+  note: "店员 PDA 上架默认售价",
+});
 
 const DEFAULT_OPS_DATA_TOPICS = [
   {
@@ -874,8 +1118,8 @@ function appendCategoryPairToTree(tree, mainCategory = "", subCategory = "") {
 const WORKSPACE_META = {
   overview: "当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。",
   testing: "当前显示：测试工具。这里集中放演练样本、模拟销售和一键重置，不再挂在店长工作台里。",
-  warehouse: "当前显示：仓库功能区。这里按商品入仓、工单管理、门店补货、Bales销售和综合管理五条线组织仓库页面。",
-  operations: "当前显示：运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
+  warehouse: "当前显示：仓库功能区。这里按商品入仓、工单管理、门店补货、仓库综合管理、中方录入和管理员管理组织仓库页面。",
+  operations: "当前显示：运营中心。这里按经营分析、业务执行和风控管理组织区域经理页面。",
   store: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。",
   admin: "当前显示：系统管理。这里看门店、供应商、角色权限、OA 审批和新店建议。",
 };
@@ -900,16 +1144,22 @@ const WAREHOUSE_NAV_SECTIONS = [
       '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.75 10h10.5M11 5.75 15.25 10 11 14.25" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.75 4.75 4.5 10l4.25 5.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity=".65"/></svg>',
   },
   {
-    id: "baleSales",
-    title: "Bales销售",
-    iconSvg:
-      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 6.25h10M5 10h10M5 13.75h6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13.25 5.25h2v2M12.5 14.75h3.5v-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity=".72"/></svg>',
-  },
-  {
     id: "general",
-    title: "综合管理",
+    title: "仓库综合管理",
     iconSvg:
       '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="4.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="11.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="11.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>',
+  },
+  {
+    id: "china",
+    title: "中方录入",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5.25h10v9.5H5z" stroke="currentColor" stroke-width="1.5"/><path d="M7.25 8h5.5M7.25 11h3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4 4.25h3.25M4 15.75h5.25" stroke="currentColor" stroke-width="1.3" opacity=".65" stroke-linecap="round"/></svg>',
+  },
+  {
+    id: "admin",
+    title: "管理员管理",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3.75 5.25 5.5v3.75c0 3.2 2.06 5.93 4.75 6.95 2.69-1.02 4.75-3.75 4.75-6.95V5.5L10 3.75Z" stroke="currentColor" stroke-width="1.6"/><path d="M8.15 10.2h3.7M10 8.35v3.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   },
 ];
 
@@ -1012,6 +1262,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 129,
     icon: "库",
     navTitle: "0. 主档库",
+    hiddenInNav: true,
   },
   {
     match: "0. 包裹批次目录",
@@ -1034,6 +1285,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 70,
     icon: "品",
     navTitle: "1. 新建商品",
+    hiddenInNav: true,
   },
   {
     match: "2. 生成内部商品码",
@@ -1041,6 +1293,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 80,
     icon: "码",
     navTitle: "2. 内部商品码",
+    hiddenInNav: true,
   },
   {
     match: "3. 仓库收货",
@@ -1048,6 +1301,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 90,
     icon: "收",
     navTitle: "3. 仓库收货",
+    hiddenInNav: true,
   },
   {
     match: "0.1 原始 Bale 总库存",
@@ -1086,18 +1340,18 @@ const WAREHOUSE_PANEL_NAV_META = [
   },
   {
     match: "0.3 分拣库存 / 中转区库存",
-    section: "workorder",
+    section: "general",
     order: 120,
     icon: "位",
     navTitle: "0.3 分拣库存 / 中转区库存",
-    hiddenInNav: true,
   },
   {
     match: "门店送货执行单",
-    section: "workorder",
+    section: "replenishment",
     order: 121,
     icon: "送",
     navTitle: "门店送货执行单",
+    hiddenInNav: true,
   },
   {
     match: "B2B 已售包裹",
@@ -1105,6 +1359,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 122,
     icon: "售",
     navTitle: "B2B 已售包裹",
+    hiddenInNav: true,
   },
   {
     match: "0.4 待售包裹工单",
@@ -1112,6 +1367,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 125,
     icon: "售",
     navTitle: "0.4 待售包裹工单",
+    hiddenInNav: true,
   },
   {
     match: "门店补货流程页",
@@ -1157,42 +1413,45 @@ const WAREHOUSE_PANEL_NAV_META = [
   },
   {
     match: "Bales销售｜待售包裹",
-    section: "baleSales",
+    section: "general",
     order: 129,
     icon: "售",
     navTitle: "待售包裹",
+    hiddenInNav: true,
   },
   {
     match: "Bales销售｜真实出库",
-    section: "baleSales",
+    section: "general",
     order: 130,
     icon: "出",
     navTitle: "真实出库",
+    hiddenInNav: true,
   },
   {
     match: "4. 货架位管理",
-    section: "general",
+    section: "admin",
     order: 131,
     icon: "架",
     navTitle: "4. 货架位管理",
+    hiddenInNav: true,
   },
   {
-    match: "4.1 打印纸模板管理",
-    section: "general",
+    match: "4.1 打印模版管理",
+    section: "admin",
     order: 135,
     icon: "模",
-    navTitle: "4.1 打印纸模板管理",
+    navTitle: "4.1 打印模版管理",
   },
   {
     match: "4.2 中方来源 Bale 录入",
-    section: "general",
+    section: "china",
     order: 137,
     icon: "源",
     navTitle: "4.2 中方来源 Bale 录入",
   },
   {
     match: "4.3 中方来源列表 / 补填成本",
-    section: "general",
+    section: "china",
     order: 138,
     icon: "费",
     navTitle: "4.3 中方来源列表 / 补填成本",
@@ -1203,6 +1462,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 139,
     icon: "账",
     navTitle: "4.4 商品身份证 ID 台账",
+    hiddenInNav: true,
   },
   {
     match: "4.5 直挂拆包计件 / 成本确认",
@@ -1210,27 +1470,45 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 139.5,
     icon: "拆",
     navTitle: "4.5 直挂拆包计件 / 成本确认",
+    hiddenInNav: true,
   },
   {
     match: "4.7 默认成本价管理",
-    section: "general",
+    section: "admin",
     order: 139.9,
     icon: "价",
     navTitle: "4.7 默认成本价管理",
+    hiddenInNav: true,
+  },
+  {
+    match: "4.8 分拣库位管理",
+    section: "general",
+    order: 139.95,
+    icon: "位",
+    navTitle: "4.8 分拣库位管理",
+  },
+  {
+    match: "4.9 默认售价管理",
+    section: "general",
+    order: 139.98,
+    icon: "价",
+    navTitle: "4.9 默认售价管理",
   },
   {
     match: "5. 耗材管理",
-    section: "general",
+    section: "admin",
     order: 140,
     icon: "耗",
     navTitle: "5. 耗材管理",
+    hiddenInNav: true,
   },
   {
     match: "6. 固定资产",
-    section: "general",
+    section: "admin",
     order: 150,
     icon: "资",
     navTitle: "6. 固定资产",
+    hiddenInNav: true,
   },
   {
     match: "7. 综合看板",
@@ -1238,6 +1516,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 160,
     icon: "览",
     navTitle: "7. 综合看板",
+    hiddenInNav: true,
   },
   {
     match: "8. 需求提报",
@@ -1245,6 +1524,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 170,
     icon: "需",
     navTitle: "8. 需求提报",
+    hiddenInNav: true,
   },
 ];
 
@@ -1259,9 +1539,17 @@ const OPERATIONS_PANEL_NAV_META = [
   {
     match: "2. AI 固定分析框架",
     section: "insight",
-    order: 20,
+    order: 30,
     icon: "析",
     navTitle: "2. AI 固定分析框架",
+    hiddenInNav: true,
+  },
+  {
+    match: "2. 全部销售数据 / 简要分析",
+    section: "insight",
+    order: 20,
+    icon: "售",
+    navTitle: "全部销售数据",
   },
   {
     match: "3. 业务动作台",
@@ -1269,6 +1557,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 30,
     icon: "动",
     navTitle: "3. 业务动作台",
+    hiddenInNav: true,
   },
   {
     match: "门店限价规则",
@@ -1276,6 +1565,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 40,
     icon: "价",
     navTitle: "门店限价规则",
+    hiddenInNav: true,
   },
   {
     match: "7. 风控预警中心",
@@ -1283,6 +1573,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 90,
     icon: "警",
     navTitle: "7. 风控预警中心",
+    hiddenInNav: true,
   },
   {
     match: "8. 现金收取与存储",
@@ -1290,6 +1581,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 100,
     icon: "现",
     navTitle: "8. 现金收取与存储",
+    hiddenInNav: true,
   },
   {
     match: "9. 巡店记录与评分",
@@ -1297,6 +1589,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 110,
     icon: "巡",
     navTitle: "9. 巡店记录与评分",
+    hiddenInNav: true,
   },
   {
     match: "10. 会议纪要与 AI 分析",
@@ -1304,6 +1597,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 120,
     icon: "会",
     navTitle: "10. 会议纪要与 AI 分析",
+    hiddenInNav: true,
   },
   {
     match: "11. 区域经理评分卡",
@@ -1311,6 +1605,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 130,
     icon: "评",
     navTitle: "11. 区域经理评分卡",
+    hiddenInNav: true,
   },
   {
     match: "12. 异常流 / 例外闭环",
@@ -1318,6 +1613,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 140,
     icon: "异",
     navTitle: "12. 异常流 / 例外闭环",
+    hiddenInNav: true,
   },
   {
     match: "13. 运营数据接入框架",
@@ -1325,6 +1621,7 @@ const OPERATIONS_PANEL_NAV_META = [
     order: 150,
     icon: "数",
     navTitle: "13. 运营数据接入框架",
+    hiddenInNav: true,
   },
 ];
 
@@ -1365,6 +1662,15 @@ const STORE_PANEL_NAV_META = [
     order: 30,
     icon: "编",
     navTitle: "7. 店员 PDA 上架工作台",
+    hiddenInNav: true,
+  },
+  {
+    match: "7.1 打印任务 / 重打",
+    section: "clerk",
+    order: 40,
+    icon: "印",
+    navTitle: "内部兼容：打印任务 / 重打",
+    hiddenInNav: true,
   },
   {
     match: "7.2 直挂店员工作台",
@@ -1372,6 +1678,7 @@ const STORE_PANEL_NAV_META = [
     order: 45,
     icon: "直",
     navTitle: "7.2 直挂店员工作台",
+    hiddenInNav: true,
   },
   {
     match: "9. 收银销售",
@@ -1386,6 +1693,7 @@ const STORE_PANEL_NAV_META = [
     order: 70,
     icon: "废",
     navTitle: "作废单",
+    hiddenInNav: true,
   },
   {
     match: "顾客退货 / 退款单",
@@ -1393,6 +1701,7 @@ const STORE_PANEL_NAV_META = [
     order: 80,
     icon: "退",
     navTitle: "顾客退货 / 退款单",
+    hiddenInNav: true,
   },
   {
     match: "支付异常单",
@@ -1400,6 +1709,7 @@ const STORE_PANEL_NAV_META = [
     order: 90,
     icon: "异",
     navTitle: "支付异常单",
+    hiddenInNav: true,
   },
   {
     match: "11. Safaricom / M-Pesa",
@@ -1407,6 +1717,7 @@ const STORE_PANEL_NAV_META = [
     order: 100,
     icon: "付",
     navTitle: "11. Safaricom / M-Pesa",
+    hiddenInNav: true,
   },
   {
     match: "12. 离线销售同步",
@@ -1414,37 +1725,57 @@ const STORE_PANEL_NAV_META = [
     order: 110,
     icon: "离",
     navTitle: "12. 离线销售同步",
+    hiddenInNav: true,
   },
   {
     match: "8. 门店货架位",
-    section: "general",
+    section: "manager",
     order: 120,
     icon: "位",
     navTitle: "8. 门店货架位",
   },
   {
     match: "10. 周期退仓",
-    section: "manager",
+    section: "general",
     order: 130,
     icon: "仓",
     navTitle: "10. 周期退仓",
+    hiddenInNav: true,
   },
   {
     match: "实时数据查看",
-    section: "manager",
+    section: "general",
     order: 140,
     icon: "览",
     navTitle: "实时数据查看",
+    hiddenInNav: true,
+  },
+  {
+    match: "8. 上架会话 / 异常核对",
+    section: "general",
+    order: 150,
+    icon: "核",
+    navTitle: "内部兼容：上架会话 / 异常核对",
+    hiddenInNav: true,
   },
 ];
 
 const ADMIN_PANEL_NAV_META = [
+  {
+    match: "系统配置（先不用看）",
+    section: "master",
+    order: 5,
+    icon: "配",
+    navTitle: "内部兼容：系统配置",
+    hiddenInNav: true,
+  },
   {
     match: "门店管理",
     section: "master",
     order: 10,
     icon: "店",
     navTitle: "门店管理",
+    hiddenInNav: true,
   },
   {
     match: "供应商管理",
@@ -1452,6 +1783,7 @@ const ADMIN_PANEL_NAV_META = [
     order: 20,
     icon: "供",
     navTitle: "供应商管理",
+    hiddenInNav: true,
   },
   {
     match: "角色 / 权限矩阵",
@@ -1466,6 +1798,7 @@ const ADMIN_PANEL_NAV_META = [
     order: 40,
     icon: "OA",
     navTitle: "OA / HR / 财务审批框架",
+    hiddenInNav: true,
   },
   {
     match: "账号 / 用户",
@@ -1475,11 +1808,19 @@ const ADMIN_PANEL_NAV_META = [
     navTitle: "账号 / 用户",
   },
   {
+    match: "数据管理 / Test Data Tools",
+    section: "governance",
+    order: 55,
+    icon: "数",
+    navTitle: "数据管理",
+  },
+  {
     match: "开新店建议",
     section: "expansion",
     order: 60,
     icon: "拓",
     navTitle: "开新店建议",
+    hiddenInNav: true,
   },
 ];
 
@@ -1511,7 +1852,7 @@ const LEGACY_WORKSPACE_MAP = {
 
 const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  warehouse: ["inbound", "workorder", "replenishment", "baleSales", "general"],
+  warehouse: ["inbound", "workorder", "replenishment", "general", "china", "admin"],
   operations: ["insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"],
@@ -1532,7 +1873,7 @@ function createRoleAccessProfile(workspaces = WORKSPACE_ORDER, sections = FULL_S
 function getRoleAccessProfile(user = currentSession.user) {
   const roleCode = getNormalizedRoleCode(user);
   if (!roleCode) {
-    return createRoleAccessProfile(["overview", "testing", "warehouse", "operations", "store", "admin"]);
+    return createRoleAccessProfile([], {});
   }
 
   const superRoles = new Set(["admin", "super_admin", "owner", "boss", "headquarters", "head_office"]);
@@ -1543,14 +1884,14 @@ function getRoleAccessProfile(user = currentSession.user) {
   const chinaEntryRoles = new Set(["china_entry", "china_operator", "procurement", "buyer"]);
   if (chinaEntryRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "warehouse"], {
-      warehouse: ["inbound", "general"],
+      warehouse: ["china", "inbound"],
     });
   }
 
   const chinaFinanceRoles = new Set(["china_finance", "finance", "accountant"]);
   if (chinaFinanceRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "warehouse", "operations", "admin"], {
-      warehouse: ["general"],
+      warehouse: ["china", "admin"],
       operations: ["governance", "insight"],
       admin: ["governance"],
     });
@@ -1563,31 +1904,31 @@ function getRoleAccessProfile(user = currentSession.user) {
     });
   }
 
-  const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager"]);
+  const regionalRoles = new Set(["area_supervisor", "regional_manager", "area_manager", "operations_manager"]);
   if (regionalRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "operations"], {
-      operations: ["insight", "action", "governance"],
+    return createRoleAccessProfile(["operations"], {
+      operations: ["insight"],
     });
   }
 
   const warehouseManagerRoles = new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "warehouse"], {
-      warehouse: ["inbound", "workorder", "replenishment", "baleSales", "general"],
+    return createRoleAccessProfile(["warehouse"], {
+      warehouse: ["inbound", "workorder", "replenishment", "general", "china", "admin"],
     });
   }
 
   const warehouseWorkerRoles = new Set(["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"]);
   if (warehouseWorkerRoles.has(roleCode)) {
     return createRoleAccessProfile(["warehouse"], {
-      warehouse: ["inbound", "workorder"],
+      warehouse: ["workorder"],
     });
   }
 
   const managerRoles = new Set(["store_manager", "manager", "store_supervisor", "shop_manager"]);
   if (managerRoles.has(roleCode)) {
-    return createRoleAccessProfile(["store", "testing"], {
-      store: ["manager", "general"],
+    return createRoleAccessProfile(["store"], {
+      store: ["manager"],
     });
   }
 
@@ -1780,14 +2121,43 @@ function getNormalizedRoleCode(user = currentSession.user) {
   return String(user?.role_code || "").trim().toLowerCase();
 }
 
+function getDirectLoopRoleOption(roleCode = "") {
+  const normalized = String(roleCode || "").trim().toLowerCase();
+  return DIRECT_LOOP_ROLE_OPTIONS.find((role) => role.role_code === normalized) || null;
+}
+
+function getDirectLoopRoleLabel(roleCode = "") {
+  return getDirectLoopRoleOption(roleCode)?.role_label || roleCode || "-";
+}
+
+function isPosPanelAllowedForUser(user = currentSession.user) {
+  const roleCode = getNormalizedRoleCode(user);
+  return roleCode === "admin" || CASHIER_ROLE_CODES.has(roleCode);
+}
+
 function getUserRoleLanding(user = currentSession.user) {
+  const roleCode = getNormalizedRoleCode(user);
+  if (roleCode === "admin") {
+    return { workspace: "overview", panelTitle: "先这样测试", label: "今日总览" };
+  }
+  if (roleCode === "area_supervisor") {
+    return { workspace: "operations", panelTitle: "1. 区域经营驾驶舱", label: "运营中心 / 经营分析" };
+  }
+  if (roleCode === "warehouse_manager") {
+    return { workspace: "warehouse", panelTitle: "6. 仓库执行单 / 出库打印", label: "仓库功能区 / 仓库执行" };
+  }
+  if (roleCode === "warehouse_clerk") {
+    return { workspace: "warehouse", panelTitle: "5.1 补差打包工单", label: "仓库功能区 / 打包拣货" };
+  }
+  if (CASHIER_ROLE_CODES.has(roleCode)) {
+    return { workspace: "store", panelTitle: "9. 收银销售", label: "收银区 / POS" };
+  }
   const landingResolver = storeExecutionFlow && typeof storeExecutionFlow.getStoreRoleLanding === "function"
     ? storeExecutionFlow.getStoreRoleLanding
     : null;
   if (landingResolver) {
-    return landingResolver(getNormalizedRoleCode(user), Boolean(user?.store_code));
+    return landingResolver(roleCode, Boolean(user?.store_code));
   }
-  const roleCode = getNormalizedRoleCode(user);
   if (!user?.store_code) {
     return null;
   }
@@ -1874,6 +2244,19 @@ function getWorkspaceNavSections(workspace) {
   return WORKSPACE_NAV_SECTIONS_MAP[workspace] || [];
 }
 
+function isStoreCashierPanel(panel) {
+  if (!panel || panel.dataset?.workspacePanel !== "store") {
+    return false;
+  }
+  return getWorkspacePanelNavMeta(panel).section === "cashier";
+}
+
+function showWorkspaceAccessNotice(message = "") {
+  if (workspaceHint && message) {
+    workspaceHint.textContent = message;
+  }
+}
+
 function isPanelAccessible(panel, user = currentSession.user) {
   const workspace = panel?.dataset?.workspacePanel || "";
   if (!workspace) {
@@ -1930,13 +2313,139 @@ function getHashPanelKey() {
   return decodeURIComponent(rawHash);
 }
 
+function getPanelByKey(panelKey = "") {
+  return workspacePanelsList.find((panel) => panel.dataset.panelKey === panelKey) || null;
+}
+
+function resolveRoutePanelKey(panelKey = getHashPanelKey()) {
+  const normalizedKey = String(panelKey || "").trim();
+  if (!normalizedKey) {
+    return "";
+  }
+  const exactPanel = getPanelByKey(normalizedKey);
+  if (exactPanel?.dataset?.panelKey) {
+    return exactPanel.dataset.panelKey;
+  }
+  const normalizedHash = normalizedKey.toLowerCase();
+  if (normalizedHash === "pos" || normalizedHash === "cashier" || normalizedHash === "store-pos") {
+    return getPanelKeyByTitle("store", "9. 收银销售") || normalizedKey;
+  }
+  const prefixPanel = workspacePanelsList.find((panel) => String(panel.dataset.panelKey || "").startsWith(normalizedKey));
+  return prefixPanel?.dataset?.panelKey || normalizedKey;
+}
+
+function getPendingRedirect() {
+  return safeParse(localStorage.getItem(STORAGE_KEYS.pendingRedirect), null);
+}
+
+function clearPendingRedirect() {
+  localStorage.removeItem(STORAGE_KEYS.pendingRedirect);
+}
+
+function syncAuthenticatedShellClass() {
+  document.body.classList.toggle("app-authenticated", Boolean(currentSession.token && currentSession.user));
+}
+
+function savePendingRedirectFromHash() {
+  const panelKey = resolveRoutePanelKey();
+  if (!panelKey) {
+    return null;
+  }
+  const targetPanel = getPanelByKey(panelKey);
+  if (!targetPanel) {
+    return null;
+  }
+  const pendingRedirect = {
+    hash: window.location.hash || `#${encodeURIComponent(panelKey)}`,
+    panelKey,
+    captured_at: new Date().toISOString(),
+  };
+  localStorage.setItem(STORAGE_KEYS.pendingRedirect, JSON.stringify(pendingRedirect));
+  return pendingRedirect;
+}
+
+function redirectToRoleDefaultWorkspace(user = currentSession.user, message = "") {
+  latestAuthRouteNotice = message || "";
+  const landing = getUserRoleLanding(user);
+  let targetPanel = null;
+  if (landing?.workspace && landing?.panelTitle) {
+    const panelKey = getPanelKeyByTitle(landing.workspace, landing.panelTitle);
+    targetPanel = panelKey ? getPanelByKey(panelKey) : null;
+  }
+  if (!targetPanel || !isPanelAccessible(targetPanel, user)) {
+    const fallbackWorkspace = getFirstAccessibleWorkspace(user);
+    targetPanel = getOrderedPanelsForWorkspace(fallbackWorkspace)[0] || null;
+  }
+  if (targetPanel?.dataset?.panelKey) {
+    setActivePanel(targetPanel.dataset.panelKey);
+  }
+  if (message) {
+    showWorkspaceAccessNotice(message);
+    renderAuthResultSummary("notice", { message });
+  }
+  return Boolean(targetPanel);
+}
+
+function enforceAuthenticatedRoute() {
+  latestAuthRouteNotice = "";
+  if (currentSession.token && currentSession.user) {
+    return true;
+  }
+  savePendingRedirectFromHash();
+  currentSession = { token: "", user: null };
+  syncAuthenticatedShellClass();
+  cashierTerminalPrimedStoreCode = "";
+  cashierTerminalState = createCashierTerminalState();
+  clearSortingTaskLockedShipment();
+  localStorage.removeItem(STORAGE_KEYS.token);
+  localStorage.removeItem(STORAGE_KEYS.user);
+  document.body.classList.remove("cashier-terminal-mode");
+  appShell?.classList.remove("cashier-terminal-mode");
+  authPage?.classList.remove("hidden-screen");
+  appShell?.classList.add("hidden-screen");
+  workspacePanels?.classList.add("locked");
+  if (sessionSummary) {
+    sessionSummary.textContent = "未登录";
+  }
+  if (appSessionMeta) {
+    appSessionMeta.className = "session-meta-inline";
+    appSessionMeta.textContent = "登录后显示角色和默认门店";
+  }
+  if (logoutButton) {
+    logoutButton.disabled = true;
+  }
+  renderCashierTerminal();
+  return false;
+}
+
+function resolvePendingRedirectAfterLogin(user = currentSession.user) {
+  const pendingRedirect = getPendingRedirect();
+  if (!pendingRedirect?.panelKey) {
+    return redirectToRoleDefaultWorkspace(user);
+  }
+  const targetPanel = getPanelByKey(pendingRedirect.panelKey);
+  clearPendingRedirect();
+  if (targetPanel && isPanelAccessible(targetPanel, user)) {
+    setActivePanel(pendingRedirect.panelKey);
+    return true;
+  }
+  return redirectToRoleDefaultWorkspace(user, "当前账号无权限访问该页面，已进入你的工作台");
+}
+
 function applyHashRoute() {
-  const panelKey = getHashPanelKey();
+  if (!enforceAuthenticatedRoute()) {
+    return false;
+  }
+  const panelKey = resolveRoutePanelKey();
   if (!panelKey) {
     return false;
   }
-  const targetPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === panelKey);
+  const targetPanel = getPanelByKey(panelKey);
   if (!targetPanel) {
+    return false;
+  }
+  if (!isPanelAccessible(targetPanel)) {
+    redirectToRoleDefaultWorkspace(currentSession.user, "当前账号无权限访问该页面");
     return false;
   }
   setActivePanel(panelKey, { syncHash: false });
@@ -2120,6 +2629,7 @@ function renderSummaryActions(actions = []) {
               type="button"
               class="ghost-button"
               data-panel-jump="${escapeHtml(action.panelKey)}"
+              ${action.transferShipNo ? `data-transfer-ship-fill="${escapeHtml(action.transferShipNo)}"` : ""}
             >
               ${escapeHtml(action.label)}
             </button>
@@ -2204,6 +2714,9 @@ function setActivePanel(panelKey, options = {}) {
     return;
   }
   if (!isPanelAccessible(targetPanel)) {
+    if (isStoreCashierPanel(targetPanel) && currentSession.user && !isPosPanelAllowedForUser(currentSession.user)) {
+      showWorkspaceAccessNotice("只有收银员可以进入收银区");
+    }
     const fallbackWorkspace = getFirstAccessibleWorkspace();
     const fallbackPanel = getOrderedPanelsForWorkspace(fallbackWorkspace)[0];
     if (fallbackPanel?.dataset?.panelKey && fallbackPanel.dataset.panelKey !== panelKey) {
@@ -2295,6 +2808,9 @@ const FIELD_LABELS = {
   full_name: "姓名",
   role_code: "角色代码",
   store_code: "门店代码",
+  warehouse_code: "仓库代码",
+  area_code: "区域代码",
+  managed_store_codes: "管理门店",
   category_main: "商品大类",
   category_sub: "商品小类",
   supplier_name: "供应商",
@@ -2304,7 +2820,6 @@ const FIELD_LABELS = {
   job_id: "打印任务 ID",
   note: "备注",
   receipt_no: "收货单号",
-  warehouse_code: "仓库代码",
   receipt_date: "收货日期",
   items_json: "商品明细（测试阶段格式）",
   from_warehouse_code: "调出仓库",
@@ -2378,8 +2893,10 @@ const FIELD_HELP = {
   phone: "填写联系电话，后面查供应商或异常时更方便。",
   status: "选择当前状态，正常情况下保持 active。",
   full_name: "填写员工真实姓名，方便审计日志和权限管理。",
-  role_code: "选择角色，例如 admin、cashier、store_manager。",
-  store_code: "填写所属门店代码；如果是总管理员可留系统默认。",
+  role_code: "从角色下拉框选择，系统会自动写入 role_code。",
+  store_code: "门店角色必须填写所属门店代码，例如 UTAWALA。",
+  area_code: "区域主管可填写区域代码，例如 NAIROBI-EAST。",
+  managed_store_codes: "区域主管可填写多个门店代码，用英文逗号分隔。",
   category_main: "填写商品大类，例如 pants、dress、shoes。",
   category_sub: "填写更细的小类，例如 sweat pant。",
   supplier_name: "填写这批货的供应商名称。",
@@ -2389,7 +2906,7 @@ const FIELD_HELP = {
   job_id: "填写打印任务编号；通常读取任务后会自动带出。",
   note: "补充说明，可写异常原因、交接备注或审批说明。",
   receipt_no: "填写收货单号；提交收货后会自动生成。",
-  warehouse_code: "当前先用主仓编码，例如 WH-001。",
+  warehouse_code: "仓库角色必须填写所属仓库代码，例如 WH1。",
   receipt_date: "填写收货日期；默认当天即可。",
   items_json: "这里先填商品明细；后面我会继续改成可点选的行项目表格。",
   from_warehouse_code: "填写调出仓库，目前通常是主仓。",
@@ -3220,9 +3737,29 @@ function writeOutput(selector, value) {
   if (!target) {
     return;
   }
+  target.__retailOpsOutputValue = value;
   const rawText = typeof value === "string" ? value : pretty(value);
   const shouldCompress = rawText.length > 1800 || rawText.split("\n").length > 36;
   target.textContent = shouldCompress ? buildOutputPreview(value, rawText) : rawText;
+}
+
+function readOutput(selector) {
+  const target = document.querySelector(selector);
+  if (!target) {
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(target, "__retailOpsOutputValue")) {
+    return target.__retailOpsOutputValue;
+  }
+  const rawText = String(target.textContent || "").trim();
+  if (!rawText) {
+    return null;
+  }
+  try {
+    return JSON.parse(rawText);
+  } catch (error) {
+    return rawText;
+  }
 }
 
 function renderErrorSummary(selector, message) {
@@ -4463,6 +5000,47 @@ function persistApparelSortingRackState() {
   localStorage.setItem(STORAGE_KEYS.apparelSortingRacks, JSON.stringify(ensureApparelSortingRackState()));
 }
 
+function normalizeStoreDefaultSalePriceSettings(value = {}) {
+  const source = Array.isArray(value) ? (value[0] || {}) : (value || {});
+  const defaultPrice1 = Number(
+    source.default_price_1_kes
+    || source.default_price_1
+    || source.price_1_kes
+    || source.price_1
+    || DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_1_kes,
+  );
+  const defaultPrice2 = Number(
+    source.default_price_2_kes
+    || source.default_price_2
+    || source.price_2_kes
+    || source.price_2
+    || DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_2_kes,
+  );
+  return {
+    default_price_1_kes: roundToTwo(defaultPrice1 > 0 ? defaultPrice1 : DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_1_kes),
+    default_price_2_kes: roundToTwo(defaultPrice2 > 0 ? defaultPrice2 : DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_2_kes),
+    note: String(source.note || DEFAULT_STORE_SALE_PRICE_SETTINGS.note || "").trim(),
+    updated_at: String(source.updated_at || "").trim(),
+  };
+}
+
+function ensureStoreDefaultSalePriceState() {
+  storeDefaultSalePriceState = normalizeStoreDefaultSalePriceSettings(storeDefaultSalePriceState || DEFAULT_STORE_SALE_PRICE_SETTINGS);
+  return storeDefaultSalePriceState;
+}
+
+function persistStoreDefaultSalePriceState() {
+  localStorage.setItem(STORAGE_KEYS.storeDefaultSalePrices, JSON.stringify(ensureStoreDefaultSalePriceState()));
+}
+
+function getDefaultStoreSalePriceChoices() {
+  const settings = ensureStoreDefaultSalePriceState();
+  return {
+    default_1: Number(settings.default_price_1_kes || DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_1_kes),
+    default_2: Number(settings.default_price_2_kes || DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_2_kes),
+  };
+}
+
 function roundToTwo(value) {
   return Number(Number(value || 0).toFixed(2));
 }
@@ -4727,35 +5305,6 @@ function getChinaSourceCategoryTree() {
       .sort((left, right) => String(left).localeCompare(String(right), "zh-CN"));
   });
   return merged;
-}
-
-function categoryMainOptionsHtml(selectedValue = "", { includeNew = false, supplierName = "" } = {}) {
-  const hasSupplierScope = Boolean(String(supplierName || "").trim());
-  const categoryTree = hasSupplierScope ? getSupplierScopedCategoryTree(supplierName) : getChinaSourceCategoryTree();
-  const options = [
-    `<option value="">${hasSupplierScope ? "请选择当前供应商的大类" : "请选择商品大类"}</option>`,
-  ].concat(
-    Object.keys(categoryTree).map(
-      (key) => `<option value="${escapeHtml(key)}"${key === selectedValue ? " selected" : ""}>${escapeHtml(key)}</option>`,
-    ),
-  );
-  if (includeNew && hasSupplierScope) {
-    options.push(`<option value="__new__"${selectedValue === "__new__" ? " selected" : ""}>+ 给当前供应商新建品类</option>`);
-  }
-  return options.join("");
-}
-
-function categorySubOptionsHtml(mainCategory = "", selectedValue = "", { supplierName = "" } = {}) {
-  const hasSupplierScope = Boolean(String(supplierName || "").trim());
-  const categoryTree = hasSupplierScope ? getSupplierScopedCategoryTree(supplierName) : getChinaSourceCategoryTree();
-  const placeholder = !mainCategory || mainCategory === "__new__"
-    ? (hasSupplierScope ? "请先选择当前供应商的大类" : "请选择商品小类")
-    : "请选择商品小类";
-  const options = [`<option value="">${placeholder}</option>`];
-  (categoryTree[mainCategory] || []).forEach((value) => {
-    options.push(`<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(value)}</option>`);
-  });
-  return options.join("");
 }
 
 function renderProductCategoryScopeSummary(message = "") {
@@ -5402,7 +5951,42 @@ function renderApparelSortingRackSummary(record = null) {
         </article>
       `)
       .join("")
-    : "先在 4.7 配好默认成本价，再新增一条分拣库位配置。";
+	    : "先在 4.7 配好默认成本价，再新增一条分拣库位配置。";
+}
+
+function renderStoreDefaultSalePriceSummary(record = null) {
+  const summaryTarget = document.querySelector("#storeDefaultSalePriceSummary");
+  const listTarget = document.querySelector("#storeDefaultSalePriceList");
+  if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
+    return;
+  }
+  const settings = normalizeStoreDefaultSalePriceSettings(record || (() => {
+    const form = document.querySelector("#storeDefaultSalePriceForm");
+    if (!(form instanceof HTMLFormElement)) {
+      return ensureStoreDefaultSalePriceState();
+    }
+    return Object.fromEntries(new FormData(form).entries());
+  })());
+  const saved = ensureStoreDefaultSalePriceState();
+  summaryTarget.className = "report-summary";
+  summaryTarget.innerHTML = `
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>默认售价 1</strong><span>${escapeHtml(formatKesAmount(settings.default_price_1_kes, "KES 150.00"))}</span></article>
+      <article class="store-metric"><strong>默认售价 2</strong><span>${escapeHtml(formatKesAmount(settings.default_price_2_kes, "KES 200.00"))}</span></article>
+      <article class="store-metric"><strong>PDA 关联</strong><span>店员上架价格选择</span></article>
+      <article class="store-metric"><strong>说明</strong><span>${escapeHtml(settings.note || "默认售价配置")}</span></article>
+    </div>
+  `;
+  listTarget.className = "candidate-summary";
+  listTarget.innerHTML = `
+    <article class="candidate-row">
+      <div class="candidate-main">
+        <strong>PDA 包上架 / 商品码打印默认售价</strong>
+        <div class="subtle small">${escapeHtml(`当前生效：默认售价 1 ${formatKesAmount(saved.default_price_1_kes, "KES 150.00")}；默认售价 2 ${formatKesAmount(saved.default_price_2_kes, "KES 200.00")}`)}</div>
+      </div>
+      <span class="meta-pill">写入 selected_price</span>
+    </article>
+  `;
 }
 
 function emptyChinaSourceContainerRow() {
@@ -7751,8 +8335,9 @@ function renderAuthResultSummary(kind, data) {
     <div class="report-summary-grid">
       <article class="store-metric"><strong>姓名</strong><span>${escapeHtml(user?.full_name || "-")}</span></article>
       <article class="store-metric"><strong>账号</strong><span>${escapeHtml(user?.username || "-")}</span></article>
-      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(user?.role_code || "-")}</span></article>
-      <article class="store-metric"><strong>默认门店</strong><span>${escapeHtml(user?.store_code || "全局账号")}</span></article>
+      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(user?.role_label || getDirectLoopRoleLabel(user?.role_code || ""))}</span></article>
+      <article class="store-metric"><strong>role_code</strong><span>${escapeHtml(user?.role_code || "-")}</span></article>
+      <article class="store-metric"><strong>默认门店</strong><span>${escapeHtml(user?.store_code || user?.warehouse_code || user?.area_code || "全局账号")}</span></article>
       <article class="store-metric"><strong>默认进入</strong><span>${escapeHtml(landing?.label || "保留当前工作区")}</span></article>
       <article class="store-metric"><strong>可见工作区</strong><span>${escapeHtml(visibleWorkspaces.join(" / ") || "未配置")}</span></article>
     </div>
@@ -7863,6 +8448,8 @@ function hydrateTransferForms(transfer) {
       input.value = transfer.transfer_no;
     }
   });
+  ensureTransferShipmentDraftRows(activeTransferPreparationNo);
+  renderTransferShipmentDraftSummary();
   renderReplenishmentFlowSummary(activeTransferPreparationNo);
   renderLoosePackingTaskWorkbench(activeTransferPreparationNo);
   renderTransferExecutionWorkbench(activeTransferPreparationNo);
@@ -10424,10 +11011,21 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const verificationHint = verificationPending
     ? `仓库核对尚未完成：现成待送店包 ${readiness.foundPreparedCount || 0}/${readiness.requiredPreparedCount || 0}，补差工单 ${readiness.completedLooseTaskCount || 0}/${readiness.requiredLooseTaskCount || 0}。`
     : "仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。";
-  const dispatchRows = typeof operationsFulfillmentFlow.buildTransferDispatchRows === "function"
+  let dispatchRows = typeof operationsFulfillmentFlow.buildTransferDispatchRows === "function"
     ? operationsFulfillmentFlow.buildTransferDispatchRows({ plan, looseTasks: executionRecord.looseTasks })
     : plan.finalDispatchRows;
-  const looseDispatchRows = dispatchRows.filter((row) => row.finalType === "loose_pick_sheet_dispatch");
+  const transferOutput = readOutput("#transferActionOutput");
+  const outputRows = transferOutput?.transfer_no
+    && String(transferOutput.transfer_no || "").trim().toUpperCase() === String(transfer.transfer_no || "").trim().toUpperCase()
+    && Array.isArray(transferOutput.display_store_dispatch_bales)
+    ? transferOutput.display_store_dispatch_bales
+    : [];
+  if (outputRows.length) {
+    dispatchRows = outputRows;
+  } else if (Array.isArray(transfer.display_store_dispatch_bales) && transfer.display_store_dispatch_bales.length) {
+    dispatchRows = transfer.display_store_dispatch_bales;
+  }
+  const looseDispatchRows = dispatchRows.filter((row) => row.finalType === "loose_pick_sheet_dispatch" || ["LPK", "loose_pick_sheet"].includes(String(row?.source_type || "").trim()));
   setInputValue("#preparedBaleRegistrationForm [name='transfer_no']", transfer.transfer_no);
   setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
@@ -10545,8 +11143,8 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
           .map((row) => `
             <article class="candidate-row transfer-draft-row">
               <div>
-                <strong>${escapeHtml(`${row.categoryMain || "-"} / ${row.categorySub || "-"}`)}</strong>
-                <div class="subtle small">${escapeHtml(`${row.finalLabel || "最终送店 bale"} · ${row.qty || 0} 件`)}</div>
+                <strong>${escapeHtml(`${row.categoryMain || row.category_summary || row.category_name || "-"}${row.categorySub ? ` / ${row.categorySub}` : ""}`)}</strong>
+                <div class="subtle small">${escapeHtml(`${row.finalLabel || row.source_label || "最终送店 bale"} · ${row.qty || row.item_count || 0} 件`)}</div>
                 <div class="meta-row">
                   <span class="meta-pill">${escapeHtml(row.finalType === "prepared_dispatch" ? "源头：现成待送店包裹" : "源头：补差拣货单")}</span>
                   ${row.baleBarcode ? `<span class="meta-pill">源 barcode ${escapeHtml(row.baleBarcode)}</span>` : ""}
@@ -10555,7 +11153,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
                 </div>
               </div>
               <div class="candidate-side-actions">
-                <span class="store-flag">${escapeHtml(String(row?.status || "").trim().toLowerCase() === "labelled" ? "本类已贴完" : "待打印")}</span>
+                <span class="store-flag">${escapeHtml(getDisplayStoreDispatchPrintLabel(row))}</span>
               </div>
             </article>
           `)
@@ -10610,31 +11208,6 @@ function hydrateReturnForms(returnOrder) {
       input.value = returnOrder.return_no;
     }
   });
-}
-
-function hydrateShiftForms(shift) {
-  if (!shift?.shift_no) {
-    return;
-  }
-  [
-    "#shiftReportForm [name='shift_no']",
-    "#handoverRequestForm [name='shift_no']",
-    "#closeBusinessReportForm [name='shift_no']",
-    "#saleForm [name='shift_no']",
-  ].forEach((selector) => {
-    const input = document.querySelector(selector);
-    if (input) {
-      input.value = shift.shift_no;
-    }
-  });
-  const syncField = document.querySelector("#offlineSyncForm [name='sales_json']");
-  if (syncField) {
-    const rows = safeParse(syncField.value, []);
-    if (Array.isArray(rows) && rows.length) {
-      rows[0].shift_no = shift.shift_no;
-      syncField.value = JSON.stringify(rows, null, 2);
-    }
-  }
 }
 
 function hydrateHandoverForms(handover) {
@@ -10720,6 +11293,14 @@ function hydrateShiftForms(shiftOrRows) {
   }
   if (firstRow.store_code) {
     applyStoreContext(firstRow.store_code);
+  }
+  const syncField = document.querySelector("#offlineSyncForm [name='sales_json']");
+  if (syncField) {
+    const rows = safeParse(syncField.value, []);
+    if (Array.isArray(rows) && rows.length) {
+      rows[0].shift_no = firstRow.shift_no;
+      syncField.value = JSON.stringify(rows, null, 2);
+    }
   }
   syncCashierTerminalShift(firstRow);
 }
@@ -16272,7 +16853,12 @@ async function completeCurrentBalePrintModalJob() {
   if (completionAction.action !== "complete_group") {
     throw new Error(`请先点“打印本轮全部 ${completionAction.pendingCount} 张”，确认实体出纸后，再确认本类已贴完。`);
   }
-  const jobsToComplete = [...jobs];
+  const currentModalIndex = Math.max(0, Math.min(Number(balePrintModalState.currentIndex || 0), Math.max(jobs.length - 1, 0)));
+  const currentJob = jobs[currentModalIndex] || null;
+  let jobsToComplete = [...jobs];
+  if (templateScope !== "bale") {
+    jobsToComplete = currentJob ? [currentJob] : [];
+  }
   for (const job of jobsToComplete) {
     if (!isBaleModalDirectOnlyJob(job)) {
       try {
@@ -16285,10 +16871,20 @@ async function completeCurrentBalePrintModalJob() {
       }
     }
   }
-  balePrintModalState.jobs = [];
-  balePrintModalState.currentIndex = 0;
-  balePrintModalState.hasSuccessfulBatchPrint = false;
-  baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+  if (templateScope !== "bale") {
+    const remainingJobs = jobs.filter((_, index) => index !== currentModalIndex);
+    balePrintModalState.jobs = remainingJobs;
+    balePrintModalState.currentIndex = Math.min(currentModalIndex, Math.max(remainingJobs.length - 1, 0));
+    balePrintModalState.hasSuccessfulBatchPrint = remainingJobs.length > 0;
+    if (!remainingJobs.length) {
+      baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+    }
+  } else {
+    balePrintModalState.jobs = [];
+    balePrintModalState.currentIndex = 0;
+    balePrintModalState.hasSuccessfulBatchPrint = false;
+    baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+  }
   const completedJobIds = new Set(
     jobsToComplete
       .filter((job) => !isBaleModalDirectOnlyJob(job))
@@ -16299,22 +16895,21 @@ async function completeCurrentBalePrintModalJob() {
   }
   if (templateScope !== "bale") {
     const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
+    const completedIndexes = jobsToComplete.length ? [currentModalIndex] : [];
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
-      if (transfer && Array.isArray(transfer.display_store_dispatch_bales)) {
-        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => {
-          const matched = jobsToComplete.some((job) => doesDispatchRowMatchPrintJob(row, job));
-          if (!matched) return row;
-          return { ...row, status: "labelled" };
-        });
+      if (transfer && Array.isArray(transfer.display_store_dispatch_bales) && completedIndexes.length) {
+        transfer.display_store_dispatch_bales = markDisplayStoreDispatchBaleLabelledByIndex(
+          transfer.display_store_dispatch_bales,
+          currentModalIndex,
+        );
       }
       const transferOutput = readOutput("#transferActionOutput");
-      if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales)) {
-        transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row) => {
-          const matched = jobsToComplete.some((job) => doesDispatchRowMatchPrintJob(row, job));
-          if (!matched) return row;
-          return { ...row, status: "labelled" };
-        });
+      if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales) && completedIndexes.length) {
+        transferOutput.display_store_dispatch_bales = markDisplayStoreDispatchBaleLabelledByIndex(
+          transferOutput.display_store_dispatch_bales,
+          currentModalIndex,
+        );
         writeOutput("#transferActionOutput", transferOutput);
         renderTransferActionResultSummary(transferOutput);
       }
@@ -16682,7 +17277,11 @@ function renderTransferActionResultSummary(result) {
           : ""
       }
       ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "下一阶段：仓库送货执行单 / 配送批次" },
+        {
+          panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"),
+          label: "下一阶段：仓库送货执行单 / 配送批次",
+          transferShipNo: result.transfer_no || activeTransferPreparationNo || "",
+        },
         { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "返回仓库执行单" },
       ])}
     `;
@@ -16700,7 +17299,11 @@ function renderTransferActionResultSummary(result) {
         <article class="store-metric"><strong>门店</strong><span>${escapeHtml(result.to_store_code || "-")}</span></article>
       </div>
       ${renderSummaryActions([
-        { panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"), label: "查看配送批次 / 收货跟踪" },
+        {
+          panelKey: getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪"),
+          label: "查看配送批次 / 收货跟踪",
+          transferShipNo: result.transfer_no || activeTransferPreparationNo || "",
+        },
         { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "继续：去仓库执行台" },
       ])}
     `;
@@ -16901,7 +17504,7 @@ function renderTransferShipTargetHint(transferNo = "") {
   const storeCode = String(transfer.to_store_code || "").trim().toUpperCase();
   const storeName = getTransferStoreDisplayName(transfer);
   const deliveryBatch = String(transfer.delivery_batch_no || "").trim().toUpperCase();
-  const baleCount = Number(transfer.dispatch_bale_count || transfer.delivery_batch?.bale_count || 0);
+  const baleCount = getTransferShipmentPackageCount(transfer);
   target.className = "flow-summary-note success";
   target.textContent = `目标门店：${storeCode || "-"}${storeName && storeName !== storeCode ? ` / ${storeName}` : ""}；关联仓库执行单（临时）：${normalizedTransferNo}；当前状态：${getShipmentBatchProgressLabel(transfer)}；总包数：${baleCount}${deliveryBatch ? `；配送批次：${deliveryBatch}` : ""}。`;
 }
@@ -16949,6 +17552,7 @@ async function loadTransferShipTargetHint(transferNo = "") {
     }
     upsertTransferOrderStateRow(transfer);
     renderTransferShipTargetHint(normalizedTransferNo);
+    renderTransferShipmentDraftSummary();
   } catch (error) {
     if (requestSeq !== transferShipTargetHintRequestSeq || !(target instanceof HTMLElement)) {
       return;
@@ -16989,6 +17593,256 @@ function getTransferRequestedQtyForDisplay(transfer = {}) {
   }
   const items = Array.isArray(transfer.items) ? transfer.items : [];
   return items.reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0);
+}
+
+function getTransferShipmentPackageCount(row = {}) {
+  const sdoPackages = Array.isArray(row?.store_delivery_execution_order?.packages)
+    ? row.store_delivery_execution_order.packages
+    : [];
+  if (sdoPackages.length) {
+    return sdoPackages.length;
+  }
+  const displayRows = Array.isArray(row?.display_store_dispatch_bales)
+    ? row.display_store_dispatch_bales
+    : [];
+  if (displayRows.length) {
+    return displayRows.length;
+  }
+  const storeDispatchRows = Array.isArray(row?.store_dispatch_bales) ? row.store_dispatch_bales : [];
+  if (storeDispatchRows.length) {
+    return storeDispatchRows.length;
+  }
+  const deliveryBatchCount = Number(row?.delivery_batch?.bale_count || 0);
+  if (deliveryBatchCount > 0) {
+    return deliveryBatchCount;
+  }
+  return Number(row?.dispatch_bale_count || 0);
+}
+
+function getTransferShipmentPackageRows(row = {}) {
+  const sdoPackages = Array.isArray(row?.store_delivery_execution_order?.packages)
+    ? row.store_delivery_execution_order.packages
+    : [];
+  if (sdoPackages.length) {
+    return sdoPackages;
+  }
+  const displayRows = Array.isArray(row?.display_store_dispatch_bales)
+    ? row.display_store_dispatch_bales
+    : [];
+  if (displayRows.length) {
+    return displayRows;
+  }
+  const storeDispatchRows = Array.isArray(row?.store_dispatch_bales) ? row.store_dispatch_bales : [];
+  if (storeDispatchRows.length) {
+    return storeDispatchRows;
+  }
+  const deliveryDispatchRows = Array.isArray(row?.delivery_batch?.dispatch_bales)
+    ? row.delivery_batch.dispatch_bales
+    : [];
+  return deliveryDispatchRows;
+}
+
+function getTransferShipmentItemCount(row = {}) {
+  const packageRows = getTransferShipmentPackageRows(row);
+  const packageItemCount = packageRows.reduce((sum, packageRow) => {
+    const nestedItems = Array.isArray(packageRow?.items) ? packageRow.items.length : 0;
+    return sum + Number(
+      packageRow?.item_count
+      || packageRow?.store_item_count
+      || packageRow?.total_item_count
+      || packageRow?.total_items
+      || packageRow?.qty
+      || packageRow?.quantity
+      || nestedItems
+      || 0,
+    );
+  }, 0);
+  if (packageItemCount > 0) {
+    return packageItemCount;
+  }
+  return Number(row?.requested_qty || getTransferRequestedQtyForDisplay(row) || 0);
+}
+
+function getTransferShipmentSdoCode(row = {}) {
+  return String(
+    row?.store_delivery_execution_order_no
+    || row?.store_delivery_execution_order?.execution_order_no
+    || row?.official_delivery_barcode
+    || "",
+  ).trim().toUpperCase();
+}
+
+function getTransferShipmentAvailableRows() {
+  return (Array.isArray(transferOrderState) ? transferOrderState : [])
+    .map((row) => normalizeTransferForOperationsSummary(row))
+    .filter((row) => String(row?.transfer_no || "").trim() && getTransferShipmentSdoCode(row));
+}
+
+function buildTransferShipmentDraftRow(transferOrNo = "") {
+  const transfer = transferOrNo && typeof transferOrNo === "object"
+    ? transferOrNo
+    : findTransferOrderStateRow(transferOrNo);
+  const normalized = transfer ? normalizeTransferForOperationsSummary(transfer) : {};
+  const transferNo = String(
+    normalized.transfer_no || (typeof transferOrNo === "string" ? transferOrNo : ""),
+  ).trim().toUpperCase();
+  if (!transferNo) {
+    return null;
+  }
+  const storeCode = String(normalized.to_store_code || "").trim().toUpperCase();
+  return {
+    transfer_no: transferNo,
+    to_store_code: storeCode,
+    target_store: getTransferStoreDisplayName(normalized),
+    sdo_code: getTransferShipmentSdoCode(normalized) || "SDO 未生成",
+    package_count: getTransferShipmentPackageCount(normalized),
+    item_count: getTransferShipmentItemCount(normalized),
+    status: getShipmentBatchProgressLabel(normalized),
+  };
+}
+
+function ensureTransferShipmentDraftRows(transferNo = "") {
+  const preferredTransferNo = String(
+    transferNo
+    || document.querySelector("#transferShipForm [name='transfer_no']")?.value
+    || activeTransferPreparationNo
+    || "",
+  ).trim().toUpperCase();
+  const rebuiltRows = transferShipmentDraftRows
+    .map((row) => buildTransferShipmentDraftRow(row?.transfer_no || ""))
+    .filter(Boolean);
+  transferShipmentDraftRows = rebuiltRows;
+  if (preferredTransferNo) {
+    const preferredRow = buildTransferShipmentDraftRow(preferredTransferNo);
+    if (preferredRow) {
+      transferShipmentDraftRows = [
+        preferredRow,
+        ...transferShipmentDraftRows.filter((row) => row.transfer_no !== preferredTransferNo),
+      ];
+    }
+  }
+  if (!transferShipmentDraftRows.length) {
+    const firstAvailable = getTransferShipmentAvailableRows()[0];
+    const fallbackRow = firstAvailable ? buildTransferShipmentDraftRow(firstAvailable) : null;
+    transferShipmentDraftRows = fallbackRow ? [fallbackRow] : [];
+  }
+  return transferShipmentDraftRows;
+}
+
+function getTransferShipmentDraftTotals(rows = transferShipmentDraftRows) {
+  const selectedRows = rows.filter((row) => row?.transfer_no);
+  const uniqueStores = new Set(
+    selectedRows.map((row) => String(row.to_store_code || row.target_store || "").trim().toUpperCase()).filter(Boolean),
+  );
+  const routeStops = [...new Set(selectedRows.map((row) => String(row.to_store_code || row.target_store || "").trim()).filter(Boolean))];
+  return {
+    selectedRows,
+    storeCount: uniqueStores.size,
+    packageCount: selectedRows.reduce((sum, row) => sum + Number(row.package_count || 0), 0),
+    itemCount: selectedRows.reduce((sum, row) => sum + Number(row.item_count || 0), 0),
+    routeStops,
+  };
+}
+
+function renderTransferShipmentDraftSummary() {
+  const target = document.querySelector("#transferShipLinkedOrdersSummary");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const availableRows = getTransferShipmentAvailableRows();
+  ensureTransferShipmentDraftRows();
+  if (!transferShipmentDraftRows.length) {
+    target.className = "candidate-summary empty-state";
+    target.textContent = "暂无已生成 SDO 的调拨单。先在 Page 6 生成仓库送货执行单，再创建配送批次。";
+    return;
+  }
+  const totals = getTransferShipmentDraftTotals();
+  const renderOptions = (selectedTransferNo = "") => availableRows
+    .map((row) => {
+      const transferNo = String(row.transfer_no || "").trim().toUpperCase();
+      const sdo = getTransferShipmentSdoCode(row) || "SDO 未生成";
+      const label = `${transferNo} / ${row.to_store_code || "-"} / ${sdo} / ${getTransferShipmentPackageCount(row)} 包`;
+      return `<option value="${escapeHtml(transferNo)}" ${transferNo === selectedTransferNo ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+  target.className = "candidate-summary";
+  target.innerHTML = `
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>涉及门店数</strong><span>${escapeHtml(totals.storeCount || 0)}</span></article>
+      <article class="store-metric"><strong>总包数</strong><span>${escapeHtml(totals.packageCount || 0)}</span></article>
+      <article class="store-metric"><strong>总件数</strong><span>${escapeHtml(totals.itemCount || 0)}</span></article>
+      <article class="store-metric"><strong>stops / 路线</strong><span>${escapeHtml(totals.routeStops.join(" → ") || "待选择")}</span></article>
+    </div>
+    <div class="candidate-list transfer-draft-list">
+      ${transferShipmentDraftRows
+        .map((row, index) => `
+          <article class="candidate-row transfer-draft-row">
+            <label>
+              <span class="subtle small">调拨单号</span>
+              <select data-transfer-ship-row-select="${index}">
+                <option value="">选择已生成 SDO 的调拨单</option>
+                ${renderOptions(row.transfer_no)}
+              </select>
+            </label>
+            <div>
+              <div class="subtle small">目标门店</div>
+              <strong>${escapeHtml(row.to_store_code || row.target_store || "-")}</strong>
+            </div>
+            <div>
+              <div class="subtle small">SDO / 正式送货执行码</div>
+              <strong>${escapeHtml(row.sdo_code || "SDO 未生成")}</strong>
+            </div>
+            <div>
+              <div class="subtle small">包数</div>
+              <strong>${escapeHtml(row.package_count || 0)} 包</strong>
+            </div>
+            <div>
+              <div class="subtle small">件数</div>
+              <strong>${escapeHtml(row.item_count || 0)} 件</strong>
+            </div>
+            <div>
+              <div class="subtle small">状态</div>
+              <strong>${escapeHtml(row.status || "-")}</strong>
+            </div>
+            <div class="candidate-side-actions">
+              <button type="button" class="ghost-button mini-button" data-transfer-ship-row-remove="${index}">删除行</button>
+            </div>
+          </article>
+        `)
+        .join("")}
+    </div>
+  `;
+}
+
+function syncTransferShipmentPrimaryRow() {
+  const firstRow = transferShipmentDraftRows.find((row) => row?.transfer_no);
+  if (!firstRow) {
+    return "";
+  }
+  setInputValue("#transferShipForm [name='transfer_no']", firstRow.transfer_no);
+  loadTransferShipTargetHint(firstRow.transfer_no);
+  renderWaveExecutionEntrySummary("", "ship");
+  return firstRow.transfer_no;
+}
+
+function openTransferShipmentPanelForTransfer(transferNo = "") {
+  const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
+  const panelKey = getPanelKeyByTitle("warehouse", "6.1 配送批次 / 门店收货跟踪");
+  if (panelKey) {
+    setActivePanel(panelKey);
+  }
+  populateTransferOrderSelectors();
+  ensureTransferShipmentDraftRows(transferNo);
+  const primaryTransferNo = normalizedTransferNo || transferShipmentDraftRows[0]?.transfer_no || "";
+  if (primaryTransferNo) {
+    setInputValue("#transferShipForm [name='transfer_no']", primaryTransferNo);
+    loadTransferShipTargetHint(primaryTransferNo);
+  } else {
+    renderTransferShipTargetHint();
+  }
+  renderTransferShipmentDraftSummary();
+  renderWaveExecutionEntrySummary("", "ship");
+  focusElement("#transferShipForm");
 }
 
 
@@ -17033,7 +17887,7 @@ function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
         const required = String(row.transfer?.required_arrival_date || row.transfer?.required_arrival_on || "-");
         const sdo = String(row.transfer?.store_delivery_execution_order_no || "").trim();
         if (mode === "ship") {
-          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || "SDO 未生成")} / ${escapeHtml(row.transfer?.to_store_code || "-")} / ${escapeHtml(String(row.transfer?.delivery_batch?.bale_count || 0))} 包 / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : "待生成")}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? "可进入发运" : "SDO 未生成，请先去 6 仓库执行核对"}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">查看 SDO</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">进入该申请仓库执行</button>`}</div></article>`;
+          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || "SDO 未生成")} / ${escapeHtml(row.transfer?.to_store_code || "-")} / ${escapeHtml(String(getTransferShipmentPackageCount(row.transfer)))} 包 / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : "待生成")}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? "可进入发运" : "SDO 未生成，请先去 6 仓库执行核对"}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">查看 SDO</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">进入该申请仓库执行</button>`}</div></article>`;
         }
         if (mode === "exec") {
           return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} / ${row.transfer?.to_store_code || '-'} / SDB ${row.transfer?.delivery_batch?.bale_count || 0} / LPK ${row.shortage > 0 ? '1/1' : '0/0'} / SDO ${sdo ? '已生成' : '未生成'}`)}</strong><div class="subtle small">${escapeHtml(`required ${required} / total ${row.total} 件 / shortage ${row.shortage} 件`)}</div></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${sdo ? '查看/生成 SDO' : '进入执行'}</button></div></article>`;
@@ -17063,7 +17917,7 @@ function populateTransferOrderSelectors() {
       if (mode === "ship") {
         const sdo = row.store_delivery_execution_order_no || "SDO 未生成";
         const transferNo = row.transfer_no || "-";
-        const packCount = row.delivery_batch?.bale_count || 0;
+        const packCount = getTransferShipmentPackageCount(row);
         const statusLabel = sdo === "SDO 未生成" ? "待打印" : getShipmentBatchProgressLabel(row);
         return `${sdo} / ${row.to_store_code || "-"} / ${transferNo} / ${packCount} 包 / ${statusLabel}`;
       }
@@ -17125,9 +17979,10 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   const summary = summarizeOperationsTransferRows(baseList);
   const uniqueStores = new Set(list.map((row) => String(row.to_store_code || "").trim().toUpperCase()).filter(Boolean));
   const pendingBales = list.reduce(
-    (sum, row) => sum + Math.max(Number(row.delivery_batch?.bale_count || 0) - Number(row.accepted_dispatch_bale_count || 0), 0),
+    (sum, row) => sum + Math.max(getTransferShipmentPackageCount(row) - Number(row.accepted_dispatch_bale_count || 0), 0),
     0,
   );
+  const totalDispatchBales = list.reduce((sum, row) => sum + getTransferShipmentPackageCount(row), 0);
   const exceptionCount = list.filter((row) => getShipmentBatchProgressLabel(row) === "异常 / 退回").length;
   const batchRowsByNo = list.reduce((acc, row) => {
     const batchNo = String(row.delivery_batch?.delivery_batch_no || row.delivery_batch?.shipment_session_no || "").trim().toUpperCase();
@@ -17158,7 +18013,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
       <article class="store-metric"><strong>运输中批次</strong><span>${inTransitCount || 0}</span></article>
       <article class="store-metric"><strong>已完成批次</strong><span>${completedCount || 0}</span></article>
       <article class="store-metric"><strong>涉及门店数</strong><span>${uniqueStores.size || 0}</span></article>
-      <article class="store-metric"><strong>总包数</strong><span>${summary.total_dispatch_bales || 0}</span></article>
+      <article class="store-metric"><strong>总包数</strong><span>${totalDispatchBales || summary.total_dispatch_bales || 0}</span></article>
       <article class="store-metric"><strong>待收货包数</strong><span>${pendingBales || 0}</span></article>
       <article class="store-metric"><strong>异常数</strong><span>${exceptionCount || 0}</span></article>
     </div>
@@ -17181,7 +18036,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
                           <div>
                             <strong>门店站点：${escapeHtml(String(row.to_store_code || "-").toUpperCase() || "-")}</strong>
                             <div class="subtle small">- 执行单：${escapeHtml(row.transfer_no || "-")}</div>
-                            <div class="subtle small">- 包数：${escapeHtml(row.delivery_batch?.bale_count || 0)}</div>
+                            <div class="subtle small">- 包数：${escapeHtml(getTransferShipmentPackageCount(row))}</div>
                             <div class="subtle small">- 状态：${escapeHtml(getShipmentBatchProgressLabel(row))}</div>
                           </div>
                         </article>
@@ -17210,7 +18065,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
                 <div class="meta-row">
                   <span class="meta-pill">商品数 ${items.length}</span>
                   <span class="meta-pill">申请 ${totalRequested} 件</span>
-                  <span class="meta-pill">配货 bale ${deliveryBatch.bale_count || 0}</span>
+                  <span class="meta-pill">配货 bale ${getTransferShipmentPackageCount(row)}</span>
                   <span class="meta-pill">已签收 ${row.accepted_dispatch_bale_count || 0}</span>
                   <span class="meta-pill">${escapeHtml(`${groupingLabel} / 每包最多 ${row.dispatch_max_items_per_bale || "-"} 件`)}</span>
                   <span class="meta-pill">状态 ${escapeHtml(statusLabel)}</span>
@@ -17247,7 +18102,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
                 <span class="store-flag">${escapeHtml(statusLabel)}</span>
                 <button type="button" class="ghost-button mini-button" data-transfer-dispatch-fill="${escapeHtml(row.transfer_no || "")}">填入执行区</button>
                 ${
-                  Number(deliveryBatch.bale_count || 0) > 0 && String(row.lifecycle_status || "").trim().toLowerCase() === "packed"
+                  getTransferShipmentPackageCount(row) > 0 && String(row.lifecycle_status || "").trim().toLowerCase() === "packed"
                     ? `<button type="button" class="ghost-button mini-button" data-transfer-ship-fill="${escapeHtml(row.transfer_no || "")}">填入发运</button>`
                     : ""
                 }
@@ -19205,6 +20060,52 @@ function renderSiteRecommendationSummary(data) {
   `;
 }
 
+function getUserOrganizationBindingLabel(user = {}) {
+  const roleCode = String(user?.role_code || "").trim().toLowerCase();
+  if (["store_clerk", "store_manager", "cashier"].includes(roleCode)) {
+    return user?.store_code || "未绑定门店";
+  }
+  if (["warehouse_clerk", "warehouse_manager", "warehouse_supervisor"].includes(roleCode)) {
+    return user?.warehouse_code || "未绑定仓库";
+  }
+  if (roleCode === "area_supervisor") {
+    const stores = Array.isArray(user?.managed_store_codes)
+      ? user.managed_store_codes.join(",")
+      : String(user?.managed_store_codes || "");
+    return [user?.area_code || "", stores].filter(Boolean).join(" / ") || "未绑定区域";
+  }
+  return user?.store_code || user?.warehouse_code || user?.area_code || "全局";
+}
+
+function renderUserRowsTable(rows = []) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  if (!safeRows.length) {
+    return `<div class="candidate-summary empty-state">暂无用户。</div>`;
+  }
+  return `
+    <div class="user-role-table" role="table" aria-label="账号 / 用户角色与组织绑定">
+      <div class="user-role-table-row user-role-table-head" role="row">
+        <span role="columnheader">用户名</span>
+        <span role="columnheader">姓名</span>
+        <span role="columnheader">角色中文名</span>
+        <span role="columnheader">role_code</span>
+        <span role="columnheader">绑定门店 / 仓库 / 区域</span>
+        <span role="columnheader">active / inactive</span>
+      </div>
+      ${safeRows.map((row) => `
+        <div class="user-role-table-row" role="row">
+          <span role="cell">${escapeHtml(row.username || "-")}</span>
+          <span role="cell">${escapeHtml(row.full_name || row.display_name || "-")}</span>
+          <span role="cell">${escapeHtml(row.role_label || getDirectLoopRoleLabel(row.role_code || ""))}</span>
+          <span role="cell"><code>${escapeHtml(row.role_code || "-")}</code></span>
+          <span role="cell">${escapeHtml(getUserOrganizationBindingLabel(row))}</span>
+          <span role="cell">${escapeHtml(row.status || (row.is_active === false ? "inactive" : "active"))}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderUserResultSummary(kind, data) {
   const target = document.querySelector("#userResultSummary");
   if (!target) {
@@ -19236,20 +20137,25 @@ function renderUserResultSummary(kind, data) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>账号数量</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>示例账号</strong><span>${escapeHtml(rows[0]?.username || "-")}</span></article>
-        <article class="store-metric"><strong>默认门店</strong><span>${escapeHtml(rows[0]?.store_code || "全局")}</span></article>
+        <article class="store-metric"><strong>示例绑定</strong><span>${escapeHtml(rows[0] ? getUserOrganizationBindingLabel(rows[0]) : "全局")}</span></article>
       </div>
+      ${renderUserRowsTable(rows)}
     `;
     return;
   }
+  const rows = Array.isArray(data) ? data : [data].filter(Boolean);
   target.className = "report-summary";
   target.innerHTML = `
     <div class="alert-banner">用户账号已经创建成功。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>账号</strong><span>${escapeHtml(data.username || "-")}</span></article>
       <article class="store-metric"><strong>姓名</strong><span>${escapeHtml(data.full_name || "-")}</span></article>
-      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(data.role_code || "-")}</span></article>
-      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(data.store_code || "全局")}</span></article>
+      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(data.role_label || getDirectLoopRoleLabel(data.role_code || ""))}</span></article>
+      <article class="store-metric"><strong>role_code</strong><span>${escapeHtml(data.role_code || "-")}</span></article>
+      <article class="store-metric"><strong>绑定组织</strong><span>${escapeHtml(getUserOrganizationBindingLabel(data))}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(data.status || (data.is_active === false ? "inactive" : "active"))}</span></article>
     </div>
+    ${renderUserRowsTable(rows)}
   `;
 }
 
@@ -19642,6 +20548,189 @@ function formatLocalDateTime(isoString) {
   }).format(new Date(isoString));
 }
 
+function preserveLocaleTextSpacing(original = "", translated = "") {
+  const source = String(original ?? "");
+  const leading = source.match(/^\s*/)?.[0] || "";
+  const trailing = source.match(/\s*$/)?.[0] || "";
+  return `${leading}${translated}${trailing}`;
+}
+
+function translateLocaleText(value = "", locale = appLocale) {
+  const source = String(value ?? "");
+  if (locale !== "en" || !source.trim()) {
+    return source;
+  }
+  const trimmed = source.trim();
+  const exactTranslation = APP_LOCALE_PHRASE_DICTIONARY.zhToEn[trimmed];
+  if (exactTranslation) {
+    return preserveLocaleTextSpacing(source, exactTranslation);
+  }
+  let translated = source;
+  APP_LOCALE_SORTED_TRANSLATIONS.forEach(([zhText, enText]) => {
+    if (translated.includes(zhText)) {
+      translated = translated.split(zhText).join(enText);
+    }
+  });
+  return translated;
+}
+
+function isAppLocaleSkippedElement(element) {
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+  if (APP_LOCALE_SKIP_TAGS.has(element.tagName)) {
+    return true;
+  }
+  return Boolean(element.closest("[data-locale-static], #globalLanguageSwitch, script, style, noscript, pre, code, textarea"));
+}
+
+function updateGlobalLanguageSwitch() {
+  globalLanguageButtons.forEach((button) => {
+    const isActive = button.dataset.localeOption === appLocale;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+  if (globalLanguageSwitch instanceof HTMLElement) {
+    globalLanguageSwitch.setAttribute("aria-label", appLocale === "en" ? "Language switch" : "语言切换");
+  }
+}
+
+function applyElementLocaleAttributes(element) {
+  if (!(element instanceof HTMLElement) || isAppLocaleSkippedElement(element)) {
+    return;
+  }
+  APP_LOCALE_TRANSLATABLE_ATTRIBUTES.forEach((attributeName) => {
+    if (!element.hasAttribute(attributeName)) {
+      return;
+    }
+    let originalAttributes = appLocaleOriginalAttributes.get(element);
+    if (!originalAttributes) {
+      originalAttributes = {};
+      appLocaleOriginalAttributes.set(element, originalAttributes);
+    }
+    if (!Object.prototype.hasOwnProperty.call(originalAttributes, attributeName)) {
+      originalAttributes[attributeName] = element.getAttribute(attributeName) || "";
+    }
+    const originalValue = originalAttributes[attributeName];
+    const nextValue = appLocale === "en" ? translateLocaleText(originalValue, "en") : originalValue;
+    if (element.getAttribute(attributeName) !== nextValue) {
+      element.setAttribute(attributeName, nextValue);
+    }
+  });
+}
+
+function observeAppLanguageMutations() {
+  if (appLanguageObserver && document.body) {
+    appLanguageObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: APP_LOCALE_TRANSLATABLE_ATTRIBUTES,
+    });
+  }
+}
+
+function applyAppLanguage(root = document.body) {
+  if (!(root instanceof Node)) {
+    return;
+  }
+  if (appLanguageObserver) {
+    appLanguageObserver.disconnect();
+  }
+  appLocaleApplying = true;
+  try {
+    document.documentElement.lang = appLocale === "en" ? "en" : "zh-CN";
+    updateGlobalLanguageSwitch();
+    const rootElement = root.nodeType === Node.ELEMENT_NODE ? root : document.body;
+    if (!(rootElement instanceof HTMLElement)) {
+      return;
+    }
+    const walker = document.createTreeWalker(rootElement, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (!parent || isAppLocaleSkippedElement(parent) || !String(node.nodeValue || "").trim()) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const textNodes = [];
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+      textNodes.push(currentNode);
+      currentNode = walker.nextNode();
+    }
+    textNodes.forEach((node) => {
+      if (!appLocaleOriginalTextNodes.has(node)) {
+        appLocaleOriginalTextNodes.set(node, node.nodeValue || "");
+      }
+      const originalValue = appLocaleOriginalTextNodes.get(node) || "";
+      const nextValue = appLocale === "en" ? translateLocaleText(originalValue, "en") : originalValue;
+      if (node.nodeValue !== nextValue) {
+        node.nodeValue = nextValue;
+      }
+    });
+    applyElementLocaleAttributes(rootElement);
+    rootElement.querySelectorAll("*").forEach((element) => applyElementLocaleAttributes(element));
+  } finally {
+    appLocaleApplying = false;
+    observeAppLanguageMutations();
+  }
+}
+
+function scheduleAppLanguageApply() {
+  if (appLocaleApplying) {
+    return;
+  }
+  if (appLocaleApplyFrame) {
+    cancelAnimationFrame(appLocaleApplyFrame);
+  }
+  appLocaleApplyFrame = requestAnimationFrame(() => {
+    appLocaleApplyFrame = 0;
+    applyAppLanguage(document.body);
+  });
+}
+
+function setAppLocale(locale, options = {}) {
+  appLocale = locale === "en" ? "en" : "zh";
+  localStorage.setItem(STORAGE_KEYS.appLocale, appLocale);
+  if (cashierTerminalState) {
+    cashierTerminalState.locale = appLocale;
+  }
+  applyAppLanguage();
+  if (options.renderCashier !== false && typeof renderCashierTerminal === "function") {
+    renderCashierTerminal();
+  }
+}
+
+function initializeAppLanguage() {
+  globalLanguageButtons.forEach((button) => {
+    button.addEventListener("click", () => setAppLocale(button.dataset.localeOption || "zh"));
+  });
+  applyAppLanguage(document.body);
+  if (typeof MutationObserver === "function" && !appLanguageObserver) {
+    appLanguageObserver = new MutationObserver((mutations) => {
+      if (appLocaleApplying) {
+        return;
+      }
+      mutations.forEach((mutation) => {
+        if (mutation.type === "characterData") {
+          appLocaleOriginalTextNodes.delete(mutation.target);
+        }
+        if (mutation.type === "attributes" && mutation.target instanceof HTMLElement && mutation.attributeName) {
+          const originalAttributes = appLocaleOriginalAttributes.get(mutation.target);
+          if (originalAttributes) {
+            delete originalAttributes[mutation.attributeName];
+          }
+        }
+      });
+      scheduleAppLanguageApply();
+    });
+    observeAppLanguageMutations();
+  }
+}
+
 function priceAlertLabel(eventType) {
   if (eventType === "sale.price_policy_breach") {
     return "超限价成交";
@@ -19842,18 +20931,31 @@ function parseJsonField(text, fallback) {
 }
 
 function setSession(session) {
+  latestAuthRouteNotice = "";
   currentSession = {
     token: session.access_token,
     user: session.user,
   };
+  syncAuthenticatedShellClass();
   localStorage.setItem(STORAGE_KEYS.token, session.access_token);
   localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(session.user));
-  renderSessionState();
-  applyUserDefaultLanding(session.user, { force: true });
+  renderSessionState({ restoreRoute: false });
+  resolvePendingRedirectAfterLogin(session.user);
+  syncCashierTerminalMode();
+  syncCashierTerminalDraftsFromForms();
+  renderCashierTerminal();
 }
 
-function clearSession(message = "Not signed in.") {
+function clearSession(message = "Not signed in.", options = {}) {
+  const { clearPending = false, replaceRoute = false, savePending = false } = options;
+  if (savePending) {
+    savePendingRedirectFromHash();
+  }
+  if (clearPending) {
+    clearPendingRedirect();
+  }
   currentSession = { token: "", user: null };
+  syncAuthenticatedShellClass();
   cashierTerminalPrimedStoreCode = "";
   cashierTerminalState = createCashierTerminalState();
   clearSortingTaskLockedShipment();
@@ -19872,24 +20974,30 @@ function clearSession(message = "Not signed in.") {
   logoutButton.disabled = true;
   authPage?.classList.remove("hidden-screen");
   appShell?.classList.add("hidden-screen");
+  if (replaceRoute) {
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search || ""}`);
+  }
   window.scrollTo({ top: 0, behavior: "auto" });
   renderAuthResultSummary("logout");
   renderCashierTerminal();
 }
 
-function renderSessionState() {
+function renderSessionState(options = {}) {
+  const { restoreRoute = true } = options;
   if (!currentSession.user) {
     clearSession();
     return;
   }
+  syncAuthenticatedShellClass();
 
-  const storeText = currentSession.user.store_code ? ` / ${currentSession.user.store_code}` : "";
+  const boundOrgText = currentSession.user.store_code || currentSession.user.warehouse_code || currentSession.user.area_code || "";
+  const storeText = boundOrgText ? ` / ${boundOrgText}` : "";
   if (sessionSummary) {
     sessionSummary.textContent = `${currentSession.user.full_name} · ${currentSession.user.username}`;
   }
   if (appSessionMeta) {
     appSessionMeta.className = "session-meta-inline";
-    appSessionMeta.textContent = `角色：${currentSession.user.role_code || "-"}${storeText || " / 全局账号"}`;
+    appSessionMeta.textContent = `角色：${currentSession.user.role_label || getDirectLoopRoleLabel(currentSession.user.role_code || "")} (${currentSession.user.role_code || "-"})${storeText || " / 全局账号"}`;
   }
   workspacePanels.classList.remove("locked");
   logoutButton.disabled = false;
@@ -19900,10 +21008,15 @@ function renderSessionState() {
     role: currentSession.user.role_code,
     store_code: currentSession.user.store_code || null,
   });
-  setActiveWorkspace(activeWorkspace);
+  if (restoreRoute) {
+    if (!applyHashRoute()) {
+      redirectToRoleDefaultWorkspace(currentSession.user);
+    }
+  } else {
+    setActiveWorkspace(activeWorkspace);
+  }
   renderAuthResultSummary("login", { user: currentSession.user });
   hydrateStoreDefaults();
-  applyUserDefaultLanding(currentSession.user);
   autoLoadRoleHome(currentSession.user);
   syncCashierTerminalMode();
   syncCashierTerminalDraftsFromForms();
@@ -19991,7 +21104,7 @@ function createCashierTerminalState() {
 }
 
 function isCashierTerminalRole(user = currentSession.user) {
-  return CASHIER_ROLE_CODES.has(getNormalizedRoleCode(user));
+  return isPosPanelAllowedForUser(user);
 }
 
 function getCashierTerminalCopy() {
@@ -20056,7 +21169,7 @@ function formatCashierTerminalShiftStatus(status) {
 }
 
 function syncCashierTerminalMode() {
-  const enabled = Boolean(currentSession.user) && isCashierTerminalRole();
+  const enabled = Boolean(currentSession.user) && isCashierTerminalRole() && isCashierTerminalPanelActive();
   document.body.classList.toggle("cashier-terminal-mode", enabled);
   appShell?.classList.toggle("cashier-terminal-mode", enabled);
   if (!enabled) {
@@ -20154,6 +21267,190 @@ function getCashierTerminalChangeDue() {
 function buildCashierTerminalOrderNo(storeCode = getCashierTerminalStoreCode()) {
   const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
   return `POS-${storeCode}-${timestamp}`;
+}
+
+function buildPosStoreItemSaleNo(storeCode = getCashierTerminalStoreCode()) {
+  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  return `SALE-${storeCode}-${timestamp}`;
+}
+
+function persistPosStoreItemSaleRecordState() {
+  localStorage.setItem(STORAGE_KEYS.posStoreItemSaleRecords, JSON.stringify(posStoreItemSaleRecordState || []));
+}
+
+function normalizePosStoreItemMachineCode(value = "") {
+  return String(value || "").replace(/[^0-9]/g, "").trim();
+}
+
+function getPosStoreItemTokenEntries() {
+  const entries = [];
+  Object.entries(storeSdoPackageItemTokenState || {}).forEach(([packageKey, tokens]) => {
+    (Array.isArray(tokens) ? tokens : []).forEach((token, tokenIndex) => {
+      entries.push({ packageKey, tokenIndex, token });
+    });
+  });
+  return entries;
+}
+
+function resolvePosStoreItemTokenByMachineCode(input = "") {
+  const machineCode = normalizePosStoreItemMachineCode(input);
+  if (!machineCode || !machineCode.startsWith("5")) {
+    throw new Error("这不是商品码，不能收银。请扫描 STORE_ITEM 商品条码。");
+  }
+  const entry = getPosStoreItemTokenEntries().find(({ token }) =>
+    normalizePosStoreItemMachineCode(token?.machine_code || token?.barcode_value) === machineCode
+  );
+  if (!entry) {
+    throw new Error("未找到该 STORE_ITEM 商品码，请确认店员已生成商品码。");
+  }
+  const token = entry.token || {};
+  const saleStatus = String(token.sale_status || "ready_for_sale").trim().toLowerCase();
+  if (saleStatus === "sold") {
+    throw new Error("该商品已售出，不能重复销售");
+  }
+  if (saleStatus !== "ready_for_sale") {
+    throw new Error("该商品不是可销售状态，不能收银。");
+  }
+  const printStatus = String(token.print_status || token.status || "pending_print").trim().toLowerCase();
+  if (!["pending_print", "printed", "ready_for_sale", "printed_in_store", "generated"].includes(printStatus)) {
+    throw new Error("该商品码还不能收银，请先完成商品码生成/打印流程。");
+  }
+  const price = normalizeCashierTerminalNumber(token.selected_price || token.selling_price_kes || token.price);
+  if (!(price > 0)) {
+    throw new Error("该 STORE_ITEM 缺少售价，不能收银。");
+  }
+  return {
+    ...token,
+    pos_token_key: entry.packageKey,
+    pos_token_index: entry.tokenIndex,
+    barcode: machineCode,
+    barcode_type: "STORE_ITEM",
+    product_name: token.display_code || token.token_no || machineCode,
+    display_code: token.display_code || token.token_no || "",
+    token_no: token.token_no || token.display_code || "",
+    machine_code: machineCode,
+    expected_price: price,
+    selling_price: price,
+    qty_on_hand: 1,
+    price_cap: null,
+    store_rack_code: token.store_rack_code || token.suggested_rack_code || "",
+    sale_status: "ready_for_sale",
+  };
+}
+
+function getCashierTerminalPaymentMethod() {
+  const mode = String(cashierTerminalState.activePaymentMode || "cash").trim();
+  return mode === "mpesa" ? "mpesa" : mode === "mixed" ? "mixed" : "cash";
+}
+
+function buildPosStoreItemSaleRecord(cartRow = {}, saleContext = {}) {
+  const soldAt = saleContext.sold_at || new Date().toISOString();
+  const storeCode = String(saleContext.store_code || cartRow.store_code || getCashierTerminalStoreCode()).trim().toUpperCase();
+  const cashier = String(saleContext.cashier || currentSession.user?.username || "").trim();
+  const saleNo = String(saleContext.sale_no || buildPosStoreItemSaleNo(storeCode)).trim();
+  return {
+    sale_no: saleNo,
+    order_no: saleNo,
+    store_code: storeCode,
+    cashier,
+    store_item_display_code: String(cartRow.display_code || cartRow.token_no || cartRow.product_name || "").trim(),
+    store_item_machine_code: normalizePosStoreItemMachineCode(cartRow.machine_code || cartRow.barcode),
+    price: normalizeCashierTerminalNumber(cartRow.selling_price || cartRow.selected_price || cartRow.expected_price),
+    payment_method: String(saleContext.payment_method || getCashierTerminalPaymentMethod()).trim() || "cash",
+    source_sdo: String(cartRow.source_sdo || "").trim().toUpperCase(),
+    source_package: String(cartRow.source_package || "").trim().toUpperCase(),
+    source_type: String(cartRow.source_type || "").trim().toUpperCase(),
+    assigned_employee: String(cartRow.assigned_employee || "").trim(),
+    store_rack_code: String(cartRow.store_rack_code || "").trim().toUpperCase(),
+    category_summary: String(cartRow.category_summary || "").trim(),
+    sold_at: soldAt,
+  };
+}
+
+function completeCashierTerminalStoreItemSale() {
+  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  if (!rows.length) {
+    throw new Error("购物篮还是空的，请先扫码加购。");
+  }
+  if (rows.some((row) => String(row?.barcode_type || "").trim() !== "STORE_ITEM")) {
+    throw new Error("POS 只能销售 STORE_ITEM 商品码。");
+  }
+  const totals = getCashierTerminalTotals();
+  const payments = getCashierTerminalNormalizedPaymentLines({ strict: true });
+  const paymentTotal = payments.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  if (Math.abs(paymentTotal - totals.totalAmount) > 0.01) {
+    throw new Error("付款金额必须等于购物篮总价。");
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const saleNo = buildPosStoreItemSaleNo(storeCode);
+  const soldAt = new Date().toISOString();
+  const paymentMethod = getCashierTerminalPaymentMethod();
+  const saleRecords = rows.map((row) => buildPosStoreItemSaleRecord(row, {
+    sale_no: saleNo,
+    store_code: storeCode,
+    cashier: currentSession.user?.username || "",
+    payment_method: paymentMethod,
+    sold_at: soldAt,
+  }));
+  const soldMachineCodes = new Set(saleRecords.map((record) => record.store_item_machine_code));
+  Object.entries(storeSdoPackageItemTokenState || {}).forEach(([packageKey, tokens]) => {
+    if (!Array.isArray(tokens)) {
+      return;
+    }
+    storeSdoPackageItemTokenState[packageKey] = tokens.map((token) => {
+      const machineCode = normalizePosStoreItemMachineCode(token?.machine_code || token?.barcode_value);
+      if (!soldMachineCodes.has(machineCode)) {
+        return token;
+      }
+      return {
+        ...token,
+        sale_status: "sold",
+        sold_at: soldAt,
+        cashier: currentSession.user?.username || "",
+        sold_by: currentSession.user?.username || "",
+        store_code: String(token.store_code || storeCode).trim().toUpperCase(),
+        sale_no: saleNo,
+        payment_method: paymentMethod,
+        updated_at: soldAt,
+      };
+    });
+  });
+  persistStoreSdoPackageItemTokenState();
+  posStoreItemSaleRecordState = [...(Array.isArray(posStoreItemSaleRecordState) ? posStoreItemSaleRecordState : []), ...saleRecords];
+  persistPosStoreItemSaleRecordState();
+  const result = {
+    sale_no: saleNo,
+    order_no: saleNo,
+    store_code: storeCode,
+    cashier: currentSession.user?.username || "",
+    shift_no: cashierTerminalState.shiftNo || "",
+    sold_at: soldAt,
+    payment_method: paymentMethod,
+    payment_status: "paid",
+    total_amount: totals.totalAmount,
+    total_profit: 0,
+    total_items: totals.totalItems,
+    amount_due: 0,
+    change_due: getCashierTerminalChangeDue(),
+    payments,
+    items: saleRecords.map((record) => ({
+      barcode: record.store_item_machine_code,
+      display_code: record.store_item_display_code,
+      product_name: record.category_summary || record.store_item_display_code,
+      qty: 1,
+      selling_price: record.price,
+      line_profit: 0,
+      source_sdo: record.source_sdo,
+      source_package: record.source_package,
+      source_type: record.source_type,
+      assigned_employee: record.assigned_employee,
+      store_rack_code: record.store_rack_code,
+      category_summary: record.category_summary,
+    })),
+    store_item_sale_records: saleRecords,
+  };
+  cashierTerminalState.latestCompletedSale = result;
+  return result;
 }
 
 function clearCashierTerminalLookupInputs() {
@@ -20323,6 +21620,7 @@ function renderCashierTerminalLookupPanel() {
     cashierTerminalLookupCard.innerHTML = `<div class="cashier-terminal-empty-copy">${escapeHtml(copy.lookupEmpty)}</div>`;
     return;
   }
+  const isStoreItem = String(result.barcode_type || "").trim() === "STORE_ITEM";
   const priceCapText = result.price_cap == null
     ? (cashierTerminalState.locale === "zh" ? "未设置" : "Not set")
     : formatCurrency(result.price_cap);
@@ -20330,11 +21628,11 @@ function renderCashierTerminalLookupPanel() {
   cashierTerminalLookupCard.innerHTML = `
     <div class="preview-copy">
       <span class="preview-tag">${escapeHtml(copy.latestScan)}</span>
-      <h3>${escapeHtml(result.product_name || result.barcode || "未命名商品")}</h3>
+      <h3>${escapeHtml(result.product_name || result.display_code || result.barcode || "未命名商品")}</h3>
       <div class="identity-strip">
-        <span>barcode: ${escapeHtml(result.barcode || "-")}</span>
+        <span>barcode: ${escapeHtml(result.machine_code || result.barcode || "-")}</span>
         <span>${escapeHtml(copy.rackLabel)}: ${escapeHtml(result.store_rack_code || "-")}</span>
-        <span>${escapeHtml(copy.priceCap)}: ${escapeHtml(priceCapText)}</span>
+        ${isStoreItem ? `<span>来源: ${escapeHtml(result.source_sdo || "-")} / ${escapeHtml(result.source_package || "-")}</span>` : `<span>${escapeHtml(copy.priceCap)}: ${escapeHtml(priceCapText)}</span>`}
       </div>
     </div>
     <div class="preview-metrics">
@@ -20343,8 +21641,8 @@ function renderCashierTerminalLookupPanel() {
         <strong>${escapeHtml(formatCurrency(result.expected_price))}</strong>
       </div>
       <div>
-        <span class="metric-label">${escapeHtml(copy.storeStock)}</span>
-        <strong>${escapeHtml(result.qty_on_hand ?? 0)}</strong>
+        <span class="metric-label">${escapeHtml(isStoreItem ? "品类" : copy.storeStock)}</span>
+        <strong>${escapeHtml(isStoreItem ? (result.category_summary || "-") : (result.qty_on_hand ?? 0))}</strong>
       </div>
       <button type="button" class="primary-inline cashier-terminal-preview-action" data-terminal-action="add-current-lookup">${escapeHtml(copy.addCurrentLookup)}</button>
     </div>
@@ -20376,11 +21674,14 @@ function renderCashierTerminalCart() {
         <article class="basket-row cashier-terminal-cart-row${overrideRequired && !String(row.override_reason || "").trim() ? " is-override-pending" : ""}">
           <div class="cashier-terminal-row-head">
             <div>
-              <h4 class="item-title">${escapeHtml(row.product_name || row.barcode || "未命名商品")}</h4>
+              <h4 class="item-title">${escapeHtml(row.product_name || row.display_code || row.barcode || "未命名商品")}</h4>
               <div class="item-meta">
-                <span class="meta-chip">barcode: ${escapeHtml(row.barcode || "-")}</span>
+                <span class="meta-chip">商品码 ${escapeHtml(row.display_code || row.token_no || row.barcode || "-")}</span>
+                <span class="meta-chip">machine ${escapeHtml(row.machine_code || row.barcode || "-")}</span>
+                ${row.category_summary ? `<span class="meta-chip">${escapeHtml(row.category_summary)}</span>` : ""}
                 <span class="meta-chip">${escapeHtml(copy.rackLabel)} ${escapeHtml(row.store_rack_code || "-")}</span>
                 <span class="meta-chip">${escapeHtml(copy.suggestedPrice)} ${escapeHtml(formatCurrency(row.expected_price))}</span>
+                ${(row.source_sdo || row.source_package) ? `<span class="meta-chip">来源 ${escapeHtml(row.source_sdo || "-")} / ${escapeHtml(row.source_package || "-")}</span>` : ""}
                 ${row.price_cap == null ? "" : `<span class="meta-chip">${escapeHtml(copy.priceCap)} ${escapeHtml(formatCurrency(row.price_cap))}</span>`}
                 ${overrideRequired && !String(row.override_reason || "").trim() ? `<span class="meta-chip danger">${escapeHtml(copy.missingOverrideReason)}</span>` : ""}
               </div>
@@ -20390,7 +21691,7 @@ function renderCashierTerminalCart() {
           <div class="cashier-terminal-edit-grid">
             <label>
               <span>${escapeHtml(copy.qty)}</span>
-              <input type="number" min="1" step="1" value="${escapeHtml(qty)}" data-terminal-cart-index="${index}" data-terminal-cart-field="qty" />
+              <input type="number" min="1" step="1" value="${escapeHtml(qty)}" data-terminal-cart-index="${index}" data-terminal-cart-field="qty" ${String(row.barcode_type || "").trim() === "STORE_ITEM" ? "disabled" : ""} />
             </label>
             <label>
               <span>${escapeHtml(copy.sellingPrice)}</span>
@@ -20870,18 +22171,33 @@ function upsertCashierTerminalCartItem(result) {
   if (!barcode) {
     return;
   }
+  if (String(result?.barcode_type || "").trim() === "STORE_ITEM" && cashierTerminalState.cartItems.some((row) => normalizePosStoreItemMachineCode(row.machine_code || row.barcode) === normalizePosStoreItemMachineCode(result.machine_code || result.barcode))) {
+    throw new Error("该商品已在购物篮中。");
+  }
   cashierTerminalState.cartItems = [
     ...cashierTerminalState.cartItems,
     {
       row_uid: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       barcode,
-      product_name: result.product_name || result.barcode || "未命名商品",
+      barcode_type: result.barcode_type || "",
+      token_no: result.token_no || "",
+      display_code: result.display_code || "",
+      machine_code: result.machine_code || barcode,
+      product_name: result.product_name || result.display_code || result.barcode || "未命名商品",
       qty: 1,
       selling_price: normalizeCashierTerminalNumber(result.expected_price),
       expected_price: normalizeCashierTerminalNumber(result.expected_price),
       price_cap: result.price_cap == null ? null : normalizeCashierTerminalNumber(result.price_cap),
       qty_on_hand: result.qty_on_hand ?? 0,
       store_rack_code: result.store_rack_code || "",
+      selected_price: result.selected_price || result.expected_price || "",
+      source_sdo: result.source_sdo || "",
+      source_package: result.source_package || "",
+      source_type: result.source_type || "",
+      assigned_employee: result.assigned_employee || "",
+      category_summary: result.category_summary || "",
+      pos_token_key: result.pos_token_key || "",
+      pos_token_index: result.pos_token_index,
       override_reason: "",
       customer_id: "",
       note: "",
@@ -21015,16 +22331,11 @@ async function submitCashierTerminalLookup({ addToCart = false } = {}) {
   if (!query) {
     throw new Error("请先扫描或输入商品 barcode。");
   }
-  syncCashierTerminalLookupForm(query);
-  const form = document.querySelector("#lookupForm");
-  if (!(form instanceof HTMLFormElement)) {
-    throw new Error("lookupForm 不存在，无法查询。");
-  }
-  const result = await submitLookup({ preventDefault() {}, currentTarget: form });
+  const result = resolvePosStoreItemTokenByMachineCode(query);
   cashierTerminalState.currentLookupResult = result;
   if (addToCart) {
     upsertCashierTerminalCartItem(result);
-    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物篮：${result.product_name || result.barcode}`, "success", 1400);
+    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物篮：${result.product_name || result.display_code || result.barcode}`, "success", 1400);
     clearCashierTerminalLookupInputs();
   }
   renderCashierTerminal();
@@ -21047,18 +22358,16 @@ async function submitCashierTerminalOpenShift() {
 }
 
 async function submitCashierTerminalSale() {
-  syncCashierTerminalSaleForm();
-  const form = document.querySelector("#saleForm");
-  if (!(form instanceof HTMLFormElement)) {
-    throw new Error("saleForm 不存在，无法提交销售。");
-  }
-  const result = await submitSale({ preventDefault() {}, currentTarget: form });
+  const result = completeCashierTerminalStoreItemSale();
+  writeOutput("#saleOutput", result);
+  renderSaleResultSummary(result);
+  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
   cashierTerminalState.latestCompletedSale = result;
-  cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
-  cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
+  cashierTerminalState.voidOrderNo = result.sale_no || result.order_no || cashierTerminalState.voidOrderNo;
+  cashierTerminalState.refundOrderNo = result.sale_no || result.order_no || cashierTerminalState.refundOrderNo;
   cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
   resetCashierTerminalForNextSale();
-  showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
+  showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.sale_no || result.order_no}`, "success", 1800);
   return result;
 }
 
@@ -21109,6 +22418,11 @@ function updateCashierTerminalCartField(index, field, value) {
     return;
   }
   if (field === "qty") {
+    if (String(row.barcode_type || "").trim() === "STORE_ITEM") {
+      row.qty = 1;
+      renderCashierTerminal();
+      return;
+    }
     row.qty = Math.max(1, Number(value || 1));
   } else if (field === "selling_price") {
     row.selling_price = normalizeCashierTerminalNumber(value);
@@ -23271,6 +24585,370 @@ function renderStoreOperatingSummary(rows) {
     .join("");
 }
 
+function normalizePosSalesAnalyticsPaymentMethod(value = "") {
+  const method = String(value || "").trim().toLowerCase().replace(/[-\s]/g, "_");
+  if (method === "m_pesa" || method === "mpesa") {
+    return "mpesa";
+  }
+  if (method === "mixed" || method === "hybrid") {
+    return "mixed";
+  }
+  return "cash";
+}
+
+function summarizePosStoreItemSalesForAnalytics(
+  records = posStoreItemSaleRecordState,
+  dateKey = getLocalDateKey(new Date().toISOString()),
+) {
+  const todayRows = (Array.isArray(records) ? records : [])
+    .filter((row) => getLocalDateKey(row?.sold_at || row?.created_at || "") === dateKey)
+    .map((row) => ({
+      ...row,
+      store_code: String(row?.store_code || "UNKNOWN").trim().toUpperCase() || "UNKNOWN",
+      price: normalizeCashierTerminalNumber(row?.price || row?.selling_price || row?.total_amount),
+      payment_method: normalizePosSalesAnalyticsPaymentMethod(row?.payment_method),
+    }));
+  const summaryByStore = new Map();
+  todayRows.forEach((row) => {
+    const storeCode = row.store_code;
+    if (!summaryByStore.has(storeCode)) {
+      summaryByStore.set(storeCode, {
+        storeCode,
+        todaySalesAmount: 0,
+        todayItemCount: 0,
+        todayOrderCount: 0,
+        averageTicket: 0,
+        cashSalesAmount: 0,
+        mpesaSalesAmount: 0,
+        mixedSalesAmount: 0,
+        soldStoreItemCount: 0,
+        lastSaleAt: "",
+        orderKeys: new Set(),
+      });
+    }
+    const summary = summaryByStore.get(storeCode);
+    summary.todaySalesAmount += row.price;
+    summary.todayItemCount += 1;
+    summary.soldStoreItemCount += 1;
+    if (row.payment_method === "mpesa") {
+      summary.mpesaSalesAmount += row.price;
+    } else if (row.payment_method === "mixed") {
+      summary.mixedSalesAmount += row.price;
+    } else {
+      summary.cashSalesAmount += row.price;
+    }
+    const orderKey = String(row.sale_no || row.order_no || row.store_item_machine_code || "").trim();
+    if (orderKey) {
+      summary.orderKeys.add(orderKey);
+    }
+    if (!summary.lastSaleAt || new Date(row.sold_at || 0).getTime() > new Date(summary.lastSaleAt || 0).getTime()) {
+      summary.lastSaleAt = row.sold_at || "";
+    }
+  });
+  const storeSummaries = Array.from(summaryByStore.values())
+    .map((summary) => {
+      const todayOrderCount = summary.orderKeys.size;
+      return {
+        ...summary,
+        todaySalesAmount: roundToTwo(summary.todaySalesAmount),
+        cashSalesAmount: roundToTwo(summary.cashSalesAmount),
+        mpesaSalesAmount: roundToTwo(summary.mpesaSalesAmount),
+        mixedSalesAmount: roundToTwo(summary.mixedSalesAmount),
+        todayOrderCount,
+        averageTicket: todayOrderCount ? roundToTwo(summary.todaySalesAmount / todayOrderCount) : 0,
+        orderKeys: undefined,
+      };
+    })
+    .sort((left, right) => left.storeCode.localeCompare(right.storeCode));
+  return {
+    dateKey,
+    storeSummaries,
+    saleRecords: todayRows.sort((left, right) => new Date(right.sold_at || 0).getTime() - new Date(left.sold_at || 0).getTime()),
+  };
+}
+
+function summarizeAllPosStoreItemSalesForOperations(records = posStoreItemSaleRecordState) {
+  const now = Date.now();
+  const todayKey = getLocalDateKey(new Date().toISOString());
+  const normalizedRows = (Array.isArray(records) ? records : [])
+    .map((row) => {
+      const soldAt = row?.sold_at || row?.created_at || "";
+      return {
+        ...row,
+        store_code: String(row?.store_code || "UNKNOWN").trim().toUpperCase() || "UNKNOWN",
+        price: normalizeCashierTerminalNumber(row?.price || row?.selling_price || row?.total_amount),
+        payment_method: normalizePosSalesAnalyticsPaymentMethod(row?.payment_method),
+        category_summary: String(row?.category_summary || row?.category || "-").trim() || "-",
+        sale_no: String(row?.sale_no || row?.order_no || row?.store_item_display_code || "").trim(),
+        sold_at: soldAt,
+        dateKey: getLocalDateKey(soldAt),
+        soldAtMs: Number.isFinite(new Date(soldAt).getTime()) ? new Date(soldAt).getTime() : 0,
+      };
+    })
+    .sort((left, right) => right.soldAtMs - left.soldAtMs);
+
+  const totalSalesAmount = normalizedRows.reduce((total, row) => total + row.price, 0);
+  const todayRows = normalizedRows.filter((row) => row.dateKey === todayKey);
+  const last7DaysRows = normalizedRows.filter((row) => row.soldAtMs && row.soldAtMs >= now - 7 * 24 * 60 * 60 * 1000);
+  const last30DaysRows = normalizedRows.filter((row) => row.soldAtMs && row.soldAtMs >= now - 30 * 24 * 60 * 60 * 1000);
+  const orderKeys = new Set(normalizedRows.map((row) => row.sale_no || row.store_item_machine_code || "").filter(Boolean));
+  const storeCodes = new Set(normalizedRows.map((row) => row.store_code));
+  const paymentTotals = normalizedRows.reduce(
+    (totals, row) => {
+      if (row.payment_method === "mpesa") {
+        totals.mpesaSalesAmount += row.price;
+      } else if (row.payment_method === "mixed") {
+        totals.mixedSalesAmount += row.price;
+      } else {
+        totals.cashSalesAmount += row.price;
+      }
+      return totals;
+    },
+    { cashSalesAmount: 0, mpesaSalesAmount: 0, mixedSalesAmount: 0 },
+  );
+
+  const storeSummaryMap = new Map();
+  const categorySummaryMap = new Map();
+  normalizedRows.forEach((row) => {
+    if (!storeSummaryMap.has(row.store_code)) {
+      storeSummaryMap.set(row.store_code, {
+        storeCode: row.store_code,
+        totalSalesAmount: 0,
+        totalItemCount: 0,
+        totalOrderCount: 0,
+        averageTicket: 0,
+        cashSalesAmount: 0,
+        mpesaSalesAmount: 0,
+        mixedSalesAmount: 0,
+        lastSaleAt: "",
+        orderKeys: new Set(),
+      });
+    }
+    const storeSummary = storeSummaryMap.get(row.store_code);
+    storeSummary.totalSalesAmount += row.price;
+    storeSummary.totalItemCount += 1;
+    storeSummary.orderKeys.add(row.sale_no || row.store_item_machine_code || `${row.store_code}-${storeSummary.totalItemCount}`);
+    if (row.payment_method === "mpesa") {
+      storeSummary.mpesaSalesAmount += row.price;
+    } else if (row.payment_method === "mixed") {
+      storeSummary.mixedSalesAmount += row.price;
+    } else {
+      storeSummary.cashSalesAmount += row.price;
+    }
+    if (!storeSummary.lastSaleAt || row.soldAtMs > new Date(storeSummary.lastSaleAt || 0).getTime()) {
+      storeSummary.lastSaleAt = row.sold_at || "";
+    }
+
+    if (!categorySummaryMap.has(row.category_summary)) {
+      categorySummaryMap.set(row.category_summary, { category: row.category_summary, totalSalesAmount: 0, itemCount: 0 });
+    }
+    const categorySummary = categorySummaryMap.get(row.category_summary);
+    categorySummary.totalSalesAmount += row.price;
+    categorySummary.itemCount += 1;
+  });
+
+  const storeSummaries = [...storeSummaryMap.values()]
+    .map((summary) => {
+      const totalOrderCount = summary.orderKeys.size;
+      return {
+        ...summary,
+        totalSalesAmount: roundToTwo(summary.totalSalesAmount),
+        cashSalesAmount: roundToTwo(summary.cashSalesAmount),
+        mpesaSalesAmount: roundToTwo(summary.mpesaSalesAmount),
+        mixedSalesAmount: roundToTwo(summary.mixedSalesAmount),
+        totalOrderCount,
+        averageTicket: totalOrderCount ? roundToTwo(summary.totalSalesAmount / totalOrderCount) : 0,
+        orderKeys: undefined,
+      };
+    })
+    .sort((left, right) => right.totalSalesAmount - left.totalSalesAmount);
+  const categorySummaries = [...categorySummaryMap.values()]
+    .map((summary) => ({
+      ...summary,
+      totalSalesAmount: roundToTwo(summary.totalSalesAmount),
+    }))
+    .sort((left, right) => right.totalSalesAmount - left.totalSalesAmount);
+
+  const topStore = storeSummaries[0];
+  const lowStore = storeSummaries.length > 1 ? storeSummaries[storeSummaries.length - 1] : null;
+  const topCategory = categorySummaries[0];
+  const paymentLeaders = [
+    ["现金", paymentTotals.cashSalesAmount],
+    ["M-Pesa", paymentTotals.mpesaSalesAmount],
+    ["混合支付", paymentTotals.mixedSalesAmount],
+  ].sort((left, right) => right[1] - left[1]);
+  const latestRecord = normalizedRows[0];
+  const analysisLines = normalizedRows.length
+    ? [
+        topStore ? `销售最高门店：${topStore.storeCode}，累计 ${formatKesAmount(topStore.totalSalesAmount, "KES 0.00")}。` : "",
+        lowStore ? `当前销售最低门店：${lowStore.storeCode}，累计 ${formatKesAmount(lowStore.totalSalesAmount, "KES 0.00")}，建议检查客流、陈列和补货。` : "",
+        topCategory ? `销售最高品类：${topCategory.category}，${topCategory.itemCount} 件，累计 ${formatKesAmount(topCategory.totalSalesAmount, "KES 0.00")}。` : "",
+        `支付结构：${paymentLeaders[0][0]} 占比最高，金额 ${formatKesAmount(paymentLeaders[0][1], "KES 0.00")}。`,
+        latestRecord?.sold_at ? `最近一笔销售：${latestRecord.store_code} / ${formatLocalDateTime(latestRecord.sold_at)} / ${formatKesAmount(latestRecord.price, "KES 0.00")}。` : "",
+      ].filter(Boolean)
+    : ["暂无销售数据。完成 POS STORE_ITEM 销售后，这里会生成门店、品类、支付和来源链路分析。"];
+
+  return {
+    totalSalesAmount: roundToTwo(totalSalesAmount),
+    totalItemCount: normalizedRows.length,
+    totalOrderCount: orderKeys.size,
+    storeCount: storeCodes.size,
+    averageTicket: orderKeys.size ? roundToTwo(totalSalesAmount / orderKeys.size) : 0,
+    todaySalesAmount: roundToTwo(todayRows.reduce((total, row) => total + row.price, 0)),
+    last7DaysSalesAmount: roundToTwo(last7DaysRows.reduce((total, row) => total + row.price, 0)),
+    last30DaysSalesAmount: roundToTwo(last30DaysRows.reduce((total, row) => total + row.price, 0)),
+    cashSalesAmount: roundToTwo(paymentTotals.cashSalesAmount),
+    mpesaSalesAmount: roundToTwo(paymentTotals.mpesaSalesAmount),
+    mixedSalesAmount: roundToTwo(paymentTotals.mixedSalesAmount),
+    storeSummaries,
+    categorySummaries,
+    saleRecords: normalizedRows,
+    analysisLines,
+  };
+}
+
+function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
+  const analytics = summarizeAllPosStoreItemSalesForOperations(records);
+  const overviewTarget = document.querySelector("#operationsAllSalesOverview");
+  if (overviewTarget) {
+    overviewTarget.innerHTML = `
+      <article class="store-metric"><strong>全量销售额</strong><span>${escapeHtml(formatKesAmount(analytics.totalSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>销售件数</strong><span>${escapeHtml(analytics.totalItemCount)}</span></article>
+      <article class="store-metric"><strong>订单数</strong><span>${escapeHtml(analytics.totalOrderCount)}</span></article>
+      <article class="store-metric"><strong>覆盖门店</strong><span>${escapeHtml(analytics.storeCount)}</span></article>
+      <article class="store-metric"><strong>平均客单价</strong><span>${escapeHtml(formatKesAmount(analytics.averageTicket, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatKesAmount(analytics.todaySalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>近 7 天销售额</strong><span>${escapeHtml(formatKesAmount(analytics.last7DaysSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>近 30 天销售额</strong><span>${escapeHtml(formatKesAmount(analytics.last30DaysSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>现金 / M-Pesa / 混合</strong><span>${escapeHtml(`${formatKesAmount(analytics.cashSalesAmount, "KES 0.00")} / ${formatKesAmount(analytics.mpesaSalesAmount, "KES 0.00")} / ${formatKesAmount(analytics.mixedSalesAmount, "KES 0.00")}`)}</span></article>
+    `;
+  }
+
+  const analysisTarget = document.querySelector("#operationsAllSalesAnalysis");
+  if (analysisTarget) {
+    analysisTarget.classList.toggle("empty-state", !analytics.saleRecords.length);
+    analysisTarget.innerHTML = `
+      <div class="summary-breakdown-list">
+        ${analytics.analysisLines.map((line) => `<div class="summary-breakdown-row"><span>分析</span><span>${escapeHtml(line)}</span></div>`).join("")}
+      </div>
+    `;
+  }
+
+  const storeTarget = document.querySelector("#operationsAllSalesByStore");
+  if (storeTarget) {
+    storeTarget.innerHTML = analytics.storeSummaries.length
+      ? analytics.storeSummaries.map((summary) => `
+          <article class="store-summary-item">
+            <div class="store-summary-head">
+              <div class="store-summary-title">
+                <strong>${escapeHtml(summary.storeCode)}</strong>
+                <div class="subtle">最近销售 ${summary.lastSaleAt ? escapeHtml(formatLocalDateTime(summary.lastSaleAt)) : "暂无"}</div>
+              </div>
+              <span class="store-status-chip">销售汇总</span>
+            </div>
+            <div class="store-summary-metrics">
+              <article class="store-metric"><strong>累计销售额</strong><span>${escapeHtml(formatKesAmount(summary.totalSalesAmount, "KES 0.00"))}</span></article>
+              <article class="store-metric"><strong>销售件数</strong><span>${escapeHtml(summary.totalItemCount)}</span></article>
+              <article class="store-metric"><strong>订单数</strong><span>${escapeHtml(summary.totalOrderCount)}</span></article>
+              <article class="store-metric"><strong>平均客单价</strong><span>${escapeHtml(formatKesAmount(summary.averageTicket, "KES 0.00"))}</span></article>
+            </div>
+            <div class="store-summary-flags">
+              <span class="store-flag">现金 ${escapeHtml(formatKesAmount(summary.cashSalesAmount, "KES 0.00"))}</span>
+              <span class="store-flag">M-Pesa ${escapeHtml(formatKesAmount(summary.mpesaSalesAmount, "KES 0.00"))}</span>
+              <span class="store-flag">混合 ${escapeHtml(formatKesAmount(summary.mixedSalesAmount, "KES 0.00"))}</span>
+            </div>
+          </article>
+        `).join("")
+      : `<div class="empty-state">暂无门店销售汇总。</div>`;
+  }
+
+  const recordsTarget = document.querySelector("#operationsAllSalesRecords");
+  if (recordsTarget) {
+    recordsTarget.innerHTML = analytics.saleRecords.length
+      ? analytics.saleRecords.map((record) => `
+          <article class="data-preview-card">
+            <strong>${escapeHtml(record.sale_no || record.store_item_display_code || "POS 销售记录")}</strong>
+            <div class="summary-breakdown-list">
+              <div class="summary-breakdown-row"><span>门店 / 收银员</span><span>${escapeHtml(record.store_code || "-")} / ${escapeHtml(record.cashier || "-")}</span></div>
+              <div class="summary-breakdown-row"><span>商品码</span><span>${escapeHtml(record.store_item_display_code || "-")} / ${escapeHtml(record.store_item_machine_code || "-")}</span></div>
+              <div class="summary-breakdown-row"><span>销售额 / 支付</span><span>${escapeHtml(formatKesAmount(record.price, "KES 0.00"))} / ${escapeHtml(record.payment_method || "-")}</span></div>
+              <div class="summary-breakdown-row"><span>销售时间</span><span>${record.sold_at ? escapeHtml(formatLocalDateTime(record.sold_at)) : "-"}</span></div>
+              <div class="summary-breakdown-row"><span>来源 SDO</span><span>${escapeHtml(record.source_sdo || "-")}</span></div>
+              <div class="summary-breakdown-row"><span>来源包 / 类型</span><span>${escapeHtml(record.source_package || "-")} / ${escapeHtml(record.source_type || "-")}</span></div>
+              <div class="summary-breakdown-row"><span>店员 / 货架</span><span>${escapeHtml(record.assigned_employee || "-")} / ${escapeHtml(record.store_rack_code || "-")}</span></div>
+              <div class="summary-breakdown-row"><span>品类</span><span>${escapeHtml(record.category_summary || "-")}</span></div>
+            </div>
+          </article>
+        `).join("")
+      : `<div class="empty-state">完成 POS 销售后，这里会显示全部 STORE_ITEM 销售记录。</div>`;
+  }
+}
+
+function renderPosSalesAnalyticsSummary(records = posStoreItemSaleRecordState) {
+  renderOperationsAllSalesData(records);
+  const analytics = summarizePosStoreItemSalesForAnalytics(records);
+  const summaryHtml = analytics.storeSummaries.length
+    ? analytics.storeSummaries
+        .map((summary) => `
+          <article class="store-summary-item">
+            <div class="store-summary-head">
+              <div class="store-summary-title">
+                <strong>${escapeHtml(summary.storeCode)}</strong>
+                <div class="subtle">最近一笔销售时间 ${
+                  summary.lastSaleAt ? escapeHtml(formatLocalDateTime(summary.lastSaleAt)) : "暂无"
+                }</div>
+              </div>
+              <span class="store-status-chip">POS 销售</span>
+            </div>
+            <div class="store-summary-metrics">
+              <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatKesAmount(summary.todaySalesAmount, "KES 0.00"))}</span></article>
+              <article class="store-metric"><strong>今日销售件数</strong><span>${escapeHtml(summary.todayItemCount)}</span></article>
+              <article class="store-metric"><strong>今日订单数</strong><span>${escapeHtml(summary.todayOrderCount)}</span></article>
+              <article class="store-metric"><strong>平均客单价</strong><span>${escapeHtml(formatKesAmount(summary.averageTicket, "KES 0.00"))}</span></article>
+            </div>
+            <div class="store-summary-flags">
+              <span class="store-flag">现金销售额 ${escapeHtml(formatKesAmount(summary.cashSalesAmount, "KES 0.00"))}</span>
+              <span class="store-flag">M-Pesa 销售额 ${escapeHtml(formatKesAmount(summary.mpesaSalesAmount, "KES 0.00"))}</span>
+              <span class="store-flag">混合支付销售额 ${escapeHtml(formatKesAmount(summary.mixedSalesAmount, "KES 0.00"))}</span>
+              <span class="store-flag">已售 STORE_ITEM 数量 ${escapeHtml(summary.soldStoreItemCount)}</span>
+              <span class="store-flag">门店代码 ${escapeHtml(summary.storeCode)}</span>
+            </div>
+          </article>
+        `)
+        .join("")
+    : `<div class="empty-state">今日还没有 POS STORE_ITEM 销售记录。</div>`;
+  ["#posSalesAnalyticsSummary", "#operationsPosSalesAnalyticsSummary"].forEach((selector) => {
+    const target = document.querySelector(selector);
+    if (target) {
+      target.innerHTML = summaryHtml;
+    }
+  });
+
+  const recordsHtml = analytics.saleRecords.length
+    ? analytics.saleRecords.slice(0, 20).map((record) => `
+        <article class="data-preview-card">
+          <strong>${escapeHtml(record.sale_no || record.order_no || record.store_item_display_code || "POS 销售记录")}</strong>
+          <div class="summary-breakdown-list">
+            <div class="summary-breakdown-row"><span>门店 / 收银员</span><span>${escapeHtml(record.store_code || "-")} / ${escapeHtml(record.cashier || "-")}</span></div>
+            <div class="summary-breakdown-row"><span>商品码</span><span>${escapeHtml(record.store_item_display_code || "-")} / ${escapeHtml(record.store_item_machine_code || "-")}</span></div>
+            <div class="summary-breakdown-row"><span>销售额 / 支付</span><span>${escapeHtml(formatKesAmount(record.price, "KES 0.00"))} / ${escapeHtml(record.payment_method || "-")}</span></div>
+            <div class="summary-breakdown-row"><span>销售时间</span><span>${record.sold_at ? escapeHtml(formatLocalDateTime(record.sold_at)) : "-"}</span></div>
+            <div class="summary-breakdown-row"><span>来源 SDO</span><span>${escapeHtml(record.source_sdo || "-")}</span></div>
+            <div class="summary-breakdown-row"><span>来源包 / 类型</span><span>${escapeHtml(record.source_package || "-")} / ${escapeHtml(record.source_type || "-")}</span></div>
+            <div class="summary-breakdown-row"><span>店员 / 货架</span><span>${escapeHtml(record.assigned_employee || "-")} / ${escapeHtml(record.store_rack_code || "-")}</span></div>
+            <div class="summary-breakdown-row"><span>品类</span><span>${escapeHtml(record.category_summary || "-")}</span></div>
+          </div>
+        </article>
+      `).join("")
+    : `<div class="empty-state">完成 POS 销售后，这里会显示 STORE_ITEM 销售记录和来源链路。</div>`;
+  ["#posSalesAnalyticsRecords", "#operationsPosSalesAnalyticsRecords"].forEach((selector) => {
+    const target = document.querySelector(selector);
+    if (target) {
+      target.innerHTML = recordsHtml;
+    }
+  });
+}
+
 
 function parseKnownDispatchItemCount(row = {}) {
   const candidates = [
@@ -23295,14 +24973,611 @@ function parseKnownDispatchItemCount(row = {}) {
   return null;
 }
 
+function normalizeSdoPackageSourceType(value = "", sourceCode = "") {
+  const normalized = String(value || "").trim().toUpperCase();
+  const code = String(sourceCode || "").trim().toUpperCase();
+  if (normalized === "LPK" || normalized.includes("LOOSE_PICK") || code.startsWith("LPK")) {
+    return "LPK";
+  }
+  if (
+    normalized === "SDB"
+    || normalized.includes("PREPARED")
+    || normalized.includes("STORE_DISPATCH")
+    || code.startsWith("SDB")
+  ) {
+    return "SDB";
+  }
+  return normalized || (code.startsWith("LPK") ? "LPK" : "SDB");
+}
+
+function deriveSdoMachineCode(value = "") {
+  const normalized = String(value || "").trim().toUpperCase();
+  const digits = String(value || "").replace(/[^0-9]/g, "");
+  if (/^4\d{9}$/.test(digits)) {
+    return digits;
+  }
+  const match = normalized.match(/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/);
+  return match ? `4${match[1]}${match[2]}${match[3]}${match[4]}` : "";
+}
+
+function getSdoSourceCodeFromDispatchRow(row = {}) {
+  const sourceBales = Array.isArray(row?.source_bales) ? row.source_bales : [];
+  const sourceBale = sourceBales?.find((item) => String(item || "").trim());
+  const candidates = [
+    ...sourceBales,
+    row?.taskBarcode,
+    row?.task_barcode,
+    row?.task_no,
+    row?.source_code,
+    row?.bale_no,
+  ].map((item) => String(item || "").trim().toUpperCase()).filter(Boolean);
+  return candidates.find((item) => item.startsWith("SDB") || item.startsWith("LPK"))
+    || String(sourceBale || "").trim().toUpperCase()
+    || candidates[0]
+    || "";
+}
+
+function getSdoCodeFromTransferOrOrder(transfer = {}, sdo = {}) {
+  return String(
+    sdo?.execution_order_no
+    || sdo?.official_delivery_barcode
+    || transfer?.store_delivery_execution_order_no
+    || transfer?.official_delivery_barcode
+    || transfer?.store_delivery_execution_order?.execution_order_no
+    || "",
+  ).trim().toUpperCase();
+}
+
+function buildSdoPackagePayloadFromDispatchRow(row = {}, {
+  transfer = {},
+  sdo = {},
+  index = 0,
+} = {}) {
+  const sdoCode = getSdoCodeFromTransferOrOrder(transfer, sdo);
+  const sdoMachineCode = String(
+    sdo?.machine_code
+    || transfer?.machine_code
+    || transfer?.store_delivery_execution_order?.machine_code
+    || deriveSdoMachineCode(sdoCode)
+    || "",
+  ).replace(/[^0-9]/g, "").trim();
+  const sourceCode = getSdoSourceCodeFromDispatchRow(row);
+  const sourceType = normalizeSdoPackageSourceType(row?.source_type || row?.sourceType, sourceCode);
+  const itemCount = parseKnownDispatchItemCount(row);
+  const packageIndex = Math.max(1, Number(row?.package_index || index + 1) || index + 1);
+  const storeCode = String(
+    row?.store_code
+    || row?.to_store_code
+    || row?.target_store_code
+    || sdo?.to_store_code
+    || transfer?.to_store_code
+    || transfer?.store_code
+    || "",
+  ).trim().toUpperCase();
+  const printStatus = String(row?.print_status || "").trim().toLowerCase()
+    || (String(row?.status || "").trim().toLowerCase() === "labelled" ? "labelled" : "pending_print");
+  const deliveryStatus = String(row?.delivery_status || "").trim().toLowerCase()
+    || (printStatus === "labelled" ? "labelled" : "packed");
+
+  return {
+    sdo_code: sdoCode,
+    sdo_machine_code: sdoMachineCode,
+    store_delivery_execution_order_no: sdoCode,
+    execution_order_no: sdoCode,
+    official_delivery_barcode: sdoCode,
+    machine_code: sdoMachineCode,
+    source_type: sourceType,
+    source_code: sourceCode,
+    display_code: sourceCode,
+    source_machine_code: String(row?.source_machine_code || "").replace(/[^0-9]/g, "").trim(),
+    category_summary: String(row?.category_summary || row?.category_name || "").trim(),
+    category_name: String(row?.category_name || row?.category_summary || "").trim(),
+    item_count: itemCount,
+    store_code: storeCode,
+    receiving_status: String(row?.receiving_status || "pending").trim().toLowerCase(),
+    assigned_employee: String(row?.assigned_employee || "").trim(),
+    assignment_status: String(row?.assignment_status || (row?.assigned_employee ? "assigned" : "unassigned")).trim().toLowerCase(),
+    print_status: printStatus,
+    delivery_status: deliveryStatus,
+    store_item_tokens_generated: Boolean(row?.store_item_tokens_generated),
+    store_item_token_count: Number(row?.store_item_token_count || 0),
+    package_index: packageIndex,
+    package_count: Number(row?.package_count || sdo?.package_count || 0) || 0,
+  };
+}
+
+function enrichDisplayStoreDispatchBalesWithSdo(displayRows = [], sdo = {}, transfer = {}) {
+  const rows = Array.isArray(displayRows) ? displayRows : [];
+  const packages = Array.isArray(sdo?.packages) ? sdo.packages : [];
+  const sourceRows = rows.length ? rows : packages;
+  const packageCount = Math.max(sourceRows.length, packages.length, Number(sdo?.package_count || 0));
+  return sourceRows.map((row, index) => {
+    const packageRow = packages[index] || {};
+    const merged = {
+      ...row,
+      ...packageRow,
+      source_bales: Array.isArray(row?.source_bales) ? row.source_bales : [packageRow?.source_code].filter(Boolean),
+      store_code: row?.store_code || packageRow?.store_code || sdo?.to_store_code || transfer?.to_store_code || "",
+    };
+    const payload = buildSdoPackagePayloadFromDispatchRow(merged, { transfer, sdo, index });
+    const sourceCode = payload.source_code || String(row?.bale_no || packageRow?.source_code || "").trim().toUpperCase();
+    return {
+      ...row,
+      ...payload,
+      bale_no: sourceCode,
+      source_code: sourceCode,
+      source_label: payload.source_type === "LPK" ? "LPK 补差拣货单" : "SDB 现成待送店包",
+      package_count: packageCount || payload.package_count,
+      status: String(row?.status || "").trim().toLowerCase() === "labelled" ? "labelled" : (row?.status || "ready_dispatch"),
+    };
+  });
+}
+
+function getDisplayStoreDispatchPrintLabel(row = {}) {
+  const status = String(row?.print_status || row?.status || "").trim().toLowerCase();
+  if (["labelled", "printed", "complete", "completed"].includes(status)) {
+    return "本类已贴完";
+  }
+  if (["ready_to_dispatch", "ready_dispatch"].includes(status)) {
+    return "已贴标待送店";
+  }
+  return "待打印";
+}
+
+function markDisplayStoreDispatchBaleLabelledByIndex(rows = [], index = 0) {
+  const targetIndex = Number(index);
+  return (Array.isArray(rows) ? rows : []).map((row, rowIndex) => (
+    rowIndex === targetIndex
+      ? {
+        ...row,
+        status: "labelled",
+        print_status: "labelled",
+        delivery_status: "labelled",
+      }
+      : row
+  ));
+}
+
+function getStorePackageActionKey(row = {}) {
+  const sdoCode = getStorePackageSdoCode(row);
+  const sourceCode = getStorePackageSourceCode(row);
+  const scopeCode = String(row?.transfer_no || row?.shipment_no || row?.store_code || row?.assigned_employee || "").trim().toUpperCase();
+  if (sdoCode && sourceCode) {
+    return `${sdoCode}::${sourceCode}`;
+  }
+  return sourceCode ? `${scopeCode || "STORE_PACKAGE"}::${sourceCode}` : "";
+}
+
+function persistStoreSdoPackageItemTokenState() {
+  localStorage.setItem(STORAGE_KEYS.storeSdoPackageItemTokens, JSON.stringify(storeSdoPackageItemTokenState || {}));
+}
+
+function getStoreItemTokenDateKey(row = {}) {
+  const sdoCode = String(row?.sdo_code || row?.store_delivery_execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase();
+  const sdoMatch = sdoCode.match(/^SDO(\d{6})\d{3}$/);
+  if (sdoMatch) {
+    return sdoMatch[1];
+  }
+  const machineCode = String(row?.sdo_machine_code || row?.machine_code || "").replace(/[^0-9]/g, "");
+  if (/^4\d{9}$/.test(machineCode)) {
+    return machineCode.slice(1, 7);
+  }
+  const now = new Date();
+  return `${String(now.getFullYear()).slice(-2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function getNextStoreItemTokenSequence(dateKey = "") {
+  const prefix = `5${dateKey}`;
+  let maxSerial = 0;
+  Object.values(storeSdoPackageItemTokenState || {}).forEach((tokens) => {
+    (Array.isArray(tokens) ? tokens : []).forEach((token) => {
+      const machineCode = String(token?.machine_code || token?.barcode_value || "").replace(/[^0-9]/g, "");
+      if (machineCode.startsWith(prefix)) {
+        maxSerial = Math.max(maxSerial, Number(machineCode.slice(prefix.length)) || 0);
+      }
+    });
+  });
+  return maxSerial + 1;
+}
+
+function getStoreItemTokensForSdoPackage(row = {}) {
+  const key = getStorePackageActionKey(row);
+  return key ? (Array.isArray(storeSdoPackageItemTokenState[key]) ? storeSdoPackageItemTokenState[key] : []) : [];
+}
+
+function getStoreItemTokenProgressForPackage(row = {}) {
+  const tokens = getStoreItemTokensForSdoPackage(row);
+  const itemCount = parseKnownDispatchItemCount(row) || 0;
+  const printedCount = tokens.filter((token) => ["printed", "ready_for_sale", "printed_in_store"].includes(String(token?.print_status || token?.status || "").trim().toLowerCase())).length;
+  return {
+    store_item_tokens_generated: tokens.length > 0 && itemCount > 0 && tokens.length >= itemCount,
+    store_item_token_count: tokens.length,
+    store_item_token_printed_count: printedCount,
+    processing_status: tokens.length >= itemCount && itemCount > 0 ? "商品码已生成" : "待生成商品码",
+  };
+}
+
+const STORE_CLERK_FALLBACK_RACK_CODES = ["A-01", "A-02", "B-01", "B-02", "C-01"];
+
+function normalizeStoreRackCode(value = "") {
+  return String(value || "").trim().toUpperCase();
+}
+
+function getStorePackageSdoCode(row = {}) {
+  return String(row?.sdo_code || row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase();
+}
+
+function getStorePackageSourceCode(row = {}) {
+  return String(row?.source_code || row?.bale_no || row?.display_code || "").trim().toUpperCase();
+}
+
+function getStorePackageSourceTypeLabel(row = {}) {
+  const sourceType = normalizeSdoPackageSourceType(row?.source_type, getStorePackageSourceCode(row));
+  if (sourceType === "LPK") {
+    return "补差包";
+  }
+  if (sourceType === "SDB") {
+    return "现成包";
+  }
+  if (String(row?.flow_type || "").trim() === "direct_hang") {
+    return "直挂包";
+  }
+  return sourceType || "待确认";
+}
+
+function getStorePackageCostLabel(row = {}) {
+  const cost = getStorePackageCostValue(row);
+  return cost > 0 ? formatKesAmount(cost) : "成本待确认";
+}
+
+function getStorePackageCostValue(row = {}) {
+  const costCandidates = [
+    row?.unit_cost_kes,
+    row?.default_cost_kes,
+    row?.cost_kes,
+    row?.unit_cost,
+    row?.cost,
+  ];
+  const matched = costCandidates.find((value) => Number(value) > 0);
+  return Number(matched) > 0 ? Number(matched) : 0;
+}
+
+function roundStorePackagePrice(value = 0) {
+  const numeric = Number(value || 0);
+  if (!(numeric > 0)) {
+    return 0;
+  }
+  return Math.max(1, Math.ceil(numeric / 10) * 10);
+}
+
+function getStorePackagePriceChoices(row = {}) {
+  const cost = getStorePackageCostValue(row);
+  const managedDefaults = getDefaultStoreSalePriceChoices();
+  const defaultPrice1 = Number(
+    row?.default_price_1
+    || row?.default_price_1_kes
+    || row?.suggested_price_kes
+    || row?.selling_price_kes
+    || row?.selling_price
+    || 0,
+  );
+  const defaultPrice2 = Number(
+    row?.default_price_2
+    || row?.default_price_2_kes
+    || row?.premium_price_kes
+    || 0,
+  );
+  const fallbackPrice1 = managedDefaults.default_1 > 0
+    ? managedDefaults.default_1
+    : (cost > 0 ? roundStorePackagePrice(cost * 2) : DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_1_kes);
+  const price1 = defaultPrice1 > 0 ? defaultPrice1 : fallbackPrice1;
+  const fallbackPrice2 = managedDefaults.default_2 > 0
+    ? managedDefaults.default_2
+    : (cost > 0 ? Math.max(roundStorePackagePrice(cost * 2.6), price1 + 50) : DEFAULT_STORE_SALE_PRICE_SETTINGS.default_price_2_kes);
+  const price2 = defaultPrice2 > 0 ? defaultPrice2 : fallbackPrice2;
+  return {
+    default_1: price1,
+    default_2: price2,
+  };
+}
+
+function getStorePackagePriceMode(context = {}) {
+  return String(context.selected_price_mode || storeClerkHomeState.selected_price_mode || "").trim();
+}
+
+function getStorePackageCustomPrice(context = {}) {
+  return String(context.custom_price || storeClerkHomeState.custom_price || "").trim();
+}
+
+function getSelectedStorePackagePrice(row = {}, context = {}) {
+  const mode = getStorePackagePriceMode(context);
+  const choices = getStorePackagePriceChoices(row);
+  if (mode === "default_1") {
+    return choices.default_1;
+  }
+  if (mode === "default_2") {
+    return choices.default_2;
+  }
+  if (mode === "custom") {
+    return Number(getStorePackageCustomPrice(context) || 0);
+  }
+  return 0;
+}
+
+function collectRackCodesFromValue(value, target = new Set()) {
+  if (!value) {
+    return target;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectRackCodesFromValue(item, target));
+    return target;
+  }
+  if (typeof value === "object") {
+    [
+      value.rack_code,
+      value.store_rack_code,
+      value.suggested_rack_code,
+      value.rackCode,
+      value.code,
+    ].forEach((item) => {
+      const rackCode = normalizeStoreRackCode(item);
+      if (rackCode) {
+        target.add(rackCode);
+      }
+    });
+    [
+      value.rows,
+      value.racks,
+      value.rack_locations,
+      value.locations,
+      value.items,
+      value.data,
+      value.rack_codes,
+      value.rackCodes,
+      value.suggested_rack_codes,
+    ].forEach((item) => collectRackCodesFromValue(item, target));
+    return target;
+  }
+  const rackCode = normalizeStoreRackCode(value);
+  if (rackCode) {
+    target.add(rackCode);
+  }
+  return target;
+}
+
+function getStoreClerkRackOptions(row = {}) {
+  const rackCodes = new Set();
+  collectRackCodesFromValue(row, rackCodes);
+  collectRackCodesFromValue(getStoreItemTokensForSdoPackage(row), rackCodes);
+  collectRackCodesFromValue(readOutput("#rackOutput"), rackCodes);
+  const existingRackCodes = [...rackCodes].filter(Boolean);
+  return existingRackCodes.length ? existingRackCodes : STORE_CLERK_FALLBACK_RACK_CODES;
+}
+
+function getSelectedStorePackageRackCode(row = {}, context = {}) {
+  const options = getStoreClerkRackOptions(row);
+  const preferred = normalizeStoreRackCode(
+    context.selected_rack_code
+    || storeClerkHomeState.selected_rack_code
+    || row?.store_rack_code
+    || row?.suggested_rack_code
+    || getStoreItemTokensForSdoPackage(row).find((token) => String(token?.store_rack_code || "").trim())?.store_rack_code
+    || "",
+  );
+  return options.includes(preferred) ? preferred : "";
+}
+
+function renderStoreRackOptions(row = {}, selectedRackCode = "") {
+  const selected = normalizeStoreRackCode(selectedRackCode);
+  return `
+    <option value="" ${selected ? "" : "selected"}>请选择货架位</option>
+    ${getStoreClerkRackOptions(row).map((rackCode) => `
+    <option value="${escapeHtml(rackCode)}" ${rackCode === selected ? "selected" : ""}>${escapeHtml(rackCode)}</option>
+  `).join("")}
+  `;
+}
+
+function setStoreRackCodeForSdoPackageTokens(row = {}, rackCode = "") {
+  const normalizedRackCode = normalizeStoreRackCode(rackCode);
+  const key = getStorePackageActionKey(row);
+  const tokens = getStoreItemTokensForSdoPackage(row);
+  if (!key || !normalizedRackCode || !tokens.length) {
+    return tokens;
+  }
+  storeSdoPackageItemTokenState[key] = tokens.map((token) => ({
+    ...token,
+    store_rack_code: normalizedRackCode,
+    suggested_rack_code: token.suggested_rack_code || normalizedRackCode,
+    updated_at: new Date().toISOString(),
+  }));
+  persistStoreSdoPackageItemTokenState();
+  return storeSdoPackageItemTokenState[key];
+}
+
+function setStorePackagePrintSettingsForTokens(row = {}, options = {}) {
+  const key = getStorePackageActionKey(row);
+  const tokens = getStoreItemTokensForSdoPackage(row);
+  if (!key || !tokens.length) {
+    return tokens;
+  }
+  const rackCode = normalizeStoreRackCode(options.store_rack_code || options.rackCode || "");
+  const selectedPrice = Number(options.selected_price || options.selectedPrice || 0);
+  const nowIso = new Date().toISOString();
+  storeSdoPackageItemTokenState[key] = tokens.map((token) => {
+    const isPrinted = ["printed", "ready_for_sale"].includes(String(token?.print_status || token?.status || "").trim().toLowerCase());
+    if (isPrinted) {
+      return token;
+    }
+    return {
+      ...token,
+      store_rack_code: rackCode || token.store_rack_code || "",
+      suggested_rack_code: rackCode || token.suggested_rack_code || "",
+      selected_price: selectedPrice > 0 ? selectedPrice : token.selected_price,
+      selling_price_kes: selectedPrice > 0 ? selectedPrice : token.selling_price_kes,
+      sale_status: token.sale_status || "ready_for_sale",
+      print_status: String(token.print_status || "pending_print").trim() || "pending_print",
+      updated_at: nowIso,
+    };
+  });
+  persistStoreSdoPackageItemTokenState();
+  return storeSdoPackageItemTokenState[key];
+}
+
+function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
+  const key = getStorePackageActionKey(row);
+  if (!key) {
+    throw new Error("当前包缺少 SDO 或来源包编码，不能生成 STORE_ITEM。");
+  }
+  const itemCount = parseKnownDispatchItemCount(row);
+  if (!(itemCount > 0)) {
+    throw new Error("当前包没有明确 item_count，不能按件数生成 STORE_ITEM。");
+  }
+  const rackCode = normalizeStoreRackCode(options.store_rack_code || options.rackCode || row?.store_rack_code || storeClerkHomeState.selected_rack_code || "");
+  const selectedPrice = Number(options.selected_price || options.selectedPrice || 0);
+  const existingTokens = getStoreItemTokensForSdoPackage(row);
+  if (existingTokens.length >= itemCount) {
+    return setStorePackagePrintSettingsForTokens(row, { store_rack_code: rackCode, selected_price: selectedPrice });
+  }
+  const dateKey = getStoreItemTokenDateKey(row);
+  let nextSerial = getNextStoreItemTokenSequence(dateKey);
+  const generatedAt = new Date().toISOString();
+  const normalizedExistingTokens = existingTokens.map((token) => ({
+    ...token,
+    store_rack_code: rackCode || token.store_rack_code || "",
+    suggested_rack_code: rackCode || token.suggested_rack_code || "",
+    selected_price: selectedPrice > 0 ? selectedPrice : token.selected_price,
+    selling_price_kes: selectedPrice > 0 ? selectedPrice : token.selling_price_kes,
+    sale_status: token.sale_status || "ready_for_sale",
+    print_status: token.print_status || "pending_print",
+    updated_at: generatedAt,
+  }));
+  const additionalTokens = Array.from({ length: itemCount - existingTokens.length }, (_, offset) => {
+    const serial = String(nextSerial + offset).padStart(3, "0");
+    const displayCode = `STOREITEM${dateKey}${serial}`;
+    const machineCode = `5${dateKey}${serial}`;
+    return {
+      token_no: displayCode,
+      identity_id: displayCode,
+      display_code: displayCode,
+      machine_code: machineCode,
+      barcode_value: machineCode,
+      barcode_type: "STORE_ITEM",
+      source_sdo: String(row?.sdo_code || row?.store_delivery_execution_order_no || row?.execution_order_no || "").trim().toUpperCase(),
+      source_package: String(row?.source_code || row?.bale_no || "").trim().toUpperCase(),
+      source_type: normalizeSdoPackageSourceType(row?.source_type, row?.source_code || row?.bale_no),
+      category_summary: String(row?.category_summary || row?.category_name || "").trim(),
+      store_code: String(row?.store_code || row?.to_store_code || getCurrentStoreCodeFallback() || "").trim().toUpperCase(),
+      assigned_employee: String(row?.assigned_employee || row?.assigned_clerk || "").trim(),
+      store_rack_code: rackCode,
+      suggested_rack_code: rackCode,
+      selected_price: selectedPrice,
+      selling_price_kes: selectedPrice,
+      sale_status: "ready_for_sale",
+      print_status: "pending_print",
+      status: "generated",
+      qty_index: existingTokens.length + offset + 1,
+      qty_total: itemCount,
+      generated_at: generatedAt,
+      updated_at: generatedAt,
+    };
+  });
+  storeSdoPackageItemTokenState[key] = [...normalizedExistingTokens, ...additionalTokens];
+  persistStoreSdoPackageItemTokenState();
+  return storeSdoPackageItemTokenState[key];
+}
+
+function markStoreItemTokensPrintedForSdoPackage(row = {}, options = {}) {
+  const key = getStorePackageActionKey(row);
+  const rackCode = normalizeStoreRackCode(options.store_rack_code || options.rackCode || storeClerkHomeState.selected_rack_code || "");
+  const tokens = rackCode ? setStoreRackCodeForSdoPackageTokens(row, rackCode) : getStoreItemTokensForSdoPackage(row);
+  if (!key || !tokens.length) {
+    throw new Error("当前包还没有 STORE_ITEM token，不能打印商品码。");
+  }
+  storeSdoPackageItemTokenState[key] = tokens.map((token) => ({
+    ...token,
+    store_rack_code: rackCode || token.store_rack_code || "",
+    status: "printed",
+    sale_status: token.sale_status || "ready_for_sale",
+    printed_at: token.printed_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }));
+  persistStoreSdoPackageItemTokenState();
+  return storeSdoPackageItemTokenState[key];
+}
+
+function getPendingStoreItemTokensForSdoPackage(row = {}) {
+  return getStoreItemTokensForSdoPackage(row).filter((token) => {
+    const status = String(token?.print_status || token?.status || "").trim().toLowerCase();
+    return !["printed", "ready_for_sale", "printed_in_store"].includes(status);
+  });
+}
+
+function normalizeStorePackagePrintQuantity(value, pendingCount = 0) {
+  const parsed = Number(value || 0);
+  const fallback = Math.min(Math.max(Number(pendingCount || 0), 0), 20);
+  if (!(parsed > 0)) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
+function buildStorePackagePrintPreviewTokens(row = {}, options = {}) {
+  const tokens = getStoreItemTokensForSdoPackage(row);
+  if (!tokens.length) {
+    throw new Error("请先生成 STORE_ITEM 商品码");
+  }
+  const pendingTokens = getPendingStoreItemTokensForSdoPackage(row);
+  if (!pendingTokens.length) {
+    throw new Error("本包商品码已全部打印");
+  }
+  const quantity = normalizeStorePackagePrintQuantity(options.print_quantity || options.printQuantity, pendingTokens.length);
+  if (quantity > pendingTokens.length) {
+    throw new Error("本次打印数量不能超过未打印数量");
+  }
+  if (!(quantity > 0)) {
+    throw new Error("本次打印数量必须大于 0");
+  }
+  return pendingTokens.slice(0, quantity);
+}
+
+function markStorePackagePrintPreviewTokensPrinted(row = {}, previewTokenNos = [], options = {}) {
+  const key = getStorePackageActionKey(row);
+  const tokens = getStoreItemTokensForSdoPackage(row);
+  const previewSet = new Set((Array.isArray(previewTokenNos) ? previewTokenNos : []).map((item) => String(item || "").trim()).filter(Boolean));
+  if (!key || !tokens.length) {
+    throw new Error("请先生成 STORE_ITEM 商品码");
+  }
+  if (!previewSet.size) {
+    throw new Error("请先预览本次商品码");
+  }
+  const rackCode = normalizeStoreRackCode(options.store_rack_code || options.rackCode || "");
+  const selectedPrice = Number(options.selected_price || options.selectedPrice || 0);
+  const printedAt = new Date().toISOString();
+  storeSdoPackageItemTokenState[key] = tokens.map((token) => {
+    const tokenNo = String(token?.token_no || token?.display_code || "").trim();
+    if (!previewSet.has(tokenNo)) {
+      return token;
+    }
+    return {
+      ...token,
+      store_rack_code: rackCode || token.store_rack_code || "",
+      suggested_rack_code: rackCode || token.suggested_rack_code || "",
+      selected_price: selectedPrice > 0 ? selectedPrice : token.selected_price,
+      selling_price_kes: selectedPrice > 0 ? selectedPrice : token.selling_price_kes,
+      sale_status: token.sale_status || "ready_for_sale",
+      print_status: "printed",
+      status: "printed",
+      printed_at: token.printed_at || printedAt,
+      updated_at: printedAt,
+    };
+  });
+  persistStoreSdoPackageItemTokenState();
+  return storeSdoPackageItemTokenState[key];
+}
+
 function getTransferDerivedStoreDispatchRows() {
   const derivedRows = [];
   const nowIso = new Date().toISOString();
-  const existingSdoCodes = new Set(
-    (Array.isArray(storeDispatchBaleState) ? storeDispatchBaleState : [])
-      .map((row) => String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase())
-      .filter(Boolean),
-  );
   (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
     const sdoCode = String(
       transfer?.store_delivery_execution_order_no
@@ -23310,9 +25585,8 @@ function getTransferDerivedStoreDispatchRows() {
       || transfer?.official_delivery_barcode
       || "",
     ).trim().toUpperCase();
-    if (!sdoCode || existingSdoCodes.has(sdoCode)) return;
+    if (!sdoCode) return;
     const targetStoreCode = String(transfer?.to_store_code || transfer?.store_code || "").trim().toUpperCase();
-    const packageCount = Math.max(0, Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
     const upstreamPackageRows = [
       ...(Array.isArray(transfer?.store_delivery_execution_order?.packages) ? transfer.store_delivery_execution_order.packages : []),
       ...(Array.isArray(transfer?.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : []),
@@ -23320,32 +25594,42 @@ function getTransferDerivedStoreDispatchRows() {
       ...(Array.isArray(transfer?.delivery_batch?.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : []),
       ...(Array.isArray(transfer?.shipment_session?.packages) ? transfer.shipment_session.packages : []),
     ];
+    const packageCount = Math.max(
+      upstreamPackageRows.length,
+      Number(transfer?.store_delivery_execution_order?.package_count || 0),
+      Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0),
+    );
     const explicitItemCounts = upstreamPackageRows
       .map((row) => parseKnownDispatchItemCount(row))
       .filter((count) => count !== null);
     for (let index = 0; index < packageCount; index += 1) {
       const packageLabel = String(index + 1).padStart(3, "0");
+      const upstreamRow = upstreamPackageRows[index] || {};
+      const packagePayload = buildSdoPackagePayloadFromDispatchRow(upstreamRow, {
+        transfer,
+        sdo: transfer?.store_delivery_execution_order || {},
+        index,
+      });
       const knownItemCount = explicitItemCounts[index] ?? null;
+      const sourceCode = packagePayload.source_code || `${sdoCode}-PKG${packageLabel}`;
       derivedRows.push({
-        bale_no: String(
-          upstreamPackageRows[index]?.source_code
-          || upstreamPackageRows[index]?.bale_no
-          || `${sdoCode}-PKG${packageLabel}`,
-        ).trim().toUpperCase(),
+        ...packagePayload,
+        bale_no: sourceCode,
+        source_code: sourceCode,
         transfer_no: String(transfer?.transfer_no || "").trim().toUpperCase(),
         store_code: targetStoreCode,
         to_store_code: targetStoreCode,
         target_store_code: targetStoreCode,
-        status: transfer?.status || "shipped",
-        item_count: knownItemCount,
-        category_summary: String(upstreamPackageRows[index]?.category_summary || upstreamPackageRows[index]?.category_name || "").trim(),
-        category_name: String(upstreamPackageRows[index]?.category_name || "").trim(),
+        status: packagePayload.delivery_status || transfer?.status || "shipped",
+        item_count: packagePayload.item_count ?? knownItemCount,
+        category_summary: packagePayload.category_summary,
+        category_name: packagePayload.category_name,
         updated_at: transfer?.updated_at || transfer?.created_at || nowIso,
         created_at: transfer?.created_at || nowIso,
         store_delivery_execution_order_no: sdoCode,
         execution_order_no: sdoCode,
         official_delivery_barcode: sdoCode,
-        machine_code: String(transfer?.machine_code || transfer?.store_delivery_execution_order?.machine_code || "").trim(),
+        machine_code: packagePayload.sdo_machine_code || String(transfer?.machine_code || transfer?.store_delivery_execution_order?.machine_code || "").trim(),
       });
     }
   });
@@ -23354,9 +25638,18 @@ function getTransferDerivedStoreDispatchRows() {
 
 function getStoreManagerConsoleRows(storeCode = "") {
   const normalizedStoreCode = String(storeCode || "").trim().toUpperCase();
+  const transferDerivedRows = getTransferDerivedStoreDispatchRows();
+  const derivedSdoCodes = new Set(
+    transferDerivedRows
+      .map((row) => String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase())
+      .filter(Boolean),
+  );
   const rawRows = [
-    ...storeDispatchBaleState,
-    ...getTransferDerivedStoreDispatchRows(),
+    ...transferDerivedRows,
+    ...storeDispatchBaleState.filter((row) => {
+      const sdoCode = String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase();
+      return !sdoCode || !derivedSdoCodes.has(sdoCode);
+    }),
     ...ensureDirectHangDispatchBaleState(),
   ];
   const packageMetaBySdoAndBale = new Map();
@@ -23373,6 +25666,10 @@ function getStoreManagerConsoleRows(storeCode = "") {
       const baleNo = String(pkgRow?.source_code || pkgRow?.bale_no || "").trim().toUpperCase();
       if (!baleNo) return;
       packageMetaBySdoAndBale.set(`${sdoCode}::${baleNo}`, {
+        ...buildSdoPackagePayloadFromDispatchRow(pkgRow, {
+          transfer,
+          sdo: transfer?.store_delivery_execution_order || {},
+        }),
         item_count: parseKnownDispatchItemCount(pkgRow),
         category_summary: String(pkgRow?.category_summary || pkgRow?.category_name || "").trim(),
         category_name: String(pkgRow?.category_name || pkgRow?.category_summary || "").trim(),
@@ -23381,16 +25678,28 @@ function getStoreManagerConsoleRows(storeCode = "") {
   });
   const rows = rawRows.map((row) => {
     const sdoCode = String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase();
-    const baleNo = String(row?.bale_no || row?.source_code || "").trim().toUpperCase();
+    const baleNo = String(row?.source_code || row?.bale_no || "").trim().toUpperCase();
     const meta = packageMetaBySdoAndBale.get(`${sdoCode}::${baleNo}`);
     const assignmentMap = sdoCode ? (storeReceiptPackageAssignmentState[sdoCode] || {}) : {};
     const assignedEmployee = String(assignmentMap[baleNo] || row?.assigned_employee || "").trim();
+    const tokenProgress = getStoreItemTokenProgressForPackage({
+      ...row,
+      ...meta,
+      sdo_code: sdoCode,
+      source_code: baleNo,
+      bale_no: baleNo,
+      assigned_employee: assignedEmployee,
+    });
     return {
       ...row,
+      ...meta,
+      bale_no: baleNo || row?.bale_no,
+      source_code: baleNo || row?.source_code,
       item_count: meta?.item_count !== null && meta?.item_count !== undefined ? meta.item_count : row?.item_count,
       category_summary: meta?.category_summary || row?.category_summary || "",
       category_name: meta?.category_name || row?.category_name || "",
       assigned_employee: assignedEmployee,
+      ...tokenProgress,
       status: assignedEmployee && ["received", "accepted", "partially_received", "assigned"].includes(String(row?.status || "").trim().toLowerCase())
         ? "assigned"
         : row?.status,
@@ -23511,15 +25820,25 @@ function buildStoreReceivingCommandCenterViewModel(storeCode = "", preferredSdoC
     const packageStatusMap = storeReceiptPackageStatusState[group.sdo_display_code] || {};
     const assignmentMap = getStoreReceiptPackageAssignmentMap(group.sdo_display_code);
     const packages = group.rows.map((row, index) => {
-      const baleNo = String(row?.bale_no || "").trim().toUpperCase();
+      const baleNo = String(row?.source_code || row?.bale_no || "").trim().toUpperCase();
       const receiptStatus = String(packageStatusMap[baleNo] || "pending").toLowerCase();
       const assignedClerk = String(assignmentMap[baleNo] || "").trim();
+      const tokenProgress = getStoreItemTokenProgressForPackage({
+        ...row,
+        sdo_code: group.sdo_display_code,
+        source_code: baleNo,
+        bale_no: baleNo,
+        assigned_employee: assignedClerk || row?.assigned_employee || "",
+      });
       return {
         ...row,
         bale_no: baleNo,
+        source_code: baleNo,
+        sdo_code: group.sdo_display_code,
         sequence: index + 1,
         receipt_status: receiptStatus,
         assigned_clerk: assignedClerk,
+        ...tokenProgress,
       };
     });
     const handledCount = packages.filter((row) => ["received", "exception"].includes(row.receipt_status)).length;
@@ -23973,6 +26292,218 @@ function getStoreClerkAssignedBales(storeCode = "", assignedEmployee = "") {
   return getStoreManagerConsoleRows(normalizedStoreCode).filter((row) => String(row?.assigned_employee || "").trim() === normalizedEmployee);
 }
 
+function findStorePackageRowByActionKey(actionKey = "", storeCode = "", assignedEmployee = "") {
+  const normalizedKey = String(actionKey || "").trim().toUpperCase();
+  if (!normalizedKey) {
+    return null;
+  }
+  const rows = assignedEmployee
+    ? getStoreClerkAssignedBales(storeCode, assignedEmployee)
+    : getStoreManagerConsoleRows(storeCode || getCurrentStoreCodeFallback());
+  return rows.find((row) => getStorePackageActionKey(row).toUpperCase() === normalizedKey) || null;
+}
+
+function getStorePackageCurrentStatusLabel(row = {}) {
+  const progress = getStoreItemTokenProgressForPackage(row);
+  const itemCount = parseKnownDispatchItemCount(row) || 0;
+  if (itemCount && progress.store_item_token_count < itemCount) {
+    return "待生成商品码";
+  }
+  if (itemCount && progress.store_item_token_printed_count < itemCount) {
+    return "待打印";
+  }
+  return getStoreDispatchBaleStatusLabel(row?.status || "") || "待上架";
+}
+
+function renderStorePackageListCard(row = {}, assignedEmployee = "") {
+  const actionKey = getStorePackageActionKey(row);
+  const sourceCode = getStorePackageSourceCode(row);
+  const itemCount = parseKnownDispatchItemCount(row) || 0;
+  const progress = getStoreItemTokenProgressForPackage(row);
+  const sourceTypeLabel = getStorePackageSourceTypeLabel(row);
+  const isDirectHang = row?.flow_type === "direct_hang";
+  const actionButton = isDirectHang
+    ? `<button type="button" class="primary-button clerk-package-primary" data-clerk-bale-open="${escapeHtml(row.bale_no || sourceCode || "")}" data-clerk-bale-flow="direct_hang" data-clerk-bale-employee="${escapeHtml(assignedEmployee)}">去上架</button>`
+    : (actionKey
+      ? `<button type="button" class="primary-button clerk-package-primary" data-store-package-process="${escapeHtml(actionKey)}" data-store-package-employee="${escapeHtml(assignedEmployee)}">去上架</button>`
+      : `<button type="button" class="primary-button clerk-package-primary" disabled aria-disabled="true" title="缺少来源包码">去上架</button>`);
+  return `
+    <article class="clerk-package-card">
+      <div class="clerk-package-card-main">
+        <div class="clerk-package-card-head">
+          <div>
+            <span class="eyebrow">SDO</span>
+            <strong>${escapeHtml(getStorePackageSdoCode(row) || "-")}</strong>
+          </div>
+          <span class="store-flag">${escapeHtml(getStorePackageCurrentStatusLabel(row))}</span>
+        </div>
+        <div class="clerk-package-source">
+          <span>${escapeHtml(sourceCode || "-")}</span>
+          <strong>${escapeHtml(sourceTypeLabel)}</strong>
+        </div>
+        <div class="clerk-package-facts">
+          <span><b>品类</b>${escapeHtml(row.category_summary || row.category_name || "-")}</span>
+          <span><b>件数</b>${escapeHtml(itemCount)}</span>
+          <span><b>已生成 STORE_ITEM</b>${escapeHtml(progress.store_item_token_count)}</span>
+          <span><b>已打印</b>${escapeHtml(progress.store_item_token_printed_count)}</span>
+        </div>
+      </div>
+      <div class="clerk-package-card-action">
+        ${actionButton}
+      </div>
+    </article>
+  `;
+}
+
+function renderStorePackagePriceControls(row = {}, context = {}, actionKey = "") {
+  const choices = getStorePackagePriceChoices(row);
+  const selectedMode = getStorePackagePriceMode(context);
+  const customPrice = getStorePackageCustomPrice(context);
+  const renderChecked = (mode) => (selectedMode === mode ? "checked" : "");
+  return `
+    <div class="store-package-price-picker">
+      <div class="store-package-section-title">
+        <span>售价</span>
+        <strong>${escapeHtml(getSelectedStorePackagePrice(row, context) > 0 ? formatKesAmount(getSelectedStorePackagePrice(row, context)) : "请选择售价")}</strong>
+      </div>
+      <label class="store-package-price-option">
+        <input type="radio" name="storePackagePriceMode" value="default_1" data-store-package-price-mode="${escapeHtml(actionKey)}" ${renderChecked("default_1")} />
+        <span>默认售价 1</span>
+        <strong>${escapeHtml(formatKesAmount(choices.default_1, "KES 150.00"))}</strong>
+      </label>
+      <label class="store-package-price-option">
+        <input type="radio" name="storePackagePriceMode" value="default_2" data-store-package-price-mode="${escapeHtml(actionKey)}" ${renderChecked("default_2")} />
+        <span>默认售价 2</span>
+        <strong>${escapeHtml(formatKesAmount(choices.default_2, "KES 200.00"))}</strong>
+      </label>
+      <label class="store-package-price-option store-package-price-option-custom">
+        <input type="radio" name="storePackagePriceMode" value="custom" data-store-package-price-mode="${escapeHtml(actionKey)}" ${renderChecked("custom")} />
+        <span>自定义售价</span>
+        <input id="storePackageCustomPriceInput" type="number" min="1" step="1" placeholder="输入售价" value="${escapeHtml(customPrice)}" data-store-package-custom-price="${escapeHtml(actionKey)}" />
+      </label>
+    </div>
+  `;
+}
+
+function getStorePackagePreviewTokens(row = {}, context = {}) {
+  const previewTokenNos = Array.isArray(context.print_preview_token_nos)
+    ? context.print_preview_token_nos
+    : (Array.isArray(storeClerkHomeState.print_preview_token_nos) ? storeClerkHomeState.print_preview_token_nos : []);
+  const previewSet = new Set(previewTokenNos.map((item) => String(item || "").trim()).filter(Boolean));
+  if (!previewSet.size) {
+    return [];
+  }
+  return getStoreItemTokensForSdoPackage(row).filter((token) => previewSet.has(String(token?.token_no || token?.display_code || "").trim()));
+}
+
+function renderStorePackagePrintPreview(row = {}, context = {}) {
+  const previewTokens = getStorePackagePreviewTokens(row, context);
+  if (!previewTokens.length) {
+    return '<div class="empty-state compact-empty">点击“预览本次商品码”后，这里会显示本次要打印的 STORE_ITEM。</div>';
+  }
+  const category = String(row?.category_summary || row?.category_name || "-").trim();
+  const sourceShortCode = getStorePackageSourceCode(row).slice(-8) || getStorePackageSourceCode(row) || "-";
+  return previewTokens
+    .map((token) => `
+      <article class="store-package-print-preview-card">
+        <div>
+          <strong>${escapeHtml(token.display_code || token.token_no || "-")}</strong>
+          <span>${escapeHtml(`STORE_ITEM machine_code barcode ${token.machine_code || token.barcode_value || "-"}`)}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-pill">售价 ${escapeHtml(formatKesAmount(token.selected_price || token.selling_price_kes || 0, "待选择"))}</span>
+          <span class="meta-pill">品类 ${escapeHtml(category)}</span>
+          <span class="meta-pill">货架 ${escapeHtml(token.store_rack_code || "未选货架")}</span>
+          <span class="meta-pill">来源 ${escapeHtml(sourceShortCode)}</span>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
+function renderStorePackageShelvingStep(row = {}, context = {}) {
+  if (!row) {
+    return "";
+  }
+  const actionKey = getStorePackageActionKey(row);
+  const progress = getStoreItemTokenProgressForPackage(row);
+  const itemCount = parseKnownDispatchItemCount(row) || 0;
+  const printedCount = progress.store_item_token_printed_count;
+  const unprintedCount = Math.max(itemCount - printedCount, 0);
+  const selectedRackCode = getSelectedStorePackageRackCode(row, context);
+  const selectedPrice = getSelectedStorePackagePrice(row, context);
+  const defaultPrintQty = Math.min(unprintedCount, 20);
+  const printQuantity = normalizeStorePackagePrintQuantity(context.print_quantity || storeClerkHomeState.print_quantity, unprintedCount) || defaultPrintQty;
+  const generatedComplete = itemCount > 0 && progress.store_item_token_count >= itemCount;
+  const feedbackMessage = String(context.last_action_message || storeClerkHomeState.last_action_message || "").trim();
+  const feedbackType = String(context.last_action_type || storeClerkHomeState.last_action_type || "success").trim();
+  return `
+    <section class="store-package-shelving-step">
+      <div class="store-package-step-head">
+        <button type="button" class="ghost-button mini-button" data-store-package-back>返回列表</button>
+        <div>
+          <span class="eyebrow">PDA 上架</span>
+          <strong>包上架 / 商品码打印</strong>
+        </div>
+      </div>
+      <div class="store-package-step-summary">
+        <article><span>SDO</span><strong>${escapeHtml(getStorePackageSdoCode(row) || "-")}</strong></article>
+        <article><span>来源包码</span><strong>${escapeHtml(getStorePackageSourceCode(row) || "-")}</strong></article>
+        <article><span>品类</span><strong>${escapeHtml(row.category_summary || row.category_name || "-")}</strong></article>
+        <article><span>件数</span><strong>${escapeHtml(itemCount)}</strong></article>
+        <article><span>成本价</span><strong>${escapeHtml(getStorePackageCostLabel(row))}</strong></article>
+        <article><span>已生成 STORE_ITEM</span><strong>${escapeHtml(`${progress.store_item_token_count} / ${itemCount}`)}</strong></article>
+        <article><span>已打印</span><strong>${escapeHtml(`${printedCount} / ${itemCount}`)}</strong></article>
+        <article><span>未打印</span><strong>${escapeHtml(unprintedCount)}</strong></article>
+      </div>
+      ${feedbackMessage ? `<div class="inline-feedback is-visible is-${feedbackType === "error" ? "error" : "success"}">${escapeHtml(feedbackMessage)}</div>` : ""}
+      <div class="store-package-flow-section">
+        <div class="store-package-section-title">
+          <span>上架设置</span>
+          <strong>store_rack_code / selected_price</strong>
+        </div>
+        <label class="store-package-rack-picker">
+          <span>选择货架位</span>
+          <select id="storePackageRackSelect" data-store-package-rack-select="${escapeHtml(actionKey)}">
+            ${renderStoreRackOptions(row, selectedRackCode)}
+          </select>
+        </label>
+        ${renderStorePackagePriceControls(row, context, actionKey)}
+      </div>
+      <div class="store-package-flow-section">
+        <div class="store-package-section-title">
+          <span>STORE_ITEM 生成区</span>
+          <strong>${escapeHtml(`${progress.store_item_token_count} / ${itemCount}`)}</strong>
+        </div>
+        <button type="button" class="primary-button store-package-wide-action" data-store-package-generate-items="${escapeHtml(actionKey)}" data-store-package-employee="${escapeHtml(row.assigned_employee || row.assigned_clerk || "")}" ${generatedComplete ? "disabled" : ""}>${generatedComplete ? "已生成 STORE_ITEM" : "生成 STORE_ITEM 商品码"}</button>
+        <div class="subtle small">${escapeHtml(`已生成：${progress.store_item_token_count} / ${itemCount}；待打印：${unprintedCount}`)}</div>
+      </div>
+      <div class="store-package-flow-section">
+        <div class="store-package-section-title">
+          <span>商品码打印区</span>
+          <strong>${escapeHtml(`未打印 ${unprintedCount}`)}</strong>
+        </div>
+        <label class="store-package-print-qty">
+          <span>本次打印数量</span>
+          <input id="storePackagePrintQuantityInput" type="number" min="1" max="${escapeHtml(unprintedCount)}" step="1" value="${escapeHtml(printQuantity || defaultPrintQty || 0)}" data-store-package-print-quantity="${escapeHtml(actionKey)}" />
+        </label>
+        <div class="store-package-step-actions">
+          <button type="button" class="ghost-button" data-store-package-preview-print="${escapeHtml(actionKey)}" data-store-package-employee="${escapeHtml(row.assigned_employee || row.assigned_clerk || "")}">预览本次商品码</button>
+          <button type="button" class="ghost-button" data-store-package-print-items="${escapeHtml(actionKey)}" data-store-package-employee="${escapeHtml(row.assigned_employee || row.assigned_clerk || "")}">打印本次数量</button>
+          <button type="button" class="primary-button" data-store-package-confirm-printed="${escapeHtml(actionKey)}" data-store-package-employee="${escapeHtml(row.assigned_employee || row.assigned_clerk || "")}">标记本次已打印</button>
+        </div>
+      </div>
+      <div class="store-package-token-preview" aria-live="polite">
+        <div class="store-package-section-title">
+          <span>打印预览</span>
+          <strong>${escapeHtml(selectedPrice > 0 ? formatKesAmount(selectedPrice) : "待选择售价")}</strong>
+        </div>
+        ${renderStorePackagePrintPreview(row, context)}
+      </div>
+    </section>
+  `;
+}
+
 function renderStoreClerkHomeSummary(context = {}) {
   const target = document.querySelector("#storeClerkHomeSummary");
   if (!(target instanceof HTMLElement)) {
@@ -23989,6 +26520,16 @@ function renderStoreClerkHomeSummary(context = {}) {
   storeClerkHomeState = {
     store_code: storeCode,
     assigned_employee: assignedEmployee,
+    step: context.step || storeClerkHomeState.step || "list",
+    selected_package_key: context.selected_package_key || storeClerkHomeState.selected_package_key || "",
+    selected_rack_code: normalizeStoreRackCode(context.selected_rack_code || storeClerkHomeState.selected_rack_code || ""),
+    selected_price_mode: context.selected_price_mode !== undefined ? context.selected_price_mode : storeClerkHomeState.selected_price_mode,
+    selected_price: context.selected_price !== undefined ? context.selected_price : storeClerkHomeState.selected_price,
+    custom_price: context.custom_price !== undefined ? context.custom_price : storeClerkHomeState.custom_price,
+    print_quantity: context.print_quantity !== undefined ? context.print_quantity : storeClerkHomeState.print_quantity,
+    print_preview_token_nos: Array.isArray(context.print_preview_token_nos) ? context.print_preview_token_nos : (Array.isArray(storeClerkHomeState.print_preview_token_nos) ? storeClerkHomeState.print_preview_token_nos : []),
+    last_action_message: context.last_action_message !== undefined ? context.last_action_message : storeClerkHomeState.last_action_message,
+    last_action_type: context.last_action_type || storeClerkHomeState.last_action_type || "success",
   };
   const rows = getStoreClerkAssignedBales(storeCode, assignedEmployee);
   if (!assignedEmployee) {
@@ -24002,96 +26543,38 @@ function renderStoreClerkHomeSummary(context = {}) {
     return;
   }
 
-  const pendingRows = rows.filter((row) => String(row?.status || "").trim() === "assigned");
-  const printingRows = rows.filter((row) => String(row?.status || "").trim() === "printing_in_progress");
-  const completedRows = rows.filter((row) => String(row?.status || "").trim() === "completed");
-  const directHangRows = rows.filter((row) => row?.flow_type === "direct_hang");
-  const activeRows = [...pendingRows, ...printingRows, ...rows.filter((row) => !pendingRows.includes(row) && !printingRows.includes(row) && !completedRows.includes(row))];
-  const currentRow = activeRows[0] || rows[0];
-  const remainingRows = rows.filter((row) => row !== currentRow);
+  const selectedPackageRow = storeClerkHomeState.selected_package_key ? findStorePackageRowByActionKey(
+    storeClerkHomeState.selected_package_key || "",
+    storeCode,
+    assignedEmployee,
+  ) : null;
+  if (storeClerkHomeState.step === "shelving" && selectedPackageRow) {
+    target.className = "report-summary clerk-home-shell clerk-home-pda-shell";
+    target.innerHTML = renderStorePackageShelvingStep(selectedPackageRow, storeClerkHomeState);
+    return;
+  }
 
-  const renderOpenButton = (row, label = "进入工作台") =>
-    row?.flow_type === "direct_hang"
-      ? `<button type="button" class="primary-button compact-button" data-clerk-bale-open="${escapeHtml(row.bale_no || "")}" data-clerk-bale-flow="direct_hang" data-clerk-bale-employee="${escapeHtml(assignedEmployee)}">${escapeHtml(label)}</button>`
-      : `<button type="button" class="primary-button compact-button" data-clerk-bale-open="${escapeHtml(row.bale_no || "")}" data-clerk-bale-flow="sorting" data-clerk-bale-employee="${escapeHtml(assignedEmployee)}">${escapeHtml(label)}</button>`;
-
-  target.className = "report-summary clerk-home-shell";
+  const pendingRows = rows.filter((row) => !["completed", "shelved_in_store"].includes(String(row?.status || "").trim().toLowerCase()));
+  const totalItemCount = rows.reduce((sum, row) => sum + Number(parseKnownDispatchItemCount(row) || 0), 0);
+  const generatedItemCount = rows.reduce((sum, row) => sum + Number(getStoreItemTokenProgressForPackage(row).store_item_token_count || 0), 0);
+  const printedItemCount = rows.reduce((sum, row) => sum + Number(getStoreItemTokenProgressForPackage(row).store_item_token_printed_count || 0), 0);
+  target.className = "report-summary clerk-home-shell clerk-home-pda-shell";
   target.innerHTML = `
     <div class="clerk-home-header">
       <div class="clerk-home-title">
         <span class="eyebrow">PDA 首页</span>
-        <strong>${escapeHtml(assignedEmployee)}，先处理你手上的 bale</strong>
-        <p>${escapeHtml(context.last_action_message || "系统会把当前分配给你的 bale 放在最前面。先开当前 bale，再按组挂货、填售价和打印。")}</p>
+        <strong>我的待上架包列表</strong>
+        <p>${escapeHtml(context.last_action_message || `${assignedEmployee} 只需要找到自己的包，然后点“去上架”。`)}</p>
       </div>
       <div class="clerk-home-metrics">
-        <article class="store-metric"><strong>待处理</strong><span>${pendingRows.length}</span></article>
-        <article class="store-metric"><strong>打印中</strong><span>${printingRows.length}</span></article>
-        <article class="store-metric"><strong>已完成</strong><span>${completedRows.length}</span></article>
-        <article class="store-metric"><strong>总件数</strong><span>${rows.reduce((sum, row) => sum + Number(row.item_count || 0), 0)}</span></article>
+        <article class="store-metric"><strong>待上架包数</strong><span>${pendingRows.length}</span></article>
+        <article class="store-metric"><strong>总件数</strong><span>${totalItemCount}</span></article>
+        <article class="store-metric"><strong>已生成商品码</strong><span>${generatedItemCount}</span></article>
+        <article class="store-metric"><strong>已打印商品码</strong><span>${printedItemCount}</span></article>
       </div>
     </div>
-    ${
-      currentRow
-        ? `
-          <section class="clerk-home-current">
-            <div class="clerk-home-current-copy">
-              <span class="eyebrow">当前优先处理</span>
-              <strong>${escapeHtml(currentRow.bale_no || "-")}</strong>
-              <div class="clerk-home-current-meta">
-                <span>${escapeHtml(currentRow.category_summary || currentRow.category_name || "-")}</span>
-                <span>${escapeHtml(`${currentRow.item_count || 0} 件`)}</span>
-                <span>${escapeHtml(currentRow.flow_type === "direct_hang" ? "例外直挂流" : "主分拣流")}</span>
-              </div>
-              <div class="subtle small">${escapeHtml(`状态：${getStoreDispatchBaleStatusLabel(currentRow.status || "")}${currentRow.transfer_no ? ` · 调拨单 ${currentRow.transfer_no}` : ""}${currentRow.task_no ? ` · 任务 ${currentRow.task_no}` : ""}`)}</div>
-            </div>
-            <div class="clerk-home-current-actions">
-              ${renderOpenButton(currentRow, currentRow.flow_type === "direct_hang" ? "打开直挂工作台" : "打开主工作台")}
-            </div>
-          </section>
-        `
-        : ""
-    }
-    <div class="clerk-home-grid">
-      <section class="clerk-home-panel">
-        <div class="clerk-home-panel-head">
-          <span class="eyebrow">Queue</span>
-          <strong>我的 bale 列表</strong>
-        </div>
-        <div class="clerk-home-list">
-          ${
-            remainingRows.length
-              ? remainingRows.slice(0, 6).map((row) => `
-                  <article class="clerk-home-row">
-                    <div class="clerk-home-row-copy">
-                      <strong>${escapeHtml(row.bale_no || "-")}</strong>
-                      <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
-                    </div>
-                    <div class="clerk-home-row-side">
-                      <span class="meta-pill">${escapeHtml(getStoreDispatchBaleStatusLabel(row.status || ""))}</span>
-                      ${renderOpenButton(row, "进入")}
-                    </div>
-                  </article>
-                `).join("")
-              : `<div class="candidate-summary empty-state compact-empty">当前没有其他 bale，先把这一包处理完。</div>`
-          }
-        </div>
-      </section>
-      <section class="clerk-home-panel">
-        <div class="clerk-home-panel-head">
-          <span class="eyebrow">Support</span>
-          <strong>打印 / 异常入口</strong>
-        </div>
-        <div class="manager-console-flags">
-          <span class="store-flag">${escapeHtml(`待处理 ${pendingRows.length}`)}</span>
-          <span class="store-flag ${printingRows.length ? "danger" : ""}">${escapeHtml(`打印中 ${printingRows.length}`)}</span>
-          <span class="store-flag">${escapeHtml(`例外直挂 ${directHangRows.length}`)}</span>
-        </div>
-        ${renderSummaryActions([
-          { panelKey: getPanelKeyByTitle("store", "7. 店员 PDA 上架工作台"), label: "主工作台" },
-          { panelKey: getPanelKeyByTitle("store", "7.2 直挂店员工作台"), label: "直挂工作台" },
-          { panelKey: getPanelKeyByTitle("store", "7.1 打印任务 / 重打（支持页）"), label: "打印 / 重打" },
-        ])}
-      </section>
+    <div class="clerk-package-list">
+      ${rows.map((row) => renderStorePackageListCard(row, assignedEmployee)).join("")}
     </div>
   `;
 }
@@ -24109,7 +26592,93 @@ function refreshStoreClerkHomeWithContext(context = {}) {
   renderStoreClerkHomeSummary({
     store_code: storeCode,
     assigned_employee: assignedEmployee,
+    step: context.step || storeClerkHomeState.step || "list",
+    selected_package_key: context.selected_package_key || storeClerkHomeState.selected_package_key || "",
+    selected_rack_code: context.selected_rack_code || storeClerkHomeState.selected_rack_code || "",
+    selected_price_mode: context.selected_price_mode !== undefined ? context.selected_price_mode : storeClerkHomeState.selected_price_mode,
+    selected_price: context.selected_price !== undefined ? context.selected_price : storeClerkHomeState.selected_price,
+    custom_price: context.custom_price !== undefined ? context.custom_price : storeClerkHomeState.custom_price,
+    print_quantity: context.print_quantity !== undefined ? context.print_quantity : storeClerkHomeState.print_quantity,
+    print_preview_token_nos: Array.isArray(context.print_preview_token_nos) ? context.print_preview_token_nos : storeClerkHomeState.print_preview_token_nos,
+    last_action_type: context.last_action_type || storeClerkHomeState.last_action_type || "success",
     last_action_message: context.last_action_message || "",
+  });
+}
+
+function getStorePackageShelvingInputState(row = {}) {
+  const rackCode = normalizeStoreRackCode(
+    document.querySelector("#storePackageRackSelect")?.value
+    || storeClerkHomeState.selected_rack_code
+    || "",
+  );
+  const checkedPriceMode = document.querySelector("[data-store-package-price-mode]:checked");
+  const selectedPriceMode = String(
+    checkedPriceMode instanceof HTMLInputElement ? checkedPriceMode.value : storeClerkHomeState.selected_price_mode || "",
+  ).trim();
+  const customPrice = String(
+    document.querySelector("#storePackageCustomPriceInput")?.value
+    || storeClerkHomeState.custom_price
+    || "",
+  ).trim();
+  const printQuantity = String(
+    document.querySelector("#storePackagePrintQuantityInput")?.value
+    || storeClerkHomeState.print_quantity
+    || "",
+  ).trim();
+  const selectedPrice = getSelectedStorePackagePrice(row, {
+    selected_price_mode: selectedPriceMode,
+    custom_price: customPrice,
+  });
+  return {
+    selected_rack_code: rackCode,
+    selected_price_mode: selectedPriceMode,
+    selected_price: selectedPrice,
+    custom_price: customPrice,
+    print_quantity: printQuantity,
+  };
+}
+
+function validateStorePackageShelvingSettings(settings = {}, { requireGenerated = false, row = {} } = {}) {
+  if (!settings.selected_rack_code) {
+    throw new Error("请先选择货架位");
+  }
+  if (!settings.selected_price_mode) {
+    throw new Error("请先选择售价");
+  }
+  if (settings.selected_price_mode === "custom" && !(Number(settings.custom_price || 0) > 0)) {
+    throw new Error("自定义售价必须大于 0");
+  }
+  if (!(Number(settings.selected_price || 0) > 0)) {
+    throw new Error("请先选择售价");
+  }
+  if (requireGenerated && !getStoreItemTokensForSdoPackage(row).length) {
+    throw new Error("请先生成 STORE_ITEM 商品码");
+  }
+}
+
+function refreshStorePackageShelvingAction(row = {}, context = {}) {
+  const selectedSettings = context.settings || getStorePackageShelvingInputState(row);
+  const previewTokens = Array.isArray(context.preview_tokens) ? context.preview_tokens : [];
+  const previewTokenNos = context.clear_preview
+    ? []
+    : (
+      previewTokens.length
+        ? previewTokens.map((token) => String(token?.token_no || token?.display_code || "").trim()).filter(Boolean)
+        : (Array.isArray(context.print_preview_token_nos) ? context.print_preview_token_nos : storeClerkHomeState.print_preview_token_nos)
+    );
+  refreshStoreClerkHomeWithContext({
+    store_code: context.store_code || storeClerkHomeState.store_code || getCurrentStoreCodeFallback(),
+    assigned_employee: context.assigned_employee || storeClerkHomeState.assigned_employee || getCurrentStoreWorkerFallback(),
+    step: "shelving",
+    selected_package_key: context.package_action_key || storeClerkHomeState.selected_package_key || getStorePackageActionKey(row),
+    selected_rack_code: selectedSettings.selected_rack_code,
+    selected_price_mode: selectedSettings.selected_price_mode,
+    selected_price: selectedSettings.selected_price,
+    custom_price: selectedSettings.custom_price,
+    print_quantity: selectedSettings.print_quantity,
+    print_preview_token_nos: previewTokenNos,
+    last_action_message: context.message || "",
+    last_action_type: context.type || "success",
   });
 }
 
@@ -24295,6 +26864,7 @@ async function loadDashboard() {
   ]);
   renderCards(cards);
   renderStoreOperatingSummary(storeSummaries);
+  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
   renderStoreManagerConsoleSummary({ store_code: getCurrentStoreCodeFallback() });
   renderStoreReplenishmentDemoSummary(storeReplenishmentDemoState);
   renderStoreRetailSeedSummary(storeRetailSeedState);
@@ -24306,16 +26876,326 @@ async function loadDashboard() {
   });
 }
 
-async function resetTestHistory() {
-  const confirmed = window.confirm(
-    "这会清空当前系统里的测试历史录入数据，包括关单、包裹、bale、分拣、库存、调拨、销售、打印等记录。账号、门店、供应商和基础主数据会保留。确定继续吗？",
-  );
-  if (!confirmed) {
+function normalizeRuntimeEnvironment(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["production", "prod", "正式", "live"].includes(normalized)) {
+    return "production";
+  }
+  if (["staging", "stage", "test", "testing", "uat"].includes(normalized)) {
+    return "staging";
+  }
+  return "local";
+}
+
+function getCurrentRuntimeEnvironment() {
+  const urlEnv = new URLSearchParams(window.location.search || "").get("env");
+  const explicitEnv =
+    urlEnv ||
+    window.RETAIL_OPS_ENVIRONMENT ||
+    localStorage.getItem(STORAGE_KEYS.runtimeEnvironment) ||
+    "";
+  if (explicitEnv) {
+    const normalized = normalizeRuntimeEnvironment(explicitEnv);
+    localStorage.setItem(STORAGE_KEYS.runtimeEnvironment, normalized);
+    return normalized;
+  }
+  const host = String(window.location.hostname || "").toLowerCase();
+  if (!host || host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    return "local";
+  }
+  if (host.includes("staging") || host.includes("stage") || host.includes("uat")) {
+    return "staging";
+  }
+  if (host.includes("prod") || host.includes("directloop")) {
+    return "production";
+  }
+  return "local";
+}
+
+function isProductionRuntimeEnvironment(environment = getCurrentRuntimeEnvironment()) {
+  return normalizeRuntimeEnvironment(environment) === "production";
+}
+
+function getRuntimeStorageSnapshot() {
+  return TEST_DATA_RUNTIME_STORAGE_KEYS.reduce((snapshot, entry) => {
+    const value = localStorage.getItem(entry.key);
+    if (value !== null) {
+      snapshot[entry.key] = safeParse(value, value);
+    }
+    return snapshot;
+  }, {});
+}
+
+function getStoreItemTokenRowsForTestData() {
+  const rows = [];
+  Object.entries(storeSdoPackageItemTokenState || {}).forEach(([packageKey, tokens]) => {
+    (Array.isArray(tokens) ? tokens : []).forEach((token) => {
+      rows.push({ ...token, __package_key: packageKey });
+    });
+  });
+  return rows;
+}
+
+function collectTestDataStats() {
+  const itemTokens = getStoreItemTokenRowsForTestData();
+  const sdoCodes = new Set();
+  const packageCodes = new Set(Object.keys(storeSdoPackageItemTokenState || {}));
+  const assignmentKeys = new Set();
+  itemTokens.forEach((token) => {
+    const sourceSdo = token.source_sdo || token.sdo_code || token.sdo_no;
+    const sourcePackage = token.source_package || token.package_code || token.__package_key;
+    if (sourceSdo) sdoCodes.add(String(sourceSdo));
+    if (sourcePackage) packageCodes.add(String(sourcePackage));
+    if (token.assigned_employee) {
+      assignmentKeys.add(`${sourcePackage || token.__package_key || token.machine_code}:${token.assigned_employee}`);
+    }
+  });
+  Object.values(transferPrepExecutionState || {}).forEach((row) => {
+    const sourceSdo = row?.sdo_code || row?.display_sdo_code || row?.delivery_sdo_code;
+    if (sourceSdo) sdoCodes.add(String(sourceSdo));
+    (Array.isArray(row?.packages) ? row.packages : []).forEach((pkg) => {
+      const packageCode = pkg?.source_package || pkg?.package_code || pkg?.bale_no;
+      if (packageCode) packageCodes.add(String(packageCode));
+    });
+  });
+  (Array.isArray(directHangDispatchOrderState) ? directHangDispatchOrderState : []).forEach((row) => {
+    const sourceSdo = row?.sdo_code || row?.delivery_sdo_code || row?.dispatch_order_no;
+    if (sourceSdo) sdoCodes.add(String(sourceSdo));
+  });
+  (Array.isArray(directHangDispatchBaleState) ? directHangDispatchBaleState : []).forEach((row) => {
+    const packageCode = row?.source_package || row?.package_code || row?.bale_no || row?.dispatch_bale_no;
+    if (packageCode) packageCodes.add(String(packageCode));
+  });
+  (Array.isArray(directHangUnpackState) ? directHangUnpackState : []).forEach((row) => {
+    const packageCode = row?.source_package || row?.package_code || row?.bale_no;
+    if (packageCode) packageCodes.add(String(packageCode));
+  });
+  Object.entries(storeReceiptPackageAssignmentState || {}).forEach(([packageKey, assignment]) => {
+    if (assignment?.assigned_employee) {
+      assignmentKeys.add(`${packageKey}:${assignment.assigned_employee}`);
+    }
+  });
+  const directHangStoreItems = Array.isArray(directHangStoreItemState) ? directHangStoreItemState.length : 0;
+  return {
+    users: testDataBackendStats.users ?? "需连接后端读取",
+    SDO: sdoCodes.size,
+    packages: packageCodes.size,
+    STORE_ITEM: itemTokens.length + directHangStoreItems,
+    sales: Array.isArray(posStoreItemSaleRecordState) ? posStoreItemSaleRecordState.length : 0,
+    assignments: assignmentKeys.size,
+  };
+}
+
+function buildTestDataExportPayload() {
+  return {
+    schema_version: 1,
+    exported_at: new Date().toISOString(),
+    environment: getCurrentRuntimeEnvironment(),
+    data_boundaries: DATA_BOUNDARY_LABELS,
+    runtime_test_data: {
+      storage_type: "frontend localStorage",
+      local_storage: getRuntimeStorageSnapshot(),
+    },
+    stats: collectTestDataStats(),
+  };
+}
+
+function renderTestDataTools() {
+  const environment = getCurrentRuntimeEnvironment();
+  const isProduction = isProductionRuntimeEnvironment(environment);
+  const envTarget = document.querySelector("#testDataEnvironmentSummary");
+  if (envTarget) {
+    envTarget.className = "candidate-summary";
+    envTarget.innerHTML = `
+      <div class="${isProduction ? "alert-banner" : "success-banner"}">
+        当前环境：${escapeHtml(environment)}
+        ${isProduction ? " · 正式环境禁止执行测试数据清理操作" : " · local / staging 允许清空、重置、导出和导入测试数据"}
+      </div>
+      <div class="summary-breakdown-list">
+        <div class="summary-breakdown-row"><span>${escapeHtml(DATA_BOUNDARY_LABELS.demo_seed_data)}</span><strong>代码 seed，可随代码存在</strong></div>
+        <div class="summary-breakdown-row"><span>${escapeHtml(DATA_BOUNDARY_LABELS.runtime_test_data)}</span><strong>测试运行态，可清空、导出、导入</strong></div>
+        <div class="summary-breakdown-row"><span>${escapeHtml(DATA_BOUNDARY_LABELS.production_business_data)}</span><strong>正式业务数据，未来进正式数据库</strong></div>
+      </div>
+    `;
+  }
+  const stats = collectTestDataStats();
+  const statsTarget = document.querySelector("#testDataStatsSummary");
+  if (statsTarget) {
+    statsTarget.className = "candidate-summary";
+    statsTarget.innerHTML = `
+      <div class="candidate-summary-grid compact-metrics">
+        ${Object.entries(stats)
+          .map(
+            ([label, value]) => `
+              <article class="store-metric">
+                <strong>${escapeHtml(label)}</strong>
+                <span>${escapeHtml(value)}</span>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+      <div class="subtle small">统计包括后端 users 以及当前浏览器 runtime test data：SDO、packages、STORE_ITEM、POS sales、assignments。</div>
+    `;
+  }
+}
+
+function guardTestDataMutation(operationLabel = "测试数据操作") {
+  const environment = getCurrentRuntimeEnvironment();
+  if (isProductionRuntimeEnvironment(environment)) {
+    const message = "正式环境禁止执行测试数据清理操作";
+    renderErrorSummary("#testDataEnvironmentSummary", message);
+    writeOutput("#testDataOutput", message);
+    return false;
+  }
+  const firstConfirm = window.confirm(`${operationLabel} 会修改 local / staging 测试数据，不会用于正式业务数据。确定继续吗？`);
+  if (!firstConfirm) {
+    return false;
+  }
+  const secondConfirm = window.confirm(`再次确认：${operationLabel} 后，本地 runtime test data 会被覆盖或清空。`);
+  return Boolean(secondConfirm);
+}
+
+function hydrateFrontendRuntimeTestDataStateFromLocalStorage() {
+  storeReplenishmentDemoState = safeParse(localStorage.getItem(STORAGE_KEYS.latestStoreReplenishmentDemo), null);
+  transferPrepExecutionState = safeParse(localStorage.getItem(STORAGE_KEYS.transferPrepExecution), {});
+  storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), {});
+  posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
+  chinaSourceBaleState = safeParse(localStorage.getItem(STORAGE_KEYS.chinaSourceBales), []);
+  chinaSourceCustomCategoryState = safeParse(localStorage.getItem(STORAGE_KEYS.chinaSourceCategories), {});
+  supplierCategoryScopeState = safeParse(localStorage.getItem(STORAGE_KEYS.supplierCategories), {});
+  supplierCategoryLabelState = safeParse(localStorage.getItem(STORAGE_KEYS.supplierCategoryLabels), {});
+  apparelPieceWeightState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelPieceWeights), []);
+  apparelDefaultCostState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelDefaultCosts), []);
+  apparelSortingRackState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelSortingRacks), []);
+  directHangUnpackState = safeParse(localStorage.getItem(STORAGE_KEYS.directHangUnpacks), []);
+  directHangDispatchOrderState = safeParse(localStorage.getItem(STORAGE_KEYS.directHangDispatchOrders), []);
+  directHangDispatchBaleState = safeParse(localStorage.getItem(STORAGE_KEYS.directHangDispatchBales), []);
+  directHangStoreItemState = safeParse(localStorage.getItem(STORAGE_KEYS.directHangStoreItems), []);
+  baleSalesRebaleEntryState = safeParse(localStorage.getItem(STORAGE_KEYS.baleSalesRebaleEntries), []);
+  consignmentBundleOrderState = safeParse(localStorage.getItem(STORAGE_KEYS.consignmentBundleOrders), []);
+  opsExceptionTicketState = safeParse(localStorage.getItem(STORAGE_KEYS.opsExceptionTickets), []);
+  opsDataTopicState = safeParse(localStorage.getItem(STORAGE_KEYS.opsDataTopics), []);
+  oaAttendanceRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.oaAttendanceRecords), []);
+  oaPayrollBatchState = safeParse(localStorage.getItem(STORAGE_KEYS.oaPayrollBatches), []);
+  oaFinanceApprovalState = safeParse(localStorage.getItem(STORAGE_KEYS.oaFinanceApprovals), []);
+}
+
+function clearFrontendRuntimeTestDataStorage() {
+  TEST_DATA_RUNTIME_STORAGE_KEYS.forEach((entry) => localStorage.removeItem(entry.key));
+  hydrateFrontendRuntimeTestDataStateFromLocalStorage();
+}
+
+async function refreshTestDataBackendStats() {
+  try {
+    const users = await request("/users");
+    testDataBackendStats = {
+      users: Array.isArray(users) ? users.length : 0,
+      last_error: "",
+    };
+  } catch (error) {
+    testDataBackendStats = {
+      users: "后端未连接",
+      last_error: formatErrorMessage(error),
+    };
+  }
+}
+
+async function loadTestDataTools() {
+  await refreshTestDataBackendStats();
+  renderTestDataTools();
+  writeOutput("#testDataOutput", {
+    environment: getCurrentRuntimeEnvironment(),
+    stats: collectTestDataStats(),
+    backend_error: testDataBackendStats.last_error || "",
+  });
+}
+
+async function clearLocalRuntimeTestData() {
+  if (!guardTestDataMutation("清空本地 runtime test data")) {
+    return;
+  }
+  let backendResult = null;
+  try {
+    backendResult = await request("/system/reset-test-history", { method: "POST" });
+  } catch (error) {
+    backendResult = { warning: formatErrorMessage(error) };
+  }
+  clearFrontendRuntimeTestDataStorage();
+  await refreshTestDataBackendStats();
+  renderTestDataTools();
+  writeOutput("#testDataOutput", {
+    message: "本地 runtime test data 已清空。",
+    backend: backendResult,
+    stats: collectTestDataStats(),
+  });
+  showTransientSummary("#testDataStatsSummary", "本地测试数据已清空，可以重新开始测试。", 1600);
+}
+
+async function resetDemoSeedData() {
+  if (!guardTestDataMutation("重置 demo seed")) {
     return;
   }
   const result = await request("/system/reset-test-history", { method: "POST" });
-  localStorage.removeItem(STORAGE_KEYS.latestWarehouseMainflowDemo);
-  localStorage.removeItem(STORAGE_KEYS.latestStoreReplenishmentDemo);
+  clearFrontendRuntimeTestDataStorage();
+  await refreshTestDataBackendStats();
+  renderTestDataTools();
+  writeOutput("#testDataOutput", {
+    message: "demo seed 已恢复到代码 seed baseline，runtime test data 已清空。",
+    backend: result,
+    stats: collectTestDataStats(),
+  });
+  showTransientSummary("#testDataStatsSummary", "demo seed 已重置。", 1600);
+}
+
+function exportTestDataJson() {
+  const payload = buildTestDataExportPayload();
+  const target = document.querySelector("#testDataExportText");
+  if (target) {
+    target.value = JSON.stringify(payload, null, 2);
+  }
+  renderTestDataTools();
+  writeOutput("#testDataOutput", payload);
+}
+
+function importTestDataJson() {
+  if (!guardTestDataMutation("导入 runtime test data JSON")) {
+    return;
+  }
+  const source = document.querySelector("#testDataImportText");
+  const rawText = String(source?.value || "").trim();
+  if (!rawText) {
+    renderErrorSummary("#testDataEnvironmentSummary", "请先粘贴要导入的测试数据 JSON。");
+    return;
+  }
+  const payload = safeParse(rawText, null);
+  const storagePayload = payload?.runtime_test_data?.local_storage || payload?.local_storage || {};
+  if (!payload || !storagePayload || typeof storagePayload !== "object") {
+    renderErrorSummary("#testDataEnvironmentSummary", "导入 JSON 格式不正确。");
+    return;
+  }
+  let importedCount = 0;
+  Object.entries(storagePayload).forEach(([key, value]) => {
+    if (!TEST_DATA_RUNTIME_STORAGE_KEY_SET.has(key)) {
+      return;
+    }
+    localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+    importedCount += 1;
+  });
+  hydrateFrontendRuntimeTestDataStateFromLocalStorage();
+  renderTestDataTools();
+  writeOutput("#testDataOutput", {
+    message: `已导入 ${importedCount} 个 runtime test data 存储项。`,
+    stats: collectTestDataStats(),
+  });
+}
+
+async function resetTestHistory() {
+  if (!guardTestDataMutation("清空当前系统测试历史录入数据")) {
+    return;
+  }
+  const result = await request("/system/reset-test-history", { method: "POST" });
+  clearFrontendRuntimeTestDataStorage();
   const firstInboundPanelKey = getPanelKeyByTitle("warehouse", "0. 运输 / 关单主档");
   currentInboundShipmentNo = "";
   renderInboundFlowContext("");
@@ -24701,6 +27581,7 @@ async function loadTable(kind) {
   }
   if (kind === "load-store-operating-summary") {
     renderStoreOperatingSummary(data);
+    renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
     focusElement("#storeOperatingSummary");
     return;
   }
@@ -24843,7 +27724,11 @@ async function submitLogin(event) {
     body: JSON.stringify(payload),
   });
   setSession(result);
-  renderAuthResultSummary("login", result);
+  if (latestAuthRouteNotice) {
+    renderAuthResultSummary("notice", { message: latestAuthRouteNotice });
+  } else {
+    renderAuthResultSummary("login", result);
+  }
   await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
 }
 
@@ -24853,14 +27738,14 @@ async function submitLogout() {
   } catch (error) {
     // Session may already be invalid; we still want to clear local state.
   }
-  clearSession();
+  clearSession("Logged out.", { clearPending: true, replaceRoute: true });
   authOutput.textContent = "Logged out.";
   renderAuthResultSummary("logout");
 }
 
 async function refreshSession() {
   if (!currentSession.token) {
-    clearSession();
+    clearSession("Not signed in.", { savePending: true });
     return;
   }
 
@@ -24873,6 +27758,7 @@ async function refreshSession() {
   } catch (error) {
     authOutput.textContent = error.message;
     renderAuthResultSummary("error", error.message);
+    clearSession(error.message, { savePending: true });
   }
 }
 
@@ -25974,6 +28860,9 @@ async function submitStoreClerkHome(event) {
   renderStoreClerkHomeSummary({
     store_code: payload.store_code,
     assigned_employee: payload.assigned_employee,
+    step: "list",
+    selected_package_key: "",
+    selected_rack_code: "",
     last_action_message: `${String(payload.assigned_employee || "").trim() || "当前店员"} 的当前 bale 已刷新。`,
   });
 }
@@ -26070,6 +28959,9 @@ async function submitStoreDispatchAssignment(event) {
   refreshStoreClerkHomeWithContext({
     store_code: firstResult.store_code || getCurrentStoreCodeFallback(),
     assigned_employee: firstResult.assigned_employee || payload.employee_name || "",
+    step: "list",
+    selected_package_key: "",
+    selected_rack_code: "",
     last_action_message: `已从${transferNo ? `总单 ${transferNo}` : "本次选择"}批量分配 ${results.length} 个 bale 给 ${payload.employee_name}。${assignmentPlan.assignmentMessage}`,
   });
   const panelKey = getPanelKeyByTitle("store", assignmentPlan.managerPanelTitle);
@@ -26387,13 +29279,69 @@ async function submitBarcodeAssignment(event) {
   hydrateProductForms(result);
 }
 
+function syncUserOrganizationFields() {
+  const form = document.querySelector("#userForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const roleCode = String(form.querySelector("[name='role_code']")?.value || "").trim().toLowerCase();
+  const roleOption = getDirectLoopRoleOption(roleCode);
+  const binding = roleOption?.binding || "global";
+  form.querySelectorAll("[data-user-org-field]").forEach((field) => {
+    const fieldBinding = String(field.dataset.userOrgField || "").trim();
+    const visible = fieldBinding === binding;
+    field.classList.toggle("hidden-screen", !visible);
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+      field.required = visible && ["store", "warehouse"].includes(fieldBinding);
+    }
+  });
+}
+
+function buildUserPayloadFromForm(form) {
+  const rawPayload = Object.fromEntries(new FormData(form).entries());
+  const roleCode = String(rawPayload.role_code || "").trim().toLowerCase();
+  const roleOption = getDirectLoopRoleOption(roleCode);
+  const payload = {
+    username: String(rawPayload.username || "").trim(),
+    full_name: String(rawPayload.full_name || "").trim(),
+    role_code: roleCode,
+    role_label: roleOption?.role_label || getDirectLoopRoleLabel(roleCode),
+    status: String(rawPayload.status || "active").trim().toLowerCase(),
+    is_active: String(rawPayload.status || "active").trim().toLowerCase() !== "inactive",
+    password: String(rawPayload.password || "").trim(),
+  };
+  const storeCode = String(rawPayload.store_code || "").trim().toUpperCase();
+  const warehouseCode = String(rawPayload.warehouse_code || "").trim().toUpperCase();
+  const areaCode = String(rawPayload.area_code || "").trim().toUpperCase();
+  const managedStoreCodes = String(rawPayload.managed_store_codes || "")
+    .split(",")
+    .map((code) => code.trim().toUpperCase())
+    .filter(Boolean);
+  if (["store_clerk", "store_manager", "cashier"].includes(roleCode)) {
+    if (!storeCode) {
+      throw new Error("请先填写所属门店 store_code");
+    }
+    payload.store_code = storeCode;
+  }
+  if (["warehouse_clerk", "warehouse_manager"].includes(roleCode)) {
+    if (!warehouseCode) {
+      throw new Error("请先填写所属仓库 warehouse_code");
+    }
+    payload.warehouse_code = warehouseCode;
+  }
+  if (roleCode === "area_supervisor") {
+    if (!areaCode && !managedStoreCodes.length) {
+      throw new Error("请先填写 area_code 或 managed_store_codes");
+    }
+    payload.area_code = areaCode;
+    payload.managed_store_codes = managedStoreCodes;
+  }
+  return payload;
+}
+
 async function submitUser(event) {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  const payload = Object.fromEntries(form.entries());
-  if (!payload.store_code) {
-    delete payload.store_code;
-  }
+  const payload = buildUserPayloadFromForm(event.currentTarget);
   const result = await request("/users", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -26680,6 +29628,17 @@ function hydrateApparelSortingRackForm(record = null) {
   setInputValue("#apparelSortingRackForm [name='note']", record?.note || "");
 }
 
+function hydrateStoreDefaultSalePriceForm(record = null) {
+  const form = document.querySelector("#storeDefaultSalePriceForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const settings = normalizeStoreDefaultSalePriceSettings(record || ensureStoreDefaultSalePriceState());
+  setInputValue("#storeDefaultSalePriceForm [name='default_price_1_kes']", settings.default_price_1_kes || "");
+  setInputValue("#storeDefaultSalePriceForm [name='default_price_2_kes']", settings.default_price_2_kes || "");
+  setInputValue("#storeDefaultSalePriceForm [name='note']", settings.note || "");
+}
+
 async function submitApparelPieceWeight(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -26832,6 +29791,33 @@ async function submitApparelSortingRack(event) {
   renderJsonBuilder("sorting-result-items");
   syncJsonBuilderToField("sorting-result-items");
   writeOutput("#apparelSortingRackOutput", record);
+}
+
+async function submitStoreDefaultSalePrice(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  const record = normalizeStoreDefaultSalePriceSettings({
+    default_price_1_kes: Number(payload.default_price_1_kes || 0),
+    default_price_2_kes: Number(payload.default_price_2_kes || 0),
+    note: String(payload.note || "").trim(),
+    updated_at: new Date().toISOString(),
+  });
+  if (!(record.default_price_1_kes > 0)) {
+    throw new Error("请先填写默认售价 1。");
+  }
+  if (!(record.default_price_2_kes > 0)) {
+    throw new Error("请先填写默认售价 2。");
+  }
+  storeDefaultSalePriceState = record;
+  persistStoreDefaultSalePriceState();
+  hydrateStoreDefaultSalePriceForm(record);
+  renderStoreDefaultSalePriceSummary(record);
+  renderStoreClerkHomeSummary({
+    ...storeClerkHomeState,
+    last_action_message: storeClerkHomeState.last_action_message,
+  });
+  writeOutput("#storeDefaultSalePriceOutput", record);
 }
 
 async function submitItemIdentityLedger(event) {
@@ -27804,6 +30790,7 @@ async function loadTransferPlanningContext({ force = false } = {}) {
 
 async function loadTransferOrders() {
   transferOrderState = await request("/transfers");
+  await hydrateStoreDeliveryExecutionOrdersForTransfers(transferOrderState);
   try {
     storeDispatchBaleState = await request("/stores/dispatch-bales");
     filteredStoreDispatchBaleState = storeDispatchBaleState;
@@ -27812,6 +30799,7 @@ async function loadTransferOrders() {
     filteredStoreDispatchBaleState = [];
   }
   populateTransferOrderSelectors();
+  renderTransferShipmentDraftSummary();
   renderTransferDispatchSummary(transferOrderState);
   renderStoreManagerConsoleSummary({ store_code: getCurrentStoreCodeFallback() });
   renderStoreClerkHomeSummary({
@@ -27822,6 +30810,38 @@ async function loadTransferOrders() {
   renderLoosePackingTaskWorkbench();
   renderTransferExecutionWorkbench();
   return transferOrderState;
+}
+
+async function hydrateStoreDeliveryExecutionOrdersForTransfers(transfers = []) {
+  const rows = Array.isArray(transfers) ? transfers : [];
+  await Promise.all(rows.map(async (transfer) => {
+    const transferNo = String(transfer?.transfer_no || "").trim().toUpperCase();
+    const sdoCode = String(transfer?.store_delivery_execution_order_no || transfer?.official_delivery_barcode || "").trim().toUpperCase();
+    if (!transferNo || !sdoCode) {
+      return;
+    }
+    try {
+      const sdoRows = await request(`/transfers/${encodeURIComponent(transferNo)}/store-delivery-execution-orders`);
+      const storeDeliveryExecutionOrder = Array.isArray(sdoRows)
+        ? sdoRows.find((row) => String(row?.execution_order_no || row?.official_delivery_barcode || "").trim().toUpperCase() === sdoCode)
+        : null;
+      if (!storeDeliveryExecutionOrder) {
+        return;
+      }
+      transfer.store_delivery_execution_order = storeDeliveryExecutionOrder;
+      transfer.store_delivery_execution_order_no = storeDeliveryExecutionOrder.execution_order_no || sdoCode;
+      transfer.official_delivery_barcode = storeDeliveryExecutionOrder.official_delivery_barcode || storeDeliveryExecutionOrder.execution_order_no || sdoCode;
+      transfer.machine_code = storeDeliveryExecutionOrder.machine_code || transfer.machine_code || deriveSdoMachineCode(sdoCode);
+      transfer.display_store_dispatch_bales = enrichDisplayStoreDispatchBalesWithSdo(
+        Array.isArray(transfer.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : [],
+        storeDeliveryExecutionOrder,
+        transfer,
+      );
+    } catch (error) {
+      console.warn("Unable to hydrate SDO packages", transferNo, error);
+    }
+  }));
+  return rows;
 }
 
 async function submitStartReceivingSession(event) {
@@ -27976,26 +30996,31 @@ async function submitTransferBundle(event) {
       looseTasks: executionRecord.looseTasks,
     })
     : result.store_dispatch_bales;
+  const sdoPackagePayloads = (Array.isArray(displayStoreDispatchBales) ? displayStoreDispatchBales : []).map((row, index) =>
+    buildSdoPackagePayloadFromDispatchRow(row, {
+      transfer: transfer || getTransferPreparationOrder(transferNo) || {},
+      index,
+    }),
+  );
   const storeDeliveryExecutionOrder = await request(`/transfers/${transferNo}/store-delivery-execution-orders`, {
     method: "POST",
     body: JSON.stringify({
       notes: "仓库核对完成后生成正式门店送货执行单。",
-      packages: (Array.isArray(displayStoreDispatchBales) ? displayStoreDispatchBales : []).map((row) => ({
-        source_type: String(row?.source_type || (String(row?.bale_no || "").trim().toUpperCase().startsWith("LPK") ? "LPK" : "SDB")).trim().toUpperCase(),
-        source_code: String(row?.source_code || row?.bale_no || "").trim().toUpperCase(),
-        category_summary: String(row?.category_summary || row?.category_name || "").trim(),
-        category_name: String(row?.category_name || row?.category_summary || "").trim(),
-        item_count: parseKnownDispatchItemCount(row),
-      })),
+      packages: sdoPackagePayloads,
     }),
   });
+  const enrichedDisplayStoreDispatchBales = enrichDisplayStoreDispatchBalesWithSdo(
+    displayStoreDispatchBales,
+    storeDeliveryExecutionOrder,
+    transfer || getTransferPreparationOrder(transferNo) || {},
+  );
   const displayResult = {
     ...result,
     store_delivery_execution_order: storeDeliveryExecutionOrder,
     store_delivery_execution_order_no: storeDeliveryExecutionOrder.execution_order_no,
     official_delivery_barcode: storeDeliveryExecutionOrder.official_delivery_barcode,
-    display_store_dispatch_bales: displayStoreDispatchBales,
-    display_generated_bale_count: Array.isArray(displayStoreDispatchBales) ? displayStoreDispatchBales.length : result.generated_bale_count,
+    display_store_dispatch_bales: enrichedDisplayStoreDispatchBales,
+    display_generated_bale_count: Array.isArray(enrichedDisplayStoreDispatchBales) ? enrichedDisplayStoreDispatchBales.length : result.generated_bale_count,
   };
   writeOutput("#transferActionOutput", displayResult);
   renderTransferActionResultSummary(displayResult);
@@ -28005,11 +31030,24 @@ async function submitTransferBundle(event) {
   renderReplenishmentFlowSummary(transferNo);
   renderLoosePackingTaskWorkbench(transferNo);
   const latestTransfer = await request(`/transfers/${transferNo}`);
-  upsertTransferOrderStateRow(latestTransfer);
+  upsertTransferOrderStateRow({
+    ...latestTransfer,
+    store_delivery_execution_order: storeDeliveryExecutionOrder,
+    store_delivery_execution_order_no: storeDeliveryExecutionOrder.execution_order_no,
+    official_delivery_barcode: storeDeliveryExecutionOrder.official_delivery_barcode,
+    machine_code: storeDeliveryExecutionOrder.machine_code || latestTransfer.machine_code || "",
+    display_store_dispatch_bales: enrichedDisplayStoreDispatchBales,
+  });
   openTransferDispatchPrintTemplateModal({
     transferNo,
-    transfer: transfer || getTransferPreparationOrder(transferNo) || {},
-    displayRows: displayStoreDispatchBales,
+    transfer: {
+      ...(transfer || getTransferPreparationOrder(transferNo) || {}),
+      store_delivery_execution_order: storeDeliveryExecutionOrder,
+      store_delivery_execution_order_no: storeDeliveryExecutionOrder.execution_order_no,
+      official_delivery_barcode: storeDeliveryExecutionOrder.official_delivery_barcode,
+      machine_code: storeDeliveryExecutionOrder.machine_code || "",
+    },
+    displayRows: enrichedDisplayStoreDispatchBales,
   });
   await loadTransferOrders();
 }
@@ -28029,8 +31067,14 @@ async function submitTransferShipment(event) {
   const departureTime = String(payload.departure_time || "").trim();
   const routeStops = String(payload.route_stops || "").trim();
   const existingNote = String(payload.note || "").trim();
-  if (departureTime || routeStops) {
-    payload.note = [existingNote, departureTime ? `预计出发：${departureTime}` : "", routeStops ? `路线：${routeStops}` : ""]
+  ensureTransferShipmentDraftRows(transferNo);
+  const draftTotals = getTransferShipmentDraftTotals();
+  const linkedTransferNos = draftTotals.selectedRows.map((row) => row.transfer_no).filter(Boolean);
+  const linkedSummary = linkedTransferNos.length > 1
+    ? `关联调拨单：${linkedTransferNos.join("、")}；涉及门店数：${draftTotals.storeCount}；总包数：${draftTotals.packageCount}；总件数：${draftTotals.itemCount}`
+    : "";
+  if (departureTime || routeStops || linkedSummary) {
+    payload.note = [existingNote, departureTime ? `预计出发：${departureTime}` : "", routeStops ? `路线：${routeStops}` : "", linkedSummary]
       .filter(Boolean)
       .join("；");
   }
@@ -28417,6 +31461,7 @@ const FORM_SUMMARY_SELECTORS = {
   "#directHangUnpackForm": "#directHangUnpackSummary",
   "#apparelDefaultCostForm": "#apparelDefaultCostSummary",
   "#apparelSortingRackForm": "#apparelSortingRackSummary",
+  "#storeDefaultSalePriceForm": "#storeDefaultSalePriceSummary",
   "#baleSalesRebaleEntryForm": "#baleSalesRebaleEntrySummary",
   "#consignmentBundleForm": "#consignmentBundleSummary",
   "#baleSalesOutboundScanForm": "#baleSalesOutboundSummary",
@@ -28482,6 +31527,8 @@ const FORM_SUMMARY_SELECTORS = {
 
 ensureFieldIdsAndLabels();
 initJsonBuilders();
+document.querySelector("#userForm [name='role_code']")?.addEventListener("change", syncUserOrganizationFields);
+syncUserOrganizationFields();
 parcelBatchRowState = [emptyParcelBatchRow()];
 renderParcelBatchRows();
 chinaSourceContainerRowState = [emptyChinaSourceContainerRow()];
@@ -28493,6 +31540,9 @@ renderApparelDefaultCostSummary();
 ensureApparelSortingRackState();
 hydrateApparelSortingRackForm(null);
 renderApparelSortingRackSummary();
+ensureStoreDefaultSalePriceState();
+hydrateStoreDefaultSalePriceForm(null);
+renderStoreDefaultSalePriceSummary();
 hydrateSortingLossRecord(null);
 populateItemTokenTemplateSelects();
 populateDirectHangSourceSelect();
@@ -28554,6 +31604,7 @@ bindForm("#itemIdentityLedgerForm", submitItemIdentityLedger, "#itemIdentityLedg
 bindForm("#directHangUnpackForm", submitDirectHangUnpack, "#directHangUnpackOutput");
 bindForm("#apparelDefaultCostForm", submitApparelDefaultCost, "#apparelDefaultCostOutput");
 bindForm("#apparelSortingRackForm", submitApparelSortingRack, "#apparelSortingRackOutput");
+bindForm("#storeDefaultSalePriceForm", submitStoreDefaultSalePrice, "#storeDefaultSalePriceOutput");
 
 ["has_loss_record", "loss_qty", "loss_weight_kg", "loss_note"].forEach((fieldName) => {
   document.querySelector(`#sortingResultForm [name='${fieldName}']`)?.addEventListener("input", () => {
@@ -28706,7 +31757,7 @@ cashierTerminalShell?.addEventListener("click", async (event) => {
   }
   try {
     if (target.dataset.terminalLocale) {
-      cashierTerminalState.locale = target.dataset.terminalLocale;
+      setAppLocale(target.dataset.terminalLocale, { renderCashier: false });
       updateCashierTerminalClock();
       renderCashierTerminal();
       return;
@@ -29002,6 +32053,11 @@ async function handlePanelJumpEvent(event) {
   if (!(button instanceof HTMLElement)) {
     return;
   }
+  const transferShipNo = String(button.dataset.transferShipFill || "").trim();
+  if (transferShipNo) {
+    openTransferShipmentPanelForTransfer(transferShipNo);
+    return;
+  }
   const panelKey = button.dataset.panelJump;
   if (panelKey) {
     setActivePanel(panelKey);
@@ -29033,6 +32089,9 @@ workspaceNextButton?.addEventListener("click", () => {
 });
 
 window.addEventListener("hashchange", () => {
+  if (!enforceAuthenticatedRoute()) {
+    return;
+  }
   applyHashRoute();
 });
 
@@ -29195,9 +32254,7 @@ document.querySelector("#transferDispatchSummary")?.addEventListener("click", (e
     if (!transferNo) {
       return;
     }
-    setInputValue("#transferShipForm [name='transfer_no']", transferNo);
-    loadTransferShipTargetHint(transferNo);
-    focusElement("#transferShipForm");
+    openTransferShipmentPanelForTransfer(transferNo);
     return;
   }
   const transferNo = String(button.dataset.transferDispatchFill || "").trim();
@@ -29246,16 +32303,70 @@ document.querySelector("#transferShipWaveSummary")?.addEventListener("click", (e
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
   if (!transferNo) return;
-  setInputValue("#transferShipForm [name='transfer_no']", transferNo);
-  queueTransferShipTargetHintLoad(transferNo);
-  renderWaveExecutionEntrySummary("", "ship");
+  openTransferShipmentPanelForTransfer(transferNo);
 });
 document.querySelector("#transferShipForm [name='transfer_no']")?.addEventListener("change", (event) => {
-  queueTransferShipTargetHintLoad(event.target?.value || "");
+  const transferNo = String(event.target?.value || "").trim().toUpperCase();
+  if (!isWaveSelectionValue(transferNo)) {
+    ensureTransferShipmentDraftRows(transferNo);
+    renderTransferShipmentDraftSummary();
+  }
+  queueTransferShipTargetHintLoad(transferNo);
 });
 
 document.querySelector("#transferShipForm [name='transfer_no']")?.addEventListener("change", (event) => {
   renderWaveExecutionEntrySummary(event.target?.value || "", "ship");
+});
+
+document.querySelector("#addTransferShipRowButton")?.addEventListener("click", () => {
+  ensureTransferShipmentDraftRows();
+  const selectedTransferNos = new Set(transferShipmentDraftRows.map((row) => row.transfer_no).filter(Boolean));
+  const nextTransfer = getTransferShipmentAvailableRows().find(
+    (row) => !selectedTransferNos.has(String(row.transfer_no || "").trim().toUpperCase()),
+  );
+  if (nextTransfer) {
+    const nextRow = buildTransferShipmentDraftRow(nextTransfer);
+    if (nextRow) {
+      transferShipmentDraftRows.push(nextRow);
+    }
+  }
+  renderTransferShipmentDraftSummary();
+});
+
+document.addEventListener("change", (event) => {
+  const select = event.target instanceof HTMLElement ? event.target.closest("[data-transfer-ship-row-select]") : null;
+  if (!(select instanceof HTMLSelectElement)) {
+    return;
+  }
+  const rowIndex = Number(select.dataset.transferShipRowSelect || -1);
+  const transferNo = String(select.value || "").trim().toUpperCase();
+  const draftRow = buildTransferShipmentDraftRow(transferNo);
+  if (rowIndex < 0 || !draftRow) {
+    return;
+  }
+  transferShipmentDraftRows[rowIndex] = draftRow;
+  transferShipmentDraftRows = transferShipmentDraftRows.filter((row, index, rows) => (
+    index === rows.findIndex((candidate) => candidate.transfer_no === row.transfer_no)
+  ));
+  if (rowIndex === 0) {
+    syncTransferShipmentPrimaryRow();
+  }
+  renderTransferShipmentDraftSummary();
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-transfer-ship-row-remove]") : null;
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+  const rowIndex = Number(button.dataset.transferShipRowRemove || -1);
+  if (rowIndex < 0) {
+    return;
+  }
+  transferShipmentDraftRows.splice(rowIndex, 1);
+  ensureTransferShipmentDraftRows();
+  syncTransferShipmentPrimaryRow();
+  renderTransferShipmentDraftSummary();
 });
 
 const initialTransferShipNo = String(document.querySelector("#transferShipForm [name='transfer_no']")?.value || "").trim();
@@ -29410,6 +32521,10 @@ document.addEventListener("input", (event) => {
   }
   if (target.closest("#apparelSortingRackForm")) {
     renderApparelSortingRackSummary();
+    return;
+  }
+  if (target.closest("#storeDefaultSalePriceForm")) {
+    renderStoreDefaultSalePriceSummary();
     return;
   }
   if (target.closest("#directHangUnpackForm")) {
@@ -29735,12 +32850,166 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
+    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-package-back], [data-store-package-process], [data-store-package-generate-items], [data-store-package-view-items], [data-store-package-print-items], [data-store-package-preview-print], [data-store-package-confirm-printed], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
   try {
+    if (button.dataset.storePackageBack !== undefined) {
+      refreshStoreClerkHomeWithContext({
+        store_code: getCurrentStoreCodeFallback(),
+        assigned_employee: String(document.querySelector("#storeClerkHomeForm [name='assigned_employee']")?.value || getCurrentStoreWorkerFallback()).trim(),
+        step: "list",
+        selected_package_key: "",
+        selected_rack_code: "",
+        selected_price_mode: "",
+        selected_price: "",
+        custom_price: "",
+        print_quantity: "",
+        print_preview_token_nos: [],
+        last_action_message: "",
+      });
+      return;
+    }
+    const packageActionKey = String(
+      button.dataset.storePackageProcess
+        || button.dataset.storePackageGenerateItems
+        || button.dataset.storePackageViewItems
+        || button.dataset.storePackagePrintItems
+        || button.dataset.storePackagePreviewPrint
+        || button.dataset.storePackageConfirmPrinted
+        || "",
+    ).trim();
+    if (packageActionKey) {
+      const assignedEmployee = String(button.dataset.storePackageEmployee || document.querySelector("#storeClerkHomeForm [name='assigned_employee']")?.value || "").trim();
+      const storeCode = String(document.querySelector("#storeClerkHomeForm [name='store_code']")?.value || getCurrentStoreCodeFallback()).trim().toUpperCase();
+      const row = findStorePackageRowByActionKey(packageActionKey, storeCode, assignedEmployee);
+      if (!row) {
+        throw new Error("没有找到当前店员名下对应的 SDO 包，请先从店长主控台分配后再处理。");
+      }
+      if (button.dataset.storePackageProcess) {
+        const selectedRackCode = getSelectedStorePackageRackCode(row);
+        writeOutput("#storeClerkHomeOutput", row);
+        refreshStoreClerkHomeWithContext({
+          store_code: storeCode,
+          assigned_employee: assignedEmployee,
+          step: "shelving",
+          selected_package_key: packageActionKey,
+          selected_rack_code: selectedRackCode,
+          selected_price_mode: "",
+          selected_price: "",
+          custom_price: "",
+          print_quantity: "",
+          print_preview_token_nos: [],
+          last_action_message: `已打开 ${row.source_code || row.bale_no || "当前包"} 的上架页面。`,
+        });
+        return;
+      }
+      const settings = getStorePackageShelvingInputState(row);
+      if (button.dataset.storePackageGenerateItems) {
+        try {
+          validateStorePackageShelvingSettings(settings, { row });
+        } catch (error) {
+          refreshStorePackageShelvingAction(row, {
+            store_code: storeCode,
+            assigned_employee: assignedEmployee,
+            package_action_key: packageActionKey,
+            settings,
+            message: formatErrorMessage(error),
+            type: "error",
+          });
+          return;
+        }
+        const tokens = generateStoreItemTokensForSdoPackage(row, {
+          store_rack_code: settings.selected_rack_code,
+          selected_price: settings.selected_price,
+        });
+        writeOutput("#storeClerkHomeOutput", tokens);
+        refreshStorePackageShelvingAction(row, {
+          store_code: storeCode,
+          assigned_employee: assignedEmployee,
+          package_action_key: packageActionKey,
+          settings,
+          clear_preview: true,
+          message: `${row.source_code || row.bale_no || "当前包"} 已生成 ${tokens.length} 个 STORE_ITEM barcode，货架位 ${settings.selected_rack_code}，售价 ${formatKesAmount(settings.selected_price)}。`,
+        });
+        return;
+      }
+      if (button.dataset.storePackagePreviewPrint || button.dataset.storePackagePrintItems) {
+        try {
+          validateStorePackageShelvingSettings(settings, { requireGenerated: true, row });
+          setStorePackagePrintSettingsForTokens(row, {
+            store_rack_code: settings.selected_rack_code,
+            selected_price: settings.selected_price,
+          });
+          const previewTokens = buildStorePackagePrintPreviewTokens(row, { print_quantity: settings.print_quantity });
+          writeOutput("#storeClerkHomeOutput", previewTokens);
+          refreshStorePackageShelvingAction(row, {
+            store_code: storeCode,
+            assigned_employee: assignedEmployee,
+            package_action_key: packageActionKey,
+            settings,
+            preview_tokens: previewTokens,
+            message: `已预览本次 ${previewTokens.length} 个 STORE_ITEM。确认实体打印后，再点“标记本次已打印”。`,
+          });
+        } catch (error) {
+          refreshStorePackageShelvingAction(row, {
+            store_code: storeCode,
+            assigned_employee: assignedEmployee,
+            package_action_key: packageActionKey,
+            settings,
+            message: formatErrorMessage(error),
+            type: "error",
+          });
+        }
+        return;
+      }
+      if (button.dataset.storePackageConfirmPrinted) {
+        try {
+          validateStorePackageShelvingSettings(settings, { requireGenerated: true, row });
+          const previewTokenNos = Array.isArray(storeClerkHomeState.print_preview_token_nos) ? storeClerkHomeState.print_preview_token_nos : [];
+          const tokens = markStorePackagePrintPreviewTokensPrinted(row, previewTokenNos, {
+            store_rack_code: settings.selected_rack_code,
+            selected_price: settings.selected_price,
+          });
+          writeOutput("#storeClerkHomeOutput", tokens);
+          refreshStorePackageShelvingAction(row, {
+            store_code: storeCode,
+            assigned_employee: assignedEmployee,
+            package_action_key: packageActionKey,
+            settings,
+            clear_preview: true,
+            message: `已标记本次 ${previewTokenNos.length} 个 STORE_ITEM 为已打印。`,
+          });
+        } catch (error) {
+          refreshStorePackageShelvingAction(row, {
+            store_code: storeCode,
+            assigned_employee: assignedEmployee,
+            package_action_key: packageActionKey,
+            settings,
+            message: formatErrorMessage(error),
+            type: "error",
+          });
+        }
+        return;
+      }
+      if (button.dataset.storePackageViewItems) {
+        const tokens = getStoreItemTokensForSdoPackage(row);
+        writeOutput("#storeClerkHomeOutput", tokens.length ? tokens : `${row.source_code || row.bale_no || "当前包"} 还没有生成 STORE_ITEM barcode。`);
+        refreshStorePackageShelvingAction(row, {
+          store_code: storeCode,
+          assigned_employee: assignedEmployee,
+          package_action_key: packageActionKey,
+          settings,
+          message: tokens.length
+            ? `${row.source_code || row.bale_no || "当前包"} 已生成 ${tokens.length} 个 STORE_ITEM barcode。`
+            : `${row.source_code || row.bale_no || "当前包"} 还没有生成 STORE_ITEM barcode。`,
+        });
+        return;
+      }
+      return;
+    }
     if (button.dataset.clerkBaleOpen) {
       const baleNo = String(button.dataset.clerkBaleOpen || "").trim().toUpperCase();
       const assignedEmployee = String(button.dataset.clerkBaleEmployee || "").trim();
@@ -29907,6 +33176,14 @@ document.addEventListener("click", async (event) => {
         store_code: getCurrentStoreCodeFallback(),
         selected_sdo_code: sdoCode,
         last_action_message: `SDO ${sdoCode} 已将 ${selected.length} 包分配给 ${clerkName}。`,
+      });
+      refreshStoreClerkHomeWithContext({
+        store_code: getCurrentStoreCodeFallback(),
+        assigned_employee: clerkName,
+        step: "list",
+        selected_package_key: "",
+        selected_rack_code: "",
+        last_action_message: `SDO ${sdoCode} 已分配 ${selected.length} 包给 ${clerkName}。`,
       });
       showTransientInlineNotice("#storeDispatchAssignmentNotice", `已在主控台分配 ${selected.length} 包给 ${clerkName}。`, "success", 1800);
       return;
@@ -30209,6 +33486,9 @@ document.addEventListener("click", async (event) => {
       refreshStoreClerkHomeWithContext({
         store_code: storeCode,
         assigned_employee: String(document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")?.value || "").trim(),
+        step: "list",
+        selected_package_key: "",
+        selected_rack_code: "",
         last_action_message: completionPlan.completionMessage,
       });
       await refreshStorePdaWorkbench({ lastCompletedGroup: "本 bale" });
@@ -30381,6 +33661,9 @@ document.addEventListener("click", async (event) => {
       refreshStoreClerkHomeWithContext({
         store_code: storeCode,
         assigned_employee: assignedEmployee,
+        step: "list",
+        selected_package_key: "",
+        selected_rack_code: "",
         last_action_message: completionPlan.completionMessage,
       });
       await refreshDirectHangWorkbench({ finalized: true });
@@ -32370,6 +35653,26 @@ document.querySelectorAll("[data-action]").forEach((button) => {
         await loadDashboard();
         return;
       }
+      if (action === "load-test-data-tools") {
+        await loadTestDataTools();
+        return;
+      }
+      if (action === "clear-local-test-data") {
+        await clearLocalRuntimeTestData();
+        return;
+      }
+      if (action === "reset-demo-seed") {
+        await resetDemoSeedData();
+        return;
+      }
+      if (action === "export-test-data-json") {
+        exportTestDataJson();
+        return;
+      }
+      if (action === "import-test-data-json") {
+        importTestDataJson();
+        return;
+      }
       if (action === "reset-test-history") {
         await resetTestHistory();
         return;
@@ -32449,6 +35752,17 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       }
       if (action === "reset-test-history") {
         renderErrorSummary("#testResetSummary", formatErrorMessage(error));
+        return;
+      }
+      if (
+        action === "load-test-data-tools" ||
+        action === "clear-local-test-data" ||
+        action === "reset-demo-seed" ||
+        action === "export-test-data-json" ||
+        action === "import-test-data-json"
+      ) {
+        writeOutput("#testDataOutput", formatErrorMessage(error));
+        renderErrorSummary("#testDataEnvironmentSummary", formatErrorMessage(error));
         return;
       }
       if (action === "generate-warehouse-mainflow-demo") {
@@ -32547,6 +35861,8 @@ document.querySelectorAll("[data-action]").forEach((button) => {
   });
 });
 
+initializeAppLanguage();
+
 refreshSession().catch((error) => {
   authOutput.textContent = error.message;
   renderAuthResultSummary("error", error.message);
@@ -32576,6 +35892,8 @@ renderSaleVoidRequests([]);
 renderSaleRefundRequests([]);
 renderPaymentAnomalies([]);
 renderStoreOperatingSummary([]);
+renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
+renderTestDataTools();
 renderStoreResultSummary(null);
 renderSupplierResultSummary(null);
 renderCargoTypeResultSummary(null);
@@ -32645,8 +35963,12 @@ populateChinaSourceCostRecordSelect();
 renderChinaSourceBalePreview();
 renderChinaSourceCostSummary();
 initWorkspacePageRegistry();
-if (!applyHashRoute()) {
-  setActiveWorkspace(activeWorkspace);
+if (currentSession.token) {
+  if (!applyHashRoute()) {
+    setActiveWorkspace(activeWorkspace);
+  }
+} else {
+  enforceAuthenticatedRoute();
 }
 setCurrentInboundShipment(resolveCurrentInboundShipmentNo());
 
