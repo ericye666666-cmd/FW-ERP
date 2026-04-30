@@ -1,0 +1,87 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.core.config import build_settings
+
+
+def test_default_settings_keep_local_runtime_json_without_database_url():
+    settings = build_settings(env={})
+
+    assert settings.environment == "local"
+    assert settings.storage_mode == "runtime_json"
+    assert settings.database_url is None
+
+
+def test_settings_read_storage_mode_environment_and_database_url():
+    settings = build_settings(
+        env={
+            "RETAIL_OPS_ENVIRONMENT": "staging",
+            "RETAIL_OPS_STORAGE_MODE": "dual_write",
+            "DATABASE_URL": "postgresql://fw_erp_app@example.com/fw_erp_staging",
+        }
+    )
+
+    assert settings.environment == "staging"
+    assert settings.storage_mode == "dual_write"
+    assert settings.database_url == "postgresql://fw_erp_app@example.com/fw_erp_staging"
+
+
+def test_phase_one_schema_metadata_contains_required_tables():
+    from app.db.models import PHASE_ONE_TABLE_NAMES
+    from app.db.base import Base
+
+    expected_tables = {
+        "roles",
+        "stores",
+        "warehouses",
+        "users",
+        "transfer_orders",
+        "sdo_packages",
+        "delivery_batches",
+        "delivery_batch_orders",
+        "store_receipts",
+        "store_receipt_packages",
+        "clerk_assignments",
+        "store_items",
+        "store_item_print_batches",
+        "store_item_print_batch_items",
+        "sales",
+        "sale_items",
+        "sale_payments",
+        "audit_events",
+    }
+
+    assert set(PHASE_ONE_TABLE_NAMES) == expected_tables
+    assert expected_tables.issubset(set(Base.metadata.tables))
+    assert Base.metadata.tables["store_items"].c.machine_code.unique is True
+    assert Base.metadata.tables["sales"].c.sale_no.primary_key is True
+    assert Base.metadata.tables["sdo_packages"].c.raw_payload.type.__class__.__name__ == "JSONB"
+
+
+def test_database_check_without_url_does_not_require_database():
+    from app.db.session import check_database_connection
+
+    result = check_database_connection(database_url="")
+
+    assert result["enabled"] is False
+    assert result["ok"] is False
+    assert result["status"] == "not_configured"
+
+
+def test_database_check_executes_simple_connection_when_url_is_available():
+    from app.db.session import check_database_connection
+
+    result = check_database_connection(database_url="sqlite+pysqlite:///:memory:")
+
+    assert result["enabled"] is True
+    assert result["ok"] is True
+    assert result["status"] == "connected"
+
+
+def test_database_url_normalization_prefers_psycopg_driver_for_postgres():
+    from app.db.session import normalize_database_url
+
+    assert normalize_database_url("postgresql://user@host/db").startswith("postgresql+psycopg://")
+    assert normalize_database_url("postgresql+psycopg://user:pass@host/db").startswith("postgresql+psycopg://")
