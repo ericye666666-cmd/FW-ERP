@@ -55,6 +55,18 @@ assignment, STORE_ITEM creation/printing, POS sale, and sales analytics source
 traceability. Main sorting, cost, PickingWave, and complex inventory are out of
 scope for this phase.
 
+Unknown item counts are stored as `NULL`, not `0`. This preserves the
+operational distinction between a real zero and an item count that has not been
+confirmed yet. The first migration therefore leaves these columns nullable:
+
+- `transfer_orders.total_item_count`
+- `sdo_packages.item_count`
+- `delivery_batch_orders.item_count`
+
+Operational counters where zero is a real starting value keep a zero default,
+including `store_receipt_packages.accepted_qty`,
+`store_item_print_batches.requested_qty`, and `sales.item_count`.
+
 ## Commands
 
 Install dependencies:

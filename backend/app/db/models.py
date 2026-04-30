@@ -88,7 +88,7 @@ class TransferOrder(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
     sdo_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True, unique=True)
     total_package_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    total_item_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    total_item_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
 
 
@@ -107,7 +107,7 @@ class SdoPackage(Base, TimestampMixin):
     source_type: Mapped[str] = mapped_column(Text, nullable=False)
     source_code: Mapped[str] = mapped_column(Text, nullable=False)
     category_summary: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
-    item_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    item_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     print_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending_print")
     dispatch_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending_dispatch")
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
@@ -137,7 +137,7 @@ class DeliveryBatchOrder(Base, TimestampMixin):
     stop_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     target_store_code: Mapped[str] = mapped_column(ForeignKey("stores.store_code"), nullable=False)
     package_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    item_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    item_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending_dispatch")
 
 

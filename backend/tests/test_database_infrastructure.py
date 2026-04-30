@@ -60,6 +60,28 @@ def test_phase_one_schema_metadata_contains_required_tables():
     assert Base.metadata.tables["sdo_packages"].c.raw_payload.type.__class__.__name__ == "JSONB"
 
 
+def test_unknown_item_counts_are_nullable_without_zero_defaults():
+    from app.db.base import Base
+    from app.db import models  # noqa: F401
+
+    unknown_count_columns = [
+        Base.metadata.tables["transfer_orders"].c.total_item_count,
+        Base.metadata.tables["sdo_packages"].c.item_count,
+        Base.metadata.tables["delivery_batch_orders"].c.item_count,
+    ]
+
+    for column in unknown_count_columns:
+        assert column.nullable is True
+        assert column.server_default is None
+
+    assert Base.metadata.tables["store_receipt_packages"].c.accepted_qty.nullable is False
+    assert Base.metadata.tables["store_receipt_packages"].c.accepted_qty.server_default is not None
+    assert Base.metadata.tables["store_item_print_batches"].c.requested_qty.nullable is False
+    assert Base.metadata.tables["store_item_print_batches"].c.requested_qty.server_default is not None
+    assert Base.metadata.tables["sales"].c.item_count.nullable is False
+    assert Base.metadata.tables["sales"].c.item_count.server_default is not None
+
+
 def test_database_check_without_url_does_not_require_database():
     from app.db.session import check_database_connection
 
