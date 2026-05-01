@@ -1016,8 +1016,8 @@ class InMemoryState:
             if payload.get("scan_token") != machine_code:
                 payload["scan_token"] = machine_code
                 job_updated = True
-            if payload.get("human_readable") != primary_bale_barcode:
-                payload["human_readable"] = primary_bale_barcode
+            if payload.get("human_readable") != machine_code:
+                payload["human_readable"] = machine_code
                 job_updated = True
             if payload.get("display_code") != primary_bale_barcode:
                 payload["display_code"] = primary_bale_barcode
@@ -11659,7 +11659,7 @@ class InMemoryState:
                     "scan_token": machine_code,
                     "bale_barcode": bale_barcode,
                     "legacy_bale_barcode": legacy_bale_barcode,
-                    "human_readable": bale_barcode,
+                    "human_readable": machine_code,
                     "display_code": bale_barcode,
                     "machine_code": machine_code,
                     "supplier_name": supplier_name,

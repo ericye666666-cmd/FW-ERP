@@ -480,7 +480,12 @@ def _render_label_text(lines: list[str], max_chars: int = 26) -> str:
 
 
 def _derive_bale_label_display_parts(payload: dict[str, Any]) -> dict[str, str]:
-    encoded_barcode_value = str(payload.get("scan_token") or payload.get("barcode_value") or "-").strip()
+    encoded_barcode_value = str(
+        payload.get("machine_code")
+        or payload.get("barcode_value")
+        or payload.get("scan_token")
+        or "-"
+    ).strip()
     identity_barcode_value = str(
         payload.get("legacy_bale_barcode")
         or payload.get("bale_barcode")
@@ -508,7 +513,13 @@ def _derive_bale_label_display_parts(payload: dict[str, Any]) -> dict[str, str]:
         shipment_date = barcode_parts[2]
         primary_identity = f"{barcode_parts[3]}-{barcode_parts[4]}"
         package_compact = f"{barcode_parts[5]}-{barcode_parts[6]}"
-    bottom_human = str(payload.get("human_readable") or payload.get("scan_token") or encoded_barcode_value).strip()
+    bottom_human = str(
+        payload.get("human_readable")
+        or payload.get("machine_code")
+        or payload.get("barcode_value")
+        or payload.get("scan_token")
+        or encoded_barcode_value
+    ).strip()
     if not bottom_human:
         bottom_human = package_compact or (encoded_barcode_value[-18:] if len(encoded_barcode_value) > 18 else encoded_barcode_value)
     return {
@@ -679,6 +690,14 @@ def _build_bale_template_content_map(payload: dict[str, Any], display: dict[str,
     piece_total = str(total_packages) if total_packages > 0 else "-"
     trace_code = str(display.get("barcode_value") or "").strip() or "-"
     trace_batch = _compact_batch_trace_value(parcel_batch_no)
+    template_code = str(payload.get("template_code") or "").strip().lower()
+    is_warehouse_in_label = template_code in {"warehouse_in", "warehouse_in_60x40"}
+    display_code = str(
+        payload.get("display_code")
+        or payload.get("bale_barcode")
+        or display.get("bale_barcode")
+        or ""
+    ).strip().upper()
     trace_shipment = shipment_no or "-"
     trace_inbound = _compact_inbound_time_value(received_at)
     store_name = str(payload.get("store_name") or payload.get("store_display") or "").strip()
@@ -717,8 +736,8 @@ def _build_bale_template_content_map(payload: dict[str, Any], display: dict[str,
         "top_minor": f"SUB: {category_sub or '-'}",
         "piece_current": f"No: {piece_current}",
         "piece_total": f"Total: {piece_total}",
-        "trace_code": f"Code: {trace_code}",
-        "trace_batch": f"Batch: {trace_batch}",
+        "trace_code": f"{'Machine' if is_warehouse_in_label else 'Code'}: {trace_code}",
+        "trace_batch": f"Display: {display_code or '-'}" if is_warehouse_in_label else f"Batch: {trace_batch}",
         "trace_shipment": f"Ship: {trace_shipment}",
         "trace_inbound": f"In: {trace_inbound}",
         "store_name": store_name,

@@ -218,27 +218,33 @@
   function buildBaleDirectPrintPayload(job, options = {}) {
     const currentIndex = Number(options && options.currentIndex ? options.currentIndex : 0);
     const totalJobs = Number(options && options.totalJobs ? options.totalJobs : 0);
+    const printPayload = job && job.print_payload ? job.print_payload : {};
+    const displayCode = normalizeText(printPayload.display_code || printPayload.bale_barcode || job && job.barcode);
+    const machineCode = normalizeText(printPayload.machine_code || printPayload.barcode_value || printPayload.scan_token || job && job.barcode);
     return {
       printer_name: normalizeText(options && options.printerName),
       template_code: normalizeText(options && options.templateCode),
       copies: Number(job && job.copies ? job.copies : 1) || 1,
-      barcode_value: normalizeText(job && job.print_payload && (job.print_payload.scan_token || job.print_payload.barcode_value) || job && job.barcode),
-      scan_token: normalizeText(job && job.print_payload && (job.print_payload.scan_token || job.print_payload.barcode_value)),
-      bale_barcode: normalizeText(job && (job.barcode || (job.print_payload && job.print_payload.bale_barcode))),
-      legacy_bale_barcode: normalizeText(job && job.print_payload && job.print_payload.legacy_bale_barcode),
-      supplier_name: normalizeText(job && job.print_payload && job.print_payload.supplier_name || options && options.supplierName),
-      category_main: normalizeText(job && job.print_payload && job.print_payload.category_main),
-      category_sub: normalizeText(job && job.print_payload && job.print_payload.category_sub),
-      category_display: normalizeText(job && job.print_payload && job.print_payload.category_display || options && options.categoryDisplay || job && job.product_name),
+      barcode_value: machineCode,
+      scan_token: machineCode,
+      display_code: displayCode,
+      machine_code: machineCode,
+      human_readable: normalizeText(printPayload.human_readable || machineCode),
+      bale_barcode: normalizeText(job && (job.barcode || printPayload.bale_barcode) || displayCode),
+      legacy_bale_barcode: normalizeText(printPayload.legacy_bale_barcode),
+      supplier_name: normalizeText(printPayload.supplier_name || options && options.supplierName),
+      category_main: normalizeText(printPayload.category_main),
+      category_sub: normalizeText(printPayload.category_sub),
+      category_display: normalizeText(printPayload.category_display || options && options.categoryDisplay || job && job.product_name),
       package_position_label: normalizeText(
-        job && job.print_payload && (job.print_payload.package_position_label || job.print_payload.package_position)
-          || `第 ${job && job.print_payload && job.print_payload.serial_no || currentIndex + 1} 包 / 共 ${job && job.print_payload && job.print_payload.total_packages || totalJobs || 1} 包`,
+        printPayload.package_position_label || printPayload.package_position
+          || `第 ${printPayload.serial_no || currentIndex + 1} 包 / 共 ${printPayload.total_packages || totalJobs || 1} 包`,
       ),
-      serial_no: Number(job && job.print_payload && job.print_payload.serial_no ? job.print_payload.serial_no : currentIndex + 1 || 0),
-      total_packages: Number(job && job.print_payload && job.print_payload.total_packages ? job.print_payload.total_packages : totalJobs || 0),
-      shipment_no: normalizeText(job && job.print_payload && job.print_payload.shipment_no),
-      parcel_batch_no: normalizeText(job && job.print_payload && job.print_payload.parcel_batch_no),
-      unload_date: normalizeText(job && job.print_payload && (job.print_payload.unload_date || job.print_payload.received_at)),
+      serial_no: Number(printPayload.serial_no ? printPayload.serial_no : currentIndex + 1 || 0),
+      total_packages: Number(printPayload.total_packages ? printPayload.total_packages : totalJobs || 0),
+      shipment_no: normalizeText(printPayload.shipment_no),
+      parcel_batch_no: normalizeText(printPayload.parcel_batch_no),
+      unload_date: normalizeText(printPayload.unload_date || printPayload.received_at),
     };
   }
 
