@@ -43,13 +43,13 @@ jobs:
         shell: pwsh
         working-directory: ops/local_print_agent
         run: |
-          powershell -ExecutionPolicy Bypass -File .\build_windows_exe.ps1
+          .\build_windows_exe.ps1
 
       - name: Package fw-erp-print-agent-windows.zip
         shell: pwsh
         working-directory: ops/local_print_agent
         run: |
-          powershell -ExecutionPolicy Bypass -File .\package_windows_agent.ps1
+          .\package_windows_agent.ps1
 
       - name: Verify build artifacts
         shell: pwsh
