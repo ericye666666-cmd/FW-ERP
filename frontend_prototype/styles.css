@@ -4261,6 +4261,51 @@ h3 {
   padding-right: 4px;
 }
 
+.bale-print-primary-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.bale-print-primary-button {
+  width: 100%;
+  min-height: 52px;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.bale-print-advanced {
+  border: 1px solid rgba(205, 191, 165, 0.9);
+  border-radius: 16px;
+  background: rgba(255, 253, 249, 0.72);
+  padding: 10px 12px;
+}
+
+.bale-print-advanced summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #0b5358;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}
+
+.bale-print-advanced[open] {
+  display: grid;
+  gap: 10px;
+}
+
+.bale-print-advanced .button-row {
+  gap: 8px;
+}
+
+.bale-print-modal-side .flow-summary-note.warning {
+  border-color: rgba(191, 124, 45, 0.35);
+  background: #fff7e7;
+  color: #8a4a07;
+  font-weight: 700;
+}
+
 .bale-shipment-lock-form {
   grid-template-columns: minmax(0, 1fr) 220px;
   align-items: end;
@@ -4340,6 +4385,19 @@ h3 {
     max-height: none;
     overflow: visible;
     padding-right: 0;
+  }
+
+  .bale-print-primary-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 10px 0 0;
+    background: linear-gradient(180deg, rgba(248, 243, 233, 0) 0%, #f8f3e9 26%);
+  }
+
+  .bale-print-primary-button {
+    min-height: 58px;
+    font-size: 1.05rem;
   }
 }
 

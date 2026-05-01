@@ -16807,6 +16807,68 @@ async function printCurrentBaleModalViaLocalAgent() {
   renderBalePrintModal();
 }
 
+async function printCurrentBaleModalPrimaryAction() {
+  if (localPrintAgentState.connected) {
+    return printCurrentBaleModalViaLocalAgent();
+  }
+  try {
+    await checkLocalPrintAgentHealth();
+    if (localPrintAgentState.connected) {
+      return printCurrentBaleModalViaLocalAgent();
+    }
+  } catch (error) {
+    localPrintAgentState.connected = false;
+    localPrintAgentState.lastMessage = "browser fallback";
+  }
+  balePrinterConsoleNotice = {
+    type: "warning",
+    message: "未检测到本地打印代理，当前将使用浏览器打印。",
+  };
+  return browserPrintCurrentBaleModalJob();
+}
+
+async function printAllBaleModalPrimaryAction() {
+  const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
+  if (!jobs.length) {
+    return;
+  }
+  if (!localPrintAgentState.connected) {
+    try {
+      await checkLocalPrintAgentHealth();
+    } catch (error) {
+      localPrintAgentState.connected = false;
+      localPrintAgentState.lastMessage = "browser fallback";
+    }
+  }
+  if (!localPrintAgentState.connected) {
+    balePrinterConsoleNotice = {
+      type: "warning",
+      message: "未检测到本地打印代理，当前将使用浏览器打印。请在浏览器打印窗口里打印当前张。",
+    };
+    browserPrintCurrentBaleModalJob();
+    return;
+  }
+  const originalIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0));
+  let printedCount = 0;
+  for (let index = 0; index < jobs.length; index += 1) {
+    balePrintModalState.currentIndex = index;
+    renderBalePrintModal();
+    await printCurrentBaleModalViaLocalAgent();
+    printedCount += 1;
+  }
+  balePrintModalState.currentIndex = Math.min(originalIndex, Math.max(jobs.length - 1, 0));
+  balePrintModalState.hasSuccessfulBatchPrint = true;
+  const normalizedGroupKey = String(balePrintModalState.groupKey || "").trim().toUpperCase();
+  if (normalizedGroupKey) {
+    baleBatchCompletionReadyKeys.add(normalizedGroupKey);
+  }
+  balePrinterConsoleNotice = {
+    type: "success",
+    message: `已通过本地打印代理发送 ${printedCount} 张标签。`,
+  };
+  renderBalePrintModal();
+}
+
 function renderBalePrintModal() {
   if (!(balePrintModal instanceof HTMLElement)) {
     return;
@@ -16817,10 +16879,13 @@ function renderBalePrintModal() {
   const title = document.querySelector("#balePrintModalTitle");
   const scopeNote = document.querySelector("#balePrintModalScopeNote");
   const browserPrintHint = document.querySelector("#balePrintModalBrowserPrintHint");
+  const agentFallback = document.querySelector("#balePrintModalAgentFallback");
   const frame = document.querySelector("#balePrintPreviewFrame");
   const prevButton = document.querySelector("#balePrintModalPrevButton");
   const nextButton = document.querySelector("#balePrintModalNextButton");
   const refreshButton = document.querySelector("#balePrintModalRefreshButton");
+  const primaryPrintButton = document.querySelector("#balePrintModalPrimaryPrintButton");
+  const primaryPrintAllButton = document.querySelector("#balePrintModalPrimaryPrintAllButton");
   const checkLocalAgentButton = document.querySelector("#balePrintModalCheckLocalAgentButton");
   const localAgentPrintButton = document.querySelector("#balePrintModalLocalAgentPrintButton");
   const connectButton = document.querySelector("#balePrintModalConnectButton");
@@ -16900,7 +16965,10 @@ function renderBalePrintModal() {
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
       ? "浏览器打印/PDF会输出与预览一致的 LPK 标签 HTML（含条码值），可直接用于仓库工单留档。"
-      : "Cloud staging cannot directly access USB printers. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer.";
+      : "技术说明：Cloud staging 不能直接访问 USB 打印机；未连接本地打印代理时会使用浏览器打印。";
+  }
+  if (agentFallback instanceof HTMLElement) {
+    agentFallback.classList.toggle("hidden-screen", !currentJob || Boolean(localPrintAgentState.connected));
   }
 
   if (summary) {
@@ -16950,7 +17018,6 @@ function renderBalePrintModal() {
         ${selectedPrinter && usesTsplMode
           ? `<div class="flow-summary-note success">当前已切换为 TSPL 原始指令直打，不依赖 macOS 的 A4/Letter 纸张队列。请直接测试是否正常出纸。</div>`
           : ""}
-        <div class="flow-summary-note">“直接打印本张（仅本地/LAN 后端）”仅适用于本地/LAN 部署后端。Cloud staging 建议优先使用本地打印代理或浏览器打印兜底。</div>
         ${closeAction.action !== "allow_close"
           ? `<div class="flow-summary-note">当前这轮贴码流程不会因为关闭弹窗而结束。核对实体出纸后，请点“确认本包已贴标”。</div>`
           : ""}
@@ -17009,6 +17076,15 @@ function renderBalePrintModal() {
   if (refreshButton instanceof HTMLButtonElement) {
     refreshButton.disabled = !currentJob && !alreadyComplete;
   }
+  if (primaryPrintButton instanceof HTMLButtonElement) {
+    primaryPrintButton.disabled = !currentJob;
+    primaryPrintButton.textContent = jobs.length > 1 ? "打印当前张" : "打印标签";
+  }
+  if (primaryPrintAllButton instanceof HTMLButtonElement) {
+    primaryPrintAllButton.disabled = !jobs.length;
+    primaryPrintAllButton.textContent = "打印全部";
+    primaryPrintAllButton.classList.toggle("hidden-screen", jobs.length <= 1);
+  }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
     checkLocalAgentButton.disabled = Boolean(localPrintAgentState.checking);
   }
@@ -17040,6 +17116,7 @@ function renderBalePrintModal() {
   }
   if (closeAndRefreshButton instanceof HTMLButtonElement) {
     closeAndRefreshButton.disabled = false;
+    closeAndRefreshButton.textContent = "取消并返回";
   }
   renderBaleLocalPrintAgentStatus();
 }
@@ -17233,7 +17310,7 @@ function browserPrintCurrentBaleModalJob() {
   frameWindow.print();
   balePrinterConsoleNotice = {
     type: "success",
-    message: "已打开浏览器打印对话框。Cloud staging 不能直接控制本地 USB 打印机，请在 Mac 对话框里选择 Deli_DL_720C。",
+    message: "已打开浏览器打印对话框。请在系统打印窗口里选择标签机。",
   };
   renderBalePrintModal();
 }
@@ -17385,6 +17462,8 @@ async function handleConnectBalePrinter() {
 
 async function completeCurrentBalePrintModalJob() {
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
+  const currentIndex = Math.max(0, Math.min(Number(balePrintModalState.currentIndex || 0), Math.max(jobs.length - 1, 0)));
+  const currentJob = jobs[currentIndex] || null;
   const templateScope = getActiveBaleTemplateScope();
   const completionAction = templateScope !== "bale"
     ? {
@@ -17412,7 +17491,9 @@ async function completeCurrentBalePrintModalJob() {
   if (completionAction.action !== "complete_group") {
     throw new Error(`请先点“打印本轮全部 ${completionAction.pendingCount} 张”，确认实体出纸后，再确认本包已贴标。`);
   }
-  const jobsToComplete = [...jobs];
+  const jobsToComplete = templateScope !== "bale"
+    ? (currentJob ? [currentJob] : [])
+    : [...jobs];
   for (const job of jobsToComplete) {
     if (!isBaleModalDirectOnlyJob(job)) {
       try {
@@ -17425,10 +17506,15 @@ async function completeCurrentBalePrintModalJob() {
       }
     }
   }
-  balePrintModalState.jobs = [];
-  balePrintModalState.currentIndex = 0;
-  balePrintModalState.hasSuccessfulBatchPrint = false;
-  baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+  if (templateScope === "bale") {
+    balePrintModalState.jobs = [];
+    balePrintModalState.currentIndex = 0;
+    balePrintModalState.hasSuccessfulBatchPrint = false;
+    baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+  } else if (jobsToComplete.length) {
+    balePrintModalState.jobs = jobs.filter((job) => !jobsToComplete.includes(job));
+    balePrintModalState.currentIndex = Math.min(currentIndex, Math.max(balePrintModalState.jobs.length - 1, 0));
+  }
   const completedJobIds = new Set(
     jobsToComplete
       .filter((job) => !isBaleModalDirectOnlyJob(job))
@@ -17442,18 +17528,18 @@ async function completeCurrentBalePrintModalJob() {
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
       if (transfer && Array.isArray(transfer.display_store_dispatch_bales)) {
-        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row) => {
+        transfer.display_store_dispatch_bales = transfer.display_store_dispatch_bales.map((row, index) => {
+          if (index !== currentIndex) return row;
           const matched = jobsToComplete.some((job) => doesDispatchRowMatchPrintJob(row, job));
-          if (!matched) return row;
-          return { ...row, status: "labelled" };
+          return matched ? { ...row, status: "labelled" } : row;
         });
       }
       const transferOutput = readOutput("#transferActionOutput");
       if (transferOutput?.transfer_no && String(transferOutput.transfer_no || "").trim().toUpperCase() === transferNo && Array.isArray(transferOutput.display_store_dispatch_bales)) {
-        transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row) => {
+        transferOutput.display_store_dispatch_bales = transferOutput.display_store_dispatch_bales.map((row, index) => {
+          if (index !== currentIndex) return row;
           const matched = jobsToComplete.some((job) => doesDispatchRowMatchPrintJob(row, job));
-          if (!matched) return row;
-          return { ...row, status: "labelled" };
+          return matched ? { ...row, status: "labelled" } : row;
         });
         writeOutput("#transferActionOutput", transferOutput);
         renderTransferActionResultSummary(transferOutput);
@@ -31328,6 +31414,20 @@ document.querySelector("#balePrintModalRefreshButton")?.addEventListener("click"
 });
 document.querySelector("#balePrintModalCheckLocalAgentButton")?.addEventListener("click", () => {
   checkLocalPrintAgentHealth().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
+});
+document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
+  printCurrentBaleModalPrimaryAction().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
+});
+document.querySelector("#balePrintModalPrimaryPrintAllButton")?.addEventListener("click", () => {
+  printAllBaleModalPrimaryAction().catch((error) => {
+    balePrintModalState.hasSuccessfulBatchPrint = false;
+    baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });

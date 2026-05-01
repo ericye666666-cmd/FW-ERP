@@ -48,9 +48,25 @@ test("completed inbound print modal keeps close and completion actions clickable
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
 
-test("bale print modal exposes browser print fallback with staging-safe copy", () => {
+test("bale print modal keeps field operators on primary print actions", () => {
+  assert.match(indexHtml, /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
+  assert.match(indexHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?打印全部/);
+  assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认本包已贴标/);
+  assert.match(indexHtml, /id="balePrintModalCloseAndRefreshButton"[\s\S]*?取消并返回/);
+  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?未检测到本地打印代理，当前将使用浏览器打印。/);
+});
+
+test("bale print modal moves technical print controls into collapsed advanced options", () => {
+  assert.match(indexHtml, /<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<summary>高级打印选项<\/summary>[\s\S]*id="balePrintModalCheckLocalAgentButton"/);
+  assert.doesNotMatch(indexHtml, /<details id="balePrintModalAdvancedOptions"[^>]*open/);
   assert.match(indexHtml, /id="balePrintModalBrowserPrintButton"[\s\S]*?用浏览器打印/);
-  assert.match(indexHtml, /Cloud staging cannot directly access USB printers\. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer\./);
+  assert.match(indexHtml, /id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
+});
+
+test("primary bale print action auto-selects local agent or browser fallback", () => {
+  assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?browserPrintCurrentBaleModalJob\(\)/);
+  assert.match(appJs, /document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click"/);
+  assert.match(appJs, /未检测到本地打印代理，当前将使用浏览器打印。/);
   assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
   assert.match(appJs, /frameWindow\.print\(\)/);
 });
@@ -63,9 +79,13 @@ test("bale print modal includes local print agent status and controls", () => {
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/html`, \{/);
 });
 
-test("direct backend print stays visible but clearly marked as LAN-only", () => {
+test("direct backend print stays available only as an advanced LAN option", () => {
+  assert.match(indexHtml, /<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
   assert.match(indexHtml, /id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
-  assert.match(appJs, /仅适用于本地\/LAN 部署后端/);
+});
+
+test("store dispatch print confirmation completes only the current modal job", () => {
+  assert.match(appJs, /const jobsToComplete = templateScope !== "bale"\s*\?\s*\(currentJob \? \[currentJob\] : \[\]\)\s*:\s*\[\.\.\.jobs\]/);
 });
 
 test("browser print fallback does not auto-run bale completion confirmation", () => {
