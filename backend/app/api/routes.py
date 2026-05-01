@@ -706,10 +706,10 @@ def _build_bale_template_content_map(payload: dict[str, Any], display: dict[str,
     total_quantity = str(payload.get("total_quantity") or "").strip()
     packing_list = str(payload.get("packing_list") or "").strip()
     dispatch_bale_no = str(
-        payload.get("dispatch_bale_no")
-        or payload.get("scan_token")
+        payload.get("machine_code")
         or payload.get("barcode_value")
-        or payload.get("bale_barcode")
+        or payload.get("scan_token")
+        or payload.get("dispatch_bale_no")
         or ""
     ).strip().upper()
     outbound_time = str(payload.get("outbound_time") or "").strip()
@@ -719,7 +719,7 @@ def _build_bale_template_content_map(payload: dict[str, Any], display: dict[str,
     grade = str(payload.get("grade") or "").strip()
     qty = str(payload.get("qty") or "").strip()
     weight = str(payload.get("weight") or "").strip()
-    code = str(payload.get("code") or dispatch_bale_no or trace_code).strip().upper()
+    code = str(payload.get("code") or display_code or dispatch_bale_no or trace_code).strip().upper()
     return {
         "supplier_category_package": headline_category_package,
         "supplier_package": headline_supplier_package,
@@ -738,7 +738,7 @@ def _build_bale_template_content_map(payload: dict[str, Any], display: dict[str,
         "piece_total": f"Total: {piece_total}",
         "trace_code": f"{'Machine' if is_warehouse_in_label else 'Code'}: {trace_code}",
         "trace_batch": f"Display: {display_code or '-'}" if is_warehouse_in_label else f"Batch: {trace_batch}",
-        "trace_shipment": f"Ship: {trace_shipment}",
+        "trace_shipment": f"Encoded: {trace_code}" if is_warehouse_in_label else f"Ship: {trace_shipment}",
         "trace_inbound": f"In: {trace_inbound}",
         "store_name": store_name,
         "transfer_order_no": transfer_order_no,

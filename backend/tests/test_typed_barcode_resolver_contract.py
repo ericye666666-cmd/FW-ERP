@@ -405,8 +405,10 @@ def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(st
     assert created["source_transfer_no"] == "TO-20260428-001"
     assert created["package_count"] == 1
     assert created["print_payload"]["display_code"] == created["execution_order_no"]
-    assert created["print_payload"]["human_readable"] == created["execution_order_no"]
+    assert created["print_payload"]["human_readable"] == created["machine_code"]
+    assert created["print_payload"]["machine_code"] == created["machine_code"]
     assert created["print_payload"]["barcode_value"] == created["machine_code"]
+    assert created["print_payload"]["scan_token"] == created["machine_code"]
 
     receiving_result = state.resolve_barcode(created["official_delivery_barcode"], context="store_receiving")
     assert receiving_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
@@ -469,6 +471,8 @@ def test_store_prep_print_payload_uses_type_2_machine_code(state):
     assert payload["display_code"] == prep_bale["scan_token"]
     assert payload["barcode_value"] == prep_bale["machine_code"]
     assert payload["machine_code"] == prep_bale["machine_code"]
+    assert payload["scan_token"] == prep_bale["machine_code"]
+    assert payload["human_readable"] == prep_bale["machine_code"]
     assert payload["machine_code"].startswith("2")
 
 
@@ -485,8 +489,45 @@ def test_store_item_print_payload_uses_type_5_machine_code(state):
 
     payload = job["print_payload"]
     assert payload["barcode_value"] == token["barcode_value"]
+    assert payload["machine_code"] == token["barcode_value"]
+    assert payload["human_readable"] == token["barcode_value"]
+    assert payload["display_code"] == token["token_no"]
     assert payload["barcode_value"].startswith("5")
     assert payload["token_no"] == token["token_no"]
+
+
+def test_print_station_reprint_requires_numeric_machine_code(state):
+    with pytest.raises(HTTPException) as exc_info:
+        state.create_bale_label_print_station_job(
+            {
+                "code": "RB260427AAAAB",
+                "requested_by": "warehouse_clerk_1",
+                "supplier": "Youxun",
+                "category": "dress",
+                "subcategory": "long dress",
+                "batch": "PB-001",
+                "ship_reference": "SHIP-001",
+                "total_number": 1,
+                "sequence_number": 1,
+            }
+        )
+    assert exc_info.value.status_code == 400
+    assert "machine_code" in exc_info.value.detail
+
+    job = state.create_bale_label_print_station_job(
+        {
+            "code": "1260427001",
+            "requested_by": "warehouse_clerk_1",
+            "supplier": "Youxun",
+            "category": "dress",
+            "subcategory": "long dress",
+            "batch": "PB-001",
+            "ship_reference": "SHIP-001",
+            "total_number": 1,
+            "sequence_number": 1,
+        }
+    )
+    assert job["code"] == "1260427001"
 
 
 def test_raw_bale_print_payload_uses_type_1_machine_code(state):

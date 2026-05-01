@@ -1379,9 +1379,10 @@ class InMemoryState:
                 "print_payload": {
                     "symbology": "Code128",
                     "display_code": execution_order_no,
-                    "human_readable": execution_order_no,
+                    "human_readable": machine_code,
                     "machine_code": machine_code,
                     "barcode_value": machine_code,
+                    "scan_token": machine_code,
                 },
             }
         )
@@ -6643,7 +6644,7 @@ class InMemoryState:
                 "scan_token": machine_code,
                 "bale_barcode": str(bale.get("bale_barcode") or "").strip().upper(),
                 "legacy_bale_barcode": "",
-                "human_readable": display_code,
+                "human_readable": machine_code,
                 "display_code": display_code,
                 "machine_code": machine_code,
                 "supplier_name": "SORTED STOCK",
@@ -7769,6 +7770,8 @@ class InMemoryState:
             "print_payload": {
                 "symbology": "Code128",
                 "barcode_value": barcode_value,
+                "machine_code": barcode_value,
+                "display_code": str(token.get("display_code") or normalized_token_no).strip().upper(),
                 "token_no": normalized_token_no,
                 "human_readable": barcode_value,
                 "product_name": display_name[:24],
@@ -12642,6 +12645,8 @@ class InMemoryState:
         }
         if not job["code"]:
             raise HTTPException(status_code=400, detail="Bale print job code is required")
+        if not re.fullmatch(r"[1-5]\d+", job["code"]):
+            raise HTTPException(status_code=400, detail="Bale print job code must be the numeric machine_code, not the display code")
         self.print_station_jobs.append(job)
         self._persist()
         return job

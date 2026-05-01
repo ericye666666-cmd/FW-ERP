@@ -175,6 +175,8 @@ test("buildBaleDirectPrintPayload keeps shipment trace fields for batch TSPL pri
       copies: 1,
       print_payload: {
         scan_token: "RB042220000003",
+        barcode_value: "1042220003",
+        machine_code: "1042220003",
         bale_barcode: "RB042220000003",
         legacy_bale_barcode: "BALE-BL-20260422-YOUXUN-SUMMERAP-001-003",
         supplier_name: "Youxun",
@@ -195,7 +197,10 @@ test("buildBaleDirectPrintPayload keeps shipment trace fields for batch TSPL pri
   assert.equal(payload.shipment_no, "GOSUQ I N6862022-2026-04-22");
   assert.equal(payload.parcel_batch_no, "BL-20260422-YOUXUN-SUMMERAP-001");
   assert.equal(payload.unload_date, "2026-04-22T09:42");
-  assert.equal(payload.barcode_value, "RB042220000003");
+  assert.equal(payload.display_code, "RB042220000003");
+  assert.equal(payload.barcode_value, "1042220003");
+  assert.equal(payload.scan_token, "1042220003");
+  assert.equal(payload.human_readable, "1042220003");
 });
 
 test("buildBaleDirectPrintPayload uses RAW_BALE machine_code for printable barcode", () => {
@@ -231,7 +236,11 @@ test("buildBalePrintStationJobPayload keeps bale metadata for cloud queue printi
     {
       barcode: "RB260427000005",
       print_payload: {
-        scan_token: "RB260427000005",
+        display_code: "RB260427000005",
+        scan_token: "1260427005",
+        barcode_value: "1260427005",
+        machine_code: "1260427005",
+        bale_barcode: "RB260427000005",
         supplier_name: "Youxun Demo",
         category_main: "dress",
         category_sub: "short dress",
@@ -247,7 +256,7 @@ test("buildBalePrintStationJobPayload keeps bale metadata for cloud queue printi
     },
   );
 
-  assert.equal(payload.code, "RB260427000005");
+  assert.equal(payload.code, "1260427005");
   assert.equal(payload.supplier, "Youxun Demo");
   assert.equal(payload.category, "dress");
   assert.equal(payload.subcategory, "short dress");
