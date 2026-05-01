@@ -37,16 +37,62 @@ Android PDAs do **not** install printer drivers and do **not** print directly. P
   - `local-api` mode: localhost bridge (`/health`, `/printers`, `/print/html`) for Windows one-click label printing.
   - `print-station` mode: Windows poll/claim/print/complete/fail worker for cloud queue.
 - `print_station_config.example.json` — sample print-station config.
-- `start_windows.ps1` — Windows startup script. Defaults to `local-api`; pass `-Mode print-station` for queue polling.
-- `package_windows_agent.ps1` — creates the downloadable Windows helper zip for operators.
+- `build_windows_exe.ps1` — administrator/developer build script that creates `FW-ERP-Print-Agent.exe` with PyInstaller.
+- `start_fwerp_print_agent_windows.bat` — employee launcher. It starts the bundled exe and does not call Python.
+- `start_windows.ps1` — source-mode startup script for administrators/developers. Defaults to `local-api`; pass `-Mode print-station` for queue polling.
+- `package_windows_agent.ps1` — creates the downloadable Windows helper zip for operators after the exe has been built.
 - `start_mac.sh` — legacy local API startup for macOS/Linux testing.
 - `requirements.txt` — dependency list (still standard-library runtime).
 
 ---
 
-## Build the Windows download package
+## 普通员工
+
+普通员工不需要安装 Python，也不需要输入 PowerShell 命令。
+
+1. 下载 `fw-erp-print-agent-windows.zip`。
+2. 解压到桌面或固定文件夹。
+3. 双击 `启动 FW-ERP 打印助手.bat`。
+4. 不要关闭黑色窗口。
+5. 回到 ERP 打印弹窗，点击 `检测打印助手`。
+6. 如果显示已连接，再点击 `打印标签`。
+
+员工包必须包含 `FW-ERP-Print-Agent.exe`。如果 bat 提示 `FW-ERP-Print-Agent.exe not found. Please download the official print agent package.`，说明下载的不是正式员工包，需要联系管理员重新上传安装包。
+
+---
+
+## 管理员 / 开发者
+
+管理员/开发者才需要在 Windows 打包电脑上安装 Python 和 PyInstaller，用来重新生成 exe 和 zip。
+
+### 1. Build the Windows exe
 
 From a Windows or PowerShell environment:
+
+```powershell
+cd ops\local_print_agent
+python -m pip install pyinstaller
+powershell -ExecutionPolicy Bypass -File .\build_windows_exe.ps1
+```
+
+The build script runs PyInstaller:
+
+```text
+python -m PyInstaller --onefile --name FW-ERP-Print-Agent agent.py
+```
+
+Expected output:
+
+```text
+ops\local_print_agent\dist\FW-ERP-Print-Agent.exe
+ops\local_print_agent\FW-ERP-Print-Agent.exe
+```
+
+Do not commit the exe to GitHub.
+
+### 2. Build the Windows download package
+
+After `FW-ERP-Print-Agent.exe` exists:
 
 ```powershell
 cd ops\local_print_agent
@@ -61,12 +107,12 @@ ops\local_print_agent\fw-erp-print-agent-windows.zip
 
 The zip includes:
 
-- `agent.py`
-- `start_windows.ps1`
+- `FW-ERP-Print-Agent.exe`
+- `start_fwerp_print_agent_windows.bat`
+- `启动 FW-ERP 打印助手.bat`
 - `README.md`
 - `print_station_config.example.json`
-- `requirements.txt`
-- `启动 FW-ERP 打印助手.bat`
+- `README_WINDOWS_NON_TECHNICAL.md`, if present
 
 Do not commit the zip file to GitHub. Upload it to the web server static downloads folder instead.
 
@@ -94,7 +140,7 @@ When the zip has not been uploaded yet, the ERP button shows:
 
 ## Windows Local Print Agent mode
 
-### Start
+### Start from source, for administrators/developers only
 
 ```powershell
 cd ops\local_print_agent
@@ -219,34 +265,30 @@ Fields:
 
 ## Windows setup (non-developer steps)
 
-1. **Install Python on Windows**
-   - Install Python 3.10+ from python.org.
-   - During install, enable "Add Python to PATH".
-
-2. **Install Deli DL-720C Windows driver**
+1. **Install Deli DL-720C Windows driver**
    - Install the official driver on the print-station computer.
 
-3. **Confirm Windows can print a test page**
+2. **Confirm Windows can print a test page**
    - In Windows Printer settings, print a test page to the Deli printer.
    - Do this before running FW-ERP print-station agent.
 
-4. **Configure print-station file**
+3. **Configure print-station file**
    - In `ops\local_print_agent`, copy `print_station_config.example.json` to `print_station_config.json`.
    - Set `api_base_url`, `station_id`, and exact `printer_name`.
 
-5. **Start print-station agent**
+4. **Start print-station agent from source, only for administrators/developers**
 
 ```powershell
 cd ops\local_print_agent
 powershell -ExecutionPolicy Bypass -File .\start_windows.ps1 -Mode print-station
 ```
 
-6. **Verify polling**
+5. **Verify polling**
    - Console should log repeated polling messages.
    - When there are no jobs: `polling ok: no pending jobs`.
    - When a job arrives: claimed → printed → completed.
 
-7. **Stop / restart**
+6. **Stop / restart**
    - Press `Ctrl + C` in the PowerShell window to stop.
    - Re-run `start_windows.ps1` to restart.
 
