@@ -1044,6 +1044,7 @@ let localPrintAgentState = {
   lastMessage: "",
   printerMessage: "",
 };
+const WINDOWS_PRINT_AGENT_DOWNLOAD_URL = "/downloads/fw-erp-print-agent-windows.zip";
 let baleBarcodeDirectoryNotice = null;
 let balePrinterConsoleNotice = null;
 let balePrinterJobState = [];
@@ -16855,6 +16856,35 @@ async function checkLocalPrintAgentPrinters() {
   }
 }
 
+function getWindowsPrintAgentDownloadUrl() {
+  const button = document.querySelector("#balePrintModalDownloadAgentButton");
+  const configuredUrl = button instanceof HTMLElement
+    ? String(button.dataset.downloadUrl || "").trim()
+    : "";
+  return configuredUrl || WINDOWS_PRINT_AGENT_DOWNLOAD_URL;
+}
+
+async function downloadWindowsPrintAgentPackage() {
+  const downloadUrl = getWindowsPrintAgentDownloadUrl();
+  try {
+    const response = await fetch(downloadUrl, { method: "HEAD", cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`download package unavailable (${response.status})`);
+    }
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "fw-erp-print-agent-windows.zip";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手。");
+    renderBalePrintModal();
+  } catch (error) {
+    setLocalPrintAgentMessage("error", "安装包暂未上传，请联系管理员。");
+    renderBalePrintModal();
+  }
+}
+
 function getCurrentBalePreviewHtml() {
   const frame = document.querySelector("#balePrintPreviewFrame");
   if (!(frame instanceof HTMLIFrameElement)) {
@@ -31617,6 +31647,12 @@ document.querySelector("#balePrintModalCheckLocalPrintersButton")?.addEventListe
 document.querySelector("#balePrintModalInstallStepsButton")?.addEventListener("click", () => {
   localPrintAgentState.installStepsVisible = !localPrintAgentState.installStepsVisible;
   renderBalePrintModal();
+});
+document.querySelector("#balePrintModalDownloadAgentButton")?.addEventListener("click", () => {
+  downloadWindowsPrintAgentPackage().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {
