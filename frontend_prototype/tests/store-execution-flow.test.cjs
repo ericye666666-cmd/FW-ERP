@@ -2,6 +2,15 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
+
+function loadStoreExecutionFlow() {
+  const filePath = path.join(__dirname, "..", "store-execution-flow.js");
+  const code = fs.readFileSync(filePath, "utf8");
+  delete globalThis.StoreExecutionFlow;
+  vm.runInThisContext(code, { filename: filePath });
+  return globalThis.StoreExecutionFlow;
+}
 
 const {
   getStoreRoleLanding,
@@ -12,7 +21,7 @@ const {
   buildClerkAssignment,
   buildClerkShelvingTask,
   bucketStoreManagerDispatchBales,
-} = require("../store-execution-flow.js");
+} = loadStoreExecutionFlow();
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const storeDispatchSectionHtml = (indexHtml.match(/<section class="panel store-support-panel" data-workspace-panel="store">[\s\S]*?<h2>6\. 门店验收配货 bale<\/h2>[\s\S]*?<pre id="storeDispatchBaleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
@@ -134,9 +143,11 @@ test("buildClerkShelvingTask makes the shelving session explicit for the clerk w
   });
 });
 
-test("store clerk fields expose Austin and Swahili as selectable clerk options", () => {
-  assert.match(indexHtml, /<datalist id="storeClerkOptions">[\s\S]*<option value="Austin">/);
-  assert.match(indexHtml, /<datalist id="storeClerkOptions">[\s\S]*<option value="Swahili">/);
+test("store clerk fields use dynamic user directory options instead of static clerk names", () => {
+  assert.match(indexHtml, /<datalist id="storeClerkOptions">/);
+  assert.doesNotMatch(indexHtml, /<option value="Austin">Austin<\/option>/);
+  assert.doesNotMatch(indexHtml, /<option value="Swahili">Swahili<\/option>/);
+  assert.match(appJs, /function refreshAssignableUserPickers/);
 
   const pickerMatches = indexHtml.match(/list="storeClerkOptions"/g) || [];
   assert.ok(pickerMatches.length >= 6);

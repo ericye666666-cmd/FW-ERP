@@ -160,6 +160,22 @@ def test_user_management_update_and_soft_deactivate_preserve_org_binding(isolate
     assert deactivated["status"] == "inactive"
     assert deactivated["is_active"] is False
 
+    activated = state.update_user(
+        created["id"],
+        {
+            "updated_by": "admin_1",
+            "full_name": deactivated["full_name"],
+            "role_code": deactivated["role_code"],
+            "area_code": deactivated["area_code"],
+            "managed_store_codes": deactivated["managed_store_codes"],
+            "status": "active",
+            "is_active": True,
+        },
+    )
+
+    assert activated["status"] == "active"
+    assert activated["is_active"] is True
+
 
 def test_user_management_cannot_deactivate_self(isolated_state: InMemoryState):
     state = isolated_state
@@ -169,6 +185,55 @@ def test_user_management_cannot_deactivate_self(isolated_state: InMemoryState):
         state.deactivate_user(admin["id"], "admin_1")
 
     assert exc.value.status_code == 400
+
+
+def test_user_management_cannot_deactivate_admin_1_from_another_admin(isolated_state: InMemoryState):
+    state = isolated_state
+    state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "admin_2",
+            "full_name": "Admin 2",
+            "password": "demo1234",
+            "role_code": "admin",
+            "is_active": True,
+        }
+    )
+    admin = next(row for row in state.list_users() if row["username"] == "admin_1")
+
+    with pytest.raises(HTTPException) as exc:
+        state.deactivate_user(admin["id"], "admin_2")
+
+    assert exc.value.status_code == 400
+
+
+def test_user_management_update_restricted_to_admin(isolated_state: InMemoryState):
+    state = isolated_state
+    cashier = state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "cashier_edit_permission",
+            "full_name": "Cashier Edit Permission",
+            "password": "demo1234",
+            "role_code": "cashier",
+            "store_code": "UTAWALA",
+            "is_active": True,
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        state.update_user(
+            cashier["id"],
+            {
+                "updated_by": "area_supervisor_1",
+                "full_name": "Should Not Update",
+                "role_code": "cashier",
+                "store_code": "UTAWALA",
+                "status": "active",
+            },
+        )
+
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.xfail(reason="Role matrix requires finance/owner style cost-fill authority, but finance/owner roles are not modeled or enforced yet.")

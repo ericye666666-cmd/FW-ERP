@@ -10736,7 +10736,7 @@ class InMemoryState:
         }
 
     def update_user(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-        actor = self._require_user_role(payload["updated_by"], {"admin", "area_supervisor"})
+        actor = self._require_user_role(payload["updated_by"], {"admin"})
         target = self.users.get(int(user_id))
         if not target:
             raise HTTPException(status_code=404, detail=f"Unknown user id {user_id}")
@@ -10748,6 +10748,8 @@ class InMemoryState:
         normalized_org = self._normalize_user_org_payload({**target, **payload})
         if actor["username"] == target["username"] and normalized_org["is_active"] is False:
             raise HTTPException(status_code=400, detail="不能停用当前登录账号。")
+        if target["username"] == "admin_1" and normalized_org["is_active"] is False:
+            raise HTTPException(status_code=400, detail="admin_1 不能被停用。")
 
         target["username"] = incoming_username
         if payload.get("full_name") is not None:

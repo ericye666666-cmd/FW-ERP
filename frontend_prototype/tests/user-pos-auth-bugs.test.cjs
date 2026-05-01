@@ -33,18 +33,59 @@ test("admin user list renders clear non-overlapping cards with edit and deactiva
   assert.match(appJs, /user-management-list/);
   assert.match(appJs, /data-user-edit-id/);
   assert.match(appJs, /data-user-deactivate-id/);
+  assert.match(appJs, /data-user-activate-id/);
+  assert.match(appJs, /启用/);
+  assert.match(appJs, /function activateUserFromList/);
+  assert.match(appJs, /function isCurrentUserAdmin/);
+  assert.match(appJs, /admin_1 不能被停用/);
   assert.match(appJs, /managed_store_codes/);
   assert.match(stylesCss, /\.user-management-list/);
   assert.match(stylesCss, /\.user-card/);
+  assert.match(stylesCss, /\.user-card-action-buttons/);
   assert.match(stylesCss, /word-break:\s*break-word/);
+});
+
+test("admin user list groups accounts by organization and exposes protected test delete", () => {
+  assert.match(appJs, /function buildUserOrganizationGroups/);
+  assert.match(appJs, /function renderUserOrganizationGroup/);
+  assert.match(appJs, /function deleteUserFromList/);
+  assert.match(appJs, /data-user-delete-id/);
+  assert.match(appJs, /确认删除该用户？此操作仅用于测试环境。/);
+  assert.match(appJs, /生产环境应使用 soft delete/);
+  assert.match(appJs, /当前登录账号不能删除自己/);
+  assert.match(appJs, /admin_1 不能被删除/);
+  assert.match(appJs, /仓库 \/ Warehouse/);
+  assert.match(appJs, /区域主管 \/ Area Supervisors/);
+  assert.match(appJs, /门店 \/ Stores/);
+  assert.match(appJs, /系统管理员 \/ Admin/);
+  assert.match(appJs, /总账号数/);
+  assert.match(appJs, /门店用户数/);
+  assert.match(appJs, /仓库用户数/);
+  assert.match(appJs, /区域主管数/);
+  assert.match(appJs, /refreshAssignableUserPickers\(\)/);
+  assert.match(appJs, /closest\(['"]\[data-user-edit-id\], \[data-user-deactivate-id\], \[data-user-activate-id\], \[data-user-delete-id\]['"]\)/);
+  assert.match(stylesCss, /\.user-organization-section/);
+  assert.match(stylesCss, /\.user-organization-grid/);
+  assert.match(stylesCss, /\.user-management-stats/);
 });
 
 test("cashier terminal top-right always exposes session identity and logout", () => {
   assert.match(cashierHeaderHtml, /id="cashierTerminalSessionStrip"/);
-  assert.match(cashierHeaderHtml, /data-terminal-action="logout"/);
+  assert.match(cashierHeaderHtml, /data-action="logout"/);
+  assert.doesNotMatch(cashierHeaderHtml, /data-terminal-action="logout"/);
   assert.match(appJs, /function renderCashierTerminalSessionStrip/);
-  assert.match(appJs, /case "logout":\s*await submitLogout\(\);/);
+  assert.match(appJs, /function handleGlobalLogoutClick/);
+  assert.match(appJs, /closest\(['"]\[data-action="logout"\]['"]\)/);
+  assert.match(appJs, /await submitLogout\(\);/);
   assert.match(stylesCss, /\.cashier-terminal-session-strip/);
+});
+
+test("cashier terminal side drawer stays hidden until explicitly opened", () => {
+  assert.match(indexHtml, /id="cashierTerminalDrawerBackdrop"[^>]+hidden/);
+  assert.match(indexHtml, /id="cashierTerminalDrawer"[^>]+hidden/);
+  assert.match(stylesCss, /body\.cashier-terminal-mode \.side-drawer\[hidden\]/);
+  assert.match(stylesCss, /body\.cashier-terminal-mode \.drawer-backdrop\[hidden\]/);
+  assert.match(stylesCss, /display:\s*none\s*!important/);
 });
 
 test("test environment does not restore login from storage and always clears password", () => {
@@ -53,6 +94,13 @@ test("test environment does not restore login from storage and always clears pas
   assert.doesNotMatch(appJs, /localStorage\.setItem\(STORAGE_KEYS\.token/);
   assert.doesNotMatch(appJs, /localStorage\.setItem\(STORAGE_KEYS\.user/);
   assert.doesNotMatch(indexHtml, /<input name="password" type="password" placeholder="密码" value=/);
+  assert.doesNotMatch(indexHtml, /name="password"[^>]+autocomplete="current-password"/);
+  assert.match(indexHtml, /<form id="loginForm"[^>]+autocomplete="off"/);
   assert.match(appJs, /function clearLoginPasswordField/);
+  assert.match(appJs, /passwordInput\.defaultValue\s*=\s*""/);
+  assert.match(appJs, /passwordInput\.removeAttribute\("value"\)/);
+  assert.match(appJs, /function ensureLoginPasswordCleared/);
+  assert.match(appJs, /window\.setTimeout\(clearLoginPasswordField,\s*120\)/);
+  assert.match(appJs, /window\.addEventListener\("pageshow",\s*ensureLoginPasswordCleared\)/);
   assert.match(appJs, /clearLoginPasswordField\(\);[\s\S]*authPage\?\.classList\.remove\("hidden-screen"\)/);
 });

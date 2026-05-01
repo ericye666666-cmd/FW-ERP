@@ -13,6 +13,84 @@
     return String(value || "").trim().toLowerCase();
   }
 
+  function normalizeOrgCode(value) {
+    return String(value || "").trim().toUpperCase();
+  }
+
+  function normalizeRoleSet(roleCode) {
+    const values = Array.isArray(roleCode) ? roleCode : [roleCode];
+    return new Set(values.map((value) => normalizeRoleCode(value)).filter(Boolean));
+  }
+
+  function isActiveUser(user) {
+    if (!user) {
+      return false;
+    }
+    const status = normalizeRoleCode(user.status || "");
+    if (user.is_active === false) {
+      return false;
+    }
+    if (["inactive", "disabled", "deactivated", "suspended"].includes(status)) {
+      return false;
+    }
+    return user.is_active === true || !status || status === "active";
+  }
+
+  function getUserDisplayValue(user = {}) {
+    return String(user.username || user.full_name || user.display_name || user.name || "").trim();
+  }
+
+  function getUserDisplayLabel(user = {}) {
+    const username = String(user.username || "").trim();
+    const displayName = String(user.full_name || user.display_name || user.name || username || "").trim();
+    if (username && displayName && username !== displayName) {
+      return `${displayName} · ${username}`;
+    }
+    return displayName || username;
+  }
+
+  function getActiveUsersByRole(users = [], roleCode = "") {
+    const roleSet = normalizeRoleSet(roleCode);
+    return (Array.isArray(users) ? users : [])
+      .filter((user) => isActiveUser(user))
+      .filter((user) => roleSet.has(normalizeRoleCode(user && user.role_code)))
+      .filter((user) => getUserDisplayValue(user));
+  }
+
+  function getActiveStoreUsersByRole(users = [], storeCode = "", roleCode = "") {
+    const normalizedStore = normalizeOrgCode(storeCode);
+    if (!normalizedStore) {
+      return [];
+    }
+    return getActiveUsersByRole(users, roleCode)
+      .filter((user) => normalizeOrgCode(user && user.store_code) === normalizedStore);
+  }
+
+  function getActiveWarehouseUsersByRole(users = [], warehouseCode = "", roleCode = "") {
+    const normalizedWarehouse = normalizeOrgCode(warehouseCode);
+    if (!normalizedWarehouse) {
+      return [];
+    }
+    return getActiveUsersByRole(users, roleCode)
+      .filter((user) => normalizeOrgCode(user && user.warehouse_code) === normalizedWarehouse);
+  }
+
+  function getAssignableStoreClerks(users = [], storeCode = "") {
+    return getActiveStoreUsersByRole(users, storeCode, "store_clerk");
+  }
+
+  function getAssignableWarehouseStaff(users = [], warehouseCode = "") {
+    return getActiveWarehouseUsersByRole(users, warehouseCode, [
+      "warehouse_clerk",
+      "warehouse_manager",
+      "warehouse_supervisor",
+    ]);
+  }
+
+  function getActiveCashiers(users = [], storeCode = "") {
+    return getActiveStoreUsersByRole(users, storeCode, "cashier");
+  }
+
   function getStoreRoleLanding(roleCode, hasStoreCode = true) {
     if (!hasStoreCode) {
       return null;
@@ -161,6 +239,16 @@
   }
 
   return {
+    normalizeOrgCode,
+    isActiveUser,
+    getUserDisplayValue,
+    getUserDisplayLabel,
+    getActiveUsersByRole,
+    getActiveStoreUsersByRole,
+    getActiveWarehouseUsersByRole,
+    getAssignableStoreClerks,
+    getAssignableWarehouseStaff,
+    getActiveCashiers,
     getStoreRoleLanding,
     getStoreWorkerDefault,
     buildClerkAssignment,

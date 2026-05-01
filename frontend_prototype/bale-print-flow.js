@@ -203,8 +203,8 @@
       action: "allow_close",
       pendingCount: completionAction.pendingCount,
       message: completionAction.action === "print_first"
-        ? `当前仅关闭打印窗并返回页面，不会把这 ${completionAction.pendingCount} 包标记为已打印或已贴完。`
-        : "当前仅关闭打印窗并返回页面，不会自动确认本类已贴完。",
+        ? `当前仅关闭打印窗并返回页面，不会把这 ${completionAction.pendingCount} 包标记为已打印或已贴标。`
+        : "当前仅关闭打印窗并返回页面，不会自动确认本包已贴标。",
     };
   }
 

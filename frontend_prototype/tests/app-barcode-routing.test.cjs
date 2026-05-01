@@ -42,12 +42,12 @@ test("0.1 start print opens the bale print modal before creating backend print j
 test("completed inbound print modal keeps close and completion actions clickable", () => {
   assert.match(appJs, /function isBalePrintModalAlreadyComplete/);
   assert.match(appJs, /completeButton\.disabled = completionAction\.action !== "complete_group" && !alreadyComplete/);
-  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "这一类已完成，关闭弹窗" : "确认本类已贴完"/);
+  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "本包已贴标，关闭弹窗" : "确认本包已贴标"/);
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
 
 test("bale print modal exposes browser print fallback with staging-safe copy", () => {
-  assert.match(indexHtml, /id="balePrintModalBrowserPrintButton"[\s\S]*?用浏览器打印 \/ Use browser print/);
+  assert.match(indexHtml, /id="balePrintModalBrowserPrintButton"[\s\S]*?用浏览器打印/);
   assert.match(indexHtml, /Cloud staging cannot directly access USB printers\. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer\./);
   assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
   assert.match(appJs, /frameWindow\.print\(\)/);
@@ -55,8 +55,8 @@ test("bale print modal exposes browser print fallback with staging-safe copy", (
 
 test("bale print modal includes local print agent status and controls", () => {
   assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*Local print agent: not connected · URL: http:\/\/127\.0\.0\.1:8719/);
-  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测本地打印代理 \/ Check local print agent/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*通过本地代理打印 \/ Print via local agent/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测本地打印代理/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*通过本地代理打印/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/html`, \{/);
 });
