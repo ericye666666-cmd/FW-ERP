@@ -7,6 +7,10 @@ output/
 !.env.example
 *.zip
 fw-erp-print-agent-windows.zip
+ops/local_print_agent/dist/
+ops/local_print_agent/build/
+ops/local_print_agent/*.spec
+ops/local_print_agent/FW-ERP-Print-Agent.exe
 ops/local_print_agent/*.zip
 downloads/*.zip
 *.tar

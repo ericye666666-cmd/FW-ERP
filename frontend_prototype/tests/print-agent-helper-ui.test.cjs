@@ -10,6 +10,13 @@ const gitignore = fs.readFileSync(path.join(repoRoot, ".gitignore"), "utf8");
 const packageScript = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/package_windows_agent.ps1"))
   ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/package_windows_agent.ps1"), "utf8")
   : "";
+const buildExeScript = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/build_windows_exe.ps1"))
+  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/build_windows_exe.ps1"), "utf8")
+  : "";
+const employeeBat = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"))
+  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"), "utf8")
+  : "";
+const readme = fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/README.md"), "utf8");
 
 test("print modal advanced options expose the Windows print helper controls", () => {
   assert.match(indexHtml, /FW-ERP 打印助手/);
@@ -41,11 +48,45 @@ test("print helper download checks package availability before downloading", () 
 
 test("Windows print agent package script and zip ignore rules are present", () => {
   assert.match(packageScript, /fw-erp-print-agent-windows\.zip/);
-  assert.match(packageScript, /agent\.py/);
-  assert.match(packageScript, /start_windows\.ps1/);
+  assert.match(packageScript, /FW-ERP-Print-Agent\.exe/);
+  assert.match(packageScript, /start_fwerp_print_agent_windows\.bat/);
+  assert.match(packageScript, /Run build_windows_exe\.ps1 on a Windows build machine first/);
   assert.match(packageScript, /print_station_config\.example\.json/);
   assert.match(packageScript, /Compress-Archive/);
   assert.match(gitignore, /fw-erp-print-agent-windows\.zip/);
+  assert.match(gitignore, /ops\/local_print_agent\/dist\//);
+  assert.match(gitignore, /ops\/local_print_agent\/build\//);
+  assert.match(gitignore, /ops\/local_print_agent\/\*\.spec/);
+  assert.match(gitignore, /ops\/local_print_agent\/FW-ERP-Print-Agent\.exe/);
   assert.match(gitignore, /ops\/local_print_agent\/\*\.zip/);
   assert.match(gitignore, /downloads\/\*\.zip/);
+});
+
+test("Windows employee launcher starts bundled exe without requiring Python", () => {
+  assert.match(employeeBat, /FW-ERP-Print-Agent\.exe/);
+  assert.match(employeeBat, /local-api/);
+  assert.match(employeeBat, /FW-ERP-Print-Agent\.exe not found\. Please download the official print agent package\./);
+  assert.doesNotMatch(employeeBat, /python\s+agent\.py/i);
+  assert.doesNotMatch(employeeBat, /pip install/i);
+});
+
+test("Windows exe build script uses PyInstaller for administrator packaging", () => {
+  assert.match(buildExeScript, /PyInstaller/);
+  assert.match(buildExeScript, /python -m pip install pyinstaller/);
+  assert.match(buildExeScript, /--onefile/);
+  assert.match(buildExeScript, /--name\s+FW-ERP-Print-Agent/);
+  assert.match(buildExeScript, /dist[\\/]FW-ERP-Print-Agent\.exe/);
+});
+
+test("print agent README separates employee startup from developer exe build", () => {
+  assert.match(readme, /普通员工/);
+  assert.match(readme, /不需要安装 Python/);
+  assert.match(readme, /双击 `启动 FW-ERP 打印助手\.bat`/);
+  assert.match(readme, /管理员 \/ 开发者/);
+  assert.match(readme, /PyInstaller/);
+  assert.match(readme, /build_windows_exe\.ps1/);
+  const employeeSection = readme.split("## 普通员工")[1]?.split("## 管理员 / 开发者")[0] || "";
+  assert.doesNotMatch(employeeSection, /python\.org/i);
+  assert.doesNotMatch(employeeSection, /python -m/i);
+  assert.doesNotMatch(employeeSection, /PyInstaller/);
 });

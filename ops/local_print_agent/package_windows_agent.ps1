@@ -14,12 +14,16 @@ $StageRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("fw-erp-print-agent-" 
 New-Item -ItemType Directory -Path $StageRoot | Out-Null
 
 try {
+  $ExePath = Join-Path $Root "FW-ERP-Print-Agent.exe"
+  if (!(Test-Path $ExePath)) {
+    throw "FW-ERP-Print-Agent.exe not found. Run build_windows_exe.ps1 on a Windows build machine first."
+  }
+
   $RequiredFiles = @(
-    "agent.py",
-    "start_windows.ps1",
+    "FW-ERP-Print-Agent.exe",
+    "start_fwerp_print_agent_windows.bat",
     "README.md",
-    "print_station_config.example.json",
-    "requirements.txt"
+    "print_station_config.example.json"
   )
 
   foreach ($FileName in $RequiredFiles) {
@@ -40,13 +44,7 @@ try {
     }
   }
 
-  $Launcher = @"
-@echo off
-cd /d "%~dp0"
-powershell -ExecutionPolicy Bypass -File "%~dp0start_windows.ps1"
-pause
-"@
-  Set-Content -Path (Join-Path $StageRoot "启动 FW-ERP 打印助手.bat") -Value $Launcher -Encoding ASCII
+  Copy-Item -Path (Join-Path $Root "start_fwerp_print_agent_windows.bat") -Destination (Join-Path $StageRoot "启动 FW-ERP 打印助手.bat") -Force
 
   if (Test-Path $OutputPath) {
     Remove-Item $OutputPath -Force
