@@ -61,6 +61,33 @@ Android PDAs do **not** install printer drivers and do **not** print directly. P
 
 ---
 
+## GitHub Actions 自动打包
+
+不想在本地 Windows 电脑安装 Python / PyInstaller 时，优先用 GitHub Actions 自动打包。
+
+1. 打开 GitHub repository 的 **Actions**。
+2. 选择 workflow：`Build Windows Print Agent`。
+3. 点击 `Run workflow`。这个 workflow 使用 `workflow_dispatch` 手动触发。
+4. 等待 Windows runner 完成构建。
+5. 在 workflow run 的 **Artifacts** 下载：
+   - `FW-ERP-Print-Agent.exe`
+   - `fw-erp-print-agent-windows.zip`
+6. 把 `fw-erp-print-agent-windows.zip` 上传到服务器：
+
+```text
+/downloads/fw-erp-print-agent-windows.zip
+```
+
+当前 nginx/static 部署建议路径：
+
+```text
+/var/www/fw-erp/downloads/fw-erp-print-agent-windows.zip
+```
+
+如果需要从 GitHub Release 下载，在手动触发 workflow 时填写 `release_tag`，workflow 会把 exe 和 zip 附加到对应 release。
+
+---
+
 ## 管理员 / 开发者
 
 管理员/开发者才需要在 Windows 打包电脑上安装 Python 和 PyInstaller，用来重新生成 exe 和 zip。
