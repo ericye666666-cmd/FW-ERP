@@ -6,6 +6,9 @@ output/
 .env.*
 !.env.example
 *.zip
+fw-erp-print-agent-windows.zip
+ops/local_print_agent/*.zip
+downloads/*.zip
 *.tar
 *.tar.gz
 *.tgz

@@ -38,8 +38,57 @@ Android PDAs do **not** install printer drivers and do **not** print directly. P
   - `print-station` mode: Windows poll/claim/print/complete/fail worker for cloud queue.
 - `print_station_config.example.json` — sample print-station config.
 - `start_windows.ps1` — Windows startup script. Defaults to `local-api`; pass `-Mode print-station` for queue polling.
+- `package_windows_agent.ps1` — creates the downloadable Windows helper zip for operators.
 - `start_mac.sh` — legacy local API startup for macOS/Linux testing.
 - `requirements.txt` — dependency list (still standard-library runtime).
+
+---
+
+## Build the Windows download package
+
+From a Windows or PowerShell environment:
+
+```powershell
+cd ops\local_print_agent
+powershell -ExecutionPolicy Bypass -File .\package_windows_agent.ps1
+```
+
+The script creates:
+
+```text
+ops\local_print_agent\fw-erp-print-agent-windows.zip
+```
+
+The zip includes:
+
+- `agent.py`
+- `start_windows.ps1`
+- `README.md`
+- `print_station_config.example.json`
+- `requirements.txt`
+- `启动 FW-ERP 打印助手.bat`
+
+Do not commit the zip file to GitHub. Upload it to the web server static downloads folder instead.
+
+The ERP print modal download button points to:
+
+```text
+/downloads/fw-erp-print-agent-windows.zip
+```
+
+For the current deployment, place the generated zip at:
+
+```text
+/var/www/fw-erp/downloads/fw-erp-print-agent-windows.zip
+```
+
+If the server is using a project-local static folder instead of nginx static files, copy the same zip into the folder that is served as `/downloads/`.
+
+When the zip has not been uploaded yet, the ERP button shows:
+
+```text
+安装包暂未上传，请联系管理员。
+```
 
 ---
 
