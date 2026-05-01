@@ -1032,30 +1032,36 @@
               <div class="button-row">
                 <button id="balePrintModalPrevButton" type="button" class="ghost-button mini-button">上一张</button>
                 <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button">下一张</button>
-                <button id="balePrintModalRefreshButton" type="button" class="ghost-button mini-button">刷新预览</button>
               </div>
-              <div id="balePrintModalLocalAgentStatus" class="candidate-summary">
-                Local print agent: not connected · URL: http://127.0.0.1:8719
+              <div id="balePrintModalAgentFallback" class="flow-summary-note warning hidden-screen">未检测到本地打印代理，当前将使用浏览器打印。</div>
+              <div class="bale-print-primary-actions">
+                <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">打印标签</button>
+                <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button bale-print-primary-button hidden-screen">打印全部</button>
+                <button id="balePrintModalCompleteButton" type="button" class="ghost-button bale-print-primary-button">确认本包已贴标</button>
+                <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button bale-print-primary-button">取消并返回</button>
               </div>
-              <div class="button-row">
-                <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测本地打印代理</button>
-                <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button">通过本地代理打印</button>
-              </div>
-              <div class="button-row">
-                <button id="balePrintModalConnectButton" type="button" class="ghost-button mini-button">检测打印机</button>
-                <button id="balePrintModalDirectPrintButton" type="button" class="ghost-button mini-button">直接打印本张（仅本地/LAN 后端）</button>
-                <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button">打印本轮全部</button>
-                <button id="balePrintModalSendToStationButton" type="button" class="ghost-button mini-button">发送到打印站</button>
-                <button id="balePrintModalBrowserPrintButton" type="button" class="ghost-button mini-button">用浏览器打印</button>
-              </div>
-              <div id="balePrintModalBrowserPrintHint" class="subtle small">
-                Cloud staging cannot directly access USB printers. For one-click label printing, run FW-ERP Local Print Agent on the computer connected to the label printer.
-              </div>
-              <div id="balePrintModalScopeNote" class="subtle small"></div>
-              <div class="button-row">
-                <button id="balePrintModalCompleteButton" type="button" class="ghost-button mini-button">确认本包已贴标</button>
-                <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button mini-button">取消并返回当前页</button>
-              </div>
+              <details id="balePrintModalAdvancedOptions" class="bale-print-advanced">
+                <summary>高级打印选项</summary>
+                <div id="balePrintModalLocalAgentStatus" class="candidate-summary">
+                  Local print agent: not connected · URL: http://127.0.0.1:8719
+                </div>
+                <div class="button-row">
+                  <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测本地打印代理</button>
+                  <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button">通过本地代理打印</button>
+                </div>
+                <div class="button-row">
+                  <button id="balePrintModalConnectButton" type="button" class="ghost-button mini-button">检测打印机</button>
+                  <button id="balePrintModalDirectPrintButton" type="button" class="ghost-button mini-button">直接打印本张（仅本地/LAN 后端）</button>
+                  <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button">打印本轮全部</button>
+                  <button id="balePrintModalSendToStationButton" type="button" class="ghost-button mini-button">发送到打印站</button>
+                  <button id="balePrintModalBrowserPrintButton" type="button" class="ghost-button mini-button">用浏览器打印</button>
+                  <button id="balePrintModalRefreshButton" type="button" class="ghost-button mini-button">刷新预览</button>
+                </div>
+                <div id="balePrintModalBrowserPrintHint" class="subtle small">
+                  技术说明：Cloud staging 不能直接访问 USB 打印机；未连接本地打印代理时会使用浏览器打印。
+                </div>
+                <div id="balePrintModalScopeNote" class="subtle small"></div>
+              </details>
             </div>
           </div>
         </div>
