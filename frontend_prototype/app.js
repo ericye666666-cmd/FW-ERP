@@ -10767,17 +10767,21 @@ function buildLoosePickSheetPrinterPayloadForTask(task = {}, transfer = {}, { pr
   }
   const label = buildLoosePickSheetLabelForTask(task, transfer);
   const machineCode = buildLpkMachineCode(label.transferNo || transfer?.transfer_no || task?.transferNo);
-  const barcodeValue = String(machineCode || label.barcodeValue || label.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const displayCode = String(label.barcodeValue || label.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  const barcodeValue = String(machineCode || "").replace(/[^0-9]/g, "").toUpperCase();
   const pickQty = Number(label.pickQty || 0);
   return {
     printer_name: String(printerName || "").trim(),
     template_code: "store_loose_pick_60x40",
     template_scope: "warehouseout_bale",
     copies: 1,
+    display_code: displayCode,
+    machine_code: barcodeValue,
     barcode_value: barcodeValue,
     scan_token: barcodeValue,
-    bale_barcode: barcodeValue,
+    bale_barcode: displayCode,
     legacy_bale_barcode: "",
+    human_readable: barcodeValue,
     supplier_name: "STORE REPLENISHMENT",
     category_main: "PICK SHEET",
     category_sub: "LOOSE GAP",
@@ -10801,7 +10805,7 @@ function buildLoosePickSheetPrinterPayloadForTask(task = {}, transfer = {}, { pr
     grade: `PKG<${Number(label.packageLimitQty || 200)}`,
     qty: String(Math.max(0, pickQty)),
     weight: "",
-    code: barcodeValue,
+    code: displayCode,
   };
 }
 
@@ -10811,13 +10815,13 @@ function buildWarehouseoutModalPrintJobFromPayload(payload = {}, {
 } = {}) {
   const templateCode = String(payload.template_code || getActiveBaleTemplateCode()).trim().toLowerCase();
   const barcodeValue = String(
-    payload.dispatch_bale_no
-    || payload.scan_token
+    payload.machine_code
     || payload.barcode_value
-    || payload.bale_barcode
-    || payload.code
+    || payload.scan_token
+    || payload.dispatch_bale_no
     || "",
-  ).trim().toUpperCase();
+  ).replace(/[^0-9]/g, "").trim();
+  const displayCode = String(payload.display_code || payload.bale_barcode || payload.code || barcodeValue || "").trim().toUpperCase();
   return {
     id: null,
     job_type: "warehouseout_bale_direct_label",
@@ -10836,10 +10840,13 @@ function buildWarehouseoutModalPrintJobFromPayload(payload = {}, {
       ...payload,
       template_code: templateCode,
       template_scope: "warehouseout_bale",
-      barcode_value: String(payload.barcode_value || barcodeValue).trim().toUpperCase(),
-      scan_token: String(payload.scan_token || barcodeValue).trim().toUpperCase(),
+      display_code: displayCode,
+      machine_code: barcodeValue,
+      barcode_value: barcodeValue,
+      scan_token: barcodeValue,
       dispatch_bale_no: barcodeValue,
-      code: String(payload.code || barcodeValue).trim().toUpperCase(),
+      human_readable: barcodeValue,
+      code: String(payload.code || displayCode).trim().toUpperCase(),
     },
   };
 }
@@ -10910,8 +10917,9 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     display_code: displayCode || "",
     machine_code: machineCode || derivedMachineCode || "",
     scan_token: barcodeValue,
-    bale_barcode: barcodeValue,
+    bale_barcode: displayCode || finalBaleNo || "",
     legacy_bale_barcode: "",
+    human_readable: barcodeValue,
     supplier_name: "STORE DISPATCH",
     category_main: sourceLabel,
     category_sub: categorySummary,
@@ -10942,7 +10950,7 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     grade: String(row.grade || "").trim(),
     qty: String(Math.max(0, itemCount)),
     weight: "",
-    code: barcodeValue,
+    code: displayCode || finalBaleNo || barcodeValue,
   };
 }
 
@@ -16440,12 +16448,13 @@ function renderCode128Svg(value, { width = 320, height = 84, quietZoneModules = 
 function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   const payload = job.print_payload || {};
   const defaultBarcodeValue = String(
-    payload.dispatch_bale_no
-    || payload.scan_token
+    payload.machine_code
     || payload.barcode_value
+    || payload.scan_token
+    || payload.dispatch_bale_no
     || job.barcode
     || "",
-  ).trim().toUpperCase();
+  ).replace(/[^0-9]/g, "").trim();
   const title = String(payload.supplier_name || "STORE DISPATCH").trim().toUpperCase();
   const storeName = String(payload.store_name || payload.status || "").trim();
   const categoryDisplay = String(payload.category_display || job.product_name || "送店 barcode").trim();
@@ -16461,8 +16470,9 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   if (isLpkTemplate) {
     const lpkTitle = "LPK SHORTAGE PICK";
     const subtitle = "仓库补差拣货工单 / 门店不可扫";
-    const displayCode = String(payload.display_code || payload.human_readable || payload.dispatch_bale_no || "").trim().toUpperCase();
-    const barcodeValue = String(payload.machine_code || payload.barcode_value || payload.scan_token || job.barcode || "").trim().toUpperCase();
+    const displayCode = String(payload.display_code || payload.bale_barcode || payload.code || "").trim().toUpperCase();
+    const machineCode = String(payload.machine_code || payload.barcode_value || payload.scan_token || defaultBarcodeValue || "").replace(/[^0-9]/g, "").trim();
+    const barcodeValue = machineCode;
     const barcodeSvg = renderCode128Svg(barcodeValue, { width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1.7 });
     const requestNo = String(payload.transfer_order_no || payload.shipment_no || "").trim().toUpperCase();
     const qtyLabel = String(payload.qty || payload.total_quantity || "").trim();
@@ -16483,10 +16493,10 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   </style>
 </head>
 <body>
-  <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
+  <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
     <h1>${escapeHtml(lpkTitle)}</h1>
     <p class="sub">${escapeHtml(subtitle)}</p>
-    <p class="meta">Display: ${escapeHtml(displayCode || "-")}<br>Store: ${escapeHtml(storeName || "-")}<br>Request: ${escapeHtml(requestNo || "-")}<br>Category: ${escapeHtml(categoryDisplay || "-")}<br>Qty: ${escapeHtml(qtyLabel || qty || "-")} pcs${arrivalDate ? `<br>需到货时间: ${escapeHtml(arrivalDate)}` : ""}</p>
+    <p class="meta">Display: ${escapeHtml(displayCode || "-")}<br>Machine: ${escapeHtml(machineCode || "-")}<br>Encoded: ${escapeHtml(barcodeValue || "-")}<br>Store: ${escapeHtml(storeName || "-")}<br>Request: ${escapeHtml(requestNo || "-")}<br>Category: ${escapeHtml(categoryDisplay || "-")}<br>Qty: ${escapeHtml(qtyLabel || qty || "-")} pcs${arrivalDate ? `<br>需到货时间: ${escapeHtml(arrivalDate)}` : ""}</p>
     <div class="barcode-wrap">
       ${barcodeSvg}
       <div class="code">${escapeHtml(barcodeValue || "NO BARCODE")}</div>
@@ -16500,7 +16510,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     const packageLabel = String(payload.package_position_label || payload.bale_piece_summary || "").trim();
     const displayCode = String(payload.display_code || payload.parcel_batch_no || payload.dispatch_bale_no || "").trim().toUpperCase();
     const machineCode = String(payload.machine_code || payload.barcode_value || payload.scan_token || defaultBarcodeValue).replace(/[^0-9]/g, "").trim();
-    const barcodeValue = machineCode || defaultBarcodeValue;
+    const barcodeValue = machineCode;
     const barcodeSvg = renderCode128Svg(barcodeValue, { width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1.7 });
     return `<!doctype html>
 <html>
@@ -16543,12 +16553,12 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   </style>
 </head>
 <body>
-  <section class="label">
+  <section class="label" data-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
     <div class="left">
       <div class="kicker">${escapeHtml(sizeLabel)} · STORE DISPATCH</div>
       <h1>${escapeHtml("STORE DISPATCH / SDO")}</h1>
       <p class="meta">${escapeHtml("正式门店送货执行码")}</p>
-      <p class="meta">${escapeHtml(`Display: ${displayCode || "-"}`)}<br>${escapeHtml(`Store: ${storeName || "-"}`)}<br>${escapeHtml(`Request: ${transferNo || "-"}`)}<br>${escapeHtml(`Packages: ${String(payload.package_count || payload.total_packages || "").trim() || "-"}`)}</p>
+      <p class="meta">${escapeHtml(`Display: ${displayCode || "-"}`)}<br>${escapeHtml(`Machine: ${machineCode || "-"}`)}<br>${escapeHtml(`Encoded: ${barcodeValue || "-"}`)}<br>${escapeHtml(`Store: ${storeName || "-"}`)}<br>${escapeHtml(`Request: ${transferNo || "-"}`)}<br>${escapeHtml(`Packages: ${String(payload.package_count || payload.total_packages || "").trim() || "-"}`)}</p>
       <div><span class="badge">${escapeHtml(packageLabel || qty || "送店包")}</span></div>
       <div class="barcode-wrap">
         ${barcodeSvg}
@@ -17202,7 +17212,13 @@ function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = 
     });
   }
   const printPayload = job?.print_payload || {};
-  const machineCode = String(printPayload.machine_code || printPayload.barcode_value || printPayload.scan_token || job?.barcode || "").trim();
+  const machineCode = String(
+    printPayload.machine_code
+    || printPayload.barcode_value
+    || printPayload.scan_token
+    || job?.barcode
+    || "",
+  ).replace(/[^0-9]/g, "").trim();
   const displayCode = String(printPayload.display_code || printPayload.bale_barcode || job?.barcode || "").trim();
   return {
     printer_name: String(document.querySelector("[data-bale-modal-printer-select]")?.value || document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "").trim(),
@@ -17212,7 +17228,7 @@ function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = 
     scan_token: machineCode,
     display_code: displayCode,
     machine_code: machineCode,
-    human_readable: String(printPayload.human_readable || machineCode).trim(),
+    human_readable: machineCode,
     bale_barcode: String(job?.barcode || printPayload.bale_barcode || displayCode || "").trim(),
     legacy_bale_barcode: String(printPayload.legacy_bale_barcode || "").trim(),
     supplier_name: String(printPayload.supplier_name || balePrintModalState.supplierName || "").trim(),
@@ -17314,7 +17330,13 @@ async function sendCurrentBaleModalJobToPrintStation() {
       shipmentNo: balePrintModalState.shipmentNo,
     })
     : {
-      code: String(currentJob?.print_payload?.scan_token || currentJob?.print_payload?.barcode_value || currentJob?.barcode || "").trim(),
+      code: String(
+        currentJob?.print_payload?.machine_code
+        || currentJob?.print_payload?.barcode_value
+        || currentJob?.print_payload?.scan_token
+        || currentJob?.barcode
+        || "",
+      ).replace(/[^0-9]/g, "").trim(),
       supplier: String(currentJob?.print_payload?.supplier_name || balePrintModalState.supplierName || "").trim(),
       category: String(currentJob?.print_payload?.category_main || "").trim(),
       subcategory: String(currentJob?.print_payload?.category_sub || "").trim(),
@@ -28206,7 +28228,7 @@ async function queueCompressionTaskPrintJobs(resultRow = {}) {
 async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
   const baleNo = String(row?.bale_no || "").trim().toUpperCase();
   const displayCode = String(row?.scan_token || row?.bale_barcode || "").trim().toUpperCase();
-  const barcodeValue = String(row?.machine_code || row?.barcode_value || displayCode).trim().toUpperCase();
+  const barcodeValue = String(row?.machine_code || row?.barcode_value || "").replace(/[^0-9]/g, "").trim();
   if (!baleNo || !barcodeValue) {
     throw new Error("当前这张压缩 bale 还没有历史 barcode，不能直接补打。");
   }
@@ -28230,6 +28252,7 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
       legacy_bale_barcode: "",
       display_code: displayCode,
       machine_code: barcodeValue,
+      human_readable: barcodeValue,
       supplier_name: "SORTED STOCK",
       category_main: String(row?.category_main || "").trim(),
       category_sub: String(row?.category_sub || "").trim(),

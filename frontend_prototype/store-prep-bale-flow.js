@@ -9,6 +9,11 @@
     return String(value || "").trim();
   }
 
+  function normalizeMachineCode(value) {
+    const normalized = normalizeText(value).replace(/[^0-9]/g, "");
+    return /^[1-5]\d+$/.test(normalized) ? normalized : "";
+  }
+
   function normalizeLower(value) {
     return normalizeText(value).toLowerCase();
   }
@@ -163,7 +168,7 @@
     const taskType = normalizeLower(row && row.task_type) || "store_dispatch";
     const resolvedTemplateCode = normalizeText(templateCode) || getStorePrepTemplateDefaultCode(taskType);
     const displayCode = normalizeText(row && (row.scan_token || row.bale_barcode)).toUpperCase();
-    const machineCode = normalizeText(row && (row.machine_code || row.barcode_value)).toUpperCase() || displayCode;
+    const machineCode = normalizeMachineCode(row && (row.machine_code || row.barcode_value));
     const categoryMain = normalizeText(row && row.category_main);
     const categorySub = normalizeText(row && row.category_sub);
     const categoryDisplay = [categoryMain, categorySub].filter(Boolean).join(" / ");
@@ -182,6 +187,7 @@
       legacy_bale_barcode: "",
       display_code: displayCode,
       machine_code: machineCode,
+      human_readable: machineCode,
       supplier_name: "SORTED STOCK",
       category_main: categoryMain,
       category_sub: categorySub,

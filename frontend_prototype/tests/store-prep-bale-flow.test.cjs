@@ -96,8 +96,8 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
   const payload = buildStorePrepBaleDirectPrintPayload(
     {
       bale_no: "SPB-20260423-004",
-      bale_barcode: "WB260423000004",
-      scan_token: "WB260423000004",
+      bale_barcode: "SDB260423004",
+      scan_token: "SDB260423004",
       machine_code: "2260423004",
       task_no: "SPT-20260423-004",
       task_type: "sale",
@@ -116,9 +116,12 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
 
   assert.equal(payload.printer_name, "Deli DL-720C");
   assert.equal(payload.template_code, "wait_for_sale");
-  assert.equal(payload.display_code, "WB260423000004");
+  assert.equal(payload.display_code, "SDB260423004");
+  assert.match(payload.display_code, /^SDB/);
   assert.equal(payload.machine_code, "2260423004");
   assert.equal(payload.barcode_value, "2260423004");
+  assert.equal(payload.scan_token, "2260423004");
+  assert.equal(payload.human_readable, "2260423004");
   assert.equal(payload.dispatch_bale_no, "2260423004");
   assert.equal(payload.shipment_no, "SPT-20260423-004");
   assert.equal(payload.parcel_batch_no, "SPB-20260423-004");

@@ -637,8 +637,9 @@
       machine_code: machineCode,
       barcode_value: barcodeValue,
       scan_token: barcodeValue,
-      bale_barcode: barcodeValue,
+      bale_barcode: normalizeText(label.barcodeValue || label.taskNo).toUpperCase(),
       legacy_bale_barcode: "",
+      human_readable: barcodeValue,
       supplier_name: "STORE REPLENISHMENT",
       category_main: "PICK SHEET",
       category_sub: "LOOSE GAP",
@@ -662,7 +663,7 @@
       grade: `PKG<${packageLimitQty}`,
       qty: String(Math.max(0, pickQty)),
       weight: "",
-      code: barcodeValue,
+      code: normalizeText(label.barcodeValue || label.taskNo).toUpperCase(),
     };
   }
 

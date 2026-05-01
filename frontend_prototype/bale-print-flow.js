@@ -13,6 +13,21 @@
     return String(value || "").trim();
   }
 
+  function normalizeMachineCode(value) {
+    const normalized = normalizeText(value).replace(/[^0-9]/g, "");
+    return /^[1-5]\d+$/.test(normalized) ? normalized : "";
+  }
+
+  function pickMachineCode(...values) {
+    for (const value of values) {
+      const candidate = normalizeMachineCode(value);
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return "";
+  }
+
   function isWarehouseShortCode(value) {
     return /^RB[A-Z0-9]{6,}$/.test(normalizeBarcode(value));
   }
@@ -220,7 +235,12 @@
     const totalJobs = Number(options && options.totalJobs ? options.totalJobs : 0);
     const printPayload = job && job.print_payload ? job.print_payload : {};
     const displayCode = normalizeText(printPayload.display_code || printPayload.bale_barcode || job && job.barcode);
-    const machineCode = normalizeText(printPayload.machine_code || printPayload.barcode_value || printPayload.scan_token || job && job.barcode);
+    const machineCode = pickMachineCode(
+      printPayload.machine_code,
+      printPayload.barcode_value,
+      printPayload.scan_token,
+      job && job.barcode,
+    );
     return {
       printer_name: normalizeText(options && options.printerName),
       template_code: normalizeText(options && options.templateCode),
@@ -229,7 +249,7 @@
       scan_token: machineCode,
       display_code: displayCode,
       machine_code: machineCode,
-      human_readable: normalizeText(printPayload.human_readable || machineCode),
+      human_readable: pickMachineCode(printPayload.human_readable) || machineCode,
       bale_barcode: normalizeText(job && (job.barcode || printPayload.bale_barcode) || displayCode),
       legacy_bale_barcode: normalizeText(printPayload.legacy_bale_barcode),
       supplier_name: normalizeText(printPayload.supplier_name || options && options.supplierName),
@@ -268,15 +288,16 @@
   function buildBalePrintStationJobPayload(job, options = {}) {
     const currentIndex = Number(options && options.currentIndex ? options.currentIndex : 0);
     const totalJobs = Number(options && options.totalJobs ? options.totalJobs : 0);
+    const printPayload = job && job.print_payload ? job.print_payload : {};
     return {
-      code: normalizeText(job && job.print_payload && (job.print_payload.scan_token || job.print_payload.barcode_value) || job && job.barcode),
-      supplier: normalizeText(job && job.print_payload && job.print_payload.supplier_name || options && options.supplierName),
-      category: normalizeText(job && job.print_payload && (job.print_payload.category_main || job.print_payload.cat)),
-      subcategory: normalizeText(job && job.print_payload && (job.print_payload.category_sub || job.print_payload.sub)),
-      batch: normalizeText(job && job.print_payload && job.print_payload.parcel_batch_no),
-      ship_reference: normalizeText(job && job.print_payload && job.print_payload.shipment_no || options && options.shipmentNo),
-      total_number: Number(job && job.print_payload && job.print_payload.total_packages ? job.print_payload.total_packages : totalJobs || 0),
-      sequence_number: Number(job && job.print_payload && job.print_payload.serial_no ? job.print_payload.serial_no : currentIndex + 1 || 0),
+      code: pickMachineCode(printPayload.machine_code, printPayload.barcode_value, printPayload.scan_token, job && job.barcode),
+      supplier: normalizeText(printPayload.supplier_name || options && options.supplierName),
+      category: normalizeText(printPayload.category_main || printPayload.cat),
+      subcategory: normalizeText(printPayload.category_sub || printPayload.sub),
+      batch: normalizeText(printPayload.parcel_batch_no),
+      ship_reference: normalizeText(printPayload.shipment_no || options && options.shipmentNo),
+      total_number: Number(printPayload.total_packages ? printPayload.total_packages : totalJobs || 0),
+      sequence_number: Number(printPayload.serial_no ? printPayload.serial_no : currentIndex + 1 || 0),
     };
   }
 
