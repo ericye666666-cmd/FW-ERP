@@ -14,9 +14,13 @@ test("barcode resolver test has barcode input, required contexts, and test butto
   assert.match(indexHtml, /<form id="barcodeResolverTestForm"[\s\S]*?<input name="barcode" placeholder="RB260427AAAQH"/);
   [
     "warehouse_sorting_create",
+    "warehouse_dispatch_planning",
+    "warehouse_execution",
+    "warehouse_shortage_pick",
     "pos",
     "store_receiving",
     "store_pda",
+    "identity_ledger",
     "b2b_bale_sales",
   ].forEach((context) => {
     assert.match(indexHtml, new RegExp(`<option value="${context}">${context}<\\/option>`));

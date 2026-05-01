@@ -24,121 +24,101 @@ def state():
         temp_dir.cleanup()
 
 
-def _prepare_sorting_flow(state: InMemoryState, customs_notice_no: str = "TYPED260427", qty: int = 2):
-    state.upsert_apparel_default_cost(
-        {
-            "category_main": "dress",
-            "category_sub": "ladies dress",
-            "grade": "P",
-            "default_cost_kes": 80,
-            "note": "typed resolver contract test",
-        },
-        "warehouse_supervisor_1",
-    )
-    state.upsert_apparel_sorting_rack(
-        {
-            "category_main": "dress",
-            "category_sub": "ladies dress",
-            "grade": "P",
-            "default_cost_kes": 80,
-            "rack_code": "DR-P-01",
-            "note": "typed resolver contract test",
-        },
-        "warehouse_supervisor_1",
-    )
-    shipment = state.create_inbound_shipment(
-        {
-            "shipment_type": "sea",
-            "customs_notice_no": customs_notice_no,
-            "unload_date": "2026-04-27",
-            "coc_goods_manifest": "typed resolver contract test",
-            "note": "",
-            "coc_documents": [],
-        }
-    )
-    state.create_parcel_batch(
-        {
-            "intake_type": "sea_freight",
-            "inbound_shipment_no": shipment["shipment_no"],
-            "supplier_name": "Resolver Contract Supplier",
-            "cargo_type": "apparel",
-            "category_main": "dress",
-            "category_sub": "ladies dress",
-            "package_count": 1,
-            "total_weight": 40,
-            "received_by": "warehouse_clerk_1",
-            "note": "",
-        }
-    )
-    state.confirm_inbound_shipment_intake(
-        shipment["shipment_no"],
-        {
-            "declared_total_packages": 1,
-            "confirmed_by": "warehouse_supervisor_1",
-            "note": "",
-        },
-    )
-    raw_bale = state.generate_bale_barcodes(shipment["shipment_no"], "warehouse_supervisor_1")[0]
-    task = state.create_sorting_task(
-        {
-            "bale_barcodes": [raw_bale["bale_barcode"]],
-            "handler_names": ["warehouse_clerk_1"],
-            "note": "",
-            "created_by": "warehouse_supervisor_1",
-        }
-    )
-    state.submit_sorting_task_results(
-        task["task_no"],
-        {
-            "result_items": [
-                {
-                    "category_name": "dress / ladies dress",
-                    "grade": "P",
-                    "qty": qty,
-                    "confirm_to_inventory": True,
-                }
-            ],
-            "note": "",
-            "created_by": "warehouse_supervisor_1",
-        },
-    )
+def _seed_raw_bale(state: InMemoryState) -> dict:
+    raw_bale = {
+        "id": 1,
+        "bale_barcode": "RB260427AAAAB",
+        "scan_token": "RB260427AAAAB",
+        "machine_code": "1260427001",
+        "legacy_bale_barcode": "BALE-260427-001",
+        "shipment_no": "SHIP-BCRULE-RAW",
+        "parcel_batch_no": "PB-BCRULE-RAW",
+        "status": "ready_for_sorting",
+        "created_at": "2026-04-27T00:00:00+03:00",
+        "updated_at": "2026-04-27T00:00:00+03:00",
+    }
+    state.bale_barcodes[raw_bale["bale_barcode"]] = raw_bale
     return raw_bale
 
 
-def _prepare_dispatch_and_store_item(state: InMemoryState):
-    raw_bale = _prepare_sorting_flow(state)
-    dispatch_bale = state.list_store_dispatch_bales()[0]
-    state.accept_store_dispatch_bale(
-        dispatch_bale["bale_no"],
-        {"store_code": "UTAWALA", "accepted_by": "store_manager_1", "note": ""},
-    )
-    state.assign_store_dispatch_bale(
-        dispatch_bale["bale_no"],
-        {"employee_name": "store_clerk_1", "assigned_by": "store_manager_1", "note": ""},
-    )
-    token = state.get_store_dispatch_bale_tokens(dispatch_bale["bale_no"])[0]
-    state.update_item_barcode_token_store_edit(
-        token["token_no"],
+def _seed_dispatch_bale(state: InMemoryState) -> dict:
+    dispatch_bale = {
+        "bale_no": "SDB260428AAB",
+        "bale_barcode": "SDB260428AAB",
+        "scan_token": "SDB260428AAB",
+        "machine_code": "2260428002",
+        "transfer_no": "TO-20260428-001",
+        "source_bales": ["SDB260428AAB"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 100,
+        "token_nos": [],
+    }
+    state.store_dispatch_bales[dispatch_bale["bale_no"]] = dispatch_bale
+    return dispatch_bale
+
+
+def _seed_store_item_token(state: InMemoryState) -> dict:
+    token = {
+        "token_no": "TOK-ST20260428001-0001",
+        "identity_no": "TOK-ST20260428001-0001",
+        "barcode_value": "5260428001",
+        "final_item_barcode": {"barcode_value": "5260428001"},
+        "status": "printed_in_store",
+        "category_name": "dress / ladies dress",
+        "grade": "P",
+        "task_no": "ST-20260428-001",
+        "shipment_no": "SHIP-BCRULE-ITEM",
+        "customs_notice_no": "",
+        "source_bale_barcodes": [],
+        "source_legacy_bale_barcodes": [],
+        "sku_code": "DRESS-P",
+        "rack_code": "",
+        "qty_index": 1,
+        "qty_total": 1,
+        "token_group_no": 1,
+        "store_dispatch_bale_no": "SDB260428AAB",
+        "store_code": "UTAWALA",
+        "assigned_employee": "store_clerk_1",
+        "selling_price_kes": 500,
+        "store_rack_code": "A-01",
+        "created_at": "2026-04-28T00:00:00+03:00",
+        "updated_at": "2026-04-28T00:00:00+03:00",
+    }
+    state.item_barcode_tokens[token["token_no"]] = token
+    return token
+
+
+def _seed_store_delivery_execution(state: InMemoryState) -> dict:
+    order = state._normalize_store_delivery_execution_order(
         {
-            "store_code": "UTAWALA",
-            "selling_price_kes": 500,
-            "store_rack_code": "A-01",
-            "updated_by": "store_clerk_1",
-            "note": "",
-        },
-    )
-    job = state.queue_item_barcode_token_print_jobs(
-        {
-            "token_nos": [token["token_no"]],
-            "copies": 1,
-            "printer_name": "Deli DL-720C",
-            "template_code": "clothes_retail",
-            "requested_by": "store_clerk_1",
+            "execution_order_no": "SDO260428001",
+            "source_transfer_no": "TO-20260428-001",
+            "from_warehouse_code": "WH1",
+            "to_store_code": "UTAWALA",
+            "packages": [
+                {
+                    "source_type": "SDB",
+                    "source_code": "SDB260428AAB",
+                    "item_count": 100,
+                    "category_summary": "dress / ladies dress",
+                }
+            ],
+            "status": "pending_print",
+            "created_by": "warehouse_clerk_1",
+            "created_at": "2026-04-28T00:00:00+03:00",
         }
-    )[0]
-    state.mark_print_job_printed(job["id"], "store_clerk_1")
-    store_item_barcode = job["print_payload"]["barcode_value"]
-    return raw_bale, dispatch_bale, token, store_item_barcode
+    )
+    state.store_delivery_execution_orders[order["execution_order_no"]] = order
+    return order
+
+
+def _prepare_barcode_fixtures(state: InMemoryState):
+    raw_bale = _seed_raw_bale(state)
+    dispatch_bale = _seed_dispatch_bale(state)
+    token = _seed_store_item_token(state)
+    sdo = _seed_store_delivery_execution(state)
+    return raw_bale, dispatch_bale, token, sdo
 
 
 def _seed_store_prep_bale(state: InMemoryState, bale_no: str = "SDB260428AAB") -> dict:
@@ -150,6 +130,7 @@ def _seed_store_prep_bale(state: InMemoryState, bale_no: str = "SDB260428AAB") -
             "task_type": "store_dispatch",
             "status": "waiting_store_dispatch",
             "qty": 100,
+            "machine_code": "2260428001",
         }
     )
     state.store_prep_bales[bale["bale_no"]] = bale
@@ -186,7 +167,8 @@ def _seed_transfer_with_dispatch_for_execution(state: InMemoryState, transfer_no
 
 
 def test_pos_accepts_only_store_item_and_requires_identity_id(state):
-    _, dispatch_bale, token, store_item_barcode = _prepare_dispatch_and_store_item(state)
+    _, dispatch_bale, token, _ = _prepare_barcode_fixtures(state)
+    store_item_barcode = token["barcode_value"]
 
     accepted = state.resolve_barcode(store_item_barcode, context="pos")
     assert accepted["barcode_type"] == "STORE_ITEM"
@@ -202,11 +184,17 @@ def test_pos_accepts_only_store_item_and_requires_identity_id(state):
     assert dispatch_rejected["barcode_type"] == "DISPATCH_BALE"
     assert dispatch_rejected["reject_reason"]
 
+    legacy_token_rejected = state.resolve_barcode(token["token_no"], context="pos")
+    assert legacy_token_rejected["barcode_type"] == "STORE_ITEM"
+    assert legacy_token_rejected["pos_allowed"] is False
+    assert legacy_token_rejected["reject_reason"]
+
 
 def test_warehouse_sorting_accepts_raw_bale_and_rejects_store_item(state):
-    raw_bale, _, _, store_item_barcode = _prepare_dispatch_and_store_item(state)
+    raw_bale, _, token, _ = _prepare_barcode_fixtures(state)
+    store_item_barcode = token["barcode_value"]
 
-    raw_result = state.resolve_barcode(raw_bale["bale_barcode"], context="warehouse_sorting_create")
+    raw_result = state.resolve_barcode(raw_bale["machine_code"], context="warehouse_sorting_create")
     assert raw_result["barcode_type"] == "RAW_BALE"
     assert raw_result["reject_reason"] == ""
 
@@ -215,21 +203,30 @@ def test_warehouse_sorting_accepts_raw_bale_and_rejects_store_item(state):
     assert store_item_result["reject_reason"]
 
 
-def test_store_receiving_accepts_dispatch_bale_and_rejects_raw_bale(state):
-    raw_bale, dispatch_bale, _, _ = _prepare_dispatch_and_store_item(state)
+def test_store_receiving_accepts_only_sdo_and_rejects_bale_or_item_codes(state):
+    raw_bale, dispatch_bale, token, sdo = _prepare_barcode_fixtures(state)
 
-    dispatch_result = state.resolve_barcode(dispatch_bale["bale_no"], context="store_receiving")
+    sdo_result = state.resolve_barcode(sdo["machine_code"], context="store_receiving")
+    assert sdo_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
+    assert sdo_result["reject_reason"] == ""
+
+    dispatch_result = state.resolve_barcode(dispatch_bale["machine_code"], context="store_receiving")
     assert dispatch_result["barcode_type"] == "DISPATCH_BALE"
-    assert dispatch_result["reject_reason"] == ""
+    assert dispatch_result["reject_reason"]
 
-    raw_result = state.resolve_barcode(raw_bale["bale_barcode"], context="store_receiving")
+    raw_result = state.resolve_barcode(raw_bale["machine_code"], context="store_receiving")
     assert raw_result["barcode_type"] == "RAW_BALE"
     assert raw_result["reject_reason"]
+
+    item_result = state.resolve_barcode(token["barcode_value"], context="store_receiving")
+    assert item_result["barcode_type"] == "STORE_ITEM"
+    assert item_result["reject_reason"]
 
 
 @pytest.mark.xfail(reason="Typed BALE_SALES resolver class for B2B context is documented but not implemented yet.", strict=True)
 def test_b2b_bale_sales_accepts_bale_sales_and_rejects_store_item(state):
-    _, _, _, store_item_barcode = _prepare_dispatch_and_store_item(state)
+    _, _, token, _ = _prepare_barcode_fixtures(state)
+    store_item_barcode = token["barcode_value"]
 
     bale_sales_result = state.resolve_barcode("BS260427AAA", context="b2b_bale_sales")
     assert bale_sales_result["barcode_type"] == "BALE_SALES"
@@ -240,11 +237,23 @@ def test_b2b_bale_sales_accepts_bale_sales_and_rejects_store_item(state):
     assert store_item_result["reject_reason"]
 
 
-@pytest.mark.xfail(reason="LOOSE_PICK typed barcode recognition is documented but not implemented in resolver.", strict=True)
-def test_pos_rejects_loose_pick_with_typed_classification(state):
-    result = state.resolve_barcode("LP260427ABC", context="pos")
-    assert result["barcode_type"] == "LOOSE_PICK"
-    assert result["reject_reason"]
+def test_lpk_resolves_as_warehouse_only_loose_pick_task(state):
+    machine_result = state.resolve_barcode("3260428001", context="warehouse_shortage_pick")
+    assert machine_result["barcode_type"] == "LOOSE_PICK_TASK"
+    assert machine_result["business_object"]["kind"] == "LOOSE_PICK_TASK"
+    assert machine_result["reject_reason"] == ""
+
+    display_result = state.resolve_barcode("LPK260428001", context="warehouse_execution")
+    assert display_result["barcode_type"] == "LOOSE_PICK_TASK"
+    assert display_result["reject_reason"] == ""
+
+    pos_result = state.resolve_barcode("3260428001", context="pos")
+    assert pos_result["barcode_type"] == "LOOSE_PICK_TASK"
+    assert pos_result["reject_reason"]
+
+    receiving_result = state.resolve_barcode("LPK260428001", context="store_receiving")
+    assert receiving_result["barcode_type"] == "LOOSE_PICK_TASK"
+    assert receiving_result["reject_reason"]
 
 
 @pytest.mark.xfail(reason="BALE_SALES typed barcode recognition is documented but not implemented in resolver.", strict=True)
@@ -255,15 +264,19 @@ def test_pos_rejects_bale_sales_with_typed_classification(state):
 
 
 def test_pos_rejects_raw_bale_dispatch_bale_and_unknown(state):
-    raw_bale, dispatch_bale, _, _ = _prepare_dispatch_and_store_item(state)
+    raw_bale, dispatch_bale, _, sdo = _prepare_barcode_fixtures(state)
 
-    raw_result = state.resolve_barcode(raw_bale["bale_barcode"], context="pos")
+    raw_result = state.resolve_barcode(raw_bale["machine_code"], context="pos")
     assert raw_result["barcode_type"] == "RAW_BALE"
     assert raw_result["reject_reason"]
 
-    dispatch_result = state.resolve_barcode(dispatch_bale["bale_no"], context="pos")
+    dispatch_result = state.resolve_barcode(dispatch_bale["machine_code"], context="pos")
     assert dispatch_result["barcode_type"] == "DISPATCH_BALE"
     assert dispatch_result["reject_reason"]
+
+    sdo_result = state.resolve_barcode(sdo["machine_code"], context="pos")
+    assert sdo_result["barcode_type"] == "STORE_DELIVERY_EXECUTION"
+    assert sdo_result["reject_reason"]
 
     unknown_result = state.resolve_barcode("UNKNOWN-DOES-NOT-EXIST", context="pos")
     assert unknown_result["barcode_type"] == "UNKNOWN"
@@ -273,8 +286,8 @@ def test_pos_rejects_raw_bale_dispatch_bale_and_unknown(state):
 
 
 def test_same_raw_bale_identity_is_preserved_across_contexts_with_contextual_rejection(state):
-    raw_bale, _, _, _ = _prepare_dispatch_and_store_item(state)
-    raw_barcode = raw_bale["bale_barcode"]
+    raw_bale, _, _, _ = _prepare_barcode_fixtures(state)
+    raw_barcode = raw_bale["machine_code"]
 
     expected_contexts = {
         "warehouse_sorting_create": False,
@@ -289,9 +302,9 @@ def test_same_raw_bale_identity_is_preserved_across_contexts_with_contextual_rej
         assert result["barcode_type"] == "RAW_BALE"
         assert result["barcode_type"] != "UNKNOWN"
         assert result["business_object"]["kind"] == "INBOUND_BALE"
-        assert result["business_object"]["id"] == raw_barcode
+        assert result["business_object"]["id"] == raw_bale["bale_barcode"]
         assert result["object_type"] == "raw_bale"
-        assert result["object_id"] == raw_barcode
+        assert result["object_id"] == raw_bale["bale_barcode"]
         assert result["template_scope"] == "bale"
         if context == "pos":
             assert result["pos_allowed"] is False
@@ -302,28 +315,30 @@ def test_same_raw_bale_identity_is_preserved_across_contexts_with_contextual_rej
 
 
 def test_rejection_messages_include_operational_direction_not_only_invalid(state):
-    raw_bale, dispatch_bale, _, store_item_barcode = _prepare_dispatch_and_store_item(state)
+    raw_bale, _, token, _ = _prepare_barcode_fixtures(state)
+    store_item_barcode = token["barcode_value"]
 
-    pos_reject = state.resolve_barcode(raw_bale["bale_barcode"], context="pos")["reject_reason"]
+    pos_reject = state.resolve_barcode(raw_bale["machine_code"], context="pos")["reject_reason"]
     sorting_reject = state.resolve_barcode(store_item_barcode, context="warehouse_sorting_create")["reject_reason"]
-    receiving_reject = state.resolve_barcode(raw_bale["bale_barcode"], context="store_receiving")["reject_reason"]
-    pda_reject = state.resolve_barcode(raw_bale["bale_barcode"], context="store_pda")["reject_reason"]
+    receiving_reject = state.resolve_barcode(raw_bale["machine_code"], context="store_receiving")["reject_reason"]
+    pda_reject = state.resolve_barcode(raw_bale["machine_code"], context="store_pda")["reject_reason"]
 
     for message in [pos_reject, sorting_reject, receiving_reject, pda_reject]:
         lowered = message.lower()
         assert "invalid barcode" not in lowered
         assert len(message.strip()) >= 10
 
-    pos_next_step = state.resolve_barcode(raw_bale["bale_barcode"], context="pos")["operational_next_step"]
+    pos_next_step = state.resolve_barcode(raw_bale["machine_code"], context="pos")["operational_next_step"]
     sorting_next_step = state.resolve_barcode(store_item_barcode, context="warehouse_sorting_create")["operational_next_step"]
-    receiving_next_step = state.resolve_barcode(raw_bale["bale_barcode"], context="store_receiving")["operational_next_step"]
-    pda_next_step = state.resolve_barcode(raw_bale["bale_barcode"], context="store_pda")["operational_next_step"]
+    receiving_next_step = state.resolve_barcode(raw_bale["machine_code"], context="store_receiving")["operational_next_step"]
+    pda_next_step = state.resolve_barcode(raw_bale["machine_code"], context="store_pda")["operational_next_step"]
     for next_step in [pos_next_step, sorting_next_step, receiving_next_step, pda_next_step]:
         assert len(next_step.strip()) >= 8
 
 
 def test_template_scope_is_not_business_identity_authority_contract(state):
-    _, _, token, store_item_barcode = _prepare_dispatch_and_store_item(state)
+    _, _, token, _ = _prepare_barcode_fixtures(state)
+    store_item_barcode = token["barcode_value"]
     result = state.resolve_barcode(store_item_barcode, context="pos")
 
     assert result["barcode_type"] == "STORE_ITEM"
@@ -335,7 +350,7 @@ def test_template_scope_is_not_business_identity_authority_contract(state):
 
 def test_store_prep_bale_resolves_as_warehouse_side_waiting_dispatch_object(state):
     prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
-    result = state.resolve_barcode(prep_bale["bale_barcode"], context="identity_ledger")
+    result = state.resolve_barcode(prep_bale["machine_code"], context="warehouse_dispatch_planning")
 
     assert result["barcode_type"] == "STORE_PREP_BALE"
     assert result["business_object"]["kind"] == "STORE_PREP_BALE"
@@ -346,7 +361,7 @@ def test_store_prep_bale_resolves_as_warehouse_side_waiting_dispatch_object(stat
 
 def test_store_prep_bale_is_rejected_in_store_pda_pos_and_b2b_sales(state):
     prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
-    barcode = prep_bale["bale_barcode"]
+    barcode = prep_bale["machine_code"]
 
     store_pda_result = state.resolve_barcode(barcode, context="store_pda")
     assert store_pda_result["barcode_type"] == "STORE_PREP_BALE"
@@ -361,16 +376,16 @@ def test_store_prep_bale_is_rejected_in_store_pda_pos_and_b2b_sales(state):
     assert b2b_result["reject_reason"] == "这是待送店压缩包，不是待售卖 Bale。请切换到待售 Bale 业务页面后重试。"
 
 
-def test_store_prep_bale_is_rejected_in_store_receiving_but_dispatch_execution_stays_allowed(state):
+def test_store_prep_bale_and_dispatch_bale_are_rejected_in_store_receiving(state):
     prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
-    receiving_result = state.resolve_barcode(prep_bale["bale_barcode"], context="store_receiving")
+    receiving_result = state.resolve_barcode(prep_bale["machine_code"], context="store_receiving")
     assert receiving_result["barcode_type"] == "STORE_PREP_BALE"
     assert receiving_result["reject_reason"] == "这是仓库待送店压缩包码，不是正式送货执行码。请让仓库先生成送货执行单并打印正式送店 barcode。"
 
-    _, dispatch_bale, _, _ = _prepare_dispatch_and_store_item(state)
-    dispatch_result = state.resolve_barcode(dispatch_bale["bale_no"], context="store_receiving")
+    dispatch_bale = _seed_dispatch_bale(state)
+    dispatch_result = state.resolve_barcode(dispatch_bale["machine_code"], context="store_receiving")
     assert dispatch_result["barcode_type"] == "DISPATCH_BALE"
-    assert dispatch_result["reject_reason"] == ""
+    assert dispatch_result["reject_reason"]
 
 
 def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(state):
@@ -420,7 +435,7 @@ def test_create_store_delivery_execution_order_rejects_when_transfer_has_no_disp
 
 def test_store_prep_bale_rejection_message_in_store_receiving_mentions_official_execution_barcode(state):
     prep_bale = _seed_store_prep_bale(state, "SDB260428AAB")
-    receiving_result = state.resolve_barcode(prep_bale["bale_barcode"], context="store_receiving")
+    receiving_result = state.resolve_barcode(prep_bale["machine_code"], context="store_receiving")
     assert receiving_result["barcode_type"] == "STORE_PREP_BALE"
     assert receiving_result["reject_reason"] == "这是仓库待送店压缩包码，不是正式送货执行码。请让仓库先生成送货执行单并打印正式送店 barcode。"
 
@@ -428,6 +443,7 @@ def test_store_prep_bale_rejection_message_in_store_receiving_mentions_official_
 def test_machine_code_mapping_rules_for_lpk_and_sdo(state):
     assert state._physical_label_machine_code("TO-20260428-001", "LPK", source_reference="TO-20260428-001") == "3260428001"
     assert state._physical_label_machine_code("SDO260428001", "SDO") == "4260428001"
+    assert state._physical_label_machine_code("ST-20260428-001-0001", "STORE_ITEM") == "5260428001"
 
 
 def test_lpk_machine_code_uses_related_to_number_to_avoid_collision(state):
@@ -446,10 +462,45 @@ def test_lpk_machine_code_uses_related_to_number_to_avoid_collision(state):
     assert machine_code_1 != machine_code_2
 
 
-def test_store_prep_print_payload_stays_in_sdb_namespace(state):
+def test_store_prep_print_payload_uses_type_2_machine_code(state):
     prep_bale = _seed_store_prep_bale(state, "SDB-TRF20260428001-001")
     job = state.queue_store_prep_bale_print_job(prep_bale["bale_no"], requested_by="warehouse_clerk_1")
     payload = job["print_payload"]
-    assert payload["barcode_value"] == prep_bale["scan_token"]
-    assert payload["machine_code"] == prep_bale["scan_token"]
-    assert not payload["machine_code"].startswith("3")
+    assert payload["display_code"] == prep_bale["scan_token"]
+    assert payload["barcode_value"] == prep_bale["machine_code"]
+    assert payload["machine_code"] == prep_bale["machine_code"]
+    assert payload["machine_code"].startswith("2")
+
+
+def test_store_item_print_payload_uses_type_5_machine_code(state):
+    token = _seed_store_item_token(state)
+    token["barcode_value"] = token["token_no"]
+
+    job = state._build_item_token_print_job(
+        token["token_no"],
+        copies=1,
+        printer_name="Deli DL-720C",
+        requested_by="Austin",
+    )
+
+    payload = job["print_payload"]
+    assert payload["barcode_value"] == token["barcode_value"]
+    assert payload["barcode_value"].startswith("5")
+    assert payload["token_no"] == token["token_no"]
+
+
+def test_raw_bale_print_payload_uses_type_1_machine_code(state):
+    raw_bale = _seed_raw_bale(state)
+    job = {
+        "id": 1,
+        "job_type": "bale_barcode_label",
+        "barcode": raw_bale["bale_barcode"],
+        "template_code": "warehouse_in",
+        "print_payload": {"barcode_value": raw_bale["bale_barcode"], "scan_token": raw_bale["bale_barcode"]},
+    }
+    state.print_jobs.append(job)
+    state._hydrate_bale_print_jobs()
+    assert job["print_payload"]["display_code"] == raw_bale["bale_barcode"]
+    assert job["print_payload"]["barcode_value"] == raw_bale["machine_code"]
+    assert job["print_payload"]["machine_code"] == raw_bale["machine_code"]
+    assert job["print_payload"]["barcode_value"].startswith("1")

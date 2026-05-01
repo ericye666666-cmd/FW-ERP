@@ -1007,9 +1007,13 @@ let sortingScannerHealthState = {
 };
 const BARCODE_RESOLVER_TEST_CONTEXTS = [
   "warehouse_sorting_create",
+  "warehouse_dispatch_planning",
+  "warehouse_execution",
+  "warehouse_shortage_pick",
   "pos",
   "store_receiving",
   "store_pda",
+  "identity_ledger",
   "b2b_bale_sales",
 ];
 let selectedBalePrintMap = new Map();
@@ -27349,7 +27353,8 @@ async function queueCompressionTaskPrintJobs(resultRow = {}) {
 
 async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
   const baleNo = String(row?.bale_no || "").trim().toUpperCase();
-  const barcodeValue = String(row?.scan_token || row?.bale_barcode || "").trim().toUpperCase();
+  const displayCode = String(row?.scan_token || row?.bale_barcode || "").trim().toUpperCase();
+  const barcodeValue = String(row?.machine_code || row?.barcode_value || displayCode).trim().toUpperCase();
   if (!baleNo || !barcodeValue) {
     throw new Error("当前这张压缩 bale 还没有历史 barcode，不能直接补打。");
   }
@@ -27371,6 +27376,8 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
       scan_token: barcodeValue,
       bale_barcode: String(row?.bale_barcode || "").trim().toUpperCase(),
       legacy_bale_barcode: "",
+      display_code: displayCode,
+      machine_code: barcodeValue,
       supplier_name: "SORTED STOCK",
       category_main: String(row?.category_main || "").trim(),
       category_sub: String(row?.category_sub || "").trim(),
@@ -27389,7 +27396,7 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
       grade: String(row?.grade_summary || "").trim(),
       qty: String(Number(row?.qty || 0)),
       weight: row?.actual_weight_kg ? `${row.actual_weight_kg} KG` : "",
-      code: barcodeValue,
+      code: displayCode,
     };
   const result = await request("/print-jobs/bale-direct/print", {
     method: "POST",
@@ -28552,7 +28559,7 @@ async function submitItemIdentityLedger(event) {
   }
   let ledgerLookupValue = identityNo;
   try {
-    const resolved = await resolveBarcodeForContext(identityNo, "identity_ledger", ["RAW_BALE", "DISPATCH_BALE", "STORE_DELIVERY_EXECUTION", "STORE_ITEM"]);
+    const resolved = await resolveBarcodeForContext(identityNo, "identity_ledger", ["RAW_BALE", "DISPATCH_BALE", "STORE_PREP_BALE", "LOOSE_PICK_TASK", "STORE_DELIVERY_EXECUTION", "STORE_ITEM"]);
     if (window.barcodeResolverFlow && typeof window.barcodeResolverFlow.getIdentityLedgerLookupValue === "function") {
       ledgerLookupValue = window.barcodeResolverFlow.getIdentityLedgerLookupValue(identityNo, resolved);
     } else {

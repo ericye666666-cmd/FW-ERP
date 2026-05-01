@@ -769,9 +769,20 @@ class InMemoryState:
         return f"TOK-{task_code}-{serial_no:04d}"
 
     def _store_item_barcode_value(self, task_no: str, serial_no: int, created_at: Any = "") -> str:
+        display_seed = f"{str(task_no or '').strip().upper()}-{max(int(serial_no or 0), 1):04d}"
+        machine_code = self._physical_label_machine_code(display_seed, "STORE_ITEM")
+        if re.fullmatch(r"5\d{9}", machine_code):
+            return machine_code
         date_fragment = self._date_fragment_from_value(created_at or task_no, fallback_now=True)
-        serial_seed = self._serial_seed_from_task_group(task_no, 0) * 10000 + max(int(serial_no or 0), 1)
-        return f"IT{date_fragment}{self._alpha_serial_code(serial_seed, 6)}"
+        return f"5{date_fragment}{max(int(serial_no or 0), 1) % 1000:03d}"
+
+    def _raw_bale_machine_code(self, row: dict[str, Any]) -> str:
+        existing = str(row.get("machine_code") or "").strip().upper()
+        if re.fullmatch(r"1\d{9}", existing):
+            return existing
+        date_fragment = self._date_fragment_from_value(row.get("unload_date") or row.get("created_at"), fallback_now=True)
+        serial_no = int(row.get("id") or row.get("serial_no") or 1)
+        return f"1{date_fragment}{max(serial_no, 1) % 1000:03d}"
 
     def _raw_bale_scan_token(self, row: dict[str, Any]) -> str:
         existing = str(row.get("scan_token") or "").strip().upper()
@@ -796,6 +807,30 @@ class InMemoryState:
             return current
         return ""
 
+    def _store_prep_bale_machine_code(self, row: dict[str, Any]) -> str:
+        existing = str(row.get("machine_code") or "").strip().upper()
+        if re.fullmatch(r"2\d{9}", existing):
+            return existing
+        bale_barcode = str(row.get("bale_barcode") or row.get("scan_token") or row.get("bale_no") or "").strip().upper()
+        candidate = self._physical_label_machine_code(bale_barcode, "STORE_PREP_BALE")
+        if re.fullmatch(r"2\d{9}", candidate):
+            return candidate
+        date_fragment = self._date_fragment_from_value(row.get("created_at") or row.get("updated_at") or bale_barcode, fallback_now=True)
+        serial_no = int(row.get("id") or row.get("serial_no") or 1)
+        return f"2{date_fragment}{max(serial_no, 1) % 1000:03d}"
+
+    def _store_dispatch_bale_machine_code(self, row: dict[str, Any]) -> str:
+        existing = str(row.get("machine_code") or "").strip().upper()
+        if re.fullmatch(r"2\d{9}", existing):
+            return existing
+        bale_no = str(row.get("bale_no") or row.get("bale_barcode") or row.get("dispatch_bale_no") or "").strip().upper()
+        candidate = self._physical_label_machine_code(bale_no, "SDB")
+        if re.fullmatch(r"2\d{9}", candidate):
+            return candidate
+        token_group_no = int(row.get("token_group_no") or row.get("id") or 1)
+        date_fragment = self._date_fragment_from_value(row.get("created_at") or row.get("updated_at") or bale_no, fallback_now=True)
+        return f"2{date_fragment}{max(token_group_no, 1) % 1000:03d}"
+
     def _raw_bale_matches_reference(self, row: dict[str, Any], bale_reference: str) -> bool:
         normalized_reference = str(bale_reference or "").strip().upper()
         if not normalized_reference:
@@ -803,6 +838,7 @@ class InMemoryState:
         return normalized_reference in {
             str(row.get("bale_barcode") or "").strip().upper(),
             str(row.get("scan_token") or "").strip().upper(),
+            str(row.get("machine_code") or "").strip().upper(),
             str(row.get("legacy_bale_barcode") or "").strip().upper(),
         }
 
@@ -897,6 +933,10 @@ class InMemoryState:
         if str(row.get("scan_token") or "").strip().upper() != scan_token:
             row["scan_token"] = scan_token
             updated = True
+        machine_code = self._raw_bale_machine_code(row)
+        if str(row.get("machine_code") or "").strip().upper() != machine_code:
+            row["machine_code"] = machine_code
+            updated = True
         legacy_bale_barcode = self._raw_bale_legacy_barcode(row)
         if str(row.get("legacy_bale_barcode") or "").strip().upper() != legacy_bale_barcode:
             row["legacy_bale_barcode"] = legacy_bale_barcode
@@ -962,6 +1002,7 @@ class InMemoryState:
             primary_bale_barcode = str(bale.get("bale_barcode") or "").strip().upper()
             legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
             scan_token = str(bale.get("scan_token") or "").strip().upper()
+            machine_code = str(bale.get("machine_code") or "").strip().upper() or self._raw_bale_machine_code(bale)
             job_updated = False
             if str(job.get("barcode") or "").strip().upper() != primary_bale_barcode:
                 job["barcode"] = primary_bale_barcode
@@ -969,14 +1010,20 @@ class InMemoryState:
             if str(job.get("template_code") or "").strip().lower() != LOCKED_BALE_TEMPLATE_CODE:
                 job["template_code"] = LOCKED_BALE_TEMPLATE_CODE
                 job_updated = True
-            if payload.get("barcode_value") != scan_token:
-                payload["barcode_value"] = scan_token
+            if payload.get("barcode_value") != machine_code:
+                payload["barcode_value"] = machine_code
                 job_updated = True
-            if payload.get("scan_token") != scan_token:
-                payload["scan_token"] = scan_token
+            if payload.get("scan_token") != machine_code:
+                payload["scan_token"] = machine_code
                 job_updated = True
-            if payload.get("human_readable") != scan_token:
-                payload["human_readable"] = scan_token
+            if payload.get("human_readable") != primary_bale_barcode:
+                payload["human_readable"] = primary_bale_barcode
+                job_updated = True
+            if payload.get("display_code") != primary_bale_barcode:
+                payload["display_code"] = primary_bale_barcode
+                job_updated = True
+            if payload.get("machine_code") != machine_code:
+                payload["machine_code"] = machine_code
                 job_updated = True
             if payload.get("bale_barcode") != primary_bale_barcode:
                 payload["bale_barcode"] = primary_bale_barcode
@@ -1138,6 +1185,7 @@ class InMemoryState:
         bale_barcode = self._store_prep_bale_barcode(normalized)
         normalized["bale_barcode"] = bale_barcode
         normalized["scan_token"] = bale_barcode
+        normalized["machine_code"] = self._store_prep_bale_machine_code(normalized)
         normalized["task_no"] = str(normalized.get("task_no") or "").strip().upper()
         normalized["task_type"] = str(normalized.get("task_type") or "store_dispatch").strip().lower() or "store_dispatch"
         normalized["category_main"] = str(normalized.get("category_main") or "").strip()
@@ -1219,6 +1267,14 @@ class InMemoryState:
         type_digit = type_digit_map.get(normalized_type, "")
         if not normalized_display or not type_digit:
             return normalized_display
+        if normalized_type == "STORE_ITEM":
+            date_fragment = self._date_fragment_from_value(normalized_display)
+            serial_groups = re.findall(r"\d+", normalized_display)
+            serial_fragment = "001"
+            if serial_groups:
+                serial_fragment = f"{max(int(serial_groups[-1] or 1), 1) % 1000:03d}"
+            if date_fragment != "000000":
+                return f"{type_digit}{date_fragment}{serial_fragment}"
         digits_source = normalized_display
         if normalized_type == "LPK" and normalized_source_reference:
             digits_source = normalized_source_reference
@@ -1340,6 +1396,7 @@ class InMemoryState:
         return round(base_cost * 2.2, 2)
 
     def _refresh_store_dispatch_bale_summary(self, bale: dict[str, Any]) -> None:
+        bale["machine_code"] = self._store_dispatch_bale_machine_code(bale)
         token_rows = [
             self.item_barcode_tokens.get(str(token_no or "").strip().upper())
             for token_no in bale.get("token_nos", [])
@@ -3015,6 +3072,9 @@ class InMemoryState:
             "store_receiving",
             "store_manager_assign",
             "store_pda",
+            "warehouse_dispatch_planning",
+            "warehouse_execution",
+            "warehouse_shortage_pick",
             "identity_ledger",
             "b2b_bale_sales",
         ]
@@ -3076,9 +3136,20 @@ class InMemoryState:
             token_no = str(token.get("token_no") or normalized_barcode).strip().upper()
             identity_id = str(token.get("identity_no") or token_no).strip().upper()
             status = str(token.get("status") or "").strip().lower()
-            product_id = self.product_by_barcode.get(str(token.get("barcode_value") or "").strip().upper()) or self.product_by_barcode.get(token_no)
+            official_machine_code = str(
+                ((token.get("final_item_barcode") or {}).get("barcode_value"))
+                or token.get("barcode_value")
+                or ""
+            ).strip().upper()
+            product_id = self.product_by_barcode.get(official_machine_code) or self.product_by_barcode.get(token_no)
             allowed_contexts = ["store_pda", "identity_ledger"]
-            if status in {"printed_in_store", "shelved", "sold", "returned_to_warehouse"} or product_id is not None:
+            scanned_official_machine_code = bool(
+                re.fullmatch(r"5\d{9}", normalized_barcode)
+                and normalized_barcode == official_machine_code
+            )
+            if scanned_official_machine_code and (
+                status in {"printed_in_store", "shelved", "sold", "returned_to_warehouse"} or product_id is not None
+            ):
                 allowed_contexts.append("pos")
             matches.append(
                 self._build_barcode_resolve_result(
@@ -3105,6 +3176,7 @@ class InMemoryState:
                         str(row.get("bale_no") or "").strip().upper(),
                         str(row.get("bale_barcode") or "").strip().upper(),
                         str(row.get("dispatch_bale_no") or "").strip().upper(),
+                        str(row.get("machine_code") or "").strip().upper(),
                     }
                 ),
                 None,
@@ -3117,7 +3189,7 @@ class InMemoryState:
                     object_type="dispatch_bale",
                     object_id=str(dispatch_bale.get("bale_no") or normalized_barcode).strip().upper(),
                     template_scope="warehouseout_bale",
-                    allowed_contexts=["store_receiving", "store_manager_assign", "store_pda", "identity_ledger"],
+                    allowed_contexts=["warehouse_dispatch_planning", "warehouse_execution", "store_manager_assign", "store_pda", "identity_ledger"],
                     context=normalized_context,
                 )
             )
@@ -3163,6 +3235,7 @@ class InMemoryState:
                         str(row.get("bale_no") or "").strip().upper(),
                         str(row.get("bale_barcode") or "").strip().upper(),
                         str(row.get("scan_token") or "").strip().upper(),
+                        str(row.get("machine_code") or "").strip().upper(),
                     }
                 ),
                 None,
@@ -3176,7 +3249,20 @@ class InMemoryState:
                     object_type="store_prep_bale",
                     object_id=str(prep_bale.get("bale_barcode") or prep_bale.get("bale_no") or normalized_barcode).strip().upper(),
                     template_scope="warehouse_store_prep_bale",
-                    allowed_contexts=["warehouse_dispatch_planning", "identity_ledger"],
+                    allowed_contexts=["warehouse_dispatch_planning", "warehouse_execution", "identity_ledger"],
+                    context=normalized_context,
+                )
+            )
+
+        if re.fullmatch(r"3\d{9}", normalized_barcode) or re.fullmatch(r"LPK[A-Z0-9-]+", normalized_barcode):
+            matches.append(
+                self._build_barcode_resolve_result(
+                    barcode_value=normalized_barcode,
+                    barcode_type="LOOSE_PICK_TASK",
+                    object_type="loose_pick_task",
+                    object_id=normalized_barcode,
+                    template_scope="warehouseout_bale",
+                    allowed_contexts=["warehouse_shortage_pick", "warehouse_execution", "identity_ledger"],
                     context=normalized_context,
                 )
             )
@@ -6532,8 +6618,8 @@ class InMemoryState:
         if bale.get("actual_weight_kg") not in {None, ""} and float(bale.get("actual_weight_kg") or 0) > 0:
             package_label = f"{package_label} · {float(bale.get('actual_weight_kg') or 0):g} KG"
         status_text = "WAIT FOR SALE" if task_type == "sale" else "WAITING FOR STORE DISPATCH"
-        barcode_value = str(bale.get("scan_token") or bale.get("bale_barcode") or "").strip().upper()
-        machine_code = barcode_value
+        display_code = str(bale.get("scan_token") or bale.get("bale_barcode") or "").strip().upper()
+        machine_code = str(bale.get("machine_code") or self._store_prep_bale_machine_code(bale)).strip().upper()
         job = {
             "id": next(self._print_job_ids),
             "job_type": "bale_barcode_label",
@@ -6557,8 +6643,8 @@ class InMemoryState:
                 "scan_token": machine_code,
                 "bale_barcode": str(bale.get("bale_barcode") or "").strip().upper(),
                 "legacy_bale_barcode": "",
-                "human_readable": barcode_value,
-                "display_code": barcode_value,
+                "human_readable": display_code,
+                "display_code": display_code,
                 "machine_code": machine_code,
                 "supplier_name": "SORTED STOCK",
                 "category_main": str(bale.get("category_main") or "").strip(),
@@ -6582,7 +6668,7 @@ class InMemoryState:
                     if bale.get("actual_weight_kg") not in {None, ""} and float(bale.get("actual_weight_kg") or 0) > 0
                     else ""
                 ),
-                "code": barcode_value,
+                "code": display_code,
                 "template_code": template["template_code"],
                 "template_name": template.get("name", ""),
                 "template_scope": template.get("template_scope", "warehouseout_bale"),
@@ -7662,7 +7748,7 @@ class InMemoryState:
         )
         display_name = f"{category_name} · {str(token.get('grade') or '').strip()}".strip(" ·")
         barcode_value = str(token.get("barcode_value") or "").strip().upper()
-        if not barcode_value:
+        if not re.fullmatch(r"5\d{9}", barcode_value):
             barcode_value = self._store_item_barcode_value(str(token.get("task_no") or ""), int(token.get("qty_index") or 1), token.get("created_at"))
             token["barcode_value"] = barcode_value
         token["barcode_value"] = barcode_value
@@ -11540,6 +11626,7 @@ class InMemoryState:
             legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
             if str(bale.get("shipment_no") or "").strip().upper() != normalized_shipment_no:
                 raise HTTPException(status_code=409, detail=f"{bale_reference} 不属于当前船单 {normalized_shipment_no}")
+            self._ensure_raw_bale_defaults(bale)
             batch_no = str(bale.get("parcel_batch_no") or "").strip().upper()
             batch = parcel_batch_map.get(batch_no, {})
             supplier_name = str(bale.get("supplier_name") or "").strip() or str(batch.get("supplier_name") or "").strip() or "-"
@@ -11548,6 +11635,7 @@ class InMemoryState:
             category_display = " / ".join(part for part in [category_main, category_sub] if part) or "-"
             serial_no = int(bale.get("serial_no") or 0)
             batch_total_packages = int(batch.get("package_count") or 0) or serial_no or 1
+            machine_code = str(bale.get("machine_code") or self._raw_bale_machine_code(bale)).strip().upper()
             job = {
                 "id": next(self._print_job_ids),
                 "job_type": "bale_barcode_label",
@@ -11567,11 +11655,13 @@ class InMemoryState:
                 "error_message": "",
                 "print_payload": {
                     "symbology": "Code128",
-                    "barcode_value": str(bale.get("scan_token") or "").strip().upper() or bale_barcode,
-                    "scan_token": str(bale.get("scan_token") or "").strip().upper() or bale_barcode,
+                    "barcode_value": machine_code,
+                    "scan_token": machine_code,
                     "bale_barcode": bale_barcode,
                     "legacy_bale_barcode": legacy_bale_barcode,
-                    "human_readable": str(bale.get("scan_token") or "").strip().upper() or bale_barcode,
+                    "human_readable": bale_barcode,
+                    "display_code": bale_barcode,
+                    "machine_code": machine_code,
                     "supplier_name": supplier_name,
                     "category_main": category_main,
                     "category_sub": category_sub,
@@ -12637,7 +12727,13 @@ class InMemoryState:
                 )
                 token["status"] = "printed_in_store"
                 token["identity_no"] = token_no
-                barcode_value = str((job.get("print_payload") or {}).get("barcode_value") or token.get("barcode_value") or token_no).strip().upper()
+                barcode_value = str((job.get("print_payload") or {}).get("barcode_value") or token.get("barcode_value") or "").strip().upper()
+                if not re.fullmatch(r"5\d{9}", barcode_value):
+                    barcode_value = self._store_item_barcode_value(
+                        str(token.get("task_no") or ""),
+                        int(token.get("qty_index") or 1),
+                        token.get("created_at"),
+                    )
                 token["barcode_value"] = barcode_value
                 token["printed_at"] = job["printed_at"]
                 token["printed_by"] = actor["username"]

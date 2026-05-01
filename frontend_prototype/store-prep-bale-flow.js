@@ -162,7 +162,8 @@
   } = {}) {
     const taskType = normalizeLower(row && row.task_type) || "store_dispatch";
     const resolvedTemplateCode = normalizeText(templateCode) || getStorePrepTemplateDefaultCode(taskType);
-    const barcodeValue = normalizeText(row && (row.scan_token || row.bale_barcode)).toUpperCase();
+    const displayCode = normalizeText(row && (row.scan_token || row.bale_barcode)).toUpperCase();
+    const machineCode = normalizeText(row && (row.machine_code || row.barcode_value)).toUpperCase() || displayCode;
     const categoryMain = normalizeText(row && row.category_main);
     const categorySub = normalizeText(row && row.category_sub);
     const categoryDisplay = [categoryMain, categorySub].filter(Boolean).join(" / ");
@@ -175,10 +176,12 @@
       printer_name: normalizeText(printerName),
       template_code: resolvedTemplateCode,
       copies: 1,
-      barcode_value: barcodeValue,
-      scan_token: barcodeValue,
+      barcode_value: machineCode,
+      scan_token: machineCode,
       bale_barcode: normalizeText(row && row.bale_barcode).toUpperCase(),
       legacy_bale_barcode: "",
+      display_code: displayCode,
+      machine_code: machineCode,
       supplier_name: "SORTED STOCK",
       category_main: categoryMain,
       category_sub: categorySub,
@@ -190,14 +193,14 @@
       parcel_batch_no: normalizeText(row && row.bale_no).toUpperCase(),
       unload_date: normalizeText(row && (row.updated_at || row.created_at)),
       template_scope: "warehouseout_bale",
-      dispatch_bale_no: barcodeValue,
+      dispatch_bale_no: machineCode,
       status: taskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH",
       cat: categoryMain,
       sub: categorySub,
       grade: normalizeText(row && row.grade_summary),
       qty: String(Math.max(0, qty)),
       weight: actualWeightKg > 0 ? `${actualWeightKg % 1 === 0 ? String(actualWeightKg) : String(roundToTwo(actualWeightKg))} KG` : "",
-      code: barcodeValue,
+      code: displayCode,
     };
   }
 
