@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const {
   buildStorePrepBaleDirectPrintPayload,
@@ -10,7 +11,17 @@ const {
   getStorePrepTemplateDefaultCode,
   pickPreferredStorePrepTemplateCode,
   summarizeStorePrepBales,
-} = require("../store-prep-bale-flow.js");
+} = (() => {
+  const filename = path.join(__dirname, "../store-prep-bale-flow.js");
+  const sandbox = { module: { exports: {} } };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(fs.readFileSync(filename, "utf8"), sandbox, { filename });
+  return sandbox.module.exports;
+})();
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
 test("buildStorePrepCategoryOptions groups current sorted inventory by subcategory", () => {
   const options = buildStorePrepCategoryOptions([
@@ -19,7 +30,7 @@ test("buildStorePrepCategoryOptions groups current sorted inventory by subcatego
     { category_name: "dress / 2 pieces", qty_on_hand: 7 },
   ]);
 
-  assert.deepEqual(options, [
+  assert.deepEqual(plain(options), [
     { value: "", label: "选择小类" },
     { value: "2 pieces", label: "2 pieces · 可打包 12 件" },
     { value: "lady tops", label: "lady tops · 可打包 8 件" },
@@ -32,7 +43,7 @@ test("summarizeStorePrepBales keeps warehouse packaged inventory in KES", () => 
     { bale_no: "SPB-002", task_type: "sale", qty: 100, total_cost_kes: 8500, updated_at: "2026-04-23T09:30:00Z" },
   ]);
 
-  assert.deepEqual(summary, {
+  assert.deepEqual(plain(summary), {
     baleCount: 2,
     dispatchBaleCount: 1,
     saleBaleCount: 1,
@@ -52,7 +63,7 @@ test("estimateSaleBaleGradeMix derives target pieces and graded counts from weig
     ],
   });
 
-  assert.deepEqual(estimate, {
+  assert.deepEqual(plain(estimate), {
     targetQty: 20,
     ratioSummary: "P80% / S20%",
     gradeRequirements: [
@@ -87,6 +98,7 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
       bale_no: "SPB-20260423-004",
       bale_barcode: "WB260423000004",
       scan_token: "WB260423000004",
+      machine_code: "2260423004",
       task_no: "SPT-20260423-004",
       task_type: "sale",
       category_main: "dress",
@@ -104,8 +116,10 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
 
   assert.equal(payload.printer_name, "Deli DL-720C");
   assert.equal(payload.template_code, "wait_for_sale");
-  assert.equal(payload.barcode_value, "WB260423000004");
-  assert.equal(payload.dispatch_bale_no, "WB260423000004");
+  assert.equal(payload.display_code, "WB260423000004");
+  assert.equal(payload.machine_code, "2260423004");
+  assert.equal(payload.barcode_value, "2260423004");
+  assert.equal(payload.dispatch_bale_no, "2260423004");
   assert.equal(payload.shipment_no, "SPT-20260423-004");
   assert.equal(payload.parcel_batch_no, "SPB-20260423-004");
   assert.equal(payload.status, "wait for sale");
@@ -124,7 +138,7 @@ test("store prep bale workbench is a dedicated warehouse panel", () => {
     path.join(__dirname, "../app.js"),
     "utf8",
   );
-  assert.match(html, /<h2>0\.1\.2 压缩工单管理 \/ Bale compression work orders<\/h2>/);
+  assert.match(html, /<h2>0\.1\.2 压缩工单管理<\/h2>/);
   assert.doesNotMatch(html, /id="compressionTaskAcceptanceWindow"/);
   assert.match(html, /id="compressionTaskAcceptanceModal"/);
   assert.match(html, /name="actual_qty"/);
