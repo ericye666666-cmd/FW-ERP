@@ -259,6 +259,128 @@ h3 {
   color: var(--ink);
 }
 
+.clerk-pda-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.clerk-pda-head {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border-radius: var(--radius-card);
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-deep), var(--accent));
+}
+
+.clerk-pda-head .eyebrow,
+.clerk-pda-head p {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.store-package-card-list {
+  display: grid;
+  gap: 14px;
+}
+
+.store-package-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--panel-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.store-package-card-head,
+.store-package-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.store-package-title {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.store-package-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.store-package-grid span {
+  display: grid;
+  gap: 3px;
+  min-height: 64px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(245, 237, 224, 0.72);
+}
+
+.store-package-grid b {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.store-package-primary {
+  min-width: 142px;
+  min-height: 58px;
+  font-size: 20px;
+}
+
+.store-package-shelving-step,
+.store-package-flow-block {
+  display: grid;
+  gap: 14px;
+}
+
+.store-package-flow-block {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.store-package-price-choices {
+  align-items: stretch;
+}
+
+.store-print-preview-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.store-print-label-preview {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.store-print-label-price {
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.store-print-barcode {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f0f0ed;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
 .category-library-sub-text em {
   font-style: normal;
   font-size: 13px;

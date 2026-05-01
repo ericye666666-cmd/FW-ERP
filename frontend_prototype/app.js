@@ -17,6 +17,9 @@ const STORAGE_KEYS = {
   directHangDispatchOrders: "retail_ops_direct_hang_dispatch_orders",
   directHangDispatchBales: "retail_ops_direct_hang_dispatch_bales",
   directHangStoreItems: "retail_ops_direct_hang_store_items",
+  storeSdoPackageItemTokens: "retail_ops_store_sdo_package_item_tokens",
+  posStoreItemSaleRecords: "retail_ops_pos_store_item_sale_records",
+  storeDefaultSalePrices: "retail_ops_store_default_sale_prices",
   baleSalesRebaleEntries: "retail_ops_bale_sales_rebale_entries",
   consignmentBundleOrders: "retail_ops_consignment_bundle_orders",
   opsExceptionTickets: "retail_ops_exception_tickets",
@@ -1089,6 +1092,10 @@ let storeDispatchBaleState = [];
 let filteredStoreDispatchBaleState = [];
 let storeReceiptPackageStatusState = {};
 let storeReceiptPackageAssignmentState = {};
+let storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), []);
+let storePackagePrintPreviewState = {};
+let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
+let storeDefaultSalePrices = safeParse(localStorage.getItem(STORAGE_KEYS.storeDefaultSalePrices), {});
 let warehouseDispatchHistoryState = [];
 let warehouseSoldPackageHistoryState = [];
 let baleSalesPricingCandidateState = [];
@@ -1112,6 +1119,7 @@ let storePdaWorkbenchState = {
 let storeClerkHomeState = {
   assigned_employee: "",
   store_code: "",
+  active_package_key: "",
 };
 let parcelBatchRowState = [];
 let chinaSourceBaleState = safeParse(localStorage.getItem(STORAGE_KEYS.chinaSourceBales), []);
@@ -1975,6 +1983,14 @@ const OPERATIONS_PANEL_NAV_META = [
     icon: "析",
     navTitle: "2. AI 固定分析框架",
     navTitleEn: "2. AI Analytics Framework",
+  },
+  {
+    match: "2. 全部销售数据 / 简要分析",
+    section: "insight",
+    order: 21,
+    icon: "售",
+    navTitle: "2. 全部销售数据 / 简要分析",
+    navTitleEn: "2. All Sales Data / Brief Analysis",
   },
   {
     match: "3. 业务动作台",
@@ -4268,9 +4284,21 @@ function writeOutput(selector, value) {
   if (!target) {
     return;
   }
+  target.__retailOpsOutputValue = value;
   const rawText = typeof value === "string" ? value : pretty(value);
   const shouldCompress = rawText.length > 1800 || rawText.split("\n").length > 36;
   target.textContent = shouldCompress ? buildOutputPreview(value, rawText) : rawText;
+}
+
+function readOutput(selector) {
+  const target = document.querySelector(selector);
+  if (!target) {
+    return null;
+  }
+  if (Object.prototype.hasOwnProperty.call(target, "__retailOpsOutputValue")) {
+    return target.__retailOpsOutputValue;
+  }
+  return target.textContent || "";
 }
 
 function renderErrorSummary(selector, message) {
@@ -5778,35 +5806,6 @@ function getChinaSourceCategoryTree() {
       .sort((left, right) => String(left).localeCompare(String(right), "zh-CN"));
   });
   return merged;
-}
-
-function categoryMainOptionsHtml(selectedValue = "", { includeNew = false, supplierName = "" } = {}) {
-  const hasSupplierScope = Boolean(String(supplierName || "").trim());
-  const categoryTree = hasSupplierScope ? getSupplierScopedCategoryTree(supplierName) : getChinaSourceCategoryTree();
-  const options = [
-    `<option value="">${hasSupplierScope ? "请选择当前供应商的大类" : "请选择商品大类"}</option>`,
-  ].concat(
-    Object.keys(categoryTree).map(
-      (key) => `<option value="${escapeHtml(key)}"${key === selectedValue ? " selected" : ""}>${escapeHtml(key)}</option>`,
-    ),
-  );
-  if (includeNew && hasSupplierScope) {
-    options.push(`<option value="__new__"${selectedValue === "__new__" ? " selected" : ""}>+ 给当前供应商新建品类</option>`);
-  }
-  return options.join("");
-}
-
-function categorySubOptionsHtml(mainCategory = "", selectedValue = "", { supplierName = "" } = {}) {
-  const hasSupplierScope = Boolean(String(supplierName || "").trim());
-  const categoryTree = hasSupplierScope ? getSupplierScopedCategoryTree(supplierName) : getChinaSourceCategoryTree();
-  const placeholder = !mainCategory || mainCategory === "__new__"
-    ? (hasSupplierScope ? "请先选择当前供应商的大类" : "请选择商品小类")
-    : "请选择商品小类";
-  const options = [`<option value="">${placeholder}</option>`];
-  (categoryTree[mainCategory] || []).forEach((value) => {
-    options.push(`<option value="${escapeHtml(value)}"${value === selectedValue ? " selected" : ""}>${escapeHtml(value)}</option>`);
-  });
-  return options.join("");
 }
 
 function renderProductCategoryScopeSummary(message = "") {
@@ -11667,31 +11666,6 @@ function hydrateReturnForms(returnOrder) {
   });
 }
 
-function hydrateShiftForms(shift) {
-  if (!shift?.shift_no) {
-    return;
-  }
-  [
-    "#shiftReportForm [name='shift_no']",
-    "#handoverRequestForm [name='shift_no']",
-    "#closeBusinessReportForm [name='shift_no']",
-    "#saleForm [name='shift_no']",
-  ].forEach((selector) => {
-    const input = document.querySelector(selector);
-    if (input) {
-      input.value = shift.shift_no;
-    }
-  });
-  const syncField = document.querySelector("#offlineSyncForm [name='sales_json']");
-  if (syncField) {
-    const rows = safeParse(syncField.value, []);
-    if (Array.isArray(rows) && rows.length) {
-      rows[0].shift_no = shift.shift_no;
-      syncField.value = JSON.stringify(rows, null, 2);
-    }
-  }
-}
-
 function hydrateHandoverForms(handover) {
   if (!handover?.handover_no) {
     return;
@@ -11772,6 +11746,14 @@ function hydrateShiftForms(shiftOrRows) {
     setInputValue("#handoverRequestForm [name='shift_no']", firstRow.shift_no);
     setInputValue("#closeBusinessReportForm [name='shift_no']", firstRow.shift_no);
     setInputValue("#saleForm [name='shift_no']", firstRow.shift_no);
+    const syncField = document.querySelector("#offlineSyncForm [name='sales_json']");
+    if (syncField) {
+      const syncRows = safeParse(syncField.value, []);
+      if (Array.isArray(syncRows) && syncRows.length) {
+        syncRows[0].shift_no = firstRow.shift_no;
+        syncField.value = JSON.stringify(syncRows, null, 2);
+      }
+    }
   }
   if (firstRow.store_code) {
     applyStoreContext(firstRow.store_code);
@@ -21720,7 +21702,7 @@ function formatCashierTerminalShiftStatus(status) {
 }
 
 function syncCashierTerminalMode() {
-  const enabled = Boolean(currentSession.user) && isCashierTerminalRole();
+  const enabled = Boolean(currentSession.user) && isCashierTerminalRole() && isCashierTerminalPanelActive();
   document.body.classList.toggle("cashier-terminal-mode", enabled);
   appShell?.classList.toggle("cashier-terminal-mode", enabled);
   if (!enabled) {
@@ -22548,6 +22530,34 @@ function removeCashierTerminalPaymentLine(index) {
   renderCashierTerminal();
 }
 
+function resolvePosStoreItemTokenByMachineCode(value = "") {
+  const machineCode = String(value || "").replace(/[^0-9]/g, "").trim();
+  if (!machineCode.startsWith("5")) {
+    throw new Error("这不是商品码，不能收银。请扫描 STORE_ITEM 商品条码。");
+  }
+  const token = storeSdoPackageItemTokenState.find((row) => String(row?.machine_code || "").trim() === machineCode);
+  if (!token) {
+    throw new Error("未找到这个 STORE_ITEM 商品码，请先由店员生成并打印商品码。");
+  }
+  if (String(token.sale_status || "").trim() === "sold") {
+    throw new Error("该商品已售出，不能重复销售");
+  }
+  if (String(token.sale_status || "").trim() !== "ready_for_sale") {
+    throw new Error("该商品还不是可销售状态。");
+  }
+  return {
+    ...token,
+    barcode: token.machine_code,
+    product_name: token.display_code || token.machine_code,
+    expected_price: Number(token.selected_price || 0),
+    selling_price: Number(token.selected_price || 0),
+    price_cap: null,
+    qty_on_hand: 1,
+    store_item_display_code: token.display_code,
+    store_item_machine_code: token.machine_code,
+  };
+}
+
 function upsertCashierTerminalCartItem(result) {
   const barcode = String(result?.barcode || "").trim();
   if (!barcode) {
@@ -22565,6 +22575,13 @@ function upsertCashierTerminalCartItem(result) {
       price_cap: result.price_cap == null ? null : normalizeCashierTerminalNumber(result.price_cap),
       qty_on_hand: result.qty_on_hand ?? 0,
       store_rack_code: result.store_rack_code || "",
+      store_item_display_code: result.store_item_display_code || result.display_code || "",
+      store_item_machine_code: result.store_item_machine_code || result.machine_code || barcode,
+      source_sdo: result.source_sdo || "",
+      source_package: result.source_package || "",
+      source_type: result.source_type || "",
+      assigned_employee: result.assigned_employee || "",
+      category_summary: result.category_summary || "",
       override_reason: "",
       customer_id: "",
       note: "",
@@ -22593,6 +22610,127 @@ function resetCashierTerminalForNextSale() {
 function syncCashierTerminalLookupForm(query) {
   setInputValue("#lookupForm [name='store_code']", getCashierTerminalStoreCode());
   setInputValue("#lookupForm [name='barcode']", query);
+}
+
+function buildPosStoreItemSaleNo(storeCode = getCashierTerminalStoreCode()) {
+  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  return `SALE-${storeCode}-${timestamp}`;
+}
+
+function getCashierTerminalPaymentMethodForSale() {
+  const mode = String(cashierTerminalState.activePaymentMode || "cash").trim().toLowerCase();
+  if (mode === "mpesa") {
+    return "mpesa";
+  }
+  if (mode === "mixed") {
+    return "mixed";
+  }
+  return "cash";
+}
+
+function buildPosStoreItemMargin(token = {}) {
+  const selectedPrice = Number(token.selected_price ?? token.selling_price ?? token.expected_price ?? 0);
+  const rawCostPrice = token.cost_price;
+  const costPrice = rawCostPrice == null || rawCostPrice === "" ? null : Number(rawCostPrice);
+  const costStatus = String(token.cost_status || "").trim().toLowerCase();
+  if (costStatus === "unknown" || !(costPrice > 0)) {
+    return {
+      selected_price: selectedPrice,
+      cost_price: null,
+      cost_status: "unknown",
+      gross_margin: null,
+      gross_margin_pct: null,
+    };
+  }
+  const grossMargin = selectedPrice - costPrice;
+  return {
+    selected_price: selectedPrice,
+    cost_price: costPrice,
+    cost_status: "known",
+    gross_margin: Number(grossMargin.toFixed(4)),
+    gross_margin_pct: selectedPrice > 0 ? Number((grossMargin / selectedPrice).toFixed(4)) : null,
+  };
+}
+
+function buildPosStoreItemSaleRecord(token = {}, saleNo = buildPosStoreItemSaleNo(), paymentMethod = getCashierTerminalPaymentMethodForSale()) {
+  const storeCode = String(token.store_code || getCashierTerminalStoreCode()).trim().toUpperCase();
+  const soldAt = new Date().toISOString();
+  const margin = buildPosStoreItemMargin(token);
+  return {
+    sale_no: saleNo,
+    store_code: storeCode,
+    cashier: currentSession.user?.username || currentSession.user?.full_name || "cashier",
+    store_item_display_code: token.display_code || token.store_item_display_code || "",
+    store_item_machine_code: token.machine_code || token.store_item_machine_code || "",
+    price: margin.selected_price,
+    selected_price: margin.selected_price,
+    cost_price: margin.cost_price,
+    cost_status: margin.cost_status,
+    gross_margin: margin.gross_margin,
+    gross_margin_pct: margin.gross_margin_pct,
+    payment_method: paymentMethod,
+    source_sdo: token.source_sdo || "",
+    source_package: token.source_package || "",
+    source_type: token.source_type || "",
+    assigned_employee: token.assigned_employee || "",
+    store_rack_code: token.store_rack_code || "",
+    category_summary: token.category_summary || "",
+    sold_at: soldAt,
+  };
+}
+
+function completeCashierTerminalStoreItemSale() {
+  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  if (!rows.length) {
+    throw new Error("购物篮还是空的，请先扫码加购。");
+  }
+  const saleNo = buildPosStoreItemSaleNo(getCashierTerminalStoreCode());
+  const paymentMethod = getCashierTerminalPaymentMethodForSale();
+  const soldAt = new Date().toISOString();
+  const machineCodes = rows.map((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim()).filter(Boolean);
+  const records = [];
+  storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => {
+    const tokenMachineCode = String(token?.machine_code || "").trim();
+    if (!machineCodes.includes(tokenMachineCode)) {
+      return token;
+    }
+    const cartRow = rows.find((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim() === tokenMachineCode) || {};
+    const soldToken = {
+      ...token,
+      selected_price: Number(cartRow.selling_price || token.selected_price || 0),
+      sale_status: "sold",
+      sold_at: soldAt,
+      cashier: currentSession.user?.username || currentSession.user?.full_name || "cashier",
+      payment_method: paymentMethod,
+    };
+    records.push(buildPosStoreItemSaleRecord(soldToken, saleNo, paymentMethod));
+    return soldToken;
+  });
+  if (records.length !== machineCodes.length) {
+    throw new Error("部分 STORE_ITEM 商品码未找到，不能完成销售。");
+  }
+  posStoreItemSaleRecordState = [...records, ...posStoreItemSaleRecordState];
+  persistStoreSdoPackageItemTokenState();
+  persistPosStoreItemSaleRecordState();
+  const result = {
+    order_no: saleNo,
+    sale_no: saleNo,
+    store_code: getCashierTerminalStoreCode(),
+    cashier: currentSession.user?.username || currentSession.user?.full_name || "cashier",
+    payment_method: paymentMethod,
+    sold_at: soldAt,
+    total_amount: records.reduce((sum, row) => sum + Number(row.price || 0), 0),
+    items: records.map((record) => ({
+      barcode: record.store_item_machine_code,
+      selling_price: record.price,
+      source_sdo: record.source_sdo,
+      source_package: record.source_package,
+    })),
+  };
+  cashierTerminalState.latestCompletedSale = result;
+  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
+  renderOperationsAllSalesData(posStoreItemSaleRecordState);
+  return result;
 }
 
 function syncCashierTerminalOpenShiftForm() {
@@ -22699,11 +22837,9 @@ async function submitCashierTerminalLookup({ addToCart = false } = {}) {
     throw new Error("请先扫描或输入商品 barcode。");
   }
   syncCashierTerminalLookupForm(query);
-  const form = document.querySelector("#lookupForm");
-  if (!(form instanceof HTMLFormElement)) {
-    throw new Error("lookupForm 不存在，无法查询。");
-  }
-  const result = await submitLookup({ preventDefault() {}, currentTarget: form });
+  const result = resolvePosStoreItemTokenByMachineCode(query);
+  writeOutput("#lookupOutput", result);
+  renderLookupResultSummary(result);
   cashierTerminalState.currentLookupResult = result;
   if (addToCart) {
     upsertCashierTerminalCartItem(result);
@@ -22730,6 +22866,19 @@ async function submitCashierTerminalOpenShift() {
 }
 
 async function submitCashierTerminalSale() {
+  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  const isStoreItemOnlyCart = rows.length && rows.every((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim().startsWith("5"));
+  if (isStoreItemOnlyCart) {
+    const result = completeCashierTerminalStoreItemSale();
+    cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
+    cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
+    cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
+    resetCashierTerminalForNextSale();
+    renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
+    renderOperationsAllSalesData(posStoreItemSaleRecordState);
+    showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
+    return result;
+  }
   syncCashierTerminalSaleForm();
   const form = document.querySelector("#saleForm");
   if (!(form instanceof HTMLFormElement)) {
@@ -22741,6 +22890,7 @@ async function submitCashierTerminalSale() {
   cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
   cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
   resetCashierTerminalForNextSale();
+  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
   showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
   return result;
 }
@@ -25538,6 +25688,235 @@ function renderStoreRecentSalesSimulationSummary(result = null) {
   `;
 }
 
+function summarizePosStoreItemSalesForAnalytics(records = []) {
+  const todayKey = getLocalDateKey(new Date().toISOString());
+  const storeMap = new Map();
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    const storeCode = String(record?.store_code || "UNKNOWN").trim().toUpperCase() || "UNKNOWN";
+    if (!storeMap.has(storeCode)) {
+      storeMap.set(storeCode, {
+        store_code: storeCode,
+        todaySalesAmount: 0,
+        todayItemCount: 0,
+        todayOrderNos: new Set(),
+        todayOrderCount: 0,
+        averageTicket: 0,
+        cashSalesAmount: 0,
+        mpesaSalesAmount: 0,
+        mixedSalesAmount: 0,
+        soldStoreItemCount: 0,
+        costKnownItemCount: 0,
+        costUnknownItemCount: 0,
+        knownGrossMarginAmount: 0,
+        marginPendingRecordCount: 0,
+        lastSaleAt: "",
+      });
+    }
+    const summary = storeMap.get(storeCode);
+    const amount = Number(record?.price || 0);
+    const soldAt = String(record?.sold_at || "");
+    const isToday = getLocalDateKey(soldAt || new Date().toISOString()) === todayKey;
+    const hasKnownCost = String(record?.cost_status || "").trim().toLowerCase() === "known" && record?.cost_price != null && Number.isFinite(Number(record.cost_price));
+    summary.soldStoreItemCount += 1;
+    if (hasKnownCost) {
+      summary.costKnownItemCount += 1;
+      summary.knownGrossMarginAmount += Number(record?.gross_margin || 0);
+    } else {
+      summary.costUnknownItemCount += 1;
+      summary.marginPendingRecordCount += 1;
+    }
+    if (!summary.lastSaleAt || new Date(soldAt || 0).getTime() > new Date(summary.lastSaleAt || 0).getTime()) {
+      summary.lastSaleAt = soldAt;
+    }
+    if (isToday) {
+      summary.todaySalesAmount += amount;
+      summary.todayItemCount += 1;
+      if (record?.sale_no) {
+        summary.todayOrderNos.add(record.sale_no);
+      }
+      const method = String(record?.payment_method || "cash").trim().toLowerCase();
+      if (method === "mpesa") {
+        summary.mpesaSalesAmount += amount;
+      } else if (method === "mixed") {
+        summary.mixedSalesAmount += amount;
+      } else {
+        summary.cashSalesAmount += amount;
+      }
+    }
+  });
+  return [...storeMap.values()].map((summary) => {
+    summary.todayOrderCount = summary.todayOrderNos.size;
+    summary.averageTicket = summary.todayOrderCount ? summary.todaySalesAmount / summary.todayOrderCount : 0;
+    delete summary.todayOrderNos;
+    return summary;
+  });
+}
+
+function renderPosSalesAnalyticsSummary(records = posStoreItemSaleRecordState) {
+  const summaries = summarizePosStoreItemSalesForAnalytics(records);
+  const summaryTargets = ["#posSalesAnalyticsSummary", "#operationsPosSalesAnalyticsSummary"];
+  summaryTargets.forEach((selector) => {
+    const target = document.querySelector(selector);
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    target.className = "report-summary";
+    target.innerHTML = summaries.length
+      ? `
+        <div class="report-summary-grid">
+          ${summaries.map((row) => `
+            <article class="store-metric">
+              <strong>${escapeHtml(row.store_code)}</strong>
+              <span>${escapeHtml(formatKesAmount(row.todaySalesAmount, "KES 0.00"))}</span>
+              <small>${escapeHtml(`件数 ${row.todayItemCount} · 订单 ${row.todayOrderCount} · 客单价 ${formatKesAmount(row.averageTicket, "KES 0.00")}`)}</small>
+              <small>${escapeHtml(`现金 ${formatKesAmount(row.cashSalesAmount, "KES 0.00")} · M-Pesa ${formatKesAmount(row.mpesaSalesAmount, "KES 0.00")} · 混合 ${formatKesAmount(row.mixedSalesAmount, "KES 0.00")}`)}</small>
+              <small>${escapeHtml(`成本已知 ${row.costKnownItemCount} · 成本待确认 ${row.costUnknownItemCount} · 已知毛利 ${formatKesAmount(row.knownGrossMarginAmount, "KES 0.00")}`)}</small>
+              <small>${escapeHtml(`已售 STORE_ITEM ${row.soldStoreItemCount} · 最近 ${row.lastSaleAt ? formatLocalDateTime(row.lastSaleAt) : "-"}`)}</small>
+            </article>
+          `).join("")}
+        </div>
+      `
+      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+  });
+  const recordTargets = ["#posSalesAnalyticsRecords", "#operationsPosSalesAnalyticsRecords"];
+  recordTargets.forEach((selector) => {
+    const target = document.querySelector(selector);
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    target.className = "candidate-list";
+    target.innerHTML = (Array.isArray(records) && records.length)
+      ? records.slice(0, 30).map((record) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(record.store_item_display_code || record.store_item_machine_code || "-")}</strong>
+            <div class="subtle small">${escapeHtml(`${record.store_code || "-"} · ${formatKesAmount(record.price || 0, "KES 0.00")} · ${record.payment_method || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`成本 ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · 毛利 ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
+            <div class="subtle small">${escapeHtml(`STORE_ITEM ${record.store_item_machine_code || "-"} · SDO ${record.source_sdo || "-"} · 来源包 ${record.source_package || "-"} · ${record.source_type || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`店员 ${record.assigned_employee || "-"} · 货架 ${record.store_rack_code || "-"} · 品类 ${record.category_summary || "-"}`)}</div>
+          </div>
+          <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.sold_at ? formatLocalDateTime(record.sold_at) : "-")}</span></div>
+        </article>
+      `).join("")
+      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+  });
+  renderOperationsAllSalesData(records);
+}
+
+function summarizeAllPosStoreItemSalesForOperations(records = []) {
+  const list = Array.isArray(records) ? records : [];
+  const now = new Date();
+  const todayKey = getLocalDateKey(now.toISOString());
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).getTime();
+  const totalSalesAmount = list.reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const totalItemCount = list.length;
+  const totalOrderCount = new Set(list.map((row) => row.sale_no).filter(Boolean)).size;
+  const storeCount = new Set(list.map((row) => String(row?.store_code || "").trim()).filter(Boolean)).size;
+  const todaySalesAmount = list
+    .filter((row) => getLocalDateKey(row?.sold_at || "") === todayKey)
+    .reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const last7DaysSalesAmount = list
+    .filter((row) => new Date(row?.sold_at || 0).getTime() >= sevenDaysAgo)
+    .reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const cashSalesAmount = list.filter((row) => String(row?.payment_method || "cash").toLowerCase() === "cash").reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const mpesaSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mpesa").reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const mixedSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mixed").reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const costKnownItemCount = list.filter((row) => String(row?.cost_status || "").trim().toLowerCase() === "known" && row?.cost_price != null).length;
+  const costUnknownItemCount = Math.max(totalItemCount - costKnownItemCount, 0);
+  const knownGrossMarginAmount = list.reduce((sum, row) => (
+    row?.gross_margin == null ? sum : sum + Number(row.gross_margin || 0)
+  ), 0);
+  const marginPendingRecordCount = list.filter((row) => row?.gross_margin == null).length;
+  const storeSummaries = summarizePosStoreItemSalesForAnalytics(list);
+  const categoryMap = new Map();
+  list.forEach((row) => {
+    const category = String(row?.category_summary || "未分类").trim() || "未分类";
+    categoryMap.set(category, (categoryMap.get(category) || 0) + Number(row?.price || 0));
+  });
+  const categorySummaries = [...categoryMap.entries()].map(([category_summary, sales_amount]) => ({ category_summary, sales_amount }));
+  const analysisLines = [
+    totalItemCount ? `共售出 ${totalItemCount} 个 STORE_ITEM，销售额 ${formatKesAmount(totalSalesAmount, "KES 0.00")}。` : "当前没有生成销售记录。",
+    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "等待 POS 完成第一笔 STORE_ITEM 销售。",
+    marginPendingRecordCount ? `${marginPendingRecordCount} 条销售记录毛利待确认，原因是上游成本仍未确认。` : `已知成本销售毛利 ${formatKesAmount(knownGrossMarginAmount, "KES 0.00")}。`,
+  ];
+  return {
+    totalSalesAmount,
+    totalItemCount,
+    totalOrderCount,
+    storeCount,
+    averageTicket: totalOrderCount ? totalSalesAmount / totalOrderCount : 0,
+    todaySalesAmount,
+    last7DaysSalesAmount,
+    cashSalesAmount,
+    mpesaSalesAmount,
+    mixedSalesAmount,
+    costKnownItemCount,
+    costUnknownItemCount,
+    knownGrossMarginAmount,
+    marginPendingRecordCount,
+    storeSummaries,
+    categorySummaries,
+    analysisLines,
+  };
+}
+
+function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
+  const summary = summarizeAllPosStoreItemSalesForOperations(records);
+  const overviewTarget = document.querySelector("#operationsAllSalesOverview");
+  if (overviewTarget instanceof HTMLElement) {
+    overviewTarget.className = "report-summary-grid";
+    overviewTarget.innerHTML = `
+      <article class="store-metric"><strong>全部销售额</strong><span>${escapeHtml(formatKesAmount(summary.totalSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatKesAmount(summary.todaySalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>销售件数</strong><span>${summary.totalItemCount}</span></article>
+      <article class="store-metric"><strong>订单数</strong><span>${summary.totalOrderCount}</span></article>
+      <article class="store-metric"><strong>客单价</strong><span>${escapeHtml(formatKesAmount(summary.averageTicket, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>近 7 天</strong><span>${escapeHtml(formatKesAmount(summary.last7DaysSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>成本已知件数</strong><span>${summary.costKnownItemCount}</span></article>
+      <article class="store-metric"><strong>成本待确认件数</strong><span>${summary.costUnknownItemCount}</span></article>
+      <article class="store-metric"><strong>已知成本销售毛利</strong><span>${escapeHtml(formatKesAmount(summary.knownGrossMarginAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>毛利待确认记录数</strong><span>${summary.marginPendingRecordCount}</span></article>
+    `;
+  }
+  const analysisTarget = document.querySelector("#operationsAllSalesAnalysis");
+  if (analysisTarget instanceof HTMLElement) {
+    analysisTarget.className = "candidate-summary";
+    analysisTarget.innerHTML = summary.analysisLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("");
+  }
+  const byStoreTarget = document.querySelector("#operationsAllSalesByStore");
+  if (byStoreTarget instanceof HTMLElement) {
+    byStoreTarget.className = "candidate-list";
+    byStoreTarget.innerHTML = summary.storeSummaries.length
+      ? summary.storeSummaries.map((row) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(row.store_code)}</strong>
+            <div class="subtle small">${escapeHtml(`销售额 ${formatKesAmount(row.todaySalesAmount, "KES 0.00")} · 件数 ${row.todayItemCount} · 订单 ${row.todayOrderCount}`)}</div>
+          </div>
+          <div class="candidate-side"><span class="meta-pill">${escapeHtml(row.lastSaleAt ? formatLocalDateTime(row.lastSaleAt) : "-")}</span></div>
+        </article>
+      `).join("")
+      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+  }
+  const recordsTarget = document.querySelector("#operationsAllSalesRecords");
+  if (recordsTarget instanceof HTMLElement) {
+    recordsTarget.className = "candidate-list";
+    recordsTarget.innerHTML = (Array.isArray(records) && records.length)
+      ? records.slice(0, 50).map((record) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(record.sale_no || "-")}</strong>
+            <div class="subtle small">${escapeHtml(`${record.store_item_display_code || "-"} · ${record.store_item_machine_code || "-"} · ${formatKesAmount(record.price || 0, "KES 0.00")}`)}</div>
+            <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
+            <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · category_summary ${record.category_summary || "-"}`)}</div>
+          </div>
+          <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.payment_method || "-")}</span></div>
+        </article>
+      `).join("")
+      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+  }
+}
+
 function renderStoreRetailSeedSummary(result = null) {
   const target = document.querySelector("#storeRetailSeedSummary");
   if (!(target instanceof HTMLElement)) {
@@ -25655,6 +26034,410 @@ function getStoreClerkAssignedBales(storeCode = "", assignedEmployee = "") {
   return getStoreManagerConsoleRows(normalizedStoreCode).filter((row) => String(row?.assigned_employee || "").trim() === normalizedEmployee);
 }
 
+function persistStoreSdoPackageItemTokenState() {
+  localStorage.setItem(STORAGE_KEYS.storeSdoPackageItemTokens, JSON.stringify(storeSdoPackageItemTokenState));
+}
+
+function persistPosStoreItemSaleRecordState() {
+  localStorage.setItem(STORAGE_KEYS.posStoreItemSaleRecords, JSON.stringify(posStoreItemSaleRecordState));
+}
+
+function getStorePackageSdoCode(row = {}) {
+  return String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || row?.source_sdo || "").trim().toUpperCase();
+}
+
+function getStorePackageSourceCode(row = {}) {
+  return String(row?.source_code || row?.bale_no || row?.store_dispatch_bale_no || row?.prepared_bale_no || row?.dispatch_bale_no || "").trim().toUpperCase();
+}
+
+function getStorePackageSourceType(row = {}) {
+  const explicit = String(row?.source_type || row?.package_type || "").trim().toUpperCase();
+  if (explicit) {
+    return explicit;
+  }
+  const sourceCode = getStorePackageSourceCode(row);
+  if (sourceCode.startsWith("LPK")) {
+    return "LPK";
+  }
+  if (sourceCode.startsWith("SDB")) {
+    return "SDB";
+  }
+  return row?.flow_type === "direct_hang" ? "SDB" : "SDB";
+}
+
+function getStorePackageActionKey(row = {}) {
+  const transferNo = String(row?.transfer_no || "").trim().toUpperCase();
+  const shipmentNo = String(row?.shipment_no || row?.task_no || "").trim().toUpperCase();
+  const storeCode = String(row?.store_code || row?.to_store_code || row?.target_store_code || "").trim().toUpperCase();
+  const assignedEmployee = String(row?.assigned_employee || "").trim();
+  const sourceCode = getStorePackageSourceCode(row);
+  const sdoCode = getStorePackageSdoCode(row);
+  const scopeCode = sdoCode || transferNo || shipmentNo || storeCode || assignedEmployee;
+  return sourceCode ? `${scopeCode || "STORE_PACKAGE"}::${sourceCode}` : "";
+}
+
+function findStorePackageByActionKey(actionKey = "", rows = null) {
+  const normalizedKey = String(actionKey || "").trim();
+  if (!normalizedKey) {
+    return null;
+  }
+  const sourceRows = Array.isArray(rows)
+    ? rows
+    : getStoreClerkAssignedBales(storeClerkHomeState.store_code, storeClerkHomeState.assigned_employee);
+  return sourceRows.find((row) => getStorePackageActionKey(row) === normalizedKey) || null;
+}
+
+function getStorePackageItemCount(row = {}) {
+  const known = parseKnownDispatchItemCount(row);
+  if (known !== null && known !== undefined) {
+    return Number(known);
+  }
+  const fallback = Number(row?.item_count ?? row?.qty ?? row?.piece_count);
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
+}
+
+function getStorePackageCostPrice(row = {}) {
+  const unitCostCandidates = [
+    row?.cost_price,
+    row?.unit_cost_kes,
+    row?.unit_cost_amount,
+    row?.single_item_cost_kes,
+  ];
+  for (const candidate of unitCostCandidates) {
+    const numeric = Number(candidate);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+  }
+  const totalCostCandidates = [
+    row?.total_cost_kes,
+    row?.total_cost,
+    row?.package_cost_kes,
+    row?.package_total_cost_kes,
+  ];
+  const itemCount = getStorePackageItemCount(row);
+  for (const candidate of totalCostCandidates) {
+    const totalCost = Number(candidate);
+    if (Number.isFinite(totalCost) && totalCost > 0 && Number(itemCount) > 0) {
+      return Number((totalCost / itemCount).toFixed(4));
+    }
+  }
+  return null;
+}
+
+function getStorePackageCostLabel(row = {}) {
+  const costPrice = getStorePackageCostPrice(row);
+  return costPrice == null ? "成本待确认" : formatKesAmount(costPrice, "成本待确认");
+}
+
+function getStorePackageCategoryLabel(row = {}) {
+  return String(row?.category_summary || row?.category_name || [row?.category_main, row?.category_sub].filter(Boolean).join(" / ") || "-").trim();
+}
+
+function getStorePackageTokens(actionKey = "") {
+  const normalizedKey = String(actionKey || "").trim();
+  return storeSdoPackageItemTokenState.filter((token) => String(token?.source_package_key || "").trim() === normalizedKey);
+}
+
+function getStorePackageTokenCounts(row = {}) {
+  const actionKey = getStorePackageActionKey(row);
+  const tokens = getStorePackageTokens(actionKey);
+  return {
+    generated: tokens.length,
+    printed: tokens.filter((token) => String(token?.print_status || "").trim() === "printed").length,
+    pendingPrint: tokens.filter((token) => String(token?.print_status || "").trim() === "pending_print").length,
+  };
+}
+
+function getStoreRackOptionsForPackage(storeCode = "") {
+  const normalizedStoreCode = String(storeCode || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const rackOutput = readOutput("#rackOutput");
+  const outputRows = Array.isArray(rackOutput) ? rackOutput : Array.isArray(rackOutput?.rack_locations) ? rackOutput.rack_locations : [];
+  const maintainedRacks = outputRows
+    .filter((row) => !normalizedStoreCode || String(row?.store_code || "").trim().toUpperCase() === normalizedStoreCode)
+    .map((row) => String(row?.rack_code || row?.store_rack_code || row?.code || "").trim().toUpperCase())
+    .filter(Boolean);
+  const fallbackRacks = ["A-01", "A-02", "B-01", "B-02", "C-01"];
+  return [...new Set(maintainedRacks.length ? maintainedRacks : fallbackRacks)];
+}
+
+function getDefaultStoreSalePriceChoices(costPrice = null) {
+  // 4.9 默认售价管理后续接真实配置；当前按包成本或前端 fallback 计算。
+  if (costPrice != null && Number.isFinite(Number(costPrice)) && Number(costPrice) > 0) {
+    return {
+      default_price_1: Math.round(costPrice * 1.8),
+      default_price_2: Math.round(costPrice * 2.2),
+    };
+  }
+  return {
+    default_price_1: 150,
+    default_price_2: 200,
+  };
+}
+
+function getStorePackagePriceChoices(row = {}) {
+  const costPrice = getStorePackageCostPrice(row);
+  const defaults = getDefaultStoreSalePriceChoices(costPrice);
+  const storeCode = String(row?.store_code || row?.to_store_code || row?.target_store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const categoryKey = getStorePackageCategoryLabel(row).toLowerCase();
+  const override = storeDefaultSalePrices?.[storeCode]?.[categoryKey] || null;
+  return {
+    default_price_1: Number(override?.default_price_1 || defaults.default_price_1),
+    default_price_2: Number(override?.default_price_2 || defaults.default_price_2),
+  };
+}
+
+function getSelectedStorePackagePrice(row = {}, actionKey = getStorePackageActionKey(row)) {
+  const priceChoices = getStorePackagePriceChoices(row);
+  const selectedInput = document.querySelector(`input[name="storePackagePriceChoice"][data-store-package-key="${CSS.escape(actionKey)}"]:checked`);
+  const selectedMode = selectedInput instanceof HTMLInputElement ? selectedInput.value : "";
+  if (selectedMode === "default_price_1") {
+    return priceChoices.default_price_1;
+  }
+  if (selectedMode === "default_price_2") {
+    return priceChoices.default_price_2;
+  }
+  if (selectedMode === "custom") {
+    const customInput = document.querySelector(`[data-store-package-custom-price="${CSS.escape(actionKey)}"]`);
+    const customPrice = Number(customInput?.value || 0);
+    if (!(customPrice > 0)) {
+      throw new Error("请先选择售价");
+    }
+    return customPrice;
+  }
+  throw new Error("请先选择售价");
+}
+
+function buildStoreItemTokenSerial() {
+  const today = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+  const sameDayCount = storeSdoPackageItemTokenState.filter((token) => String(token?.display_code || "").includes(today)).length;
+  return {
+    today,
+    sequence: sameDayCount + 1,
+  };
+}
+
+function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
+  const actionKey = getStorePackageActionKey(row);
+  const existingTokens = getStorePackageTokens(actionKey);
+  if (existingTokens.length) {
+    return existingTokens;
+  }
+  const rackCode = String(options.store_rack_code || "").trim().toUpperCase();
+  if (!rackCode) {
+    throw new Error("请先选择货架位");
+  }
+  const selectedPrice = Number(options.selected_price);
+  if (!(selectedPrice > 0)) {
+    throw new Error("请先选择售价");
+  }
+  const itemCount = getStorePackageItemCount(row);
+  if (!(itemCount > 0)) {
+    throw new Error("当前包件数待确认，不能生成 STORE_ITEM。");
+  }
+  const priceChoices = getStorePackagePriceChoices(row);
+  const costPrice = getStorePackageCostPrice(row);
+  const sourceCostLayer = String(row?.source_cost_layer || row?.cost_layer || "").trim();
+  const sourceSdo = getStorePackageSdoCode(row);
+  const sourcePackage = getStorePackageSourceCode(row);
+  const sourceType = getStorePackageSourceType(row);
+  const storeCode = String(row?.store_code || row?.to_store_code || row?.target_store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const assignedEmployee = String(row?.assigned_employee || storeClerkHomeState.assigned_employee || getCurrentStoreWorkerFallback()).trim();
+  const categorySummary = getStorePackageCategoryLabel(row);
+  const newTokens = [];
+  for (let index = 0; index < itemCount; index += 1) {
+    const serial = buildStoreItemTokenSerial();
+    const serialText = String(serial.sequence + index).padStart(3, "0");
+    const displayCode = `STOREITEM${serial.today}${serialText}`;
+    const machineCode = `5${serial.today}${serialText}`;
+    newTokens.push({
+      display_code: displayCode,
+      machine_code: machineCode,
+      barcode_value: machineCode,
+      barcode_type: "STORE_ITEM",
+      source_package_key: actionKey,
+      source_sdo: sourceSdo,
+      source_package: sourcePackage,
+      source_type: sourceType,
+      store_code: storeCode,
+      assigned_employee: assignedEmployee,
+      category_summary: categorySummary,
+      item_count_source: 1,
+      cost_price: costPrice,
+      cost_status: costPrice == null ? "unknown" : "known",
+      source_cost_layer: sourceCostLayer,
+      default_price_1: priceChoices.default_price_1,
+      default_price_2: priceChoices.default_price_2,
+      selected_price: selectedPrice,
+      store_rack_code: rackCode,
+      print_status: "pending_print",
+      sale_status: "ready_for_sale",
+      created_at: new Date().toISOString(),
+    });
+  }
+  storeSdoPackageItemTokenState = [...storeSdoPackageItemTokenState, ...newTokens];
+  persistStoreSdoPackageItemTokenState();
+  return newTokens;
+}
+
+function buildStorePackagePrintPreviewTokens(row = {}, quantity = null) {
+  const actionKey = typeof row === "string" ? row : getStorePackageActionKey(row);
+  const pending = getStorePackageTokens(actionKey).filter((token) => String(token?.print_status || "").trim() === "pending_print");
+  if (!pending.length) {
+    throw new Error("本包商品码已全部打印");
+  }
+  const requested = quantity == null ? Math.min(pending.length, 20) : Math.min(Math.max(1, Number(quantity || 1)), pending.length);
+  const previewTokens = pending.slice(0, requested);
+  storePackagePrintPreviewState[actionKey] = previewTokens.map((token) => token.machine_code);
+  return previewTokens;
+}
+
+function markStorePackagePrintPreviewTokensPrinted(row = {}) {
+  const actionKey = typeof row === "string" ? row : getStorePackageActionKey(row);
+  const previewMachineCodes = new Set(storePackagePrintPreviewState[actionKey] || []);
+  if (!previewMachineCodes.size) {
+    throw new Error("请先预览本次商品码");
+  }
+  storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => (
+    previewMachineCodes.has(String(token?.machine_code || "").trim())
+      ? { ...token, print_status: "printed", printed_at: new Date().toISOString() }
+      : token
+  ));
+  storePackagePrintPreviewState[actionKey] = [];
+  persistStoreSdoPackageItemTokenState();
+}
+
+function renderStorePackageListCard(row = {}) {
+  const actionKey = getStorePackageActionKey(row);
+  const itemCount = getStorePackageItemCount(row);
+  const counts = getStorePackageTokenCounts(row);
+  const sourceCode = getStorePackageSourceCode(row);
+  const sourceType = getStorePackageSourceType(row);
+  const status = String(row?.status || "assigned").trim();
+  return `
+    <article class="store-package-card">
+      <div class="store-package-card-main">
+        <div class="store-package-card-head">
+          <div>
+            <span class="eyebrow">SDO</span>
+            <strong>${escapeHtml(getStorePackageSdoCode(row) || "-")}</strong>
+          </div>
+          <span class="meta-pill">${escapeHtml(translateStatusLabel(status, "store_dispatch_bale"))}</span>
+        </div>
+        <div class="store-package-title">${escapeHtml(sourceCode || "-")} <span class="meta-pill">${escapeHtml(sourceType === "LPK" ? "补差包" : "现成包")}</span></div>
+        <div class="store-package-grid">
+          <span><b>来源类型</b>${escapeHtml(sourceType === "LPK" ? "补差包 / LPK" : "现成包 / SDB")}</span>
+          <span><b>品类</b>${escapeHtml(getStorePackageCategoryLabel(row))}</span>
+          <span><b>件数</b>${escapeHtml(itemCount == null ? "件数待确认" : `${itemCount}`)}</span>
+          <span><b>成本状态</b>${escapeHtml(getStorePackageCostLabel(row))}</span>
+          <span><b>已生成 STORE_ITEM</b>${counts.generated}</span>
+          <span><b>已打印</b>${counts.printed}</span>
+        </div>
+      </div>
+      <div class="store-package-card-action">
+        <button type="button" class="primary-button store-package-primary" data-store-package-process="${escapeHtml(actionKey)}">去上架</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderStorePackagePrintPreview(actionKey = "") {
+  const previewMachineCodes = new Set(storePackagePrintPreviewState[actionKey] || []);
+  const previewTokens = getStorePackageTokens(actionKey).filter((token) => previewMachineCodes.has(String(token?.machine_code || "").trim()));
+  if (!previewTokens.length) {
+    return `<div class="empty-state">点击“预览本次商品码”后，这里会显示本次要打印的 STORE_ITEM。</div>`;
+  }
+  return `
+    <div class="store-print-preview-list">
+      ${previewTokens.slice(0, 20).map((token) => `
+        <article class="store-print-label-preview">
+          <div class="store-print-label-price">KES ${escapeHtml(formatCurrency(token.selected_price || 0))}</div>
+          <div class="store-print-label-category">${escapeHtml(token.category_summary || "-")}</div>
+          <div class="store-print-label-meta">货架 ${escapeHtml(token.store_rack_code || "-")} · 来源 ${escapeHtml(token.source_package || "-")}</div>
+          <strong>${escapeHtml(token.display_code || "-")}</strong>
+          <div class="store-print-barcode">STORE_ITEM machine_code barcode ${escapeHtml(token.machine_code || "-")}</div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderStorePackageShelvingStep(row = {}, context = {}) {
+  const actionKey = getStorePackageActionKey(row);
+  const itemCount = getStorePackageItemCount(row);
+  const counts = getStorePackageTokenCounts(row);
+  const unprinted = Math.max(counts.generated - counts.printed, 0);
+  const priceChoices = getStorePackagePriceChoices(row);
+  const rackOptions = getStoreRackOptionsForPackage(row?.store_code);
+  const selectedRack = String(context.selected_rack || "").trim().toUpperCase();
+  const defaultPrintQty = Math.min(unprinted || itemCount || 0, 20);
+  return `
+    <section class="store-package-shelving-step">
+      <div class="store-package-step-head">
+        <button type="button" class="ghost-button mini-button" data-store-package-back>返回包列表</button>
+        <div>
+          <span class="eyebrow">PDA 上架</span>
+          <h3>包上架 / 商品码打印</h3>
+        </div>
+      </div>
+      <div class="report-summary-grid">
+        <article class="store-metric"><strong>SDO</strong><span>${escapeHtml(getStorePackageSdoCode(row) || "-")}</span></article>
+        <article class="store-metric"><strong>来源包码</strong><span>${escapeHtml(getStorePackageSourceCode(row) || "-")}</span></article>
+        <article class="store-metric"><strong>来源类型</strong><span>${escapeHtml(getStorePackageSourceType(row))}</span></article>
+        <article class="store-metric"><strong>品类</strong><span>${escapeHtml(getStorePackageCategoryLabel(row))}</span></article>
+        <article class="store-metric"><strong>件数</strong><span>${escapeHtml(itemCount == null ? "件数待确认" : `${itemCount}`)}</span></article>
+        <article class="store-metric"><strong>成本价</strong><span>${escapeHtml(getStorePackageCostLabel(row))}</span></article>
+        <article class="store-metric"><strong>已生成 STORE_ITEM</strong><span>${counts.generated} / ${escapeHtml(itemCount ?? "-")}</span></article>
+        <article class="store-metric"><strong>已打印</strong><span>${counts.printed} / ${escapeHtml(itemCount ?? "-")}</span></article>
+        <article class="store-metric"><strong>未打印</strong><span>${unprinted}</span></article>
+      </div>
+      <section class="store-package-flow-block">
+        <h4>上架设置</h4>
+        <label>
+          <span>选择货架位</span>
+          <select data-store-package-rack="${escapeHtml(actionKey)}" name="store_rack_code">
+            <option value="">请选择货架位</option>
+            ${rackOptions.map((rack) => `<option value="${escapeHtml(rack)}" ${rack === selectedRack ? "selected" : ""}>${escapeHtml(rack)}</option>`).join("")}
+          </select>
+        </label>
+        <div class="choice-row store-package-price-choices">
+          <label class="choice-pill">
+            <input type="radio" name="storePackagePriceChoice" data-store-package-key="${escapeHtml(actionKey)}" value="default_price_1" />
+            <span>默认售价 1 · KES ${escapeHtml(formatCurrency(priceChoices.default_price_1))}</span>
+          </label>
+          <label class="choice-pill">
+            <input type="radio" name="storePackagePriceChoice" data-store-package-key="${escapeHtml(actionKey)}" value="default_price_2" />
+            <span>默认售价 2 · KES ${escapeHtml(formatCurrency(priceChoices.default_price_2))}</span>
+          </label>
+          <label class="choice-pill">
+            <input type="radio" name="storePackagePriceChoice" data-store-package-key="${escapeHtml(actionKey)}" value="custom" />
+            <span>自定义售价</span>
+            <input type="number" min="1" step="1" data-store-package-custom-price="${escapeHtml(actionKey)}" placeholder="自定义售价" />
+          </label>
+        </div>
+        <div class="subtle small">${escapeHtml(getStorePackageCostPrice(row) == null ? "成本待确认：默认售价暂用 150 / 200。" : "默认售价按成本价 1.8 / 2.2 倍取整。")}</div>
+      </section>
+      <section class="store-package-flow-block">
+        <h4>STORE_ITEM 生成区</h4>
+        <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}" ${counts.generated ? "disabled" : ""}>${counts.generated ? "已生成 STORE_ITEM" : "生成 STORE_ITEM 商品码"}</button>
+      </section>
+      <section class="store-package-flow-block">
+        <h4>商品码打印区</h4>
+        <label>
+          <span>本次打印数量</span>
+          <input type="number" min="1" max="${escapeHtml(unprinted || 1)}" value="${escapeHtml(defaultPrintQty || 1)}" data-store-package-print-qty="${escapeHtml(actionKey)}" />
+        </label>
+        <div class="button-row">
+          <button type="button" class="ghost-button" data-store-package-preview-print="${escapeHtml(actionKey)}">预览本次商品码</button>
+          <button type="button" class="ghost-button" data-store-package-print-items="${escapeHtml(actionKey)}">打印本次数量</button>
+          <button type="button" class="primary-button" data-store-package-confirm-printed="${escapeHtml(actionKey)}">标记本次已打印</button>
+        </div>
+        ${renderStorePackagePrintPreview(actionKey)}
+      </section>
+    </section>
+  `;
+}
+
 function renderStoreClerkHomeSummary(context = {}) {
   const target = document.querySelector("#storeClerkHomeSummary");
   if (!(target instanceof HTMLElement)) {
@@ -25671,6 +26454,7 @@ function renderStoreClerkHomeSummary(context = {}) {
   storeClerkHomeState = {
     store_code: storeCode,
     assigned_employee: assignedEmployee,
+    active_package_key: context.active_package_key || storeClerkHomeState.active_package_key || "",
   };
   const rows = getStoreClerkAssignedBales(storeCode, assignedEmployee);
   if (!assignedEmployee) {
@@ -25684,98 +26468,38 @@ function renderStoreClerkHomeSummary(context = {}) {
     return;
   }
 
-  const pendingRows = rows.filter((row) => String(row?.status || "").trim() === "assigned");
-  const printingRows = rows.filter((row) => String(row?.status || "").trim() === "printing_in_progress");
-  const completedRows = rows.filter((row) => String(row?.status || "").trim() === "completed");
-  const directHangRows = rows.filter((row) => row?.flow_type === "direct_hang");
-  const activeRows = [...pendingRows, ...printingRows, ...rows.filter((row) => !pendingRows.includes(row) && !printingRows.includes(row) && !completedRows.includes(row))];
-  const currentRow = activeRows[0] || rows[0];
-  const remainingRows = rows.filter((row) => row !== currentRow);
-
-  const renderOpenButton = (row, label = "进入工作台") =>
-    row?.flow_type === "direct_hang"
-      ? `<button type="button" class="primary-button compact-button" data-clerk-bale-open="${escapeHtml(row.bale_no || "")}" data-clerk-bale-flow="direct_hang" data-clerk-bale-employee="${escapeHtml(assignedEmployee)}">${escapeHtml(label)}</button>`
-      : `<button type="button" class="primary-button compact-button" data-clerk-bale-open="${escapeHtml(row.bale_no || "")}" data-clerk-bale-flow="sorting" data-clerk-bale-employee="${escapeHtml(assignedEmployee)}">${escapeHtml(label)}</button>`;
-
-  target.className = "report-summary clerk-home-shell";
+  const activeRow = findStorePackageByActionKey(storeClerkHomeState.active_package_key, rows);
+  target.className = "report-summary clerk-pda-shell";
+  if (activeRow) {
+    target.innerHTML = renderStorePackageShelvingStep(activeRow, context);
+    applyGlobalI18n(target, currentLanguage);
+    return;
+  }
+  const totals = rows.reduce((summary, row) => {
+    const itemCount = getStorePackageItemCount(row);
+    const counts = getStorePackageTokenCounts(row);
+    summary.itemCount += itemCount || 0;
+    summary.generated += counts.generated;
+    summary.printed += counts.printed;
+    return summary;
+  }, { itemCount: 0, generated: 0, printed: 0 });
   target.innerHTML = `
-    <div class="clerk-home-header">
-      <div class="clerk-home-title">
-        <span class="eyebrow">PDA 首页</span>
-        <strong>${escapeHtml(assignedEmployee)}，先处理你手上的 bale</strong>
-        <p>${escapeHtml(context.last_action_message || "系统会把当前分配给你的 bale 放在最前面。先开当前 bale，再按组挂货、填售价和打印。")}</p>
-      </div>
-      <div class="clerk-home-metrics">
-        <article class="store-metric"><strong>待处理</strong><span>${pendingRows.length}</span></article>
-        <article class="store-metric"><strong>打印中</strong><span>${printingRows.length}</span></article>
-        <article class="store-metric"><strong>已完成</strong><span>${completedRows.length}</span></article>
-        <article class="store-metric"><strong>总件数</strong><span>${rows.reduce((sum, row) => sum + Number(row.item_count || 0), 0)}</span></article>
-      </div>
+    <div class="clerk-pda-head">
+      <span class="eyebrow">PDA 首页</span>
+      <h3>我的待上架包列表</h3>
+      <p>${escapeHtml(context.last_action_message || `${assignedEmployee} 的当前 bale 已刷新。`)}</p>
     </div>
-    ${
-      currentRow
-        ? `
-          <section class="clerk-home-current">
-            <div class="clerk-home-current-copy">
-              <span class="eyebrow">当前优先处理</span>
-              <strong>${escapeHtml(currentRow.bale_no || "-")}</strong>
-              <div class="clerk-home-current-meta">
-                <span>${escapeHtml(currentRow.category_summary || currentRow.category_name || "-")}</span>
-                <span>${escapeHtml(`${currentRow.item_count || 0} 件`)}</span>
-                <span>${escapeHtml(currentRow.flow_type === "direct_hang" ? "例外直挂流" : "主分拣流")}</span>
-              </div>
-              <div class="subtle small">${escapeHtml(`状态：${getStoreDispatchBaleStatusLabel(currentRow.status || "")}${currentRow.transfer_no ? ` · 调拨单 ${currentRow.transfer_no}` : ""}${currentRow.task_no ? ` · 任务 ${currentRow.task_no}` : ""}`)}</div>
-            </div>
-            <div class="clerk-home-current-actions">
-              ${renderOpenButton(currentRow, currentRow.flow_type === "direct_hang" ? "打开直挂工作台" : "打开主工作台")}
-            </div>
-          </section>
-        `
-        : ""
-    }
-    <div class="clerk-home-grid">
-      <section class="clerk-home-panel">
-        <div class="clerk-home-panel-head">
-          <span class="eyebrow">Queue</span>
-          <strong>我的 bale 列表</strong>
-        </div>
-        <div class="clerk-home-list">
-          ${
-            remainingRows.length
-              ? remainingRows.slice(0, 6).map((row) => `
-                  <article class="clerk-home-row">
-                    <div class="clerk-home-row-copy">
-                      <strong>${escapeHtml(row.bale_no || "-")}</strong>
-                      <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
-                    </div>
-                    <div class="clerk-home-row-side">
-                      <span class="meta-pill">${escapeHtml(getStoreDispatchBaleStatusLabel(row.status || ""))}</span>
-                      ${renderOpenButton(row, "进入")}
-                    </div>
-                  </article>
-                `).join("")
-              : `<div class="candidate-summary empty-state compact-empty">当前没有其他 bale，先把这一包处理完。</div>`
-          }
-        </div>
-      </section>
-      <section class="clerk-home-panel">
-        <div class="clerk-home-panel-head">
-          <span class="eyebrow">Support</span>
-          <strong>打印 / 异常入口</strong>
-        </div>
-        <div class="manager-console-flags">
-          <span class="store-flag">${escapeHtml(`待处理 ${pendingRows.length}`)}</span>
-          <span class="store-flag ${printingRows.length ? "danger" : ""}">${escapeHtml(`打印中 ${printingRows.length}`)}</span>
-          <span class="store-flag">${escapeHtml(`例外直挂 ${directHangRows.length}`)}</span>
-        </div>
-        ${renderSummaryActions([
-          { panelKey: getPanelKeyByTitle("store", "7. 店员 PDA 上架工作台"), label: "主工作台" },
-          { panelKey: getPanelKeyByTitle("store", "7.2 直挂店员工作台"), label: "直挂工作台" },
-          { panelKey: getPanelKeyByTitle("store", "7.1 打印任务 / 重打（支持页）"), label: "打印 / 重打" },
-        ])}
-      </section>
+    <div class="report-summary-grid clerk-pda-metrics">
+      <article class="store-metric"><strong>待上架包数</strong><span>${rows.length}</span></article>
+      <article class="store-metric"><strong>总件数</strong><span>${totals.itemCount}</span></article>
+      <article class="store-metric"><strong>已生成商品码</strong><span>${totals.generated}</span></article>
+      <article class="store-metric"><strong>已打印商品码</strong><span>${totals.printed}</span></article>
+    </div>
+    <div class="store-package-card-list">
+      ${rows.map((row) => renderStorePackageListCard(row)).join("")}
     </div>
   `;
+  applyGlobalI18n(target, currentLanguage);
 }
 
 function refreshStoreClerkHomeWithContext(context = {}) {
@@ -31510,12 +32234,94 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
+    ? event.target.closest("[data-store-package-process], [data-store-package-back], [data-store-package-generate-items], [data-store-package-preview-print], [data-store-package-print-items], [data-store-package-confirm-printed], [data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
   try {
+    if (button.dataset.storePackageProcess) {
+      storeClerkHomeState.active_package_key = String(button.dataset.storePackageProcess || "").trim();
+      renderStoreClerkHomeSummary({
+        store_code: storeClerkHomeState.store_code,
+        assigned_employee: storeClerkHomeState.assigned_employee,
+        active_package_key: storeClerkHomeState.active_package_key,
+      });
+      return;
+    }
+    if (button.dataset.storePackageBack !== undefined) {
+      storeClerkHomeState.active_package_key = "";
+      renderStoreClerkHomeSummary({
+        store_code: storeClerkHomeState.store_code,
+        assigned_employee: storeClerkHomeState.assigned_employee,
+        active_package_key: "",
+      });
+      return;
+    }
+    if (button.dataset.storePackageGenerateItems || button.dataset.storePackagePreviewPrint || button.dataset.storePackagePrintItems || button.dataset.storePackageConfirmPrinted) {
+      const actionKey = String(
+        button.dataset.storePackageGenerateItems
+        || button.dataset.storePackagePreviewPrint
+        || button.dataset.storePackagePrintItems
+        || button.dataset.storePackageConfirmPrinted
+        || "",
+      ).trim();
+      const row = findStorePackageByActionKey(actionKey);
+      if (!row) {
+        throw new Error("当前包已不在店员任务列表中，请刷新我的任务。");
+      }
+      if (button.dataset.storePackageGenerateItems) {
+        const rackSelect = document.querySelector(`[data-store-package-rack="${CSS.escape(actionKey)}"]`);
+        const rackCode = String(rackSelect?.value || "").trim().toUpperCase();
+        if (!rackCode) {
+          throw new Error("请先选择货架位");
+        }
+        const selectedPrice = getSelectedStorePackagePrice(row, actionKey);
+        const tokens = generateStoreItemTokensForSdoPackage(row, {
+          store_rack_code: rackCode,
+          selected_price: selectedPrice,
+        });
+        writeOutput("#storeClerkHomeOutput", tokens);
+        renderStoreClerkHomeSummary({
+          store_code: storeClerkHomeState.store_code,
+          assigned_employee: storeClerkHomeState.assigned_employee,
+          active_package_key: actionKey,
+          last_action_message: `已生成 ${tokens.length} 个 STORE_ITEM 商品码。`,
+        });
+        return;
+      }
+      if (button.dataset.storePackagePreviewPrint || button.dataset.storePackagePrintItems) {
+        if (!getStorePackageTokens(actionKey).length) {
+          throw new Error("请先生成 STORE_ITEM 商品码");
+        }
+        const rackSelect = document.querySelector(`[data-store-package-rack="${CSS.escape(actionKey)}"]`);
+        if (!String(rackSelect?.value || "").trim()) {
+          throw new Error("请先选择货架位");
+        }
+        getSelectedStorePackagePrice(row, actionKey);
+        const qtyInput = document.querySelector(`[data-store-package-print-qty="${CSS.escape(actionKey)}"]`);
+        const previewTokens = buildStorePackagePrintPreviewTokens(actionKey, Number(qtyInput?.value || 0));
+        writeOutput("#storeClerkHomeOutput", previewTokens);
+        renderStoreClerkHomeSummary({
+          store_code: storeClerkHomeState.store_code,
+          assigned_employee: storeClerkHomeState.assigned_employee,
+          active_package_key: actionKey,
+          last_action_message: `本次预览 ${previewTokens.length} 个 STORE_ITEM 商品码。`,
+        });
+        return;
+      }
+      if (button.dataset.storePackageConfirmPrinted) {
+        markStorePackagePrintPreviewTokensPrinted(actionKey);
+        writeOutput("#storeClerkHomeOutput", getStorePackageTokens(actionKey));
+        renderStoreClerkHomeSummary({
+          store_code: storeClerkHomeState.store_code,
+          assigned_employee: storeClerkHomeState.assigned_employee,
+          active_package_key: actionKey,
+          last_action_message: "本次预览的商品码已标记为已打印。",
+        });
+        return;
+      }
+    }
     if (button.dataset.clerkBaleOpen) {
       const baleNo = String(button.dataset.clerkBaleOpen || "").trim().toUpperCase();
       const assignedEmployee = String(button.dataset.clerkBaleEmployee || "").trim();
@@ -34384,6 +35190,8 @@ renderPriceRuleResultSummary(null);
 renderLookupResultSummary(null);
 renderTableSummary(null, null);
 renderSaleResultSummary(null);
+renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
+renderOperationsAllSalesData(posStoreItemSaleRecordState);
 renderSaleVoidResultSummary(null);
 renderSaleRefundResultSummary(null);
 renderPaymentAnomalyResultSummary(null);

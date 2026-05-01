@@ -91,6 +91,10 @@ test("clerk package shelving step supports price selection and batch print previ
   const stepSource = extractFunctionSource(appJs, "renderStorePackageShelvingStep");
   const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
   const priceChoiceSource = extractFunctionSource(appJs, "getStorePackagePriceChoices");
+  const defaultPriceSource = extractFunctionSource(appJs, "getDefaultStoreSalePriceChoices");
+  const costSource = extractFunctionSource(appJs, "getStorePackageCostPrice");
+  const previewSource = extractFunctionSource(appJs, "buildStorePackagePrintPreviewTokens");
+  const markPrintedSource = extractFunctionSource(appJs, "markStorePackagePrintPreviewTokensPrinted");
 
   assert.match(stepSource, /上架设置/);
   assert.match(stepSource, /store_rack_code/);
@@ -111,8 +115,29 @@ test("clerk package shelving step supports price selection and batch print previ
   assert.match(appJs, /STORE_ITEM machine_code barcode/);
 
   assert.match(generateSource, /selected_price:\s*selectedPrice/);
+  assert.match(generateSource, /item_count_source:\s*1/);
+  assert.match(generateSource, /cost_price:\s*costPrice/);
+  assert.match(generateSource, /cost_status:\s*costPrice == null \? "unknown" : "known"/);
+  assert.match(generateSource, /source_cost_layer:\s*sourceCostLayer/);
+  assert.match(generateSource, /default_price_1:\s*priceChoices\.default_price_1/);
+  assert.match(generateSource, /default_price_2:\s*priceChoices\.default_price_2/);
   assert.match(generateSource, /print_status:\s*"pending_print"/);
   assert.match(generateSource, /machineCode = `5/);
+  assert.match(generateSource, /barcode_value:\s*machineCode/);
+  assert.match(costSource, /total_cost_kes/);
+  assert.match(costSource, /totalCost \/ itemCount/);
+  assert.match(costSource, /return null/);
+  assert.doesNotMatch(generateSource, /costPrice \|\| 0/);
+  assert.match(defaultPriceSource, /Math\.round\(costPrice \* 1\.8\)/);
+  assert.match(defaultPriceSource, /Math\.round\(costPrice \* 2\.2\)/);
+  assert.match(defaultPriceSource, /default_price_1:\s*150/);
+  assert.match(defaultPriceSource, /default_price_2:\s*200/);
+  assert.match(previewSource, /pending\.slice\(0, requested\)/);
+  assert.match(previewSource, /Math\.min\(.*pending\.length/);
+  assert.match(previewSource, /token\.machine_code/);
+  assert.match(markPrintedSource, /previewMachineCodes\.has/);
+  assert.match(markPrintedSource, /print_status:\s*"printed"/);
+  assert.match(markPrintedSource, /printed_at:/);
 
   assert.match(appJs, /function getSelectedStorePackagePrice/);
   assert.match(appJs, /function buildStorePackagePrintPreviewTokens/);
