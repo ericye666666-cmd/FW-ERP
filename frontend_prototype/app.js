@@ -1038,7 +1038,11 @@ let localPrintAgentState = {
   url: String(localStorage.getItem(STORAGE_KEYS.localPrintAgentUrl) || "http://127.0.0.1:8719").trim() || "http://127.0.0.1:8719",
   connected: false,
   checking: false,
+  printerChecking: false,
+  printers: [],
+  installStepsVisible: false,
   lastMessage: "",
+  printerMessage: "",
 };
 let baleBarcodeDirectoryNotice = null;
 let balePrinterConsoleNotice = null;
@@ -16734,9 +16738,29 @@ function renderBaleLocalPrintAgentStatus() {
     ? "检测中"
     : (localPrintAgentState.connected ? "已连接" : "未启动");
   const modeText = localPrintAgentState.connected ? "本地打印代理直打" : "请先启动 FW-ERP Print Agent";
-  const suffix = localPrintAgentState.lastMessage ? ` · ${localPrintAgentState.lastMessage}` : "";
+  const agentClass = localPrintAgentState.connected ? "flow-summary-note success" : "flow-summary-note warning";
+  const printers = Array.isArray(localPrintAgentState.printers) ? localPrintAgentState.printers : [];
+  const hasDeli = printers.some((printer) => normalizePrinterName(printer?.name || "").includes("deli"));
+  const printerText = localPrintAgentState.printerChecking
+    ? "正在检测本机打印机..."
+    : (hasDeli ? "已检测到 Deli DL-720C" : (localPrintAgentState.printerMessage || "尚未检测本机打印机"));
+  const helperMessage = localPrintAgentState.connected
+    ? "显示已连接后，可以点击“打印标签”。"
+    : "请先下载并启动 Windows 打印助手";
+  const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
   statusArea.className = "candidate-summary";
-  statusArea.textContent = `当前打印方式：${modeText} · 本地打印代理：${statusText} · URL: ${agentUrl}${suffix}`;
+  statusArea.innerHTML = `
+    <div class="${agentClass}">
+      <strong>FW-ERP 打印助手</strong>
+      <div>打印助手：${escapeHtml(statusText)}</div>
+      <div>本地地址：${escapeHtml(agentUrl)}</div>
+      <div>当前推荐：Windows 电脑请先启动打印助手，再点击“打印标签”</div>
+      <div>当前打印方式：${escapeHtml(modeText)}</div>
+      <div>${escapeHtml(helperMessage)}</div>
+      ${suffix}
+    </div>
+    <div class="subtle small">${escapeHtml(printerText)}</div>
+  `;
 }
 
 function renderBalePrintMethodStatus({
@@ -16796,6 +16820,36 @@ async function checkLocalPrintAgentHealth() {
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = "health failed";
     setLocalPrintAgentMessage("error", `本地打印代理未启动（${agentUrl}）。请先启动 FW-ERP Print Agent；浏览器打印在高级选项中作为备用。`);
+    renderBalePrintModal();
+    throw error;
+  }
+}
+
+async function checkLocalPrintAgentPrinters() {
+  const agentUrl = getLocalPrintAgentUrl();
+  localPrintAgentState.printerChecking = true;
+  localPrintAgentState.printerMessage = "";
+  renderBaleLocalPrintAgentStatus();
+  try {
+    const response = await fetch(`${agentUrl}/printers`, { method: "GET" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(String(payload?.warning || payload?.message || `printer check failed (${response.status})`));
+    }
+    const printers = Array.isArray(payload?.printers) ? payload.printers : [];
+    localPrintAgentState.printers = printers;
+    localPrintAgentState.printerChecking = false;
+    const hasDeli = printers.some((printer) => normalizePrinterName(printer?.name || "").includes("deli"));
+    localPrintAgentState.printerMessage = hasDeli
+      ? "已检测到 Deli DL-720C"
+      : (printers.length ? `已检测到 ${printers.length} 台本机打印机，未发现 Deli DL-720C。` : "当前未检测到本机打印机。");
+    setLocalPrintAgentMessage(hasDeli ? "success" : "warning", localPrintAgentState.printerMessage);
+    renderBalePrintModal();
+    return payload;
+  } catch (error) {
+    localPrintAgentState.printerChecking = false;
+    localPrintAgentState.printerMessage = "检测本机打印机失败，请确认打印助手已经启动。";
+    setLocalPrintAgentMessage("error", localPrintAgentState.printerMessage);
     renderBalePrintModal();
     throw error;
   }
@@ -16985,6 +17039,9 @@ function renderBalePrintModal() {
   const primaryPrintButton = document.querySelector("#balePrintModalPrimaryPrintButton");
   const primaryPrintAllButton = document.querySelector("#balePrintModalPrimaryPrintAllButton");
   const checkLocalAgentButton = document.querySelector("#balePrintModalCheckLocalAgentButton");
+  const checkLocalPrintersButton = document.querySelector("#balePrintModalCheckLocalPrintersButton");
+  const installStepsButton = document.querySelector("#balePrintModalInstallStepsButton");
+  const installSteps = document.querySelector("#balePrintModalInstallSteps");
   const localAgentPrintButton = document.querySelector("#balePrintModalLocalAgentPrintButton");
   const connectButton = document.querySelector("#balePrintModalConnectButton");
   const directPrintButton = document.querySelector("#balePrintModalDirectPrintButton");
@@ -17191,6 +17248,15 @@ function renderBalePrintModal() {
   }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
     checkLocalAgentButton.disabled = Boolean(localPrintAgentState.checking);
+  }
+  if (checkLocalPrintersButton instanceof HTMLButtonElement) {
+    checkLocalPrintersButton.disabled = Boolean(localPrintAgentState.printerChecking);
+  }
+  if (installStepsButton instanceof HTMLButtonElement) {
+    installStepsButton.textContent = localPrintAgentState.installStepsVisible ? "收起安装步骤" : "查看安装步骤";
+  }
+  if (installSteps instanceof HTMLElement) {
+    installSteps.classList.toggle("hidden-screen", !localPrintAgentState.installStepsVisible);
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob;
@@ -31541,6 +31607,16 @@ document.querySelector("#balePrintModalCheckLocalAgentButton")?.addEventListener
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
+});
+document.querySelector("#balePrintModalCheckLocalPrintersButton")?.addEventListener("click", () => {
+  checkLocalPrintAgentPrinters().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
+});
+document.querySelector("#balePrintModalInstallStepsButton")?.addEventListener("click", () => {
+  localPrintAgentState.installStepsVisible = !localPrintAgentState.installStepsVisible;
+  renderBalePrintModal();
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {
