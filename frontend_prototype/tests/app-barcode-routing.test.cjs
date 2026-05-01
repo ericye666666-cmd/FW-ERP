@@ -14,7 +14,7 @@ test("formal app loads barcode resolver before app.js", () => {
 test("high-risk scan pages call the global resolver with explicit context", () => {
   assert.match(appJs, /resolveBarcodeForContext\(baleCode,\s*"warehouse_sorting_create",\s*\["RAW_BALE"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\],\s*"store_receiving",\s*\["STORE_DELIVERY_EXECUTION"\]\)/);
-  assert.match(appJs, /resolveBarcodeForContext\(baleNo,\s*"store_receiving",\s*\["DISPATCH_BALE"\]\)/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(baleNo,\s*"store_receiving",\s*\["DISPATCH_BALE"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.bale_no,\s*"store_pda",\s*\["DISPATCH_BALE"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.barcode,\s*"pos",\s*\["STORE_ITEM"\]\)/);
