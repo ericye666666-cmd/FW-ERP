@@ -17,6 +17,9 @@ const employeeBat = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/sta
   ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"), "utf8")
   : "";
 const readme = fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/README.md"), "utf8");
+const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"))
+  ? fs.readFileSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"), "utf8")
+  : "";
 
 test("print modal advanced options expose the Windows print helper controls", () => {
   assert.match(indexHtml, /FW-ERP 打印助手/);
@@ -85,8 +88,31 @@ test("print agent README separates employee startup from developer exe build", (
   assert.match(readme, /管理员 \/ 开发者/);
   assert.match(readme, /PyInstaller/);
   assert.match(readme, /build_windows_exe\.ps1/);
-  const employeeSection = readme.split("## 普通员工")[1]?.split("## 管理员 / 开发者")[0] || "";
+  const employeeSection = readme.split("## 普通员工")[1]?.split("## GitHub Actions 自动打包")[0] || "";
   assert.doesNotMatch(employeeSection, /python\.org/i);
   assert.doesNotMatch(employeeSection, /python -m/i);
   assert.doesNotMatch(employeeSection, /PyInstaller/);
+});
+
+test("GitHub Actions workflow builds Windows print agent artifacts", () => {
+  assert.match(githubWorkflow, /name:\s*Build Windows Print Agent/);
+  assert.match(githubWorkflow, /workflow_dispatch:/);
+  assert.match(githubWorkflow, /ops\/local_print_agent\/\*\*/);
+  assert.match(githubWorkflow, /\.github\/workflows\/build-windows-print-agent\.yml/);
+  assert.match(githubWorkflow, /runs-on:\s*windows-latest/);
+  assert.match(githubWorkflow, /actions\/setup-python@v5/);
+  assert.match(githubWorkflow, /python -m pip install pyinstaller/);
+  assert.match(githubWorkflow, /build_windows_exe\.ps1/);
+  assert.match(githubWorkflow, /package_windows_agent\.ps1/);
+  assert.match(githubWorkflow, /FW-ERP-Print-Agent\.exe/);
+  assert.match(githubWorkflow, /fw-erp-print-agent-windows\.zip/);
+  assert.match(githubWorkflow, /actions\/upload-artifact@v4/);
+});
+
+test("print agent README documents GitHub Actions build path", () => {
+  assert.match(readme, /GitHub Actions/);
+  assert.match(readme, /Build Windows Print Agent/);
+  assert.match(readme, /workflow_dispatch/);
+  assert.match(readme, /Artifacts/);
+  assert.match(readme, /\/downloads\/fw-erp-print-agent-windows\.zip/);
 });
