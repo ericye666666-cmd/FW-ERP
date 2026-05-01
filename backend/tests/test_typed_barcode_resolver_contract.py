@@ -502,5 +502,8 @@ def test_raw_bale_print_payload_uses_type_1_machine_code(state):
     state._hydrate_bale_print_jobs()
     assert job["print_payload"]["display_code"] == raw_bale["bale_barcode"]
     assert job["print_payload"]["barcode_value"] == raw_bale["machine_code"]
+    assert job["print_payload"]["display_code"] != job["print_payload"]["barcode_value"]
+    assert job["print_payload"]["scan_token"] == raw_bale["machine_code"]
     assert job["print_payload"]["machine_code"] == raw_bale["machine_code"]
+    assert job["print_payload"]["human_readable"] == raw_bale["machine_code"]
     assert job["print_payload"]["barcode_value"].startswith("1")

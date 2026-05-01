@@ -16721,11 +16721,41 @@ function renderBaleLocalPrintAgentStatus() {
   }
   const agentUrl = getLocalPrintAgentUrl();
   const statusText = localPrintAgentState.checking
-    ? "checking"
-    : (localPrintAgentState.connected ? "connected" : "not connected");
+    ? "检测中"
+    : (localPrintAgentState.connected ? "已连接" : "未连接");
   const suffix = localPrintAgentState.lastMessage ? ` · ${localPrintAgentState.lastMessage}` : "";
   statusArea.className = "candidate-summary";
-  statusArea.textContent = `Local print agent: ${statusText} · URL: ${agentUrl}${suffix}`;
+  statusArea.textContent = `本地打印代理：${statusText} · URL: ${agentUrl}${suffix}`;
+}
+
+function renderBalePrintMethodStatus({
+  selectedPrinterName = "Deli DL-720C",
+  selectedTemplate = null,
+  supportsTemplate = true,
+  usesTsplMode = false,
+} = {}) {
+  const printerName = String(selectedPrinterName || "Deli DL-720C").trim() || "Deli DL-720C";
+  const sizeLabel = getSelectedBaleTemplateSizeLabel(selectedTemplate || {});
+  const queueNote = !supportsTemplate && !usesTsplMode
+    ? `<div>本地代理队列暂不支持 ${escapeHtml(sizeLabel)}，浏览器打印仍可使用。</div>`
+    : "";
+  if (localPrintAgentState.connected) {
+    return `
+      <strong>当前打印方式：本地打印代理</strong>
+      <div>本地打印代理：已连接</div>
+      <div>浏览器打印状态：可用作备用</div>
+      <div>推荐操作：点击“打印标签”，打印机会按本地代理返回的队列执行。</div>
+      ${queueNote}
+    `;
+  }
+  return `
+    <strong>当前打印方式：浏览器打印</strong>
+    <div>Windows 打印机：请在系统打印窗口选择 ${escapeHtml(printerName.replace(/_/g, " "))}</div>
+    <div>本地打印代理：未连接</div>
+    <div>浏览器打印状态：可用</div>
+    <div>推荐操作：点击“打印标签”，在系统打印窗口选择 ${escapeHtml(printerName.replace(/_/g, " "))}。</div>
+    ${queueNote}
+  `;
 }
 
 async function checkLocalPrintAgentHealth() {
@@ -16754,7 +16784,7 @@ async function checkLocalPrintAgentHealth() {
     localPrintAgentState.connected = false;
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = "health failed";
-    setLocalPrintAgentMessage("error", `本地打印代理不可用（${agentUrl}）。请先启动 FW-ERP Local Print Agent，或改用“${chooseI18nLabel("用浏览器打印", "Use browser print")}”。`);
+    setLocalPrintAgentMessage("error", `本地打印代理：未连接（${agentUrl}）。浏览器打印仍可使用。`);
     renderBalePrintModal();
     throw error;
   }
@@ -16822,7 +16852,7 @@ async function printCurrentBaleModalPrimaryAction() {
   }
   balePrinterConsoleNotice = {
     type: "warning",
-    message: "未检测到本地打印代理，当前将使用浏览器打印。",
+    message: "当前打印方式：浏览器打印。请在系统打印窗口选择 Deli DL-720C。",
   };
   return browserPrintCurrentBaleModalJob();
 }
@@ -16843,7 +16873,7 @@ async function printAllBaleModalPrimaryAction() {
   if (!localPrintAgentState.connected) {
     balePrinterConsoleNotice = {
       type: "warning",
-      message: "未检测到本地打印代理，当前将使用浏览器打印。请在浏览器打印窗口里打印当前张。",
+      message: "当前打印方式：浏览器打印。请在系统打印窗口选择 Deli DL-720C，并从当前张开始打印。",
     };
     browserPrintCurrentBaleModalJob();
     return;
@@ -16965,10 +16995,16 @@ function renderBalePrintModal() {
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
       ? "浏览器打印/PDF会输出与预览一致的 LPK 标签 HTML（含条码值），可直接用于仓库工单留档。"
-      : "技术说明：Cloud staging 不能直接访问 USB 打印机；未连接本地打印代理时会使用浏览器打印。";
+      : "高级说明：本地打印代理未连接时，主按钮会自动使用浏览器打印；Windows 打印机请在系统打印窗口选择。";
   }
   if (agentFallback instanceof HTMLElement) {
-    agentFallback.classList.toggle("hidden-screen", !currentJob || Boolean(localPrintAgentState.connected));
+    agentFallback.className = `flow-summary-note ${localPrintAgentState.connected ? "success" : "warning"}${currentJob ? "" : " hidden-screen"}`;
+    agentFallback.innerHTML = renderBalePrintMethodStatus({
+      selectedPrinterName,
+      selectedTemplate,
+      supportsTemplate,
+      usesTsplMode,
+    });
   }
 
   if (summary) {
@@ -17004,8 +17040,8 @@ function renderBalePrintModal() {
         <div class="button-row bale-modal-status-row">
           <span class="meta-pill">${escapeHtml(selectedTemplate.barcode_type || "Code128")} 一维码</span>
           <span class="meta-pill">当前测试 ${selectedTemplate.width_mm || 60}x${selectedTemplate.height_mm || 40}</span>
-          <span class="meta-pill">${escapeHtml(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "待安装打印机")}</span>
-          <span class="meta-pill ${supportsTemplate ? "" : "warning-pill"}">${usesTsplMode ? "标签机 TSPL 直打" : (supportsTemplate ? `支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}` : `当前队列不支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}`)}</span>
+          <span class="meta-pill">${escapeHtml(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "Windows 打印窗口选择打印机")}</span>
+          <span class="meta-pill ${supportsTemplate ? "" : "warning-pill"}">${usesTsplMode ? "标签机 TSPL 直打" : (supportsTemplate ? `本地代理队列支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}` : `本地代理队列暂不支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}，浏览器打印仍可使用。`)}</span>
           ${
             balePrinterConsoleNotice
               ? `<span class="meta-pill">${escapeHtml(balePrinterConsoleNotice.message)}</span>`
@@ -17013,7 +17049,7 @@ function renderBalePrintModal() {
           }
         </div>
         ${selectedPrinter && !supportsTemplate && !usesTsplMode
-          ? `<div class="alert-banner">当前这台 ${escapeHtml(selectedPrinterName.replace(/_/g, " "))} 打印队列没有暴露 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))} 标签纸尺寸。任务可能发送成功，但打印机不会实际出纸。</div>`
+          ? `<div class="alert-banner">本地代理队列暂不支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}，浏览器打印仍可使用。请点击“打印标签”，在系统打印窗口选择 ${escapeHtml(selectedPrinterName.replace(/_/g, " "))}。</div>`
           : ""}
         ${selectedPrinter && usesTsplMode
           ? `<div class="flow-summary-note success">当前已切换为 TSPL 原始指令直打，不依赖 macOS 的 A4/Letter 纸张队列。请直接测试是否正常出纸。</div>`
@@ -17139,7 +17175,7 @@ async function getBaleModalPrintContext() {
   balePrintModalState.preferredTemplateCode = templateCode;
   const selectedTemplate = getSelectedBaleTemplate(templateCode, templateScope, activeTaskType);
   if (!usesTsplMode && !printerSupportsBaleTemplate(matchedPrinter, selectedTemplate)) {
-    throw new Error(`当前系统打印队列没有 ${getSelectedBaleTemplateSizeLabel(selectedTemplate)} 标签纸尺寸。请先把 Deli 打印机按标签机纸张重新配置后再打。`);
+    throw new Error(`本地代理队列暂不支持 ${getSelectedBaleTemplateSizeLabel(selectedTemplate)}，浏览器打印仍可使用。`);
   }
   return {
     printerName,
@@ -17165,43 +17201,49 @@ function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = 
       totalJobs,
     });
   }
+  const printPayload = job?.print_payload || {};
+  const machineCode = String(printPayload.machine_code || printPayload.barcode_value || printPayload.scan_token || job?.barcode || "").trim();
+  const displayCode = String(printPayload.display_code || printPayload.bale_barcode || job?.barcode || "").trim();
   return {
     printer_name: String(document.querySelector("[data-bale-modal-printer-select]")?.value || document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "").trim(),
     template_code: String(document.querySelector("[data-bale-modal-template-select]")?.value || getActiveBaleTemplateCode()).trim() || getActiveBaleTemplateCode(),
     copies: Number(job?.copies || 1) || 1,
-    barcode_value: String(job?.print_payload?.scan_token || job?.print_payload?.barcode_value || job?.barcode || "").trim(),
-    scan_token: String(job?.print_payload?.scan_token || job?.print_payload?.barcode_value || "").trim(),
-    bale_barcode: String(job?.barcode || job?.print_payload?.bale_barcode || "").trim(),
-    legacy_bale_barcode: String(job?.print_payload?.legacy_bale_barcode || "").trim(),
-    supplier_name: String(job?.print_payload?.supplier_name || balePrintModalState.supplierName || "").trim(),
-    category_main: String(job?.print_payload?.category_main || "").trim(),
-    category_sub: String(job?.print_payload?.category_sub || "").trim(),
-    category_display: String(job?.print_payload?.category_display || balePrintModalState.categoryDisplay || job?.product_name || "").trim(),
+    barcode_value: machineCode,
+    scan_token: machineCode,
+    display_code: displayCode,
+    machine_code: machineCode,
+    human_readable: String(printPayload.human_readable || machineCode).trim(),
+    bale_barcode: String(job?.barcode || printPayload.bale_barcode || displayCode || "").trim(),
+    legacy_bale_barcode: String(printPayload.legacy_bale_barcode || "").trim(),
+    supplier_name: String(printPayload.supplier_name || balePrintModalState.supplierName || "").trim(),
+    category_main: String(printPayload.category_main || "").trim(),
+    category_sub: String(printPayload.category_sub || "").trim(),
+    category_display: String(printPayload.category_display || balePrintModalState.categoryDisplay || job?.product_name || "").trim(),
     package_position_label: String(
-      job?.print_payload?.package_position_label
-        || job?.print_payload?.package_position
-        || `第 ${job?.print_payload?.serial_no || currentIndex + 1} 包 / 共 ${job?.print_payload?.total_packages || totalJobs || 1} 包`,
+      printPayload.package_position_label
+        || printPayload.package_position
+        || `第 ${printPayload.serial_no || currentIndex + 1} 包 / 共 ${printPayload.total_packages || totalJobs || 1} 包`,
     ).trim(),
-    serial_no: Number(job?.print_payload?.serial_no || currentIndex + 1 || 0),
-    total_packages: Number(job?.print_payload?.total_packages || totalJobs || 0),
-    shipment_no: String(job?.print_payload?.shipment_no || "").trim(),
-    parcel_batch_no: String(job?.print_payload?.parcel_batch_no || "").trim(),
-    unload_date: String(job?.print_payload?.unload_date || job?.print_payload?.received_at || "").trim(),
+    serial_no: Number(printPayload.serial_no || currentIndex + 1 || 0),
+    total_packages: Number(printPayload.total_packages || totalJobs || 0),
+    shipment_no: String(printPayload.shipment_no || "").trim(),
+    parcel_batch_no: String(printPayload.parcel_batch_no || "").trim(),
+    unload_date: String(printPayload.unload_date || printPayload.received_at || "").trim(),
     template_scope: templateScope,
-    store_name: String(job?.print_payload?.store_name || "").trim(),
-    transfer_order_no: String(job?.print_payload?.transfer_order_no || "").trim(),
-    bale_piece_summary: String(job?.print_payload?.bale_piece_summary || "").trim(),
-    total_quantity: String(job?.print_payload?.total_quantity || "").trim(),
-    packing_list: String(job?.print_payload?.packing_list || "").trim(),
-    dispatch_bale_no: String(job?.print_payload?.dispatch_bale_no || job?.print_payload?.scan_token || job?.print_payload?.barcode_value || job?.barcode || "").trim(),
-    outbound_time: String(job?.print_payload?.outbound_time || "").trim(),
-    status: String(job?.print_payload?.status || (activeTaskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH")).trim(),
-    cat: String(job?.print_payload?.cat || job?.print_payload?.category_main || "").trim(),
-    sub: String(job?.print_payload?.sub || job?.print_payload?.category_sub || "").trim(),
-    grade: String(job?.print_payload?.grade || job?.print_payload?.grade_summary || "").trim(),
-    qty: String(job?.print_payload?.qty || "").trim(),
-    weight: String(job?.print_payload?.weight || "").trim(),
-    code: String(job?.print_payload?.code || job?.print_payload?.dispatch_bale_no || job?.print_payload?.scan_token || job?.print_payload?.barcode_value || job?.barcode || "").trim(),
+    store_name: String(printPayload.store_name || "").trim(),
+    transfer_order_no: String(printPayload.transfer_order_no || "").trim(),
+    bale_piece_summary: String(printPayload.bale_piece_summary || "").trim(),
+    total_quantity: String(printPayload.total_quantity || "").trim(),
+    packing_list: String(printPayload.packing_list || "").trim(),
+    dispatch_bale_no: String(printPayload.dispatch_bale_no || printPayload.scan_token || printPayload.barcode_value || job?.barcode || "").trim(),
+    outbound_time: String(printPayload.outbound_time || "").trim(),
+    status: String(printPayload.status || (activeTaskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH")).trim(),
+    cat: String(printPayload.cat || printPayload.category_main || "").trim(),
+    sub: String(printPayload.sub || printPayload.category_sub || "").trim(),
+    grade: String(printPayload.grade || printPayload.grade_summary || "").trim(),
+    qty: String(printPayload.qty || "").trim(),
+    weight: String(printPayload.weight || "").trim(),
+    code: String(printPayload.code || printPayload.dispatch_bale_no || printPayload.scan_token || printPayload.barcode_value || job?.barcode || "").trim(),
   };
 }
 

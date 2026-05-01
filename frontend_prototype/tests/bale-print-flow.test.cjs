@@ -198,6 +198,34 @@ test("buildBaleDirectPrintPayload keeps shipment trace fields for batch TSPL pri
   assert.equal(payload.barcode_value, "RB042220000003");
 });
 
+test("buildBaleDirectPrintPayload uses RAW_BALE machine_code for printable barcode", () => {
+  const payload = buildBaleDirectPrintPayload(
+    {
+      barcode: "RB260427AAAAB",
+      copies: 1,
+      print_payload: {
+        display_code: "RB260427AAAAB",
+        bale_barcode: "RB260427AAAAB",
+        scan_token: "RB260427AAAAB",
+        barcode_value: "1260427001",
+        machine_code: "1260427001",
+        human_readable: "1260427001",
+        supplier_name: "Youxun",
+        category_main: "Summer+",
+        category_sub: "wait identify",
+      },
+    },
+    { printerName: "Deli DL-720C", templateCode: "warehouse_in", currentIndex: 0, totalJobs: 1 },
+  );
+
+  assert.equal(payload.display_code, "RB260427AAAAB");
+  assert.equal(payload.bale_barcode, "RB260427AAAAB");
+  assert.equal(payload.machine_code, "1260427001");
+  assert.equal(payload.barcode_value, "1260427001");
+  assert.equal(payload.scan_token, "1260427001");
+  assert.equal(payload.human_readable, "1260427001");
+});
+
 test("buildBalePrintStationJobPayload keeps bale metadata for cloud queue printing", () => {
   const payload = buildBalePrintStationJobPayload(
     {

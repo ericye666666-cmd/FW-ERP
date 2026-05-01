@@ -53,7 +53,10 @@ test("bale print modal keeps field operators on primary print actions", () => {
   assert.match(indexHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?打印全部/);
   assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认本包已贴标/);
   assert.match(indexHtml, /id="balePrintModalCloseAndRefreshButton"[\s\S]*?取消并返回/);
-  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?未检测到本地打印代理，当前将使用浏览器打印。/);
+  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?当前打印方式：浏览器打印/);
+  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?Windows 打印机：请在系统打印窗口选择 Deli DL-720C/);
+  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?本地打印代理：未连接/);
+  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?推荐操作：点击“打印标签”，在系统打印窗口选择 Deli DL-720C。/);
 });
 
 test("bale print modal moves technical print controls into collapsed advanced options", () => {
@@ -66,7 +69,13 @@ test("bale print modal moves technical print controls into collapsed advanced op
 test("primary bale print action auto-selects local agent or browser fallback", () => {
   assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?browserPrintCurrentBaleModalJob\(\)/);
   assert.match(appJs, /document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click"/);
-  assert.match(appJs, /未检测到本地打印代理，当前将使用浏览器打印。/);
+  assert.match(appJs, /当前打印方式：浏览器打印/);
+  assert.match(appJs, /selectedPrinterName = "Deli DL-720C"/);
+  assert.match(appJs, /Windows 打印机：请在系统打印窗口选择 \$\{escapeHtml\(printerName\.replace/);
+  assert.match(appJs, /本地打印代理：未连接/);
+  assert.match(appJs, /本地代理队列暂不支持/);
+  assert.doesNotMatch(appJs, /待安装打印机/);
+  assert.doesNotMatch(appJs, /当前队列不支持/);
   assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
   assert.match(appJs, /frameWindow\.print\(\)/);
 });
