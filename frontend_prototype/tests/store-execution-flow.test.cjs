@@ -24,10 +24,10 @@ const {
 } = loadStoreExecutionFlow();
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-const storeDispatchSectionHtml = (indexHtml.match(/<section class="panel store-support-panel" data-workspace-panel="store">[\s\S]*?<h2>6\. 门店验收配货 bale<\/h2>[\s\S]*?<pre id="storeDispatchBaleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
+const storeDispatchSectionHtml = (indexHtml.match(/<section class="panel store-support-panel(?: hidden-screen)?" data-workspace-panel="store">[\s\S]*?<form id="storeDispatchBaleAcceptForm"[\s\S]*?<pre id="storeDispatchBaleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
 const storeDispatchAssignmentSectionHtml = (indexHtml.match(/<form id="storeDispatchAssignmentForm" class="sorting-task-form warehouse-step-form">[\s\S]*?<pre id="storeDispatchAssignmentOutput" class="output hidden-output"><\/pre>/) || [""])[0];
 const testingToolsSectionHtml = (indexHtml.match(/<section class="panel" data-workspace-panel="testing">[\s\S]*?<h2>测试工具<\/h2>[\s\S]*?<pre id="storeRecentSalesSimulationOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
-const storeManagerConsoleSectionHtml = (indexHtml.match(/<section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">[\s\S]*?<h2>5\. 门店执行控制台<\/h2>[\s\S]*?<pre id="storeManagerConsoleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
+const storeManagerConsoleSectionHtml = (indexHtml.match(/<section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">[\s\S]*?<h2>5\. 门店收货主控台<\/h2>[\s\S]*?<pre id="storeManagerConsoleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 
 test("getStoreRoleLanding sends store clerks to my current bale instead of the manager console", () => {
@@ -165,14 +165,13 @@ test("store dispatch acceptance page removes directory filters and keeps only ba
   assert.match(appJs, /function resolveStoreReceiptBaleNo/);
   assert.match(appJs, /function parseStoreReceiptScannedBaleNos/);
   assert.match(appJs, /function splitStoreReceiptContinuousChunk/);
-  assert.match(appJs, /function buildStoreReceiptBatchPlan/);
+  assert.match(appJs, /function getStoreReceiptTransferRows/);
+  assert.match(appJs, /function getStoreReceiptSdoStatusText/);
   assert.match(appJs, /function normalizeStoreReceiptBaleInputFromForm/);
   assert.match(appJs, /function renderStoreReceiptTransferBaleList/);
-  assert.match(appJs, /SDB026042500005/);
-  assert.match(appJs, /genericShort = remaining\.match\(/);
-  assert.match(appJs, /\^SDB\\d\{1,3\}/);
-  assert.match(appJs, /if \(remaining === "SDB"\)/);
-  assert.match(appJs, /if \(unresolvedRows\.length === 1\)/);
+  assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\], "store_receiving", \["STORE_DELIVERY_EXECUTION"\]\)/);
+  assert.match(appJs, /门店收货只扫正式门店送货执行码/);
+  assert.match(appJs, /SDB 和 LPK 仍然只是仓库内部核对码/);
   assert.match(appJs, /#storeDispatchBaleAcceptForm \[name='bale_no'\][\s\S]*addEventListener\("input"/);
 });
 
@@ -188,7 +187,7 @@ test("store manager can assign a transfer order batch or pasted dispatch bales i
   assert.match(appJs, /function parseStoreDispatchAssignmentBaleNos/);
   assert.match(appJs, /async function resolveStoreDispatchAssignmentTargets/);
   assert.match(appJs, /function renderStoreDispatchAssignmentOverview/);
-  assert.match(appJs, /待签收总单 \/ bale/);
+  assert.match(appJs, /SDB \/ LPK 仅作来源码核对/);
   assert.match(appJs, /data-store-receipt-transfer-fill/);
   assert.match(appJs, /transfer_no/);
   assert.match(appJs, /Promise\.all/);
