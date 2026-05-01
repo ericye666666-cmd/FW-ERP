@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import re
 import shutil
@@ -105,6 +106,103 @@ def _resolve_printer_name_unix(requested_printer: str) -> tuple[str, str | None]
     return requested, warning or "No local printers were found by lpstat."
 
 
+def _coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _parse_windows_printer_json(raw_json: str) -> tuple[list[dict], str | None]:
+    text = str(raw_json or "").strip()
+    if not text:
+        return [], "Get-Printer returned no printers."
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return [], f"Get-Printer returned invalid JSON: {exc}"
+
+    rows = parsed if isinstance(parsed, list) else [parsed]
+    printers: list[dict] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("Name") or row.get("name") or "").strip()
+        if not name:
+            continue
+        work_offline = _coerce_bool(row.get("WorkOffline") or row.get("work_offline"))
+        raw_status = str(row.get("PrinterStatus") or row.get("Status") or row.get("status") or "").strip()
+        status_lower = raw_status.lower()
+        is_problem_status = any(
+            marker in status_lower
+            for marker in ("offline", "error", "paper", "jam", "paused", "unavailable")
+        )
+        printers.append(
+            {
+                "name": name,
+                "is_default": _coerce_bool(row.get("IsDefault") or row.get("Default") or row.get("is_default")),
+                "status": "offline" if work_offline else ("unavailable" if is_problem_status else "available"),
+                "raw_status": raw_status or ("Offline" if work_offline else "Normal"),
+            }
+        )
+
+    if not printers:
+        return [], "Get-Printer returned no usable printer names."
+    return printers, None
+
+
+def _list_printers_windows() -> tuple[list[dict], str | None]:
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-Command",
+        (
+            "$ErrorActionPreference = 'Stop'; "
+            "$defaultPrinter = (Get-CimInstance Win32_Printer | "
+            "Where-Object { $_.Default -eq $true } | "
+            "Select-Object -First 1 -ExpandProperty Name); "
+            "Get-Printer | ForEach-Object { "
+            "[pscustomobject]@{ "
+            "Name = $_.Name; "
+            "PrinterStatus = [string]$_.PrinterStatus; "
+            "WorkOffline = [bool]$_.WorkOffline; "
+            "IsDefault = ($_.Name -eq $defaultPrinter) "
+            "} } | ConvertTo-Json -Compress"
+        ),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "unknown Get-Printer error"
+        return [], f"Get-Printer failed: {err}"
+    return _parse_windows_printer_json(result.stdout)
+
+
+def _resolve_printer_name_windows(requested_printer: str) -> tuple[str, str | None]:
+    requested = str(requested_printer or "").strip()
+    if not requested:
+        return requested, "No printer name was provided."
+
+    printers, warning = _list_printers_windows()
+    for printer in printers:
+        name = str(printer.get("name") or "").strip()
+        if name == requested:
+            return name, warning
+
+    requested_norm = _normalize_printer_name(requested)
+    for printer in printers:
+        name = str(printer.get("name") or "").strip()
+        printer_norm = _normalize_printer_name(name)
+        if not printer_norm:
+            continue
+        if printer_norm == requested_norm:
+            return name, f"Matched requested printer '{requested}' to Windows queue '{name}'."
+        if printer_norm.startswith(requested_norm) or requested_norm.startswith(printer_norm):
+            return name, f"Matched requested printer '{requested}' to Windows queue '{name}'."
+
+    if printers:
+        return requested, f"Requested printer '{requested}' was not found. Available printers: {', '.join(str(p.get('name') or '') for p in printers)}"
+    return requested, warning or "No Windows printers were found by Get-Printer."
+
+
 def _print_html_unix(printer: str, html_path: str) -> tuple[bool, str, str]:
     if not shutil.which("lp"):
         return False, "lp command is not available. Install CUPS or use browser print fallback.", printer
@@ -188,6 +286,195 @@ def _print_text_windows(printer_name: str, text_content: str) -> tuple[bool, str
         return False, message, text_path
 
     return True, f"Printed via Windows Out-Printer to '{printer_name}'.", text_path
+
+
+def _clean_positive_int(value: object, *, default: int = 1, maximum: int = 20) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(1, min(parsed, maximum))
+
+
+def _normalize_template_size(value: object) -> str:
+    raw = str(value or "").strip().lower().replace(" ", "")
+    if raw in {"60x40", "60×40", "60*40", "60mmx40mm"}:
+        return "60x40"
+    return raw or "60x40"
+
+
+def _looks_like_machine_code(value: object) -> bool:
+    return bool(re.fullmatch(r"[1-5][0-9]{5,}", str(value or "").strip()))
+
+
+def _select_barcode_value(payload: dict) -> tuple[str, str | None]:
+    label_payload = payload.get("label_payload") if isinstance(payload.get("label_payload"), dict) else {}
+    candidates = [
+        label_payload.get("barcode_value"),
+        payload.get("barcode_value"),
+        label_payload.get("machine_code"),
+        payload.get("machine_code"),
+    ]
+    machine_candidates = [
+        label_payload.get("machine_code"),
+        payload.get("machine_code"),
+    ]
+
+    for candidate in candidates:
+        cleaned = re.sub(r"[^A-Za-z0-9]", "", str(candidate or "").strip()).upper()
+        if _looks_like_machine_code(cleaned):
+            return cleaned, None
+
+    for candidate in machine_candidates:
+        cleaned = re.sub(r"[^A-Za-z0-9]", "", str(candidate or "").strip()).upper()
+        if cleaned:
+            return cleaned, "Machine code does not match the expected numeric barcode prefix."
+
+    display_code = str(label_payload.get("display_code") or payload.get("display_code") or "").strip()
+    return "", f"Missing machine barcode value. Display code '{display_code}' will not be used as the encoded barcode."
+
+
+def _normalize_print_html_request(payload: dict) -> tuple[dict, str | None]:
+    html = payload.get("html")
+    if not html or not isinstance(html, str):
+        return {}, "Invalid request: 'html' string is required."
+
+    printer = payload.get("printer_name") or payload.get("printer")
+    if not printer or not isinstance(printer, str):
+        return {}, "Invalid request: 'printer_name' string is required."
+
+    barcode_value, warning = _select_barcode_value(payload)
+    label_payload = payload.get("label_payload") if isinstance(payload.get("label_payload"), dict) else {}
+    display_code = str(label_payload.get("display_code") or payload.get("display_code") or "").strip()
+    return (
+        {
+            "html": html,
+            "printer_name": printer.strip(),
+            "copies": _clean_positive_int(payload.get("copies"), default=1, maximum=20),
+            "template_size": _normalize_template_size(payload.get("template_size")),
+            "barcode_value": barcode_value,
+            "display_code": display_code,
+            "label_payload": label_payload,
+            "warning": warning,
+        },
+        None,
+    )
+
+
+def _powershell_single_quote(value: object) -> str:
+    return str(value or "").replace("'", "''")
+
+
+def _windows_file_uri(path: str) -> str:
+    normalized = str(path or "").replace("\\", "/")
+    if re.match(r"^[A-Za-z]:/", normalized):
+        return f"file:///{normalized}"
+    if normalized.startswith("//"):
+        return f"file:{normalized}"
+    return Path(normalized).resolve().as_uri()
+
+
+def _find_windows_browser() -> str:
+    explicit = os.environ.get("FWERP_PRINT_BROWSER_PATH", "").strip()
+    candidates = [
+        explicit,
+        shutil.which("msedge") or "",
+        shutil.which("chrome") or "",
+        shutil.which("chrome.exe") or "",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return ""
+
+
+def _build_windows_html_print_script(
+    *,
+    printer_name: str,
+    browser_path: str,
+    html_path: str,
+    copies: int,
+    wait_seconds: int = 8,
+    browser_profile_dir: str = "",
+) -> str:
+    profile_dir = browser_profile_dir or tempfile.mkdtemp(prefix="fwerp-print-agent-browser-")
+    file_uri = _windows_file_uri(html_path)
+    return (
+        "$ErrorActionPreference = 'Stop'; "
+        f"$targetPrinter = '{_powershell_single_quote(printer_name)}'; "
+        f"$browserPath = '{_powershell_single_quote(browser_path)}'; "
+        f"$fileUri = '{_powershell_single_quote(file_uri)}'; "
+        f"$profileDir = '{_powershell_single_quote(profile_dir)}'; "
+        f"$copies = {int(copies)}; "
+        f"$waitSeconds = {int(wait_seconds)}; "
+        "$previousDefault = (Get-CimInstance Win32_Printer | "
+        "Where-Object { $_.Default -eq $true } | "
+        "Select-Object -First 1 -ExpandProperty Name); "
+        "Get-Printer -Name $targetPrinter -ErrorAction Stop | Out-Null; "
+        "$network = New-Object -ComObject WScript.Network; "
+        "$network.SetDefaultPrinter($targetPrinter); "
+        "try { "
+        "New-Item -ItemType Directory -Force -Path $profileDir | Out-Null; "
+        "for ($i = 0; $i -lt $copies; $i++) { "
+        "$args = @('--kiosk-printing','--disable-print-preview','--no-first-run',"
+        "'--disable-extensions','--user-data-dir=' + $profileDir,$fileUri); "
+        "$proc = Start-Process -FilePath $browserPath -ArgumentList $args -PassThru; "
+        "Start-Sleep -Seconds $waitSeconds; "
+        "if ($proc -and -not $proc.HasExited) { "
+        "$proc.CloseMainWindow() | Out-Null; "
+        "Start-Sleep -Milliseconds 800; "
+        "if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } "
+        "} "
+        "} "
+        "} finally { "
+        "if ($previousDefault) { $network.SetDefaultPrinter($previousDefault) } "
+        "}"
+    )
+
+
+def _print_html_windows(
+    *,
+    printer: str,
+    html_path: str,
+    copies: int = 1,
+    template_size: str = "60x40",
+) -> tuple[bool, str, str]:
+    if platform.system() != "Windows":
+        return False, "Windows HTML print is only available when the agent runs on Windows.", printer
+
+    resolved_printer, warning = _resolve_printer_name_windows(printer)
+    browser_path = _find_windows_browser()
+    if not browser_path:
+        return (
+            False,
+            "Microsoft Edge or Google Chrome was not found. Install Edge/Chrome or set FWERP_PRINT_BROWSER_PATH.",
+            resolved_printer,
+        )
+
+    script = _build_windows_html_print_script(
+        printer_name=resolved_printer,
+        browser_path=browser_path,
+        html_path=html_path,
+        copies=copies,
+        wait_seconds=8,
+    )
+    command = ["powershell", "-NoProfile", "-Command", script]
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        err = result.stderr.strip() or result.stdout.strip() or "unknown Windows browser print error"
+        prefix = f"{warning} " if warning else ""
+        return False, f"{prefix}Windows HTML print failed for '{resolved_printer}': {err}", resolved_printer
+
+    prefix = f"{warning} " if warning else ""
+    return (
+        True,
+        f"{prefix}Print job submitted to '{resolved_printer}' via Windows kiosk browser printing ({template_size}, {copies} copies).",
+        resolved_printer,
+    )
 
 
 def _http_json(method: str, url: str, payload: dict | None = None) -> tuple[int, dict]:
@@ -372,6 +659,8 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                 {
                     "status": "ok",
                     "version": APP_VERSION,
+                    "platform": platform.system().lower(),
+                    "mode": "local-api",
                     "host": HOST,
                     "port": PORT,
                     "timestamp_utc": _utc_now(),
@@ -394,14 +683,15 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                 return
 
             if system_name == "Windows":
+                printers, warning = _list_printers_windows()
                 self._send_json(
                     {
                         "platform": system_name,
-                        "printers": [],
-                        "count": 0,
-                        "warning": "Windows printer listing is not implemented in local API mode.",
+                        "printers": printers,
+                        "count": len(printers),
+                        "warning": warning,
                     },
-                    501,
+                    200 if printers else 500,
                 )
                 return
 
@@ -423,15 +713,12 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
         payload = self._read_json()
 
         if path == "/print/html":
-            html = payload.get("html")
-            printer = payload.get("printer")
-
-            if not html or not isinstance(html, str):
-                self._send_json({"error": "Invalid request: 'html' string is required."}, 400)
+            normalized, validation_error = _normalize_print_html_request(payload)
+            if validation_error:
+                self._send_json({"error": validation_error}, 400)
                 return
-            if not printer or not isinstance(printer, str):
-                self._send_json({"error": "Invalid request: 'printer' string is required."}, 400)
-                return
+            html = normalized["html"]
+            printer = normalized["printer_name"]
 
             with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8") as temp_file:
                 temp_file.write(html)
@@ -448,6 +735,36 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                         "resolved_printer": resolved_printer,
                         "message": message,
                         "temp_file": html_path,
+                        "template_size": normalized["template_size"],
+                        "copies": normalized["copies"],
+                        "barcode_value": normalized["barcode_value"],
+                        "display_code": normalized["display_code"],
+                        "warning": normalized["warning"],
+                    },
+                    200 if success else 500,
+                )
+                return
+
+            if system_name == "Windows":
+                success, message, resolved_printer = _print_html_windows(
+                    printer=printer,
+                    html_path=html_path,
+                    copies=normalized["copies"],
+                    template_size=normalized["template_size"],
+                )
+                self._send_json(
+                    {
+                        "ok": success,
+                        "platform": system_name,
+                        "printer": printer,
+                        "resolved_printer": resolved_printer,
+                        "message": message,
+                        "temp_file": html_path,
+                        "template_size": normalized["template_size"],
+                        "copies": normalized["copies"],
+                        "barcode_value": normalized["barcode_value"],
+                        "display_code": normalized["display_code"],
+                        "warning": normalized["warning"],
                     },
                     200 if success else 500,
                 )
@@ -458,7 +775,7 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
                     "ok": False,
                     "platform": system_name,
                     "printer": printer,
-                    "message": "Use Windows print-station mode for production. Local HTML print API is not available on Windows.",
+                    "message": f"Unsupported platform for HTML print: {system_name}",
                     "temp_file": html_path,
                 },
                 501,

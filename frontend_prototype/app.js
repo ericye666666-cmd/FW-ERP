@@ -16732,10 +16732,11 @@ function renderBaleLocalPrintAgentStatus() {
   const agentUrl = getLocalPrintAgentUrl();
   const statusText = localPrintAgentState.checking
     ? "检测中"
-    : (localPrintAgentState.connected ? "已连接" : "未连接");
+    : (localPrintAgentState.connected ? "已连接" : "未启动");
+  const modeText = localPrintAgentState.connected ? "本地打印代理直打" : "请先启动 FW-ERP Print Agent";
   const suffix = localPrintAgentState.lastMessage ? ` · ${localPrintAgentState.lastMessage}` : "";
   statusArea.className = "candidate-summary";
-  statusArea.textContent = `本地打印代理：${statusText} · URL: ${agentUrl}${suffix}`;
+  statusArea.textContent = `当前打印方式：${modeText} · 本地打印代理：${statusText} · URL: ${agentUrl}${suffix}`;
 }
 
 function renderBalePrintMethodStatus({
@@ -16759,11 +16760,11 @@ function renderBalePrintMethodStatus({
     `;
   }
   return `
-    <strong>当前打印方式：浏览器打印</strong>
-    <div>Windows 打印机：请在系统打印窗口选择 ${escapeHtml(printerName.replace(/_/g, " "))}</div>
-    <div>本地打印代理：未连接</div>
-    <div>浏览器打印状态：可用</div>
-    <div>推荐操作：点击“打印标签”，在系统打印窗口选择 ${escapeHtml(printerName.replace(/_/g, " "))}。</div>
+    <strong>当前打印方式：等待本地打印代理</strong>
+    <div>Windows 打印机：${escapeHtml(printerName.replace(/_/g, " "))}</div>
+    <div>本地打印代理：未启动</div>
+    <div>浏览器打印状态：高级选项中可手动备用</div>
+    <div>推荐操作：先启动 FW-ERP Print Agent，再点击“打印标签”。</div>
     ${queueNote}
   `;
 }
@@ -16794,7 +16795,7 @@ async function checkLocalPrintAgentHealth() {
     localPrintAgentState.connected = false;
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = "health failed";
-    setLocalPrintAgentMessage("error", `本地打印代理：未连接（${agentUrl}）。浏览器打印仍可使用。`);
+    setLocalPrintAgentMessage("error", `本地打印代理未启动（${agentUrl}）。请先启动 FW-ERP Print Agent；浏览器打印在高级选项中作为备用。`);
     renderBalePrintModal();
     throw error;
   }
@@ -16815,9 +16816,48 @@ function getCurrentBalePreviewHtml() {
   return `<!doctype html>\n${frameDocument.documentElement.outerHTML}`;
 }
 
+function normalizeLocalAgentMachineBarcode(value) {
+  const cleaned = String(value || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return /^[1-5]\d{5,}$/.test(cleaned) ? cleaned : "";
+}
+
+function buildLocalAgentLabelPayload(job, directPayload = {}) {
+  const payload = job?.print_payload || {};
+  const machineCode = [
+    payload.barcode_value,
+    payload.machine_code,
+    directPayload.barcode_value,
+    directPayload.machine_code,
+    payload.scan_token,
+    job?.barcode,
+  ].map(normalizeLocalAgentMachineBarcode).find(Boolean) || "";
+  const displayCode = String(
+    payload.display_code
+      || directPayload.display_code
+      || payload.legacy_bale_barcode
+      || directPayload.legacy_bale_barcode
+      || payload.bale_barcode
+      || directPayload.bale_barcode
+      || payload.dispatch_bale_no
+      || directPayload.dispatch_bale_no
+      || job?.barcode
+      || "",
+  ).trim().toUpperCase();
+  return {
+    ...directPayload,
+    display_code: displayCode,
+    machine_code: machineCode,
+    barcode_value: machineCode,
+    encoded_barcode: machineCode,
+    template_code: directPayload.template_code || payload.template_code || "",
+    template_scope: directPayload.template_scope || getActiveBaleTemplateScope(),
+  };
+}
+
 async function printCurrentBaleModalViaLocalAgent() {
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
-  const currentJob = jobs[balePrintModalState.currentIndex] || null;
+  const currentIndex = Number(balePrintModalState.currentIndex || 0);
+  const currentJob = jobs[currentIndex] || null;
   if (!currentJob) {
     throw new Error("当前没有可打印的标签。");
   }
@@ -16826,6 +16866,14 @@ async function printCurrentBaleModalViaLocalAgent() {
   if (!printerName) {
     throw new Error("请先选择打印机。");
   }
+  const directPayload = buildBaleModalDirectPayload(currentJob, {
+    currentIndex,
+    totalJobs: jobs.length,
+  });
+  const labelPayload = buildLocalAgentLabelPayload(currentJob, directPayload);
+  const selectedTemplateCode = String(document.querySelector("[data-bale-modal-template-select]")?.value || getActiveBaleTemplateCode()).trim() || getActiveBaleTemplateCode();
+  const selectedTemplate = getSelectedBaleTemplate(selectedTemplateCode, getActiveBaleTemplateScope(), getActiveBaleModalTaskType());
+  const templateSize = `${Number(selectedTemplate.width_mm || 60)}x${Number(selectedTemplate.height_mm || 40)}`;
   const agentUrl = getLocalPrintAgentUrl();
   const response = await fetch(`${agentUrl}/print/html`, {
     method: "POST",
@@ -16834,7 +16882,16 @@ async function printCurrentBaleModalViaLocalAgent() {
     },
     body: JSON.stringify({
       html,
+      printer_name: printerName,
       printer: printerName,
+      copies: Number(directPayload.copies || currentJob?.copies || 1) || 1,
+      template_size: templateSize,
+      template_code: selectedTemplateCode,
+      template_scope: getActiveBaleTemplateScope(),
+      label_payload: labelPayload,
+      barcode_value: labelPayload.barcode_value,
+      machine_code: labelPayload.machine_code,
+      display_code: labelPayload.display_code,
     }),
   });
   const payload = await response.json().catch(() => ({}));
@@ -16843,7 +16900,7 @@ async function printCurrentBaleModalViaLocalAgent() {
   }
   localPrintAgentState.connected = true;
   localPrintAgentState.lastMessage = "print submitted";
-  setLocalPrintAgentMessage("success", String(payload?.message || `已通过本地代理发送打印：${printerName}`));
+  setLocalPrintAgentMessage("success", String(payload?.message || `已发送到本地打印代理：${printerName}`));
   renderBalePrintModal();
 }
 
@@ -16858,13 +16915,14 @@ async function printCurrentBaleModalPrimaryAction() {
     }
   } catch (error) {
     localPrintAgentState.connected = false;
-    localPrintAgentState.lastMessage = "browser fallback";
+    localPrintAgentState.lastMessage = "agent not running";
   }
   balePrinterConsoleNotice = {
-    type: "warning",
-    message: "当前打印方式：浏览器打印。请在系统打印窗口选择 Deli DL-720C。",
+    type: "error",
+    message: "本地打印代理未启动，请先启动 FW-ERP Print Agent。浏览器打印保留在高级选项中。",
   };
-  return browserPrintCurrentBaleModalJob();
+  renderBalePrintModal();
+  throw new Error("本地打印代理未启动，请先启动 FW-ERP Print Agent。");
 }
 
 async function printAllBaleModalPrimaryAction() {
@@ -16877,16 +16935,16 @@ async function printAllBaleModalPrimaryAction() {
       await checkLocalPrintAgentHealth();
     } catch (error) {
       localPrintAgentState.connected = false;
-      localPrintAgentState.lastMessage = "browser fallback";
+      localPrintAgentState.lastMessage = "agent not running";
     }
   }
   if (!localPrintAgentState.connected) {
     balePrinterConsoleNotice = {
-      type: "warning",
-      message: "当前打印方式：浏览器打印。请在系统打印窗口选择 Deli DL-720C，并从当前张开始打印。",
+      type: "error",
+      message: "本地打印代理未启动，请先启动 FW-ERP Print Agent。浏览器打印保留在高级选项中。",
     };
-    browserPrintCurrentBaleModalJob();
-    return;
+    renderBalePrintModal();
+    throw new Error("本地打印代理未启动，请先启动 FW-ERP Print Agent。");
   }
   const originalIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0));
   let printedCount = 0;
@@ -17136,6 +17194,7 @@ function renderBalePrintModal() {
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob;
+    localAgentPrintButton.textContent = "打印标签";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
