@@ -1049,11 +1049,26 @@
               <details id="balePrintModalAdvancedOptions" class="bale-print-advanced">
                 <summary>高级打印选项</summary>
                 <div id="balePrintModalLocalAgentStatus" class="candidate-summary">
-                  当前打印方式：请先启动 FW-ERP Print Agent · 本地打印代理：未启动 · URL: http://127.0.0.1:8719
+                  <strong>FW-ERP 打印助手</strong><br />
+                  打印助手：未启动<br />
+                  本地地址：http://127.0.0.1:8719<br />
+                  当前推荐：Windows 电脑请先启动打印助手，再点击“打印标签”
                 </div>
                 <div class="button-row">
-                  <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测本地打印代理</button>
+                  <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测打印助手</button>
+                  <button id="balePrintModalCheckLocalPrintersButton" type="button" class="ghost-button mini-button">检测本机打印机</button>
+                  <button id="balePrintModalDownloadAgentButton" type="button" class="ghost-button mini-button" disabled title="安装包待上传，当前请联系管理员。">下载 Windows 打印助手</button>
+                  <button id="balePrintModalInstallStepsButton" type="button" class="ghost-button mini-button">查看安装步骤</button>
                   <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button">打印标签</button>
+                </div>
+                <div id="balePrintModalDownloadHint" class="subtle small">安装包待上传，当前请联系管理员。</div>
+                <div id="balePrintModalInstallSteps" class="flow-summary-note hidden-screen">
+                  1. 下载 Windows 打印助手<br />
+                  2. 解压到桌面<br />
+                  3. 双击“启动 FW-ERP 打印助手.bat”<br />
+                  4. 不要关闭黑色窗口<br />
+                  5. 回到 ERP，点击“检测打印助手”<br />
+                  6. 显示已连接后，点击“打印标签”
                 </div>
                 <div class="button-row">
                   <button id="balePrintModalConnectButton" type="button" class="ghost-button mini-button">检测打印机</button>
