@@ -55,9 +55,21 @@ test("POS sale completion records source chain and marks only scanned STORE_ITEM
     "assigned_employee",
     "store_rack_code",
     "category_summary",
+    "selected_price",
+    "cost_price",
+    "cost_status",
+    "gross_margin",
+    "gross_margin_pct",
     "payment_method",
     "sold_at",
   ].forEach((field) => assert.match(recordSource, new RegExp(`${field}:`)));
+  assert.match(appJs, /function buildPosStoreItemMargin/);
+  const marginSource = extractFunctionSource(appJs, "buildPosStoreItemMargin");
+  assert.match(marginSource, /cost_status[\s\S]*unknown/);
+  assert.match(marginSource, /gross_margin:\s*null/);
+  assert.match(marginSource, /gross_margin_pct:\s*null/);
+  assert.match(marginSource, /selectedPrice - costPrice/);
+  assert.match(marginSource, /grossMargin \/ selectedPrice/);
   assert.match(completeSource, /sale_status:\s*"sold"/);
   assert.match(completeSource, /sold_at:/);
   assert.match(completeSource, /cashier:/);
@@ -97,6 +109,10 @@ test("operations analytics renders POS store summaries and source-chain sale rec
     "mpesaSalesAmount",
     "mixedSalesAmount",
     "soldStoreItemCount",
+    "costKnownItemCount",
+    "costUnknownItemCount",
+    "knownGrossMarginAmount",
+    "marginPendingRecordCount",
     "lastSaleAt",
   ].forEach((field) => assert.match(summarizeSource, new RegExp(field)));
   [
@@ -106,6 +122,8 @@ test("operations analytics renders POS store summaries and source-chain sale rec
     "assigned_employee",
     "store_rack_code",
     "category_summary",
+    "成本待确认",
+    "毛利待确认",
   ].forEach((field) => assert.match(renderSource, new RegExp(field)));
   assert.match(appJs, /renderPosSalesAnalyticsSummary\(posStoreItemSaleRecordState\)/);
   assert.match(extractFunctionSource(appJs, "submitCashierTerminalSale"), /renderPosSalesAnalyticsSummary\(posStoreItemSaleRecordState\)/);
@@ -135,6 +153,10 @@ test("operations center exposes all POS sales data with brief analysis", () => {
     "mixedSalesAmount",
     "storeSummaries",
     "categorySummaries",
+    "costKnownItemCount",
+    "costUnknownItemCount",
+    "knownGrossMarginAmount",
+    "marginPendingRecordCount",
     "analysisLines",
   ].forEach((field) => assert.match(allSalesSummarySource, new RegExp(field)));
   [
@@ -145,6 +167,9 @@ test("operations center exposes all POS sales data with brief analysis", () => {
     "source_sdo",
     "source_package",
     "category_summary",
+    "cost_status",
+    "gross_margin",
+    "毛利待确认",
   ].forEach((field) => assert.match(allSalesRenderSource, new RegExp(field)));
   assert.match(appJs, /renderOperationsAllSalesData\(records\)/);
   assert.match(appJs, /match:\s*"2\. 全部销售数据 \/ 简要分析"/);

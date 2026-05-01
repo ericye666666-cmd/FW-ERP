@@ -1404,6 +1404,20 @@
 
       <section class="panel" data-workspace-panel="operations">
         <div class="panel-head">
+          <h2>2. 全部销售数据 / 简要分析</h2>
+        </div>
+        <div id="operationsAllSalesOverview" class="report-summary-grid"></div>
+        <div id="operationsAllSalesAnalysis" class="candidate-summary empty-state">POS 完成 STORE_ITEM 销售后，这里会显示简要分析。</div>
+        <h3>门店销售汇总</h3>
+        <div id="operationsAllSalesByStore" class="candidate-list"></div>
+        <h3>销售记录</h3>
+        <div id="operationsAllSalesRecords" class="candidate-list"></div>
+        <div id="operationsPosSalesAnalyticsSummary" class="candidate-summary empty-state">这里会同步 POS 门店销售汇总。</div>
+        <div id="operationsPosSalesAnalyticsRecords" class="candidate-list"></div>
+      </section>
+
+      <section class="panel" data-workspace-panel="operations">
+        <div class="panel-head">
           <h2>2. AI 固定分析框架</h2>
         </div>
         <div class="candidate-summary">
@@ -3446,6 +3460,12 @@
             这里会显示销售成功后的中文摘要、利润、支付状态和后续待处理事项。
           </div>
           <pre id="saleOutput" class="output hidden-output"></pre>
+          <section class="data-preview-card">
+            <h3>门店销售汇总</h3>
+            <div id="posSalesAnalyticsSummary" class="candidate-summary empty-state">完成 STORE_ITEM 销售后，这里会显示本店销售汇总。</div>
+            <h3>销售记录</h3>
+            <div id="posSalesAnalyticsRecords" class="candidate-list"></div>
+          </section>
         </div>
       </section>
 
