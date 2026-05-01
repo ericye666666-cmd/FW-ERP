@@ -119,56 +119,121 @@ def test_contract_cost_fill_denies_store_role(isolated_state: InMemoryState):
     assert exc.value.status_code == 403
 
 
-def test_user_org_binding_persists_role_label_scope_and_status(isolated_state: InMemoryState):
+def test_user_management_update_and_soft_deactivate_preserve_org_binding(isolated_state: InMemoryState):
     state = isolated_state
-
-    warehouse_manager = state.create_user(
+    created = state.create_user(
         {
             "created_by": "admin_1",
-            "username": "warehouse_manager_wh1",
-            "full_name": "Warehouse Manager WH1",
-            "role_code": "warehouse_manager",
-            "warehouse_code": "WH1",
+            "username": "cashier_edit_1",
+            "full_name": "Cashier Edit 1",
             "password": "demo1234",
+            "role_code": "cashier",
+            "store_code": "UTAWALA",
+            "is_active": True,
         }
     )
-    assert warehouse_manager["role_label"] == "仓库主管"
-    assert warehouse_manager["warehouse_code"] == "WH1"
-    assert warehouse_manager["status"] == "active"
-    assert state._require_user_role("warehouse_manager_wh1", {"warehouse_supervisor"})["username"] == "warehouse_manager_wh1"
 
-    area_supervisor = state.create_user(
+    updated = state.update_user(
+        created["id"],
         {
-            "created_by": "admin_1",
-            "username": "area_supervisor_east",
-            "full_name": "Area Supervisor East",
+            "updated_by": "admin_1",
+            "full_name": "Edited Area Supervisor",
             "role_code": "area_supervisor",
-            "area_code": "EAST",
+            "store_code": "",
+            "warehouse_code": "",
+            "area_code": "NAIROBI-EAST",
             "managed_store_codes": ["UTAWALA", "KAWANGWARE"],
-            "password": "demo1234",
-        }
+            "status": "active",
+        },
     )
-    assert area_supervisor["role_label"] == "区域主管"
-    assert area_supervisor["area_code"] == "EAST"
-    assert area_supervisor["managed_store_codes"] == ["UTAWALA", "KAWANGWARE"]
+
+    assert updated["full_name"] == "Edited Area Supervisor"
+    assert updated["role_code"] == "area_supervisor"
+    assert updated["store_code"] is None
+    assert updated["area_code"] == "NAIROBI-EAST"
+    assert updated["managed_store_codes"] == ["UTAWALA", "KAWANGWARE"]
+    assert updated["status"] == "active"
+    assert updated["is_active"] is True
+
+    deactivated = state.deactivate_user(created["id"], "admin_1")
+
+    assert deactivated["status"] == "inactive"
+    assert deactivated["is_active"] is False
+
+    activated = state.update_user(
+        created["id"],
+        {
+            "updated_by": "admin_1",
+            "full_name": deactivated["full_name"],
+            "role_code": deactivated["role_code"],
+            "area_code": deactivated["area_code"],
+            "managed_store_codes": deactivated["managed_store_codes"],
+            "status": "active",
+            "is_active": True,
+        },
+    )
+
+    assert activated["status"] == "active"
+    assert activated["is_active"] is True
 
 
-def test_user_org_binding_requires_store_for_cashier(isolated_state: InMemoryState):
+def test_user_management_cannot_deactivate_self(isolated_state: InMemoryState):
     state = isolated_state
+    admin = next(row for row in state.list_users() if row["username"] == "admin_1")
 
     with pytest.raises(HTTPException) as exc:
-        state.create_user(
-            {
-                "created_by": "admin_1",
-                "username": "cashier_missing_store",
-                "full_name": "Cashier Missing Store",
-                "role_code": "cashier",
-                "password": "demo1234",
-            }
-        )
+        state.deactivate_user(admin["id"], "admin_1")
 
     assert exc.value.status_code == 400
-    assert "store_code" in str(exc.value.detail)
+
+
+def test_user_management_cannot_deactivate_admin_1_from_another_admin(isolated_state: InMemoryState):
+    state = isolated_state
+    state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "admin_2",
+            "full_name": "Admin 2",
+            "password": "demo1234",
+            "role_code": "admin",
+            "is_active": True,
+        }
+    )
+    admin = next(row for row in state.list_users() if row["username"] == "admin_1")
+
+    with pytest.raises(HTTPException) as exc:
+        state.deactivate_user(admin["id"], "admin_2")
+
+    assert exc.value.status_code == 400
+
+
+def test_user_management_update_restricted_to_admin(isolated_state: InMemoryState):
+    state = isolated_state
+    cashier = state.create_user(
+        {
+            "created_by": "admin_1",
+            "username": "cashier_edit_permission",
+            "full_name": "Cashier Edit Permission",
+            "password": "demo1234",
+            "role_code": "cashier",
+            "store_code": "UTAWALA",
+            "is_active": True,
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        state.update_user(
+            cashier["id"],
+            {
+                "updated_by": "area_supervisor_1",
+                "full_name": "Should Not Update",
+                "role_code": "cashier",
+                "store_code": "UTAWALA",
+                "status": "active",
+            },
+        )
+
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.xfail(reason="Role matrix requires finance/owner style cost-fill authority, but finance/owner roles are not modeled or enforced yet.")

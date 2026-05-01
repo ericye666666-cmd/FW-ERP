@@ -93,11 +93,11 @@ test("getBaleModalCompletionAction requires a successful batch print before grou
 test("getBaleModalCloseAction always allows closing without marking the class as complete", () => {
   const beforeBatchPrint = getBaleModalCloseAction({ pendingCount: 5, hasSuccessfulBatchPrint: false });
   assert.equal(beforeBatchPrint.action, "allow_close");
-  assert.match(beforeBatchPrint.message, /不会把这 5 包标记为已打印或已贴完/);
+  assert.match(beforeBatchPrint.message, /不会把这 5 包标记为已打印或已贴标/);
 
   const afterBatchPrintBeforeConfirm = getBaleModalCloseAction({ pendingCount: 5, hasSuccessfulBatchPrint: true });
   assert.equal(afterBatchPrintBeforeConfirm.action, "allow_close");
-  assert.match(afterBatchPrintBeforeConfirm.message, /不会自动确认本类已贴完/);
+  assert.match(afterBatchPrintBeforeConfirm.message, /不会自动确认本包已贴标/);
 
   const afterConfirm = getBaleModalCloseAction({ pendingCount: 0, hasSuccessfulBatchPrint: true });
   assert.equal(afterConfirm.action, "allow_close");

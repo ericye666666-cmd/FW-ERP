@@ -198,7 +198,7 @@ from app.schemas.transfers import (
     TransferReceiveRequest,
     TransferShipRequest,
 )
-from app.schemas.users import RoleResponse, UserCreate, UserResponse
+from app.schemas.users import RoleResponse, UserCreate, UserResponse, UserUpdate
 from app.schemas.voids import SaleVoidRequestCreate, SaleVoidRequestResponse, SaleVoidReviewRequest
 from app.schemas.warehouse import (
     GoodsReceiptCreate,
@@ -2147,6 +2147,27 @@ def list_users(
 ) -> list[UserResponse]:
     _require_current_user(authorization=authorization)
     return [UserResponse(**user) for user in state.list_users()]
+
+
+@router.patch("/users/{user_id}", response_model=UserResponse, tags=["users"])
+def update_user(
+    user_id: int,
+    payload: UserUpdate,
+    authorization: Optional[str] = Header(default=None),
+) -> UserResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump(exclude_unset=True)
+    data["updated_by"] = current_user["username"]
+    return UserResponse(**state.update_user(user_id, data))
+
+
+@router.delete("/users/{user_id}", response_model=UserResponse, tags=["users"])
+def deactivate_user(
+    user_id: int,
+    authorization: Optional[str] = Header(default=None),
+) -> UserResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return UserResponse(**state.deactivate_user(user_id, current_user["username"]))
 
 
 @router.get(
