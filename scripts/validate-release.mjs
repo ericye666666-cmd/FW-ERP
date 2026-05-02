@@ -48,6 +48,7 @@ const checks = [
       "frontend_prototype/tests/bale-print-flow.test.cjs",
       "frontend_prototype/tests/barcode-print-payload.test.cjs",
       "frontend_prototype/tests/store-prep-bale-flow.test.cjs",
+      "frontend_prototype/tests/sdo-store-item-flow.test.cjs",
       "frontend_prototype/tests/pos-store-item-sale-flow.test.cjs",
       "frontend_prototype/tests/print-agent-helper-ui.test.cjs",
       "frontend_prototype/tests/user-pos-auth-bugs.test.cjs",
@@ -55,7 +56,7 @@ const checks = [
       "frontend_prototype/tests/release-validation-contract.test.cjs",
     ],
     display:
-      "node --test frontend_prototype/tests/app-barcode-routing.test.cjs frontend_prototype/tests/barcode-resolver-test-tools.test.cjs frontend_prototype/tests/bale-print-flow.test.cjs frontend_prototype/tests/barcode-print-payload.test.cjs frontend_prototype/tests/store-prep-bale-flow.test.cjs frontend_prototype/tests/pos-store-item-sale-flow.test.cjs frontend_prototype/tests/print-agent-helper-ui.test.cjs frontend_prototype/tests/user-pos-auth-bugs.test.cjs frontend_prototype/tests/user-role-binding-flow.test.cjs frontend_prototype/tests/release-validation-contract.test.cjs",
+      "node --test frontend_prototype/tests/app-barcode-routing.test.cjs frontend_prototype/tests/barcode-resolver-test-tools.test.cjs frontend_prototype/tests/bale-print-flow.test.cjs frontend_prototype/tests/barcode-print-payload.test.cjs frontend_prototype/tests/store-prep-bale-flow.test.cjs frontend_prototype/tests/sdo-store-item-flow.test.cjs frontend_prototype/tests/pos-store-item-sale-flow.test.cjs frontend_prototype/tests/print-agent-helper-ui.test.cjs frontend_prototype/tests/user-pos-auth-bugs.test.cjs frontend_prototype/tests/user-role-binding-flow.test.cjs frontend_prototype/tests/release-validation-contract.test.cjs",
   },
   {
     name: "Production frontend build",

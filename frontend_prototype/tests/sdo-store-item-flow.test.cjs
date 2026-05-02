@@ -26,19 +26,72 @@ function extractFunctionSource(source, functionName) {
 }
 
 test("transfer bundle writes SDB/LPK source packages and hydrates SDO packages back into transfer state", () => {
-  assert.match(appJs, /function buildSdoPackagePayloadFromDispatchRow/);
-  assert.match(appJs, /Array\.isArray\(row\?\.source_bales\)/);
-  assert.match(appJs, /sourceBales\?\.find/);
-  assert.match(appJs, /async function hydrateStoreDeliveryExecutionOrdersForTransfers/);
+  const submitSource = extractFunctionSource(appJs, "submitTransferBundle");
+  const displayRowSource = extractFunctionSource(appJs, "getTransferDerivedStoreDispatchRows");
+  assert.match(submitSource, /buildTransferDispatchResultDisplayRows/);
+  assert.match(submitSource, /source_type:\s*String\(row\?\.source_type/);
+  assert.match(submitSource, /source_code:\s*String\(row\?\.source_code \|\| row\?\.bale_no/);
+  assert.match(submitSource, /item_count:\s*parseKnownDispatchItemCount\(row\)/);
   assert.match(appJs, /store_delivery_execution_order:\s*storeDeliveryExecutionOrder/);
+  assert.match(appJs, /store_delivery_execution_order_no:\s*storeDeliveryExecutionOrder\.execution_order_no/);
+  assert.match(appJs, /official_delivery_barcode:\s*storeDeliveryExecutionOrder\.official_delivery_barcode/);
+  assert.match(displayRowSource, /store_delivery_execution_order\?\.packages/);
+  assert.match(displayRowSource, /display_store_dispatch_bales/);
+  assert.match(displayRowSource, /store_dispatch_bales/);
+});
+
+test("loading transfers hydrates SDO packages before store receiving derives package rows", () => {
+  const loadSource = extractFunctionSource(appJs, "loadTransferOrders");
+  const hydrateSource = extractFunctionSource(appJs, "hydrateTransferOrdersWithStoreDeliveryExecutionOrders");
+  const displayRowSource = extractFunctionSource(appJs, "getTransferDerivedStoreDispatchRows");
+
+  assert.match(loadSource, /hydrateTransferOrdersWithStoreDeliveryExecutionOrders/);
+  assert.match(hydrateSource, /store-delivery-execution-orders/);
+  assert.match(hydrateSource, /store_delivery_execution_order:/);
+  assert.match(hydrateSource, /machine_code:/);
+  assert.match(displayRowSource, /const packageCount = getTransferShipmentPackageCount\(transfer\)/);
+  assert.match(displayRowSource, /source_type:\s*String\(upstreamPackageRows\[index\]\?\.source_type/);
 });
 
 test("warehouse print confirmation updates only the current modal index and re-renders Page 6 cards", () => {
-  assert.match(appJs, /function markDisplayStoreDispatchBaleLabelledByIndex/);
-  assert.match(appJs, /const currentModalIndex =/);
-  assert.match(appJs, /jobsToComplete = currentJob \? \[currentJob\] : \[\]/);
-  assert.match(appJs, /renderTransferExecutionWorkbench\(transferNo\)/);
-  assert.doesNotMatch(appJs, /doesDispatchRowMatchPrintJob\(row, job\)/);
+  const completionSource = extractFunctionSource(appJs, "completeCurrentBalePrintModalJob");
+  assert.match(completionSource, /const currentIndex =/);
+  assert.match(completionSource, /currentJob \? \[currentJob\] : \[\]/);
+  assert.match(completionSource, /index !== currentIndex/);
+  assert.match(completionSource, /status:\s*"labelled"/);
+  assert.match(completionSource, /renderTransferActionResultSummary\(transferOutput\)/);
+  assert.match(completionSource, /renderTransferExecutionWorkbench\(transferNo\)/);
+  assert.match(completionSource, /renderTransferDispatchSummary\(transferOrderState\)/);
+});
+
+test("warehouse execution selectors summarize demand lines and prepared SDB counts", () => {
+  const start = appJs.indexOf("function populateTransferOrderSelectors");
+  assert.notEqual(start, -1, "populateTransferOrderSelectors should exist");
+  const end = appJs.indexOf("async function refreshPickingWavePanel", start);
+  assert.notEqual(end, -1, "populateTransferOrderSelectors block should end before refreshPickingWavePanel");
+  const source = appJs.slice(start, end);
+
+  assert.match(source, /const plan = buildTransferPreparationPlan\(getTransferPreparationPlanRows\(row\)\)/);
+  assert.match(source, /const total = Number\(summary\.totalRequestedQty/);
+  assert.match(source, /const sdbCount = Number\(summary\.selectedPreparedBaleCount/);
+  assert.match(source, /SDB \$\{sdbCount\}/);
+  assert.doesNotMatch(source, /SDB \$\{row\.delivery_batch\?\.bale_count \|\| 0\}/);
+});
+
+test("warehouse execution keeps the SDO generation form bound to the active transfer", () => {
+  const source = extractFunctionSource(appJs, "renderTransferExecutionWorkbench");
+  assert.match(source, /setInputValue\("#transferBundleForm \[name='transfer_no'\]", transfer\.transfer_no\)/);
+  assert.match(source, /setInputValue\("#approveTransferForm \[name='transfer_no'\]", transfer\.transfer_no\)/);
+  assert.match(source, /setInputValue\("#transferPrintForm \[name='transfer_no'\]", transfer\.transfer_no\)/);
+});
+
+test("warehouse ship selectors can count generated SDO packages without runtime errors", () => {
+  const source = extractFunctionSource(appJs, "getTransferShipmentPackageCount");
+  assert.match(source, /store_delivery_execution_order\?\.packages/);
+  assert.match(source, /display_store_dispatch_bales/);
+  assert.match(source, /store_dispatch_bales/);
+  assert.match(source, /delivery_batch\?\.bale_count/);
+  assert.match(source, /dispatch_bale_count/);
 });
 
 test("Austin clerk page can generate traceable STORE_ITEM tokens from assigned SDO packages", () => {
@@ -49,6 +102,14 @@ test("Austin clerk page can generate traceable STORE_ITEM tokens from assigned S
   assert.match(appJs, /source_package:/);
   assert.match(appJs, /data-store-package-generate-items/);
   assert.match(appJs, /data-store-package-print-items/);
+});
+
+test("STORE_ITEM source_type is normalized to SDB or LPK for assigned SDO packages", () => {
+  const source = extractFunctionSource(appJs, "getStorePackageSourceType");
+  assert.match(source, /PREPARED_STORE_DISPATCH_BALE/);
+  assert.match(source, /LOOSE_PICK_SHEET/);
+  assert.match(source, /return "SDB"/);
+  assert.match(source, /return "LPK"/);
 });
 
 test("writeOutput preserves raw objects so visible compressed output can still be updated by code", () => {
