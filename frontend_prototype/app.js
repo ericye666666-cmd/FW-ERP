@@ -10722,13 +10722,47 @@ function formatLoosePickSheetPackingLinesForTask(task = {}) {
     .map((line) => {
       const categoryMain = String(line?.categoryMain || "").trim();
       const categorySub = String(line?.categorySub || "").trim();
-      const qty = Number(line?.qty || 0);
+      const qty = Number(line?.pickedQty ?? line?.picked_qty ?? line?.qty ?? 0);
+      const requestedQty = Math.max(qty, Number(line?.requestedQty ?? line?.requested_qty ?? qty));
+      const shortageQty = Math.max(0, Number(line?.shortageQty ?? line?.shortage_qty ?? 0));
       if (!categoryMain && !categorySub && qty <= 0) {
         return "";
       }
-      return `${categoryMain || "-"} / ${categorySub || "-"} · ${Math.max(0, qty)} 件`;
+      return `${categoryMain || "-"} / ${categorySub || "-"} · ${Math.max(0, qty)} 件${
+        shortageQty > 0 ? `（需求 ${requestedQty} / 缺 ${shortageQty}）` : ""
+      }`;
     })
     .filter(Boolean);
+}
+
+function getLoosePickLineStatusLabel(line = {}) {
+  const requestedQty = Math.max(0, Number(line.requestedQty ?? line.requested_qty ?? line.qty ?? 0));
+  const pickedQty = Math.max(0, Number(line.pickedQty ?? line.picked_qty ?? line.qty ?? 0));
+  const shortageQty = Math.max(0, Number(line.shortageQty ?? line.shortage_qty ?? 0));
+  if (String(line.statusLabel || "").trim()) {
+    return String(line.statusLabel).trim();
+  }
+  if (requestedQty <= 0) {
+    return "待处理";
+  }
+  if (pickedQty > 0 && shortageQty > 0) {
+    return "部分拣货";
+  }
+  if (shortageQty > 0) {
+    return "库存不足";
+  }
+  if (pickedQty > 0) {
+    return "已拣";
+  }
+  return "待处理";
+}
+
+function getLoosePickTaskPickedQty(task = {}) {
+  return Number(task.pickedQty ?? task.picked_qty ?? task.totalQty ?? task.qty ?? 0);
+}
+
+function getLoosePickTaskShortageQty(task = {}) {
+  return Math.max(0, Number(task.shortageQty ?? task.shortage_qty ?? 0));
 }
 
 function buildLoosePickSheetLabelForTask(task = {}, transfer = {}) {
@@ -11312,6 +11346,12 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
   const packageLimitQty = tasks[0]?.packageLimitQty || getLoosePackingPackageLimitQty(executionRecord.packageLimitQty);
   const plannedPackageCount = tasks[0]?.plannedPackageCount
     || (plan.summary?.looseQtyToPick ? Math.max(1, Math.ceil(Number(plan.summary.looseQtyToPick || 0) / packageLimitQty)) : 0);
+  const unresolvedShortageQty = Number(readiness.unresolvedShortageQty || plan.summary?.shortageQty || 0);
+  const looseTaskStatusLabel = unresolvedShortageQty > 0
+    ? "库存不足"
+    : readiness.pendingLooseTaskCount
+      ? "待完成"
+      : "已完成";
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
     <div class="alert-banner">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差打包工单码，不是门店收货码。</div>
@@ -11321,9 +11361,10 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
       <article class="store-metric"><strong>需到货时间</strong><span>${escapeHtml(transfer.required_arrival_date || transfer.required_arrival_on || "-")}</span></article>
       <article class="store-metric"><strong>申请总件数</strong><span>${escapeHtml(plan.summary?.totalRequestedQty || 0)} 件</span></article>
       <article class="store-metric"><strong>散货补差件数</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)}</span></article>
+      <article class="store-metric"><strong>缺货件数</strong><span>${escapeHtml(unresolvedShortageQty)}</span></article>
       <article class="store-metric"><strong>封包上限</strong><span>小于 ${escapeHtml(packageLimitQty)} 件 / 包</span></article>
       <article class="store-metric"><strong>建议补差包</strong><span>${escapeHtml(plannedPackageCount)} 个</span></article>
-      <article class="store-metric"><strong>拣货单状态</strong><span>${escapeHtml(readiness.pendingLooseTaskCount ? "待完成" : "已完成")}</span></article>
+      <article class="store-metric"><strong>拣货单状态</strong><span>${escapeHtml(looseTaskStatusLabel)}</span></article>
     </div>
     ${renderSummaryActions([
       { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "补差完成后回仓库执行台" },
@@ -11334,7 +11375,9 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
       { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "无需补差，去 6 仓库执行单继续" },
     ]);
     listTarget.className = "candidate-summary empty-state";
-    listTarget.textContent = "该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。";
+    listTarget.textContent = unresolvedShortageQty > 0
+      ? "当前可用库存为 0，不能生成已完成 LPK。请等待补货，或取消缺货行后再继续。"
+      : "该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。";
     return;
   }
   if (!tasks.length) {
@@ -11345,39 +11388,92 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
   listTarget.className = "candidate-list transfer-draft-list";
   listTarget.innerHTML = tasks.map((task) => {
     const status = String(task.status || "pending_pick").trim().toLowerCase();
-    const statusLabel = status === "packed" ? "已拣货并封包" : "待拣货贴标";
+    const taskShortageQty = getLoosePickTaskShortageQty(task);
+    const taskPickedQty = getLoosePickTaskPickedQty(task);
+    const statusLabel = status === "packed"
+      ? (taskShortageQty > 0 ? "部分拣货已封包" : "已拣货并封包")
+      : "待拣货贴标";
     const taskLines = Array.isArray(task.lines) ? task.lines : [];
     const printLabel = buildLoosePickSheetLabelForTask(task, transfer);
+    const displayCode = String(task.printableBarcode || printLabel.barcodeValue || task.taskBarcode || task.taskNo || "-").trim().toUpperCase();
+    const machineCode = buildLpkMachineCode(task.transferNo || transfer?.transfer_no || "");
+    const requestNo = String(task.transferNo || transfer?.transfer_no || "-").trim().toUpperCase();
+    const storeName = getTransferStoreDisplayName(transfer);
     const nextAction = status === "packed"
-      ? `<span class="store-flag">已完成</span>`
-      : `<button type="button" class="ghost-button mini-button" data-loose-task-action="pack" data-loose-task-no="${escapeHtml(task.taskNo || "")}" data-transfer-no="${escapeHtml(task.transferNo || "")}">确认已拣货并封包</button>`;
+      ? `<span class="store-flag">${escapeHtml(statusLabel)}</span>`
+      : `<button type="button" class="ghost-button mini-button" data-loose-task-action="pack" data-loose-task-no="${escapeHtml(task.taskNo || "")}" data-transfer-no="${escapeHtml(task.transferNo || "")}">${escapeHtml(taskShortageQty > 0 ? "确认按现有库存部分拣货并封包" : "确认已拣货并封包")}</button>`;
     return `
       <article class="candidate-row transfer-draft-row loose-pick-sheet-card">
-        <div class="loose-pick-sheet-main">
-          <div class="loose-pick-barcode">
-            <span class="barcode-stripes" aria-hidden="true"></span>
-            <strong>${escapeHtml(task.printableBarcode || task.taskBarcode || task.taskNo || "-")}</strong>
-          </div>
-          <strong>${escapeHtml(task.taskNo || "-")}</strong>
-          <div class="subtle small">${escapeHtml(`补差总量 ${task.totalQty || task.qty || 0} 件 · 小于 ${task.packageLimitQty || 200} 件 / 包 · 建议 ${task.plannedPackageCount || 0} 个补差包`)}</div>
-          <div class="meta-row">
-            <span class="meta-pill">${escapeHtml(statusLabel)}</span>
-            <span class="meta-pill">一张 barcode 拣货单</span>
-            ${Array.isArray(task.rackCodes) && task.rackCodes.length ? `<span class="meta-pill">库位 ${escapeHtml(task.rackCodes.join("、"))}</span>` : ""}
-          </div>
-          <div class="loose-pick-line-list">
-            ${taskLines.map((line) => `
-              <div class="summary-breakdown-row">
-                <span>${escapeHtml(`${line.categoryMain || "-"} / ${line.categorySub || "-"}`)}</span>
-                <span>${escapeHtml(`${line.qty || 0} 件 · ${Array.isArray(line.rackCodes) && line.rackCodes.length ? line.rackCodes.join("、") : "待定位库位"}`)}</span>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-        <div class="candidate-side-actions loose-pick-label-actions">
-          ${renderLoosePickSheetTemplateCard(printLabel)}
-          <button type="button" class="ghost-button mini-button" data-loose-task-action="print-label" data-loose-task-no="${escapeHtml(task.taskNo || "")}" data-transfer-no="${escapeHtml(task.transferNo || "")}">发送标签机打印</button>
-          ${nextAction}
+        <div class="split-grid lpk-picking-layout">
+          <section class="loose-pick-sheet-main">
+            <div class="transfer-workbench-head is-compact">
+              <span class="eyebrow">LPK identity</span>
+              <h3>这个 LPK 拣了什么</h3>
+            </div>
+            <div class="loose-pick-barcode">
+              <span class="barcode-stripes" aria-hidden="true"></span>
+              <strong>${escapeHtml(displayCode || "-")}</strong>
+            </div>
+            <div class="report-summary-grid compact-metrics">
+              <article class="store-metric"><strong>LPK display_code</strong><span>${escapeHtml(displayCode || "-")}</span></article>
+              <article class="store-metric"><strong>LPK machine_code</strong><span>${escapeHtml(machineCode || "-")}</span></article>
+              <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(storeName || "-")}</span></article>
+              <article class="store-metric"><strong>状态</strong><span>${escapeHtml(statusLabel)}</span></article>
+              <article class="store-metric"><strong>关联补货单 / SDO / request</strong><span>${escapeHtml(requestNo)}</span></article>
+            </div>
+            <div class="meta-row">
+              <span class="meta-pill">${escapeHtml(`已拣 ${taskPickedQty} 件`)}</span>
+              <span class="meta-pill">${escapeHtml(`缺货 ${taskShortageQty} 件`)}</span>
+              <span class="meta-pill">${escapeHtml(`小于 ${task.packageLimitQty || 200} 件 / 包`)}</span>
+            </div>
+            ${renderLoosePickSheetTemplateCard(printLabel)}
+            <div class="button-row">
+              <button type="button" class="ghost-button mini-button" data-loose-task-action="print-label" data-loose-task-no="${escapeHtml(task.taskNo || "")}" data-transfer-no="${escapeHtml(task.transferNo || "")}">发送标签机打印</button>
+              ${nextAction}
+            </div>
+          </section>
+          <section class="loose-pick-sheet-main">
+            <div class="transfer-workbench-head is-compact">
+              <span class="eyebrow">Pick detail</span>
+              <h3>拣货明细</h3>
+            </div>
+            <div class="matrix-table-shell">
+              <table class="matrix-table compact-table">
+                <thead>
+                  <tr>
+                    <th>大类</th>
+                    <th>小类</th>
+                    <th>需求数量</th>
+                    <th>已拣数量</th>
+                    <th>缺货数量</th>
+                    <th>来源包 / 来源库位</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${taskLines.map((line) => {
+                    const pickedQty = Number(line.pickedQty ?? line.picked_qty ?? line.qty ?? 0);
+                    const requestedQty = Number(line.requestedQty ?? line.requested_qty ?? pickedQty);
+                    const shortageQty = Number(line.shortageQty ?? line.shortage_qty ?? 0);
+                    const sourceLabel = Array.isArray(line.rackCodes) && line.rackCodes.length
+                      ? line.rackCodes.join("、")
+                      : (line.baleLabel || "待定位库位");
+                    return `
+                      <tr>
+                        <td>${escapeHtml(line.categoryMain || "-")}</td>
+                        <td>${escapeHtml(line.categorySub || "-")}</td>
+                        <td>${escapeHtml(requestedQty)}</td>
+                        <td>${escapeHtml(pickedQty)}</td>
+                        <td>${escapeHtml(shortageQty)}</td>
+                        <td>${escapeHtml(sourceLabel)}</td>
+                        <td><span class="meta-pill">${escapeHtml(getLoosePickLineStatusLabel(line))}</span></td>
+                      </tr>
+                    `;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </article>
     `;
@@ -18144,52 +18240,66 @@ function renderTransferResultSummary(result) {
   const normalized = normalizeTransferForOperationsSummary(result);
   const demandLines = Array.isArray(normalized.demand_lines) ? normalized.demand_lines : [];
   const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(result));
-  const hasLooseShortage = Number(plan.summary?.looseQtyToPick || 0) > 0;
-  const requiredArrivalDate = String(result.required_arrival_date || result.required_arrival_on || "").trim();
-  const nextActionLabel = hasLooseShortage ? "去 5.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";
-  const nextActionPanel = hasLooseShortage
-    ? getPanelKeyByTitle("warehouse", "5.1 补差打包工单")
-    : getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印");
+  const summary = plan.summary || {};
+  const categoryCount = plan.categoryCards.length || demandLines.length || items.length;
+  const totalQty = Number(summary.totalRequestedQty || totalRequested || 0);
+  const totalShortageQty = Number(summary.shortageQty || 0);
+  const storeLabel = String(result.to_store_code || normalized.to_store_code || "-").trim().toUpperCase() || "-";
+  const statusLabel = getTransferOrderStatusLabel(result.status || normalized.lifecycle || "");
+  const createdBy = String(result.created_by || result.requested_by || currentSession?.user?.username || "-").trim() || "-";
+  const createdAt = String(result.created_at || result.updated_at || new Date().toISOString()).trim();
+  const detailRows = plan.categoryCards.length ? plan.categoryCards : demandLines.map((row) => ({
+    categoryMain: row.category_main,
+    categorySub: row.category_sub,
+    requestedQty: Number(row.requested_qty || 0),
+    availableQty: 0,
+    pickableQty: 0,
+    shortageQty: Number(row.requested_qty || 0),
+    suggestedAction: "等待补货",
+    stockBadgeLabel: "库存不足",
+  }));
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">Step 1 已创建补货申请单，下一步请按 Step 2 配货建议和 Step 3 动作继续执行。</div>
+    <div class="alert-banner">${escapeHtml(storeLabel)} 补货单</div>
+    <div class="subtle small">共 ${escapeHtml(totalQty)} 件 · ${escapeHtml(categoryCount)} 个品类 · 缺货 ${escapeHtml(totalShortageQty)} 件</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>补货申请单号</strong><span>补货申请单号：${escapeHtml(result.transfer_no || "-")}</span></article>
-      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(getTransferOrderStatusLabel(result.status || normalized.lifecycle || ""))}</span></article>
-      <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(result.to_store_code || "-")}</span></article>
-      <article class="store-metric"><strong>需到货时间</strong><span>${escapeHtml(requiredArrivalDate || "-")}</span></article>
-      <article class="store-metric"><strong>申请总件数</strong><span>${totalRequested} 件</span></article>
-      <article class="store-metric"><strong>需求行</strong><span>${demandLines.length || items.length}</span></article>
-      <article class="store-metric"><strong>散货缺口</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)} 件</span></article>
-      <article class="store-metric"><strong>建议补差包</strong><span>${escapeHtml(plan.summary?.plannedLooseBaleCount || 0)} 个</span></article>
-      <article class="store-metric"><strong>Step 3 下一步动作</strong><span>${escapeHtml(nextActionLabel)}</span></article>
+      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeLabel)}</span></article>
+      <article class="store-metric"><strong>总需求数量</strong><span>${escapeHtml(totalQty)} 件</span></article>
+      <article class="store-metric"><strong>品类数量</strong><span>${escapeHtml(categoryCount)}</span></article>
+      <article class="store-metric"><strong>创建人 / 创建时间</strong><span>${escapeHtml(`${createdBy} / ${createdAt}`)}</span></article>
+      <article class="store-metric"><strong>当前状态</strong><span>${escapeHtml(statusLabel || "待仓库备货")}</span></article>
+      <article class="store-metric"><strong>缺货数量</strong><span>${escapeHtml(totalShortageQty)} 件</span></article>
     </div>
-    ${
-      demandLines.length
-        ? `
-          <div class="candidate-list transfer-draft-list">
-            ${demandLines
-              .map(
-                (row) => `
-                  <article class="candidate-row transfer-draft-row">
-                    <div>
-                      <strong>${escapeHtml([row.category_main, row.category_sub, row.grade].filter(Boolean).join(" / ") || "-")}</strong>
-                      <div class="subtle small">该需求已归属补货申请单 ${escapeHtml(result.transfer_no || "-")}，仓库会先核对现成 SDB 待送店包，再处理散货补差。</div>
-                    </div>
-                    <div class="candidate-side-actions">
-                      <span class="store-flag">${escapeHtml(Number(row.requested_qty || 0))} 件</span>
-                    </div>
-                  </article>
-                `,
-              )
-              .join("")}
-          </div>
-        `
-        : ""
-    }
+    <div class="matrix-table-shell">
+      <table class="matrix-table compact-table">
+        <thead>
+          <tr>
+            <th>大类</th>
+            <th>小类</th>
+            <th>需求数量</th>
+            <th>可用库存</th>
+            <th>可拣数量</th>
+            <th>缺货数量</th>
+            <th>建议动作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${detailRows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.categoryMain || row.category_main || "-")}</td>
+              <td>${escapeHtml(row.categorySub || row.category_sub || "-")}</td>
+              <td>${escapeHtml(row.requestedQty ?? row.requested_qty ?? 0)}</td>
+              <td>${escapeHtml(row.availableQty ?? row.available_qty ?? 0)}</td>
+              <td>${escapeHtml(row.pickableQty ?? row.pickable_qty ?? 0)}</td>
+              <td>${escapeHtml(row.shortageQty ?? row.shortage_qty ?? 0)}</td>
+              <td><span class="meta-pill">${escapeHtml(row.suggestedAction || row.stockBadgeLabel || (Number(row.shortageQty ?? row.shortage_qty ?? 0) > 0 ? "部分拣货" : "可全拣"))}</span></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
     ${renderSummaryActions([
-      { panelKey: nextActionPanel, label: nextActionLabel },
-      { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "去 6 仓库执行单" },
+      { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "生成仓库备货任务" },
     ])}
   `;
 }
@@ -18618,17 +18728,17 @@ function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
   if (!waveNo) {
     target.className = "candidate-summary empty-state";
     target.textContent = mode === "ship"
-      ? "选择波次后，这里展示波次内可配送 SDO 与未生成 SDO 的申请。"
+      ? "选择仓库备货任务后，这里展示任务内可配送 SDO 与未生成 SDO 的申请。"
       : mode === "exec"
-        ? "选择波次后，这里展示每张申请的 SDB/LPK/SDO 执行状态。"
-        : "选择波次后，这里展示波次上下文与申请列表。";
+        ? "选择仓库备货任务后，这里展示每张申请的 SDB/LPK/SDO 执行状态。"
+        : "选择仓库备货任务后，这里展示任务上下文与申请列表。";
     return;
   }
   const wave = getWaveSummaryByNo(waveNo);
   const rows = buildWaveRequestRows(wave);
   target.className = "candidate-summary";
   target.innerHTML = `
-    <div class="alert-banner">已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。</div>
+    <div class="alert-banner">已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。</div>
     <div class="subtle small">${escapeHtml(`${waveNo} / ${(wave?.stores_included || []).length} stores / ${Number(wave?.total_requested_qty || 0)} 件`)}</div>
     <div class="candidate-list transfer-draft-list">
       ${rows.map((row) => {
@@ -18641,7 +18751,7 @@ function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
           return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} / ${row.transfer?.to_store_code || '-'} / SDB ${row.transfer?.delivery_batch?.bale_count || 0} / LPK ${row.shortage > 0 ? '1/1' : '0/0'} / SDO ${sdo ? '已生成' : '未生成'}`)}</strong><div class="subtle small">${escapeHtml(`required ${required} / total ${row.total} 件 / shortage ${row.shortage} 件`)}</div></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${sdo ? '查看/生成 SDO' : '进入执行'}</button></div></article>`;
         }
         return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} | ${row.transfer?.to_store_code || '-'} | required ${required} | total ${row.total} 件 | shortage ${row.shortage} 件`)}</strong></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="lpk">${row.shortage > 0 ? '进入该申请补差' : '无缺口，去仓库执行'}</button></div></article>`;
-      }).join("") || '<div class="empty-state">该波次暂无可展示的补货申请。</div>'}
+      }).join("") || '<div class="empty-state">该仓库备货任务暂无可展示的补货申请。</div>'}
     </div>`;
 }
 function populateTransferOrderSelectors() {
@@ -18712,7 +18822,7 @@ async function refreshPickingWavePanel() {
     window.__pickingWaveCache = Array.isArray(waves) ? waves : [];
     if (!Array.isArray(waves) || !waves.length) {
       list.className = "candidate-summary empty-state";
-      list.textContent = "暂无波次。";
+      list.textContent = "暂无仓库备货任务。";
       return;
     }
     list.className = "candidate-summary";
@@ -30711,7 +30821,7 @@ async function submitTransferApproval(event) {
   }
   if (isWaveSelectionValue(transferNo)) {
     renderWaveExecutionEntrySummary(transferNo, "exec");
-    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+    throw new Error("已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const result = getTransferPreparationOrder(transferNo) || await request(`/transfers/${transferNo}`);
   activeTransferPreparationNo = String(transferNo || "").trim().toUpperCase();
@@ -30732,7 +30842,7 @@ async function submitLoosePackingTaskPlan(event) {
   }
   if (isWaveSelectionValue(transferNo)) {
     renderWaveExecutionEntrySummary(transferNo, "lpk");
-    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+    throw new Error("已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const transfer = getTransferPreparationOrder(transferNo);
   if (!transfer?.transfer_no) {
@@ -30772,7 +30882,7 @@ async function submitPreparedBaleRegistration(event) {
   }
   if (isWaveSelectionValue(transferNo)) {
     renderWaveExecutionEntrySummary(transferNo, "exec");
-    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+    throw new Error("已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const transfer = getTransferPreparationOrder(transferNo);
   if (!transfer?.transfer_no) {
@@ -31018,7 +31128,7 @@ async function submitTransferBundle(event) {
   const transferNo = String(payload.transfer_no || "").trim().toUpperCase();
   if (isWaveSelectionValue(transferNo)) {
     renderWaveExecutionEntrySummary(transferNo, "exec");
-    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+    throw new Error("已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const transfer = getTransferPreparationOrder(transferNo);
   const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer || transferNo));
@@ -31098,7 +31208,7 @@ async function submitTransferShipment(event) {
   }
   if (isWaveSelectionValue(transferNo)) {
     renderWaveExecutionEntrySummary(transferNo, "ship");
-    throw new Error("已选择备货波次。请选择波次内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
+    throw new Error("已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
   const departureTime = String(payload.departure_time || "").trim();
   const routeStops = String(payload.route_stops || "").trim();
@@ -32538,6 +32648,8 @@ document.querySelector("#loosePackingTaskList")?.addEventListener("click", async
     return;
   }
   const nextStatus = action === "pack" ? "packed" : "picking";
+  const currentTask = executionRecord.looseTasks.find((row) => String(row?.taskNo || "").trim().toUpperCase() === taskNo);
+  const currentTaskShortageQty = getLoosePickTaskShortageQty(currentTask || {});
   const nextTasks = typeof operationsFulfillmentFlow.updateLoosePackingTaskStatus === "function"
     ? operationsFulfillmentFlow.updateLoosePackingTaskStatus({
       tasks: executionRecord.looseTasks,
@@ -32558,7 +32670,9 @@ document.querySelector("#loosePackingTaskList")?.addEventListener("click", async
   renderTransferExecutionWorkbench(transfer || transferNo);
   showTransientInlineNotice(
     "#loosePackingTaskPlanNotice",
-    nextStatus === "packed" ? `${taskNo} 已确认拣货并封包。` : `${taskNo} 已进入拣货中。`,
+    nextStatus === "packed"
+      ? (currentTaskShortageQty > 0 ? `${taskNo} 已按现有库存部分拣货并封包，仍有缺货 ${currentTaskShortageQty} 件。` : `${taskNo} 已确认拣货并封包。`)
+      : `${taskNo} 已进入拣货中。`,
     "success",
     1800,
   );

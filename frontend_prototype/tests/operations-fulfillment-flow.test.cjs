@@ -825,21 +825,22 @@ test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1"
   assert.match(indexHtml, /1 选申请/);
   assert.match(indexHtml, /2 看建议/);
   assert.match(indexHtml, /3 生成任务/);
-  assert.match(appJs, /补货申请单号：\$\{escapeHtml\(result\.transfer_no \|\| "-"\)\}/);
-  assert.match(appJs, /const nextActionLabel = hasLooseShortage \? "去 5\.1 生成补差打包工单" : "无需补差，去 6 仓库执行单继续";/);
+  assert.match(appJs, /\$\{escapeHtml\(storeLabel\)\} 补货单/);
+  assert.match(appJs, /生成仓库备货任务/);
 });
 
 test("phase 2A page 5.1 copy uses request number label and warehouse-only LPK guidance", () => {
-  assert.match(indexHtml, /选择补货申请 \/ 选择备货波次/);
+  assert.match(indexHtml, /选择补货申请 \/ 选择仓库备货任务/);
   assert.match(indexHtml, /LPK = 仓库补差工单码；门店不可扫。/);
   assert.match(appJs, /该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。/);
 });
 
-test("phase B2 picking wave panel supports optional wave creation and request multi-select", () => {
-  assert.match(indexHtml, /备货波次是可选工具；补货申请也可以单独执行。/);
+test("phase B2 warehouse prep task panel supports request multi-select", () => {
+  assert.match(indexHtml, /仓库备货任务/);
+  assert.match(indexHtml, /把多个补货品类合成一个仓库拣货任务，仓库按这个任务备货。/);
   assert.match(indexHtml, /id="pickingWaveForm"/);
   assert.match(indexHtml, /name="selected_replenishment_request_nos"[\s\S]*multiple/);
-  assert.match(indexHtml, /创建备货波次/);
+  assert.match(indexHtml, /生成仓库备货任务/);
   assert.match(appJs, /await request\("\/picking-waves", \{ method: "POST"/);
   assert.match(appJs, /await request\("\/picking-waves"\)/);
 });
