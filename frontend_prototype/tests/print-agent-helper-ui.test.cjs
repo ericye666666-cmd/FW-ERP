@@ -34,12 +34,14 @@ test("print modal advanced options expose the Windows print helper controls", ()
   assert.match(indexHtml, /data-download-url="\/downloads\/fw-erp-print-agent-windows\.zip"/);
 });
 
-test("admin test data tools expose RAW_BALE machine_code repair controls", () => {
-  assert.match(indexHtml, /RAW_BALE machine_code 修复/);
-  assert.match(indexHtml, /预检查 RAW_BALE machine_code/);
-  assert.match(indexHtml, /确认修复 RAW_BALE machine_code/);
-  assert.match(indexHtml, /此工具只修复历史 RAW_BALE 缺少正式 machine_code 的数据/);
-  assert.match(indexHtml, /不会修改 POS、库存、成本或 SDB\/LPK\/SDO\/STORE_ITEM 规则/);
+test("test tools expose RAW_BALE barcode data repair controls", () => {
+  const testingPanel = indexHtml.match(/<section class="panel" data-workspace-panel="testing">[\s\S]*?<pre id="storeRecentSalesSimulationOutput" class="output hidden-output"><\/pre>/)?.[0] || "";
+  assert.match(testingPanel, /条码识别测试/);
+  assert.match(testingPanel, /RAW_BALE 条码数据修复/);
+  assert.match(testingPanel, /预检查 RAW_BALE 条码数据/);
+  assert.match(testingPanel, /确认修复 RAW_BALE 条码数据/);
+  assert.match(testingPanel, /修复历史 RAW_BALE 缺少正式 machine_code 的数据/);
+  assert.match(testingPanel, /不会修改 POS、库存、成本、SDB、LPK、SDO 或 STORE_ITEM 规则/);
   assert.match(indexHtml, /data-action="raw-bale-machine-code-repair-dry-run"/);
   assert.match(indexHtml, /data-action="raw-bale-machine-code-repair-apply"/);
   assert.match(indexHtml, /id="rawBaleMachineCodeRepairSummary"/);
@@ -52,11 +54,12 @@ test("RAW_BALE machine_code repair UI calls the admin repair endpoint with dry-r
   assert.match(appJs, /dry_run:\s*dryRun/);
   assert.match(appJs, /raw-bale-machine-code-repair-dry-run/);
   assert.match(appJs, /raw-bale-machine-code-repair-apply/);
-  assert.match(appJs, /确认修复 RAW_BALE machine_code/);
+  assert.match(appJs, /确定要修复 RAW_BALE machine_code 吗？此操作只修复历史 RAW_BALE 条码数据，不会修改 POS、库存、成本。/);
   assert.match(appJs, /would_update_raw_bales/);
   assert.match(appJs, /would_update_print_jobs/);
   assert.match(appJs, /skipped/);
   assert.match(appJs, /sample/);
+  assert.match(appJs, /登录已过期，请重新登录后再执行修复。/);
 });
 
 test("print helper detection checks local health and local printers without opening browser print", () => {

@@ -23546,10 +23546,14 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
+    const message = extractApiErrorMessage(data) || (typeof data === "string" ? data : pretty(data));
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = data;
     if (response.status === 401) {
       clearSession("Session expired. Please sign in again.");
     }
-    throw new Error(extractApiErrorMessage(data) || (typeof data === "string" ? data : pretty(data)));
+    throw error;
   }
   return data;
 }
@@ -27166,17 +27170,23 @@ function renderRawBaleMachineCodeRepairReport(report = {}) {
   if (applyButton instanceof HTMLButtonElement) {
     applyButton.disabled = !canApply;
   }
-  const statusTitle = report.dry_run ? "RAW_BALE machine_code 预检查结果" : "RAW_BALE machine_code 修复结果";
-  const metrics = [
-    ["would_update_raw_bales", wouldUpdateRawBales],
-    ["would_update_print_jobs", wouldUpdatePrintJobs],
-    ["updated_raw_bales", updatedRawBales],
-    ["updated_print_jobs", updatedPrintJobs],
-    ["already_valid_raw_bales", Number(report.already_valid_raw_bales || 0)],
-    ["skipped", skipped.length],
-  ];
+  const statusTitle = report.dry_run ? "RAW_BALE 条码数据预检查结果" : "RAW_BALE 条码数据修复结果";
+  const metrics = report.dry_run
+    ? [
+        ["将修复 RAW_BALE 数量", wouldUpdateRawBales],
+        ["将修复打印任务数量", wouldUpdatePrintJobs],
+        ["已跳过数量", skipped.length],
+        ["已有合法 machine_code", Number(report.already_valid_raw_bales || 0)],
+      ]
+    : [
+        ["已修复 RAW_BALE 数量", updatedRawBales],
+        ["已修复打印任务数量", updatedPrintJobs],
+        ["已跳过数量", skipped.length],
+        ["已有合法 machine_code", Number(report.already_valid_raw_bales || 0)],
+      ];
   const sampleHtml = sample.length
     ? sample
+        .slice(0, 10)
         .map((item) => {
           const fallbackText = item.fallback_date_used ? " / fallback_date_used" : "";
           return `<li><code>${escapeHtml(item.display_code || "-")}</code> -> <code>${escapeHtml(item.new_machine_code || "-")}</code> <span class="subtle">${escapeHtml(item.reason || "")}${fallbackText}</span></li>`;
@@ -27189,9 +27199,18 @@ function renderRawBaleMachineCodeRepairReport(report = {}) {
         .map((item) => `<li><code>${escapeHtml(item.display_code || item.job_id || "-")}</code>：${escapeHtml(item.reason || "skipped")}</li>`)
         .join("")
     : "<li>无跳过项。</li>";
+  const noRepairNeeded = report.dry_run && wouldUpdateRawBales <= 0 && wouldUpdatePrintJobs <= 0;
+  const successText = !report.dry_run
+    ? `<div class="alert-banner success-banner">RAW_BALE 条码数据已修复。请刷新页面，重新打开 RAW_BALE 打印弹窗，再点击打印标签。</div>`
+    : "";
+  const noRepairText = noRepairNeeded
+    ? `<div class="alert-banner success-banner">没有需要修复的 RAW_BALE 数据</div>`
+    : "";
   target.className = "candidate-summary";
   target.innerHTML = `
     <strong>${escapeHtml(statusTitle)}</strong>
+    ${successText}
+    ${noRepairText}
     <div class="kpi-strip compact">
       ${metrics.map(([label, value]) => `<span>${escapeHtml(label)}：<strong>${escapeHtml(value)}</strong></span>`).join("")}
     </div>
@@ -27208,16 +27227,23 @@ function renderRawBaleMachineCodeRepairReport(report = {}) {
   `;
 }
 
+function getRawBaleMachineCodeRepairErrorMessage(error) {
+  if (error?.status === 401) {
+    return "登录已过期，请重新登录后再执行修复。";
+  }
+  return formatErrorMessage(error);
+}
+
 async function runRawBaleMachineCodeRepair({ dryRun = true } = {}) {
   if (!dryRun) {
-    const confirmed = window.confirm("确认修复 RAW_BALE machine_code？此操作会回填历史 RAW_BALE 源记录和旧打印任务。");
+    const confirmed = window.confirm("确定要修复 RAW_BALE machine_code 吗？此操作只修复历史 RAW_BALE 条码数据，不会修改 POS、库存、成本。");
     if (!confirmed) {
       return;
     }
   }
   renderErrorSummary(
     "#rawBaleMachineCodeRepairSummary",
-    dryRun ? "正在预检查 RAW_BALE machine_code..." : "正在修复 RAW_BALE machine_code...",
+    dryRun ? "正在预检查 RAW_BALE 条码数据..." : "正在修复 RAW_BALE 条码数据...",
   );
   const report = await request("/admin/tools/raw-bale-machine-code-repair", {
     method: "POST",
@@ -35565,8 +35591,12 @@ document.querySelectorAll("[data-action]").forEach((button) => {
         return;
       }
       if (action === "raw-bale-machine-code-repair-dry-run" || action === "raw-bale-machine-code-repair-apply") {
-        writeOutput("#rawBaleMachineCodeRepairOutput", formatErrorMessage(error));
-        renderErrorSummary("#rawBaleMachineCodeRepairSummary", formatErrorMessage(error));
+        const message = getRawBaleMachineCodeRepairErrorMessage(error);
+        writeOutput("#rawBaleMachineCodeRepairOutput", message);
+        renderErrorSummary("#rawBaleMachineCodeRepairSummary", message);
+        if (error?.status === 401) {
+          renderAuthResultSummary("notice", { message });
+        }
         return;
       }
       if (action === "generate-warehouse-mainflow-demo") {
