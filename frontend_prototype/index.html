@@ -3382,6 +3382,7 @@
 
           <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions">
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer"><span>班次</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="legacy-stock" data-drawer="legacyStockDrawer"><span>旧库存快速销售</span><strong>旧库存</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>作废</span><strong>-</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer"><span>退款</span><strong>-</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>异常</span><strong>-</strong></button>
@@ -3563,7 +3564,7 @@
             <div class="line-builder-head">
               <div>
                 <strong>离线销售补录明细</strong>
-                <p>一行代表一笔离线销售。测试阶段先支持每笔单一条商品和一条付款。</p>
+                <p>一行代表一笔离线销售。M-Pesa 可勾选“已通过 Safaricom 手机短信确认到账”记录人工确认责任链。</p>
               </div>
               <button type="button" class="ghost-button mini-button" data-builder-add="offline-sales">新增一行</button>
             </div>

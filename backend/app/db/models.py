@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Numeric, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -254,31 +254,49 @@ class SaleItem(Base, TimestampMixin):
     __tablename__ = "sale_items"
     __table_args__ = (
         UniqueConstraint("sale_no", "store_item_id", name="uq_sale_items_sale_store_item"),
+        Index("ix_sale_items_sale_no", "sale_no"),
+        Index("ix_sale_items_source_type_sale_no", "source_type", "sale_no"),
         Index("ix_sale_items_source_chain", "source_sdo", "source_package"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     sale_no: Mapped[str] = mapped_column(ForeignKey("sales.sale_no"), nullable=False)
-    store_item_id: Mapped[int] = mapped_column(ForeignKey("store_items.id"), nullable=False)
+    store_item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("store_items.id"), nullable=True)
     store_item_display_code: Mapped[str] = mapped_column(Text, nullable=False)
     store_item_machine_code: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+    unit_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    line_total: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    selected_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     source_sdo: Mapped[str] = mapped_column(Text, nullable=False)
     source_package: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(Text, nullable=False)
     assigned_employee: Mapped[str] = mapped_column(Text, nullable=False)
     store_rack_code: Mapped[str] = mapped_column(Text, nullable=False)
     category_summary: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    legacy_category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    legacy_subcategory: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    legacy_item_label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class SalePayment(Base, TimestampMixin):
     __tablename__ = "sale_payments"
+    __table_args__ = (
+        Index("ix_sale_payments_sale_no", "sale_no"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     sale_no: Mapped[str] = mapped_column(ForeignKey("sales.sale_no"), nullable=False)
     method: Mapped[str] = mapped_column(Text, nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     reference: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    customer_phone: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payment_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="collected")
+    manual_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    confirmed_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    confirmed_at_local: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmation_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class AuditEvent(Base):

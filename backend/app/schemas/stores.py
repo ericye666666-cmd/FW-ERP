@@ -115,7 +115,10 @@ class StoreOperatingSummaryResponse(BaseModel):
     open_shift_count: int
     handover_pending_count: int
     today_price_alerts: int
+    today_cash_amount: float
     today_mpesa_amount: float
+    today_legacy_stock_sales_amount: float
+    today_store_item_sales_amount: float
     today_refund_amount: float
     unmatched_mpesa_count: int
     offline_failed_rows: int

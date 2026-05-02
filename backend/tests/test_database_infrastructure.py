@@ -57,6 +57,26 @@ def test_phase_one_schema_metadata_contains_required_tables():
     assert expected_tables.issubset(set(Base.metadata.tables))
     assert Base.metadata.tables["store_items"].c.machine_code.unique is True
     assert Base.metadata.tables["sales"].c.sale_no.primary_key is True
+    assert Base.metadata.tables["sale_items"].c.store_item_id.nullable is True
+    for column_name in [
+        "quantity",
+        "unit_price",
+        "line_total",
+        "selected_price",
+        "legacy_category",
+        "legacy_subcategory",
+        "legacy_item_label",
+    ]:
+        assert column_name in Base.metadata.tables["sale_items"].c
+    for column_name in [
+        "customer_phone",
+        "payment_status",
+        "manual_confirmed",
+        "confirmed_by",
+        "confirmed_at_local",
+        "confirmation_note",
+    ]:
+        assert column_name in Base.metadata.tables["sale_payments"].c
     assert Base.metadata.tables["sdo_packages"].c.raw_payload.type.__class__.__name__ == "JSONB"
 
 

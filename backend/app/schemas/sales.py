@@ -13,7 +13,21 @@ class SaleLotAllocationResponse(BaseModel):
 
 
 class SaleItem(BaseModel):
-    barcode: str = Field(min_length=1)
+    barcode: str = ""
+    source_type: str = "STORE_ITEM"
+    category: str = ""
+    subcategory: str = ""
+    legacy_category: str = ""
+    legacy_subcategory: str = ""
+    legacy_item_label: str = ""
+    store_item_display_code: str = ""
+    store_item_machine_code: str = ""
+    source_sdo: str = ""
+    source_package: str = ""
+    assigned_employee: str = ""
+    store_rack_code: str = ""
+    category_summary: str = ""
+    selected_price: Optional[float] = None
     qty: int = Field(ge=1)
     selling_price: float = Field(ge=0)
     override_reason: str = ""
@@ -25,6 +39,13 @@ class SalePayment(BaseModel):
     amount: float = Field(ge=0)
     reference: str = ""
     customer_id: str = ""
+    customer_phone: str = ""
+    payment_status: str = ""
+    manual_confirmed: bool = False
+    mpesa_manual_confirmed: bool = False
+    confirmed_by: str = ""
+    confirmed_at_local: Optional[str] = None
+    confirmation_note: str = ""
 
 
 class SaleCreate(BaseModel):
@@ -43,8 +64,21 @@ class SaleCreate(BaseModel):
 
 class SaleItemResponse(BaseModel):
     identity_id: str = ""
-    barcode: str
-    product_name: str
+    barcode: str = ""
+    product_name: str = ""
+    source_type: str = "STORE_ITEM"
+    legacy_category: str = ""
+    legacy_subcategory: str = ""
+    legacy_item_label: str = ""
+    store_item_display_code: str = ""
+    store_item_machine_code: str = ""
+    source_sdo: str = ""
+    source_package: str = ""
+    assigned_employee: str = ""
+    store_rack_code: str = ""
+    category_summary: str = ""
+    selected_price: Optional[float] = None
+    unit_price: Optional[float] = None
     qty: int
     launch_price: float
     expected_price: float
@@ -70,10 +104,18 @@ class SalePaymentResponse(BaseModel):
     amount: float
     reference: str = ""
     customer_id: str = ""
+    customer_phone: str = ""
+    payment_status: str = ""
+    manual_confirmed: bool = False
+    mpesa_manual_confirmed: bool = False
+    confirmed_by: str = ""
+    confirmed_at_local: Optional[str] = None
+    confirmation_note: str = ""
 
 
 class SaleResponse(BaseModel):
     id: int
+    sale_no: str = ""
     client_sale_id: str = ""
     sync_batch_no: str = ""
     order_no: str
@@ -94,6 +136,11 @@ class SaleResponse(BaseModel):
     payment_status: str = "paid"
     amount_due: float = 0
     amount_overpaid: float = 0
+    local_persisted: bool = False
+    db_sync_status: str = "not_configured"
+    db_sync_error: str = ""
+    db_sync_pending: bool = False
+    db_sync_failed_at: Optional[str] = None
     payment_anomaly_count: int = 0
     payment_anomaly_nos: List[str] = []
     change_due: float
