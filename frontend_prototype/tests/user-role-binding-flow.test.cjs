@@ -21,6 +21,26 @@ const {
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 
+function extractFunctionSource(source, functionName) {
+  const start = source.indexOf(`function ${functionName}`);
+  assert.notEqual(start, -1, `missing function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `missing function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract ${functionName}`);
+}
+
 const users = [
   { username: "austin", full_name: "Austin", role_code: "store_clerk", store_code: "UTAWALA", status: "active", is_active: true },
   { username: "inactive_clerk", full_name: "Inactive Clerk", role_code: "store_clerk", store_code: "UTAWALA", status: "inactive", is_active: false },
@@ -80,4 +100,29 @@ test("frontend reuses central user picker helpers instead of static staff lists"
   assert.doesNotMatch(indexHtml, /<option value="Austin">Austin<\/option>/);
   assert.doesNotMatch(indexHtml, /<option value="Swahili">Swahili<\/option>/);
   assert.doesNotMatch(appJs, /const fallback = \["Austin", "Swahili", "Josephine"\]/);
+});
+
+test("role access profiles keep each account inside its operational workspace", () => {
+  const profileSource = extractFunctionSource(appJs, "getRoleAccessProfile");
+  const warehouseWorkerBlock = profileSource.slice(
+    profileSource.indexOf("const warehouseWorkerRoles"),
+    profileSource.indexOf("const managerRoles"),
+  );
+  const cashierBlock = profileSource.slice(
+    profileSource.indexOf("const cashierRoles"),
+    profileSource.indexOf("return createRoleAccessProfile([\"overview\"], {})"),
+  );
+
+  assert.match(profileSource, /const warehouseManagerRoles = new Set\(\["warehouse_manager", "warehouse_supervisor"\]\)/);
+  assert.match(profileSource, /warehouse:\s*\["inbound", "workorder", "replenishment", "baleSales", "general"\]/);
+  assert.match(profileSource, /const warehouseWorkerRoles = new Set\(\["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"\]\)/);
+  assert.match(profileSource, /return createRoleAccessProfile\(\["warehouse"\], \{\s*warehouse:\s*\["inbound", "workorder"\]/);
+  assert.match(profileSource, /const cashierRoles = new Set\(\["cashier", "store_cashier"\]\)/);
+  assert.match(profileSource, /return createRoleAccessProfile\(\["store"\], \{\s*store:\s*\["cashier"\]/);
+  assert.match(profileSource, /const clerkRoles = new Set\(\["store_clerk", "clerk", "store_staff", "sales_clerk"\]\)/);
+  assert.match(profileSource, /return createRoleAccessProfile\(\["store"\], \{\s*store:\s*\["clerk"\]/);
+  assert.match(profileSource, /const regionalRoles = new Set\(\["regional_manager", "area_manager", "operations_manager", "area_supervisor"\]\)/);
+  assert.match(profileSource, /return createRoleAccessProfile\(\["overview", "operations"\], \{\s*operations:\s*\["insight", "action", "governance"\]/);
+  assert.doesNotMatch(cashierBlock, /warehouse:\s*\[/);
+  assert.doesNotMatch(warehouseWorkerBlock, /store:\s*\["cashier"\]/);
 });

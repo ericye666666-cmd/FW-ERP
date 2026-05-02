@@ -34,9 +34,11 @@ const checks = [
       "backend/tests/test_global_barcode_rules.py",
       "backend/tests/test_windows_local_print_agent.py",
       "backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_bale_scan_token_is_short_and_used_for_print_payload_and_sorting_lookup",
+      "backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_confirm_bale_barcode_labelled_is_idempotent_for_current_bale",
+      "backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_failed_bale_print_job_does_not_mark_raw_bale_labelled",
     ],
     display:
-      "python3 -m pytest -q backend/tests/test_typed_barcode_resolver_contract.py backend/tests/test_global_barcode_rules.py backend/tests/test_windows_local_print_agent.py backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_bale_scan_token_is_short_and_used_for_print_payload_and_sorting_lookup",
+      "python3 -m pytest -q backend/tests/test_typed_barcode_resolver_contract.py backend/tests/test_global_barcode_rules.py backend/tests/test_windows_local_print_agent.py backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_bale_scan_token_is_short_and_used_for_print_payload_and_sorting_lookup backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_confirm_bale_barcode_labelled_is_idempotent_for_current_bale backend/tests/test_main_sorting_flow_state.py::MainSortingFlowStateTest::test_failed_bale_print_job_does_not_mark_raw_bale_labelled",
   },
   {
     name: "Frontend barcode, print, token, POS, auth, user binding, and release validation tests",

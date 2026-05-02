@@ -2335,7 +2335,7 @@ function getRoleAccessProfile(user = currentSession.user) {
     });
   }
 
-  const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager"]);
+  const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager", "area_supervisor"]);
   if (regionalRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "operations"], {
       operations: ["insight", "action", "governance"],

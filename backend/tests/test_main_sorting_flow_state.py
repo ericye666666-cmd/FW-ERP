@@ -153,6 +153,44 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertTrue(by_barcode[bales[0]["bale_barcode"]]["printed_at"])
         self.assertIsNone(by_barcode[bales[1]["bale_barcode"]]["printed_at"])
 
+    def test_confirm_bale_barcode_labelled_is_idempotent_for_current_bale(self):
+        _, bales = self._create_ready_bales(customs_notice_no="LABELCONFIRMIDEMP", package_count=2)
+
+        first = self.state.confirm_bale_barcode_labelled(
+            bales[0]["bale_barcode"],
+            actor_username="warehouse_clerk_1",
+        )
+        second = self.state.confirm_bale_barcode_labelled(
+            bales[0]["bale_barcode"],
+            actor_username="warehouse_clerk_1",
+        )
+
+        self.assertEqual(second["bale_barcode"], bales[0]["bale_barcode"])
+        self.assertEqual(second["printed_at"], first["printed_at"])
+        rows = self.state.list_bale_barcodes(shipment_no=bales[0]["shipment_no"])
+        printed_rows = [row for row in rows if row.get("printed_at")]
+        self.assertEqual([row["bale_barcode"] for row in printed_rows], [bales[0]["bale_barcode"]])
+
+    def test_failed_bale_print_job_does_not_mark_raw_bale_labelled(self):
+        shipment, bales = self._create_ready_bales(customs_notice_no="LABELFAIL", package_count=1)
+        queued = self.state.queue_bale_barcode_print_jobs(
+            shipment["shipment_no"],
+            [{"bale_barcode": bales[0]["bale_barcode"], "copies": 1}],
+            requested_by="warehouse_clerk_1",
+        )
+        job = queued["print_jobs"][0]
+
+        failed_job = self.state.mark_print_job_failed(
+            job["id"],
+            failed_by="warehouse_clerk_1",
+            note="printer offline",
+        )
+
+        self.assertEqual(failed_job["status"], "failed")
+        rows = self.state.list_bale_barcodes(shipment_no=shipment["shipment_no"])
+        self.assertIsNone(rows[0]["printed_at"])
+        self.assertEqual(rows[0]["printed_by"], "")
+
     def test_sorting_task_list_keeps_warehouse_clerk_assignment(self):
         _, bales, _, _ = self._create_ready_bales_with_source_cost(
             customs_notice_no="WHCLERKASSIGN",
