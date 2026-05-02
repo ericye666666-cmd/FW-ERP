@@ -505,6 +505,21 @@ def _first_label_value(payload: dict, *keys: str, default: object = "") -> objec
     return default
 
 
+def _label_category_path(payload: dict) -> str:
+    category_main = str(_first_label_value(payload, "category_main", "cat", "category", default="")).strip()
+    category_sub = str(_first_label_value(payload, "category_sub", "sub", "subcategory", default="")).strip()
+    if category_main and category_sub and category_sub.lower() != category_main.lower():
+        return f"{category_main}/{category_sub}"
+    return category_main or category_sub or "-"
+
+
+def _first_summary_item(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "-"
+    return re.split(r"\s*;\s*|\r?\n", text, maxsplit=1)[0].strip() or "-"
+
+
 def _label_template_family(payload: dict) -> str:
     template_code = str(payload.get("template_code") or "").strip().lower()
     if template_code in {"warehouse_in", "warehouse_in_60x40", "raw_bale_60x40"}:
@@ -549,22 +564,25 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
     if family == "store_prep_bale":
         return [
             (20, 8, "SDB / STORE PREP BALE", 2, 2, 25),
-            (20, 46, f"Category: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}", 1, 1, 34),
-            (20, 76, f"Qty: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}", 1, 1, 24),
-            (252, 76, f"Store: {_first_label_value(payload, 'store', 'store_code', 'destination', default='-')}", 1, 1, 22),
-            (20, 110, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 136, f"Machine: {barcode_value}", 1, 1, 34),
-            (20, 162, f"Encoded: {barcode_value}", 1, 1, 34),
+            (20, 42, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', 'destination', default='-')}", 1, 1, 24),
+            (252, 42, f"Qty: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}", 1, 1, 20),
+            (20, 70, f"Category: {_label_category_path(payload)}", 1, 1, 34),
+            (20, 98, f"Grade: {_first_label_value(payload, 'grade', 'grade_summary', default='-')}", 1, 1, 24),
+            (252, 98, f"Source: {_first_label_value(payload, 'source_reference', 'source_bale_no', 'source', default='-')}", 1, 1, 22),
+            (20, 126, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 152, f"Machine: {barcode_value}", 1, 1, 34),
+            (20, 178, f"Encoded: {barcode_value}", 1, 1, 34),
         ]
     if family == "loose_pick_task":
         return [
-            (20, 8, "LPK SHORTAGE PICK", 2, 2, 24),
-            (20, 46, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
-            (20, 76, f"Qty: {_first_label_value(payload, 'qty', 'item_count', 'quantity', default='-')}", 1, 1, 22),
-            (252, 76, f"Category: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}", 1, 1, 22),
-            (20, 110, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 136, f"Machine: {barcode_value}", 1, 1, 34),
-            (20, 162, f"Encoded: {barcode_value}", 1, 1, 34),
+            (20, 8, "LPK / SHORTAGE PICK", 2, 2, 24),
+            (20, 46, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
+            (20, 74, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
+            (20, 102, f"Pick: {_first_summary_item(_first_label_value(payload, 'picked_item_summary', 'pick_summary', 'packing_list', default='-'))}", 1, 1, 34),
+            (20, 130, f"Short: {_first_summary_item(_first_label_value(payload, 'shortage_summary', 'short_summary', default='-'))}", 1, 1, 34),
+            (20, 158, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 184, f"Machine: {barcode_value}", 1, 1, 34),
+            (20, 210, f"Encoded: {barcode_value}", 1, 1, 34),
         ]
     if family == "store_delivery_execution":
         return [

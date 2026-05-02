@@ -172,6 +172,19 @@
     const categoryMain = normalizeText(row && row.category_main);
     const categorySub = normalizeText(row && row.category_sub);
     const categoryDisplay = [categoryMain, categorySub].filter(Boolean).join(" / ");
+    const storeName = normalizeText(row && (
+      row.target_store_code
+      || row.to_store_code
+      || row.store_code
+      || row.store_name
+      || row.destination
+    )).toUpperCase();
+    const sourceReference = normalizeText(row && (
+      row.source_bale_no
+      || row.source_reference
+      || row.source_code
+      || (Array.isArray(row.source_bales) ? row.source_bales[0] : "")
+    )).toUpperCase();
     const actualWeightKg = Number(row && row.actual_weight_kg || 0);
     const qty = Number(row && row.qty || 0);
     const packagePositionLabel = actualWeightKg > 0
@@ -181,22 +194,27 @@
       printer_name: normalizeText(printerName),
       template_code: resolvedTemplateCode,
       copies: 1,
+      label_title: "SDB / STORE PREP BALE",
       barcode_value: machineCode,
       scan_token: machineCode,
-      bale_barcode: normalizeText(row && row.bale_barcode).toUpperCase(),
+      bale_barcode: displayCode,
       legacy_bale_barcode: "",
       display_code: displayCode,
       machine_code: machineCode,
       human_readable: machineCode,
       supplier_name: "SORTED STOCK",
+      store: storeName,
+      store_name: storeName,
       category_main: categoryMain,
       category_sub: categorySub,
       category_display: categoryDisplay,
+      source_reference: sourceReference,
+      operator_note: "SDB 待送店包 / 来源包 / 不是门店正式收货码",
       package_position_label: packagePositionLabel,
       serial_no: 1,
       total_packages: 1,
       shipment_no: normalizeText(row && row.task_no).toUpperCase(),
-      parcel_batch_no: normalizeText(row && row.bale_no).toUpperCase(),
+      parcel_batch_no: displayCode,
       unload_date: normalizeText(row && (row.updated_at || row.created_at)),
       template_scope: "warehouseout_bale",
       dispatch_bale_no: machineCode,

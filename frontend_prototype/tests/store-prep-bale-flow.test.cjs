@@ -124,7 +124,7 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
   assert.equal(payload.human_readable, "2260423004");
   assert.equal(payload.dispatch_bale_no, "2260423004");
   assert.equal(payload.shipment_no, "SPT-20260423-004");
-  assert.equal(payload.parcel_batch_no, "SPB-20260423-004");
+  assert.equal(payload.parcel_batch_no, "SDB260423004");
   assert.equal(payload.status, "wait for sale");
   assert.equal(payload.grade, "S 10 件");
   assert.equal(payload.qty, "10");

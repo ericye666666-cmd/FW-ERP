@@ -66,7 +66,10 @@ test("SDB print payload uses display code for humans and type-2 machine code for
     task_type: "store_dispatch",
     category_main: "dress",
     category_sub: "long dress",
+    grade_summary: "A",
     qty: 100,
+    target_store_code: "UTAWALA",
+    source_bale_no: "RB260428XYZ",
   });
 
   assert.equal(payload.display_code, "SDB260428AAB");
@@ -76,6 +79,57 @@ test("SDB print payload uses display code for humans and type-2 machine code for
   assert.equal(payload.human_readable, "2260428002");
   assert.equal(payload.dispatch_bale_no, "2260428002");
   assert.notEqual(payload.display_code, payload.barcode_value);
+  assert.equal(payload.label_title, "SDB / STORE PREP BALE");
+  assert.equal(payload.category_main, "dress");
+  assert.equal(payload.category_sub, "long dress");
+  assert.equal(payload.category_display, "dress / long dress");
+  assert.equal(payload.grade, "A");
+  assert.equal(payload.store, "UTAWALA");
+  assert.equal(payload.store_name, "UTAWALA");
+  assert.equal(payload.source_reference, "RB260428XYZ");
+  assert.match(payload.operator_note, /SDB 待送店包/);
+  assert.match(payload.operator_note, /不是门店正式收货码/);
+  assert.doesNotMatch(JSON.stringify(payload), /SPB/);
+});
+
+test("LPK print payload says what was picked and what is short", () => {
+  const flow = loadOperationsFulfillmentFlow();
+  const plan = flow.buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "dress", category_sub: "long dress", requested_qty: 80 },
+      { category_main: "dress", category_sub: "short dress", requested_qty: 60 },
+      { category_main: "tops", category_sub: "lady tops", requested_qty: 40 },
+    ],
+    preparedBales: [],
+    looseRows: [
+      { category_name: "dress / long dress", qty_on_hand: 80, rack_code: "A-01" },
+      { category_name: "dress / short dress", qty_on_hand: 40, rack_code: "A-02" },
+      { category_name: "tops / lady tops", qty_on_hand: 40, rack_code: "A-03" },
+    ],
+  });
+  const [task] = flow.buildLoosePackingTasks({
+    transferNo: "TO-20260428-001",
+    plan,
+  });
+
+  const payload = flow.buildLoosePickSheetDirectPrintPayload({
+    task,
+    transfer: { transfer_no: "TO-20260428-001", to_store_code: "UTAWALA" },
+    storeName: "UTAWALA",
+    printerName: "Deli DL-720C",
+  });
+
+  assert.equal(payload.display_code, "LPK260428001");
+  assert.equal(payload.machine_code, "3260428001");
+  assert.equal(payload.barcode_value, "3260428001");
+  assert.equal(payload.label_title, "LPK / SHORTAGE PICK");
+  assert.match(payload.picked_item_summary, /dress\/long dress x80/);
+  assert.match(payload.picked_item_summary, /dress\/short dress x40/);
+  assert.match(payload.picked_item_summary, /\+1 more/);
+  assert.match(payload.shortage_summary, /dress\/short dress x20/);
+  assert.match(payload.packing_list, /Pick: dress\/long dress x80/);
+  assert.match(payload.packing_list, /Short: dress\/short dress x20/);
+  assert.doesNotMatch(payload.packing_list, /tops\/lady tops x40/);
 });
 
 test("RAW_BALE print code paths prefer type-1 machine_code over RB display code", () => {

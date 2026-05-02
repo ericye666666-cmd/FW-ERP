@@ -10742,6 +10742,7 @@ function buildLoosePickSheetLabelForTask(task = {}, transfer = {}) {
   }
   const barcodeValue = String(task?.printableBarcode || task?.taskBarcode || task?.taskNo || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
   return {
+    labelTitle: "LPK / SHORTAGE PICK",
     templateCode: "store_loose_pick_60x40",
     templateName: "门店补差拣货单 60x40",
     templateScope: "warehouseout_bale",
@@ -10791,6 +10792,7 @@ function buildLoosePickSheetPrinterPayloadForTask(task = {}, transfer = {}, { pr
     template_code: "store_loose_pick_60x40",
     template_scope: "warehouseout_bale",
     copies: 1,
+    label_title: label.labelTitle || "LPK / SHORTAGE PICK",
     display_code: displayCode,
     machine_code: barcodeValue,
     barcode_value: barcodeValue,
@@ -10812,6 +10814,8 @@ function buildLoosePickSheetPrinterPayloadForTask(task = {}, transfer = {}, { pr
     transfer_order_no: label.transferNo,
     bale_piece_summary: "补差拣货单",
     total_quantity: `${pickQty} pcs`,
+    picked_item_summary: "",
+    shortage_summary: "",
     packing_list: label.packingList || "",
     dispatch_bale_no: barcodeValue,
     outbound_time: "",
@@ -10989,7 +10993,7 @@ function openLoosePickSheetPrintTemplateModal(task = {}, transfer = {}) {
     shipmentNo: String(task.transferNo || transfer?.transfer_no || "").trim().toUpperCase(),
     groupKey: String(task.taskNo || task.taskBarcode || "").trim().toUpperCase(),
     jobs: [job],
-    supplierName: "LPK SHORTAGE PICK",
+    supplierName: "LPK / SHORTAGE PICK",
     categoryDisplay: `${getTransferStoreDisplayName(transfer)} / 补差拣货工单`,
     templateScope: "warehouseout_bale",
     taskType: "lpk_shortage_pick",
@@ -16487,7 +16491,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   const selectedTemplateCode = String(selectedTemplate.template_code || payload.template_code || job.template_code || "").trim().toLowerCase();
   const isLpkTemplate = selectedTemplateCode === "store_loose_pick_60x40";
   if (isLpkTemplate) {
-    const lpkTitle = "LPK SHORTAGE PICK";
+    const lpkTitle = "LPK / SHORTAGE PICK";
     const subtitle = "仓库补差拣货工单 / 门店不可扫";
     const displayCode = String(payload.display_code || payload.bale_barcode || payload.code || "").trim().toUpperCase();
     const machineCode = String(payload.machine_code || payload.barcode_value || payload.scan_token || defaultBarcodeValue || "").replace(/[^0-9]/g, "").trim();
@@ -16496,6 +16500,8 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     const requestNo = String(payload.transfer_order_no || payload.shipment_no || "").trim().toUpperCase();
     const qtyLabel = String(payload.qty || payload.total_quantity || "").trim();
     const arrivalDate = String(payload.required_arrival_date || "").trim();
+    const pickedSummary = String(payload.picked_item_summary || payload.pick_summary || "").trim();
+    const shortageSummary = String(payload.shortage_summary || "").trim();
     return `<!doctype html>
 <html>
 <head>
@@ -16506,6 +16512,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     .label { width: 420px; min-height: 280px; padding: 18px; border: 2px solid #c6dadd; border-radius: 16px; background: #fffaf1; }
     h1 { margin: 4px 0 4px; font-size: 26px; line-height: 1.05; letter-spacing: .03em; }
     .sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #0b6268; }
+    .pick-summary { margin: 0 0 8px; padding: 7px 8px; border: 1px solid #1d4f55; background: #eef9f7; font-size: 13px; line-height: 1.35; font-weight: 800; color: #10292d; }
     .meta { margin: 0 0 8px; font-size: 12px; color: #463f37; line-height: 1.4; }
     .barcode-wrap { padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid #d7c8b2; }
     .code { margin-top: 6px; font-size: 16px; font-weight: 900; letter-spacing: .07em; word-break: break-all; text-align: center; }
@@ -16515,6 +16522,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   <section class="label" data-print-template="store_loose_pick_60x40" data-lpk-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
     <h1>${escapeHtml(lpkTitle)}</h1>
     <p class="sub">${escapeHtml(subtitle)}</p>
+    <div class="pick-summary">Pick: ${escapeHtml(pickedSummary || "-")}${shortageSummary ? `<br>Short: ${escapeHtml(shortageSummary)}` : ""}</div>
     <p class="meta">Display: ${escapeHtml(displayCode || "-")}<br>Machine: ${escapeHtml(machineCode || "-")}<br>Encoded: ${escapeHtml(barcodeValue || "-")}<br>Store: ${escapeHtml(storeName || "-")}<br>Request: ${escapeHtml(requestNo || "-")}<br>Category: ${escapeHtml(categoryDisplay || "-")}<br>Qty: ${escapeHtml(qtyLabel || qty || "-")} pcs${arrivalDate ? `<br>需到货时间: ${escapeHtml(arrivalDate)}` : ""}</p>
     <div class="barcode-wrap">
       ${barcodeSvg}
@@ -16861,7 +16869,7 @@ async function checkLocalPrintAgentHealth() {
     localPrintAgentState.connected = false;
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = "health failed";
-    setLocalPrintAgentMessage("error", `本地打印代理未启动（${agentUrl}）。请先启动 FW-ERP Print Agent；浏览器打印在高级选项中作为备用。`);
+    setLocalPrintAgentMessage("error", "打印助手未连接，请先启动 Windows 打印助手");
     renderBalePrintModal();
     throw error;
   }
@@ -17113,10 +17121,10 @@ async function printCurrentBaleModalPrimaryAction() {
   }
   balePrinterConsoleNotice = {
     type: "error",
-    message: "本地打印代理未启动，请先启动 FW-ERP Print Agent。浏览器打印保留在高级选项中。",
+    message: "打印助手未连接，请先启动 Windows 打印助手",
   };
   renderBalePrintModal();
-  throw new Error("本地打印代理未启动，请先启动 FW-ERP Print Agent。");
+  throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
 }
 
 async function printAllBaleModalPrimaryAction() {
@@ -17214,6 +17222,8 @@ function renderBalePrintModal() {
   const closeAction = getBalePrintModalCloseAction();
   const alreadyComplete = isBalePrintModalAlreadyComplete(completionAction);
   const selectedTemplateCode = getActiveBaleTemplateCode(balePrintModalState.preferredTemplateCode || currentJob?.template_code || currentJob?.print_payload?.template_code || "");
+  const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" || selectedTemplateCode === "transtoshop";
+  const isSdbPrint = selectedTemplateCode === "store_prep_bale_60x40" || selectedTemplateCode === "wait_for_transtoshop" || selectedTemplateCode === "wait_for_sale";
   balePrintModalState.preferredTemplateCode = selectedTemplateCode;
   const selectedTemplate = getSelectedBaleTemplate(selectedTemplateCode, templateScope, activeTaskType);
   const selectedPrinterName = String(document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim();
@@ -17379,7 +17389,7 @@ function renderBalePrintModal() {
   }
   if (primaryPrintButton instanceof HTMLButtonElement) {
     primaryPrintButton.disabled = !currentJob;
-    primaryPrintButton.textContent = jobs.length > 1 ? "打印当前张" : "打印标签";
+    primaryPrintButton.textContent = isSdoPrint ? "打印 SDO 条码" : (isLpkPrint ? "打印 LPK 条码" : (isSdbPrint ? "打印 SDB 标签" : (jobs.length > 1 ? "打印当前张" : "打印标签")));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
@@ -17400,7 +17410,7 @@ function renderBalePrintModal() {
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob;
-    localAgentPrintButton.textContent = "打印标签";
+    localAgentPrintButton.textContent = "高级：重试本张";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
@@ -17410,7 +17420,7 @@ function renderBalePrintModal() {
   }
   if (printAllButton instanceof HTMLButtonElement) {
     printAllButton.disabled = !jobs.length;
-    printAllButton.textContent = jobs.length ? "打印本轮全部标签" : "当前类别没有待打印条码";
+    printAllButton.textContent = jobs.length ? "高级：批量重试" : "当前类别没有待打印条码";
   }
   if (sendToStationButton instanceof HTMLButtonElement) {
     sendToStationButton.disabled = !currentJob;
