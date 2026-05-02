@@ -21,17 +21,21 @@ const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/buil
   ? fs.readFileSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"), "utf8")
   : "";
 
-test("print modal advanced options expose the Windows print helper controls", () => {
+test("print modal advanced options expose only field-safe print helper controls", () => {
   assert.match(indexHtml, /FW-ERP 打印助手/);
   assert.match(indexHtml, /打印助手：未启动/);
   assert.match(indexHtml, /本地地址：http:\/\/127\.0\.0\.1:8719/);
   assert.match(indexHtml, /检测打印助手/);
-  assert.match(indexHtml, /检测本机打印机/);
-  assert.match(indexHtml, /下载 Windows 打印助手/);
-  assert.match(indexHtml, /查看安装步骤/);
-  assert.match(indexHtml, /点击后会检测安装包/);
-  assert.doesNotMatch(indexHtml, /id="balePrintModalDownloadAgentButton"[^>]*disabled/);
-  assert.match(indexHtml, /data-download-url="\/downloads\/fw-erp-print-agent-windows\.zip"/);
+  assert.match(indexHtml, /检测打印机队列/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>打印标签<\/button>/);
+  assert.match(indexHtml, /id="balePrintModalPrintAllButton"[^>]*>打印本轮全部标签<\/button>/);
+  const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
+  assert.doesNotMatch(advancedSection, /下载 Windows 打印助手/);
+  assert.doesNotMatch(advancedSection, /查看安装步骤/);
+  assert.doesNotMatch(advancedSection, /直接打印本张/);
+  assert.doesNotMatch(advancedSection, /发送到打印站/);
+  assert.doesNotMatch(advancedSection, /用浏览器打印/);
+  assert.doesNotMatch(advancedSection, /刷新预览/);
 });
 
 test("test tools expose RAW_BALE barcode data repair controls", () => {
@@ -65,10 +69,11 @@ test("RAW_BALE machine_code repair UI calls the admin repair endpoint with dry-r
 test("print helper detection checks local health and local printers without opening browser print", () => {
   assert.match(appJs, /async function checkLocalPrintAgentPrinters/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/printers`/);
-  assert.match(appJs, /Deli DL-720C 当前在线/);
   assert.match(appJs, /已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。/);
-  assert.match(appJs, /当前未检测到本机打印机。/);
-  assert.match(appJs, /已检测到 \$\{rows\.length\} 台本机打印机，未发现 Deli DL-720C。/);
+  assert.match(appJs, /当前未检测到本机打印队列。/);
+  assert.match(appJs, /已检测到 \$\{rows\.length\} 个打印队列，未发现 Deli DL-720C。/);
+  assert.doesNotMatch(appJs, /Deli DL-720C 当前在线/);
+  assert.doesNotMatch(appJs, /已检测到 Deli DL-720C/);
   assert.doesNotMatch(appJs, /checkLocalPrintAgentPrinters[\s\S]{0,1200}browserPrintCurrentBaleModalJob/);
 });
 
