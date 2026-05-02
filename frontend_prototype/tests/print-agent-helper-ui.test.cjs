@@ -52,7 +52,7 @@ test("local agent primary label printing uses raw label endpoint instead of brow
 test("frontend validates local agent label machine code before calling print agent", () => {
   assert.match(appJs, /function validateLocalAgentLabelPayload/);
   assert.match(appJs, /\^\[1-5\]\\d\{9\}\$/);
-  assert.match(appJs, /当前标签缺少合法 machine_code，不能打印。/);
+  assert.match(appJs, /当前 bale 缺少正式 machine_code，请重新生成入库标签或联系管理员修复数据。/);
   assert.match(appJs, /doesLocalAgentLabelTypeMatch/);
   assert.match(appJs, /template_code:\s*selectedTemplateCode/);
 

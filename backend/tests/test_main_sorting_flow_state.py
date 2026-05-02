@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-sys.path.insert(0, "/Users/ericye/Desktop/AI自动化/retail_ops_system/backend")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.core.state import InMemoryState
@@ -682,7 +682,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(updated_bale["status"], "sorting_in_progress")
 
     def test_bale_scan_token_is_short_and_used_for_print_payload_and_sorting_lookup(self):
-        shipment, bales = self._create_ready_bales(customs_notice_no="RAW240427")
+        shipment, bales, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240427")
         first_bale = bales[0]
 
         self.assertTrue(first_bale["bale_barcode"].startswith("RB"))
@@ -697,8 +697,10 @@ class MainSortingFlowStateTest(unittest.TestCase):
         )
         job = queued["print_jobs"][0]
         self.assertEqual(job["barcode"], first_bale["bale_barcode"])
-        self.assertEqual(job["print_payload"]["barcode_value"], first_bale["bale_barcode"])
-        self.assertEqual(job["print_payload"]["scan_token"], first_bale["scan_token"])
+        self.assertRegex(job["print_payload"]["machine_code"], r"^1\d{9}$")
+        self.assertEqual(job["print_payload"]["barcode_value"], first_bale["machine_code"])
+        self.assertEqual(job["print_payload"]["scan_token"], first_bale["machine_code"])
+        self.assertEqual(job["print_payload"]["human_readable"], first_bale["machine_code"])
         self.assertEqual(job["print_payload"]["bale_barcode"], first_bale["bale_barcode"])
         self.assertEqual(job["print_payload"]["legacy_bale_barcode"], first_bale["legacy_bale_barcode"])
 
