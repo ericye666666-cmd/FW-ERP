@@ -37,6 +37,7 @@ Printing:
 - RAW_BALE, SDB, LPK, SDO, and STORE_ITEM print payloads preserve display codes while encoding machine codes.
 - RAW_BALE cannot print `RB...` or a short value such as `260427` as the barcode.
 - Old RAW_BALE print jobs are hydrated from source records only when a formal 1-prefixed machine code exists.
+- RAW_BALE machine_code repair/backfill tests cover dry-run reporting, apply mode, source-record repair, old print-job payload repair, uniqueness, and ambiguous-source skips.
 - Windows Print Agent checks cover `/health`, `/printers`, and `/print/label`.
 - TSPL raw printing is the formal Windows Deli path.
 
@@ -120,4 +121,4 @@ The following frontend tests are not used as blocking checks in `npm run validat
 - `frontend_prototype/tests/sdo-store-item-flow.test.cjs`
 - `frontend_prototype/tests/test-data-tools-flow.test.cjs`
 
-This exclusion is narrow: the release gate still checks current cashier logout/password behavior, user role binding, barcode routing, print payloads, Windows Print Agent helper UI, STORE_ITEM POS sales, backend barcode contracts, RAW_BALE print job hydration, and `npm run build`.
+This exclusion is narrow: the release gate still checks current cashier logout/password behavior, user role binding, barcode routing, print payloads, Windows Print Agent helper UI, STORE_ITEM POS sales, backend barcode contracts, RAW_BALE print job hydration, RAW_BALE machine_code repair/backfill, and `npm run build`.

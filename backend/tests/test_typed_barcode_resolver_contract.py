@@ -1,5 +1,6 @@
 import sys
 import tempfile
+import re
 from pathlib import Path
 
 import pytest
@@ -615,3 +616,175 @@ def test_stale_raw_bale_print_job_does_not_guess_machine_code_from_display_code(
     assert payload["barcode_value"] == "RB260427AAAQH"
     assert payload["scan_token"] == "RB260427AAAQH"
     assert payload["barcode_value"] != "260427"
+
+
+def test_raw_bale_machine_code_repair_dry_run_reports_missing_source_and_print_job(state):
+    raw_bale = {
+        "id": 31,
+        "bale_barcode": "RB260427AAAQH",
+        "scan_token": "RB260427AAAQH",
+        "machine_code": "",
+        "legacy_bale_barcode": "BALE-260427-031",
+        "shipment_no": "SHIP-REPAIR-RAW",
+        "parcel_batch_no": "PB-REPAIR-RAW",
+        "status": "ready_for_sorting",
+        "unload_date": "2026-04-27",
+        "created_at": "2026-04-27T00:00:00+03:00",
+    }
+    state.bale_barcodes[raw_bale["bale_barcode"]] = raw_bale
+    state.print_jobs.append(
+        {
+            "id": 3101,
+            "job_type": "bale_barcode_label",
+            "status": "queued",
+            "barcode": raw_bale["bale_barcode"],
+            "template_code": "warehouse_in",
+            "print_payload": {
+                "display_code": raw_bale["bale_barcode"],
+                "bale_barcode": raw_bale["bale_barcode"],
+                "scan_token": raw_bale["bale_barcode"],
+                "barcode_value": raw_bale["bale_barcode"],
+                "human_readable": raw_bale["bale_barcode"],
+                "machine_code": "",
+            },
+        }
+    )
+
+    report = state.repair_raw_bale_machine_codes(dry_run=True, actor_username="admin_1")
+
+    assert report["dry_run"] is True
+    assert report["would_update_raw_bales"] == 1
+    assert report["would_update_print_jobs"] == 1
+    assert raw_bale["machine_code"] == ""
+    assert state.print_jobs[-1]["print_payload"]["barcode_value"] == "RB260427AAAQH"
+    assert report["sample"][0]["display_code"] == "RB260427AAAQH"
+    assert re.fullmatch(r"1\d{9}", report["sample"][0]["new_machine_code"])
+    assert report["sample"][0]["new_machine_code"] != "260427"
+
+
+def test_raw_bale_machine_code_repair_apply_updates_source_and_print_payload(state):
+    raw_bale = {
+        "id": 32,
+        "bale_barcode": "RB260427AABCD",
+        "scan_token": "RB260427AABCD",
+        "machine_code": "260427",
+        "legacy_bale_barcode": "BALE-260427-032",
+        "shipment_no": "SHIP-REPAIR-RAW",
+        "parcel_batch_no": "PB-REPAIR-RAW",
+        "status": "ready_for_sorting",
+        "unload_date": "2026-04-27",
+        "created_at": "2026-04-27T00:00:00+03:00",
+    }
+    state.bale_barcodes[raw_bale["bale_barcode"]] = raw_bale
+    state.print_jobs.append(
+        {
+            "id": 3201,
+            "job_type": "bale_barcode_label",
+            "status": "queued",
+            "barcode": raw_bale["bale_barcode"],
+            "template_code": "warehouse_in",
+            "print_payload": {
+                "display_code": raw_bale["bale_barcode"],
+                "bale_barcode": raw_bale["bale_barcode"],
+                "scan_token": raw_bale["bale_barcode"],
+                "barcode_value": raw_bale["bale_barcode"],
+                "human_readable": raw_bale["bale_barcode"],
+                "machine_code": "",
+            },
+        }
+    )
+
+    report = state.repair_raw_bale_machine_codes(dry_run=False, actor_username="admin_1")
+
+    assert report["dry_run"] is False
+    assert report["updated_raw_bales"] == 1
+    assert report["updated_print_jobs"] == 1
+    assert re.fullmatch(r"1\d{9}", raw_bale["machine_code"])
+    assert raw_bale["machine_code"].startswith("1260427")
+    payload = state.print_jobs[-1]["print_payload"]
+    assert payload["display_code"] == "RB260427AABCD"
+    assert payload["machine_code"] == raw_bale["machine_code"]
+    assert payload["barcode_value"] == raw_bale["machine_code"]
+    assert payload["scan_token"] == raw_bale["machine_code"]
+    assert payload["human_readable"] == raw_bale["machine_code"]
+    assert payload["barcode_value"] != "260427"
+
+
+def test_raw_bale_machine_code_repair_keeps_valid_codes_and_generates_unique_sequence(state):
+    valid_bale = {
+        "id": 51,
+        "bale_barcode": "RB351231VALID",
+        "scan_token": "RB351231VALID",
+        "machine_code": "1351231004",
+        "legacy_bale_barcode": "BALE-351231-004",
+        "unload_date": "2035-12-31",
+        "status": "ready_for_sorting",
+    }
+    missing_bale = {
+        "id": 52,
+        "bale_barcode": "RB351231MISSN",
+        "scan_token": "RB351231MISSN",
+        "machine_code": "",
+        "legacy_bale_barcode": "BALE-351231-005",
+        "unload_date": "2035-12-31",
+        "status": "ready_for_sorting",
+    }
+    state.bale_barcodes[valid_bale["bale_barcode"]] = valid_bale
+    state.bale_barcodes[missing_bale["bale_barcode"]] = missing_bale
+
+    report = state.repair_raw_bale_machine_codes(dry_run=False, actor_username="admin_1")
+
+    assert report["already_valid_raw_bales"] >= 1
+    assert valid_bale["machine_code"] == "1351231004"
+    assert missing_bale["machine_code"] == "1351231005"
+    all_codes = [
+        row.get("machine_code")
+        for row in state.bale_barcodes.values()
+        if re.fullmatch(r"1\d{9}", str(row.get("machine_code") or ""))
+    ]
+    assert len(all_codes) == len(set(all_codes))
+
+
+def test_raw_bale_machine_code_repair_skips_ambiguous_print_job_without_guessing(state):
+    first = {
+        "id": 61,
+        "bale_barcode": "RB360101AAAAB",
+        "scan_token": "RB360101AAAAB",
+        "machine_code": "1360101001",
+        "legacy_bale_barcode": "BALE-DUP-RAW",
+        "unload_date": "2036-01-01",
+    }
+    second = {
+        "id": 62,
+        "bale_barcode": "RB360101AAAAC",
+        "scan_token": "RB360101AAAAC",
+        "machine_code": "1360101002",
+        "legacy_bale_barcode": "BALE-DUP-RAW",
+        "unload_date": "2036-01-01",
+    }
+    state.bale_barcodes[first["bale_barcode"]] = first
+    state.bale_barcodes[second["bale_barcode"]] = second
+    state.print_jobs.append(
+        {
+            "id": 6101,
+            "job_type": "bale_barcode_label",
+            "status": "queued",
+            "barcode": "BALE-DUP-RAW",
+            "template_code": "warehouse_in",
+            "print_payload": {
+                "display_code": "BALE-DUP-RAW",
+                "bale_barcode": "BALE-DUP-RAW",
+                "barcode_value": "BALE-DUP-RAW",
+                "scan_token": "BALE-DUP-RAW",
+                "machine_code": "",
+            },
+        }
+    )
+
+    report = state.repair_raw_bale_machine_codes(dry_run=False, actor_username="admin_1")
+
+    assert report["updated_print_jobs"] == 0
+    assert any(item["reason"] == "cannot_find_unique_raw_bale_source" for item in report["skipped"])
+    payload = state.print_jobs[-1]["print_payload"]
+    assert payload["barcode_value"] == "BALE-DUP-RAW"
+    assert payload.get("machine_code", "") == ""
