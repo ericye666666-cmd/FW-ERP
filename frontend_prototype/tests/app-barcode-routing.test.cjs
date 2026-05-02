@@ -66,13 +66,13 @@ test("bale print modal moves technical print controls into collapsed advanced op
   assert.match(indexHtml, /id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
 });
 
-test("primary bale print action auto-selects local agent or browser fallback", () => {
-  assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?browserPrintCurrentBaleModalJob\(\)/);
+test("primary bale print action requires local agent and keeps browser print in advanced fallback", () => {
+  assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?本地打印代理未启动，请先启动 FW-ERP Print Agent/);
   assert.match(appJs, /document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click"/);
-  assert.match(appJs, /当前打印方式：浏览器打印/);
+  assert.match(appJs, /当前打印方式：等待本地打印代理/);
   assert.match(appJs, /selectedPrinterName = "Deli DL-720C"/);
-  assert.match(appJs, /Windows 打印机：请在系统打印窗口选择 \$\{escapeHtml\(printerName\.replace/);
-  assert.match(appJs, /本地打印代理：未连接/);
+  assert.match(appJs, /Windows 打印机：\$\{escapeHtml\(printerName\.replace/);
+  assert.match(appJs, /本地打印代理：未启动/);
   assert.match(appJs, /本地代理队列暂不支持/);
   assert.doesNotMatch(appJs, /待安装打印机/);
   assert.doesNotMatch(appJs, /当前队列不支持/);
@@ -81,11 +81,12 @@ test("primary bale print action auto-selects local agent or browser fallback", (
 });
 
 test("bale print modal includes local print agent status and controls", () => {
-  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*Local print agent: not connected · URL: http:\/\/127\.0\.0\.1:8719/);
-  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测本地打印代理/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*通过本地代理打印/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*FW-ERP 打印助手/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*本地地址：http:\/\/127\.0\.0\.1:8719/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印助手/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*打印标签/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
-  assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/html`, \{/);
+  assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/label`, \{/);
 });
 
 test("direct backend print stays available only as an advanced LAN option", () => {

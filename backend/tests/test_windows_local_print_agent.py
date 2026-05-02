@@ -98,6 +98,98 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertIn("file:///C:/Temp/label.html", script)
         self.assertIn("Deli DL-720C", script)
 
+    def test_raw_bale_tspl_uses_60x40_and_machine_barcode(self):
+        normalized, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "copies": 1,
+                "template_size": "60x40",
+                "label_payload": {
+                    "display_code": "RB260427AAAQH",
+                    "barcode_value": "1260427001",
+                    "supplier_name": "YOUXUNDE",
+                    "category_main": "tops",
+                    "category_sub": "shirt",
+                    "serial_no": 1,
+                    "total_packages": 18,
+                    "shipment_no": "SHIP-260427",
+                    "parcel_batch_no": "PB-001",
+                    "received_at": "2026-04-27",
+                },
+            }
+        )
+
+        self.assertIsNone(error)
+        tspl = agent._build_tspl_60x40_label(normalized["label_payload"], copies=normalized["copies"])
+
+        self.assertIn("SIZE 60 mm,40 mm", tspl)
+        self.assertIn("GAP 2 mm,0 mm", tspl)
+        self.assertIn('BARCODE 40,220,"128"', tspl)
+        self.assertIn('"1260427001"', tspl)
+        self.assertNotIn('"RB260427AAAQH"', tspl.split("BARCODE", 1)[1])
+        self.assertIn('TEXT 24,160,"0",0,1,1,"Display: RB260427AAAQH"', tspl)
+        self.assertIn('TEXT 24,184,"0",0,1,1,"Machine: 1260427001"', tspl)
+
+    def test_tspl_uses_type_prefixed_machine_codes_for_all_label_types(self):
+        cases = [
+            ("SDB260429AAB", "2260429001", {"category": "long dress", "item_count": 100, "store": "UTAWALA"}),
+            ("LPK260429001", "3260429001", {"transfer_order_no": "TO-001", "qty": 12, "category": "kids"}),
+            ("SDO260429002", "4260429002", {"store": "UTAWALA", "request": "TO-001", "packages": 3, "packing_list": "SDB/LPK"}),
+            ("STOREITEM260429001", "5260429001", {"price": 150, "rack": "A-01", "category": "tops"}),
+        ]
+
+        for display_code, barcode_value, extra_fields in cases:
+            with self.subTest(display_code=display_code):
+                payload = {"display_code": display_code, "barcode_value": barcode_value, **extra_fields}
+                normalized, error = agent._normalize_print_label_request(
+                    {"printer_name": "Deli DL-720C", "label_payload": payload}
+                )
+
+                self.assertIsNone(error)
+                tspl = agent._build_tspl_60x40_label(normalized["label_payload"], copies=1)
+                self.assertIn(f'"{barcode_value}"', tspl)
+                self.assertNotIn(f'BARCODE 40,220,"128",80,1,0,2,2,"{display_code}"', tspl)
+
+    def test_print_label_request_rejects_display_code_as_barcode_value(self):
+        _, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "label_payload": {
+                    "display_code": "RB260427AAAQH",
+                    "machine_code": "1260427001",
+                    "barcode_value": "RB260427AAAQH",
+                },
+            }
+        )
+
+        self.assertIn("barcode_value must be a 1/2/3/4/5-prefixed machine_code", error)
+
+    def test_windows_label_print_uses_raw_tspl_sender_not_browser_kiosk(self):
+        normalized, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "label_payload": {
+                    "display_code": "SDB260429AAB",
+                    "barcode_value": "2260429001",
+                    "category": "long dress",
+                    "item_count": 100,
+                },
+            }
+        )
+        self.assertIsNone(error)
+
+        with patch.object(agent.platform, "system", return_value="Windows"), \
+            patch.object(agent, "_resolve_printer_name_windows", return_value=("Deli DL-720C", None)), \
+            patch.object(agent, "_send_raw_to_windows_printer", return_value=(True, "raw ok")) as raw_sender, \
+            patch.object(agent, "_build_windows_html_print_script", side_effect=AssertionError("browser kiosk should not be used")):
+            success, message, resolved_printer, tspl = agent._print_label_windows(normalized)
+
+        self.assertTrue(success)
+        self.assertEqual(resolved_printer, "Deli DL-720C")
+        self.assertIn("TSPL raw", message)
+        self.assertIn('"2260429001"', tspl)
+        raw_sender.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

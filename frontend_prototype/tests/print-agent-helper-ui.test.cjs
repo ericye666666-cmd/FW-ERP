@@ -41,6 +41,14 @@ test("print helper detection checks local health and local printers without open
   assert.doesNotMatch(appJs, /checkLocalPrintAgentPrinters[\s\S]{0,1200}browserPrintCurrentBaleModalJob/);
 });
 
+test("local agent primary label printing uses raw label endpoint instead of browser HTML", () => {
+  assert.match(appJs, /async function printCurrentBaleModalViaLocalAgent/);
+  assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/label`/);
+  assert.doesNotMatch(appJs, /printCurrentBaleModalViaLocalAgent[\s\S]{0,2400}\/print\/html/);
+  assert.match(appJs, /label_payload:\s*labelPayload/);
+  assert.match(appJs, /barcode_value:\s*labelPayload\.barcode_value/);
+});
+
 test("print helper download checks package availability before downloading", () => {
   assert.match(appJs, /async function downloadWindowsPrintAgentPackage/);
   assert.match(appJs, /\/downloads\/fw-erp-print-agent-windows\.zip/);
@@ -115,4 +123,11 @@ test("print agent README documents GitHub Actions build path", () => {
   assert.match(readme, /workflow_dispatch/);
   assert.match(readme, /Artifacts/);
   assert.match(readme, /\/downloads\/fw-erp-print-agent-windows\.zip/);
+});
+
+test("print agent README documents TSPL raw label printing as the formal Deli path", () => {
+  assert.match(readme, /TSPL raw/);
+  assert.match(readme, /\/print\/label/);
+  assert.match(readme, /SIZE 60 mm,40 mm/);
+  assert.match(readme, /does not open Edge\/Chrome/i);
 });
