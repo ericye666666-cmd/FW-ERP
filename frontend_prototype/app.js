@@ -11508,6 +11508,9 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   const looseDispatchRows = dispatchRows.filter((row) => row.finalType === "loose_pick_sheet_dispatch");
   setInputValue("#preparedBaleRegistrationForm [name='transfer_no']", transfer.transfer_no);
   setInputValue("#loosePackingTaskPlanForm [name='transfer_no']", transfer.transfer_no);
+  setInputValue("#approveTransferForm [name='transfer_no']", transfer.transfer_no);
+  setInputValue("#transferBundleForm [name='transfer_no']", transfer.transfer_no);
+  setInputValue("#transferPrintForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
     <div class="alert-banner">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
@@ -18481,6 +18484,20 @@ function renderTransferShipTargetHint(transferNo = "") {
   target.textContent = `目标门店：${storeCode || "-"}${storeName && storeName !== storeCode ? ` / ${storeName}` : ""}；关联仓库执行单（临时）：${normalizedTransferNo}；当前状态：${getShipmentBatchProgressLabel(transfer)}；总包数：${baleCount}${deliveryBatch ? `；配送批次：${deliveryBatch}` : ""}。`;
 }
 
+function getTransferShipmentPackageCount(transfer = {}) {
+  const sdoPackages = transfer?.store_delivery_execution_order?.packages;
+  if (Array.isArray(sdoPackages) && sdoPackages.length) {
+    return sdoPackages.length;
+  }
+  if (Array.isArray(transfer?.display_store_dispatch_bales) && transfer.display_store_dispatch_bales.length) {
+    return transfer.display_store_dispatch_bales.length;
+  }
+  if (Array.isArray(transfer?.store_dispatch_bales) && transfer.store_dispatch_bales.length) {
+    return transfer.store_dispatch_bales.length;
+  }
+  return Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0);
+}
+
 function findTransferOrderStateRow(transferNo = "") {
   const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
   if (!normalizedTransferNo) {
@@ -18632,21 +18649,24 @@ function populateTransferOrderSelectors() {
     if (!(select instanceof HTMLSelectElement)) return;
     const previousValue = String(select.value || "").trim().toUpperCase();
     const options = rows.map((row) => {
-      const total = Number(row.requested_qty || (Array.isArray(row.items) ? row.items.reduce((s, i) => s + Number(i.requested_qty || 0), 0) : 0));
-      const shortage = Number(buildTransferPreparationPlan(getTransferPreparationPlanRows(row)).summary?.looseQtyToPick || 0);
+      const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(row));
+      const summary = plan.summary || {};
+      const total = Number(summary.totalRequestedQty || row.requested_qty || 0);
+      const shortage = Number(summary.looseQtyToPick || 0);
+      const sdbCount = Number(summary.selectedPreparedBaleCount || row.delivery_batch?.bale_count || 0);
       const requiredDate = String(row.required_arrival_date || row.required_arrival_on || "-").trim() || "-";
       if (mode === "ship") {
         const hasSdo = Boolean(row.store_delivery_execution_order_no);
         const sdo = row.store_delivery_execution_order_no || chooseI18nLabel("SDO 未生成", "SDO Not Generated");
         const transferNo = row.transfer_no || "-";
-        const packCount = row.delivery_batch?.bale_count || 0;
+        const packCount = hasSdo ? getTransferShipmentPackageCount(row) : Math.max(sdbCount + (shortage > 0 ? 1 : 0), 0);
         const statusLabel = hasSdo ? getShipmentBatchProgressLabel(row) : translateStatusLabel("pending_print", "store_dispatch_bale");
         return `${sdo} / ${row.to_store_code || "-"} / ${transferNo} / ${formatI18nCount(packCount, "包", "packages")} / ${statusLabel}`;
       }
       if (mode === "exec") {
         return currentLanguage === "en"
-          ? `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / total ${total} items / SDB ${row.delivery_batch?.bale_count || 0} / LPK ${shortage > 0 ? 1 : 0} / SDO ${row.store_delivery_execution_order_no ? "generated" : "not generated"}`
-          : `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / SDB ${row.delivery_batch?.bale_count || 0} / LPK ${shortage > 0 ? 1 : 0} / SDO ${row.store_delivery_execution_order_no ? "已生成" : "未生成"}`;
+          ? `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / total ${total} items / SDB ${sdbCount} / LPK ${shortage > 0 ? 1 : 0} / SDO ${row.store_delivery_execution_order_no ? "generated" : "not generated"}`
+          : `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / SDB ${sdbCount} / LPK ${shortage > 0 ? 1 : 0} / SDO ${row.store_delivery_execution_order_no ? "已生成" : "未生成"}`;
       }
       return currentLanguage === "en"
         ? `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / total ${total} items / shortage ${shortage} items`
@@ -25576,7 +25596,6 @@ function getTransferDerivedStoreDispatchRows() {
     ).trim().toUpperCase();
     if (!sdoCode || existingSdoCodes.has(sdoCode)) return;
     const targetStoreCode = String(transfer?.to_store_code || transfer?.store_code || "").trim().toUpperCase();
-    const packageCount = Math.max(0, Number(transfer?.delivery_batch?.bale_count || transfer?.dispatch_bale_count || 0));
     const upstreamPackageRows = [
       ...(Array.isArray(transfer?.store_delivery_execution_order?.packages) ? transfer.store_delivery_execution_order.packages : []),
       ...(Array.isArray(transfer?.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : []),
@@ -25587,6 +25606,7 @@ function getTransferDerivedStoreDispatchRows() {
     const explicitItemCounts = upstreamPackageRows
       .map((row) => parseKnownDispatchItemCount(row))
       .filter((count) => count !== null);
+    const packageCount = getTransferShipmentPackageCount(transfer);
     for (let index = 0; index < packageCount; index += 1) {
       const packageLabel = String(index + 1).padStart(3, "0");
       const knownItemCount = explicitItemCounts[index] ?? null;
@@ -25602,6 +25622,7 @@ function getTransferDerivedStoreDispatchRows() {
         target_store_code: targetStoreCode,
         status: transfer?.status || "shipped",
         item_count: knownItemCount,
+        source_type: String(upstreamPackageRows[index]?.source_type || "").trim(),
         category_summary: String(upstreamPackageRows[index]?.category_summary || upstreamPackageRows[index]?.category_name || "").trim(),
         category_name: String(upstreamPackageRows[index]?.category_name || "").trim(),
         updated_at: transfer?.updated_at || transfer?.created_at || nowIso,
@@ -26347,7 +26368,9 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
             <strong>${escapeHtml(record.sale_no || "-")}</strong>
             <div class="subtle small">${escapeHtml(`${record.store_item_display_code || "-"} · ${record.store_item_machine_code || "-"} · ${formatKesAmount(record.price || 0, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
-            <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · category_summary ${record.category_summary || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · source_type ${record.source_type || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`assigned_employee ${record.assigned_employee || "-"} · store_rack_code ${record.store_rack_code || "-"} · cashier ${record.cashier || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`category_summary ${record.category_summary || "-"}`)}</div>
           </div>
           <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.payment_method || "-")}</span></div>
         </article>
@@ -26492,6 +26515,12 @@ function getStorePackageSourceCode(row = {}) {
 function getStorePackageSourceType(row = {}) {
   const explicit = String(row?.source_type || row?.package_type || "").trim().toUpperCase();
   if (explicit) {
+    if (["PREPARED_STORE_DISPATCH_BALE", "PREPARED_STORE_PREP_BALE", "STORE_PREP_BALE", "STORE_PREP", "STORE_DISPATCH_BALE"].includes(explicit)) {
+      return "SDB";
+    }
+    if (["LOOSE_PICK_SHEET", "LOOSE_PICK_TASK", "SHORTAGE_PICK", "SHORTAGE_PICK_PACK"].includes(explicit)) {
+      return "LPK";
+    }
     return explicit;
   }
   const sourceCode = getStorePackageSourceCode(row);
@@ -30800,8 +30829,45 @@ async function loadTransferPlanningContext({ force = false } = {}) {
   return transferOrderState;
 }
 
+async function hydrateTransferOrdersWithStoreDeliveryExecutionOrders(rows = []) {
+  if (!Array.isArray(rows) || !rows.length) {
+    return [];
+  }
+  return Promise.all(rows.map(async (transfer) => {
+    const transferNo = String(transfer?.transfer_no || "").trim().toUpperCase();
+    const sdoCode = String(
+      transfer?.store_delivery_execution_order_no
+      || transfer?.store_delivery_execution_order?.execution_order_no
+      || transfer?.official_delivery_barcode
+      || "",
+    ).trim().toUpperCase();
+    if (!transferNo || !sdoCode || Array.isArray(transfer?.store_delivery_execution_order?.packages)) {
+      return transfer;
+    }
+    try {
+      const orders = await request(`/transfers/${encodeURIComponent(transferNo)}/store-delivery-execution-orders`);
+      const orderList = Array.isArray(orders) ? orders : [];
+      const matchedOrder = orderList.find((order) => String(
+        order?.execution_order_no || order?.official_delivery_barcode || "",
+      ).trim().toUpperCase() === sdoCode) || orderList[0] || null;
+      if (!matchedOrder) {
+        return transfer;
+      }
+      return {
+        ...transfer,
+        store_delivery_execution_order: matchedOrder,
+        store_delivery_execution_order_no: matchedOrder.execution_order_no || transfer.store_delivery_execution_order_no || sdoCode,
+        official_delivery_barcode: matchedOrder.official_delivery_barcode || transfer.official_delivery_barcode || sdoCode,
+        machine_code: matchedOrder.machine_code || transfer.machine_code || "",
+      };
+    } catch (_error) {
+      return transfer;
+    }
+  }));
+}
+
 async function loadTransferOrders() {
-  transferOrderState = await request("/transfers");
+  transferOrderState = await hydrateTransferOrdersWithStoreDeliveryExecutionOrders(await request("/transfers"));
   try {
     storeDispatchBaleState = await request("/stores/dispatch-bales");
     filteredStoreDispatchBaleState = storeDispatchBaleState;

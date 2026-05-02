@@ -26,6 +26,7 @@ test("release validation script runs the required build, barcode, print, and tok
     "frontend_prototype/tests/barcode-print-payload.test.cjs",
     "frontend_prototype/tests/bale-print-flow.test.cjs",
     "frontend_prototype/tests/store-prep-bale-flow.test.cjs",
+    "frontend_prototype/tests/sdo-store-item-flow.test.cjs",
     "frontend_prototype/tests/pos-store-item-sale-flow.test.cjs",
     "frontend_prototype/tests/print-agent-helper-ui.test.cjs",
     "frontend_prototype/tests/user-pos-auth-bugs.test.cjs",
@@ -58,7 +59,6 @@ test("release validation docs explain the preflight command and deployment check
     "Historical Tests Not In The Blocking Gate",
     "frontend_prototype/tests/auth-route-guard-flow.test.cjs",
     "frontend_prototype/tests/priority-mainline-page-structure.test.cjs",
-    "frontend_prototype/tests/sdo-store-item-flow.test.cjs",
     "frontend_prototype/tests/test-data-tools-flow.test.cjs",
   ].forEach((needle) => {
     assert.match(doc, new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

@@ -27,6 +27,7 @@ Barcode identity:
 
 STORE_ITEM token and POS flow:
 
+- Warehouse Page 6 SDB/LPK to SDO targeted checks are included.
 - STORE_ITEM labels use 5-prefixed machine codes.
 - POS only accepts STORE_ITEM.
 - POS sale records keep the STORE_ITEM source chain.
@@ -118,7 +119,6 @@ The following frontend tests are not used as blocking checks in `npm run validat
 
 - `frontend_prototype/tests/auth-route-guard-flow.test.cjs`
 - `frontend_prototype/tests/priority-mainline-page-structure.test.cjs`
-- `frontend_prototype/tests/sdo-store-item-flow.test.cjs`
 - `frontend_prototype/tests/test-data-tools-flow.test.cjs`
 
-This exclusion is narrow: the release gate still checks current cashier logout/password behavior, user role binding, barcode routing, print payloads, Windows Print Agent helper UI, STORE_ITEM POS sales, backend barcode contracts, RAW_BALE print job hydration, RAW_BALE machine_code repair/backfill, and `npm run build`.
+This exclusion is narrow: the release gate still checks current cashier logout/password behavior, user role binding, barcode routing, print payloads, Windows Print Agent helper UI, warehouse SDB/LPK to SDO handoff checks, STORE_ITEM POS sales, backend barcode contracts, RAW_BALE print job hydration, RAW_BALE machine_code repair/backfill, and `npm run build`.
