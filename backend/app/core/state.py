@@ -15,8 +15,16 @@ from app.core.config import settings
 from app.core.persistence import load_json, save_json
 from app.core.security import generate_session_token, hash_password, verify_password
 from app.core.seed_data import ACTIVE_STORES, DEFAULT_CARGO_TYPES, DEFAULT_USERS, LABEL_TEMPLATES, ROLE_DEFINITIONS, STORE_RACK_TEMPLATE
+from app.db.pos_sales import (
+    DB_SYNC_FAILURE_MESSAGE,
+    MPESA_PAYMENT_MANUAL_CONFIRMATION_ACTION,
+    should_write_sale_to_database,
+    write_sale_transaction_to_database,
+)
 
 NAIROBI_TZ = ZoneInfo("Africa/Nairobi")
+LEGACY_STOCK_SOURCE_TYPE = "LEGACY_STOCK"
+STORE_ITEM_SOURCE_TYPE = "STORE_ITEM"
 LOCKED_BALE_TEMPLATE_CODE = "warehouse_in"
 SALES_FX_RATES_TO_KES = {
     "KES": 1.0,
@@ -142,6 +150,12 @@ def _derive_apparel_sorting_rack_code(category_main: str, category_sub: str, gra
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on", "checked"}
 
 
 def _normalize_unload_date_value(value: str) -> str:
@@ -3624,6 +3638,14 @@ class InMemoryState:
                 for payment in sale["payments"]:
                     payment.setdefault("reference", "")
                     payment.setdefault("customer_id", "")
+                    payment.setdefault("customer_phone", "")
+                    method = str(payment.get("method") or "").strip().lower()
+                    payment.setdefault("payment_status", "collected" if method == "cash" else "collected")
+                    payment.setdefault("manual_confirmed", False)
+                    payment.setdefault("mpesa_manual_confirmed", bool(payment.get("manual_confirmed")))
+                    payment.setdefault("confirmed_by", "")
+                    payment.setdefault("confirmed_at_local", "")
+                    payment.setdefault("confirmation_note", "")
             for item in sale.get("items", []):
                 resolved_identity_id = self._resolve_identity_id_for_barcode(item.get("barcode", ""))
                 if item.get("identity_id") != resolved_identity_id:
@@ -9888,7 +9910,7 @@ class InMemoryState:
 
     def open_cashier_shift(self, payload: dict[str, Any]) -> dict[str, Any]:
         store = self._ensure_store_exists(payload["store_code"])
-        actor = self._require_user_role(payload["opened_by"], {"cashier", "store_manager"}, store_code=store["code"])
+        actor = self._require_user_role(payload["opened_by"], {"cashier", "store_cashier", "admin"}, store_code=store["code"])
         existing = self._find_open_shift_for_cashier(store["code"], actor["username"])
         if existing:
             return existing
@@ -14026,7 +14048,7 @@ class InMemoryState:
 
     def create_sale_transaction(self, payload: dict[str, Any]) -> dict[str, Any]:
         store = self._ensure_store_exists(payload["store_code"])
-        actor = self._require_user_role(payload["cashier_name"], {"cashier", "store_manager"}, store_code=store["code"])
+        actor = self._require_user_role(payload["cashier_name"], {"cashier", "store_cashier", "admin"}, store_code=store["code"])
         shift_no = payload.get("shift_no", "").strip()
         if shift_no:
             shift = self.get_cashier_shift(shift_no)
@@ -14041,6 +14063,21 @@ class InMemoryState:
             shift = open_shift
             shift_no = shift["shift_no"]
 
+        sale_no = str(payload["order_no"]).strip()
+        if not sale_no:
+            raise HTTPException(status_code=400, detail="Sale number is required")
+        payload["order_no"] = sale_no
+        existing_transaction = next(
+            (
+                transaction
+                for transaction in self.sales_transactions
+                if str(transaction.get("sale_no") or transaction.get("order_no") or "").strip() == sale_no
+            ),
+            None,
+        )
+        if existing_transaction:
+            return existing_transaction
+
         line_items: list[dict[str, Any]] = []
         total_qty = 0
         total_amount = 0.0
@@ -14052,10 +14089,39 @@ class InMemoryState:
         if not payments:
             raise HTTPException(status_code=400, detail="At least one payment line is required")
 
+        expected_total_amount = 0.0
         for item in payload["items"]:
-            resolved = self.resolve_barcode(item["barcode"], context="pos")
+            source_type = str(item.get("source_type") or STORE_ITEM_SOURCE_TYPE).strip().upper()
+            if source_type == LEGACY_STOCK_SOURCE_TYPE:
+                legacy_category = str(item.get("legacy_category") or item.get("category") or "").strip()
+                legacy_subcategory = str(item.get("legacy_subcategory") or item.get("subcategory") or "").strip()
+                if not legacy_category:
+                    raise HTTPException(status_code=400, detail="Legacy stock category is required")
+                if not legacy_subcategory:
+                    raise HTTPException(status_code=400, detail="Legacy stock subcategory is required")
+                try:
+                    qty = int(item.get("qty") or 0)
+                    selling_price = float(item.get("selling_price") or item.get("unit_price") or 0)
+                except (TypeError, ValueError):
+                    raise HTTPException(status_code=400, detail="Legacy stock quantity and price must be numbers") from None
+                if qty <= 0:
+                    raise HTTPException(status_code=400, detail="Legacy stock quantity must be greater than 0")
+                if selling_price <= 0:
+                    raise HTTPException(status_code=400, detail="Legacy stock price must be greater than 0")
+                expected_total_amount += round(qty * selling_price, 2)
+                continue
+
+            resolved = self.resolve_barcode(item.get("barcode", ""), context="pos")
             if resolved["barcode_type"] != "STORE_ITEM" or resolved.get("reject_reason"):
-                raise HTTPException(status_code=400, detail=resolved.get("reject_reason") or f"{item['barcode']} is not a store item barcode")
+                barcode = str(item.get("barcode") or "").strip()
+                raise HTTPException(status_code=400, detail=resolved.get("reject_reason") or f"{barcode} is not a store item barcode")
+            try:
+                store_item_qty = int(item.get("qty") or 0)
+                store_item_price = float(item.get("selling_price") or 0)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="STORE_ITEM quantity and price must be numbers") from None
+            if store_item_qty <= 0:
+                raise HTTPException(status_code=400, detail="STORE_ITEM quantity must be greater than 0")
             product = self.get_product_by_barcode(item["barcode"])
             stock_key = f"{store['code']}||{product['barcode']}"
             store_row = self.store_stock.get(stock_key)
@@ -14068,8 +14134,128 @@ class InMemoryState:
                         f"requested {item['qty']}, available {available_qty}"
                     ),
                 )
+            expected_total_amount += round(store_item_qty * store_item_price, 2)
+
+        expected_total_amount = round(expected_total_amount, 2)
+        normalized_payments = []
+        allowed_payment_methods = {"cash", "mpesa"}
+        power_mode = str(payload.get("power_mode", "online") or "online").strip().lower() or "online"
+        for payment in payments:
+            method = str(payment.get("method") or "").strip().lower()
+            if not method:
+                raise HTTPException(status_code=400, detail="必须选择支付方式")
+            if method not in allowed_payment_methods:
+                raise HTTPException(status_code=400, detail="支付方式只支持 cash / mpesa / mixed")
+            try:
+                amount = round(float(payment.get("amount") or 0), 2)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="付款金额必须是数字") from None
+            if amount <= 0:
+                raise HTTPException(status_code=400, detail="付款金额必须大于 0")
+            reference = str(payment.get("reference") or "").strip().upper()
+            customer_phone = str(payment.get("customer_phone") or payment.get("phone_number") or "").strip()
+            manual_confirmed = method == "mpesa" and (
+                _truthy(payment.get("manual_confirmed")) or _truthy(payment.get("mpesa_manual_confirmed"))
+            )
+            raw_payment_status = str(payment.get("payment_status") or "").strip().lower()
+            confirmed_by = str(payment.get("confirmed_by") or "").strip()
+            confirmed_at_local = str(payment.get("confirmed_at_local") or "").strip()
+            confirmation_note = str(payment.get("confirmation_note") or "").strip()
+            if method == "cash":
+                payment_status = "collected"
+                manual_confirmed = False
+            elif manual_confirmed:
+                if not reference:
+                    raise HTTPException(status_code=400, detail="M-Pesa reference is required for manual confirmation")
+                confirmed_by = confirmed_by or actor["username"]
+                self._require_user_role(confirmed_by, {"cashier", "store_cashier", "store_manager"}, store_code=store["code"])
+                confirmed_at_local = confirmed_at_local or now_iso()
+                payment_status = "manual_confirmed"
+            elif power_mode != "online" or raw_payment_status == "pending_verification":
+                if not reference:
+                    raise HTTPException(status_code=400, detail="M-Pesa reference is required for offline verification")
+                payment_status = "pending_verification"
+            elif raw_payment_status in {"collected", "verified", "failed", "pending_verification", "manual_confirmed"}:
+                payment_status = raw_payment_status
+            else:
+                payment_status = "collected"
+            normalized_payments.append(
+                {
+                    "method": method,
+                    "amount": amount,
+                    "reference": reference,
+                    "customer_id": str(payment.get("customer_id") or "").strip(),
+                    "customer_phone": customer_phone,
+                    "payment_status": payment_status,
+                    "manual_confirmed": manual_confirmed,
+                    "mpesa_manual_confirmed": manual_confirmed,
+                    "confirmed_by": confirmed_by,
+                    "confirmed_at_local": confirmed_at_local,
+                    "confirmation_note": confirmation_note,
+                }
+            )
+        payment_methods = {payment["method"] for payment in normalized_payments}
+        if len(normalized_payments) > 1 and not {"cash", "mpesa"}.issubset(payment_methods):
+            raise HTTPException(status_code=400, detail="混合支付必须同时包含 cash 和 M-Pesa")
+        payment_total = round(sum(payment["amount"] for payment in normalized_payments), 2)
+        if abs(payment_total - expected_total_amount) > 0.01:
+            raise HTTPException(status_code=400, detail="付款金额必须等于销售总额")
 
         for item in payload["items"]:
+            source_type = str(item.get("source_type") or STORE_ITEM_SOURCE_TYPE).strip().upper()
+            if source_type == LEGACY_STOCK_SOURCE_TYPE:
+                qty = int(item.get("qty") or 1)
+                unit_price = round(float(item.get("selling_price") or item.get("unit_price") or 0.0), 2)
+                legacy_category = str(item.get("legacy_category") or item.get("category") or "").strip()
+                legacy_subcategory = str(item.get("legacy_subcategory") or item.get("subcategory") or "").strip()
+                legacy_item_label = str(item.get("legacy_item_label") or "").strip()
+                category_summary = " / ".join(part for part in [legacy_category, legacy_subcategory] if part)
+                product_name = f"Legacy stock - {category_summary}" if category_summary else "Legacy stock"
+                line_total = round(qty * unit_price, 2)
+                total_qty += qty
+                total_amount += line_total
+                total_profit += line_total
+                line_items.append(
+                    {
+                        "identity_id": "",
+                        "barcode": "",
+                        "product_name": product_name,
+                        "source_type": LEGACY_STOCK_SOURCE_TYPE,
+                        "legacy_category": legacy_category,
+                        "legacy_subcategory": legacy_subcategory,
+                        "legacy_item_label": legacy_item_label,
+                        "store_item_display_code": "",
+                        "store_item_machine_code": "",
+                        "source_sdo": "",
+                        "source_package": "",
+                        "assigned_employee": "",
+                        "store_rack_code": "",
+                        "category_summary": category_summary,
+                        "selected_price": unit_price,
+                        "unit_price": unit_price,
+                        "qty": qty,
+                        "quantity": qty,
+                        "launch_price": unit_price,
+                        "expected_price": unit_price,
+                        "price_cap": None,
+                        "price_rule_no": "",
+                        "cost_price": 0.0,
+                        "average_cost_price": 0.0,
+                        "selling_price": unit_price,
+                        "line_total": line_total,
+                        "line_profit": line_total,
+                        "price_override": False,
+                        "override_reason": item.get("override_reason", "").strip(),
+                        "customer_id": item.get("customer_id", "").strip(),
+                        "price_policy_breach": False,
+                        "returned_qty": 0,
+                        "returned_amount_total": 0.0,
+                        "lot_allocations": [],
+                        "returned_lot_allocations": [],
+                    }
+                )
+                continue
+
             product = self.get_product_by_barcode(item["barcode"])
             stock_key = f"{store['code']}||{product['barcode']}"
             lot_allocations = self._consume_lots_fifo(self.store_lots[stock_key], item["qty"])
@@ -14108,6 +14294,53 @@ class InMemoryState:
             line_cost = round(sum(allocation["line_cost"] for allocation in lot_allocations), 2)
             average_cost_price = round(line_cost / item["qty"], 2) if item["qty"] else 0.0
             line_profit = round(line_total - line_cost, 2)
+            token = self._find_item_token_by_barcode_value(product["barcode"]) or {}
+            final_item_barcode = token.get("final_item_barcode") or {}
+            store_item_display_code = str(
+                token.get("display_code")
+                or token.get("token_no")
+                or token.get("identity_no")
+                or identity_id
+            ).strip().upper()
+            store_item_machine_code = str(
+                final_item_barcode.get("barcode_value")
+                or token.get("barcode_value")
+                or product["barcode"]
+            ).strip().upper()
+            source_bale_codes = [
+                str(code or "").strip().upper()
+                for code in token.get("source_bale_barcodes", []) or []
+                if str(code or "").strip()
+            ]
+            source_sdo = str(
+                token.get("source_sdo")
+                or token.get("store_delivery_order_no")
+                or token.get("sdo_code")
+                or token.get("store_dispatch_bale_no")
+                or ""
+            ).strip().upper()
+            source_package = str(
+                token.get("source_package")
+                or token.get("source_package_code")
+                or token.get("store_dispatch_bale_no")
+                or (source_bale_codes[0] if source_bale_codes else "")
+            ).strip().upper()
+            category_summary = str(
+                token.get("category_summary")
+                or token.get("category_name")
+                or " / ".join(
+                    part
+                    for part in [
+                        str(product.get("category_main") or "").strip(),
+                        str(product.get("category_sub") or "").strip(),
+                    ]
+                    if part
+                )
+            ).strip()
+            selected_price = round(
+                float(token.get("selling_price_kes") or item.get("selected_price") or expected_price or item["selling_price"]),
+                2,
+            )
             total_qty += item["qty"]
             total_amount += line_total
             total_cost += line_cost
@@ -14121,7 +14354,21 @@ class InMemoryState:
                     "identity_id": identity_id,
                     "barcode": product["barcode"],
                     "product_name": product["product_name"],
+                    "source_type": STORE_ITEM_SOURCE_TYPE,
+                    "legacy_category": "",
+                    "legacy_subcategory": "",
+                    "legacy_item_label": "",
+                    "store_item_display_code": store_item_display_code,
+                    "store_item_machine_code": store_item_machine_code,
+                    "source_sdo": source_sdo,
+                    "source_package": source_package,
+                    "assigned_employee": str(token.get("assigned_employee") or "").strip(),
+                    "store_rack_code": str(token.get("store_rack_code") or product.get("rack_code") or "").strip().upper(),
+                    "category_summary": category_summary,
+                    "selected_price": selected_price,
+                    "unit_price": item["selling_price"],
                     "qty": item["qty"],
+                    "quantity": item["qty"],
                     "launch_price": product["launch_price"],
                     "expected_price": expected_price,
                     "price_cap": pricing["price_cap"],
@@ -14179,15 +14426,6 @@ class InMemoryState:
                     },
                 )
 
-        normalized_payments = [
-            {
-                "method": payment["method"].strip().lower(),
-                "amount": round(payment["amount"], 2),
-                "reference": payment.get("reference", "").strip().upper(),
-                "customer_id": payment.get("customer_id", "").strip(),
-            }
-            for payment in payments
-        ]
         payment_total = round(sum(payment["amount"] for payment in normalized_payments), 2)
         total_amount = round(total_amount, 2)
         raw_overage = round(max(payment_total - total_amount, 0.0), 2)
@@ -14312,10 +14550,38 @@ class InMemoryState:
         elif amount_overpaid > 0:
             payment_status = "overpaid"
         else:
-            payment_status = "paid"
+            mpesa_statuses = [
+                payment.get("payment_status", "collected")
+                for payment in normalized_payments
+                if payment["method"] == "mpesa"
+            ]
+            if len(payment_methods) > 1:
+                if "pending_verification" in mpesa_statuses:
+                    payment_status = "mixed_pending"
+                elif any(status in {"manual_confirmed", "verified"} for status in mpesa_statuses):
+                    payment_status = "mixed_manual_confirmed"
+                else:
+                    payment_status = "collected"
+            elif normalized_payments:
+                payment_status = normalized_payments[0].get("payment_status") or "collected"
+            else:
+                payment_status = "collected"
+
+        source_type_totals: dict[str, float] = defaultdict(float)
+        source_type_qty: dict[str, int] = defaultdict(int)
+        for line_item in line_items:
+            line_source_type = str(line_item.get("source_type") or STORE_ITEM_SOURCE_TYPE).strip().upper()
+            source_type_totals[line_source_type] += float(line_item.get("line_total") or 0.0)
+            source_type_qty[line_source_type] += int(line_item.get("qty") or line_item.get("quantity") or 0)
+        source_type_totals = {
+            source_type: round(amount, 2)
+            for source_type, amount in source_type_totals.items()
+        }
+        should_sync_database = should_write_sale_to_database()
 
         transaction = {
             "id": next(self._sale_ids),
+            "sale_no": payload["order_no"],
             "client_sale_id": payload.get("client_sale_id", "").strip(),
             "sync_batch_no": payload.get("sync_batch_no", "").strip(),
             "order_no": payload["order_no"],
@@ -14337,13 +14603,20 @@ class InMemoryState:
             "payment_status": payment_status,
             "amount_due": amount_due,
             "amount_overpaid": amount_overpaid,
+            "local_persisted": True,
+            "db_sync_status": "pending" if should_sync_database else "not_configured",
+            "db_sync_error": "",
+            "db_sync_pending": should_sync_database,
+            "db_sync_failed_at": None,
             "payment_anomaly_count": len(payment_anomalies),
             "payment_anomaly_nos": [row["anomaly_no"] for row in payment_anomalies],
             "change_due": change_due,
             "total_cost": round(total_cost, 2),
             "total_profit": round(total_profit, 2),
-            "power_mode": payload.get("power_mode", "online"),
+            "power_mode": power_mode,
             "note": payload.get("note", ""),
+            "source_type_totals": source_type_totals,
+            "source_type_qty": dict(source_type_qty),
             "override_alert_count": override_alert_count,
             "policy_breach_count": policy_breach_count,
             "voided_at": None,
@@ -14369,14 +14642,76 @@ class InMemoryState:
                 "payment_total": payment_total,
                 "payment_status": payment_status,
                 "payment_anomaly_count": len(payment_anomalies),
+                "store_code": store["code"],
                 "shift_no": shift_no,
                 "power_mode": transaction["power_mode"],
                 "client_sale_id": transaction["client_sale_id"],
                 "sync_batch_no": transaction["sync_batch_no"],
                 "identity_ids": transaction["identity_ids"],
+                "source_type_totals": source_type_totals,
+                "source_type_qty": dict(source_type_qty),
             },
         )
+        for payment in normalized_payments:
+            if payment["method"] != "mpesa" or not payment.get("manual_confirmed"):
+                continue
+            confirmed_by = payment.get("confirmed_by") or actor["username"]
+            self._log_event(
+                event_type=MPESA_PAYMENT_MANUAL_CONFIRMATION_ACTION,
+                entity_type="sale",
+                entity_id=payload["order_no"],
+                actor=confirmed_by,
+                summary=f"M-Pesa payment manually confirmed for {payload['order_no']}",
+                details={
+                    "cashier": actor["username"],
+                    "confirmed_by": confirmed_by,
+                    "store_code": store["code"],
+                    "sale_no": payload["order_no"],
+                    "reference": payment.get("reference", ""),
+                    "amount": payment.get("amount", 0.0),
+                    "confirmed_at_local": payment.get("confirmed_at_local", ""),
+                    "confirmation_note": payment.get("confirmation_note", ""),
+                },
+            )
         self._persist()
+        if should_sync_database:
+            try:
+                write_sale_transaction_to_database(transaction)
+                transaction["db_sync_status"] = "written"
+                transaction["db_sync_error"] = ""
+                transaction["db_sync_pending"] = False
+                transaction["db_sync_failed_at"] = None
+                try:
+                    self._persist()
+                except Exception:
+                    pass
+            except Exception as exc:
+                error_message = str(exc).strip() or exc.__class__.__name__
+                transaction["db_sync_status"] = "failed"
+                transaction["db_sync_error"] = error_message[:160]
+                transaction["db_sync_pending"] = True
+                transaction["db_sync_failed_at"] = now_iso()
+                self._log_event(
+                    event_type="sale.db_sync_failed",
+                    entity_type="sale",
+                    entity_id=transaction["sale_no"],
+                    actor=actor["username"],
+                    summary=DB_SYNC_FAILURE_MESSAGE,
+                    details={
+                        "sale_no": transaction["sale_no"],
+                        "store_code": store["code"],
+                        "total_amount": transaction["total_amount"],
+                        "total_qty": transaction["total_qty"],
+                        "db_sync_status": "failed",
+                        "db_sync_error": transaction["db_sync_error"],
+                        "db_sync_pending": True,
+                        "db_sync_failed_at": transaction["db_sync_failed_at"],
+                    },
+                )
+                try:
+                    self._persist()
+                except Exception:
+                    pass
         return transaction
 
     def get_dashboard_summary(self) -> list[dict[str, Any]]:
@@ -14473,7 +14808,10 @@ class InMemoryState:
                 "open_shift_count": 0,
                 "handover_pending_count": 0,
                 "today_price_alerts": 0,
+                "today_cash_amount": 0.0,
                 "today_mpesa_amount": 0.0,
+                "today_legacy_stock_sales_amount": 0.0,
+                "today_store_item_sales_amount": 0.0,
                 "today_refund_amount": 0.0,
                 "unmatched_mpesa_count": 0,
                 "offline_failed_rows": 0,
@@ -14506,6 +14844,20 @@ class InMemoryState:
             summary["today_qty"] += int(sale.get("total_qty", 0))
             summary["today_profit"] += float(sale.get("total_profit", 0.0))
             summary["today_transaction_count"] += 1
+            for item in sale.get("items", []) or []:
+                item_amount = float(item.get("line_total") or 0.0)
+                source_type = str(item.get("source_type") or STORE_ITEM_SOURCE_TYPE).strip().upper()
+                if source_type == LEGACY_STOCK_SOURCE_TYPE:
+                    summary["today_legacy_stock_sales_amount"] += item_amount
+                elif source_type == STORE_ITEM_SOURCE_TYPE:
+                    summary["today_store_item_sales_amount"] += item_amount
+            for payment in sale.get("payments", []) or []:
+                payment_method = str(payment.get("method") or "").strip().lower()
+                payment_amount = float(payment.get("amount", 0.0) or 0.0)
+                if payment_method == "cash":
+                    summary["today_cash_amount"] += payment_amount
+                elif payment_method == "mpesa":
+                    summary["today_mpesa_amount"] += payment_amount
 
         for row in self.sale_refund_requests.values():
             summary = summaries.get(row.get("store_code", ""))
@@ -14569,8 +14921,6 @@ class InMemoryState:
             summary = summaries.get(store_code)
             if not summary:
                 continue
-            if self._nairobi_day_key(row.get("collected_at")) == today_key:
-                summary["today_mpesa_amount"] += float(row.get("amount", 0.0))
             if row.get("match_status") == "unmatched":
                 summary["unmatched_mpesa_count"] += 1
 
@@ -14595,7 +14945,10 @@ class InMemoryState:
             summary["today_sales_amount"] = round(summary["today_sales_amount"], 2)
             summary["today_profit"] = round(summary["today_profit"], 2)
             summary["today_average_ticket"] = round(summary["today_sales_amount"] / txn_count, 2) if txn_count else 0.0
+            summary["today_cash_amount"] = round(summary["today_cash_amount"], 2)
             summary["today_mpesa_amount"] = round(summary["today_mpesa_amount"], 2)
+            summary["today_legacy_stock_sales_amount"] = round(summary["today_legacy_stock_sales_amount"], 2)
+            summary["today_store_item_sales_amount"] = round(summary["today_store_item_sales_amount"], 2)
             summary["today_refund_amount"] = round(summary["today_refund_amount"], 2)
             rows.append(summary)
 

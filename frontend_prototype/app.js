@@ -102,7 +102,23 @@ let saleVoidState = [];
 let saleRefundState = [];
 let paymentAnomalyState = [];
 let userDirectoryState = [];
-const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier"]);
+const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier", "admin"]);
+const POS_DB_SYNC_FAILURE_MESSAGE = "销售已完成，但数据库同步失败，请联系管理员";
+const MPESA_MANUAL_CONFIRMATION_ACTION = "MPESA_PAYMENT_MANUALLY_CONFIRMED";
+const MPESA_MANUAL_CONFIRMATION_LABEL = "已通过 Safaricom 手机短信确认到账";
+const STORE_ITEM_SOURCE_TYPE = "STORE_ITEM";
+const LEGACY_STOCK_SOURCE_TYPE = "LEGACY_STOCK";
+const LEGACY_STOCK_CATEGORY_OPTIONS = {
+  Tops: ["lady tops", "unisex T-shirt", "men shirt"],
+  Dress: ["short dress", "long dress", "2 pieces"],
+  Pants: ["sweat pant", "cargo pant", "jeans pant", "others pants"],
+  Jacket: ["jacket"],
+  Kids: ["baby kids", "big kids"],
+  Shoes: ["sport shoes", "office shoes", "lady shoes", "kids shoes"],
+  Bags: ["bags"],
+  Cosmetics: ["cosmetics"],
+  Others: ["others"],
+};
 const USER_ROLE_LABELS = {
   store_clerk: "店员",
   store_manager: "店长",
@@ -802,6 +818,16 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     refundAction: "退款 / 退货",
     paymentAnomaly: "支付异常",
     offlineAction: "离线单",
+    legacyStockAction: "旧库存快速销售",
+    legacyStockSource: "旧库存",
+    legacyStockDrawerTitle: "旧库存快速销售",
+    legacyStockHint: "只记录旧库存品类、售价、数量和付款，不生成 STORE_ITEM，不改库存。",
+    legacyCategory: "服装大类",
+    legacySubcategory: "小类",
+    legacyItemLabel: "旧价签备注",
+    legacyPrice: "旧标签价格",
+    legacyQty: "数量",
+    addLegacyStock: "加入旧库存销售",
     shiftAction: "开班",
     receiptPlaceholderTitle: "小票预览 / 补打",
     receiptPlaceholderHint: "本轮不接真实 receipt API，也不拿 print-jobs 冒充小票。",
@@ -915,6 +941,16 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     refundAction: "Refund / Return",
     paymentAnomaly: "Payment anomalies",
     offlineAction: "Offline queue",
+    legacyStockAction: "Legacy stock quick sale",
+    legacyStockSource: "Legacy stock",
+    legacyStockDrawerTitle: "Legacy Stock Quick Sale",
+    legacyStockHint: "Records category, price, quantity, and payment only. It does not generate STORE_ITEM or touch inventory.",
+    legacyCategory: "Category",
+    legacySubcategory: "Subcategory",
+    legacyItemLabel: "Old tag note",
+    legacyPrice: "Old tag price",
+    legacyQty: "Qty",
+    addLegacyStock: "Add legacy item",
     shiftAction: "Open Shift",
     receiptPlaceholderTitle: "Receipt Preview / Reprint",
     receiptPlaceholderHint: "This round does not connect a real receipt API and does not fake receipt printing through print-jobs.",
@@ -979,6 +1015,7 @@ let sortingStockCategoryMainFilter = "";
 let sortingStockSearchText = "";
 let cashierTerminalClockTimer = null;
 let cashierTerminalPrimedStoreCode = "";
+let cashierTerminalSaleSubmitPromise = null;
 let cashierTerminalState = createCashierTerminalState();
 let sortingStockMinLooseQtyFilter = "";
 let activeSortingCompressionGroupKey = "";
@@ -3864,6 +3901,12 @@ const JSON_BUILDERS = {
       amount: 0,
       reference: "",
       customer_id: "",
+      customer_phone: "",
+      mpesa_manual_confirmed: false,
+      confirmed_by: currentSession.user?.username || "",
+      confirmed_at_local: "",
+      confirmation_note: "",
+      payment_status: "collected",
       note: "synced after blackout",
     }),
     fields: [
@@ -3910,10 +3953,22 @@ const JSON_BUILDERS = {
       { key: "amount", label: "收款金额", type: "number", min: "0", step: "0.01" },
       { key: "reference", label: "支付参考号", type: "text", placeholder: "M-Pesa 建议填流水号" },
       { key: "customer_id", label: "客户 ID", type: "text", placeholder: "有就填" },
+      { key: "customer_phone", label: "M-Pesa customer phone", type: "text", placeholder: "例如 254700000001" },
+      { key: "mpesa_manual_confirmed", label: "已通过 Safaricom 手机短信确认到账", type: "checkbox" },
+      { key: "confirmed_by", label: "confirmed_by", type: "text", placeholder: "默认当前 cashier，可填 store_manager" },
+      { key: "confirmed_at_local", label: "confirmed_at_local", type: "text", placeholder: "留空则提交时生成" },
+      { key: "confirmation_note", label: "confirmation_note", type: "text", placeholder: "例如 Safaricom SMS seen" },
       { key: "note", label: "这一笔备注", type: "text", placeholder: "例如 synced after blackout" },
     ],
     toOutputValue: (rows) =>
-      rows.map((row) => ({
+      rows.map((row) => {
+        const paymentMethod = String(row.payment_method || "cash").trim().toLowerCase() || "cash";
+        const manualConfirmed = paymentMethod === "mpesa" && Boolean(row.mpesa_manual_confirmed || row.manual_confirmed);
+        const paymentStatus = paymentMethod === "mpesa"
+          ? (manualConfirmed ? "manual_confirmed" : "pending_verification")
+          : "collected";
+        const confirmedAtLocal = manualConfirmed ? (row.confirmed_at_local || new Date().toISOString()) : (row.confirmed_at_local || "");
+        return {
         client_sale_id: row.client_sale_id || "",
         order_no: row.order_no || "",
         store_code: row.store_code || currentSession.user?.store_code || "UTAWALA",
@@ -3932,13 +3987,21 @@ const JSON_BUILDERS = {
         ],
         payments: [
           {
-            method: row.payment_method || "cash",
+            method: paymentMethod,
             amount: Number(row.amount || 0),
             reference: row.reference || "",
             customer_id: row.customer_id || "",
+            customer_phone: row.customer_phone || "",
+            payment_status: paymentStatus,
+            manual_confirmed: manualConfirmed,
+            mpesa_manual_confirmed: manualConfirmed,
+            confirmed_by: manualConfirmed ? (row.confirmed_by || row.cashier_name || currentSession.user?.username || "") : "",
+            confirmed_at_local: confirmedAtLocal,
+            confirmation_note: row.confirmation_note || "",
           },
         ],
-      })),
+        };
+      }),
     fromOutputValue: (value) =>
       Array.isArray(value)
         ? value.map((sale) => ({
@@ -3955,6 +4018,13 @@ const JSON_BUILDERS = {
             payment_method: sale.payments?.[0]?.method || "cash",
             amount: Number(sale.payments?.[0]?.amount || 0),
             reference: sale.payments?.[0]?.reference || "",
+            customer_phone: sale.payments?.[0]?.customer_phone || sale.payments?.[0]?.phone_number || "",
+            payment_status: sale.payments?.[0]?.payment_status || "",
+            manual_confirmed: Boolean(sale.payments?.[0]?.manual_confirmed),
+            mpesa_manual_confirmed: Boolean(sale.payments?.[0]?.mpesa_manual_confirmed || sale.payments?.[0]?.manual_confirmed),
+            confirmed_by: sale.payments?.[0]?.confirmed_by || "",
+            confirmed_at_local: sale.payments?.[0]?.confirmed_at_local || "",
+            confirmation_note: sale.payments?.[0]?.confirmation_note || "",
             customer_id: sale.items?.[0]?.customer_id || sale.payments?.[0]?.customer_id || "",
             note: sale.note || "",
           }))
@@ -4032,6 +4102,20 @@ function renderJsonBuilder(builderId) {
               </div>
             `;
           }
+          if (field.type === "checkbox") {
+            return `
+              <div class="line-builder-field">
+                <label>${escapeHtml(field.label)}</label>
+                <input
+                  type="checkbox"
+                  data-builder-input="${builderId}"
+                  data-row-index="${rowIndex}"
+                  data-field-key="${field.key}"
+                  ${value ? "checked" : ""}
+                />
+              </div>
+            `;
+          }
           return `
             <div class="line-builder-field">
               <label>${escapeHtml(field.label)}</label>
@@ -4086,6 +4170,11 @@ function getBuilderRowsFromDom(builderId) {
       }
       const control = rowNode.querySelector(`[data-field-key="${field.key}"]`);
       if (!control) {
+        return;
+      }
+      if (field.type === "checkbox") {
+        row[field.key] = Boolean(control.checked);
+        hasContent = hasContent || Boolean(control.checked);
         return;
       }
       const rawValue = control.value ?? "";
@@ -21905,6 +21994,7 @@ function ensureLoginPasswordCleared() {
 function clearSession(message = "Not signed in.") {
   currentSession = { token: "", user: null };
   cashierTerminalPrimedStoreCode = "";
+  cashierTerminalSaleSubmitPromise = null;
   cashierTerminalState = createCashierTerminalState();
   clearSortingTaskLockedShipment();
   localStorage.removeItem(STORAGE_KEYS.token);
@@ -22003,6 +22093,13 @@ function createCashierTerminalPaymentLine(method = "cash") {
     amount: "",
     reference: "",
     customer_id: "",
+    customer_phone: "",
+    payment_status: method === "mpesa" ? "pending_verification" : "collected",
+    manual_confirmed: false,
+    mpesa_manual_confirmed: false,
+    confirmed_by: "",
+    confirmed_at_local: "",
+    confirmation_note: "",
   };
 }
 
@@ -22013,6 +22110,9 @@ function createCashierTerminalState() {
     activePaymentMode: "cash",
     paymentLines: [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")],
     latestCompletedSale: null,
+    saleSubmitInFlight: false,
+    pendingSaleNo: "",
+    pendingSaleResult: null,
     activeDrawer: "",
     locale: "zh",
     networkStatus: navigator.onLine ? "online" : "offline",
@@ -22022,9 +22122,18 @@ function createCashierTerminalState() {
     shiftOpen: false,
     currentTime: "",
     note: "正常销售",
+    legacyCategory: "Tops",
+    legacySubcategory: "lady tops",
+    legacyItemLabel: "",
+    legacyPrice: "150",
+    legacyQty: "1",
     cashReceived: "",
     mpesaAmount: "",
     mpesaReference: "",
+    mpesaCustomerPhone: "",
+    mpesaManualConfirmed: false,
+    mpesaConfirmedBy: "",
+    mpesaConfirmationNote: "",
     openingFloatCash: "1000",
     openingNote: "早班开始",
     voidOrderNo: "",
@@ -22144,6 +22253,22 @@ function normalizeCashierTerminalNumber(value) {
   return Math.max(numeric, 0);
 }
 
+function getLegacyStockSubcategories(category = cashierTerminalState.legacyCategory) {
+  const normalizedCategory = String(category || "Tops").trim() || "Tops";
+  return LEGACY_STOCK_CATEGORY_OPTIONS[normalizedCategory] || LEGACY_STOCK_CATEGORY_OPTIONS.Tops;
+}
+
+function renderLegacyStockSelectOptions(options = [], selectedValue = "") {
+  const normalizedSelected = String(selectedValue || "").trim();
+  const normalizedOptions = [...new Set(options.map((value) => String(value || "").trim()).filter(Boolean))];
+  if (normalizedSelected && !normalizedOptions.includes(normalizedSelected)) {
+    normalizedOptions.push(normalizedSelected);
+  }
+  return normalizedOptions
+    .map((value) => `<option value="${escapeHtml(value)}"${value === normalizedSelected ? " selected" : ""}>${escapeHtml(value)}</option>`)
+    .join("");
+}
+
 function getCashierTerminalTotals() {
   const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
   return rows.reduce(
@@ -22159,6 +22284,9 @@ function getCashierTerminalTotals() {
 }
 
 function isCashierTerminalPriceOverride(row) {
+  if (String(row?.source_type || "").trim().toUpperCase() === LEGACY_STOCK_SOURCE_TYPE) {
+    return false;
+  }
   const sellingPrice = normalizeCashierTerminalNumber(row?.selling_price);
   const expectedPrice = normalizeCashierTerminalNumber(row?.expected_price);
   return Math.abs(sellingPrice - expectedPrice) > 0.0001;
@@ -22169,23 +22297,95 @@ function getCashierTerminalNormalizedPaymentLines({ strict = false } = {}) {
   if (!totalAmount) {
     return [];
   }
+  const cashierUsername = String(currentSession.user?.username || currentSession.user?.full_name || "cashier").trim() || "cashier";
+  const buildMpesaPaymentLine = ({
+    amount,
+    reference,
+    customer_phone,
+    manual_confirmed,
+    confirmed_by,
+    confirmed_at_local,
+    confirmation_note,
+    customer_id = "",
+  } = {}) => {
+    const normalizedReference = String(reference || "").trim();
+    const isManualConfirmed = Boolean(manual_confirmed);
+    if (strict && Number(amount || 0) > 0 && !normalizedReference) {
+      throw new Error("请填写 M-Pesa reference / transaction code。");
+    }
+    return {
+      method: "mpesa",
+      amount,
+      reference: normalizedReference,
+      customer_id: String(customer_id || "").trim(),
+      customer_phone: String(customer_phone || "").trim(),
+      payment_status: isManualConfirmed ? "manual_confirmed" : "pending_verification",
+      manual_confirmed: isManualConfirmed,
+      mpesa_manual_confirmed: isManualConfirmed,
+      confirmed_by: isManualConfirmed ? String(confirmed_by || cashierUsername).trim() || cashierUsername : "",
+      confirmed_at_local: isManualConfirmed ? (String(confirmed_at_local || "").trim() || new Date().toISOString()) : "",
+      confirmation_note: String(confirmation_note || "").trim(),
+    };
+  };
   if (cashierTerminalState.activePaymentMode === "cash") {
-    return [{ method: "cash", amount: totalAmount, reference: "", customer_id: "" }];
+    return [{
+      method: "cash",
+      amount: totalAmount,
+      reference: "",
+      customer_id: "",
+      customer_phone: "",
+      payment_status: "collected",
+      manual_confirmed: false,
+      mpesa_manual_confirmed: false,
+      confirmed_by: "",
+      confirmed_at_local: "",
+      confirmation_note: "",
+    }];
   }
   if (cashierTerminalState.activePaymentMode === "mpesa") {
     const amount = normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totalAmount);
     if (strict && amount <= 0) {
       throw new Error("请先填写 M-Pesa 金额。");
     }
-    return amount ? [{ method: "mpesa", amount, reference: String(cashierTerminalState.mpesaReference || "").trim(), customer_id: "" }] : [];
+    return amount ? [buildMpesaPaymentLine({
+      amount,
+      reference: cashierTerminalState.mpesaReference,
+      customer_phone: cashierTerminalState.mpesaCustomerPhone,
+      manual_confirmed: cashierTerminalState.mpesaManualConfirmed,
+      confirmed_by: cashierTerminalState.mpesaConfirmedBy,
+      confirmation_note: cashierTerminalState.mpesaConfirmationNote,
+    })] : [];
   }
   const lines = (cashierTerminalState.paymentLines || [])
-    .map((row) => ({
-      method: String(row?.method || "cash").trim() || "cash",
-      amount: normalizeCashierTerminalNumber(row?.amount),
-      reference: String(row?.reference || "").trim(),
-      customer_id: String(row?.customer_id || "").trim(),
-    }))
+    .map((row) => {
+      const method = String(row?.method || "cash").trim().toLowerCase() || "cash";
+      const amount = normalizeCashierTerminalNumber(row?.amount);
+      if (method === "mpesa") {
+        return buildMpesaPaymentLine({
+          amount,
+          reference: row?.reference,
+          customer_id: row?.customer_id,
+          customer_phone: row?.customer_phone,
+          manual_confirmed: row?.manual_confirmed || row?.mpesa_manual_confirmed,
+          confirmed_by: row?.confirmed_by,
+          confirmed_at_local: row?.confirmed_at_local,
+          confirmation_note: row?.confirmation_note,
+        });
+      }
+      return {
+        method: "cash",
+        amount,
+        reference: "",
+        customer_id: String(row?.customer_id || "").trim(),
+        customer_phone: "",
+        payment_status: "collected",
+        manual_confirmed: false,
+        mpesa_manual_confirmed: false,
+        confirmed_by: "",
+        confirmed_at_local: "",
+        confirmation_note: "",
+      };
+    })
     .filter((row) => row.amount > 0);
   if (strict && !lines.length) {
     throw new Error("混合支付至少要有一行付款。");
@@ -22210,8 +22410,11 @@ function getCashierTerminalChangeDue() {
 }
 
 function buildCashierTerminalOrderNo(storeCode = getCashierTerminalStoreCode()) {
-  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-  return `POS-${storeCode}-${timestamp}`;
+  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
+  const datePart = timestamp.slice(0, 8);
+  const timePart = timestamp.slice(8, 14);
+  const randomPart = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `SALE-${datePart}-${timePart}-${randomPart}`;
 }
 
 function clearCashierTerminalLookupInputs() {
@@ -22446,13 +22649,17 @@ function renderCashierTerminalCart() {
       const sellingPrice = normalizeCashierTerminalNumber(row.selling_price);
       const lineTotal = qty * sellingPrice;
       const overrideRequired = isCashierTerminalPriceOverride(row);
+      const sourceType = String(row.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase();
+      const itemCodeLabel = sourceType === LEGACY_STOCK_SOURCE_TYPE
+        ? `${copy.legacyStockSource}: ${row.legacy_category || row.category || "-"} / ${row.legacy_subcategory || row.subcategory || "-"}`
+        : `barcode: ${row.barcode || "-"}`;
       return `
         <article class="basket-row cashier-terminal-cart-row${overrideRequired && !String(row.override_reason || "").trim() ? " is-override-pending" : ""}">
           <div class="cashier-terminal-row-head">
             <div>
               <h4 class="item-title">${escapeHtml(row.product_name || row.barcode || "未命名商品")}</h4>
               <div class="item-meta">
-                <span class="meta-chip">barcode: ${escapeHtml(row.barcode || "-")}</span>
+                <span class="meta-chip">${escapeHtml(itemCodeLabel)}</span>
                 <span class="meta-chip">${escapeHtml(copy.rackLabel)} ${escapeHtml(row.store_rack_code || "-")}</span>
                 <span class="meta-chip">${escapeHtml(copy.suggestedPrice)} ${escapeHtml(formatCurrency(row.expected_price))}</span>
                 ${row.price_cap == null ? "" : `<span class="meta-chip">${escapeHtml(copy.priceCap)} ${escapeHtml(formatCurrency(row.price_cap))}</span>`}
@@ -22528,6 +22735,43 @@ function renderCashierTerminalPaymentPanel() {
   const paymentTotal = getCashierTerminalPaymentAssignedTotal();
   const amountDue = totals.totalAmount - paymentTotal;
   const changeDue = getCashierTerminalChangeDue();
+  const completeDisabled = cashierTerminalState.saleSubmitInFlight || !totals.totalItems || !cashierTerminalState.shiftOpen;
+  const completeLabel = cashierTerminalState.saleSubmitInFlight ? "提交中..." : copy.completeTrade;
+  const cashierUsername = String(currentSession.user?.username || currentSession.user?.full_name || "cashier").trim() || "cashier";
+  const manualConfirmationLabel = "已通过 Safaricom 手机短信确认到账";
+  const renderMpesaManualFields = ({ prefix = "", row = {}, index = null } = {}) => {
+    const indexAttr = index == null ? "" : ` data-terminal-payment-index="${index}"`;
+    const fieldName = (name) => {
+      if (prefix) {
+        return `${prefix}${name}`;
+      }
+      return ({
+        CustomerPhone: "customer_phone",
+        ManualConfirmed: "manual_confirmed",
+        ConfirmedBy: "confirmed_by",
+        ConfirmationNote: "confirmation_note",
+      })[name] || name;
+    };
+    const manualConfirmed = Boolean(row?.manual_confirmed || row?.mpesa_manual_confirmed || row?.mpesaManualConfirmed);
+    return `
+      <label class="field">
+        <span>customer phone</span>
+        <input type="text" value="${escapeHtml(row?.customer_phone || row?.mpesaCustomerPhone || "")}" data-terminal-payment-field="${escapeHtml(fieldName("CustomerPhone"))}"${indexAttr} placeholder="2547..." />
+      </label>
+      <label class="field checkbox-field">
+        <input type="checkbox" data-terminal-payment-field="${escapeHtml(fieldName("ManualConfirmed"))}"${indexAttr}${manualConfirmed ? " checked" : ""} />
+        <span>${escapeHtml(manualConfirmationLabel || MPESA_MANUAL_CONFIRMATION_LABEL)}</span>
+      </label>
+      <label class="field">
+        <span>confirmed_by</span>
+        <input type="text" value="${escapeHtml(row?.confirmed_by || row?.mpesaConfirmedBy || cashierUsername)}" data-terminal-payment-field="${escapeHtml(fieldName("ConfirmedBy"))}"${indexAttr} />
+      </label>
+      <label class="field">
+        <span>confirmation_note</span>
+        <input type="text" value="${escapeHtml(row?.confirmation_note || row?.mpesaConfirmationNote || "")}" data-terminal-payment-field="${escapeHtml(fieldName("ConfirmationNote"))}"${indexAttr} placeholder="Safaricom SMS seen" />
+      </label>
+    `;
+  };
   const mixedRows = (cashierTerminalState.paymentLines || [])
     .map((row, index) => `
       <div class="cashier-terminal-payment-line">
@@ -22552,6 +22796,7 @@ function renderCashierTerminalPaymentPanel() {
           data-terminal-payment-field="reference"
         />
         <button type="button" class="ghost-button mini-button" data-terminal-payment-remove="${index}">删</button>
+        ${String(row?.method || "").trim().toLowerCase() === "mpesa" ? renderMpesaManualFields({ row, index }) : ""}
       </div>
     `)
     .join("");
@@ -22599,6 +22844,15 @@ function renderCashierTerminalPaymentPanel() {
                 <span>${escapeHtml(copy.reference)}</span>
                 <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(copy.reference)}" />
               </label>
+              ${renderMpesaManualFields({
+                prefix: "mpesa",
+                row: {
+                  mpesaCustomerPhone: cashierTerminalState.mpesaCustomerPhone,
+                  mpesaManualConfirmed: cashierTerminalState.mpesaManualConfirmed,
+                  mpesaConfirmedBy: cashierTerminalState.mpesaConfirmedBy,
+                  mpesaConfirmationNote: cashierTerminalState.mpesaConfirmationNote,
+                },
+              })}
             </div>
           `
           : `
@@ -22611,7 +22865,7 @@ function renderCashierTerminalPaymentPanel() {
           `}
     </div>
     <div class="payment-actions cashier-terminal-payment-actions">
-      <button type="button" class="primary-action" data-terminal-action="complete-sale"><span>F8</span><span>${escapeHtml(copy.completeTrade)}</span></button>
+      <button type="button" class="primary-action" data-terminal-action="complete-sale" aria-busy="${cashierTerminalState.saleSubmitInFlight ? "true" : "false"}"${completeDisabled ? " disabled" : ""}><span>F8</span><span>${escapeHtml(completeLabel)}</span></button>
       <div class="secondary-actions">
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer">${escapeHtml(copy.receiptReprint)}</button>
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer">${escapeHtml(copy.voidAction)}</button>
@@ -22642,6 +22896,7 @@ function renderCashierTerminalQuickActions() {
     : 0;
   cashierTerminalQuickActions.innerHTML = `
     <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer"><span>${escapeHtml(copy.shiftAction)}</span><strong>${escapeHtml(cashierTerminalState.shiftNo || copy.noShift)}</strong></button>
+    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="legacy-stock" data-drawer="legacyStockDrawer"><span>${escapeHtml(copy.legacyStockAction)}</span><strong>${escapeHtml(copy.legacyStockSource)}</strong></button>
     <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>F7</span><strong>${escapeHtml(copy.voidAction)}</strong></button>
     <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer"><span>F9</span><strong>${escapeHtml(copy.refundAction)}</strong></button>
     <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>${escapeHtml(copy.paymentAnomaly)}</span><strong>${escapeHtml(anomalyCount || 0)}</strong></button>
@@ -22700,6 +22955,49 @@ function renderCashierTerminalDrawer() {
         <button type="button" class="secondary-inline" data-terminal-action="load-shifts">${escapeHtml(copy.loadShifts)}</button>
         <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-report-kind="t"${shiftReportDisabled}>${escapeHtml(copy.tReport)}</button>
         <button type="button" class="primary-inline" data-terminal-action="load-shift-report" data-report-kind="z"${shiftReportDisabled}>${escapeHtml(copy.zReport)}</button>
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "legacy-stock") {
+    const categoryOptions = renderLegacyStockSelectOptions(Object.keys(LEGACY_STOCK_CATEGORY_OPTIONS), cashierTerminalState.legacyCategory);
+    const subcategoryOptions = renderLegacyStockSelectOptions(getLegacyStockSubcategories(cashierTerminalState.legacyCategory), cashierTerminalState.legacySubcategory);
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head">
+        <div>
+          <p class="panel-kicker">LEGACY STOCK</p>
+          <h3>${escapeHtml(copy.legacyStockDrawerTitle)}</h3>
+        </div>
+        <button type="button" class="drawer-close" data-terminal-action="close-drawer" aria-label="${escapeHtml(copy.escToClose)}">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-card">
+          <h4>${escapeHtml(copy.legacyStockSource)}</h4>
+          <p>${escapeHtml(copy.legacyStockHint)}</p>
+        </div>
+        <label class="field">
+          <span>${escapeHtml(copy.legacyCategory)}</span>
+          <select data-terminal-drawer-field="legacyCategory">${categoryOptions}</select>
+        </label>
+        <label class="field">
+          <span>${escapeHtml(copy.legacySubcategory)}</span>
+          <select data-terminal-drawer-field="legacySubcategory">${subcategoryOptions}</select>
+        </label>
+        <label class="field">
+          <span>${escapeHtml(copy.legacyPrice)}</span>
+          <input type="number" min="0.01" step="0.01" value="${escapeHtml(cashierTerminalState.legacyPrice || "150")}" data-terminal-drawer-field="legacyPrice" />
+        </label>
+        <label class="field">
+          <span>${escapeHtml(copy.legacyQty)}</span>
+          <input type="number" min="1" step="1" value="${escapeHtml(cashierTerminalState.legacyQty || "1")}" data-terminal-drawer-field="legacyQty" />
+        </label>
+        <label class="field">
+          <span>${escapeHtml(copy.legacyItemLabel)}</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.legacyItemLabel || "")}" data-terminal-drawer-field="legacyItemLabel" />
+        </label>
+      </div>
+      <div class="drawer-foot">
+        <button type="button" class="primary-inline" data-terminal-action="add-legacy-stock">${escapeHtml(copy.addLegacyStock)}</button>
       </div>
     `;
     return;
@@ -22876,6 +23174,18 @@ function renderCashierTerminalDrawer() {
     return;
   }
   const latestItems = Array.isArray(latestSale?.items) ? latestSale.items : [];
+  const latestPayments = Array.isArray(latestSale?.payments) ? latestSale.payments : [];
+  const manualMpesaPayments = latestPayments.filter((payment) =>
+    String(payment?.method || "").trim().toLowerCase() === "mpesa"
+    && (payment?.manual_confirmed || payment?.mpesa_manual_confirmed || payment?.payment_status === "manual_confirmed")
+  );
+  const manualMpesaReceiptLines = manualMpesaPayments.map((payment) => `
+    <div class="receipt-line"><span>M-Pesa：人工确认到账</span><span>${escapeHtml(formatCurrency(payment.amount || 0))}</span></div>
+    <div class="receipt-line"><span>reference</span><span>${escapeHtml(payment.reference || "-")}</span></div>
+    <div class="receipt-line"><span>confirmed_by</span><span>${escapeHtml(payment.confirmed_by || latestSale?.cashier || currentSession.user?.username || "-")}</span></div>
+    <div class="receipt-line"><span>offline_sale_id</span><span>${escapeHtml(latestSale?.client_sale_id || latestSale?.order_no || latestSale?.sale_no || "-")}</span></div>
+    <div class="receipt-line"><span>待同步</span><span>${escapeHtml(latestSale?.db_sync_pending ? "是" : "待联网复核")}</span></div>
+  `).join("");
   cashierTerminalDrawer.innerHTML = `
     <div class="drawer-head">
       <div>
@@ -22893,6 +23203,7 @@ function renderCashierTerminalDrawer() {
         ${latestItems.length ? latestItems.map((row) => `<div class="receipt-line"><span>${escapeHtml(row.barcode || "-")}</span><span>${escapeHtml(formatCurrency(row.selling_price || 0))}</span></div>`).join("") : `<div class="receipt-line"><span>${escapeHtml(copy.latestSale)}</span><span>${escapeHtml(latestSale?.order_no || "-")}</span></div>`}
         <div class="receipt-divider"></div>
         <div class="receipt-line"><span>${escapeHtml(copy.grossAmount)}</span><strong>${escapeHtml(formatCurrency(latestSale?.total_amount || 0))}</strong></div>
+        ${manualMpesaReceiptLines ? `<div class="receipt-divider"></div>${manualMpesaReceiptLines}` : ""}
         <div class="receipt-badge">UI SHELL</div>
       </div>
       <div class="drawer-hint">${escapeHtml(copy.receiptPlaceholderHint)}</div>
@@ -22975,6 +23286,8 @@ function upsertCashierTerminalCartItem(result) {
   if (!barcode) {
     return;
   }
+  cashierTerminalState.pendingSaleNo = "";
+  cashierTerminalState.pendingSaleResult = null;
   cashierTerminalState.cartItems = [
     ...cashierTerminalState.cartItems,
     {
@@ -22991,7 +23304,7 @@ function upsertCashierTerminalCartItem(result) {
       store_item_machine_code: result.store_item_machine_code || result.machine_code || barcode,
       source_sdo: result.source_sdo || "",
       source_package: result.source_package || "",
-      source_type: result.source_type || "",
+      source_type: STORE_ITEM_SOURCE_TYPE,
       assigned_employee: result.assigned_employee || "",
       category_summary: result.category_summary || "",
       override_reason: "",
@@ -23002,12 +23315,74 @@ function upsertCashierTerminalCartItem(result) {
   renderCashierTerminal();
 }
 
+function addLegacyStockQuickSaleToCart() {
+  const category = String(cashierTerminalState.legacyCategory || "").trim();
+  const subcategory = String(cashierTerminalState.legacySubcategory || "").trim();
+  const price = normalizeCashierTerminalNumber(cashierTerminalState.legacyPrice);
+  const qty = Number(cashierTerminalState.legacyQty);
+  const legacyItemLabel = String(cashierTerminalState.legacyItemLabel || "").trim();
+  if (!category) {
+    throw new Error("旧库存快速销售必须填写大类。");
+  }
+  if (!subcategory) {
+    throw new Error("旧库存快速销售必须填写小类。");
+  }
+  if (!(price > 0)) {
+    throw new Error("旧库存快速销售必须填写大于 0 的价格。");
+  }
+  if (!Number.isInteger(qty) || qty <= 0) {
+    throw new Error("旧库存快速销售数量必须是正整数。");
+  }
+  cashierTerminalState.pendingSaleNo = "";
+  cashierTerminalState.pendingSaleResult = null;
+  cashierTerminalState.cartItems = [
+    ...cashierTerminalState.cartItems,
+    {
+      row_uid: `legacy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      source_type: LEGACY_STOCK_SOURCE_TYPE,
+      barcode: "",
+      product_name: `${getCashierTerminalCopy().legacyStockSource} ${category} / ${subcategory}`,
+      category,
+      subcategory,
+      legacy_category: category,
+      legacy_subcategory: subcategory,
+      legacy_item_label: legacyItemLabel,
+      qty,
+      quantity: qty,
+      selling_price: price,
+      expected_price: price,
+      selected_price: price,
+      price_cap: null,
+      qty_on_hand: qty,
+      store_rack_code: "",
+      store_item_display_code: "",
+      store_item_machine_code: "",
+      source_sdo: "",
+      source_package: "",
+      assigned_employee: "",
+      category_summary: `${category} / ${subcategory}`,
+      override_reason: "",
+      customer_id: "",
+      cost_status: "unknown",
+      cost_price: null,
+      note: "legacy stock quick sale",
+    },
+  ];
+  cashierTerminalState.activeDrawer = "";
+  renderCashierTerminal();
+}
+
 function resetCashierTerminalForNextSale() {
   cashierTerminalState.cartItems = [];
   cashierTerminalState.currentLookupResult = null;
+  cashierTerminalState.pendingSaleNo = "";
   cashierTerminalState.cashReceived = "";
   cashierTerminalState.mpesaAmount = "";
   cashierTerminalState.mpesaReference = "";
+  cashierTerminalState.mpesaCustomerPhone = "";
+  cashierTerminalState.mpesaManualConfirmed = false;
+  cashierTerminalState.mpesaConfirmedBy = "";
+  cashierTerminalState.mpesaConfirmationNote = "";
   cashierTerminalState.paymentLines = [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")];
   cashierTerminalState.activeDrawer = "";
   setInputValue("#saleForm [name='order_no']", "");
@@ -23025,8 +23400,11 @@ function syncCashierTerminalLookupForm(query) {
 }
 
 function buildPosStoreItemSaleNo(storeCode = getCashierTerminalStoreCode()) {
-  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-  return `SALE-${storeCode}-${timestamp}`;
+  const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, "");
+  const datePart = timestamp.slice(0, 8);
+  const timePart = timestamp.slice(8, 14);
+  const randomPart = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `SALE-${datePart}-${timePart}-${randomPart}`;
 }
 
 function getCashierTerminalPaymentMethodForSale() {
@@ -23083,12 +23461,170 @@ function buildPosStoreItemSaleRecord(token = {}, saleNo = buildPosStoreItemSaleN
     payment_method: paymentMethod,
     source_sdo: token.source_sdo || "",
     source_package: token.source_package || "",
-    source_type: token.source_type || "",
+    source_type: STORE_ITEM_SOURCE_TYPE,
     assigned_employee: token.assigned_employee || "",
     store_rack_code: token.store_rack_code || "",
     category_summary: token.category_summary || "",
+    quantity: 1,
     sold_at: soldAt,
   };
+}
+
+function getSaleResultPaymentMethod(result = {}) {
+  const payments = Array.isArray(result.payments) ? result.payments : [];
+  const methods = [...new Set(payments.map((payment) => String(payment?.method || "").trim().toLowerCase()).filter(Boolean))];
+  if (methods.length > 1) {
+    return "mixed";
+  }
+  return methods[0] || String(result.payment_method || "cash").trim().toLowerCase() || "cash";
+}
+
+function getMpesaPaymentAnalyticsMeta(payments = []) {
+  const mpesaPayments = (Array.isArray(payments) ? payments : [])
+    .filter((payment) => String(payment?.method || "").trim().toLowerCase() === "mpesa");
+  const mpesaAmount = mpesaPayments.reduce((sum, payment) => sum + Number(payment?.amount || 0), 0);
+  const statuses = mpesaPayments.map((payment) => String(payment?.payment_status || "").trim().toLowerCase()).filter(Boolean);
+  const manualConfirmed = mpesaPayments.some((payment) =>
+    payment?.manual_confirmed || payment?.mpesa_manual_confirmed || String(payment?.payment_status || "").trim().toLowerCase() === "manual_confirmed"
+  );
+  let mpesaPaymentStatus = "";
+  if (statuses.includes("pending_verification")) {
+    mpesaPaymentStatus = "pending_verification";
+  } else if (manualConfirmed) {
+    mpesaPaymentStatus = "manual_confirmed";
+  } else if (statuses.includes("verified")) {
+    mpesaPaymentStatus = "verified";
+  } else if (mpesaPayments.length) {
+    mpesaPaymentStatus = statuses[0] || "collected";
+  }
+  return {
+    mpesa_amount: mpesaAmount,
+    mpesa_payment_status: mpesaPaymentStatus,
+    manual_confirmed_mpesa: manualConfirmed,
+    mpesa_reference: mpesaPayments.map((payment) => payment?.reference || "").filter(Boolean).join(" / "),
+    mpesa_confirmed_by: mpesaPayments.map((payment) => payment?.confirmed_by || "").filter(Boolean).join(" / "),
+  };
+}
+
+function buildPosSaleAnalyticsRecordsFromResult(result = {}) {
+  const saleNo = String(result.sale_no || result.order_no || "").trim();
+  const storeCode = String(result.store_code || getCashierTerminalStoreCode()).trim().toUpperCase();
+  const paymentMethod = getSaleResultPaymentMethod(result);
+  const soldAt = result.sold_at || new Date().toISOString();
+  const cashier = result.cashier || result.cashier_name || currentSession.user?.username || currentSession.user?.full_name || "cashier";
+  const mpesaMeta = getMpesaPaymentAnalyticsMeta(result.payments || []);
+  return (Array.isArray(result.items) ? result.items : []).map((item, index) => {
+    const sourceType = String(item?.source_type || (item?.legacy_category ? LEGACY_STOCK_SOURCE_TYPE : STORE_ITEM_SOURCE_TYPE)).trim().toUpperCase();
+    const quantity = Math.max(1, Number(item?.quantity || item?.qty || 1));
+    const unitPrice = normalizeCashierTerminalNumber(item?.unit_price || item?.selling_price || item?.selected_price || item?.expected_price || item?.launch_price);
+    const lineTotal = normalizeCashierTerminalNumber(item?.line_total || unitPrice * quantity);
+    const legacyCategory = String(item?.legacy_category || item?.category || "").trim();
+    const legacySubcategory = String(item?.legacy_subcategory || item?.subcategory || "").trim();
+    const displayCode = sourceType === LEGACY_STOCK_SOURCE_TYPE
+      ? String(item?.legacy_item_label || `${legacyCategory || "legacy"} / ${legacySubcategory || "stock"}`).trim()
+      : String(item?.store_item_display_code || item?.identity_id || item?.barcode || "").trim();
+    const machineCode = sourceType === LEGACY_STOCK_SOURCE_TYPE
+      ? ""
+      : String(item?.store_item_machine_code || item?.barcode || "").trim();
+    return {
+      sale_no: saleNo,
+      store_code: storeCode,
+      cashier,
+      store_item_display_code: displayCode,
+      store_item_machine_code: machineCode,
+      price: lineTotal,
+      quantity,
+      selected_price: unitPrice,
+      unit_price: unitPrice,
+      line_total: lineTotal,
+      cost_price: sourceType === LEGACY_STOCK_SOURCE_TYPE ? null : item?.cost_price ?? null,
+      cost_status: sourceType === LEGACY_STOCK_SOURCE_TYPE ? "unknown" : String(item?.cost_status || "unknown").trim().toLowerCase(),
+      gross_margin: item?.gross_margin ?? null,
+      gross_margin_pct: item?.gross_margin_pct ?? null,
+      payment_method: paymentMethod,
+      ...mpesaMeta,
+      db_sync_status: result.db_sync_status || "",
+      db_sync_error: result.db_sync_error || "",
+      db_sync_pending: Boolean(result.db_sync_pending),
+      db_sync_failed_at: result.db_sync_failed_at || "",
+      source_sdo: item?.source_sdo || "",
+      source_package: item?.source_package || "",
+      source_type: sourceType,
+      legacy_category: legacyCategory,
+      legacy_subcategory: legacySubcategory,
+      legacy_item_label: item?.legacy_item_label || "",
+      assigned_employee: item?.assigned_employee || "",
+      store_rack_code: item?.store_rack_code || "",
+      category_summary: item?.category_summary || [legacyCategory, legacySubcategory].filter(Boolean).join(" / "),
+      sold_at: soldAt,
+      row_uid: `${saleNo || "sale"}-${sourceType}-${index}`,
+    };
+  });
+}
+
+function appendPosSaleResultToLocalAnalytics(result = {}) {
+  const records = buildPosSaleAnalyticsRecordsFromResult(result);
+  if (!records.length) {
+    return [];
+  }
+  const existingKeys = new Set(
+    (Array.isArray(posStoreItemSaleRecordState) ? posStoreItemSaleRecordState : [])
+      .map((record) => `${record.sale_no || ""}::${record.row_uid || record.store_item_machine_code || record.store_item_display_code || ""}`),
+  );
+  const newRecords = records.filter((record) => {
+    const key = `${record.sale_no || ""}::${record.row_uid || record.store_item_machine_code || record.store_item_display_code || ""}`;
+    if (existingKeys.has(key)) {
+      return false;
+    }
+    existingKeys.add(key);
+    return true;
+  });
+  if (newRecords.length) {
+    posStoreItemSaleRecordState = [...newRecords, ...posStoreItemSaleRecordState];
+    persistPosStoreItemSaleRecordState();
+  }
+  return newRecords;
+}
+
+function markCashierTerminalStoreItemsSoldLocally(result = {}) {
+  const items = Array.isArray(result.items) ? result.items : [];
+  const machineCodes = new Set(
+    items
+      .map((item) => String(item?.store_item_machine_code || item?.barcode || "").replace(/[^0-9]/g, "").trim())
+      .filter((value) => value.startsWith("5")),
+  );
+  if (machineCodes.size) {
+    const saleNo = String(result.sale_no || result.order_no || "").trim();
+    const soldAt = String(result.sold_at || new Date().toISOString());
+    const paymentMethod = getSaleResultPaymentMethod(result);
+    let updated = false;
+    storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => {
+      const tokenMachineCode = String(
+        token?.machine_code
+          || token?.barcode_value
+          || token?.final_item_barcode?.barcode_value
+          || "",
+      ).replace(/[^0-9]/g, "").trim();
+      if (!machineCodes.has(tokenMachineCode)) {
+        return token;
+      }
+      updated = true;
+      return {
+        ...token,
+        sale_status: "sold",
+        sold_at: soldAt,
+        cashier: result.cashier || result.cashier_name || currentSession.user?.username || currentSession.user?.full_name || "cashier",
+        payment_method: paymentMethod,
+        sale_no: saleNo,
+        db_sync_status: result.db_sync_status || "",
+        db_sync_pending: Boolean(result.db_sync_pending),
+      };
+    });
+    if (updated) {
+      persistStoreSdoPackageItemTokenState();
+    }
+  }
+  return appendPosSaleResultToLocalAnalytics(result);
 }
 
 function completeCashierTerminalStoreItemSale() {
@@ -23096,8 +23632,11 @@ function completeCashierTerminalStoreItemSale() {
   if (!rows.length) {
     throw new Error("购物篮还是空的，请先扫码加购。");
   }
-  const saleNo = buildPosStoreItemSaleNo(getCashierTerminalStoreCode());
+  const saleNo = cashierTerminalState.pendingSaleNo || buildPosStoreItemSaleNo(getCashierTerminalStoreCode());
+  cashierTerminalState.pendingSaleNo = saleNo;
   const paymentMethod = getCashierTerminalPaymentMethodForSale();
+  const payments = getCashierTerminalNormalizedPaymentLines();
+  const mpesaMeta = getMpesaPaymentAnalyticsMeta(payments);
   const soldAt = new Date().toISOString();
   const machineCodes = rows.map((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim()).filter(Boolean);
   const records = [];
@@ -23115,7 +23654,7 @@ function completeCashierTerminalStoreItemSale() {
       cashier: currentSession.user?.username || currentSession.user?.full_name || "cashier",
       payment_method: paymentMethod,
     };
-    records.push(buildPosStoreItemSaleRecord(soldToken, saleNo, paymentMethod));
+    records.push({ ...buildPosStoreItemSaleRecord(soldToken, saleNo, paymentMethod), ...mpesaMeta });
     return soldToken;
   });
   if (records.length !== machineCodes.length) {
@@ -23132,11 +23671,22 @@ function completeCashierTerminalStoreItemSale() {
     payment_method: paymentMethod,
     sold_at: soldAt,
     total_amount: records.reduce((sum, row) => sum + Number(row.price || 0), 0),
+    local_persisted: true,
+    db_sync_status: "not_configured",
+    db_sync_error: "",
+    db_sync_pending: false,
+    payments,
     items: records.map((record) => ({
       barcode: record.store_item_machine_code,
       selling_price: record.price,
+      source_type: STORE_ITEM_SOURCE_TYPE,
+      store_item_display_code: record.store_item_display_code,
+      store_item_machine_code: record.store_item_machine_code,
       source_sdo: record.source_sdo,
       source_package: record.source_package,
+      assigned_employee: record.assigned_employee,
+      store_rack_code: record.store_rack_code,
+      category_summary: record.category_summary,
     })),
   };
   cashierTerminalState.latestCompletedSale = result;
@@ -23160,21 +23710,53 @@ function syncCashierTerminalSaleForm() {
     throw new Error("购物篮还是空的，请先扫码加购。");
   }
   const items = cashierTerminalState.cartItems.map((row) => {
+    const sourceType = String(row.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase();
     const item = {
       barcode: String(row.barcode || "").trim(),
+      source_type: sourceType,
       qty: Math.max(1, Number(row.qty || 1)),
       selling_price: normalizeCashierTerminalNumber(row.selling_price),
       override_reason: String(row.override_reason || "").trim(),
       customer_id: String(row.customer_id || "").trim(),
     };
+    if (sourceType === LEGACY_STOCK_SOURCE_TYPE) {
+      item.category = String(row.legacy_category || row.category || "").trim();
+      item.subcategory = String(row.legacy_subcategory || row.subcategory || "").trim();
+      item.legacy_category = item.category;
+      item.legacy_subcategory = item.subcategory;
+      item.legacy_item_label = String(row.legacy_item_label || "").trim();
+      item.selected_price = normalizeCashierTerminalNumber(row.selected_price || row.selling_price);
+      return item;
+    }
+    item.store_item_display_code = String(row.store_item_display_code || "").trim();
+    item.store_item_machine_code = String(row.store_item_machine_code || row.barcode || "").trim();
+    item.source_sdo = String(row.source_sdo || "").trim();
+    item.source_package = String(row.source_package || "").trim();
+    item.assigned_employee = String(row.assigned_employee || "").trim();
+    item.store_rack_code = String(row.store_rack_code || "").trim();
+    item.category_summary = String(row.category_summary || "").trim();
+    item.selected_price = normalizeCashierTerminalNumber(row.selected_price || row.expected_price || row.selling_price);
     if (isCashierTerminalPriceOverride(row) && !item.override_reason) {
       throw new Error(`商品 ${item.barcode} 改价后必须填写 override reason。`);
     }
     return item;
   });
   const payments = getCashierTerminalNormalizedPaymentLines({ strict: true });
+  const paymentTotal = Number(payments.reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+  const saleTotal = Number(totals.totalAmount.toFixed(2));
+  const paymentMethods = new Set(payments.map((payment) => String(payment.method || "").trim().toLowerCase()));
+  if (!payments.length) {
+    throw new Error("必须选择支付方式。");
+  }
+  if (cashierTerminalState.activePaymentMode === "mixed" && (payments.length < 2 || !paymentMethods.has("cash") || !paymentMethods.has("mpesa"))) {
+    throw new Error("混合支付必须同时包含 cash 和 M-Pesa。");
+  }
+  if (Math.abs(paymentTotal - saleTotal) > 0.01) {
+    throw new Error("付款金额必须等于销售总额。");
+  }
   const orderField = document.querySelector("#saleForm [name='order_no']");
-  const nextOrderNo = String(orderField?.value || "").trim() || buildCashierTerminalOrderNo();
+  const nextOrderNo = cashierTerminalState.pendingSaleNo || String(orderField?.value || "").trim() || buildCashierTerminalOrderNo();
+  cashierTerminalState.pendingSaleNo = nextOrderNo;
   setInputValue("#saleForm [name='order_no']", nextOrderNo);
   setInputValue("#saleForm [name='store_code']", getCashierTerminalStoreCode());
   setInputValue("#saleForm [name='shift_no']", cashierTerminalState.shiftNo);
@@ -23278,33 +23860,64 @@ async function submitCashierTerminalOpenShift() {
 }
 
 async function submitCashierTerminalSale() {
-  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
-  const isStoreItemOnlyCart = rows.length && rows.every((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim().startsWith("5"));
-  if (isStoreItemOnlyCart) {
-    const result = completeCashierTerminalStoreItemSale();
-    cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
-    cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
-    cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
-    resetCashierTerminalForNextSale();
-    renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
-    renderOperationsAllSalesData(posStoreItemSaleRecordState);
-    showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
-    return result;
+  if (cashierTerminalSaleSubmitPromise) {
+    return cashierTerminalSaleSubmitPromise;
   }
-  syncCashierTerminalSaleForm();
-  const form = document.querySelector("#saleForm");
-  if (!(form instanceof HTMLFormElement)) {
-    throw new Error("saleForm 不存在，无法提交销售。");
-  }
-  const result = await submitSale({ preventDefault() {}, currentTarget: form });
-  cashierTerminalState.latestCompletedSale = result;
-  cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
-  cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
-  cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
-  resetCashierTerminalForNextSale();
-  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
-  showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
-  return result;
+
+  cashierTerminalSaleSubmitPromise = (async () => {
+    const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+    const completedResult = cashierTerminalState.pendingSaleResult || cashierTerminalState.latestCompletedSale;
+    if (!rows.length && completedResult?.sale_no) {
+      showTransientInlineNotice("#cashierTerminalInlineNotice", `交易已完成：${completedResult.order_no || completedResult.sale_no}`, "success", 1800);
+      return completedResult;
+    }
+    if (!cashierTerminalState.shiftNo || !cashierTerminalState.shiftOpen) {
+      throw new Error("请先开班，再开始交易。");
+    }
+    cashierTerminalState.saleSubmitInFlight = true;
+    cashierTerminalState.pendingSaleResult = null;
+    if (!cashierTerminalState.pendingSaleNo) {
+      cashierTerminalState.pendingSaleNo = buildCashierTerminalOrderNo();
+    }
+    renderCashierTerminalPaymentPanel();
+    try {
+      syncCashierTerminalSaleForm();
+      const form = document.querySelector("#saleForm");
+      if (!(form instanceof HTMLFormElement)) {
+        throw new Error("saleForm 不存在，无法提交销售。");
+      }
+      let result;
+      try {
+        form.dataset.skipJsonBuilderSync = "true";
+        result = await submitSale({ preventDefault() {}, currentTarget: form });
+      } finally {
+        delete form.dataset.skipJsonBuilderSync;
+      }
+      markCashierTerminalStoreItemsSoldLocally(result);
+      cashierTerminalState.pendingSaleResult = result;
+      cashierTerminalState.latestCompletedSale = result;
+      cashierTerminalState.voidOrderNo = result.order_no || result.sale_no || cashierTerminalState.voidOrderNo;
+      cashierTerminalState.refundOrderNo = result.order_no || result.sale_no || cashierTerminalState.refundOrderNo;
+      cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
+      resetCashierTerminalForNextSale();
+      renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
+      renderOperationsAllSalesData(posStoreItemSaleRecordState);
+      if (result.db_sync_status === "failed") {
+        showTransientInlineNotice("#cashierTerminalInlineNotice", `${POS_DB_SYNC_FAILURE_MESSAGE}：${result.order_no || result.sale_no || "-"}`, "warning", 3600);
+      } else {
+        showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no || result.sale_no}`, "success", 1800);
+      }
+      return result;
+    } catch (error) {
+      cashierTerminalState.pendingSaleNo = "";
+      throw error;
+    } finally {
+      cashierTerminalState.saleSubmitInFlight = false;
+      cashierTerminalSaleSubmitPromise = null;
+      renderCashierTerminalPaymentPanel();
+    }
+  })();
+  return cashierTerminalSaleSubmitPromise;
 }
 
 async function submitCashierTerminalVoidRequest() {
@@ -23369,16 +23982,32 @@ function updateCashierTerminalPaymentField(field, value, index = null) {
     if (!line) {
       return;
     }
-    line[field] = field === "amount" ? String(value || "") : String(value || "");
+    if (field === "manual_confirmed" || field === "mpesa_manual_confirmed") {
+      line.manual_confirmed = Boolean(value);
+      line.mpesa_manual_confirmed = Boolean(value);
+      line.payment_status = Boolean(value) ? "manual_confirmed" : "pending_verification";
+    } else {
+      line[field] = field === "amount" ? String(value || "") : String(value || "");
+    }
     renderCashierTerminal();
     return;
   }
-  cashierTerminalState[field] = String(value || "");
+  if (field === "mpesaManualConfirmed") {
+    cashierTerminalState.mpesaManualConfirmed = Boolean(value);
+  } else {
+    cashierTerminalState[field] = String(value || "");
+  }
   renderCashierTerminal();
 }
 
 function updateCashierTerminalDrawerField(field, value) {
   cashierTerminalState[field] = String(value || "");
+  if (field === "legacyCategory") {
+    const options = getLegacyStockSubcategories(cashierTerminalState.legacyCategory);
+    if (!options.includes(cashierTerminalState.legacySubcategory)) {
+      cashierTerminalState.legacySubcategory = options[0] || "lady tops";
+    }
+  }
 }
 
 function handleCashierTerminalNetworkChange() {
@@ -23412,6 +24041,10 @@ async function handleCashierTerminalAction(action, target) {
       return;
     case "add-payment-line":
       addCashierTerminalPaymentLine();
+      return;
+    case "add-legacy-stock":
+      addLegacyStockQuickSaleToCart();
+      showTransientInlineNotice("#cashierTerminalInlineNotice", "旧库存已加入购物篮。", "success", 1400);
       return;
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
@@ -25482,6 +26115,14 @@ function renderStoreOperatingSummary(rows) {
               <span>${row.today_qty || 0}</span>
             </article>
             <article class="store-metric">
+              <strong>旧库存销售额</strong>
+              <span>${Number(row.today_legacy_stock_sales_amount || 0).toFixed(2)}</span>
+            </article>
+            <article class="store-metric">
+              <strong>STORE_ITEM销售额</strong>
+              <span>${Number(row.today_store_item_sales_amount || 0).toFixed(2)}</span>
+            </article>
+            <article class="store-metric">
               <strong>库存件数</strong>
               <span>${row.qty_on_hand || 0}</span>
             </article>
@@ -25499,6 +26140,7 @@ function renderStoreOperatingSummary(rows) {
             <span class="store-flag">今日单数 ${escapeHtml(row.today_transaction_count || 0)}</span>
             <span class="store-flag">客单 ${escapeHtml(Number(row.today_average_ticket || 0).toFixed(2))}</span>
             <span class="store-flag">SKU ${escapeHtml(row.sku_count || 0)}</span>
+            <span class="store-flag">今日现金 ${escapeHtml(Number(row.today_cash_amount || 0).toFixed(2))}</span>
             <span class="store-flag">今日 M-Pesa ${escapeHtml(Number(row.today_mpesa_amount || 0).toFixed(2))}</span>
             <span class="store-flag">今日退款 ${escapeHtml(Number(row.today_refund_amount || 0).toFixed(2))}</span>
           </div>
@@ -26120,25 +26762,46 @@ function summarizePosStoreItemSalesForAnalytics(records = []) {
         cashSalesAmount: 0,
         mpesaSalesAmount: 0,
         mixedSalesAmount: 0,
+        manualConfirmedMpesaAmount: 0,
+        pendingVerificationMpesaAmount: 0,
+        verifiedMpesaAmount: 0,
+        manual_confirmed_mpesa: 0,
+        legacyStockSalesAmount: 0,
+        storeItemSalesAmount: 0,
+        legacyStockItemCount: 0,
         soldStoreItemCount: 0,
         costKnownItemCount: 0,
         costUnknownItemCount: 0,
         knownGrossMarginAmount: 0,
         marginPendingRecordCount: 0,
+        categorySummaries: new Map(),
+        subcategorySummaries: new Map(),
         lastSaleAt: "",
       });
     }
     const summary = storeMap.get(storeCode);
-    const amount = Number(record?.price || 0);
+    const amount = Number(record?.line_total ?? record?.price ?? 0);
+    const quantity = Math.max(1, Number(record?.quantity || record?.qty || 1));
+    const sourceType = String(record?.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase();
     const soldAt = String(record?.sold_at || "");
     const isToday = getLocalDateKey(soldAt || new Date().toISOString()) === todayKey;
     const hasKnownCost = String(record?.cost_status || "").trim().toLowerCase() === "known" && record?.cost_price != null && Number.isFinite(Number(record.cost_price));
-    summary.soldStoreItemCount += 1;
+    const category = String(record?.legacy_category || record?.category_summary || "未分类").trim() || "未分类";
+    const subcategory = String(record?.legacy_subcategory || record?.subcategory || record?.category_summary || "未分类").trim() || "未分类";
+    summary.categorySummaries.set(category, (summary.categorySummaries.get(category) || 0) + amount);
+    summary.subcategorySummaries.set(subcategory, (summary.subcategorySummaries.get(subcategory) || 0) + amount);
+    if (sourceType === LEGACY_STOCK_SOURCE_TYPE) {
+      summary.legacyStockSalesAmount += amount;
+      summary.legacyStockItemCount += quantity;
+    } else {
+      summary.storeItemSalesAmount += amount;
+      summary.soldStoreItemCount += quantity;
+    }
     if (hasKnownCost) {
-      summary.costKnownItemCount += 1;
+      summary.costKnownItemCount += quantity;
       summary.knownGrossMarginAmount += Number(record?.gross_margin || 0);
     } else {
-      summary.costUnknownItemCount += 1;
+      summary.costUnknownItemCount += quantity;
       summary.marginPendingRecordCount += 1;
     }
     if (!summary.lastSaleAt || new Date(soldAt || 0).getTime() > new Date(summary.lastSaleAt || 0).getTime()) {
@@ -26146,7 +26809,7 @@ function summarizePosStoreItemSalesForAnalytics(records = []) {
     }
     if (isToday) {
       summary.todaySalesAmount += amount;
-      summary.todayItemCount += 1;
+      summary.todayItemCount += quantity;
       if (record?.sale_no) {
         summary.todayOrderNos.add(record.sale_no);
       }
@@ -26158,11 +26821,24 @@ function summarizePosStoreItemSalesForAnalytics(records = []) {
       } else {
         summary.cashSalesAmount += amount;
       }
+      const mpesaStatus = String(record?.mpesa_payment_status || record?.payment_status || "").trim().toLowerCase();
+      if (method === "mpesa" || method === "mixed" || record?.manual_confirmed_mpesa) {
+        if (record?.manual_confirmed_mpesa || mpesaStatus === "manual_confirmed") {
+          summary.manualConfirmedMpesaAmount += amount;
+          summary.manual_confirmed_mpesa += amount;
+        } else if (mpesaStatus === "pending_verification") {
+          summary.pendingVerificationMpesaAmount += amount;
+        } else if (mpesaStatus === "verified") {
+          summary.verifiedMpesaAmount += amount;
+        }
+      }
     }
   });
   return [...storeMap.values()].map((summary) => {
     summary.todayOrderCount = summary.todayOrderNos.size;
     summary.averageTicket = summary.todayOrderCount ? summary.todaySalesAmount / summary.todayOrderCount : 0;
+    summary.categorySummaries = [...summary.categorySummaries.entries()].map(([category, sales_amount]) => ({ category, sales_amount }));
+    summary.subcategorySummaries = [...summary.subcategorySummaries.entries()].map(([subcategory, sales_amount]) => ({ subcategory, sales_amount }));
     delete summary.todayOrderNos;
     return summary;
   });
@@ -26177,22 +26853,32 @@ function renderPosSalesAnalyticsSummary(records = posStoreItemSaleRecordState) {
       return;
     }
     target.className = "report-summary";
+    const localDbFallbackHint = `<div class="alert-banner">数据库销售分析暂不可用，当前显示本地记录</div>`;
     target.innerHTML = summaries.length
       ? `
+        ${localDbFallbackHint}
         <div class="report-summary-grid">
-          ${summaries.map((row) => `
+          ${summaries.map((row) => {
+            const categoryText = (row.categorySummaries || []).slice(0, 3).map((item) => `${item.category} ${formatKesAmount(item.sales_amount, "KES 0.00")}`).join(" · ") || "-";
+            const subcategoryText = (row.subcategorySummaries || []).slice(0, 3).map((item) => `${item.subcategory} ${formatKesAmount(item.sales_amount, "KES 0.00")}`).join(" · ") || "-";
+            return `
             <article class="store-metric">
               <strong>${escapeHtml(row.store_code)}</strong>
               <span>${escapeHtml(formatKesAmount(row.todaySalesAmount, "KES 0.00"))}</span>
               <small>${escapeHtml(`件数 ${row.todayItemCount} · 订单 ${row.todayOrderCount} · 客单价 ${formatKesAmount(row.averageTicket, "KES 0.00")}`)}</small>
               <small>${escapeHtml(`现金 ${formatKesAmount(row.cashSalesAmount, "KES 0.00")} · M-Pesa ${formatKesAmount(row.mpesaSalesAmount, "KES 0.00")} · 混合 ${formatKesAmount(row.mixedSalesAmount, "KES 0.00")}`)}</small>
+              <small>${escapeHtml(`M-Pesa 人工确认 ${formatKesAmount(row.manualConfirmedMpesaAmount, "KES 0.00")} · M-Pesa 待核验 ${formatKesAmount(row.pendingVerificationMpesaAmount, "KES 0.00")} · M-Pesa 已系统核验 ${formatKesAmount(row.verifiedMpesaAmount, "KES 0.00")}`)}</small>
+              <small>${escapeHtml(`LEGACY_STOCK ${formatKesAmount(row.legacyStockSalesAmount, "KES 0.00")} · STORE_ITEM ${formatKesAmount(row.storeItemSalesAmount, "KES 0.00")}`)}</small>
+              <small>${escapeHtml(`按大类销售 ${categoryText}`)}</small>
+              <small>${escapeHtml(`按小类销售 ${subcategoryText}`)}</small>
               <small>${escapeHtml(`成本已知 ${row.costKnownItemCount} · 成本待确认 ${row.costUnknownItemCount} · 已知毛利 ${formatKesAmount(row.knownGrossMarginAmount, "KES 0.00")}`)}</small>
-              <small>${escapeHtml(`已售 STORE_ITEM ${row.soldStoreItemCount} · 最近 ${row.lastSaleAt ? formatLocalDateTime(row.lastSaleAt) : "-"}`)}</small>
+              <small>${escapeHtml(`已售 STORE_ITEM ${row.soldStoreItemCount} · 旧库存 ${row.legacyStockItemCount} · 最近 ${row.lastSaleAt ? formatLocalDateTime(row.lastSaleAt) : "-"}`)}</small>
             </article>
-          `).join("")}
+            `;
+          }).join("")}
         </div>
       `
-      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+      : `${localDbFallbackHint}<div class="empty-state">当前没有生成销售记录。</div>`;
   });
   const recordTargets = ["#posSalesAnalyticsRecords", "#operationsPosSalesAnalyticsRecords"];
   recordTargets.forEach((selector) => {
@@ -26202,18 +26888,26 @@ function renderPosSalesAnalyticsSummary(records = posStoreItemSaleRecordState) {
     }
     target.className = "candidate-list";
     target.innerHTML = (Array.isArray(records) && records.length)
-      ? records.slice(0, 30).map((record) => `
-        <article class="candidate-row">
-          <div class="candidate-main">
-            <strong>${escapeHtml(record.store_item_display_code || record.store_item_machine_code || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${record.store_code || "-"} · ${formatKesAmount(record.price || 0, "KES 0.00")} · ${record.payment_method || "-"}`)}</div>
-            <div class="subtle small">${escapeHtml(`成本 ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · 毛利 ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
-            <div class="subtle small">${escapeHtml(`STORE_ITEM ${record.store_item_machine_code || "-"} · SDO ${record.source_sdo || "-"} · 来源包 ${record.source_package || "-"} · ${record.source_type || "-"}`)}</div>
-            <div class="subtle small">${escapeHtml(`店员 ${record.assigned_employee || "-"} · 货架 ${record.store_rack_code || "-"} · 品类 ${record.category_summary || "-"}`)}</div>
-          </div>
-          <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.sold_at ? formatLocalDateTime(record.sold_at) : "-")}</span></div>
-        </article>
-      `).join("")
+      ? records.slice(0, 30).map((record) => {
+        const sourceType = String(record.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase();
+        const amount = Number(record.line_total ?? record.price ?? 0);
+        const itemLabel = sourceType === LEGACY_STOCK_SOURCE_TYPE
+          ? `${record.legacy_category || "-"} / ${record.legacy_subcategory || "-"}`
+          : (record.store_item_display_code || record.store_item_machine_code || "-");
+        return `
+          <article class="candidate-row">
+            <div class="candidate-main">
+              <strong>${escapeHtml(itemLabel)}</strong>
+              <div class="subtle small">${escapeHtml(`${record.store_code || "-"} · ${formatKesAmount(amount, "KES 0.00")} · ${record.payment_method || "-"} · ${sourceType}`)}</div>
+              <div class="subtle small">${escapeHtml(`成本 ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · 毛利 ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
+              <div class="subtle small">${escapeHtml(`STORE_ITEM ${record.store_item_machine_code || "-"} · SDO ${record.source_sdo || "-"} · 来源包 ${record.source_package || "-"} · ${record.source_type || "-"}`)}</div>
+              <div class="subtle small">${escapeHtml(`店员 ${record.assigned_employee || "-"} · 货架 ${record.store_rack_code || "-"} · 品类 ${record.category_summary || "-"}`)}</div>
+              <div class="subtle small">${escapeHtml(`M-Pesa 状态 ${record.mpesa_payment_status || "-"} · manual_confirmed_mpesa ${record.manual_confirmed_mpesa ? "yes" : "no"}`)}</div>
+            </div>
+            <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.sold_at ? formatLocalDateTime(record.sold_at) : "-")}</span></div>
+          </article>
+        `;
+      }).join("")
       : `<div class="empty-state">当前没有生成销售记录。</div>`;
   });
   renderOperationsAllSalesData(records);
@@ -26224,20 +26918,35 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   const now = new Date();
   const todayKey = getLocalDateKey(now.toISOString());
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).getTime();
-  const totalSalesAmount = list.reduce((sum, row) => sum + Number(row?.price || 0), 0);
-  const totalItemCount = list.length;
+  const totalSalesAmount = list.reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const totalItemCount = list.reduce((sum, row) => sum + Math.max(1, Number(row?.quantity || row?.qty || 1)), 0);
   const totalOrderCount = new Set(list.map((row) => row.sale_no).filter(Boolean)).size;
   const storeCount = new Set(list.map((row) => String(row?.store_code || "").trim()).filter(Boolean)).size;
   const todaySalesAmount = list
     .filter((row) => getLocalDateKey(row?.sold_at || "") === todayKey)
-    .reduce((sum, row) => sum + Number(row?.price || 0), 0);
+    .reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
   const last7DaysSalesAmount = list
     .filter((row) => new Date(row?.sold_at || 0).getTime() >= sevenDaysAgo)
-    .reduce((sum, row) => sum + Number(row?.price || 0), 0);
-  const cashSalesAmount = list.filter((row) => String(row?.payment_method || "cash").toLowerCase() === "cash").reduce((sum, row) => sum + Number(row?.price || 0), 0);
-  const mpesaSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mpesa").reduce((sum, row) => sum + Number(row?.price || 0), 0);
-  const mixedSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mixed").reduce((sum, row) => sum + Number(row?.price || 0), 0);
-  const costKnownItemCount = list.filter((row) => String(row?.cost_status || "").trim().toLowerCase() === "known" && row?.cost_price != null).length;
+    .reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const cashSalesAmount = list.filter((row) => String(row?.payment_method || "cash").toLowerCase() === "cash").reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const mpesaSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mpesa").reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const mixedSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mixed").reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const manualConfirmedMpesaAmount = list
+    .filter((row) => row?.manual_confirmed_mpesa || String(row?.mpesa_payment_status || row?.payment_status || "").toLowerCase() === "manual_confirmed")
+    .reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const pendingVerificationMpesaAmount = list
+    .filter((row) => String(row?.mpesa_payment_status || row?.payment_status || "").toLowerCase() === "pending_verification")
+    .reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const verifiedMpesaAmount = list
+    .filter((row) => String(row?.mpesa_payment_status || row?.payment_status || "").toLowerCase() === "verified")
+    .reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const legacyStockSalesAmount = list.filter((row) => String(row?.source_type || "").trim().toUpperCase() === LEGACY_STOCK_SOURCE_TYPE).reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const storeItemSalesAmount = list.filter((row) => String(row?.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase() === STORE_ITEM_SOURCE_TYPE).reduce((sum, row) => sum + Number(row?.line_total ?? row?.price ?? 0), 0);
+  const legacyStockItemCount = list.filter((row) => String(row?.source_type || "").trim().toUpperCase() === LEGACY_STOCK_SOURCE_TYPE).reduce((sum, row) => sum + Math.max(1, Number(row?.quantity || row?.qty || 1)), 0);
+  const storeItemItemCount = list.filter((row) => String(row?.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase() === STORE_ITEM_SOURCE_TYPE).reduce((sum, row) => sum + Math.max(1, Number(row?.quantity || row?.qty || 1)), 0);
+  const costKnownItemCount = list
+    .filter((row) => String(row?.cost_status || "").trim().toLowerCase() === "known" && row?.cost_price != null)
+    .reduce((sum, row) => sum + Math.max(1, Number(row?.quantity || row?.qty || 1)), 0);
   const costUnknownItemCount = Math.max(totalItemCount - costKnownItemCount, 0);
   const knownGrossMarginAmount = list.reduce((sum, row) => (
     row?.gross_margin == null ? sum : sum + Number(row.gross_margin || 0)
@@ -26245,14 +26954,21 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   const marginPendingRecordCount = list.filter((row) => row?.gross_margin == null).length;
   const storeSummaries = summarizePosStoreItemSalesForAnalytics(list);
   const categoryMap = new Map();
+  const subcategoryMap = new Map();
   list.forEach((row) => {
-    const category = String(row?.category_summary || "未分类").trim() || "未分类";
-    categoryMap.set(category, (categoryMap.get(category) || 0) + Number(row?.price || 0));
+    const category = String(row?.legacy_category || row?.category_summary || "未分类").trim() || "未分类";
+    const subcategory = String(row?.legacy_subcategory || row?.subcategory || row?.category_summary || "未分类").trim() || "未分类";
+    categoryMap.set(category, (categoryMap.get(category) || 0) + Number(row?.line_total ?? row?.price ?? 0));
+    subcategoryMap.set(subcategory, (subcategoryMap.get(subcategory) || 0) + Number(row?.line_total ?? row?.price ?? 0));
   });
   const categorySummaries = [...categoryMap.entries()].map(([category_summary, sales_amount]) => ({ category_summary, sales_amount }));
+  const subcategorySummaries = [...subcategoryMap.entries()].map(([subcategory_summary, sales_amount]) => ({ subcategory_summary, sales_amount }));
   const analysisLines = [
-    totalItemCount ? `共售出 ${totalItemCount} 个 STORE_ITEM，销售额 ${formatKesAmount(totalSalesAmount, "KES 0.00")}。` : "当前没有生成销售记录。",
-    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "等待 POS 完成第一笔 STORE_ITEM 销售。",
+    totalItemCount ? `共售出 ${totalItemCount} 件，销售额 ${formatKesAmount(totalSalesAmount, "KES 0.00")}。` : "当前没有生成销售记录。",
+    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "等待 POS 完成第一笔销售。",
+    `LEGACY_STOCK ${formatKesAmount(legacyStockSalesAmount, "KES 0.00")} / ${legacyStockItemCount} 件；STORE_ITEM ${formatKesAmount(storeItemSalesAmount, "KES 0.00")} / ${storeItemItemCount} 件。`,
+    `M-Pesa 人工确认 ${formatKesAmount(manualConfirmedMpesaAmount, "KES 0.00")}；M-Pesa 待核验 ${formatKesAmount(pendingVerificationMpesaAmount, "KES 0.00")}；M-Pesa 已系统核验 ${formatKesAmount(verifiedMpesaAmount, "KES 0.00")}。`,
+    `按小类销售：${subcategorySummaries.slice(0, 5).map((row) => `${row.subcategory_summary} ${formatKesAmount(row.sales_amount, "KES 0.00")}`).join(" · ") || "-" }。`,
     marginPendingRecordCount ? `${marginPendingRecordCount} 条销售记录毛利待确认，原因是上游成本仍未确认。` : `已知成本销售毛利 ${formatKesAmount(knownGrossMarginAmount, "KES 0.00")}。`,
   ];
   return {
@@ -26266,12 +26982,20 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
     cashSalesAmount,
     mpesaSalesAmount,
     mixedSalesAmount,
+    manualConfirmedMpesaAmount,
+    pendingVerificationMpesaAmount,
+    verifiedMpesaAmount,
+    legacyStockSalesAmount,
+    storeItemSalesAmount,
+    legacyStockItemCount,
+    storeItemItemCount,
     costKnownItemCount,
     costUnknownItemCount,
     knownGrossMarginAmount,
     marginPendingRecordCount,
     storeSummaries,
     categorySummaries,
+    subcategorySummaries,
     analysisLines,
   };
 }
@@ -26288,6 +27012,14 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
       <article class="store-metric"><strong>订单数</strong><span>${summary.totalOrderCount}</span></article>
       <article class="store-metric"><strong>客单价</strong><span>${escapeHtml(formatKesAmount(summary.averageTicket, "KES 0.00"))}</span></article>
       <article class="store-metric"><strong>近 7 天</strong><span>${escapeHtml(formatKesAmount(summary.last7DaysSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>现金金额</strong><span>${escapeHtml(formatKesAmount(summary.cashSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>M-Pesa 金额</strong><span>${escapeHtml(formatKesAmount(summary.mpesaSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>混合金额</strong><span>${escapeHtml(formatKesAmount(summary.mixedSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>M-Pesa 人工确认</strong><span>${escapeHtml(formatKesAmount(summary.manualConfirmedMpesaAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>M-Pesa 待核验</strong><span>${escapeHtml(formatKesAmount(summary.pendingVerificationMpesaAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>M-Pesa 已系统核验</strong><span>${escapeHtml(formatKesAmount(summary.verifiedMpesaAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>LEGACY_STOCK 销售额</strong><span>${escapeHtml(formatKesAmount(summary.legacyStockSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>STORE_ITEM 销售额</strong><span>${escapeHtml(formatKesAmount(summary.storeItemSalesAmount, "KES 0.00"))}</span></article>
       <article class="store-metric"><strong>成本已知件数</strong><span>${summary.costKnownItemCount}</span></article>
       <article class="store-metric"><strong>成本待确认件数</strong><span>${summary.costUnknownItemCount}</span></article>
       <article class="store-metric"><strong>已知成本销售毛利</strong><span>${escapeHtml(formatKesAmount(summary.knownGrossMarginAmount, "KES 0.00"))}</span></article>
@@ -26297,7 +27029,8 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
   const analysisTarget = document.querySelector("#operationsAllSalesAnalysis");
   if (analysisTarget instanceof HTMLElement) {
     analysisTarget.className = "candidate-summary";
-    analysisTarget.innerHTML = summary.analysisLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("");
+    const subcategorySummaryText = `按小类销售：${summary.subcategorySummaries.slice(0, 5).map((row) => `${row.subcategory_summary} ${formatKesAmount(row.sales_amount, "KES 0.00")}`).join(" · ") || "-"}`;
+    analysisTarget.innerHTML = [...summary.analysisLines, subcategorySummaryText].map((line) => `<div>${escapeHtml(line)}</div>`).join("");
   }
   const byStoreTarget = document.querySelector("#operationsAllSalesByStore");
   if (byStoreTarget instanceof HTMLElement) {
@@ -26308,6 +27041,8 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
           <div class="candidate-main">
             <strong>${escapeHtml(row.store_code)}</strong>
             <div class="subtle small">${escapeHtml(`销售额 ${formatKesAmount(row.todaySalesAmount, "KES 0.00")} · 件数 ${row.todayItemCount} · 订单 ${row.todayOrderCount}`)}</div>
+            <div class="subtle small">${escapeHtml(`LEGACY_STOCK ${formatKesAmount(row.legacyStockSalesAmount, "KES 0.00")} · STORE_ITEM ${formatKesAmount(row.storeItemSalesAmount, "KES 0.00")}`)}</div>
+            <div class="subtle small">${escapeHtml(`M-Pesa 人工确认 ${formatKesAmount(row.manualConfirmedMpesaAmount, "KES 0.00")} · 待核验 ${formatKesAmount(row.pendingVerificationMpesaAmount, "KES 0.00")} · 已系统核验 ${formatKesAmount(row.verifiedMpesaAmount, "KES 0.00")}`)}</div>
           </div>
           <div class="candidate-side"><span class="meta-pill">${escapeHtml(row.lastSaleAt ? formatLocalDateTime(row.lastSaleAt) : "-")}</span></div>
         </article>
@@ -26318,17 +27053,25 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
   if (recordsTarget instanceof HTMLElement) {
     recordsTarget.className = "candidate-list";
     recordsTarget.innerHTML = (Array.isArray(records) && records.length)
-      ? records.slice(0, 50).map((record) => `
-        <article class="candidate-row">
-          <div class="candidate-main">
-            <strong>${escapeHtml(record.sale_no || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${record.store_item_display_code || "-"} · ${record.store_item_machine_code || "-"} · ${formatKesAmount(record.price || 0, "KES 0.00")}`)}</div>
-            <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
-            <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · category_summary ${record.category_summary || "-"}`)}</div>
-          </div>
-          <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.payment_method || "-")}</span></div>
-        </article>
-      `).join("")
+      ? records.slice(0, 50).map((record) => {
+        const sourceType = String(record.source_type || STORE_ITEM_SOURCE_TYPE).trim().toUpperCase();
+        const itemLabel = sourceType === LEGACY_STOCK_SOURCE_TYPE
+          ? `${record.legacy_category || "-"} / ${record.legacy_subcategory || "-"}`
+          : `${record.store_item_display_code || "-"} · ${record.store_item_machine_code || "-"}`;
+        const amount = Number(record.line_total ?? record.price ?? 0);
+        return `
+          <article class="candidate-row">
+            <div class="candidate-main">
+              <strong>${escapeHtml(record.sale_no || "-")}</strong>
+              <div class="subtle small">${escapeHtml(`${itemLabel} · ${formatKesAmount(amount, "KES 0.00")} · ${sourceType}`)}</div>
+              <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
+              <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · category_summary ${record.category_summary || "-"}`)}</div>
+              <div class="subtle small">${escapeHtml(`M-Pesa ${record.mpesa_payment_status || "-"} · manual_confirmed_mpesa ${record.manual_confirmed_mpesa ? "yes" : "no"}`)}</div>
+            </div>
+            <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.payment_method || "-")}</span></div>
+          </article>
+        `;
+      }).join("")
       : `<div class="empty-state">当前没有生成销售记录。</div>`;
   }
 }
@@ -31107,8 +31850,10 @@ async function submitPrintPreview(event) {
 
 async function submitSale(event) {
   event.preventDefault();
-  syncJsonBuilderToField("sale-items");
-  syncJsonBuilderToField("sale-payments");
+  if (event.currentTarget?.dataset?.skipJsonBuilderSync !== "true") {
+    syncJsonBuilderToField("sale-items");
+    syncJsonBuilderToField("sale-payments");
+  }
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
   payload.items = parseJsonField(payload.items_json, []);
@@ -31740,9 +32485,10 @@ cashierTerminalShell?.addEventListener("input", (event) => {
     return;
   }
   if (target.dataset.terminalPaymentField) {
+    const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
     updateCashierTerminalPaymentField(
       target.dataset.terminalPaymentField,
-      target.value,
+      value,
       target.dataset.terminalPaymentIndex ? Number(target.dataset.terminalPaymentIndex) : null,
     );
     return;
@@ -31758,9 +32504,10 @@ cashierTerminalShell?.addEventListener("change", (event) => {
     return;
   }
   if (target.dataset.terminalPaymentField) {
+    const value = target instanceof HTMLInputElement && target.type === "checkbox" ? target.checked : target.value;
     updateCashierTerminalPaymentField(
       target.dataset.terminalPaymentField,
-      target.value,
+      value,
       target.dataset.terminalPaymentIndex ? Number(target.dataset.terminalPaymentIndex) : null,
     );
     return;
