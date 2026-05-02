@@ -16780,7 +16780,7 @@ function renderBalePrintMethodStatus({
       <strong>当前打印方式：本地打印代理</strong>
       <div>本地打印代理：已连接</div>
       <div>浏览器打印状态：可用作备用</div>
-      <div>推荐操作：点击“打印标签”，打印机会按本地代理返回的队列执行。</div>
+      <div>推荐操作：点击“打印标签”，Deli 标签机会按 TSPL 原始指令直接出纸。</div>
       ${queueNote}
     `;
   }
@@ -16945,7 +16945,6 @@ async function printCurrentBaleModalViaLocalAgent() {
   if (!currentJob) {
     throw new Error("当前没有可打印的标签。");
   }
-  const html = getCurrentBalePreviewHtml();
   const printerName = String(document.querySelector("[data-bale-modal-printer-select]")?.value || document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim();
   if (!printerName) {
     throw new Error("请先选择打印机。");
@@ -16959,13 +16958,12 @@ async function printCurrentBaleModalViaLocalAgent() {
   const selectedTemplate = getSelectedBaleTemplate(selectedTemplateCode, getActiveBaleTemplateScope(), getActiveBaleModalTaskType());
   const templateSize = `${Number(selectedTemplate.width_mm || 60)}x${Number(selectedTemplate.height_mm || 40)}`;
   const agentUrl = getLocalPrintAgentUrl();
-  const response = await fetch(`${agentUrl}/print/html`, {
+  const response = await fetch(`${agentUrl}/print/label`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      html,
       printer_name: printerName,
       printer: printerName,
       copies: Number(directPayload.copies || currentJob?.copies || 1) || 1,
@@ -17150,7 +17148,7 @@ function renderBalePrintModal() {
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
       ? "浏览器打印/PDF会输出与预览一致的 LPK 标签 HTML（含条码值），可直接用于仓库工单留档。"
-      : "高级说明：本地打印代理未连接时，主按钮会自动使用浏览器打印；Windows 打印机请在系统打印窗口选择。";
+      : "高级说明：浏览器打印只作为备用选项。正式标签打印请先启动 FW-ERP Print Agent，再点击主按钮。";
   }
   if (agentFallback instanceof HTMLElement) {
     agentFallback.className = `flow-summary-note ${localPrintAgentState.connected ? "success" : "warning"}${currentJob ? "" : " hidden-screen"}`;
@@ -17207,7 +17205,7 @@ function renderBalePrintModal() {
           ? `<div class="alert-banner">本地代理队列暂不支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}，浏览器打印仍可使用。请点击“打印标签”，在系统打印窗口选择 ${escapeHtml(selectedPrinterName.replace(/_/g, " "))}。</div>`
           : ""}
         ${selectedPrinter && usesTsplMode
-          ? `<div class="flow-summary-note success">当前已切换为 TSPL 原始指令直打，不依赖 macOS 的 A4/Letter 纸张队列。请直接测试是否正常出纸。</div>`
+          ? `<div class="flow-summary-note success">当前已切换为 TSPL 原始指令直打，不依赖 Edge/Chrome 浏览器打印。请直接测试 Deli 标签机是否正常出纸。</div>`
           : ""}
         ${closeAction.action !== "allow_close"
           ? `<div class="flow-summary-note">当前这轮贴码流程不会因为关闭弹窗而结束。核对实体出纸后，请点“确认本包已贴标”。</div>`

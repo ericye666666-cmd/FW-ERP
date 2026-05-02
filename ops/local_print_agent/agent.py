@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib import error, parse, request
 from urllib.parse import urlparse
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 HOST = "127.0.0.1"
 PORT = 8719
 ALLOWED_ORIGINS = {
@@ -334,6 +334,55 @@ def _select_barcode_value(payload: dict) -> tuple[str, str | None]:
     return "", f"Missing machine barcode value. Display code '{display_code}' will not be used as the encoded barcode."
 
 
+def _select_strict_label_barcode_value(payload: dict) -> tuple[str, str | None]:
+    label_payload = payload.get("label_payload") if isinstance(payload.get("label_payload"), dict) else {}
+    raw_barcode = label_payload.get("barcode_value", payload.get("barcode_value"))
+    barcode_value = re.sub(r"[^A-Za-z0-9]", "", str(raw_barcode or "").strip()).upper()
+    if barcode_value:
+        if _looks_like_machine_code(barcode_value):
+            return barcode_value, None
+        return "", "barcode_value must be a 1/2/3/4/5-prefixed machine_code."
+
+    raw_machine_code = label_payload.get("machine_code", payload.get("machine_code"))
+    machine_code = re.sub(r"[^A-Za-z0-9]", "", str(raw_machine_code or "").strip()).upper()
+    if _looks_like_machine_code(machine_code):
+        return machine_code, None
+
+    display_code = str(label_payload.get("display_code") or payload.get("display_code") or "").strip()
+    return "", f"Missing machine barcode value. Display code '{display_code}' will not be used as the encoded barcode."
+
+
+def _normalize_print_label_request(payload: dict) -> tuple[dict, str | None]:
+    printer = payload.get("printer_name") or payload.get("printer")
+    if not printer or not isinstance(printer, str):
+        return {}, "Invalid request: 'printer_name' string is required."
+
+    label_payload = payload.get("label_payload") if isinstance(payload.get("label_payload"), dict) else {}
+    merged_payload = {**payload, **label_payload}
+    barcode_value, barcode_error = _select_strict_label_barcode_value(payload)
+    if barcode_error:
+        return {}, barcode_error
+
+    display_code = str(merged_payload.get("display_code") or "").strip().upper()
+    normalized_label_payload = {
+        **merged_payload,
+        "display_code": display_code,
+        "machine_code": barcode_value,
+        "barcode_value": barcode_value,
+    }
+    return (
+        {
+            "printer_name": printer.strip(),
+            "copies": _clean_positive_int(payload.get("copies"), default=1, maximum=20),
+            "template_size": _normalize_template_size(payload.get("template_size")),
+            "barcode_value": barcode_value,
+            "display_code": display_code,
+            "label_payload": normalized_label_payload,
+        },
+        None,
+    )
+
+
 def _normalize_print_html_request(payload: dict) -> tuple[dict, str | None]:
     html = payload.get("html")
     if not html or not isinstance(html, str):
@@ -359,6 +408,104 @@ def _normalize_print_html_request(payload: dict) -> tuple[dict, str | None]:
         },
         None,
     )
+
+
+def _tspl_text_value(value: object, *, max_len: int = 34) -> str:
+    cleaned = re.sub(r"[\r\n\t]+", " ", str(value or "").strip())
+    cleaned = cleaned.replace('"', "'")
+    cleaned = "".join(ch if 32 <= ord(ch) <= 126 else "?" for ch in cleaned)
+    return cleaned[:max_len]
+
+
+def _tspl_text(x: int, y: int, text: str) -> str:
+    return f'TEXT {int(x)},{int(y)},"0",0,1,1,"{_tspl_text_value(text)}"'
+
+
+def _first_label_value(payload: dict, *keys: str, default: object = "") -> object:
+    for key in keys:
+        value = payload.get(key)
+        if value not in (None, ""):
+            return value
+    return default
+
+
+def _build_tspl_label_lines(payload: dict) -> list[str]:
+    barcode_value = str(payload.get("barcode_value") or payload.get("machine_code") or "").strip()
+    display_code = str(payload.get("display_code") or "").strip()
+    prefix = barcode_value[:1]
+    if prefix == "1":
+        return [
+            f"SUP: {_first_label_value(payload, 'supplier_name', 'supplier', default='-')}",
+            f"CAT: {_first_label_value(payload, 'category_main', 'category', default='-')}",
+            f"SUB: {_first_label_value(payload, 'category_sub', 'subcategory', default='-')}",
+            f"No: {_first_label_value(payload, 'serial_no', 'package_no', default='-')} / Total: {_first_label_value(payload, 'total_packages', default='-')}",
+            f"SHIP: {_first_label_value(payload, 'shipment_no', 'parcel_batch_no', default='-')}",
+            f"DATE: {_first_label_value(payload, 'received_at', 'unload_date', default='-')}",
+            f"Display: {display_code or '-'}",
+            f"Machine: {barcode_value}",
+        ]
+    if prefix == "2":
+        return [
+            "SDB / Store Prep Bale",
+            f"CAT: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}",
+            f"QTY: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}",
+            f"STORE: {_first_label_value(payload, 'store', 'store_code', 'destination', default='-')}",
+            f"Display: {display_code or '-'}",
+            f"Machine: {barcode_value}",
+        ]
+    if prefix == "3":
+        return [
+            "LPK / Shortage Pick",
+            f"REQ: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}",
+            f"QTY: {_first_label_value(payload, 'qty', 'item_count', 'quantity', default='-')}",
+            f"CAT: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}",
+            f"Display: {display_code or '-'}",
+            f"Machine: {barcode_value}",
+        ]
+    if prefix == "4":
+        return [
+            "SDO / Store Delivery",
+            f"STORE: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}",
+            f"REQ: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}",
+            f"PKG: {_first_label_value(payload, 'packages', 'package_count', 'bale_count', default='-')}",
+            f"LIST: {_first_label_value(payload, 'packing_list', default='-')}",
+            f"Display: {display_code or '-'}",
+            f"Machine: {barcode_value}",
+        ]
+    if prefix == "5":
+        return [
+            "STORE ITEM",
+            f"PRICE: {_first_label_value(payload, 'price', 'selected_price', default='-')}",
+            f"RACK: {_first_label_value(payload, 'rack', 'store_rack_code', default='-')}",
+            f"CAT: {_first_label_value(payload, 'category', 'category_summary', default='-')}",
+            f"Display: {display_code or '-'}",
+            f"Machine: {barcode_value}",
+        ]
+    return [f"Display: {display_code or '-'}", f"Machine: {barcode_value}"]
+
+
+def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
+    barcode_value = str(label_payload.get("barcode_value") or label_payload.get("machine_code") or "").strip()
+    if not _looks_like_machine_code(barcode_value):
+        raise ValueError("barcode_value must be a 1/2/3/4/5-prefixed machine_code.")
+
+    commands = [
+        "SIZE 60 mm,40 mm",
+        "GAP 2 mm,0 mm",
+        "DENSITY 8",
+        "SPEED 4",
+        "DIRECTION 1",
+        "CLS",
+    ]
+    for index, text in enumerate(_build_tspl_label_lines(label_payload)[:8]):
+        commands.append(_tspl_text(24, 16 + index * 24, text))
+    commands.extend(
+        [
+            f'BARCODE 40,220,"128",80,1,0,2,2,"{barcode_value}"',
+            f"PRINT {max(1, int(copies))},1",
+        ]
+    )
+    return "\r\n".join(commands) + "\r\n"
 
 
 def _powershell_single_quote(value: object) -> str:
@@ -475,6 +622,98 @@ def _print_html_windows(
         f"{prefix}Print job submitted to '{resolved_printer}' via Windows kiosk browser printing ({template_size}, {copies} copies).",
         resolved_printer,
     )
+
+
+def _send_raw_to_windows_printer(printer_name: str, raw_text: str) -> tuple[bool, str]:
+    if platform.system() != "Windows":
+        return False, "Windows raw print is only available when the agent runs on Windows."
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except Exception as exc:  # pragma: no cover - ctypes is always available on normal Windows Python.
+        return False, f"Python ctypes is unavailable for Windows raw printing: {exc}"
+
+    class DOC_INFO_1W(ctypes.Structure):
+        _fields_ = [
+            ("pDocName", wintypes.LPWSTR),
+            ("pOutputFile", wintypes.LPWSTR),
+            ("pDatatype", wintypes.LPWSTR),
+        ]
+
+    winspool = ctypes.WinDLL("winspool.drv", use_last_error=True)
+    winspool.OpenPrinterW.argtypes = [wintypes.LPWSTR, ctypes.POINTER(wintypes.HANDLE), wintypes.LPVOID]
+    winspool.OpenPrinterW.restype = wintypes.BOOL
+    winspool.StartDocPrinterW.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(DOC_INFO_1W)]
+    winspool.StartDocPrinterW.restype = wintypes.DWORD
+    winspool.StartPagePrinter.argtypes = [wintypes.HANDLE]
+    winspool.StartPagePrinter.restype = wintypes.BOOL
+    winspool.WritePrinter.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    winspool.WritePrinter.restype = wintypes.BOOL
+    winspool.EndPagePrinter.argtypes = [wintypes.HANDLE]
+    winspool.EndDocPrinter.argtypes = [wintypes.HANDLE]
+    winspool.ClosePrinter.argtypes = [wintypes.HANDLE]
+
+    printer_handle = wintypes.HANDLE()
+    if not winspool.OpenPrinterW(str(printer_name), ctypes.byref(printer_handle), None):
+        error_code = ctypes.get_last_error()
+        return False, f"OpenPrinter failed for '{printer_name}' (Windows error {error_code})."
+
+    try:
+        doc_info = DOC_INFO_1W("FW-ERP 60x40 TSPL Label", None, "RAW")
+        if not winspool.StartDocPrinterW(printer_handle, 1, ctypes.byref(doc_info)):
+            error_code = ctypes.get_last_error()
+            return False, f"StartDocPrinter RAW failed for '{printer_name}' (Windows error {error_code})."
+        try:
+            if not winspool.StartPagePrinter(printer_handle):
+                error_code = ctypes.get_last_error()
+                return False, f"StartPagePrinter failed for '{printer_name}' (Windows error {error_code})."
+            try:
+                data = str(raw_text or "").encode("ascii", errors="replace")
+                buffer = ctypes.create_string_buffer(data)
+                bytes_written = wintypes.DWORD(0)
+                ok = winspool.WritePrinter(
+                    printer_handle,
+                    buffer,
+                    len(data),
+                    ctypes.byref(bytes_written),
+                )
+                if not ok or int(bytes_written.value) != len(data):
+                    error_code = ctypes.get_last_error()
+                    return (
+                        False,
+                        f"WritePrinter RAW failed for '{printer_name}' "
+                        f"({bytes_written.value}/{len(data)} bytes, Windows error {error_code}).",
+                    )
+            finally:
+                winspool.EndPagePrinter(printer_handle)
+        finally:
+            winspool.EndDocPrinter(printer_handle)
+    finally:
+        winspool.ClosePrinter(printer_handle)
+
+    return True, f"Sent {len(raw_text.encode('ascii', errors='replace'))} TSPL bytes to '{printer_name}'."
+
+
+def _print_label_windows(normalized: dict) -> tuple[bool, str, str, str]:
+    if platform.system() != "Windows":
+        return False, "Windows TSPL label print is only available when the agent runs on Windows.", normalized.get("printer_name", ""), ""
+
+    requested_printer = str(normalized.get("printer_name") or "").strip()
+    resolved_printer, warning = _resolve_printer_name_windows(requested_printer)
+    try:
+        tspl = _build_tspl_60x40_label(
+            normalized.get("label_payload") if isinstance(normalized.get("label_payload"), dict) else {},
+            copies=int(normalized.get("copies") or 1),
+        )
+    except Exception as exc:
+        return False, f"Could not build TSPL label: {exc}", resolved_printer, ""
+
+    success, raw_message = _send_raw_to_windows_printer(resolved_printer, tspl)
+    prefix = f"{warning} " if warning else ""
+    if not success:
+        return False, f"{prefix}Windows TSPL raw print failed for '{resolved_printer}': {raw_message}", resolved_printer, tspl
+    return True, f"{prefix}Print job submitted to '{resolved_printer}' via TSPL raw printing.", resolved_printer, tspl
 
 
 def _http_json(method: str, url: str, payload: dict | None = None) -> tuple[int, dict]:
@@ -712,7 +951,69 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         payload = self._read_json()
 
+        if path in {"/print/label", "/print/tspl"}:
+            normalized, validation_error = _normalize_print_label_request(payload)
+            if validation_error:
+                self._send_json({"ok": False, "error": validation_error, "message": validation_error}, 400)
+                return
+
+            system_name = platform.system()
+            if system_name == "Windows":
+                success, message, resolved_printer, tspl = _print_label_windows(normalized)
+                self._send_json(
+                    {
+                        "ok": success,
+                        "platform": system_name,
+                        "mode": "tspl_raw",
+                        "printer": normalized["printer_name"],
+                        "resolved_printer": resolved_printer,
+                        "message": message,
+                        "template_size": normalized["template_size"],
+                        "copies": normalized["copies"],
+                        "barcode_value": normalized["barcode_value"],
+                        "display_code": normalized["display_code"],
+                        "tspl": tspl,
+                    },
+                    200 if success else 500,
+                )
+                return
+
+            self._send_json(
+                {
+                    "ok": False,
+                    "platform": system_name,
+                    "mode": "tspl_raw",
+                    "message": f"TSPL raw label print is currently supported on Windows only: {system_name}",
+                },
+                501,
+            )
+            return
+
         if path == "/print/html":
+            if platform.system() == "Windows" and isinstance(payload.get("label_payload"), dict):
+                normalized, validation_error = _normalize_print_label_request(payload)
+                if validation_error:
+                    self._send_json({"ok": False, "error": validation_error, "message": validation_error}, 400)
+                    return
+                success, message, resolved_printer, tspl = _print_label_windows(normalized)
+                self._send_json(
+                    {
+                        "ok": success,
+                        "platform": "Windows",
+                        "mode": "tspl_raw",
+                        "printer": normalized["printer_name"],
+                        "resolved_printer": resolved_printer,
+                        "message": message,
+                        "template_size": normalized["template_size"],
+                        "copies": normalized["copies"],
+                        "barcode_value": normalized["barcode_value"],
+                        "display_code": normalized["display_code"],
+                        "tspl": tspl,
+                    },
+                    200 if success else 500,
+                )
+                return
+
             normalized, validation_error = _normalize_print_html_request(payload)
             if validation_error:
                 self._send_json({"error": validation_error}, 400)
@@ -786,8 +1087,8 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
             self._send_json(
                 {
                     "ok": False,
-                    "experimental": True,
-                    "message": "POST /print/raw is reserved for future TSPL/ZPL/EPL support and is disabled in MVP.",
+                    "experimental": False,
+                    "message": "POST /print/raw is disabled. Use POST /print/label for validated 60x40 TSPL label printing.",
                 },
                 501,
             )
