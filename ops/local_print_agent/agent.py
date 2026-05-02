@@ -303,8 +303,55 @@ def _normalize_template_size(value: object) -> str:
     return raw or "60x40"
 
 
+MACHINE_CODE_RE = re.compile(r"^[1-5][0-9]{9}$")
+
+TEMPLATE_MACHINE_PREFIXES = {
+    "warehouse_in": "1",
+    "warehouse_in_60x40": "1",
+    "raw_bale_60x40": "1",
+    "store_prep_bale_60x40": "2",
+    "wait_for_transtoshop": "2",
+    "wait_for_sale": "2",
+    "store_loose_pick_60x40": "3",
+    "lpk_shortage_pick": "3",
+    "store_dispatch_60x40": "4",
+    "transtoshop": "4",
+    "store_item_60x40": "5",
+    "apparel_60x40": "5",
+    "clothes_retail": "5",
+}
+
+DISPLAY_MACHINE_PREFIXES = [
+    (re.compile(r"^STOREITEM"), "5"),
+    (re.compile(r"^RAW_BALE"), "1"),
+    (re.compile(r"^RB"), "1"),
+    (re.compile(r"^SDB"), "2"),
+    (re.compile(r"^LPK"), "3"),
+    (re.compile(r"^SDO"), "4"),
+]
+
+MISSING_MACHINE_CODE_MESSAGE = "Missing valid 10-digit machine_code. Display code cannot be used as barcode."
+
+
+def _normalize_machine_code(value: object) -> str:
+    cleaned = str(value or "").strip().upper()
+    return cleaned if MACHINE_CODE_RE.fullmatch(cleaned) else ""
+
+
 def _looks_like_machine_code(value: object) -> bool:
-    return bool(re.fullmatch(r"[1-5][0-9]{5,}", str(value or "").strip()))
+    return bool(_normalize_machine_code(value))
+
+
+def _template_machine_prefix(template_code: object) -> str:
+    return TEMPLATE_MACHINE_PREFIXES.get(str(template_code or "").strip().lower(), "")
+
+
+def _display_machine_prefix(display_code: object) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]", "", str(display_code or "").strip()).upper()
+    for pattern, prefix in DISPLAY_MACHINE_PREFIXES:
+        if pattern.match(normalized):
+            return prefix
+    return ""
 
 
 def _select_barcode_value(payload: dict) -> tuple[str, str | None]:
@@ -321,12 +368,12 @@ def _select_barcode_value(payload: dict) -> tuple[str, str | None]:
     ]
 
     for candidate in candidates:
-        cleaned = re.sub(r"[^A-Za-z0-9]", "", str(candidate or "").strip()).upper()
+        cleaned = str(candidate or "").strip().upper()
         if _looks_like_machine_code(cleaned):
             return cleaned, None
 
     for candidate in machine_candidates:
-        cleaned = re.sub(r"[^A-Za-z0-9]", "", str(candidate or "").strip()).upper()
+        cleaned = str(candidate or "").strip().upper()
         if cleaned:
             return cleaned, "Machine code does not match the expected numeric barcode prefix."
 
@@ -337,19 +384,35 @@ def _select_barcode_value(payload: dict) -> tuple[str, str | None]:
 def _select_strict_label_barcode_value(payload: dict) -> tuple[str, str | None]:
     label_payload = payload.get("label_payload") if isinstance(payload.get("label_payload"), dict) else {}
     raw_barcode = label_payload.get("barcode_value", payload.get("barcode_value"))
-    barcode_value = re.sub(r"[^A-Za-z0-9]", "", str(raw_barcode or "").strip()).upper()
+    barcode_value = str(raw_barcode or "").strip().upper()
     if barcode_value:
-        if _looks_like_machine_code(barcode_value):
-            return barcode_value, None
-        return "", "barcode_value must be a 1/2/3/4/5-prefixed machine_code."
+        normalized_barcode = _normalize_machine_code(barcode_value)
+        if normalized_barcode:
+            return normalized_barcode, None
+        return "", MISSING_MACHINE_CODE_MESSAGE
 
     raw_machine_code = label_payload.get("machine_code", payload.get("machine_code"))
-    machine_code = re.sub(r"[^A-Za-z0-9]", "", str(raw_machine_code or "").strip()).upper()
-    if _looks_like_machine_code(machine_code):
+    machine_code = _normalize_machine_code(raw_machine_code)
+    if machine_code:
         return machine_code, None
 
-    display_code = str(label_payload.get("display_code") or payload.get("display_code") or "").strip()
-    return "", f"Missing machine barcode value. Display code '{display_code}' will not be used as the encoded barcode."
+    return "", MISSING_MACHINE_CODE_MESSAGE
+
+
+def _validate_label_type_contract(
+    *,
+    template_code: object,
+    display_code: object,
+    machine_code: str,
+) -> str | None:
+    template_prefix = _template_machine_prefix(template_code)
+    display_prefix = _display_machine_prefix(display_code)
+    machine_prefix = str(machine_code or "")[:1]
+    if template_prefix and template_prefix != machine_prefix:
+        return "machine_code does not match template/display type."
+    if display_prefix and display_prefix != machine_prefix:
+        return "machine_code does not match template/display type."
+    return None
 
 
 def _normalize_print_label_request(payload: dict) -> tuple[dict, str | None]:
@@ -364,11 +427,21 @@ def _normalize_print_label_request(payload: dict) -> tuple[dict, str | None]:
         return {}, barcode_error
 
     display_code = str(merged_payload.get("display_code") or "").strip().upper()
+    template_code = str(merged_payload.get("template_code") or payload.get("template_code") or "").strip().lower()
+    type_error = _validate_label_type_contract(
+        template_code=template_code,
+        display_code=display_code,
+        machine_code=barcode_value,
+    )
+    if type_error:
+        return {}, type_error
     normalized_label_payload = {
         **merged_payload,
         "display_code": display_code,
         "machine_code": barcode_value,
         "barcode_value": barcode_value,
+        "template_code": template_code,
+        "template_scope": str(merged_payload.get("template_scope") or payload.get("template_scope") or "").strip().lower(),
     }
     return (
         {
@@ -417,8 +490,8 @@ def _tspl_text_value(value: object, *, max_len: int = 34) -> str:
     return cleaned[:max_len]
 
 
-def _tspl_text(x: int, y: int, text: str) -> str:
-    return f'TEXT {int(x)},{int(y)},"0",0,1,1,"{_tspl_text_value(text)}"'
+def _tspl_text(x: int, y: int, text: str, *, x_scale: int = 1, y_scale: int = 1, max_len: int = 34) -> str:
+    return f'TEXT {int(x)},{int(y)},"0",0,{int(x_scale)},{int(y_scale)},"{_tspl_text_value(text, max_len=max_len)}"'
 
 
 def _first_label_value(payload: dict, *keys: str, default: object = "") -> object:
@@ -429,65 +502,99 @@ def _first_label_value(payload: dict, *keys: str, default: object = "") -> objec
     return default
 
 
-def _build_tspl_label_lines(payload: dict) -> list[str]:
+def _label_template_family(payload: dict) -> str:
+    template_code = str(payload.get("template_code") or "").strip().lower()
+    if template_code in {"warehouse_in", "warehouse_in_60x40", "raw_bale_60x40"}:
+        return "raw_bale"
+    if template_code in {"store_prep_bale_60x40", "wait_for_transtoshop", "wait_for_sale"}:
+        return "store_prep_bale"
+    if template_code in {"store_loose_pick_60x40", "lpk_shortage_pick"}:
+        return "loose_pick_task"
+    if template_code in {"store_dispatch_60x40", "transtoshop"}:
+        return "store_delivery_execution"
+    if template_code in {"store_item_60x40", "apparel_60x40", "clothes_retail"}:
+        return "store_item"
+
+    display_prefix = _display_machine_prefix(payload.get("display_code"))
+    machine_prefix = str(payload.get("barcode_value") or payload.get("machine_code") or "")[:1]
+    prefix = display_prefix or machine_prefix
+    return {
+        "1": "raw_bale",
+        "2": "store_prep_bale",
+        "3": "loose_pick_task",
+        "4": "store_delivery_execution",
+        "5": "store_item",
+    }.get(prefix, "")
+
+
+def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int, int]]:
     barcode_value = str(payload.get("barcode_value") or payload.get("machine_code") or "").strip()
     display_code = str(payload.get("display_code") or "").strip()
-    prefix = barcode_value[:1]
-    if prefix == "1":
+    family = _label_template_family(payload)
+    if family == "raw_bale":
         return [
-            f"SUP: {_first_label_value(payload, 'supplier_name', 'supplier', default='-')}",
-            f"CAT: {_first_label_value(payload, 'category_main', 'category', default='-')}",
-            f"SUB: {_first_label_value(payload, 'category_sub', 'subcategory', default='-')}",
-            f"No: {_first_label_value(payload, 'serial_no', 'package_no', default='-')} / Total: {_first_label_value(payload, 'total_packages', default='-')}",
-            f"SHIP: {_first_label_value(payload, 'shipment_no', 'parcel_batch_no', default='-')}",
-            f"DATE: {_first_label_value(payload, 'received_at', 'unload_date', default='-')}",
-            f"Display: {display_code or '-'}",
-            f"Machine: {barcode_value}",
+            (20, 8, "RAW_BALE / WAREHOUSE IN", 2, 2, 24),
+            (20, 42, f"SUP: {_first_label_value(payload, 'supplier_name', 'supplier', default='-')}", 1, 1, 28),
+            (20, 68, f"CAT: {_first_label_value(payload, 'category_main', 'category', default='-')}", 1, 1, 28),
+            (20, 94, f"SUB: {_first_label_value(payload, 'category_sub', 'subcategory', default='-')}", 1, 1, 28),
+            (328, 42, f"No: {_first_label_value(payload, 'serial_no', 'package_no', default='-')}", 1, 1, 16),
+            (328, 68, f"Total: {_first_label_value(payload, 'total_packages', default='-')}", 1, 1, 16),
+            (250, 166, f"Display: {display_code or '-'}", 1, 1, 28),
+            (250, 192, f"Machine: {barcode_value}", 1, 1, 28),
+            (250, 218, f"Encoded: {barcode_value}", 1, 1, 28),
         ]
-    if prefix == "2":
+    if family == "store_prep_bale":
         return [
-            "SDB / Store Prep Bale",
-            f"CAT: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}",
-            f"QTY: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}",
-            f"STORE: {_first_label_value(payload, 'store', 'store_code', 'destination', default='-')}",
-            f"Display: {display_code or '-'}",
-            f"Machine: {barcode_value}",
+            (20, 8, "SDB / STORE PREP BALE", 2, 2, 25),
+            (20, 46, f"Category: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}", 1, 1, 34),
+            (20, 76, f"Qty: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}", 1, 1, 24),
+            (252, 76, f"Store: {_first_label_value(payload, 'store', 'store_code', 'destination', default='-')}", 1, 1, 22),
+            (20, 110, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 136, f"Machine: {barcode_value}", 1, 1, 34),
+            (20, 162, f"Encoded: {barcode_value}", 1, 1, 34),
         ]
-    if prefix == "3":
+    if family == "loose_pick_task":
         return [
-            "LPK / Shortage Pick",
-            f"REQ: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}",
-            f"QTY: {_first_label_value(payload, 'qty', 'item_count', 'quantity', default='-')}",
-            f"CAT: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}",
-            f"Display: {display_code or '-'}",
-            f"Machine: {barcode_value}",
+            (20, 8, "LPK SHORTAGE PICK", 2, 2, 24),
+            (20, 46, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
+            (20, 76, f"Qty: {_first_label_value(payload, 'qty', 'item_count', 'quantity', default='-')}", 1, 1, 22),
+            (252, 76, f"Category: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}", 1, 1, 22),
+            (20, 110, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 136, f"Machine: {barcode_value}", 1, 1, 34),
+            (20, 162, f"Encoded: {barcode_value}", 1, 1, 34),
         ]
-    if prefix == "4":
+    if family == "store_delivery_execution":
         return [
-            "SDO / Store Delivery",
-            f"STORE: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}",
-            f"REQ: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}",
-            f"PKG: {_first_label_value(payload, 'packages', 'package_count', 'bale_count', default='-')}",
-            f"LIST: {_first_label_value(payload, 'packing_list', default='-')}",
-            f"Display: {display_code or '-'}",
-            f"Machine: {barcode_value}",
+            (20, 8, "STORE DISPATCH / SDO", 2, 2, 24),
+            (20, 46, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
+            (20, 74, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
+            (20, 102, f"Packages: {_first_label_value(payload, 'packages', 'package_count', 'bale_count', default='-')}", 1, 1, 24),
+            (252, 102, f"Packing List: {_first_label_value(payload, 'packing_list', default='-')}", 1, 1, 24),
+            (20, 136, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 162, f"Machine: {barcode_value}", 1, 1, 34),
+            (20, 188, f"Encoded: {barcode_value}", 1, 1, 34),
         ]
-    if prefix == "5":
+    if family == "store_item":
         return [
-            "STORE ITEM",
-            f"PRICE: {_first_label_value(payload, 'price', 'selected_price', default='-')}",
-            f"RACK: {_first_label_value(payload, 'rack', 'store_rack_code', default='-')}",
-            f"CAT: {_first_label_value(payload, 'category', 'category_summary', default='-')}",
-            f"Display: {display_code or '-'}",
-            f"Machine: {barcode_value}",
+            (20, 8, "STORE ITEM", 2, 2, 20),
+            (20, 44, f"Price: {_first_label_value(payload, 'price', 'selected_price', default='-')}", 2, 2, 18),
+            (250, 44, f"Rack: {_first_label_value(payload, 'rack', 'store_rack_code', default='-')}", 1, 1, 18),
+            (20, 86, f"Category: {_first_label_value(payload, 'category', 'category_summary', default='-')}", 1, 1, 34),
+            (20, 118, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 144, f"Machine: {barcode_value}", 1, 1, 34),
+            (20, 170, f"Encoded: {barcode_value}", 1, 1, 34),
         ]
-    return [f"Display: {display_code or '-'}", f"Machine: {barcode_value}"]
+    return [
+        (20, 8, f"Display: {display_code or '-'}", 1, 1, 34),
+        (20, 34, f"Machine: {barcode_value}", 1, 1, 34),
+        (20, 60, f"Encoded: {barcode_value}", 1, 1, 34),
+    ]
 
 
 def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
     barcode_value = str(label_payload.get("barcode_value") or label_payload.get("machine_code") or "").strip()
     if not _looks_like_machine_code(barcode_value):
-        raise ValueError("barcode_value must be a 1/2/3/4/5-prefixed machine_code.")
+        raise ValueError(MISSING_MACHINE_CODE_MESSAGE)
 
     commands = [
         "SIZE 60 mm,40 mm",
@@ -495,13 +602,15 @@ def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
         "DENSITY 8",
         "SPEED 4",
         "DIRECTION 1",
+        "REFERENCE 0,0",
         "CLS",
     ]
-    for index, text in enumerate(_build_tspl_label_lines(label_payload)[:8]):
-        commands.append(_tspl_text(24, 16 + index * 24, text))
+    for x, y, text, x_scale, y_scale, max_len in _build_tspl_label_lines(label_payload):
+        commands.append(_tspl_text(x, y, text, x_scale=x_scale, y_scale=y_scale, max_len=max_len))
+    commands.append("BAR 20,126,436,3")
     commands.extend(
         [
-            f'BARCODE 40,220,"128",80,1,0,2,2,"{barcode_value}"',
+            f'BARCODE 24,232,"128",72,1,0,2,2,"{barcode_value}"',
             f"PRINT {max(1, int(copies))},1",
         ]
     )

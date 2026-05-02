@@ -14,8 +14,8 @@
   }
 
   function normalizeMachineCode(value) {
-    const normalized = normalizeText(value).replace(/[^0-9]/g, "");
-    return /^[1-5]\d+$/.test(normalized) ? normalized : "";
+    const normalized = normalizeText(value).replace(/\s+/g, "");
+    return /^[1-5]\d{9}$/.test(normalized) ? normalized : "";
   }
 
   function pickMachineCode(...values) {

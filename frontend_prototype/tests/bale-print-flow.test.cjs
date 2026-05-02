@@ -231,6 +231,29 @@ test("buildBaleDirectPrintPayload uses RAW_BALE machine_code for printable barco
   assert.equal(payload.human_readable, "1260427001");
 });
 
+test("buildBaleDirectPrintPayload does not extract short digits from RAW_BALE display code", () => {
+  const payload = buildBaleDirectPrintPayload(
+    {
+      barcode: "RB260427AAAQH",
+      copies: 1,
+      print_payload: {
+        display_code: "RB260427AAAQH",
+        bale_barcode: "RB260427AAAQH",
+        scan_token: "RB260427AAAQH",
+        barcode_value: "RB260427AAAQH",
+        machine_code: "",
+      },
+    },
+    { printerName: "Deli DL-720C", templateCode: "warehouse_in", currentIndex: 0, totalJobs: 1 },
+  );
+
+  assert.equal(payload.display_code, "RB260427AAAQH");
+  assert.equal(payload.machine_code, "");
+  assert.equal(payload.barcode_value, "");
+  assert.equal(payload.scan_token, "");
+  assert.equal(payload.human_readable, "");
+});
+
 test("buildBalePrintStationJobPayload keeps bale metadata for cloud queue printing", () => {
   const payload = buildBalePrintStationJobPayload(
     {

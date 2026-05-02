@@ -233,6 +233,7 @@ Formal Deli DL-720C label printing uses TSPL raw commands. It does not open Edge
 - `printer_name` or `printer`
 - `copies`
 - `template_size`, for example `60x40`
+- `template_code` and `template_scope`
 - `label_payload` with `display_code`, `machine_code`, and `barcode_value`
 
 The agent generates a 60mm x 40mm label:
@@ -251,10 +252,25 @@ PRINT 1,1
 
 Barcode rule:
 
-- encoded barcode comes from `barcode_value` when it is a valid 1/2/3/4/5-prefixed machine code.
+- encoded barcode comes from `barcode_value` only when it is a valid 10-digit machine code: `^[1-5][0-9]{9}$`.
 - if `barcode_value` is missing, the agent may use valid `machine_code`.
-- if `barcode_value` is present but is not a machine code, the agent rejects the request.
+- if neither value is a valid 10-digit machine code, the agent rejects the request.
+- the agent never extracts digits from display codes such as `RB260427AAAQH`, `SDB260427AAAQH`, `LPK260427001`, or `SDO260427001`.
+- `template_code`, `display_code`, and `machine_code` must agree on type:
+  - `warehouse_in` / `RB...` requires a `1...` machine code.
+  - `store_prep_bale_60x40` or `wait_for_transtoshop` / `SDB...` requires a `2...` machine code.
+  - `store_loose_pick_60x40` / `LPK...` requires a `3...` machine code.
+  - `store_dispatch_60x40` / `SDO...` requires a `4...` machine code.
+  - `store_item_60x40` or `clothes_retail` / `STOREITEM...` requires a `5...` machine code.
 - `display_code` is never used as the encoded barcode.
+
+Template rule:
+
+- `warehouse_in` renders the RAW_BALE / WAREHOUSE IN layout, with supplier/category/package fields and machine-code barcode.
+- `store_prep_bale_60x40` and `wait_for_transtoshop` render SDB / STORE PREP BALE.
+- `store_loose_pick_60x40` renders LPK SHORTAGE PICK.
+- `store_dispatch_60x40` and `transtoshop` render STORE DISPATCH / SDO.
+- `store_item_60x40`, `apparel_60x40`, and `clothes_retail` render STORE ITEM.
 
 Legacy `POST /print/html` is browser/HTML fallback only. On Windows, if a request includes `label_payload`, `/print/html` routes to the same TSPL raw path instead of Edge/Chrome kiosk printing.
 
