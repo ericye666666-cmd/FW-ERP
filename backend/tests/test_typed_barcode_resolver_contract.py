@@ -548,3 +548,70 @@ def test_raw_bale_print_payload_uses_type_1_machine_code(state):
     assert job["print_payload"]["machine_code"] == raw_bale["machine_code"]
     assert job["print_payload"]["human_readable"] == raw_bale["machine_code"]
     assert job["print_payload"]["barcode_value"].startswith("1")
+
+
+def test_stale_raw_bale_print_job_is_hydrated_when_source_has_machine_code(state):
+    raw_bale = _seed_raw_bale(state)
+    job = {
+        "id": 2,
+        "job_type": "bale_barcode_label",
+        "status": "queued",
+        "barcode": raw_bale["bale_barcode"],
+        "template_code": "warehouse_in",
+        "print_payload": {
+            "display_code": raw_bale["bale_barcode"],
+            "bale_barcode": raw_bale["bale_barcode"],
+            "scan_token": raw_bale["bale_barcode"],
+            "barcode_value": raw_bale["bale_barcode"],
+            "machine_code": "",
+        },
+    }
+    state.print_jobs.append(job)
+
+    listed = state.list_print_jobs(status="queued")
+
+    payload = listed[0]["print_payload"]
+    assert payload["display_code"] == raw_bale["bale_barcode"]
+    assert payload["machine_code"] == raw_bale["machine_code"]
+    assert payload["barcode_value"] == raw_bale["machine_code"]
+    assert payload["scan_token"] == raw_bale["machine_code"]
+    assert payload["human_readable"] == raw_bale["machine_code"]
+
+
+def test_stale_raw_bale_print_job_does_not_guess_machine_code_from_display_code(state):
+    raw_bale = {
+        "id": 1,
+        "bale_barcode": "RB260427AAAQH",
+        "scan_token": "RB260427AAAQH",
+        "legacy_bale_barcode": "BALE-260427-001",
+        "shipment_no": "SHIP-BCRULE-RAW",
+        "parcel_batch_no": "PB-BCRULE-RAW",
+        "status": "ready_for_sorting",
+        "created_at": "2026-04-27T00:00:00+03:00",
+        "updated_at": "2026-04-27T00:00:00+03:00",
+    }
+    state.bale_barcodes[raw_bale["bale_barcode"]] = raw_bale
+    job = {
+        "id": 3,
+        "job_type": "bale_barcode_label",
+        "status": "queued",
+        "barcode": raw_bale["bale_barcode"],
+        "template_code": "warehouse_in",
+        "print_payload": {
+            "display_code": raw_bale["bale_barcode"],
+            "bale_barcode": raw_bale["bale_barcode"],
+            "scan_token": raw_bale["bale_barcode"],
+            "barcode_value": raw_bale["bale_barcode"],
+            "machine_code": "",
+        },
+    }
+    state.print_jobs.append(job)
+
+    listed = state.list_print_jobs(status="queued")
+
+    payload = listed[0]["print_payload"]
+    assert payload["display_code"] == "RB260427AAAQH"
+    assert payload.get("machine_code", "") == ""
+    assert payload["barcode_value"] == "RB260427AAAQH"
+    assert payload["scan_token"] == "RB260427AAAQH"
+    assert payload["barcode_value"] != "260427"

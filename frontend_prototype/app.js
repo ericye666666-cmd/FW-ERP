@@ -16946,9 +16946,19 @@ function doesLocalAgentLabelTypeMatch(labelPayload = {}, { templateCode = "" } =
   return (!templatePrefix || templatePrefix === machinePrefix) && (!displayPrefix || displayPrefix === machinePrefix);
 }
 
+const RAW_BALE_MISSING_MACHINE_CODE_MESSAGE = "当前 bale 缺少正式 machine_code，请重新生成入库标签或联系管理员修复数据。";
+
+function isRawBaleLocalAgentLabel(labelPayload = {}, { templateCode = "" } = {}) {
+  return getLocalAgentTemplateMachinePrefix(templateCode || labelPayload.template_code) === "1"
+    || getLocalAgentDisplayMachinePrefix(labelPayload.display_code) === "1";
+}
+
 function validateLocalAgentLabelPayload(labelPayload = {}, { templateCode = "" } = {}) {
   const machineCode = normalizeLocalAgentMachineBarcode(labelPayload.barcode_value || labelPayload.machine_code);
   if (!machineCode || !doesLocalAgentLabelTypeMatch(labelPayload, { templateCode })) {
+    if (isRawBaleLocalAgentLabel(labelPayload, { templateCode })) {
+      return RAW_BALE_MISSING_MACHINE_CODE_MESSAGE;
+    }
     return "当前标签缺少合法 machine_code，不能打印。";
   }
   return "";

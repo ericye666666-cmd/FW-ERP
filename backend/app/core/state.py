@@ -784,6 +784,9 @@ class InMemoryState:
         serial_no = int(row.get("id") or row.get("serial_no") or 1)
         return f"1{date_fragment}{max(serial_no, 1) % 1000:03d}"
 
+    def _is_raw_bale_machine_code(self, value: Any) -> bool:
+        return bool(re.fullmatch(r"1\d{9}", str(value or "").strip().upper()))
+
     def _raw_bale_scan_token(self, row: dict[str, Any]) -> str:
         existing = str(row.get("scan_token") or "").strip().upper()
         if existing:
@@ -993,18 +996,48 @@ class InMemoryState:
         for job in self.print_jobs:
             if str(job.get("job_type") or "").strip().lower() != "bale_barcode_label":
                 continue
-            bale_reference = str(job.get("barcode") or "").strip().upper()
-            bale = self._find_raw_bale_by_reference_no_defaults(bale_reference)
-            if not bale:
-                continue
-            self._ensure_raw_bale_defaults(bale)
             payload = dict(job.get("print_payload") or {})
-            primary_bale_barcode = str(bale.get("bale_barcode") or "").strip().upper()
-            legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
-            scan_token = str(bale.get("scan_token") or "").strip().upper()
-            machine_code = str(bale.get("machine_code") or "").strip().upper() or self._raw_bale_machine_code(bale)
+            existing_machine_code = next(
+                (
+                    candidate
+                    for candidate in [
+                        str(payload.get("machine_code") or "").strip().upper(),
+                        str(payload.get("barcode_value") or "").strip().upper(),
+                        str(payload.get("scan_token") or "").strip().upper(),
+                        str(payload.get("human_readable") or "").strip().upper(),
+                    ]
+                    if self._is_raw_bale_machine_code(candidate)
+                ),
+                "",
+            )
+            bale_reference_candidates = [
+                str(job.get("barcode") or "").strip().upper(),
+                str(payload.get("display_code") or "").strip().upper(),
+                str(payload.get("bale_barcode") or "").strip().upper(),
+                str(payload.get("legacy_bale_barcode") or "").strip().upper(),
+                str(payload.get("machine_code") or "").strip().upper(),
+                str(payload.get("barcode_value") or "").strip().upper(),
+                str(payload.get("scan_token") or "").strip().upper(),
+            ]
+            bale = None
+            for bale_reference in bale_reference_candidates:
+                bale = self._find_raw_bale_by_reference_no_defaults(bale_reference)
+                if bale:
+                    break
+            source_machine_code = str((bale or {}).get("machine_code") or "").strip().upper()
+            if not existing_machine_code and not self._is_raw_bale_machine_code(source_machine_code):
+                # Do not infer RAW_BALE machine_code from RB... display codes.
+                # Old orphaned jobs must be regenerated from a source record that
+                # already carries a formal 1-prefixed 10-digit machine_code.
+                continue
+            machine_code = existing_machine_code or source_machine_code
+            primary_bale_barcode = (
+                str((bale or {}).get("bale_barcode") or "").strip().upper()
+                or str(payload.get("display_code") or payload.get("bale_barcode") or job.get("barcode") or "").strip().upper()
+            )
+            legacy_bale_barcode = str((bale or {}).get("legacy_bale_barcode") or payload.get("legacy_bale_barcode") or "").strip().upper()
             job_updated = False
-            if str(job.get("barcode") or "").strip().upper() != primary_bale_barcode:
+            if primary_bale_barcode and str(job.get("barcode") or "").strip().upper() != primary_bale_barcode:
                 job["barcode"] = primary_bale_barcode
                 job_updated = True
             if str(job.get("template_code") or "").strip().lower() != LOCKED_BALE_TEMPLATE_CODE:
@@ -12614,6 +12647,8 @@ class InMemoryState:
         return created
 
     def list_print_jobs(self, status: Optional[str] = None) -> list[dict[str, Any]]:
+        if self._hydrate_bale_print_jobs():
+            self._persist()
         if not status:
             return self.print_jobs
         normalized = status.strip().lower()
@@ -12698,6 +12733,8 @@ class InMemoryState:
         return job
 
     def get_print_job(self, job_id: int) -> dict[str, Any]:
+        if self._hydrate_bale_print_jobs():
+            self._persist()
         for job in self.print_jobs:
             if job["id"] == job_id:
                 return job
