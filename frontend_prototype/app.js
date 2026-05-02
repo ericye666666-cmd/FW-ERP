@@ -16901,8 +16901,57 @@ function getCurrentBalePreviewHtml() {
 }
 
 function normalizeLocalAgentMachineBarcode(value) {
-  const cleaned = String(value || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-  return /^[1-5]\d{5,}$/.test(cleaned) ? cleaned : "";
+  const cleaned = String(value || "").trim().replace(/\s+/g, "");
+  return /^[1-5]\d{9}$/.test(cleaned) ? cleaned : "";
+}
+
+function getLocalAgentTemplateMachinePrefix(templateCode = "") {
+  const normalized = String(templateCode || "").trim().toLowerCase();
+  const map = {
+    warehouse_in: "1",
+    warehouse_in_60x40: "1",
+    raw_bale_60x40: "1",
+    store_prep_bale_60x40: "2",
+    wait_for_transtoshop: "2",
+    wait_for_sale: "2",
+    store_loose_pick_60x40: "3",
+    lpk_shortage_pick: "3",
+    store_dispatch_60x40: "4",
+    transtoshop: "4",
+    store_item_60x40: "5",
+    apparel_60x40: "5",
+    clothes_retail: "5",
+  };
+  return map[normalized] || "";
+}
+
+function getLocalAgentDisplayMachinePrefix(displayCode = "") {
+  const normalized = String(displayCode || "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  if (normalized.startsWith("STOREITEM")) return "5";
+  if (normalized.startsWith("RAW_BALE") || normalized.startsWith("RB")) return "1";
+  if (normalized.startsWith("SDB")) return "2";
+  if (normalized.startsWith("LPK")) return "3";
+  if (normalized.startsWith("SDO")) return "4";
+  return "";
+}
+
+function doesLocalAgentLabelTypeMatch(labelPayload = {}, { templateCode = "" } = {}) {
+  const machineCode = normalizeLocalAgentMachineBarcode(labelPayload.barcode_value || labelPayload.machine_code);
+  if (!machineCode) {
+    return false;
+  }
+  const machinePrefix = machineCode.slice(0, 1);
+  const templatePrefix = getLocalAgentTemplateMachinePrefix(templateCode || labelPayload.template_code);
+  const displayPrefix = getLocalAgentDisplayMachinePrefix(labelPayload.display_code);
+  return (!templatePrefix || templatePrefix === machinePrefix) && (!displayPrefix || displayPrefix === machinePrefix);
+}
+
+function validateLocalAgentLabelPayload(labelPayload = {}, { templateCode = "" } = {}) {
+  const machineCode = normalizeLocalAgentMachineBarcode(labelPayload.barcode_value || labelPayload.machine_code);
+  if (!machineCode || !doesLocalAgentLabelTypeMatch(labelPayload, { templateCode })) {
+    return "当前标签缺少合法 machine_code，不能打印。";
+  }
+  return "";
 }
 
 function buildLocalAgentLabelPayload(job, directPayload = {}) {
@@ -16953,10 +17002,22 @@ async function printCurrentBaleModalViaLocalAgent() {
     currentIndex,
     totalJobs: jobs.length,
   });
-  const labelPayload = buildLocalAgentLabelPayload(currentJob, directPayload);
   const selectedTemplateCode = String(document.querySelector("[data-bale-modal-template-select]")?.value || getActiveBaleTemplateCode()).trim() || getActiveBaleTemplateCode();
   const selectedTemplate = getSelectedBaleTemplate(selectedTemplateCode, getActiveBaleTemplateScope(), getActiveBaleModalTaskType());
   const templateSize = `${Number(selectedTemplate.width_mm || 60)}x${Number(selectedTemplate.height_mm || 40)}`;
+  const labelPayload = {
+    ...buildLocalAgentLabelPayload(currentJob, directPayload),
+    template_code: selectedTemplateCode,
+    template_scope: getActiveBaleTemplateScope(),
+  };
+  const validationError = validateLocalAgentLabelPayload(labelPayload, {
+    templateCode: selectedTemplateCode,
+  });
+  if (validationError) {
+    setLocalPrintAgentMessage("error", validationError);
+    renderBalePrintModal();
+    throw new Error(validationError);
+  }
   const agentUrl = getLocalPrintAgentUrl();
   const response = await fetch(`${agentUrl}/print/label`, {
     method: "POST",

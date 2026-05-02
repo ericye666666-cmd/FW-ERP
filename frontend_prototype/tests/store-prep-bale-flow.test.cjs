@@ -132,6 +132,33 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
   assert.equal(payload.package_position_label, "10 件 · 38.5 KG");
 });
 
+test("buildStorePrepBaleDirectPrintPayload does not extract machine code from SDB display code", () => {
+  const payload = buildStorePrepBaleDirectPrintPayload(
+    {
+      bale_no: "SPB-20260427-001",
+      bale_barcode: "SDB260427AAAQH",
+      scan_token: "SDB260427AAAQH",
+      machine_code: "",
+      barcode_value: "SDB260427AAAQH",
+      task_no: "SPT-20260427-001",
+      task_type: "store_dispatch",
+      category_main: "jacket",
+      category_sub: "baseball jacket",
+      qty: 20,
+    },
+    {
+      printerName: "Deli DL-720C",
+      templateCode: "store_prep_bale_60x40",
+    },
+  );
+
+  assert.equal(payload.display_code, "SDB260427AAAQH");
+  assert.equal(payload.machine_code, "");
+  assert.equal(payload.barcode_value, "");
+  assert.equal(payload.scan_token, "");
+  assert.equal(payload.dispatch_bale_no, "");
+});
+
 test("store prep bale workbench is a dedicated warehouse panel", () => {
   const html = fs.readFileSync(
     path.join(__dirname, "../index.html"),

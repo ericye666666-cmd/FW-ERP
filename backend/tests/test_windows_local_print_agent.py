@@ -104,8 +104,11 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
                 "printer_name": "Deli DL-720C",
                 "copies": 1,
                 "template_size": "60x40",
+                "template_code": "warehouse_in",
+                "template_scope": "bale",
                 "label_payload": {
                     "display_code": "RB260427AAAQH",
+                    "machine_code": "1260427001",
                     "barcode_value": "1260427001",
                     "supplier_name": "YOUXUNDE",
                     "category_main": "tops",
@@ -124,29 +127,47 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
 
         self.assertIn("SIZE 60 mm,40 mm", tspl)
         self.assertIn("GAP 2 mm,0 mm", tspl)
-        self.assertIn('BARCODE 40,220,"128"', tspl)
+        self.assertIn("RAW_BALE / WAREHOUSE IN", tspl)
+        self.assertNotIn("SDB / Store Prep Bale", tspl)
+        self.assertIn("Display: RB260427AAAQH", tspl)
+        self.assertIn("Machine: 1260427001", tspl)
+        self.assertIn("Encoded: 1260427001", tspl)
+        self.assertIn("SUP: YOUXUNDE", tspl)
+        self.assertIn("CAT: tops", tspl)
+        self.assertIn("SUB: shirt", tspl)
+        self.assertIn("No: 1", tspl)
+        self.assertIn("Total: 18", tspl)
+        self.assertIn('BARCODE', tspl)
         self.assertIn('"1260427001"', tspl)
         self.assertNotIn('"RB260427AAAQH"', tspl.split("BARCODE", 1)[1])
-        self.assertIn('TEXT 24,160,"0",0,1,1,"Display: RB260427AAAQH"', tspl)
-        self.assertIn('TEXT 24,184,"0",0,1,1,"Machine: 1260427001"', tspl)
+        self.assertIn("PRINT 1,1", tspl)
+        self.assertNotIn("PRINT 2,1", tspl)
 
     def test_tspl_uses_type_prefixed_machine_codes_for_all_label_types(self):
         cases = [
-            ("SDB260429AAB", "2260429001", {"category": "long dress", "item_count": 100, "store": "UTAWALA"}),
-            ("LPK260429001", "3260429001", {"transfer_order_no": "TO-001", "qty": 12, "category": "kids"}),
-            ("SDO260429002", "4260429002", {"store": "UTAWALA", "request": "TO-001", "packages": 3, "packing_list": "SDB/LPK"}),
-            ("STOREITEM260429001", "5260429001", {"price": 150, "rack": "A-01", "category": "tops"}),
+            ("store_prep_bale_60x40", "warehouseout_bale", "SDB260429AAB", "2260429001", "SDB / STORE PREP BALE", {"category": "long dress", "item_count": 100, "store": "UTAWALA"}),
+            ("store_loose_pick_60x40", "warehouseout_bale", "LPK260429001", "3260429001", "LPK SHORTAGE PICK", {"transfer_order_no": "TO-001", "qty": 12, "category": "kids"}),
+            ("store_dispatch_60x40", "warehouseout_bale", "SDO260429002", "4260429002", "STORE DISPATCH / SDO", {"store": "UTAWALA", "request": "TO-001", "packages": 3, "packing_list": "SDB/LPK"}),
+            ("store_item_60x40", "product", "STOREITEM260429001", "5260429001", "STORE ITEM", {"price": 150, "rack": "A-01", "category": "tops"}),
         ]
 
-        for display_code, barcode_value, extra_fields in cases:
+        for template_code, template_scope, display_code, barcode_value, title, extra_fields in cases:
             with self.subTest(display_code=display_code):
-                payload = {"display_code": display_code, "barcode_value": barcode_value, **extra_fields}
+                payload = {"display_code": display_code, "machine_code": barcode_value, "barcode_value": barcode_value, **extra_fields}
                 normalized, error = agent._normalize_print_label_request(
-                    {"printer_name": "Deli DL-720C", "label_payload": payload}
+                    {
+                        "printer_name": "Deli DL-720C",
+                        "template_code": template_code,
+                        "template_scope": template_scope,
+                        "label_payload": payload,
+                    }
                 )
 
                 self.assertIsNone(error)
                 tspl = agent._build_tspl_60x40_label(normalized["label_payload"], copies=1)
+                self.assertIn(title, tspl)
+                self.assertIn(f"Machine: {barcode_value}", tspl)
+                self.assertIn(f"Encoded: {barcode_value}", tspl)
                 self.assertIn(f'"{barcode_value}"', tspl)
                 self.assertNotIn(f'BARCODE 40,220,"128",80,1,0,2,2,"{display_code}"', tspl)
 
@@ -162,7 +183,64 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
             }
         )
 
-        self.assertIn("barcode_value must be a 1/2/3/4/5-prefixed machine_code", error)
+        self.assertIn("Missing valid 10-digit machine_code. Display code cannot be used as barcode.", error)
+
+    def test_print_label_request_rejects_short_or_display_derived_machine_codes(self):
+        invalid_values = ["260427", "260427001", "126-0427001", "RB260427AAAQH", "SDB260427AAAQH", "LPK260427001", "SDO260427001"]
+        for value in invalid_values:
+            with self.subTest(value=value):
+                _, error = agent._normalize_print_label_request(
+                    {
+                        "printer_name": "Deli DL-720C",
+                        "template_code": "warehouse_in",
+                        "template_scope": "bale",
+                        "label_payload": {
+                            "display_code": "RB260427AAAQH",
+                            "machine_code": value,
+                            "barcode_value": value,
+                        },
+                    }
+                )
+                self.assertIn("Missing valid 10-digit machine_code. Display code cannot be used as barcode.", error)
+
+    def test_print_label_request_validates_display_template_and_machine_type(self):
+        invalid_cases = [
+            ("warehouse_in", "bale", "RB260427AAAQH", "2260427001"),
+            ("store_prep_bale_60x40", "warehouseout_bale", "SDB260427AAAQH", "1260427001"),
+            ("store_loose_pick_60x40", "warehouseout_bale", "LPK260427001", "4260427001"),
+            ("store_dispatch_60x40", "warehouseout_bale", "SDO260427001", "3260427001"),
+            ("store_item_60x40", "product", "STOREITEM260427001", "4260427001"),
+        ]
+        for template_code, template_scope, display_code, machine_code in invalid_cases:
+            with self.subTest(template_code=template_code, display_code=display_code):
+                _, error = agent._normalize_print_label_request(
+                    {
+                        "printer_name": "Deli DL-720C",
+                        "template_code": template_code,
+                        "template_scope": template_scope,
+                        "label_payload": {
+                            "display_code": display_code,
+                            "machine_code": machine_code,
+                            "barcode_value": machine_code,
+                        },
+                    }
+                )
+                self.assertIn("does not match template/display type", error)
+
+        normalized, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "template_code": "warehouse_in",
+                "template_scope": "bale",
+                "label_payload": {
+                    "display_code": "RB260427AAAQH",
+                    "machine_code": "1260427001",
+                    "barcode_value": "1260427001",
+                },
+            }
+        )
+        self.assertIsNone(error)
+        self.assertEqual(normalized["barcode_value"], "1260427001")
 
     def test_windows_label_print_uses_raw_tspl_sender_not_browser_kiosk(self):
         normalized, error = agent._normalize_print_label_request(

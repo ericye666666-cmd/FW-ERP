@@ -49,6 +49,19 @@ test("local agent primary label printing uses raw label endpoint instead of brow
   assert.match(appJs, /barcode_value:\s*labelPayload\.barcode_value/);
 });
 
+test("frontend validates local agent label machine code before calling print agent", () => {
+  assert.match(appJs, /function validateLocalAgentLabelPayload/);
+  assert.match(appJs, /\^\[1-5\]\\d\{9\}\$/);
+  assert.match(appJs, /当前标签缺少合法 machine_code，不能打印。/);
+  assert.match(appJs, /doesLocalAgentLabelTypeMatch/);
+  assert.match(appJs, /template_code:\s*selectedTemplateCode/);
+
+  const printFunction = appJs.match(/async function printCurrentBaleModalViaLocalAgent[\s\S]*?async function printCurrentBaleModalPrimaryAction/)[0];
+  assert.match(printFunction, /validateLocalAgentLabelPayload\(labelPayload,\s*\{/);
+  assert.match(printFunction, /throw new Error\(validationError\)/);
+  assert.doesNotMatch(printFunction, /fetch\(`\$\{agentUrl\}\/print\/label`[\s\S]*?validateLocalAgentLabelPayload/);
+});
+
 test("print helper download checks package availability before downloading", () => {
   assert.match(appJs, /async function downloadWindowsPrintAgentPackage/);
   assert.match(appJs, /\/downloads\/fw-erp-print-agent-windows\.zip/);
