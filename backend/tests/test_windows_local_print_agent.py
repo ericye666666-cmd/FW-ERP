@@ -38,8 +38,30 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertIsNone(warning)
         self.assertEqual(printers[1]["name"], "Deli DL-720C")
         self.assertEqual(printers[1]["status"], "available")
+        self.assertEqual(printers[1]["raw_status"], "Normal")
+        self.assertFalse(printers[1]["work_offline"])
+        self.assertTrue(printers[1]["available"])
         self.assertFalse(printers[1]["is_default"])
         self.assertTrue(printers[0]["is_default"])
+
+    def test_parse_windows_get_printer_json_marks_offline_queue_not_available(self):
+        raw = json.dumps(
+            {
+                "Name": "Deli DL-720C",
+                "PrinterStatus": "Offline",
+                "WorkOffline": True,
+                "IsDefault": False,
+            }
+        )
+
+        printers, warning = agent._parse_windows_printer_json(raw)
+
+        self.assertIsNone(warning)
+        self.assertEqual(printers[0]["name"], "Deli DL-720C")
+        self.assertEqual(printers[0]["status"], "offline")
+        self.assertEqual(printers[0]["raw_status"], "Offline")
+        self.assertTrue(printers[0]["work_offline"])
+        self.assertFalse(printers[0]["available"])
 
     def test_resolve_windows_printer_name_matches_spacing_and_punctuation(self):
         printers = [

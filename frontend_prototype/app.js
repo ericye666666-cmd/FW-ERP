@@ -2238,6 +2238,14 @@ const ADMIN_PANEL_NAV_META = [
     navTitleEn: "Users & Accounts",
   },
   {
+    match: "数据管理 / Test Data Tools",
+    section: "governance",
+    order: 55,
+    icon: "数",
+    navTitle: "数据管理 / Test Data Tools",
+    navTitleEn: "Data Management / Test Data Tools",
+  },
+  {
     match: "开新店建议",
     section: "expansion",
     order: 60,
@@ -16729,6 +16737,37 @@ function setLocalPrintAgentMessage(type, message) {
   localPrintAgentState.lastMessage = String(message || "").trim();
 }
 
+function isDeliLocalPrinter(printer) {
+  const normalizedName = normalizePrinterName(printer?.name || "");
+  return normalizedName.includes("deli") && (normalizedName.includes("720") || normalizedName.includes("dl720c"));
+}
+
+function isLocalPrinterAvailable(printer) {
+  const status = String(printer?.status || "").trim().toLowerCase();
+  if (printer?.available === true) {
+    return true;
+  }
+  if (printer?.available === false || printer?.work_offline === true) {
+    return false;
+  }
+  return status === "available";
+}
+
+function getLocalPrinterDetectionMessage(printers = []) {
+  const rows = Array.isArray(printers) ? printers : [];
+  if (!rows.length) {
+    return { type: "warning", message: "当前未检测到本机打印机。" };
+  }
+  const deliPrinter = rows.find((printer) => isDeliLocalPrinter(printer));
+  if (!deliPrinter) {
+    return { type: "warning", message: `已检测到 ${rows.length} 台本机打印机，未发现 Deli DL-720C。` };
+  }
+  if (isLocalPrinterAvailable(deliPrinter)) {
+    return { type: "success", message: "Deli DL-720C 当前在线" };
+  }
+  return { type: "warning", message: "已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。" };
+}
+
 function renderBaleLocalPrintAgentStatus() {
   const statusArea = document.querySelector("#balePrintModalLocalAgentStatus");
   if (!(statusArea instanceof HTMLElement)) {
@@ -16741,10 +16780,9 @@ function renderBaleLocalPrintAgentStatus() {
   const modeText = localPrintAgentState.connected ? "本地打印代理直打" : "请先启动 FW-ERP Print Agent";
   const agentClass = localPrintAgentState.connected ? "flow-summary-note success" : "flow-summary-note warning";
   const printers = Array.isArray(localPrintAgentState.printers) ? localPrintAgentState.printers : [];
-  const hasDeli = printers.some((printer) => normalizePrinterName(printer?.name || "").includes("deli"));
   const printerText = localPrintAgentState.printerChecking
     ? "正在检测本机打印机..."
-    : (hasDeli ? "已检测到 Deli DL-720C" : (localPrintAgentState.printerMessage || "尚未检测本机打印机"));
+    : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印机");
   const helperMessage = localPrintAgentState.connected
     ? "显示已连接后，可以点击“打印标签”。"
     : "请先下载并启动 Windows 打印助手";
@@ -16828,6 +16866,7 @@ async function checkLocalPrintAgentHealth() {
 
 async function checkLocalPrintAgentPrinters() {
   const agentUrl = getLocalPrintAgentUrl();
+  localPrintAgentState.printers = [];
   localPrintAgentState.printerChecking = true;
   localPrintAgentState.printerMessage = "";
   renderBaleLocalPrintAgentStatus();
@@ -16840,14 +16879,13 @@ async function checkLocalPrintAgentPrinters() {
     const printers = Array.isArray(payload?.printers) ? payload.printers : [];
     localPrintAgentState.printers = printers;
     localPrintAgentState.printerChecking = false;
-    const hasDeli = printers.some((printer) => normalizePrinterName(printer?.name || "").includes("deli"));
-    localPrintAgentState.printerMessage = hasDeli
-      ? "已检测到 Deli DL-720C"
-      : (printers.length ? `已检测到 ${printers.length} 台本机打印机，未发现 Deli DL-720C。` : "当前未检测到本机打印机。");
-    setLocalPrintAgentMessage(hasDeli ? "success" : "warning", localPrintAgentState.printerMessage);
+    const detection = getLocalPrinterDetectionMessage(printers);
+    localPrintAgentState.printerMessage = detection.message;
+    setLocalPrintAgentMessage(detection.type, localPrintAgentState.printerMessage);
     renderBalePrintModal();
     return payload;
   } catch (error) {
+    localPrintAgentState.printers = [];
     localPrintAgentState.printerChecking = false;
     localPrintAgentState.printerMessage = "检测本机打印机失败，请确认打印助手已经启动。";
     setLocalPrintAgentMessage("error", localPrintAgentState.printerMessage);
@@ -27112,6 +27150,83 @@ async function resetTestHistory() {
   }, 950);
 }
 
+function renderRawBaleMachineCodeRepairReport(report = {}) {
+  const target = document.querySelector("#rawBaleMachineCodeRepairSummary");
+  const applyButton = document.querySelector("#rawBaleMachineCodeRepairApplyButton");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const wouldUpdateRawBales = Number(report.would_update_raw_bales || 0);
+  const wouldUpdatePrintJobs = Number(report.would_update_print_jobs || 0);
+  const updatedRawBales = Number(report.updated_raw_bales || 0);
+  const updatedPrintJobs = Number(report.updated_print_jobs || 0);
+  const skipped = Array.isArray(report.skipped) ? report.skipped : [];
+  const sample = Array.isArray(report.sample) ? report.sample : [];
+  const canApply = Boolean(report.dry_run && (wouldUpdateRawBales > 0 || wouldUpdatePrintJobs > 0));
+  if (applyButton instanceof HTMLButtonElement) {
+    applyButton.disabled = !canApply;
+  }
+  const statusTitle = report.dry_run ? "RAW_BALE machine_code 预检查结果" : "RAW_BALE machine_code 修复结果";
+  const metrics = [
+    ["would_update_raw_bales", wouldUpdateRawBales],
+    ["would_update_print_jobs", wouldUpdatePrintJobs],
+    ["updated_raw_bales", updatedRawBales],
+    ["updated_print_jobs", updatedPrintJobs],
+    ["already_valid_raw_bales", Number(report.already_valid_raw_bales || 0)],
+    ["skipped", skipped.length],
+  ];
+  const sampleHtml = sample.length
+    ? sample
+        .map((item) => {
+          const fallbackText = item.fallback_date_used ? " / fallback_date_used" : "";
+          return `<li><code>${escapeHtml(item.display_code || "-")}</code> -> <code>${escapeHtml(item.new_machine_code || "-")}</code> <span class="subtle">${escapeHtml(item.reason || "")}${fallbackText}</span></li>`;
+        })
+        .join("")
+    : "<li>无样例。</li>";
+  const skippedHtml = skipped.length
+    ? skipped
+        .slice(0, 8)
+        .map((item) => `<li><code>${escapeHtml(item.display_code || item.job_id || "-")}</code>：${escapeHtml(item.reason || "skipped")}</li>`)
+        .join("")
+    : "<li>无跳过项。</li>";
+  target.className = "candidate-summary";
+  target.innerHTML = `
+    <strong>${escapeHtml(statusTitle)}</strong>
+    <div class="kpi-strip compact">
+      ${metrics.map(([label, value]) => `<span>${escapeHtml(label)}：<strong>${escapeHtml(value)}</strong></span>`).join("")}
+    </div>
+    <div class="summary-two-column">
+      <div>
+        <div class="subtle small">sample</div>
+        <ul class="compact-list">${sampleHtml}</ul>
+      </div>
+      <div>
+        <div class="subtle small">skipped</div>
+        <ul class="compact-list">${skippedHtml}</ul>
+      </div>
+    </div>
+  `;
+}
+
+async function runRawBaleMachineCodeRepair({ dryRun = true } = {}) {
+  if (!dryRun) {
+    const confirmed = window.confirm("确认修复 RAW_BALE machine_code？此操作会回填历史 RAW_BALE 源记录和旧打印任务。");
+    if (!confirmed) {
+      return;
+    }
+  }
+  renderErrorSummary(
+    "#rawBaleMachineCodeRepairSummary",
+    dryRun ? "正在预检查 RAW_BALE machine_code..." : "正在修复 RAW_BALE machine_code...",
+  );
+  const report = await request("/admin/tools/raw-bale-machine-code-repair", {
+    method: "POST",
+    body: JSON.stringify({ dry_run: dryRun }),
+  });
+  writeOutput("#rawBaleMachineCodeRepairOutput", report);
+  renderRawBaleMachineCodeRepairReport(report);
+}
+
 async function loadStoreClosingChecklist(storeCode) {
   const normalizedStore = (storeCode || currentSession.user?.store_code || "UTAWALA").trim().toUpperCase();
   applyStoreContext(normalizedStore);
@@ -35360,6 +35475,14 @@ document.querySelectorAll("[data-action]").forEach((button) => {
         await resetTestHistory();
         return;
       }
+      if (action === "raw-bale-machine-code-repair-dry-run") {
+        await runRawBaleMachineCodeRepair({ dryRun: true });
+        return;
+      }
+      if (action === "raw-bale-machine-code-repair-apply") {
+        await runRawBaleMachineCodeRepair({ dryRun: false });
+        return;
+      }
       if (action === "generate-warehouse-mainflow-demo") {
         await generateWarehouseMainflowDemo();
         return;
@@ -35439,6 +35562,11 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       }
       if (action === "reset-test-history") {
         renderErrorSummary("#testResetSummary", formatErrorMessage(error));
+        return;
+      }
+      if (action === "raw-bale-machine-code-repair-dry-run" || action === "raw-bale-machine-code-repair-apply") {
+        writeOutput("#rawBaleMachineCodeRepairOutput", formatErrorMessage(error));
+        renderErrorSummary("#rawBaleMachineCodeRepairSummary", formatErrorMessage(error));
         return;
       }
       if (action === "generate-warehouse-mainflow-demo") {

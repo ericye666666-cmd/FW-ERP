@@ -41,6 +41,7 @@ test("release validation docs explain the preflight command and deployment check
   [
     "npm run validate:release",
     "RAW_BALE = 1",
+    "RAW_BALE machine_code repair/backfill",
     "SDB = 2",
     "LPK = 3",
     "SDO = 4",

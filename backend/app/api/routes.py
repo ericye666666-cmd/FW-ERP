@@ -2006,6 +2006,18 @@ def generate_warehouse_mainflow_demo(
     return WarehouseMainflowDemoResponse(**state.generate_warehouse_mainflow_demo(current_user["username"]))
 
 
+@router.post("/admin/tools/raw-bale-machine-code-repair", tags=["system", "admin"])
+def repair_raw_bale_machine_codes(
+    payload: dict[str, Any],
+    authorization: Optional[str] = Header(default=None),
+) -> dict[str, Any]:
+    current_user = _require_current_user(authorization=authorization)
+    return state.repair_raw_bale_machine_codes(
+        dry_run=bool(payload.get("dry_run", True)),
+        actor_username=current_user["username"],
+    )
+
+
 @router.post(
     "/system/generate-store-replenishment-demo",
     response_model=StoreReplenishmentDemoResponse,

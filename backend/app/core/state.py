@@ -1085,6 +1085,235 @@ class InMemoryState:
                 updated = True
         return updated
 
+    def _raw_bale_repair_date_fragment(self, row: dict[str, Any], payload_hint: Optional[dict[str, Any]] = None) -> tuple[str, bool]:
+        payload_hint = payload_hint or {}
+        for value in [
+            row.get("unload_date"),
+            row.get("received_at"),
+            row.get("created_at"),
+            payload_hint.get("received_at"),
+            payload_hint.get("unload_date"),
+        ]:
+            date_fragment = self._date_fragment_from_value(value, fallback_now=False)
+            if re.fullmatch(r"\d{6}", date_fragment) and date_fragment != "000000":
+                return date_fragment, False
+        return datetime.now(NAIROBI_TZ).strftime("%y%m%d"), True
+
+    def _raw_bale_machine_code_usage(self) -> tuple[set[str], dict[str, int]]:
+        used_codes: set[str] = set()
+        max_serial_by_date: dict[str, int] = {}
+
+        def add_candidate(value: Any) -> None:
+            code = str(value or "").strip().upper()
+            if not self._is_raw_bale_machine_code(code):
+                return
+            used_codes.add(code)
+            date_fragment = code[1:7]
+            serial = int(code[-3:])
+            max_serial_by_date[date_fragment] = max(max_serial_by_date.get(date_fragment, 0), serial)
+
+        for row in self.bale_barcodes.values():
+            add_candidate(row.get("machine_code"))
+        for job in self.print_jobs:
+            payload = job.get("print_payload") or {}
+            add_candidate(payload.get("machine_code"))
+            add_candidate(payload.get("barcode_value"))
+            add_candidate(payload.get("scan_token"))
+            add_candidate(payload.get("human_readable"))
+        return used_codes, max_serial_by_date
+
+    def _next_raw_bale_machine_code(
+        self,
+        date_fragment: str,
+        used_codes: set[str],
+        max_serial_by_date: dict[str, int],
+    ) -> str:
+        serial = max_serial_by_date.get(date_fragment, 0) + 1
+        while serial <= 999:
+            candidate = f"1{date_fragment}{serial:03d}"
+            if candidate not in used_codes:
+                used_codes.add(candidate)
+                max_serial_by_date[date_fragment] = serial
+                return candidate
+            serial += 1
+        return ""
+
+    def _raw_bale_repair_candidates(self, bale_reference: str) -> list[dict[str, Any]]:
+        normalized_reference = str(bale_reference or "").strip().upper()
+        if not normalized_reference:
+            return []
+        matches: list[dict[str, Any]] = []
+        direct = self.bale_barcodes.get(normalized_reference)
+        if direct:
+            matches.append(direct)
+        for candidate in self.bale_barcodes.values():
+            if candidate is direct:
+                continue
+            if self._raw_bale_matches_reference(candidate, normalized_reference):
+                matches.append(candidate)
+        unique_matches: list[dict[str, Any]] = []
+        seen_ids: set[int] = set()
+        for match in matches:
+            marker = id(match)
+            if marker in seen_ids:
+                continue
+            seen_ids.add(marker)
+            unique_matches.append(match)
+        return unique_matches
+
+    def _raw_bale_print_job_references(self, job: dict[str, Any], payload: dict[str, Any]) -> list[str]:
+        references: list[str] = []
+        for value in [
+            job.get("barcode"),
+            payload.get("display_code"),
+            payload.get("bale_barcode"),
+            payload.get("legacy_bale_barcode"),
+            payload.get("machine_code"),
+            payload.get("barcode_value"),
+            payload.get("scan_token"),
+            payload.get("human_readable"),
+        ]:
+            normalized = str(value or "").strip().upper()
+            if normalized and normalized not in references:
+                references.append(normalized)
+        return references
+
+    def _find_unique_raw_bale_for_print_job(self, job: dict[str, Any], payload: dict[str, Any]) -> tuple[Optional[dict[str, Any]], str]:
+        matches: list[dict[str, Any]] = []
+        seen_ids: set[int] = set()
+        for reference in self._raw_bale_print_job_references(job, payload):
+            for candidate in self._raw_bale_repair_candidates(reference):
+                marker = id(candidate)
+                if marker in seen_ids:
+                    continue
+                seen_ids.add(marker)
+                matches.append(candidate)
+        if len(matches) == 1:
+            return matches[0], ""
+        if len(matches) > 1:
+            return None, "cannot_find_unique_raw_bale_source"
+        return None, "cannot_find_raw_bale_source"
+
+    def repair_raw_bale_machine_codes(self, dry_run: bool = True, actor_username: str = "admin_1") -> dict[str, Any]:
+        self._require_user_role(actor_username, {"admin"})
+        dry_run = bool(dry_run)
+        report: dict[str, Any] = {
+            "dry_run": dry_run,
+            "already_valid_raw_bales": 0,
+            "already_valid_print_jobs": 0,
+            "would_update_raw_bales": 0,
+            "would_update_print_jobs": 0,
+            "updated_raw_bales": 0,
+            "updated_print_jobs": 0,
+            "skipped": [],
+            "sample": [],
+        }
+        used_codes, max_serial_by_date = self._raw_bale_machine_code_usage()
+        payload_hint_by_source_id: dict[int, dict[str, Any]] = {}
+        for job in self.print_jobs:
+            if str(job.get("job_type") or "").strip().lower() != "bale_barcode_label":
+                continue
+            payload = dict(job.get("print_payload") or {})
+            source, _reason = self._find_unique_raw_bale_for_print_job(job, payload)
+            if source:
+                payload_hint_by_source_id.setdefault(id(source), payload)
+
+        planned_codes_by_source_id: dict[int, str] = {}
+        changed = False
+
+        for row in self.bale_barcodes.values():
+            existing = str(row.get("machine_code") or "").strip().upper()
+            if self._is_raw_bale_machine_code(existing):
+                report["already_valid_raw_bales"] += 1
+                continue
+            date_fragment, fallback_date_used = self._raw_bale_repair_date_fragment(row, payload_hint_by_source_id.get(id(row)))
+            new_machine_code = self._next_raw_bale_machine_code(date_fragment, used_codes, max_serial_by_date)
+            display_code = str(row.get("bale_barcode") or row.get("scan_token") or row.get("legacy_bale_barcode") or "").strip().upper()
+            if not new_machine_code:
+                report["skipped"].append(
+                    {
+                        "display_code": display_code,
+                        "reason": "machine_code_sequence_exhausted",
+                        "date_fragment": date_fragment,
+                    }
+                )
+                continue
+            planned_codes_by_source_id[id(row)] = new_machine_code
+            if dry_run:
+                report["would_update_raw_bales"] += 1
+            else:
+                row["machine_code"] = new_machine_code
+                row["updated_at"] = now_iso()
+                report["updated_raw_bales"] += 1
+                changed = True
+            if len(report["sample"]) < 10:
+                sample = {
+                    "display_code": display_code,
+                    "new_machine_code": new_machine_code,
+                    "reason": "missing_machine_code" if not existing else "invalid_machine_code",
+                }
+                if fallback_date_used:
+                    sample["fallback_date_used"] = True
+                report["sample"].append(sample)
+
+        for job in self.print_jobs:
+            if str(job.get("job_type") or "").strip().lower() != "bale_barcode_label":
+                continue
+            payload = dict(job.get("print_payload") or {})
+            source, reason = self._find_unique_raw_bale_for_print_job(job, payload)
+            display_code = str(
+                payload.get("display_code")
+                or payload.get("bale_barcode")
+                or job.get("barcode")
+                or ""
+            ).strip().upper()
+            if not source:
+                report["skipped"].append({"display_code": display_code, "job_id": job.get("id"), "reason": reason})
+                continue
+            machine_code = planned_codes_by_source_id.get(id(source)) or str(source.get("machine_code") or "").strip().upper()
+            if not self._is_raw_bale_machine_code(machine_code):
+                report["skipped"].append(
+                    {
+                        "display_code": display_code,
+                        "job_id": job.get("id"),
+                        "reason": "source_missing_valid_machine_code",
+                    }
+                )
+                continue
+            primary_bale_barcode = str(source.get("bale_barcode") or display_code).strip().upper()
+            legacy_bale_barcode = str(source.get("legacy_bale_barcode") or payload.get("legacy_bale_barcode") or "").strip().upper()
+            desired_payload = {
+                "machine_code": machine_code,
+                "barcode_value": machine_code,
+                "scan_token": machine_code,
+                "human_readable": machine_code,
+                "display_code": primary_bale_barcode,
+                "bale_barcode": primary_bale_barcode,
+                "legacy_bale_barcode": legacy_bale_barcode,
+                "template_code": LOCKED_BALE_TEMPLATE_CODE,
+            }
+            needs_update = any(payload.get(key) != value for key, value in desired_payload.items())
+            if str(job.get("barcode") or "").strip().upper() != primary_bale_barcode:
+                needs_update = True
+            if str(job.get("template_code") or "").strip().lower() != LOCKED_BALE_TEMPLATE_CODE:
+                needs_update = True
+            if not needs_update:
+                report["already_valid_print_jobs"] += 1
+                continue
+            if dry_run:
+                report["would_update_print_jobs"] += 1
+            else:
+                payload.update(desired_payload)
+                job["print_payload"] = payload
+                job["barcode"] = primary_bale_barcode
+                job["template_code"] = LOCKED_BALE_TEMPLATE_CODE
+                report["updated_print_jobs"] += 1
+                changed = True
+
+        if changed:
+            self._persist()
+        return report
+
     def _find_raw_bale_by_reference(self, bale_reference: str) -> Optional[dict[str, Any]]:
         row = self._find_raw_bale_by_reference_no_defaults(bale_reference)
         if not row:

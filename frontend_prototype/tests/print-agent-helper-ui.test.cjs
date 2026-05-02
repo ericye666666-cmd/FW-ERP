@@ -34,11 +34,48 @@ test("print modal advanced options expose the Windows print helper controls", ()
   assert.match(indexHtml, /data-download-url="\/downloads\/fw-erp-print-agent-windows\.zip"/);
 });
 
+test("admin test data tools expose RAW_BALE machine_code repair controls", () => {
+  assert.match(indexHtml, /RAW_BALE machine_code 修复/);
+  assert.match(indexHtml, /预检查 RAW_BALE machine_code/);
+  assert.match(indexHtml, /确认修复 RAW_BALE machine_code/);
+  assert.match(indexHtml, /此工具只修复历史 RAW_BALE 缺少正式 machine_code 的数据/);
+  assert.match(indexHtml, /不会修改 POS、库存、成本或 SDB\/LPK\/SDO\/STORE_ITEM 规则/);
+  assert.match(indexHtml, /data-action="raw-bale-machine-code-repair-dry-run"/);
+  assert.match(indexHtml, /data-action="raw-bale-machine-code-repair-apply"/);
+  assert.match(indexHtml, /id="rawBaleMachineCodeRepairSummary"/);
+  assert.match(indexHtml, /id="rawBaleMachineCodeRepairOutput"/);
+});
+
+test("RAW_BALE machine_code repair UI calls the admin repair endpoint with dry-run first", () => {
+  assert.match(appJs, /async function runRawBaleMachineCodeRepair/);
+  assert.match(appJs, /\/admin\/tools\/raw-bale-machine-code-repair/);
+  assert.match(appJs, /dry_run:\s*dryRun/);
+  assert.match(appJs, /raw-bale-machine-code-repair-dry-run/);
+  assert.match(appJs, /raw-bale-machine-code-repair-apply/);
+  assert.match(appJs, /确认修复 RAW_BALE machine_code/);
+  assert.match(appJs, /would_update_raw_bales/);
+  assert.match(appJs, /would_update_print_jobs/);
+  assert.match(appJs, /skipped/);
+  assert.match(appJs, /sample/);
+});
+
 test("print helper detection checks local health and local printers without opening browser print", () => {
   assert.match(appJs, /async function checkLocalPrintAgentPrinters/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/printers`/);
-  assert.match(appJs, /已检测到 Deli DL-720C/);
+  assert.match(appJs, /Deli DL-720C 当前在线/);
+  assert.match(appJs, /已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。/);
+  assert.match(appJs, /当前未检测到本机打印机。/);
+  assert.match(appJs, /已检测到 \$\{rows\.length\} 台本机打印机，未发现 Deli DL-720C。/);
   assert.doesNotMatch(appJs, /checkLocalPrintAgentPrinters[\s\S]{0,1200}browserPrintCurrentBaleModalJob/);
+});
+
+test("printer detection clears stale Deli state before each request and on failure", () => {
+  const printerFunction = appJs.match(/async function checkLocalPrintAgentPrinters[\s\S]*?function getWindowsPrintAgentDownloadUrl/)[0];
+  assert.match(printerFunction, /localPrintAgentState\.printers\s*=\s*\[\]/);
+  assert.match(printerFunction, /localPrintAgentState\.printerMessage\s*=\s*""/);
+  assert.match(printerFunction, /localPrintAgentState\.printerChecking\s*=\s*true/);
+  assert.match(printerFunction, /catch \(error\)[\s\S]*localPrintAgentState\.printers\s*=\s*\[\]/);
+  assert.doesNotMatch(printerFunction, /catch \(error\)[\s\S]*已检测到 Deli DL-720C/);
 });
 
 test("local agent primary label printing uses raw label endpoint instead of browser HTML", () => {

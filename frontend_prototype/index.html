@@ -2069,6 +2069,26 @@
         <pre id="userOutput" class="output hidden-output"></pre>
       </section>
 
+      <section class="panel" data-workspace-panel="admin">
+        <div class="panel-head">
+          <h2>数据管理 / Test Data Tools</h2>
+        </div>
+        <div class="hero-card">
+          <h3>RAW_BALE machine_code 修复</h3>
+          <p class="subtle">
+            此工具只修复历史 RAW_BALE 缺少正式 machine_code 的数据，不会修改 POS、库存、成本或 SDB/LPK/SDO/STORE_ITEM 规则。
+          </p>
+          <div class="button-row">
+            <button data-action="raw-bale-machine-code-repair-dry-run" type="button">预检查 RAW_BALE machine_code</button>
+            <button id="rawBaleMachineCodeRepairApplyButton" data-action="raw-bale-machine-code-repair-apply" type="button" class="danger-button" disabled>确认修复 RAW_BALE machine_code</button>
+          </div>
+          <div id="rawBaleMachineCodeRepairSummary" class="candidate-summary empty-state">
+            先点预检查。只有发现可修复的历史 RAW_BALE / 旧打印任务后，才允许确认修复。
+          </div>
+          <pre id="rawBaleMachineCodeRepairOutput" class="output hidden-output"></pre>
+        </div>
+      </section>
+
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
           <h2>1. 新建商品</h2>

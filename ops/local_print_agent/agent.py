@@ -136,12 +136,15 @@ def _parse_windows_printer_json(raw_json: str) -> tuple[list[dict], str | None]:
             marker in status_lower
             for marker in ("offline", "error", "paper", "jam", "paused", "unavailable")
         )
+        available = not work_offline and not is_problem_status
         printers.append(
             {
                 "name": name,
                 "is_default": _coerce_bool(row.get("IsDefault") or row.get("Default") or row.get("is_default")),
                 "status": "offline" if work_offline else ("unavailable" if is_problem_status else "available"),
                 "raw_status": raw_status or ("Offline" if work_offline else "Normal"),
+                "work_offline": work_offline,
+                "available": available,
             }
         )
 
