@@ -10,6 +10,8 @@ const {
   getBaleGroupCompletionAction,
   getBaleShipmentContinuationAction,
   getBaleModalCompletionAction,
+  getBaleModalCurrentJobCompletionAction,
+  getBaleGroupCurrentLabelConfirmationAction,
   getBaleScanTestResult,
   buildBalePrintStationJobPayload,
 } = BalePrintFlow;
@@ -88,6 +90,30 @@ test("getBaleModalCompletionAction requires a successful batch print before grou
   const alreadyComplete = getBaleModalCompletionAction({ pendingCount: 0, hasSuccessfulBatchPrint: true });
   assert.equal(alreadyComplete.action, "already_complete");
   assert.equal(alreadyComplete.pendingCount, 0);
+});
+
+test("RAW_BALE modal confirmation can complete only the current label job", () => {
+  const action = getBaleModalCurrentJobCompletionAction({ pendingCount: 3, hasCurrentJob: true });
+
+  assert.equal(action.action, "complete_current");
+  assert.equal(action.pendingCount, 3);
+
+  const alreadyComplete = getBaleModalCurrentJobCompletionAction({ pendingCount: 0, hasCurrentJob: false });
+  assert.equal(alreadyComplete.action, "already_complete");
+});
+
+test("list-page bale confirmation chooses the next pending package only", () => {
+  const action = getBaleGroupCurrentLabelConfirmationAction({
+    rows: [
+      { bale_barcode: "RB-001", printed_at: "2026-04-20T08:00:00Z" },
+      { bale_barcode: "RB-002", printed_at: "" },
+      { bale_barcode: "RB-003", printed_at: "" },
+    ],
+  });
+
+  assert.equal(action.action, "complete_current");
+  assert.equal(action.baleBarcode, "RB-002");
+  assert.equal(action.pendingCount, 2);
 });
 
 test("getBaleModalCloseAction always allows closing without marking the class as complete", () => {

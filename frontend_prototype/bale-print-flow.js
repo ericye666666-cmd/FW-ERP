@@ -205,6 +205,38 @@
     };
   }
 
+  function getBaleModalCurrentJobCompletionAction(options) {
+    const pendingCount = Number(options && options.pendingCount ? options.pendingCount : 0);
+    const hasCurrentJob = Boolean(options && options.hasCurrentJob);
+    if (pendingCount <= 0 || !hasCurrentJob) {
+      return {
+        action: "already_complete",
+        pendingCount: 0,
+      };
+    }
+    return {
+      action: "complete_current",
+      pendingCount,
+    };
+  }
+
+  function getBaleGroupCurrentLabelConfirmationAction(targetGroup) {
+    const pendingRows = sortRowsBySerial(targetGroup && targetGroup.rows ? targetGroup.rows : [])
+      .filter((row) => !hasPrintedMark(row));
+    if (!pendingRows.length) {
+      return {
+        action: "already_complete",
+        pendingCount: 0,
+        baleBarcode: "",
+      };
+    }
+    return {
+      action: "complete_current",
+      pendingCount: pendingRows.length,
+      baleBarcode: normalizeBarcode(pendingRows[0] && pendingRows[0].bale_barcode),
+    };
+  }
+
   function getBaleModalCloseAction(options) {
     const completionAction = getBaleModalCompletionAction(options);
     if (completionAction.action === "already_complete") {
@@ -374,6 +406,8 @@
     getBaleGroupCompletionAction,
     getBaleShipmentContinuationAction,
     getBaleModalCompletionAction,
+    getBaleModalCurrentJobCompletionAction,
+    getBaleGroupCurrentLabelConfirmationAction,
     getBaleScanTestResult,
     buildBalePrintStationJobPayload,
   };

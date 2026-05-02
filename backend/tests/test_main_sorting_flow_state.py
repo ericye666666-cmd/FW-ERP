@@ -137,6 +137,42 @@ class MainSortingFlowStateTest(unittest.TestCase):
         bales = self.state.generate_bale_barcodes(shipment["shipment_no"], "warehouse_supervisor_1")
         return shipment, bales, source_pool_token, source_bale_token
 
+    def test_confirm_bale_barcode_labelled_marks_only_target_bale(self):
+        _, bales = self._create_ready_bales(customs_notice_no="LABELCONFIRM", package_count=2)
+
+        result = self.state.confirm_bale_barcode_labelled(
+            bales[0]["bale_barcode"],
+            actor_username="warehouse_clerk_1",
+        )
+
+        self.assertEqual(result["bale_barcode"], bales[0]["bale_barcode"])
+        self.assertTrue(result["printed_at"])
+        self.assertEqual(result["printed_by"], "warehouse_clerk_1")
+        rows = self.state.list_bale_barcodes(shipment_no=bales[0]["shipment_no"])
+        by_barcode = {row["bale_barcode"]: row for row in rows}
+        self.assertTrue(by_barcode[bales[0]["bale_barcode"]]["printed_at"])
+        self.assertIsNone(by_barcode[bales[1]["bale_barcode"]]["printed_at"])
+
+    def test_sorting_task_list_keeps_warehouse_clerk_assignment(self):
+        _, bales, _, _ = self._create_ready_bales_with_source_cost(
+            customs_notice_no="WHCLERKASSIGN",
+            package_count=1,
+        )
+
+        task = self.state.create_sorting_task(
+            {
+                "bale_barcodes": [bales[0]["bale_barcode"]],
+                "handler_names": ["warehouse_clerk_1"],
+                "note": "assign to WH1 warehouse clerk",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+
+        rows = self.state.list_sorting_tasks(status="open")
+        listed_task = next(row for row in rows if row["task_no"] == task["task_no"])
+        self.assertEqual(listed_task["handler_names"], ["warehouse_clerk_1"])
+        self.assertEqual(listed_task["status"], "open")
+
     def _create_confirmed_sorting_inventory(
         self,
         customs_notice_no="SORT240423",

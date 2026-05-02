@@ -73,6 +73,9 @@ test("frontend reuses central user picker helpers instead of static staff lists"
   assert.match(appJs, /getAssignableStoreClerks/);
   assert.match(appJs, /getAssignableWarehouseStaff/);
   assert.match(appJs, /getActiveCashiers/);
+  const refreshFunction = appJs.match(/function refreshAssignableUserPickers[\s\S]*?async function refreshUserDirectoryForPickers/)?.[0] || "";
+  assert.match(refreshFunction, /compressionEmployeeState\s*=\s*getAssignableWarehouseStaff\(warehouseCode\)/);
+  assert.match(refreshFunction, /renderJsonBuilder\("sorting-handler-names"\)/);
   assert.match(appJs, /No active staff available/);
   assert.doesNotMatch(indexHtml, /<option value="Austin">Austin<\/option>/);
   assert.doesNotMatch(indexHtml, /<option value="Swahili">Swahili<\/option>/);

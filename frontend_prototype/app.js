@@ -2794,6 +2794,9 @@ function refreshAssignableUserPickers({ rerenderPanels = true } = {}) {
   renderAssignableUserDatalist("#storeClerkOptions", storeClerks);
   syncAssignableStoreClerkInputs(storeCode);
   compressionEmployeeState = getAssignableWarehouseStaff(warehouseCode);
+  if (jsonBuilderState["sorting-handler-names"]) {
+    renderJsonBuilder("sorting-handler-names");
+  }
   if (jsonBuilderState["offline-sales"]) {
     renderJsonBuilder("offline-sales");
   }
@@ -16756,14 +16759,11 @@ function isLocalPrinterAvailable(printer) {
 function getLocalPrinterDetectionMessage(printers = []) {
   const rows = Array.isArray(printers) ? printers : [];
   if (!rows.length) {
-    return { type: "warning", message: "当前未检测到本机打印机。" };
+    return { type: "warning", message: "当前未检测到本机打印队列。" };
   }
   const deliPrinter = rows.find((printer) => isDeliLocalPrinter(printer));
   if (!deliPrinter) {
-    return { type: "warning", message: `已检测到 ${rows.length} 台本机打印机，未发现 Deli DL-720C。` };
-  }
-  if (isLocalPrinterAvailable(deliPrinter)) {
-    return { type: "success", message: "Deli DL-720C 当前在线" };
+    return { type: "warning", message: `已检测到 ${rows.length} 个打印队列，未发现 Deli DL-720C。` };
   }
   return { type: "warning", message: "已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。" };
 }
@@ -16781,8 +16781,8 @@ function renderBaleLocalPrintAgentStatus() {
   const agentClass = localPrintAgentState.connected ? "flow-summary-note success" : "flow-summary-note warning";
   const printers = Array.isArray(localPrintAgentState.printers) ? localPrintAgentState.printers : [];
   const printerText = localPrintAgentState.printerChecking
-    ? "正在检测本机打印机..."
-    : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印机");
+    ? "正在检测本机打印队列..."
+    : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印队列");
   const helperMessage = localPrintAgentState.connected
     ? "显示已连接后，可以点击“打印标签”。"
     : "请先下载并启动 Windows 打印助手";
@@ -16887,7 +16887,7 @@ async function checkLocalPrintAgentPrinters() {
   } catch (error) {
     localPrintAgentState.printers = [];
     localPrintAgentState.printerChecking = false;
-    localPrintAgentState.printerMessage = "检测本机打印机失败，请确认打印助手已经启动。";
+    localPrintAgentState.printerMessage = "检测本机打印队列失败，请确认打印助手已经启动。";
     setLocalPrintAgentMessage("error", localPrintAgentState.printerMessage);
     renderBalePrintModal();
     throw error;
@@ -17199,13 +17199,13 @@ function renderBalePrintModal() {
       action: jobs.length ? "complete_group" : "already_complete",
       pendingCount: jobs.length,
     }
-    : (balePrintFlow.getBaleModalCompletionAction
-    ? balePrintFlow.getBaleModalCompletionAction({
+    : (balePrintFlow.getBaleModalCurrentJobCompletionAction
+    ? balePrintFlow.getBaleModalCurrentJobCompletionAction({
       pendingCount: jobs.length,
-      hasSuccessfulBatchPrint: balePrintModalState.hasSuccessfulBatchPrint,
+      hasCurrentJob: Boolean(currentJob),
     })
     : {
-      action: jobs.length ? (balePrintModalState.hasSuccessfulBatchPrint ? "complete_group" : "print_first") : "already_complete",
+      action: jobs.length && currentJob ? "complete_current" : "already_complete",
       pendingCount: jobs.length,
     });
   const closeAction = getBalePrintModalCloseAction();
@@ -17407,7 +17407,7 @@ function renderBalePrintModal() {
   }
   if (printAllButton instanceof HTMLButtonElement) {
     printAllButton.disabled = !jobs.length;
-    printAllButton.textContent = jobs.length ? `打印本轮全部 ${jobs.length} 张` : "当前类别没有待打印条码";
+    printAllButton.textContent = jobs.length ? "打印本轮全部标签" : "当前类别没有待打印条码";
   }
   if (sendToStationButton instanceof HTMLButtonElement) {
     sendToStationButton.disabled = !currentJob;
@@ -17416,7 +17416,7 @@ function renderBalePrintModal() {
     browserPrintButton.disabled = !currentJob;
   }
   if (completeButton instanceof HTMLButtonElement) {
-    completeButton.disabled = completionAction.action !== "complete_group" && !alreadyComplete;
+    completeButton.disabled = !["complete_group", "complete_current"].includes(completionAction.action) && !alreadyComplete;
     completeButton.textContent = alreadyComplete ? "本包已贴标，关闭弹窗" : "确认本包已贴标";
   }
   if (closeBalePrintModalButton instanceof HTMLButtonElement) {
@@ -17766,6 +17766,16 @@ function openBalePrintModal(state = {}) {
   renderBalePrintModal();
 }
 
+function getBaleModalJobReference(job = {}) {
+  return String(
+    job?.print_payload?.bale_barcode
+      || job?.print_payload?.display_code
+      || job?.print_payload?.legacy_bale_barcode
+      || job?.barcode
+      || "",
+  ).trim().toUpperCase();
+}
+
 async function handleConnectBalePrinter() {
   const printerName = String(document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim();
   const shipmentNo = String(document.querySelector("#balePrinterConsoleForm [name='shipment_no']")?.value || "").trim();
@@ -17796,13 +17806,13 @@ async function completeCurrentBalePrintModalJob() {
       action: jobs.length ? "complete_group" : "already_complete",
       pendingCount: jobs.length,
     }
-    : (balePrintFlow.getBaleModalCompletionAction
-    ? balePrintFlow.getBaleModalCompletionAction({
+    : (balePrintFlow.getBaleModalCurrentJobCompletionAction
+    ? balePrintFlow.getBaleModalCurrentJobCompletionAction({
       pendingCount: jobs.length,
-      hasSuccessfulBatchPrint: balePrintModalState.hasSuccessfulBatchPrint,
+      hasCurrentJob: Boolean(currentJob),
     })
     : {
-      action: jobs.length ? (balePrintModalState.hasSuccessfulBatchPrint ? "complete_group" : "print_first") : "already_complete",
+      action: jobs.length && currentJob ? "complete_current" : "already_complete",
       pendingCount: jobs.length,
     });
   if (completionAction.action === "already_complete") {
@@ -17814,10 +17824,10 @@ async function completeCurrentBalePrintModalJob() {
     }
     return;
   }
-  if (completionAction.action !== "complete_group") {
-    throw new Error(`请先点“打印本轮全部 ${completionAction.pendingCount} 张”，确认实体出纸后，再确认本包已贴标。`);
+  if (!["complete_group", "complete_current"].includes(completionAction.action)) {
+    throw new Error(`请先打印当前标签，确认实体出纸后，再确认本包已贴标。`);
   }
-  const jobsToComplete = templateScope !== "bale"
+  const jobsToComplete = templateScope !== "bale" || completionAction.action === "complete_current"
     ? (currentJob ? [currentJob] : [])
     : [...jobs];
   for (const job of jobsToComplete) {
@@ -17830,13 +17840,17 @@ async function completeCurrentBalePrintModalJob() {
           throw error;
         }
       }
+    } else if (templateScope === "bale") {
+      await confirmSingleBaleBarcodeLabelled(getBaleModalJobReference(job));
     }
   }
   if (templateScope === "bale") {
-    balePrintModalState.jobs = [];
-    balePrintModalState.currentIndex = 0;
-    balePrintModalState.hasSuccessfulBatchPrint = false;
-    baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+    balePrintModalState.jobs = jobs.filter((job) => !jobsToComplete.includes(job));
+    balePrintModalState.currentIndex = Math.min(currentIndex, Math.max(balePrintModalState.jobs.length - 1, 0));
+    if (!balePrintModalState.jobs.length) {
+      balePrintModalState.hasSuccessfulBatchPrint = false;
+      baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
+    }
   } else if (jobsToComplete.length) {
     balePrintModalState.jobs = jobs.filter((job) => !jobsToComplete.includes(job));
     balePrintModalState.currentIndex = Math.min(currentIndex, Math.max(balePrintModalState.jobs.length - 1, 0));
@@ -17892,9 +17906,18 @@ async function completeCurrentBalePrintModalJob() {
     }
     baleBarcodeDirectoryNotice = {
       type: "success",
-      message: `${balePrintModalState.supplierName || ""} ${balePrintModalState.categoryDisplay || ""} 这一类 ${jobsToComplete.length} 包已经全部贴码完成。`,
+      message: balePrintModalState.jobs.length
+        ? "已确认本包已贴标，已切到下一张待贴标签。"
+        : "已确认本包已贴标，本轮标签已经处理完成。",
     };
     renderBaleShipmentPrintProgress(shipmentNo);
+  }
+  if (templateScope === "bale" && !balePrintModalState.jobs.length) {
+    closeBalePrintModal({ force: true });
+    if (shipmentNo) {
+      renderBaleBarcodeDirectorySummary(shipmentNo);
+    }
+    return;
   }
   renderBalePrintModal();
 }
@@ -28113,6 +28136,16 @@ async function confirmBalePrintFlowAndContinue() {
   }
 }
 
+async function confirmSingleBaleBarcodeLabelled(baleBarcode = "") {
+  const normalizedBaleBarcode = String(baleBarcode || "").trim().toUpperCase();
+  if (!normalizedBaleBarcode) {
+    throw new Error("没有找到当前包的 bale barcode。");
+  }
+  return request(`/warehouse/bale-barcodes/${encodeURIComponent(normalizedBaleBarcode)}/confirm-labelled`, {
+    method: "POST",
+  });
+}
+
 async function confirmBalePrintGroup(groupKey = "") {
   const shipmentNo =
     String(document.querySelector("#baleBarcodeViewForm [name='shipment_no']")?.value || "").trim()
@@ -28126,11 +28159,12 @@ async function confirmBalePrintGroup(groupKey = "") {
   if (!targetGroup) {
     throw new Error("没有找到这一类待贴码批次。");
   }
-  const completionAction = balePrintFlow.getBaleGroupCompletionAction
-    ? balePrintFlow.getBaleGroupCompletionAction(targetGroup)
+  const completionAction = balePrintFlow.getBaleGroupCurrentLabelConfirmationAction
+    ? balePrintFlow.getBaleGroupCurrentLabelConfirmationAction(targetGroup)
     : {
-      action: targetGroup.rows.some((row) => !row.printed_at) ? "resume_printing" : "already_complete",
+      action: targetGroup.rows.some((row) => !row.printed_at) ? "complete_current" : "already_complete",
       pendingCount: targetGroup.rows.filter((row) => !row.printed_at).length,
+      baleBarcode: String((targetGroup.rows.find((row) => !row.printed_at) || {}).bale_barcode || "").trim().toUpperCase(),
     };
   if (completionAction.action === "already_complete") {
     baleBarcodeDirectoryNotice = {
@@ -28144,19 +28178,33 @@ async function confirmBalePrintGroup(groupKey = "") {
     renderBaleBarcodeDirectorySummary(shipmentNo);
     return;
   }
+  if (completionAction.action !== "complete_current" || !completionAction.baleBarcode) {
+    throw new Error("没有找到当前待确认的包。");
+  }
   activeBaleBatchKey = getBaleBatchGroupKey(targetGroup);
   if (activeBaleBatchKey) {
     expandedBaleBatchKeys.add(activeBaleBatchKey);
   }
-  const remainingOverall = rows.filter((row) => !row.printed_at).length;
+  await confirmSingleBaleBarcodeLabelled(completionAction.baleBarcode);
+  const refreshedRows = await reloadBaleShipmentPrintRows(shipmentNo);
+  const refreshedGroups = groupBalesByBatch(refreshedRows);
+  const refreshedTargetGroup = refreshedGroups.find((group) => getBaleBatchGroupKey(group) === activeBaleBatchKey);
+  const remainingInGroup = refreshedTargetGroup
+    ? Math.max(0, Number(refreshedTargetGroup.totalPackages || 0) - Number(refreshedTargetGroup.printedCount || 0))
+    : 0;
+  const nextPendingKey = getNextPendingBaleBatchKey(refreshedGroups);
   baleBarcodeDirectoryNotice = {
-    type: "error",
-    message: remainingOverall
-      ? `${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 还剩 ${completionAction.pendingCount} 包待贴码。请先在打印弹层里逐张点击“标记本张已打印”。`
-      : "所有类别已经贴码完成，现在可以进入分拣任务。",
+    type: "success",
+    message: remainingInGroup
+      ? `已确认本包已贴标。${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 还剩 ${remainingInGroup} 包待贴码。`
+      : `已确认本包已贴标。${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 这一类已经完成。`,
   };
+  activeBaleBatchKey = remainingInGroup ? activeBaleBatchKey : nextPendingKey;
+  if (activeBaleBatchKey) {
+    expandedBaleBatchKeys.add(activeBaleBatchKey);
+  }
+  renderBaleShipmentPrintProgress(shipmentNo);
   renderBaleBarcodeDirectorySummary(shipmentNo);
-  await openBalePrintModalForGroup(groupKey);
 }
 
 async function openBalePrintModalForGroup(groupKey = "") {

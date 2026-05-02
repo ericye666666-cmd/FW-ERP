@@ -11,7 +11,7 @@ from html import escape
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from textwrap import wrap
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -2611,6 +2611,24 @@ def list_bale_barcodes(
     ]
 
 
+@router.post(
+    "/warehouse/bale-barcodes/{bale_barcode}/confirm-labelled",
+    response_model=BaleBarcodeResponse,
+    tags=["warehouse", "printing"],
+)
+def confirm_bale_barcode_labelled(
+    bale_barcode: str,
+    authorization: Optional[str] = Header(default=None),
+) -> BaleBarcodeResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return BaleBarcodeResponse(
+        **state.confirm_bale_barcode_labelled(
+            bale_barcode,
+            actor_username=current_user["username"],
+        )
+    )
+
+
 @router.get("/warehouse/raw-bales", response_model=list[RawBaleStockResponse], tags=["warehouse"])
 def list_raw_bales(
     shipment_no: Optional[str] = Query(default=None),
@@ -4351,14 +4369,14 @@ def create_transfer_dispatch_bundle(
 
 @router.post(
     "/print-jobs/{job_id}/complete",
-    response_model=PrintJobResponse | BaleLabelPrintJobResponse,
+    response_model=Union[PrintJobResponse, BaleLabelPrintJobResponse],
     tags=["printing"],
 )
 def mark_print_job_printed(
     job_id: int,
     payload: Optional[PrintStationCompleteRequest] = None,
     authorization: Optional[str] = Header(default=None),
-) -> PrintJobResponse | BaleLabelPrintJobResponse:
+) -> Union[PrintJobResponse, BaleLabelPrintJobResponse]:
     current_user = _require_current_user(authorization=authorization)
     if payload is not None:
         return BaleLabelPrintJobResponse(
@@ -4369,14 +4387,14 @@ def mark_print_job_printed(
 
 @router.post(
     "/print-jobs/{job_id}/fail",
-    response_model=PrintJobResponse | BaleLabelPrintJobResponse,
+    response_model=Union[PrintJobResponse, BaleLabelPrintJobResponse],
     tags=["printing"],
 )
 def mark_print_job_failed(
     job_id: int,
-    payload: PrintJobFailureRequest | PrintStationFailRequest,
+    payload: Union[PrintJobFailureRequest, PrintStationFailRequest],
     authorization: Optional[str] = Header(default=None),
-) -> PrintJobResponse | BaleLabelPrintJobResponse:
+) -> Union[PrintJobResponse, BaleLabelPrintJobResponse]:
     current_user = _require_current_user(authorization=authorization)
     if isinstance(payload, PrintStationFailRequest):
         return BaleLabelPrintJobResponse(

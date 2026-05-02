@@ -43,7 +43,7 @@ test("0.1 start print opens the bale print modal before creating backend print j
 
 test("completed inbound print modal keeps close and completion actions clickable", () => {
   assert.match(appJs, /function isBalePrintModalAlreadyComplete/);
-  assert.match(appJs, /completeButton\.disabled = completionAction\.action !== "complete_group" && !alreadyComplete/);
+  assert.match(appJs, /completeButton\.disabled = !\["complete_group", "complete_current"\]\.includes\(completionAction\.action\) && !alreadyComplete/);
   assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "本包已贴标，关闭弹窗" : "确认本包已贴标"/);
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
@@ -60,10 +60,21 @@ test("bale print modal keeps field operators on primary print actions", () => {
 });
 
 test("bale print modal moves technical print controls into collapsed advanced options", () => {
-  assert.match(indexHtml, /<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<summary>高级打印选项<\/summary>[\s\S]*id="balePrintModalCheckLocalAgentButton"/);
+  const advancedOptions = indexHtml.match(/<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<\/details>/);
+  assert.ok(advancedOptions, "advanced print options should exist");
+  const advancedHtml = advancedOptions[0];
+  assert.match(advancedHtml, /<summary>高级打印选项<\/summary>/);
   assert.doesNotMatch(indexHtml, /<details id="balePrintModalAdvancedOptions"[^>]*open/);
-  assert.match(indexHtml, /id="balePrintModalBrowserPrintButton"[\s\S]*?用浏览器打印/);
-  assert.match(indexHtml, /id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
+  assert.match(advancedHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印助手/);
+  assert.match(advancedHtml, /id="balePrintModalCheckLocalPrintersButton"[\s\S]*?检测打印机队列/);
+  assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?打印标签/);
+  assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?打印本轮全部标签/);
+  assert.doesNotMatch(advancedHtml, /下载 Windows 打印助手/);
+  assert.doesNotMatch(advancedHtml, /查看安装步骤/);
+  assert.doesNotMatch(advancedHtml, /直接打印本张/);
+  assert.doesNotMatch(advancedHtml, /发送到打印站/);
+  assert.doesNotMatch(advancedHtml, /用浏览器打印/);
+  assert.doesNotMatch(advancedHtml, /刷新预览/);
 });
 
 test("primary bale print action requires local agent and keeps browser print in advanced fallback", () => {
@@ -89,13 +100,21 @@ test("bale print modal includes local print agent status and controls", () => {
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/label`, \{/);
 });
 
-test("direct backend print stays available only as an advanced LAN option", () => {
-  assert.match(indexHtml, /<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
-  assert.match(indexHtml, /id="balePrintModalDirectPrintButton"[\s\S]*直接打印本张（仅本地\/LAN 后端）/);
+test("field advanced print controls stay limited to safe operator actions", () => {
+  const advancedOptions = indexHtml.match(/<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<\/details>/);
+  assert.ok(advancedOptions, "advanced print options should exist");
+  const advancedHtml = advancedOptions[0];
+  assert.match(advancedHtml, /检测打印助手/);
+  assert.match(advancedHtml, /检测打印机队列/);
+  assert.match(advancedHtml, /打印标签/);
+  assert.match(advancedHtml, /打印本轮全部标签/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalSendStationButton/);
 });
 
 test("store dispatch print confirmation completes only the current modal job", () => {
-  assert.match(appJs, /const jobsToComplete = templateScope !== "bale"\s*\?\s*\(currentJob \? \[currentJob\] : \[\]\)\s*:\s*\[\.\.\.jobs\]/);
+  assert.match(appJs, /const jobsToComplete = templateScope !== "bale" \|\| completionAction\.action === "complete_current"\s*\?\s*\(currentJob \? \[currentJob\] : \[\]\)\s*:\s*\[\.\.\.jobs\]/);
 });
 
 test("browser print fallback does not auto-run bale completion confirmation", () => {
@@ -108,6 +127,15 @@ test("local agent print path does not auto-run bale completion confirmation", ()
   const localAgentPrintFunction = appJs.match(/async function printCurrentBaleModalViaLocalAgent\(\) \{[\s\S]*?\n\}/);
   assert.ok(localAgentPrintFunction, "local agent print function should exist");
   assert.doesNotMatch(localAgentPrintFunction[0], /completeCurrentBalePrintModalJob/);
+});
+
+test("print all labels sends every current-round job without confirming them", () => {
+  const printAllFunction = appJs.match(/async function printAllBaleModalPrimaryAction\(\) \{[\s\S]*?function renderBalePrintModal/);
+  assert.ok(printAllFunction, "print-all function should exist");
+  assert.match(printAllFunction[0], /for \(let index = 0; index < jobs\.length; index \+= 1\)/);
+  assert.match(printAllFunction[0], /balePrintModalState\.currentIndex = index;[\s\S]*?await printCurrentBaleModalViaLocalAgent\(\);[\s\S]*?printedCount \+= 1/);
+  assert.match(printAllFunction[0], /已通过本地打印代理发送 \$\{printedCount\} 张标签/);
+  assert.doesNotMatch(printAllFunction[0], /completeCurrentBalePrintModalJob/);
 });
 
 test("sorting task available bale list uses compact rows instead of oversized stock cards", () => {

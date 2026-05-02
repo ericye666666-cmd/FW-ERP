@@ -5566,8 +5566,9 @@ class InMemoryState:
                 and str(job.get("status") or "").strip().lower() == "printed"
             ]
             latest_print_job = max(printed_jobs, key=lambda job: str(job.get("printed_at") or job.get("created_at") or "")) if printed_jobs else None
-            normalized["printed_at"] = latest_print_job.get("printed_at") if latest_print_job else None
-            normalized["printed_by"] = latest_print_job.get("printed_by", "") if latest_print_job else ""
+            if latest_print_job:
+                normalized["printed_at"] = latest_print_job.get("printed_at")
+                normalized["printed_by"] = latest_print_job.get("printed_by", "")
             rows.append(normalized)
         if shipment_no:
             normalized_shipment_no = shipment_no.strip().upper()
@@ -11977,6 +11978,42 @@ class InMemoryState:
             "total_selected_bales": len(jobs),
             "total_print_copies": sum(int(job["copies"]) for job in jobs),
         }
+
+    def confirm_bale_barcode_labelled(self, bale_reference: str, actor_username: str) -> dict[str, Any]:
+        actor = self._require_user_role(actor_username, {"admin", "warehouse_clerk", "warehouse_supervisor"})
+        normalized_reference = str(bale_reference or "").strip().upper()
+        if not normalized_reference:
+            raise HTTPException(status_code=400, detail="bale_barcode is required")
+        bale = self._find_raw_bale_by_reference_no_defaults(normalized_reference)
+        if not bale:
+            raise HTTPException(status_code=404, detail=f"找不到 bale barcode：{normalized_reference}")
+        labelled_at = str(bale.get("printed_at") or "").strip() or now_iso()
+        bale["printed_at"] = labelled_at
+        bale["printed_by"] = actor["username"]
+        bale["updated_at"] = labelled_at
+        bale_barcode = str(bale.get("bale_barcode") or "").strip().upper()
+        legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
+        references = {value for value in {normalized_reference, bale_barcode, legacy_bale_barcode} if value}
+        for job in self.print_jobs:
+            if str(job.get("job_type") or "") != "bale_barcode_label":
+                continue
+            if str(job.get("barcode") or "").strip().upper() not in references:
+                continue
+            if str(job.get("status") or "").strip().lower() == "queued":
+                job["status"] = "printed"
+                job["printed_at"] = labelled_at
+                job["printed_by"] = actor["username"]
+                job["error_message"] = ""
+        self._log_event(
+            event_type="print.bale_label_confirmed",
+            entity_type="raw_bale",
+            entity_id=bale_barcode or normalized_reference,
+            actor=actor["username"],
+            summary=f"Bale label confirmed for {bale_barcode or normalized_reference}",
+            details={"bale_barcode": bale_barcode, "legacy_bale_barcode": legacy_bale_barcode},
+        )
+        self._persist()
+        return bale
 
     def _build_label_print_job(
         self,
