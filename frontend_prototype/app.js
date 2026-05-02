@@ -23548,6 +23548,47 @@ function appendPosSaleResultToLocalAnalytics(result = {}) {
   return newRecords;
 }
 
+function markCashierTerminalStoreItemsSoldLocally(result = {}) {
+  const items = Array.isArray(result.items) ? result.items : [];
+  const machineCodes = new Set(
+    items
+      .map((item) => String(item?.store_item_machine_code || item?.barcode || "").replace(/[^0-9]/g, "").trim())
+      .filter((value) => value.startsWith("5")),
+  );
+  if (machineCodes.size) {
+    const saleNo = String(result.sale_no || result.order_no || "").trim();
+    const soldAt = String(result.sold_at || new Date().toISOString());
+    const paymentMethod = getSaleResultPaymentMethod(result);
+    let updated = false;
+    storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => {
+      const tokenMachineCode = String(
+        token?.machine_code
+          || token?.barcode_value
+          || token?.final_item_barcode?.barcode_value
+          || "",
+      ).replace(/[^0-9]/g, "").trim();
+      if (!machineCodes.has(tokenMachineCode)) {
+        return token;
+      }
+      updated = true;
+      return {
+        ...token,
+        sale_status: "sold",
+        sold_at: soldAt,
+        cashier: result.cashier || result.cashier_name || currentSession.user?.username || currentSession.user?.full_name || "cashier",
+        payment_method: paymentMethod,
+        sale_no: saleNo,
+        db_sync_status: result.db_sync_status || "",
+        db_sync_pending: Boolean(result.db_sync_pending),
+      };
+    });
+    if (updated) {
+      persistStoreSdoPackageItemTokenState();
+    }
+  }
+  return appendPosSaleResultToLocalAnalytics(result);
+}
+
 function completeCashierTerminalStoreItemSale() {
   const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
   if (!rows.length) {
@@ -23802,25 +23843,19 @@ async function submitCashierTerminalSale() {
     }
     renderCashierTerminalPaymentPanel();
     try {
-      const activeRows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
-      const isStoreItemOnlyCart = activeRows.length && activeRows.every((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim().startsWith("5"));
-      let result;
-      if (isStoreItemOnlyCart) {
-        result = completeCashierTerminalStoreItemSale();
-      } else {
-        syncCashierTerminalSaleForm();
-        const form = document.querySelector("#saleForm");
-        if (!(form instanceof HTMLFormElement)) {
-          throw new Error("saleForm 不存在，无法提交销售。");
-        }
-        try {
-          form.dataset.skipJsonBuilderSync = "true";
-          result = await submitSale({ preventDefault() {}, currentTarget: form });
-        } finally {
-          delete form.dataset.skipJsonBuilderSync;
-        }
-        appendPosSaleResultToLocalAnalytics(result);
+      syncCashierTerminalSaleForm();
+      const form = document.querySelector("#saleForm");
+      if (!(form instanceof HTMLFormElement)) {
+        throw new Error("saleForm 不存在，无法提交销售。");
       }
+      let result;
+      try {
+        form.dataset.skipJsonBuilderSync = "true";
+        result = await submitSale({ preventDefault() {}, currentTarget: form });
+      } finally {
+        delete form.dataset.skipJsonBuilderSync;
+      }
+      markCashierTerminalStoreItemsSoldLocally(result);
       cashierTerminalState.pendingSaleResult = result;
       cashierTerminalState.latestCompletedSale = result;
       cashierTerminalState.voidOrderNo = result.order_no || result.sale_no || cashierTerminalState.voidOrderNo;

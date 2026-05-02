@@ -9681,7 +9681,7 @@ class InMemoryState:
 
     def open_cashier_shift(self, payload: dict[str, Any]) -> dict[str, Any]:
         store = self._ensure_store_exists(payload["store_code"])
-        actor = self._require_user_role(payload["opened_by"], {"cashier", "store_cashier"}, store_code=store["code"])
+        actor = self._require_user_role(payload["opened_by"], {"cashier", "store_cashier", "admin"}, store_code=store["code"])
         existing = self._find_open_shift_for_cashier(store["code"], actor["username"])
         if existing:
             return existing
@@ -13819,7 +13819,7 @@ class InMemoryState:
 
     def create_sale_transaction(self, payload: dict[str, Any]) -> dict[str, Any]:
         store = self._ensure_store_exists(payload["store_code"])
-        actor = self._require_user_role(payload["cashier_name"], {"cashier", "store_cashier"}, store_code=store["code"])
+        actor = self._require_user_role(payload["cashier_name"], {"cashier", "store_cashier", "admin"}, store_code=store["code"])
         shift_no = payload.get("shift_no", "").strip()
         if shift_no:
             shift = self.get_cashier_shift(shift_no)

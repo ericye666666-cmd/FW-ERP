@@ -117,9 +117,25 @@ test("cashier terminal supports legacy stock quick sale without loosening barcod
   assert.match(submitSource, /pendingSaleResult/);
   assert.match(submitSource, /db_sync_status[\s\S]*failed/);
   assert.match(submitSource, /showTransientInlineNotice[\s\S]*POS_DB_SYNC_FAILURE_MESSAGE/);
-  assert.match(submitSource, /appendPosSaleResultToLocalAnalytics\(result\)/);
+  assert.match(submitSource, /markCashierTerminalStoreItemsSoldLocally\(result\)/);
   assert.doesNotMatch(submitSource, /buildCashierTerminalLocalSaleResult\(preparedSale\)/);
   assert.match(extractFunctionSource(appJs, "submitCashierTerminalLookup"), /resolvePosStoreItemTokenByMachineCode\(query\)/);
+});
+
+test("STORE_ITEM-only sale uses backend submit path before local sold mirror", () => {
+  const submitSource = extractFunctionSource(appJs, "submitCashierTerminalSale");
+  assert.match(submitSource, /syncCashierTerminalSaleForm\(\)/);
+  assert.match(submitSource, /submitSale\(\{ preventDefault\(\) \{\}, currentTarget: form \}\)/);
+  assert.match(submitSource, /markCashierTerminalStoreItemsSoldLocally\(result\)/);
+  assert.doesNotMatch(submitSource, /isStoreItemOnlyCart/);
+  assert.doesNotMatch(submitSource, /completeCashierTerminalStoreItemSale\(\)/);
+
+  const localMirrorSource = extractFunctionSource(appJs, "markCashierTerminalStoreItemsSoldLocally");
+  assert.match(localMirrorSource, /sale_status:\s*"sold"/);
+  assert.match(localMirrorSource, /persistStoreSdoPackageItemTokenState\(\)/);
+  assert.match(localMirrorSource, /store_item_machine_code/);
+  assert.match(localMirrorSource, /db_sync_status/);
+  assert.match(localMirrorSource, /appendPosSaleResultToLocalAnalytics\(result\)/);
 });
 
 test("offline M-Pesa supports manual SMS confirmation responsibility chain", () => {

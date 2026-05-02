@@ -32,6 +32,17 @@ def _open_cashier_shift(state: InMemoryState):
     )
 
 
+def _open_shift_as(state: InMemoryState, username: str):
+    return state.open_cashier_shift(
+        {
+            "opened_by": username,
+            "store_code": "UTAWALA",
+            "opening_float_cash": 1000,
+            "note": f"open POS shift for {username}",
+        }
+    )
+
+
 def _legacy_sale_payload(shift_no: str = ""):
     return {
         "order_no": "POS-LEGACY-001",
@@ -51,6 +62,61 @@ def _legacy_sale_payload(shift_no: str = ""):
             }
         ],
         "payments": [{"method": "cash", "amount": 150}],
+    }
+
+
+def _seed_store_item_for_runtime_sale(state: InMemoryState, barcode: str = "5260430001") -> dict:
+    token = {
+        "token_no": "TOK-POS-STORE-001",
+        "identity_no": "TOK-POS-STORE-001",
+        "display_code": "ST-20260430-001-0001",
+        "barcode_value": barcode,
+        "final_item_barcode": {"barcode_value": barcode},
+        "status": "shelved",
+        "category_name": "tops / lady tops",
+        "grade": "P",
+        "source_sdo": "SDO260430001",
+        "source_package": "SDB260430AAB",
+        "store_dispatch_bale_no": "SDB260430AAB",
+        "store_code": "UTAWALA",
+        "assigned_employee": "store_clerk_1",
+        "selling_price_kes": 220,
+        "unit_cost_kes": 80,
+        "store_rack_code": "A-TS-LT-01",
+        "created_at": "2026-05-02T08:30:00+03:00",
+        "updated_at": "2026-05-02T08:30:00+03:00",
+    }
+    state.item_barcode_tokens[token["token_no"]] = token
+    state._ensure_item_token_product_exists(token["token_no"], actor="store_manager_1", rack_code="A-TS-LT-01")
+    state._add_store_lot(
+        "UTAWALA",
+        barcode,
+        qty=1,
+        unit_cost=80,
+        source_type="store_item_seed",
+        source_no=token["token_no"],
+        store_rack_code="A-TS-LT-01",
+    )
+    return token
+
+
+def _store_item_sale_payload(shift_no: str = "", barcode: str = "5260430001"):
+    return {
+        "order_no": "POS-STORE-RUNTIME-001",
+        "store_code": "UTAWALA",
+        "cashier_name": "cashier_1",
+        "shift_no": shift_no,
+        "sold_at": "2026-05-02T09:30:00+03:00",
+        "note": "store item POS sale",
+        "items": [
+            {
+                "source_type": "STORE_ITEM",
+                "barcode": barcode,
+                "qty": 1,
+                "selling_price": 220,
+            }
+        ],
+        "payments": [{"method": "cash", "amount": 220}],
     }
 
 
@@ -81,6 +147,56 @@ def test_legacy_stock_quick_sale_records_runtime_without_store_item_barcode(tmp_
         and row.get("details", {}).get("source_type_totals", {}).get("LEGACY_STOCK") == 150
         for row in state.audit_events
     )
+
+
+def test_admin_can_open_shift_and_complete_pos_sale(tmp_path, monkeypatch):
+    state = _new_state(tmp_path, monkeypatch)
+    shift = _open_shift_as(state, "admin_1")
+    payload = _legacy_sale_payload(shift["shift_no"])
+    payload["order_no"] = "POS-ADMIN-001"
+    payload["cashier_name"] = "admin_1"
+
+    sale = state.create_sale_transaction(payload)
+
+    assert shift["cashier_name"] == "admin_1"
+    assert sale["sale_no"] == "POS-ADMIN-001"
+    assert sale["cashier_name"] == "admin_1"
+
+
+def test_store_manager_cannot_open_shift_or_create_pos_sale_by_default(tmp_path, monkeypatch):
+    state = _new_state(tmp_path, monkeypatch)
+
+    with pytest.raises(HTTPException) as open_exc:
+        _open_shift_as(state, "store_manager_1")
+
+    assert open_exc.value.status_code == 403
+
+    payload = _legacy_sale_payload("")
+    payload["cashier_name"] = "store_manager_1"
+    with pytest.raises(HTTPException) as sale_exc:
+        state.create_sale_transaction(payload)
+
+    assert sale_exc.value.status_code == 403
+    assert state.sales_transactions == []
+
+
+def test_non_pos_roles_cannot_create_pos_sale(tmp_path, monkeypatch):
+    blocked_users = [
+        "store_clerk_1",
+        "warehouse_clerk_1",
+        "warehouse_manager_1",
+        "area_supervisor_1",
+    ]
+    for username in blocked_users:
+        state = _new_state(tmp_path / username, monkeypatch)
+        payload = _legacy_sale_payload("")
+        payload["cashier_name"] = username
+
+        with pytest.raises(HTTPException) as exc_info:
+            state.create_sale_transaction(payload)
+
+        assert exc_info.value.status_code == 403
+        assert state.sales_transactions == []
 
 
 class RecordingSession:
@@ -228,6 +344,37 @@ def test_store_item_sale_dual_write_preserves_source_chain():
     assert session.store_item.sold_at is not None
     assert rows_by_type["SalePayment"].method == "mpesa"
     assert rows_by_type["AuditEvent"].after_data["source_type_totals"]["STORE_ITEM"] == 220
+
+
+def test_store_item_runtime_sale_dual_write_failure_returns_local_sale_result(tmp_path, monkeypatch):
+    state = _new_state(tmp_path, monkeypatch)
+    shift = _open_cashier_shift(state)
+    token = _seed_store_item_for_runtime_sale(state)
+    monkeypatch.setattr(settings, "storage_mode", "dual_write")
+    monkeypatch.setattr(settings, "database_url", "postgresql://fw_erp_app@example.com/fw_erp_staging")
+
+    def fail_dual_write(_transaction):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr("app.core.state.write_sale_transaction_to_database", fail_dual_write)
+
+    sale = state.create_sale_transaction(_store_item_sale_payload(shift["shift_no"], token["barcode_value"]))
+
+    assert sale["sale_no"] == "POS-STORE-RUNTIME-001"
+    assert sale["local_persisted"] is True
+    assert sale["db_sync_status"] == "failed"
+    assert sale["db_sync_pending"] is True
+    assert sale["db_sync_error"] == "database unavailable"
+    assert sale["items"][0]["source_type"] == "STORE_ITEM"
+    assert sale["items"][0]["store_item_display_code"] == "ST-20260430-001-0001"
+    assert sale["items"][0]["store_item_machine_code"] == token["barcode_value"]
+    assert sale["items"][0]["source_sdo"] == "SDO260430001"
+    assert sale["items"][0]["source_package"] == "SDB260430AAB"
+    assert sale["items"][0]["assigned_employee"] == "store_clerk_1"
+    assert sale["items"][0]["store_rack_code"] == "A-TS-LT-01"
+    second = state.create_sale_transaction(_store_item_sale_payload(shift["shift_no"], token["barcode_value"]))
+    assert second is sale
+    assert len(state.sales_transactions) == 1
 
 
 def test_dual_write_records_manual_confirmed_mpesa_payment_and_audit_row():
