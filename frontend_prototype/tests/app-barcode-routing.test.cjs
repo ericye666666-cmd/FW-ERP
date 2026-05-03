@@ -229,6 +229,44 @@ test("warehouse prep task advanced wave parameters are collapsed and optional", 
   assert.match(appJs, /warehouse_code:\s*String\(defaultWarehouseCode \|\| "WH1"\)\.trim\(\)/);
 });
 
+test("global shell uses the approved Shadcn compact ERP design tokens", () => {
+  [
+    "--fw-bg: #f8fafc;",
+    "--fw-surface: #ffffff;",
+    "--fw-surface-muted: #f1f5f9;",
+    "--fw-border: #e2e8f0;",
+    "--fw-text: #0f172a;",
+    "--fw-primary: #2563eb;",
+    "--fw-primary-hover: #1d4ed8;",
+    "--fw-sidebar-bg: #0f172a;",
+    "--fw-sidebar-active: #1e293b;",
+    "--fw-sidebar-text: #e2e8f0;",
+  ].forEach((token) => {
+    assert.match(stylesCss, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  });
+  assert.match(stylesCss, /--bg:\s*var\(--fw-bg\);/);
+  assert.match(stylesCss, /--panel:\s*var\(--fw-surface\);/);
+  assert.match(stylesCss, /--accent:\s*var\(--fw-primary\);/);
+  assert.match(stylesCss, /--radius-panel:\s*8px;/);
+  assert.match(stylesCss, /--radius-control:\s*6px;/);
+  assert.doesNotMatch(stylesCss, /radial-gradient\(circle at top left/);
+});
+
+test("global shell styling is dark-sidebar compact-density ERP", () => {
+  assert.match(stylesCss, /\.workspace-shell\s*\{[\s\S]*?grid-template-columns:\s*248px minmax\(0,\s*1fr\);/);
+  assert.match(stylesCss, /\.workspace-top-panel\s*\{[\s\S]*?min-height:\s*56px;/);
+  assert.match(stylesCss, /\.workspace-side-panel\s*\{[\s\S]*?background:\s*var\(--fw-sidebar-bg\);/);
+  assert.match(stylesCss, /\.workspace-page-link\s*\{[\s\S]*?min-height:\s*34px;/);
+  assert.match(stylesCss, /\.workspace-page-link\.active\s*\{[\s\S]*?background:\s*var\(--fw-sidebar-active\);/);
+  assert.match(stylesCss, /\.panel\s*\{[\s\S]*?border-radius:\s*var\(--radius-panel\);/);
+  assert.match(stylesCss, /button,\s*input,\s*select,\s*textarea\s*\{[\s\S]*?min-height:\s*34px;/);
+  assert.match(stylesCss, /button\[type="submit"\][\s\S]*?background:\s*var\(--fw-primary\);/);
+  assert.match(stylesCss, /th\s*\{[\s\S]*?background:\s*var\(--fw-surface-muted\);/);
+  assert.match(stylesCss, /td,\s*th\s*\{[\s\S]*?padding:\s*7px 9px;/);
+  assert.match(stylesCss, /\.warehouse-prep-task-summary\s*\{[\s\S]*?padding:\s*12px;/);
+  assert.match(stylesCss, /\.transfer-advanced-options\s*\{[\s\S]*?padding:\s*10px 12px;/);
+});
+
 test("LPK workbench uses a left-right identity and picking-detail layout", () => {
   assert.match(appJs, /这个 LPK 拣了什么/);
   assert.match(appJs, /class="split-grid lpk-picking-layout"/);
