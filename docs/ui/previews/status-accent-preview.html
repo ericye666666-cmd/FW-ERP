@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FW-ERP Status Accent Preview</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E">
+  <style>
+    :root {
+      --fw-bg: #f8fafc;
+      --fw-surface: #ffffff;
+      --fw-surface-muted: #f1f5f9;
+      --fw-border: #e2e8f0;
+      --fw-border-strong: #cbd5e1;
+      --fw-text: #0f172a;
+      --fw-text-muted: #475569;
+      --fw-text-subtle: #64748b;
+      --fw-primary: #2563eb;
+      --fw-primary-hover: #1d4ed8;
+      --fw-primary-soft: #dbeafe;
+      --fw-sidebar-bg: #0f172a;
+      --fw-sidebar-active: #1e293b;
+      --fw-sidebar-text: #e2e8f0;
+      --status-info-bg: #eff6ff;
+      --status-info-border: #bfdbfe;
+      --status-info-text: #1d4ed8;
+      --status-success-bg: #f0fdf4;
+      --status-success-border: #bbf7d0;
+      --status-success-text: #15803d;
+      --status-warning-bg: #fffbeb;
+      --status-warning-border: #fde68a;
+      --status-warning-text: #92400e;
+      --status-danger-bg: #fef2f2;
+      --status-danger-border: #fecaca;
+      --status-danger-text: #991b1b;
+      --status-neutral-bg: #f8fafc;
+      --status-neutral-border: #e2e8f0;
+      --status-neutral-text: #475569;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--fw-bg);
+      color: var(--fw-text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      background: var(--fw-sidebar-bg);
+      color: var(--fw-sidebar-text);
+      padding: 16px 12px;
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+      align-self: stretch;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px 16px;
+      border-bottom: 1px solid rgba(226, 232, 240, 0.14);
+      margin-bottom: 14px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--fw-primary);
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 650;
+      color: #f8fafc;
+    }
+
+    .brand-meta {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .nav-group {
+      display: grid;
+      gap: 4px;
+      margin-top: 12px;
+    }
+
+    .nav-label {
+      padding: 8px;
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 650;
+      text-transform: uppercase;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 34px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: #cbd5e1;
+      font-size: 13px;
+    }
+
+    .nav-item.active {
+      background: var(--fw-sidebar-active);
+      color: #ffffff;
+    }
+
+    .main {
+      min-width: 0;
+    }
+
+    .topbar {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 20px;
+      background: rgba(255, 255, 255, 0.92);
+      border-bottom: 1px solid var(--fw-border);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      backdrop-filter: blur(8px);
+    }
+
+    .topbar-title {
+      min-width: 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 22px;
+      line-height: 30px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .topbar-subtitle {
+      color: var(--fw-text-muted);
+      font-size: 12px;
+      line-height: 16px;
+      margin-top: 1px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .content {
+      padding: 16px 20px 28px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--fw-surface);
+      border: 1px solid var(--fw-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--fw-border);
+      background: #ffffff;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .section-note {
+      color: var(--fw-text-muted);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid-5 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .grid-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .status-block {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+      min-height: 96px;
+      padding: 10px 12px;
+      border: 1px solid var(--status-neutral-border);
+      border-radius: 8px;
+      background: var(--status-neutral-bg);
+      color: var(--status-neutral-text);
+    }
+
+    .status-block-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 650;
+      font-size: 13px;
+      line-height: 18px;
+    }
+
+    .status-block-copy {
+      color: inherit;
+      font-size: 13px;
+      line-height: 18px;
+    }
+
+    .status-block-info {
+      background: var(--status-info-bg);
+      border-color: var(--status-info-border);
+      color: var(--status-info-text);
+    }
+
+    .status-block-success {
+      background: var(--status-success-bg);
+      border-color: var(--status-success-border);
+      color: var(--status-success-text);
+    }
+
+    .status-block-warning {
+      background: var(--status-warning-bg);
+      border-color: var(--status-warning-border);
+      color: var(--status-warning-text);
+    }
+
+    .status-block-danger {
+      background: var(--status-danger-bg);
+      border-color: var(--status-danger-border);
+      color: var(--status-danger-text);
+    }
+
+    .status-block-neutral {
+      background: var(--status-neutral-bg);
+      border-color: var(--status-neutral-border);
+      color: var(--status-neutral-text);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      width: max-content;
+      max-width: 100%;
+      min-height: 22px;
+      padding: 2px 8px;
+      border: 1px solid var(--status-neutral-border);
+      border-radius: 6px;
+      background: var(--status-neutral-bg);
+      color: var(--status-neutral-text);
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 16px;
+      white-space: nowrap;
+    }
+
+    .status-badge-info {
+      background: var(--status-info-bg);
+      border-color: var(--status-info-border);
+      color: var(--status-info-text);
+    }
+
+    .status-badge-success {
+      background: var(--status-success-bg);
+      border-color: var(--status-success-border);
+      color: var(--status-success-text);
+    }
+
+    .status-badge-warning {
+      background: var(--status-warning-bg);
+      border-color: var(--status-warning-border);
+      color: var(--status-warning-text);
+    }
+
+    .status-badge-danger {
+      background: var(--status-danger-bg);
+      border-color: var(--status-danger-border);
+      color: var(--status-danger-text);
+    }
+
+    .status-badge-neutral {
+      background: var(--status-neutral-bg);
+      border-color: var(--status-neutral-border);
+      color: var(--status-neutral-text);
+    }
+
+    .badge-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .badge-with-dot {
+      gap: 6px;
+    }
+
+    .mini-panel {
+      border: 1px solid var(--fw-border);
+      border-radius: 8px;
+      background: #ffffff;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .mini-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--fw-border);
+      background: var(--fw-surface-muted);
+    }
+
+    .mini-body {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      color: var(--fw-text-muted);
+      font-size: 12px;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      padding: 8px 10px;
+      border: 1px solid var(--fw-border);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    .metric-label {
+      color: var(--fw-text-muted);
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    .metric-value {
+      margin-top: 2px;
+      font-size: 18px;
+      line-height: 24px;
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--fw-border);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      background: var(--fw-surface-muted);
+      color: var(--fw-text-muted);
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 16px;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .number {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--fw-border);
+      border-radius: 8px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.36fr) minmax(0, 0.64fr);
+      gap: 12px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .accent-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--fw-border);
+    }
+
+    .accent-row:last-child {
+      border-bottom: 0;
+    }
+
+    .identity-code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: var(--fw-text);
+      font-size: 13px;
+    }
+
+    .primary-button,
+    .secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .primary-button {
+      background: var(--fw-primary);
+      color: #ffffff;
+      border-color: var(--fw-primary);
+    }
+
+    .secondary-button {
+      background: #ffffff;
+      color: var(--fw-text);
+      border-color: var(--fw-border-strong);
+    }
+
+    .segmented {
+      display: inline-flex;
+      gap: 4px;
+      padding: 3px;
+      border: 1px solid var(--fw-border);
+      border-radius: 8px;
+      background: var(--fw-surface-muted);
+    }
+
+    .segment {
+      border: 0;
+      min-height: 32px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--fw-text-muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .segment.active {
+      background: var(--fw-primary);
+      color: #ffffff;
+    }
+
+    .pos-snippet {
+      display: grid;
+      grid-template-columns: minmax(0, 0.58fr) minmax(280px, 0.42fr);
+      gap: 12px;
+    }
+
+    .total-value {
+      font-size: 28px;
+      line-height: 36px;
+      font-weight: 750;
+      color: var(--status-info-text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .empty-basket {
+      min-height: 84px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed var(--fw-border-strong);
+      border-radius: 8px;
+      color: var(--fw-text-muted);
+      background: var(--status-neutral-bg);
+      font-size: 13px;
+    }
+
+    .pda-wrap {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .pda-card {
+      border: 1px solid var(--fw-border);
+      border-radius: 16px;
+      background: #ffffff;
+      padding: 10px;
+      max-width: 360px;
+    }
+
+    .pda-screen {
+      border: 1px solid var(--fw-border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .pda-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--fw-border);
+      background: var(--fw-surface-muted);
+      font-size: 12px;
+      color: var(--fw-text-muted);
+    }
+
+    .pda-content {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .current-item {
+      display: grid;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--status-info-border);
+      border-left: 4px solid var(--fw-primary);
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .item-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .small-muted {
+      color: var(--fw-text-muted);
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    .nowrap {
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1120px) {
+      .grid-5,
+      .grid-4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .split,
+      .pos-snippet,
+      .pda-wrap {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+        min-height: 0;
+      }
+
+      .nav-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .topbar {
+        height: auto;
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 12px;
+      }
+
+      .content {
+        padding: 12px;
+      }
+
+      .panel-header,
+      .mini-header,
+      .accent-row,
+      .item-title {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .grid-5,
+      .grid-4,
+      .grid-3,
+      .grid-2,
+      .metric-row {
+        grid-template-columns: 1fr;
+      }
+
+      .segmented {
+        width: 100%;
+      }
+
+      .segment {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">FW</div>
+        <div>
+          <div class="brand-title">FW-ERP</div>
+          <div class="brand-meta">Status accent preview</div>
+        </div>
+      </div>
+
+      <nav class="nav-group" aria-label="Preview sections">
+        <div class="nav-label">Preview</div>
+        <div class="nav-item active"><span>Status blocks</span><span class="status-badge status-badge-info">5</span></div>
+        <div class="nav-item"><span>4.1 Replenishment</span></div>
+        <div class="nav-item"><span>5.1 LPK</span></div>
+        <div class="nav-item"><span>6 SDO Print</span></div>
+        <div class="nav-item"><span>POS</span></div>
+        <div class="nav-item"><span>PDA</span></div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-title">
+          <h1>FW-ERP Status Accent Preview</h1>
+          <p class="topbar-subtitle">Docs-only static visual sample for semantic blocks and badges.</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="status-badge status-badge-success badge-with-dot"><span class="dot"></span>Preview ready</span>
+          <span class="status-badge status-badge-neutral">No business logic</span>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>基础状态色块</h2>
+              <p class="section-note">Five compact semantic blocks with paired badges and text.</p>
+            </div>
+            <span class="status-badge status-badge-info">Semantic tokens</span>
+          </div>
+          <div class="panel-body">
+            <div class="grid grid-5">
+              <article class="status-block status-block-info">
+                <div class="status-block-title">
+                  <span>Info / 主流程 / 下一步</span>
+                  <span class="status-badge status-badge-info">可生成</span>
+                </div>
+                <p class="status-block-copy">下一步：生成仓库备货任务</p>
+              </article>
+              <article class="status-block status-block-success">
+                <div class="status-block-title">
+                  <span>Success / 已完成</span>
+                  <span class="status-badge status-badge-success">已连接</span>
+                </div>
+                <p class="status-block-copy">打印助手已连接</p>
+              </article>
+              <article class="status-block status-block-warning">
+                <div class="status-block-title">
+                  <span>Warning / 待处理 / 风险</span>
+                  <span class="status-badge status-badge-warning">缺货</span>
+                </div>
+                <p class="status-block-copy">库存不足：缺 40 件</p>
+              </article>
+              <article class="status-block status-block-danger">
+                <div class="status-block-title">
+                  <span>Danger / 错误 / 阻塞</span>
+                  <span class="status-badge status-badge-danger">扫码错误</span>
+                </div>
+                <p class="status-block-copy">此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码</p>
+              </article>
+              <article class="status-block status-block-neutral">
+                <div class="status-block-title">
+                  <span>Neutral / 普通状态</span>
+                  <span class="status-badge status-badge-neutral">草稿</span>
+                </div>
+                <p class="status-block-copy">草稿，等待提交</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Badge 示例</h2>
+              <p class="section-note">Table and toolbar density, with text labels on every color.</p>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="badge-row">
+              <span class="status-badge status-badge-info">可生成</span>
+              <span class="status-badge status-badge-success">已完成</span>
+              <span class="status-badge status-badge-warning">部分拣货</span>
+              <span class="status-badge status-badge-danger">打印失败</span>
+              <span class="status-badge status-badge-neutral">草稿</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>4.1 手动补货申请</h2>
+              <p class="section-note">UTAWALA 门店 · WH1 仓库 · compact replenishment table.</p>
+            </div>
+            <span class="status-badge status-badge-neutral">草稿</span>
+          </div>
+          <div class="panel-body grid grid-2">
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>手动补货申请</h3>
+                  <div class="meta-row">
+                    <span>Store: UTAWALA</span>
+                    <span>Warehouse: WH1</span>
+                  </div>
+                </div>
+                <button class="primary-button" type="button">生成申请</button>
+              </div>
+              <div class="mini-body">
+                <div class="metric-row">
+                  <div class="metric">
+                    <div class="metric-label">Requested</div>
+                    <div class="metric-value">320</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Pickable</div>
+                    <div class="metric-value">280</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">Shortage</div>
+                    <div class="metric-value">40</div>
+                  </div>
+                </div>
+
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th class="number">Requested</th>
+                        <th class="number">Pickable</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Women Tops</td>
+                        <td class="number">200</td>
+                        <td class="number">200</td>
+                        <td><span class="status-badge status-badge-info">可生成</span></td>
+                      </tr>
+                      <tr>
+                        <td>Kids Mix</td>
+                        <td class="number">120</td>
+                        <td class="number">80</td>
+                        <td><span class="status-badge status-badge-warning">缺货 40</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="status-block status-block-info">
+                  <div class="status-block-title">下一步</div>
+                  <p class="status-block-copy">确认明细后生成仓库备货任务。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>仓库备货任务</h3>
+                  <div class="meta-row">
+                    <span>Wave: WH1-UTAWALA-DRAFT</span>
+                  </div>
+                </div>
+                <span class="status-badge status-badge-neutral">等待申请</span>
+              </div>
+              <div class="mini-body">
+                <div class="status-block status-block-neutral">
+                  <div class="status-block-title">当前状态</div>
+                  <p class="status-block-copy">草稿，等待提交。</p>
+                </div>
+                <div class="status-block status-block-info">
+                  <div class="status-block-title">可行动状态</div>
+                  <p class="status-block-copy">生成后将进入 WH1 仓库备货。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>5.1 LPK / SHORTAGE PICK</h2>
+              <p class="section-note">Shortage quantity is visible without using harsh color blocks.</p>
+            </div>
+            <span class="status-badge status-badge-info">LPK active</span>
+          </div>
+          <div class="panel-body split">
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>LPK-UTAWALA-0007</h3>
+                  <div class="identity-code">LPK|WH1|UTAWALA|0007</div>
+                </div>
+                <span class="status-badge status-badge-success">已拣</span>
+              </div>
+              <div class="mini-body">
+                <div class="accent-row">
+                  <div>
+                    <strong>Picked</strong>
+                    <div class="small-muted">Women Tops · full pick</div>
+                  </div>
+                  <span class="status-badge status-badge-success">已拣 200</span>
+                </div>
+                <div class="accent-row">
+                  <div>
+                    <strong>Partial</strong>
+                    <div class="small-muted">Kids Mix · missing units stay visible</div>
+                  </div>
+                  <span class="status-badge status-badge-warning">部分拣货</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Line</th>
+                      <th class="number">Requested</th>
+                      <th class="number">Picked</th>
+                      <th class="number">Shortage</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Women Tops</td>
+                      <td class="number">200</td>
+                      <td class="number">200</td>
+                      <td class="number">0</td>
+                      <td><span class="status-badge status-badge-success">已拣</span></td>
+                    </tr>
+                    <tr>
+                      <td>Kids Mix</td>
+                      <td class="number">120</td>
+                      <td class="number">80</td>
+                      <td class="number"><strong>40</strong></td>
+                      <td><span class="status-badge status-badge-warning">缺货</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="grid grid-2">
+                <div class="status-block status-block-warning">
+                  <div class="status-block-title">库存不足</div>
+                  <p class="status-block-copy">缺货数量：40 件。可继续记录部分拣货。</p>
+                </div>
+                <div class="status-block status-block-danger">
+                  <div class="status-block-title">阻塞型缺货</div>
+                  <p class="status-block-copy">该缺货会阻塞本次 dispatch，请主管确认。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>6 SDO / 打印状态</h2>
+              <p class="section-note">Print agent, fallback, printed and failure states in one compact print panel.</p>
+            </div>
+            <span class="status-badge status-badge-info">SDO ready</span>
+          </div>
+          <div class="panel-body grid grid-3">
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>SDO-UTAWALA-0021</h3>
+                  <div class="identity-code">SDO|WH1|UTAWALA|0021</div>
+                </div>
+                <span class="status-badge status-badge-info">SDO ready</span>
+              </div>
+              <div class="mini-body">
+                <span class="status-badge status-badge-success badge-with-dot"><span class="dot"></span>Print Agent connected</span>
+                <span class="status-badge status-badge-success">Printed</span>
+                <button class="secondary-button" type="button">打印 SDO</button>
+              </div>
+            </div>
+
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>Fallback route</h3>
+                  <div class="meta-row"><span>Browser print mode</span></div>
+                </div>
+                <span class="status-badge status-badge-warning">Browser fallback</span>
+              </div>
+              <div class="mini-body">
+                <div class="status-block status-block-danger">
+                  <div class="status-block-title">Print Agent not connected</div>
+                  <p class="status-block-copy">打印助手未连接，请先启动 Windows 打印助手。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>Print job queue</h3>
+                  <div class="meta-row"><span>Last job: SDO label</span></div>
+                </div>
+                <span class="status-badge status-badge-danger">Print failed</span>
+              </div>
+              <div class="mini-body">
+                <div class="accent-row">
+                  <span>Label template</span>
+                  <span class="status-badge status-badge-success">Ready</span>
+                </div>
+                <div class="accent-row">
+                  <span>Windows helper</span>
+                  <span class="status-badge status-badge-danger">未连接</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>POS Cashier Terminal</h2>
+              <p class="section-note">Payment state, scan errors and empty basket status in cashier density.</p>
+            </div>
+            <span class="status-badge status-badge-warning">Collecting</span>
+          </div>
+          <div class="panel-body pos-snippet">
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>Basket</h3>
+                  <div class="meta-row"><span>Terminal: UTAWALA-POS-01</span></div>
+                </div>
+                <span class="status-badge status-badge-neutral">Empty basket</span>
+              </div>
+              <div class="mini-body">
+                <div class="empty-basket">空篮子，等待扫描商品码。</div>
+                <div class="status-block status-block-danger">
+                  <div class="status-block-title">POS scan error</div>
+                  <p class="status-block-copy">此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>Payment</h3>
+                  <div class="meta-row"><span>Cash / M-Pesa / Mixed</span></div>
+                </div>
+                <span class="status-badge status-badge-success">Paid</span>
+              </div>
+              <div class="mini-body">
+                <div class="status-block status-block-info">
+                  <div class="status-block-title">Grand total</div>
+                  <div class="total-value">KES 4,280</div>
+                </div>
+                <div class="segmented" aria-label="Payment mode preview">
+                  <button class="segment active" type="button">Cash</button>
+                  <button class="segment" type="button">M-Pesa</button>
+                  <button class="segment" type="button">Mixed</button>
+                </div>
+                <div class="badge-row">
+                  <span class="status-badge status-badge-success">Paid</span>
+                  <span class="status-badge status-badge-warning">Collecting</span>
+                  <span class="status-badge status-badge-warning">Sync pending</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>PDA Clerk Putaway</h2>
+              <p class="section-note">Mobile scan task, recognized item, wrong source code and sync states.</p>
+            </div>
+            <span class="status-badge status-badge-info">Current scan</span>
+          </div>
+          <div class="panel-body pda-wrap">
+            <div class="pda-card">
+              <div class="pda-screen">
+                <div class="pda-top">
+                  <span>UTAWALA clerk</span>
+                  <span class="status-badge status-badge-warning">待同步</span>
+                </div>
+                <div class="pda-content">
+                  <div class="status-block status-block-info">
+                    <div class="status-block-title">当前扫码任务</div>
+                    <p class="status-block-copy">扫描 STORE_ITEM 商品码并确认货架。</p>
+                  </div>
+
+                  <div class="current-item">
+                    <div class="item-title">
+                      <strong>Current item</strong>
+                      <span class="status-badge status-badge-success">STORE_ITEM 已识别</span>
+                    </div>
+                    <div class="identity-code">STORE_ITEM|UTAWALA|A12|000349</div>
+                    <div class="small-muted">Rack: UTA-A-12 · Putaway target visible</div>
+                  </div>
+
+                  <div class="status-block status-block-danger">
+                    <div class="status-block-title">错误码</div>
+                    <p class="status-block-copy">这是 SDB / LPK 来源包，不能直接上架销售。</p>
+                  </div>
+
+                  <div class="badge-row">
+                    <span class="status-badge status-badge-warning">待同步</span>
+                    <span class="status-badge status-badge-success">已上架</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mini-panel">
+              <div class="mini-header">
+                <div>
+                  <h3>PDA state map</h3>
+                  <div class="meta-row"><span>Scan-first compact mobile density</span></div>
+                </div>
+              </div>
+              <div class="mini-body">
+                <div class="accent-row">
+                  <span>Current scan task</span>
+                  <span class="status-badge status-badge-info">Info</span>
+                </div>
+                <div class="accent-row">
+                  <span>Recognized STORE_ITEM</span>
+                  <span class="status-badge status-badge-success">Success</span>
+                </div>
+                <div class="accent-row">
+                  <span>Wrong source package</span>
+                  <span class="status-badge status-badge-danger">Danger</span>
+                </div>
+                <div class="accent-row">
+                  <span>Pending sync</span>
+                  <span class="status-badge status-badge-warning">Warning</span>
+                </div>
+                <div class="accent-row">
+                  <span>Shelved</span>
+                  <span class="status-badge status-badge-success">已上架</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
