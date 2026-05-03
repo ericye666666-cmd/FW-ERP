@@ -34,11 +34,53 @@ test("POS scans only STORE_ITEM machine codes from clerk-generated tokens", () =
   const terminalLookupSource = extractFunctionSource(appJs, "submitCashierTerminalLookup");
   assert.match(lookupSource, /^function resolvePosStoreItemTokenByMachineCode/);
   assert.match(lookupSource, /\!machineCode\.startsWith\("5"\)/);
-  assert.match(lookupSource, /这不是商品码，不能收银。请扫描 STORE_ITEM 商品条码。/);
+  assert.match(lookupSource, /此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。/);
   assert.match(lookupSource, /sale_status[\s\S]*sold[\s\S]*该商品已售出，不能重复销售/);
   assert.match(lookupSource, /sale_status[\s\S]*ready_for_sale/);
   assert.match(terminalLookupSource, /resolvePosStoreItemTokenByMachineCode\(query\)/);
   assert.doesNotMatch(terminalLookupSource, /submitLookup\(\{ preventDefault\(\) \{\}, currentTarget: form \}\)/);
+});
+
+test("POS cashier terminal renders cashier touch layout without changing barcode scope", () => {
+  assert.match(indexHtml, /class="[^"]*cashier-terminal-shell/);
+  assert.match(indexHtml, /class="[^"]*cashier-terminal-touch-layout/);
+  assert.match(indexHtml, /id="cashierTerminalBarcodeInput"[\s\S]*?placeholder="扫描 STORE_ITEM 商品码"/);
+  assert.match(indexHtml, /id="cashierTerminalCart"[\s\S]*class="[^"]*cashier-terminal-cart/);
+  assert.match(indexHtml, /id="cashierTerminalPaymentPanel"[\s\S]*class="[^"]*cashier-terminal-payment-panel/);
+  assert.match(indexHtml, /id="cashierTerminalQuickActions"[\s\S]*class="[^"]*cashier-terminal-status-footer/);
+  assert.match(appJs, /scanTitle:\s*"扫码收银"/);
+  assert.match(appJs, /basketTitle:\s*"商品篮"/);
+  assert.match(appJs, /paymentTitle:\s*"结账区"/);
+  assert.match(appJs, /completeTrade:\s*"完成销售"/);
+  assert.match(appJs, /cashMethod:\s*"Cash"/);
+  assert.match(appJs, /mpesaMethod:\s*"M-Pesa"/);
+  assert.match(appJs, /mixedMethod:\s*"Mixed"/);
+  assert.match(appJs, /function restoreCashierTerminalFixedPaymentLabels/);
+  assert.match(appJs, /cash:\s*"Cash"/);
+  assert.match(appJs, /mpesa:\s*"M-Pesa"/);
+  assert.match(appJs, /mixed:\s*"Mixed"/);
+  assert.match(appJs, /restoreCashierTerminalFixedPaymentLabels\(\);/);
+  assert.match(appJs, /grossAmount:\s*"总金额"/);
+  assert.match(appJs, /receiptStatus:\s*"小票打印"/);
+  assert.match(appJs, /syncStatus:\s*"同步状态"/);
+  assert.match(appJs, /resolvePosStoreItemTokenByMachineCode\(query\)/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"RAW_BALE"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_PREP_BALE"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"LOOSE_PICK_TASK"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
+});
+
+test("POS cashier terminal keeps non-STORE_ITEM codes out of sales", () => {
+  const lookupSource = extractFunctionSource(appJs, "resolvePosStoreItemTokenByMachineCode");
+  assert.match(lookupSource, /const machineCode = String\(value \|\| ""\)\.replace\(\s*\/\[\^0-9\]\/g,\s*""\)/, "lookup should normalize machine code from numeric barcode input");
+  assert.match(lookupSource, /\!machineCode\.startsWith\("5"\)/);
+  assert.match(lookupSource, /throw new Error\("此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。"\)/);
+  ["RAW_BALE", "STORE_PREP_BALE", "LOOSE_PICK_TASK", "STORE_DELIVERY_EXECUTION"].forEach((barcodeType) => {
+    assert.doesNotMatch(lookupSource, new RegExp(`allowedBarcodeTypes[\\s\\S]*${barcodeType}`));
+  });
+  assert.match(appJs, /store_item_machine_code:\s*token\.machine_code/);
+  assert.match(appJs, /barcode:\s*token\.machine_code/);
+  assert.doesNotMatch(appJs, /barcode:\s*token\.display_code/);
 });
 
 test("POS sale completion records source chain and marks only scanned STORE_ITEM tokens sold", () => {
