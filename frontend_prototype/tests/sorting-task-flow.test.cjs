@@ -108,6 +108,56 @@ test("merged sorting lookup accepts real RAW_BALE machine_code and stores canoni
   assert.notDeepEqual(result.selectedBaleCodes, ["1260427521"]);
 });
 
+test("addBaleToSortingTaskSelection allows recorded source cost pending allocation", () => {
+  const result = addBaleToSortingTaskSelection({
+    allBales: [
+      {
+        bale_barcode: "RB260427AAAUB",
+        machine_code: "1260427521",
+        barcode_value: "1260427521",
+        human_readable: "1260427521",
+        status: "ready_for_sorting",
+        occupied_by_task_no: "",
+        source_cost_completed: false,
+        source_cost_allows_sorting: true,
+        source_cost_gate_status: "recorded_pending_allocation",
+        source_cost_gate_message: "来源成本已记录，待分摊；可先创建分拣任务。",
+        source_allocated_cost_kes: null,
+      },
+    ],
+    selectedBaleCodes: [],
+    baleCode: "1260427521",
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.selectedBaleCodes, ["RB260427AAAUB"]);
+  assert.notDeepEqual(result.selectedBaleCodes, ["1260427521"]);
+  assert.match(result.warning, /待分摊/);
+});
+
+test("addBaleToSortingTaskSelection blocks explicit source cost gate failure statuses", () => {
+  for (const status of ["missing_source", "missing_cost_record", "invalid_weight_or_qty"]) {
+    const result = addBaleToSortingTaskSelection({
+      allBales: [
+        {
+          bale_barcode: `RB-${status}`,
+          machine_code: "1260427521",
+          status: "ready_for_sorting",
+          occupied_by_task_no: "",
+          source_cost_allows_sorting: false,
+          source_cost_gate_status: status,
+          source_cost_gate_message: `blocked by ${status}`,
+        },
+      ],
+      selectedBaleCodes: [],
+      baleCode: "1260427521",
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, new RegExp(status));
+  }
+});
+
 test("merged sorting lookup still rejects non-RAW_BALE machine_code prefixes", () => {
   const merged = mergeSortingTaskLookupBales(
     [],

@@ -5768,6 +5768,20 @@ function getChinaSourceFinanceCompletion(record) {
 }
 
 function hasCompletedSourceCostForBale(row) {
+  const sourceCostGateStatus = String(row?.source_cost_gate_status || "").trim().toLowerCase();
+  if (row?.source_cost_allows_sorting === true) {
+    return true;
+  }
+  if (sourceCostGateStatus === "allocated" || sourceCostGateStatus === "recorded_pending_allocation") {
+    return true;
+  }
+  if (
+    sourceCostGateStatus === "missing_source"
+    || sourceCostGateStatus === "missing_cost_record"
+    || sourceCostGateStatus === "invalid_weight_or_qty"
+  ) {
+    return false;
+  }
   const sourceBaleToken = String(row?.source_bale_token || "").trim();
   if (!sourceBaleToken) {
     return false;
@@ -28922,15 +28936,17 @@ async function addSortingLookupBaleToSelection() {
   }
   setInputValue("#sortingTaskForm [name='bale_lookup']", "");
   refreshSortingShipmentOptions();
+  const successMessage = result.duplicate
+    ? `${result.matchedRow?.bale_barcode || baleCode} 已经在当前任务里。`
+    : result.approximate
+      ? `${baleCode} 疑似扫码丢字，已按 ${result.matchedRow?.bale_barcode || baleCode} 加入当前任务。`
+      : `${result.matchedRow?.bale_barcode || baleCode} 已加入当前任务。`;
+  const hasSourceCostWarning = Boolean(result.warning && !result.duplicate);
   showTransientInlineNotice(
     "#sortingTaskNotice",
-    result.duplicate
-      ? `${result.matchedRow?.bale_barcode || baleCode} 已经在当前任务里。`
-      : result.approximate
-        ? `${baleCode} 疑似扫码丢字，已按 ${result.matchedRow?.bale_barcode || baleCode} 加入当前任务。`
-        : `${result.matchedRow?.bale_barcode || baleCode} 已加入当前任务。`,
-    result.duplicate ? "info" : "success",
-    1600,
+    hasSourceCostWarning ? result.warning : successMessage,
+    hasSourceCostWarning ? "warning" : (result.duplicate ? "info" : "success"),
+    hasSourceCostWarning ? 2400 : 1600,
   );
 }
 

@@ -173,6 +173,16 @@
     if (!row || typeof row !== "object") {
       return false;
     }
+    const gateStatus = normalizeSearchValue(row.source_cost_gate_status);
+    if (row.source_cost_allows_sorting === true) {
+      return true;
+    }
+    if (gateStatus === "allocated" || gateStatus === "recorded_pending_allocation") {
+      return true;
+    }
+    if (gateStatus === "missing_source" || gateStatus === "missing_cost_record" || gateStatus === "invalid_weight_or_qty") {
+      return false;
+    }
     if (typeof row.source_cost_completed === "boolean") {
       return row.source_cost_completed;
     }
@@ -184,6 +194,25 @@
       ?? 0,
     );
     return amount > 0;
+  }
+
+  function getSourceCostGateWarning(row) {
+    const gateStatus = normalizeSearchValue(row && row.source_cost_gate_status);
+    if (gateStatus !== "recorded_pending_allocation") {
+      return "";
+    }
+    return normalizeText(row && row.source_cost_gate_message) || "来源成本已记录，待分摊；可先创建分拣任务。";
+  }
+
+  function getSourceCostGateBlockMessage(row) {
+    if (hasCompletedSourceCost(row)) {
+      return "";
+    }
+    const gateStatus = normalizeSearchValue(row && row.source_cost_gate_status);
+    if (gateStatus === "missing_source" || gateStatus === "missing_cost_record" || gateStatus === "invalid_weight_or_qty") {
+      return normalizeText(row && row.source_cost_gate_message) || `source_cost_gate_status=${gateStatus}`;
+    }
+    return "该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。";
   }
 
   function findSortingTaskLookupMatches(rows, options) {
@@ -264,20 +293,23 @@
         selectedBaleCodes,
       };
     }
-    if (!hasCompletedSourceCost(matchedRow)) {
+    const sourceCostBlockMessage = getSourceCostGateBlockMessage(matchedRow);
+    if (sourceCostBlockMessage) {
       return {
         ok: false,
-        error: "该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。",
+        error: sourceCostBlockMessage,
         selectedBaleCodes,
       };
     }
     const canonicalBaleBarcode = normalizeShipmentNo(matchedRow && matchedRow.bale_barcode);
+    const warning = getSourceCostGateWarning(matchedRow);
     if (selectedBaleCodes.includes(canonicalBaleBarcode)) {
       return {
         ok: true,
         duplicate: true,
         matchedRow,
         selectedBaleCodes,
+        warning,
       };
     }
     return {
@@ -286,6 +318,7 @@
       approximate,
       matchedRow,
       selectedBaleCodes: [...selectedBaleCodes, canonicalBaleBarcode],
+      warning,
     };
   }
 
