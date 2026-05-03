@@ -17690,12 +17690,12 @@ function renderBalePrintModal() {
       : `${balePrintModalState.supplierName || "-"} · ${balePrintModalState.categoryDisplay || "-"} · 当前类别已经全部打印完成`;
   }
   if (title) {
-    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : "Bale 条码打印窗");
+    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : (isSdoPrint ? "STORE DISPATCH / SDO 条码打印" : "Bale 条码打印窗"));
   }
   if (scopeNote) {
     scopeNote.textContent = isLpkPrint
       ? "LPK 只用于仓库补差拣货和打包。门店收货请扫描后续生成的 SDO 正式送货执行码。"
-      : (isSdbPrint ? "SDB 只用于仓库压缩后待送店 / 待售卖来源包；不是门店正式收货码。" : "");
+      : (isSdbPrint ? "SDB 只用于仓库压缩后待送店 / 待售卖来源包；不是门店正式收货码。" : (isSdoPrint ? "SDO 是门店正式收货执行码；门店收货仍只扫 SDO，不扫 SDB / LPK。" : ""));
   }
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
@@ -19730,7 +19730,7 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
     const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
       allowedCodes: ["store_dispatch_60x40"],
       selectedCode: ["store_dispatch_60x40", "transtoshop", "wait_for_transtoshop"].includes(String(selectedTemplateCode || "").trim().toLowerCase()) ? "store_dispatch_60x40" : (selectedTemplateCode || "store_dispatch_60x40"),
-    });
+    }).filter((row) => String(row?.template_code || "").trim().toLowerCase() === "store_dispatch_60x40");
     return rows.length
       ? rows
       : [{
@@ -19747,7 +19747,7 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
     const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
       allowedCodes: ["store_prep_bale_60x40"],
       selectedCode: "store_prep_bale_60x40",
-    });
+    }).filter((row) => String(row?.template_code || "").trim().toLowerCase() === "store_prep_bale_60x40");
     return rows.length
       ? rows
       : [{
@@ -19764,7 +19764,7 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
     const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
       allowedCodes: ["store_loose_pick_60x40"],
       selectedCode: selectedTemplateCode || "store_loose_pick_60x40",
-    });
+    }).filter((row) => String(row?.template_code || "").trim().toLowerCase() === "store_loose_pick_60x40");
     return rows.length
       ? rows
       : [{
@@ -19814,15 +19814,22 @@ function getPreferredBaleTemplateCode(preferredValue = "") {
 }
 
 function getPreferredWarehouseoutTemplateCode(preferredValue = "", taskType = "store_dispatch") {
+  const normalizedTaskType = String(taskType || "store_dispatch").trim().toLowerCase() || "store_dispatch";
+  if (normalizedTaskType === "transfer_dispatch") {
+    return getTransferDispatchTemplateCode();
+  }
+  if (normalizedTaskType === "lpk_shortage_pick") {
+    return "store_loose_pick_60x40";
+  }
   const warehouseoutTemplates = getSelectableLabelTemplatesByScope("warehouseout_bale");
   const persistedValue = String(preferredWarehouseoutTemplateCode || "").trim().toLowerCase();
-  if (storePrepBaleFlow.pickPreferredStorePrepTemplateCode) {
+  if (isStorePrepBaleModalTaskType(normalizedTaskType) && storePrepBaleFlow.pickPreferredStorePrepTemplateCode) {
     return storePrepBaleFlow.pickPreferredStorePrepTemplateCode(warehouseoutTemplates, {
-      taskType,
+      taskType: normalizedTaskType,
       preferredValue,
       currentValue: persistedValue,
     }) || (storePrepBaleFlow.getStorePrepTemplateDefaultCode
-      ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(taskType)
+      ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(normalizedTaskType)
       : "store_prep_bale_60x40");
   }
   const preferred = String(preferredValue || "").trim().toLowerCase();
@@ -19833,8 +19840,8 @@ function getPreferredWarehouseoutTemplateCode(preferredValue = "", taskType = "s
     return persistedValue;
   }
   const defaultCode = String(
-    storePrepBaleFlow.getStorePrepTemplateDefaultCode
-      ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(taskType)
+    isStorePrepBaleModalTaskType(normalizedTaskType) && storePrepBaleFlow.getStorePrepTemplateDefaultCode
+      ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(normalizedTaskType)
       : "store_prep_bale_60x40"
   ).trim().toLowerCase();
   if (warehouseoutTemplates.some((row) => String(row?.template_code || "").trim().toLowerCase() === defaultCode)) {
@@ -20798,13 +20805,34 @@ function templateIncludesField(template, fieldName) {
 
 function getSelectedBaleTemplate(preferredValue = "", scope = "bale", taskType = "store_dispatch") {
   const normalizedScope = String(scope || "").trim().toLowerCase() || "bale";
+  const normalizedTaskType = String(taskType || "store_dispatch").trim().toLowerCase() || "store_dispatch";
   const resolvedCode = normalizedScope === "warehouseout_bale"
-    ? getPreferredWarehouseoutTemplateCode(preferredValue, taskType)
+    ? getPreferredWarehouseoutTemplateCode(preferredValue, normalizedTaskType)
     : getPreferredBaleTemplateCode(preferredValue);
   if (normalizedScope === "warehouseout_bale") {
+    if (normalizedTaskType === "transfer_dispatch") {
+      return getLabelTemplateByCode(resolvedCode) || {
+        template_code: "store_dispatch_60x40",
+        name: "SDO / STORE_DELIVERY_EXECUTION 60x40",
+        width_mm: 60,
+        height_mm: 40,
+        barcode_type: "Code128",
+        fields: ["store_name", "transfer_order_no", "bale_piece_summary", "total_quantity", "packing_list", "dispatch_bale_no", "code"],
+      };
+    }
+    if (normalizedTaskType === "lpk_shortage_pick") {
+      return getLabelTemplateByCode(resolvedCode) || {
+        template_code: "store_loose_pick_60x40",
+        name: "门店补差拣货单 60x40",
+        width_mm: 60,
+        height_mm: 40,
+        barcode_type: "Code128",
+        fields: ["status", "cat", "grade", "qty", "packing_list", "code", "dispatch_bale_no"],
+      };
+    }
     return getLabelTemplateByCode(resolvedCode) || {
-      template_code: String(resolvedCode || "wait_for_transtoshop").trim().toLowerCase() || "wait_for_transtoshop",
-      name: "WAITING FOR STORE DISPATCH",
+      template_code: String(resolvedCode || "store_prep_bale_60x40").trim().toLowerCase() || "store_prep_bale_60x40",
+      name: "SDB / STORE_PREP_BALE 60x40",
       width_mm: 60,
       height_mm: 40,
       barcode_type: "Code128",

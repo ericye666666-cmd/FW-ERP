@@ -933,8 +933,15 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
 });
 
 test("final transfer dispatch print uses SDO 60x40 payload and machine barcode fields", () => {
+  const warehouseoutPreferenceSource = appJs.match(/function getPreferredWarehouseoutTemplateCode[\s\S]*?function populateBaleLabelTemplateSelects/)?.[0] || "";
+  const sdoOptionsSource = appJs.match(/function getBaleModalTemplateOptions[\s\S]*?if \(normalizedScope === "warehouseout_bale" && isStorePrepBaleModalTaskType/)?.[0] || "";
+
   assert.match(appJs, /function getTransferDispatchTemplateCode/);
   assert.match(appJs, /getTransferDispatchTemplateCode\(\)[\s\S]*?return "store_dispatch_60x40"/);
+  assert.match(warehouseoutPreferenceSource, /normalizedTaskType === "transfer_dispatch"[\s\S]*?return getTransferDispatchTemplateCode\(\)/);
+  assert.match(warehouseoutPreferenceSource, /normalizedTaskType === "lpk_shortage_pick"[\s\S]*?return "store_loose_pick_60x40"/);
+  assert.match(sdoOptionsSource, /\.filter\(\(row\) => String\(row\?\.template_code/);
+  assert.doesNotMatch(sdoOptionsSource, /store_prep_bale_60x40/);
   assert.match(appJs, /taskType:\s*"transfer_dispatch"/);
   assert.match(appJs, /allowedCodes:\s*\["store_dispatch_60x40"\]/);
   assert.match(appJs, /selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop" \|\| selectedTemplateCode === "wait_for_transtoshop"/);
@@ -961,6 +968,8 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /const machineCode = String\(payload\.machine_code \|\| payload\.barcode_value \|\| payload\.scan_token \|\| defaultBarcodeValue\)\.replace\(\/\[\^0-9\]\/g, ""\)\.trim\(\)/);
   assert.match(appJs, /<div class="code">\$\{escapeHtml\(barcodeValue \|\| "NO BARCODE"\)\}<\/div>/);
   assert.match(appJs, /STORE DISPATCH \/ SDO/);
+  assert.match(appJs, /isSdoPrint \? "STORE DISPATCH \/ SDO 条码打印"/);
+  assert.match(appJs, /SDO 是门店正式收货执行码；门店收货仍只扫 SDO，不扫 SDB \/ LPK。/);
   assert.match(appJs, /正式门店送货执行码/);
   assert.match(appJs, /Display: \$\{displayCode \|\| "-"\}/);
   assert.match(appJs, /Request: \$\{transferNo \|\| "-"\}/);
