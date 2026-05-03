@@ -1443,6 +1443,10 @@ class InMemoryState:
         normalized["label_summary"] = str(normalized.get("label_summary") or "").strip()
         normalized["note"] = str(normalized.get("note") or "").strip()
         normalized["created_by"] = str(normalized.get("created_by") or "").strip()
+        normalized["accepted_at"] = normalized.get("accepted_at")
+        normalized["accepted_by"] = str(normalized.get("accepted_by") or "").strip()
+        normalized["label_attached_at"] = normalized.get("label_attached_at")
+        normalized["label_attached_by"] = str(normalized.get("label_attached_by") or "").strip()
         normalized["completed_by"] = str(normalized.get("completed_by") or "").strip()
         return normalized
 
@@ -1454,6 +1458,8 @@ class InMemoryState:
         normalized["bale_barcode"] = bale_barcode
         normalized["scan_token"] = bale_barcode
         normalized["machine_code"] = self._store_prep_bale_machine_code(normalized)
+        normalized["barcode_value"] = normalized["machine_code"]
+        normalized["human_readable"] = normalized["machine_code"]
         normalized["task_no"] = str(normalized.get("task_no") or "").strip().upper()
         normalized["task_type"] = str(normalized.get("task_type") or "store_dispatch").strip().lower() or "store_dispatch"
         normalized["category_main"] = str(normalized.get("category_main") or "").strip()
@@ -1497,6 +1503,14 @@ class InMemoryState:
         )
         normalized["label_summary"] = str(normalized.get("label_summary") or "").strip()
         normalized["staging_area"] = str(normalized.get("staging_area") or "").strip()
+        normalized["label_print_job_id"] = normalized.get("label_print_job_id")
+        normalized["label_print_queued_at"] = normalized.get("label_print_queued_at")
+        normalized["label_attached_at"] = normalized.get("label_attached_at")
+        normalized["label_attached_by"] = str(normalized.get("label_attached_by") or "").strip()
+        normalized["printed_at"] = normalized.get("printed_at")
+        normalized["printed_by"] = str(normalized.get("printed_by") or "").strip()
+        normalized["inventory_converted_at"] = normalized.get("inventory_converted_at")
+        normalized["inventory_converted_by"] = str(normalized.get("inventory_converted_by") or "").strip()
         return normalized
 
     def _transfer_dispatch_bale_no(self, transfer_no: str, bale_index: int) -> str:
@@ -6447,7 +6461,10 @@ class InMemoryState:
         normalized_employee = str(employee_name or "").strip().lower()
         if not normalized_employee:
             return None
-        for row in self.list_store_prep_bale_tasks(status="open"):
+        active_compression_statuses = {"open", "barcode_generated", "printed_pending_label"}
+        for row in self.list_store_prep_bale_tasks():
+            if str(row.get("status") or "").strip().lower() not in active_compression_statuses:
+                continue
             if str(row.get("assigned_employee") or "").strip().lower() != normalized_employee:
                 continue
             task_type = str(row.get("task_type") or "store_dispatch").strip().lower()
@@ -6576,6 +6593,160 @@ class InMemoryState:
                 note="Moved loose sorted inventory into waiting store-prep bale",
                 details={"category_sub": self._split_category_name_parts(str(token.get("category_name") or ""))[1]},
             )
+
+    def _final_store_prep_bale_status(self, task_type: str) -> str:
+        return "waiting_bale_sale" if str(task_type or "").strip().lower() == "sale" else "waiting_store_dispatch"
+
+    def _final_store_prep_token_status(self, task_type: str) -> str:
+        return "packed_waiting_bale_sale" if str(task_type or "").strip().lower() == "sale" else "packed_waiting_store_dispatch"
+
+    def _find_store_prep_bale_by_reference(self, reference: str) -> Optional[dict[str, Any]]:
+        normalized_reference = str(reference or "").strip().upper()
+        if not normalized_reference:
+            return None
+        direct = self.store_prep_bales.get(normalized_reference)
+        if direct:
+            return self._normalize_store_prep_bale(direct)
+        for row in self.store_prep_bales.values():
+            normalized = self._normalize_store_prep_bale(row)
+            references = {
+                str(normalized.get("bale_no") or "").strip().upper(),
+                str(normalized.get("bale_barcode") or "").strip().upper(),
+                str(normalized.get("scan_token") or "").strip().upper(),
+                str(normalized.get("machine_code") or "").strip().upper(),
+                str(normalized.get("barcode_value") or "").strip().upper(),
+            }
+            if normalized_reference in references:
+                return normalized
+        return None
+
+    def _find_store_prep_bale_for_print_job(self, job: dict[str, Any]) -> Optional[dict[str, Any]]:
+        payload = job.get("print_payload") if isinstance(job.get("print_payload"), dict) else {}
+        references = [
+            job.get("barcode"),
+            payload.get("parcel_batch_no"),
+            payload.get("bale_barcode"),
+            payload.get("display_code"),
+            payload.get("machine_code"),
+            payload.get("barcode_value"),
+        ]
+        for reference in references:
+            bale = self._find_store_prep_bale_by_reference(str(reference or ""))
+            if bale:
+                return bale
+        return None
+
+    def _finalize_store_prep_bale_label_attached(
+        self,
+        bale_no: str,
+        *,
+        actor: str,
+        attached_at: str,
+        print_job_id: Optional[int] = None,
+    ) -> Optional[dict[str, Any]]:
+        normalized_bale_no = str(bale_no or "").strip().upper()
+        if not normalized_bale_no:
+            return None
+        stored_bale = self.store_prep_bales.get(normalized_bale_no)
+        if not stored_bale:
+            return None
+        bale = self._normalize_store_prep_bale(stored_bale)
+        task_type = str(bale.get("task_type") or "store_dispatch").strip().lower() or "store_dispatch"
+        final_status = self._final_store_prep_bale_status(task_type)
+        final_token_status = self._final_store_prep_token_status(task_type)
+        token_rows = [
+            self.item_barcode_tokens[token_no]
+            for token_no in bale.get("token_nos", []) or []
+            if str(token_no or "").strip().upper() in self.item_barcode_tokens
+        ]
+        already_converted = bool(bale.get("inventory_converted_at")) or str(bale.get("status") or "").strip().lower() == final_status
+
+        bale["status"] = final_status
+        bale["label_attached_at"] = bale.get("label_attached_at") or attached_at
+        bale["label_attached_by"] = bale.get("label_attached_by") or actor
+        bale["printed_at"] = bale.get("printed_at") or attached_at
+        bale["printed_by"] = bale.get("printed_by") or actor
+        if print_job_id is not None:
+            bale["label_print_job_id"] = print_job_id
+        bale["updated_at"] = attached_at
+
+        if not already_converted:
+            for row in token_rows:
+                if task_type == "sale":
+                    row["sale_prep_bale_no"] = normalized_bale_no
+                    row["sale_prep_task_no"] = str(bale.get("task_no") or "").strip().upper()
+                else:
+                    row["store_prep_bale_no"] = normalized_bale_no
+                    row["store_prep_task_no"] = str(bale.get("task_no") or "").strip().upper()
+                row["status"] = final_token_status
+                row["store_prep_reserved_from_status"] = ""
+                row["updated_at"] = attached_at
+
+            task_no = str(bale.get("task_no") or "").strip().upper()
+            if task_type != "sale":
+                self._deduct_store_prep_tokens_from_sorting_stock(token_rows, task_no, actor)
+                movement_type = "store_prep_bale_created"
+                product_name = f"{bale.get('category_sub') or ''} waiting store dispatch bale"
+                quantity_delta = int(bale.get("qty") or 0)
+                location_code = "warehouse_waiting_store_dispatch"
+                note = "Packed loose sorted clothes into waiting store-dispatch bale after SDB label attachment"
+                details = {"category_sub": bale.get("category_sub") or "", "bale_no": normalized_bale_no}
+            else:
+                movement_type = "store_prep_sale_bale_created"
+                product_name = f"{bale.get('category_sub') or ''} waiting bale sale"
+                quantity_delta = 0
+                location_code = "warehouse_waiting_bale_sale"
+                note = "Packed loose sorted clothes into waiting bale-sale bundle after SDB label attachment"
+                details = {
+                    "category_sub": bale.get("category_sub") or "",
+                    "bale_no": normalized_bale_no,
+                    "ratio_label": bale.get("ratio_label") or "",
+                    "ratio_summary": bale.get("ratio_summary") or "",
+                    "actual_weight_kg": bale.get("actual_weight_kg"),
+                }
+            self._record_inventory_movement(
+                movement_type=movement_type,
+                barcode=str(bale.get("bale_barcode") or "").strip().upper() or normalized_bale_no,
+                product_name=product_name,
+                quantity_delta=quantity_delta,
+                location_type="warehouse_store_prep",
+                location_code=location_code,
+                reference_type="store_prep_bale_task",
+                reference_no=task_no,
+                actor=actor,
+                note=note,
+                details=details,
+            )
+            bale["inventory_converted_at"] = attached_at
+            bale["inventory_converted_by"] = actor
+
+        self.store_prep_bales[normalized_bale_no] = self._normalize_store_prep_bale(bale)
+        task_no = str(bale.get("task_no") or "").strip().upper()
+        task = self.store_prep_bale_tasks.get(task_no)
+        if task:
+            task = self._normalize_store_prep_bale_task(task)
+            prepared_bale_nos = [
+                str(value or "").strip().upper()
+                for value in task.get("prepared_bale_nos", []) or []
+                if str(value or "").strip()
+            ]
+            if normalized_bale_no and normalized_bale_no not in prepared_bale_nos:
+                prepared_bale_nos.append(normalized_bale_no)
+            all_attached = bool(prepared_bale_nos) and all(
+                self.store_prep_bales.get(no)
+                and str(self._normalize_store_prep_bale(self.store_prep_bales.get(no, {})).get("status") or "").strip().lower()
+                == self._final_store_prep_bale_status(task.get("task_type") or "store_dispatch")
+                for no in prepared_bale_nos
+            )
+            task["status"] = "completed" if all_attached else "printed_pending_label"
+            task["label_attached_at"] = attached_at if all_attached else task.get("label_attached_at")
+            task["label_attached_by"] = actor if all_attached else task.get("label_attached_by", "")
+            if all_attached:
+                task["completed_at"] = task.get("completed_at") or attached_at
+                task["completed_by"] = task.get("completed_by") or actor
+            task["updated_at"] = attached_at
+            self.store_prep_bale_tasks[task_no] = task
+        return self.store_prep_bales[normalized_bale_no]
 
     def list_store_prep_bale_tasks(self, status: Optional[str] = None) -> list[dict[str, Any]]:
         rows = [self._normalize_store_prep_bale_task(row) for row in self.store_prep_bale_tasks.values()]
@@ -6753,6 +6924,8 @@ class InMemoryState:
         task = self._normalize_store_prep_bale_task(task)
         if task["status"] == "completed":
             return task
+        if task["status"] in {"barcode_generated", "printed_pending_label"}:
+            return task
         selected_tokens = self._get_reserved_store_prep_tokens_for_task(task)
         if not selected_tokens:
             available_tokens = self._list_available_store_prep_tokens(task["category_sub"])
@@ -6785,8 +6958,8 @@ class InMemoryState:
             if self._split_category_name_parts(str(row.get("category_name") or ""))[0]
         }
         created_at = now_iso()
-        bale_status = "waiting_bale_sale" if task_type == "sale" else "waiting_store_dispatch"
-        staging_area = "warehouse_waiting_bale_sale" if task_type == "sale" else "warehouse_waiting_store_dispatch"
+        bale_status = "barcode_generated"
+        staging_area = "warehouse_store_prep_label_pending"
         pieces_per_bale = int(task.get("pieces_per_bale") or task.get("target_qty") or actual_qty or 0)
         bale_count = int(task.get("bale_count") or 1)
         if task_type == "sale":
@@ -6860,16 +7033,11 @@ class InMemoryState:
                 if task_type == "sale":
                     row["sale_prep_bale_no"] = bale_no
                     row["sale_prep_task_no"] = normalized_task_no
-                    row["status"] = "packed_waiting_bale_sale"
                 else:
                     row["store_prep_bale_no"] = bale_no
                     row["store_prep_task_no"] = normalized_task_no
-                    row["status"] = "packed_waiting_store_dispatch"
-                row["store_prep_reserved_from_status"] = ""
                 row["updated_at"] = created_at
         self._restore_store_prep_released_tokens(task_type, released_tokens, created_at)
-        if task_type != "sale":
-            self._deduct_store_prep_tokens_from_sorting_stock(packed_tokens, normalized_task_no, actor["username"])
         task["available_qty"] = len(self._list_available_store_prep_tokens(task["category_sub"]))
         task["reserved_token_nos"] = []
         task["packed_qty"] = len(packed_tokens)
@@ -6879,62 +7047,25 @@ class InMemoryState:
         task["prepared_bale_barcodes"] = [str(row.get("bale_barcode") or "").strip().upper() for row in created_bales]
         task["prepared_bale_no"] = task["prepared_bale_nos"][0] if task["prepared_bale_nos"] else ""
         task["prepared_bale_barcode"] = task["prepared_bale_barcodes"][0] if task["prepared_bale_barcodes"] else ""
-        task["status"] = "completed"
+        task["status"] = "barcode_generated"
         task["grade_requirements"] = grade_requirements
         task["grade_summary"] = grade_summary
         task["actual_weight_kg"] = actual_weight_kg
         task["unit_cost_kes"] = task_unit_cost_kes
         task["total_cost_kes"] = total_cost_kes
-        task["completed_at"] = created_at
-        task["completed_by"] = actor["username"]
+        task["accepted_at"] = created_at
+        task["accepted_by"] = actor["username"]
+        task["completed_at"] = None
+        task["completed_by"] = ""
         task["updated_at"] = created_at
         task["note"] = str(payload.get("note") or task.get("note") or "").strip()
         self.store_prep_bale_tasks[normalized_task_no] = task
-        for store_prep_bale in created_bales:
-            bale_no = str(store_prep_bale.get("bale_no") or "").strip().upper()
-            if task_type == "sale":
-                self._record_inventory_movement(
-                    movement_type="store_prep_sale_bale_created",
-                    barcode=str(store_prep_bale.get("bale_barcode") or "").strip().upper() or bale_no,
-                    product_name=f"{task['category_sub']} waiting bale sale",
-                    quantity_delta=0,
-                    location_type="warehouse_store_prep",
-                    location_code="warehouse_waiting_bale_sale",
-                    reference_type="store_prep_bale_task",
-                    reference_no=normalized_task_no,
-                    actor=actor["username"],
-                    note="Packed loose sorted clothes into waiting bale-sale bundle without deducting sorting stock",
-                    details={
-                        "category_sub": task["category_sub"],
-                        "bale_no": bale_no,
-                        "ratio_label": task.get("ratio_label") or "",
-                        "ratio_summary": task.get("ratio_summary") or "",
-                        "actual_weight_kg": actual_weight_kg,
-                    },
-                )
-            else:
-                self._record_inventory_movement(
-                    movement_type="store_prep_bale_created",
-                    barcode=str(store_prep_bale.get("bale_barcode") or "").strip().upper() or bale_no,
-                    product_name=f"{task['category_sub']} waiting store dispatch bale",
-                    quantity_delta=int(store_prep_bale.get("qty") or 0),
-                    location_type="warehouse_store_prep",
-                    location_code="warehouse_waiting_store_dispatch",
-                    reference_type="store_prep_bale_task",
-                    reference_no=normalized_task_no,
-                    actor=actor["username"],
-                    note="Packed loose sorted clothes into waiting store-dispatch bale",
-                    details={
-                        "category_sub": task["category_sub"],
-                        "bale_no": bale_no,
-                    },
-                )
         self._log_event(
-            event_type="store_prep_bale_task.completed",
+            event_type="store_prep_bale_task.accepted",
             entity_type="store_prep_bale_task",
             entity_id=normalized_task_no,
             actor=actor["username"],
-            summary=f"Store prep bale task {normalized_task_no} completed",
+            summary=f"Store prep bale task {normalized_task_no} accepted pending SDB label attachment",
             details={
                 "task_type": task_type,
                 "prepared_bale_no": task["prepared_bale_no"],
@@ -6969,15 +7100,20 @@ class InMemoryState:
             raise HTTPException(status_code=404, detail=f"Unknown store prep bale {normalized_bale_no}")
         bale = self._normalize_store_prep_bale(bale)
         task_type = str(bale.get("task_type") or "store_dispatch").strip().lower() or "store_dispatch"
-        default_template_code = "wait_for_sale" if task_type == "sale" else "wait_for_transtoshop"
+        default_template_code = "store_prep_bale_60x40"
         resolved_template_code = str(template_code or default_template_code).strip().lower() or default_template_code
+        if resolved_template_code != default_template_code:
+            raise HTTPException(
+                status_code=400,
+                detail="SDB / STORE_PREP_BALE 标签模板已锁定，压缩输出 bale 只能使用 store_prep_bale_60x40。",
+            )
         template = self.get_label_template(resolved_template_code, template_scope="warehouseout_bale")
         label_size = f"{int(template.get('width_mm') or 60)}x{int(template.get('height_mm') or 40)}"
         category_display = " / ".join(part for part in [bale.get("category_main"), bale.get("category_sub")] if str(part or "").strip()) or "-"
         package_label = f"{int(bale.get('qty') or 0)} 件"
         if bale.get("actual_weight_kg") not in {None, ""} and float(bale.get("actual_weight_kg") or 0) > 0:
             package_label = f"{package_label} · {float(bale.get('actual_weight_kg') or 0):g} KG"
-        status_text = "WAIT FOR SALE" if task_type == "sale" else "WAITING FOR STORE DISPATCH"
+        status_text = "wait for sale" if task_type == "sale" else "WAITING FOR STORE DISPATCH"
         display_code = str(bale.get("scan_token") or bale.get("bale_barcode") or "").strip().upper()
         machine_code = str(bale.get("machine_code") or self._store_prep_bale_machine_code(bale)).strip().upper()
         job = {
@@ -7046,6 +7182,23 @@ class InMemoryState:
             },
         }
         self.print_jobs.append(job)
+        queued_at = str(job.get("created_at") or now_iso())
+        if str(bale.get("status") or "").strip().lower() not in {
+            self._final_store_prep_bale_status(task_type),
+            "completed",
+        }:
+            bale["status"] = "printed_pending_label"
+            bale["label_print_job_id"] = job["id"]
+            bale["label_print_queued_at"] = queued_at
+            bale["updated_at"] = queued_at
+            self.store_prep_bales[normalized_bale_no] = self._normalize_store_prep_bale(bale)
+            task_no = str(bale.get("task_no") or "").strip().upper()
+            if task_no in self.store_prep_bale_tasks:
+                task = self._normalize_store_prep_bale_task(self.store_prep_bale_tasks[task_no])
+                if task.get("status") != "completed":
+                    task["status"] = "printed_pending_label"
+                    task["updated_at"] = queued_at
+                    self.store_prep_bale_tasks[task_no] = task
         self._log_event(
             event_type="print.store_prep_bale_label_queued",
             entity_type="print_job",
@@ -13193,6 +13346,15 @@ class InMemoryState:
                 bale["printed_at"] = job["printed_at"]
                 bale["printed_by"] = actor["username"]
                 bale["updated_at"] = job["printed_at"]
+            else:
+                store_prep_bale = self._find_store_prep_bale_for_print_job(job)
+                if store_prep_bale:
+                    self._finalize_store_prep_bale_label_attached(
+                        str(store_prep_bale.get("bale_no") or "").strip().upper(),
+                        actor=actor["username"],
+                        attached_at=job["printed_at"],
+                        print_job_id=job["id"],
+                    )
         if str(job.get("job_type") or "") == "item_token_label":
             token_no = str(job.get("barcode") or "").strip().upper()
             token = self.item_barcode_tokens.get(token_no)

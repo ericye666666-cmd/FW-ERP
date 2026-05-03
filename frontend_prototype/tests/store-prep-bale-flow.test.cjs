@@ -41,15 +41,16 @@ test("summarizeStorePrepBales keeps warehouse packaged inventory in KES", () => 
   const summary = summarizeStorePrepBales([
     { bale_no: "SPB-001", task_type: "store_dispatch", qty: 50, total_cost_kes: 4000, updated_at: "2026-04-23T08:00:00Z" },
     { bale_no: "SPB-002", task_type: "sale", qty: 100, total_cost_kes: 8500, updated_at: "2026-04-23T09:30:00Z" },
+    { bale_no: "SPB-003", task_type: "store_dispatch", status: "printed_pending_label", qty: 100, total_cost_kes: 9000, updated_at: "2026-04-23T10:30:00Z" },
   ]);
 
   assert.deepEqual(plain(summary), {
-    baleCount: 2,
+    baleCount: 3,
     dispatchBaleCount: 1,
     saleBaleCount: 1,
     totalQty: 150,
     totalCostKes: 12500,
-    latestUpdatedAt: "2026-04-23T09:30:00Z",
+    latestUpdatedAt: "2026-04-23T10:30:00Z",
   });
 });
 
@@ -73,26 +74,28 @@ test("estimateSaleBaleGradeMix derives target pieces and graded counts from weig
   });
 });
 
-test("pickPreferredStorePrepTemplateCode defaults by task type inside warehouseout template family", () => {
+test("pickPreferredStorePrepTemplateCode locks compression output to the SDB template", () => {
   const templates = [
     { template_code: "transtoshop" },
     { template_code: "wait_for_transtoshop" },
     { template_code: "wait_for_sale" },
+    { template_code: "store_loose_pick_60x40" },
+    { template_code: "store_prep_bale_60x40" },
   ];
 
-  assert.equal(getStorePrepTemplateDefaultCode("store_dispatch"), "wait_for_transtoshop");
-  assert.equal(getStorePrepTemplateDefaultCode("sale"), "wait_for_sale");
+  assert.equal(getStorePrepTemplateDefaultCode("store_dispatch"), "store_prep_bale_60x40");
+  assert.equal(getStorePrepTemplateDefaultCode("sale"), "store_prep_bale_60x40");
   assert.equal(
-    pickPreferredStorePrepTemplateCode(templates, { taskType: "store_dispatch" }),
-    "wait_for_transtoshop",
+    pickPreferredStorePrepTemplateCode(templates, { taskType: "store_dispatch", preferredValue: "wait_for_transtoshop" }),
+    "store_prep_bale_60x40",
   );
   assert.equal(
-    pickPreferredStorePrepTemplateCode(templates, { taskType: "sale" }),
-    "wait_for_sale",
+    pickPreferredStorePrepTemplateCode(templates, { taskType: "sale", currentValue: "wait_for_sale" }),
+    "store_prep_bale_60x40",
   );
 });
 
-test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode and task-type template", () => {
+test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode and locked SDB template", () => {
   const payload = buildStorePrepBaleDirectPrintPayload(
     {
       bale_no: "SPB-20260423-004",
@@ -115,7 +118,7 @@ test("buildStorePrepBaleDirectPrintPayload reuses the bale's historical barcode 
   );
 
   assert.equal(payload.printer_name, "Deli DL-720C");
-  assert.equal(payload.template_code, "wait_for_sale");
+  assert.equal(payload.template_code, "store_prep_bale_60x40");
   assert.equal(payload.display_code, "SDB260423004");
   assert.match(payload.display_code, /^SDB/);
   assert.equal(payload.machine_code, "2260423004");
@@ -171,6 +174,13 @@ test("store prep bale workbench is a dedicated warehouse panel", () => {
   assert.match(html, /<h2>0\.1\.2 压缩工单管理<\/h2>/);
   assert.doesNotMatch(html, /id="compressionTaskAcceptanceWindow"/);
   assert.match(html, /id="compressionTaskAcceptanceModal"/);
+  assert.match(appJs, /data-compression-task-inline-panel/);
+  assert.match(appJs, /data-compression-task-acceptance-form/);
+  assert.match(appJs, /data-compression-task-print/);
+  assert.match(appJs, /模板已锁定：SDB \/ STORE_PREP_BALE 60x40/);
+  assert.match(appJs, /allowedCodes:\s*\["store_prep_bale_60x40"\]/);
+  assert.match(appJs, /openCompressionTaskForAcceptance[\s\S]*renderStorePrepBaleTaskSummary/);
+  assert.doesNotMatch(appJs, /openCompressionTaskForAcceptance[\s\S]{0,260}openCompressionTaskAcceptanceModal/);
   assert.match(html, /name="actual_qty"/);
   assert.match(html, /name="actual_weight_kg"/);
   assert.match(appJs, /name="pieces_per_bale"/);

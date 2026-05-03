@@ -1124,7 +1124,7 @@ let cargoTypeDirectoryState = [];
 let labelTemplateState = [];
 let labelTemplateDemoState = {};
 let preferredBaleTemplateCode = "warehouse_in";
-let preferredWarehouseoutTemplateCode = "wait_for_transtoshop";
+let preferredWarehouseoutTemplateCode = "store_prep_bale_60x40";
 let labelTemplateEditorState = {
   draft: null,
   selectedComponentId: "headline",
@@ -13932,6 +13932,90 @@ function updateInlineStoreDispatchCompressionRatio(form) {
   summaryTarget.textContent = `每包 ${estimate.perBaleRequirements.map((row) => `${row.grade} ${row.qty} 件`).join(" / ")}；本次 ${estimate.totalRequirements.map((row) => `${row.grade} ${row.qty} 件`).join(" / ") || "0 件"}`;
 }
 
+function getCompressionTaskStatusLabel(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "completed") return "已完成 / 已贴标";
+  if (normalized === "printed_pending_label") return "已打印待贴标";
+  if (normalized === "barcode_generated") return "已生成 bale 编号";
+  if (normalized === "acceptance_in_progress") return "验收中";
+  return "待验收";
+}
+
+function getCompressionTaskActionLabel(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "completed") return "查看验收记录";
+  if (["barcode_generated", "printed_pending_label"].includes(normalized)) return "打印 / 贴标";
+  return "去验收";
+}
+
+function getStorePrepBalesForTask(taskNo = "") {
+  const normalizedTaskNo = String(taskNo || "").trim().toUpperCase();
+  if (!normalizedTaskNo) return [];
+  return (Array.isArray(storePrepBaleState) ? storePrepBaleState : [])
+    .filter((row) => String(row?.task_no || "").trim().toUpperCase() === normalizedTaskNo);
+}
+
+function renderCompressionTaskInlinePanel(row = {}) {
+  const status = String(row?.status || "").trim().toLowerCase() || "open";
+  const taskType = String(row?.task_type || "store_dispatch").trim().toLowerCase() || "store_dispatch";
+  const isSaleTask = taskType === "sale";
+  const bales = getStorePrepBalesForTask(row.task_no || "");
+  const baleNos = bales.length
+    ? bales.map((bale) => String(bale?.bale_no || "").trim().toUpperCase()).filter(Boolean)
+    : (Array.isArray(row.prepared_bale_nos) ? row.prepared_bale_nos : [row.prepared_bale_no]).map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+  const displayCodes = bales.length
+    ? bales.map((bale) => String(bale?.scan_token || bale?.bale_barcode || "").trim().toUpperCase()).filter(Boolean)
+    : (Array.isArray(row.prepared_bale_barcodes) ? row.prepared_bale_barcodes : [row.prepared_bale_barcode]).map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+  const machineCodes = bales
+    .map((bale) => String(bale?.machine_code || bale?.barcode_value || "").trim().toUpperCase())
+    .filter(Boolean);
+  const printStatus = status === "completed"
+    ? "已贴标"
+    : status === "printed_pending_label"
+      ? "已生成打印任务，待确认贴标"
+      : status === "barcode_generated"
+        ? "已生成 SDB barcode，待打印"
+        : "待验收";
+  const openForm = status === "open" || !status;
+  return `
+    <section class="candidate-summary" data-compression-task-inline-panel>
+      <div class="alert-banner">验收完成后先生成 SDB barcode；只有确认本包已贴标后，才会转成已完成 bale 库存。</div>
+      <div class="report-summary-grid">
+        <article class="store-metric"><strong>任务号</strong><span>${escapeHtml(row.task_no || "-")}</span></article>
+        <article class="store-metric"><strong>任务类型</strong><span>${escapeHtml(getCompressionTaskTypeLabel(taskType))}</span></article>
+        <article class="store-metric"><strong>小类 / 等级</strong><span>${escapeHtml(`${row.category_sub || "-"} · ${row.grade_summary || "待生成"}`)}</span></article>
+        <article class="store-metric"><strong>目标</strong><span>${escapeHtml(isSaleTask ? `${row.target_weight_kg || "-"} KG` : `${row.target_qty || 0} 件`)}</span></article>
+        <article class="store-metric"><strong>bale 编号</strong><span>${escapeHtml(baleNos.length ? baleNos.join(" / ") : "待生成")}</span></article>
+        <article class="store-metric"><strong>display_code</strong><span>${escapeHtml(displayCodes.length ? displayCodes.join(" / ") : "待生成")}</span></article>
+        <article class="store-metric"><strong>machine_code</strong><span>${escapeHtml(machineCodes.length ? machineCodes.join(" / ") : "待生成")}</span></article>
+        <article class="store-metric"><strong>贴标状态</strong><span>${escapeHtml(printStatus)}</span></article>
+      </div>
+      <div class="button-row">
+        <span class="meta-pill">模板已锁定：SDB / STORE_PREP_BALE 60x40</span>
+        <span class="meta-pill">barcode_value = machine_code</span>
+      </div>
+      ${openForm ? `
+        <form class="form-grid compact" data-compression-task-acceptance-form>
+          <input type="hidden" name="task_no" value="${escapeHtml(row.task_no || "")}" />
+          <input name="category_sub" placeholder="小类" readonly value="${escapeHtml(row.category_sub || "")}" />
+          <input name="assigned_employee" placeholder="负责员工" readonly value="${escapeHtml(row.assigned_employee || "")}" />
+          <input name="actual_qty" type="number" min="1" step="1" placeholder="实际数量核查" value="${escapeHtml(row.target_qty || row.packed_qty || 0)}" />
+          ${isSaleTask ? `<input name="actual_weight_kg" type="number" min="0.1" step="0.1" placeholder="实际重量核验（KG）" value="${escapeHtml(row.actual_weight_kg || row.target_weight_kg || "")}" />` : ""}
+          <textarea name="note" rows="3" placeholder="主管备注 / 评价">${escapeHtml(row.note || "")}</textarea>
+          <button type="submit">完成验收并生成 SDB barcode</button>
+        </form>
+      ` : `
+        <div class="flow-summary-note">打印 SDB 标签后，请在打印窗点击“确认本包已贴标”。确认成功前，这张工单不会显示为已完成。</div>
+        <div class="button-row">
+          ${status === "completed"
+            ? '<span class="store-flag">已完成验收 / 已贴标</span>'
+            : `<button type="button" data-compression-task-print="${escapeHtml(row.task_no || "")}">打印 SDB 标签</button>`}
+        </div>
+      `}
+    </section>
+  `;
+}
+
 function renderCompressionTaskAcceptanceWindow(message = "") {
   const summaryTarget = document.querySelector("#compressionTaskAcceptanceSummary");
   const form = document.querySelector("#compressionTaskAcceptanceForm");
@@ -14005,9 +14089,9 @@ function renderStorePrepBaleTaskSummary(message = "") {
     filterInput.value = compressionTaskManagerDateFilter;
   }
   const activeDate = getCompressionTaskManagerDateFilter() || getLocalDateKey(new Date().toISOString());
-  const openRows = rows.filter((row) => String(row?.status || "").trim().toLowerCase() === "open");
+  const openRows = rows.filter((row) => String(row?.status || "").trim().toLowerCase() !== "completed");
   const completedRows = rows.filter((row) => (
-    String(row?.status || "").trim().toLowerCase() !== "open"
+    String(row?.status || "").trim().toLowerCase() === "completed"
     && getLocalDateKey(row?.completed_at || row?.updated_at || row?.created_at) === activeDate
   ));
   const visibleRows = [...openRows, ...completedRows];
@@ -14019,7 +14103,7 @@ function renderStorePrepBaleTaskSummary(message = "") {
   }
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(message || "这里统一管理压缩 bale 工单。点目录右侧按钮后，会弹窗验收并打印 barcode。")}</div>
+    <div class="alert-banner">${escapeHtml(message || "这里统一管理压缩 bale 工单。点卡片右侧按钮后，在卡片内完成验收、打印 SDB 标签并确认贴标。")}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>筛选日期</strong><span>${escapeHtml(activeDate)}</span></article>
       <article class="store-metric"><strong>待验收</strong><span>${openRows.length}</span></article>
@@ -14037,10 +14121,10 @@ function renderStorePrepBaleTaskSummary(message = "") {
         <div class="sorting-stock-row-head">
           <div>
             <strong>${escapeHtml(row.label_summary || `${row.category_sub || "-"} · ${row.target_qty || 0} 件`)}</strong>
-            <div class="subtle small">${escapeHtml(`${row.task_no || "-"} · ${String(row.status || "").trim() === "completed" ? "已完成" : "待验收"}`)}</div>
+            <div class="subtle small">${escapeHtml(`${row.task_no || "-"} · ${getCompressionTaskStatusLabel(row.status || "")}`)}</div>
           </div>
           <button type="button" class="ghost-button mini-button" data-compression-task-open="${escapeHtml(row.task_no || "")}">
-            ${String(row.status || "").trim() === "completed" ? "查看验收记录" : "去验收"}
+            ${escapeHtml(getCompressionTaskActionLabel(row.status || ""))}
           </button>
         </div>
         <div class="sorting-stock-meta">
@@ -14056,6 +14140,9 @@ function renderStorePrepBaleTaskSummary(message = "") {
           <span>barcode：${escapeHtml(Array.isArray(row.prepared_bale_barcodes) && row.prepared_bale_barcodes.length ? row.prepared_bale_barcodes.join(" / ") : (row.prepared_bale_barcode || "待生成"))}</span>
           <span>更新时间：${escapeHtml(formatLocalDateTime(row.updated_at) || "-")}</span>
         </div>
+        ${String(activeCompressionTaskNo || "").trim().toUpperCase() === String(row.task_no || "").trim().toUpperCase()
+          ? renderCompressionTaskInlinePanel(row)
+          : ""}
       </article>
     `).join("")
     : '<div class="empty-state">当前日期下还没有压缩工单历史，待验收工单会一直显示在这里。</div>';
@@ -17503,6 +17590,7 @@ function renderBalePrintModal() {
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
   const isLpkPrint = templateScope === "warehouseout_bale" && activeTaskType === "lpk_shortage_pick";
+  const isStorePrepCompressionPrint = templateScope === "warehouseout_bale" && ["store_dispatch", "sale"].includes(activeTaskType);
   const completionAction = templateScope !== "bale"
     ? {
       action: jobs.length ? "complete_group" : "already_complete",
@@ -17521,7 +17609,7 @@ function renderBalePrintModal() {
   const alreadyComplete = isBalePrintModalAlreadyComplete(completionAction);
   const selectedTemplateCode = getActiveBaleTemplateCode(balePrintModalState.preferredTemplateCode || currentJob?.template_code || currentJob?.print_payload?.template_code || "");
   const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" || selectedTemplateCode === "transtoshop";
-  const isSdbPrint = selectedTemplateCode === "store_prep_bale_60x40" || selectedTemplateCode === "wait_for_transtoshop" || selectedTemplateCode === "wait_for_sale";
+  const isSdbPrint = isStorePrepCompressionPrint && selectedTemplateCode === "store_prep_bale_60x40";
   const isStoreItemPrint = templateScope === "product" || selectedTemplateCode === "store_item_60x40";
   const isRawBalePrint = templateScope === "bale" || selectedTemplateCode === "warehouse_in" || selectedTemplateCode === "warehouse_in_60x40";
   balePrintModalState.preferredTemplateCode = selectedTemplateCode;
@@ -17560,12 +17648,12 @@ function renderBalePrintModal() {
       : `${balePrintModalState.supplierName || "-"} · ${balePrintModalState.categoryDisplay || "-"} · 当前类别已经全部打印完成`;
   }
   if (title) {
-    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : "Bale 条码打印窗";
+    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : "Bale 条码打印窗");
   }
   if (scopeNote) {
     scopeNote.textContent = isLpkPrint
       ? "LPK 只用于仓库补差拣货和打包。门店收货请扫描后续生成的 SDO 正式送货执行码。"
-      : "";
+      : (isSdbPrint ? "SDB 只用于仓库压缩后待送店 / 待售卖来源包；不是门店正式收货码。" : "");
   }
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
@@ -17591,20 +17679,27 @@ function renderBalePrintModal() {
           <div class="subtle small">${currentJob ? `Code128 一维码 · ${escapeHtml(displayParts?.packageCompact || `第 ${currentIndex + 1} 包 / 共 ${jobs.length} 包`)}${displayParts?.shipmentDate ? ` · ${escapeHtml(displayParts.shipmentDate)}` : ""}` : "这一类已经全部打印完成，可以关闭弹层并继续下一类。"}</div>
         </div>
         <div class="bale-modal-inline-grid">
-          <label class="field-stack compact-select">
-            <span>打印模板</span>
-            <select data-bale-template-select data-bale-modal-template-select>
-              ${baleTemplateOptions
-                .map(
-                  (row) => `
-                    <option value="${escapeHtml(row.template_code)}" ${row.disabled ? "disabled" : ""} ${row.selected || String(row.template_code || "").trim().toLowerCase() === String(selectedTemplate.template_code || "").trim().toLowerCase() ? "selected" : ""}>
-                      ${escapeHtml(`${getBaleTemplateOptionLabel(row)}${row.disabled ? " · 不可用于当前页面" : ""}`)}
-                    </option>
-                  `,
-                )
-                .join("")}
-            </select>
-          </label>
+          ${isStorePrepCompressionPrint ? `
+            <div class="field-stack compact-select" data-bale-modal-template-locked>
+              <span>打印模板</span>
+              <span class="meta-pill">模板已锁定：SDB / STORE_PREP_BALE 60x40</span>
+            </div>
+          ` : `
+            <label class="field-stack compact-select">
+              <span>打印模板</span>
+              <select data-bale-template-select data-bale-modal-template-select>
+                ${baleTemplateOptions
+                  .map(
+                    (row) => `
+                      <option value="${escapeHtml(row.template_code)}" ${row.disabled ? "disabled" : ""} ${row.selected || String(row.template_code || "").trim().toLowerCase() === String(selectedTemplate.template_code || "").trim().toLowerCase() ? "selected" : ""}>
+                        ${escapeHtml(`${getBaleTemplateOptionLabel(row)}${row.disabled ? " · 不可用于当前页面" : ""}`)}
+                      </option>
+                    `,
+                  )
+                  .join("")}
+              </select>
+            </label>
+          `}
           <label class="field-stack compact-select">
             <span>打印机</span>
             <select data-bale-modal-printer-select>
@@ -18185,6 +18280,29 @@ async function completeCurrentBalePrintModalJob() {
     balePrinterJobState = balePrinterJobState.filter((queuedJob) => !completedJobIds.has(String(queuedJob.id)));
   }
   if (templateScope !== "bale") {
+    const activeTaskType = getActiveBaleModalTaskType();
+    if (templateScope === "warehouseout_bale" && ["store_dispatch", "sale"].includes(activeTaskType)) {
+      const taskNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
+      await loadStorePrepBaleWorkbench({ force: true, focus: false });
+      if (taskNo) {
+        activeCompressionTaskNo = taskNo;
+      }
+      balePrinterConsoleNotice = {
+        type: "success",
+        message: `${jobsToComplete.length} 张 SDB 标签已确认贴标。`,
+      };
+      renderStorePrepBaleTaskSummary(
+        balePrintModalState.jobs.length
+          ? `${taskNo || "当前压缩工单"} 已确认本包贴标，请继续处理下一包。`
+          : `${taskNo || "当前压缩工单"} 已确认贴标完成。`,
+      );
+      if (!balePrintModalState.jobs.length) {
+        closeBalePrintModal({ force: true });
+      } else {
+        renderBalePrintModal();
+      }
+      return;
+    }
     const transferNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
     if (transferNo) {
       const transfer = transferOrderState.find((row) => String(row?.transfer_no || "").trim().toUpperCase() === transferNo);
@@ -19565,6 +19683,23 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
         selected: true,
       }];
   }
+  if (normalizedScope === "warehouseout_bale" && ["store_dispatch", "sale"].includes(getActiveBaleModalTaskType()) && labelTemplateFlow.buildLockedTemplateOptions) {
+    const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
+      allowedCodes: ["store_prep_bale_60x40"],
+      selectedCode: "store_prep_bale_60x40",
+    });
+    return rows.length
+      ? rows
+      : [{
+        template_code: "store_prep_bale_60x40",
+        name: "SDB / STORE_PREP_BALE 60x40",
+        width_mm: 60,
+        height_mm: 40,
+        template_scope: "warehouseout_bale",
+        disabled: false,
+        selected: true,
+      }];
+  }
   if (normalizedScope === "warehouseout_bale" && getActiveBaleModalTaskType() === "lpk_shortage_pick" && labelTemplateFlow.buildLockedTemplateOptions) {
     const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
       allowedCodes: ["store_loose_pick_60x40"],
@@ -19628,7 +19763,7 @@ function getPreferredWarehouseoutTemplateCode(preferredValue = "", taskType = "s
       currentValue: persistedValue,
     }) || (storePrepBaleFlow.getStorePrepTemplateDefaultCode
       ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(taskType)
-      : "wait_for_transtoshop");
+      : "store_prep_bale_60x40");
   }
   const preferred = String(preferredValue || "").trim().toLowerCase();
   if (preferred && warehouseoutTemplates.some((row) => String(row?.template_code || "").trim().toLowerCase() === preferred)) {
@@ -19640,7 +19775,7 @@ function getPreferredWarehouseoutTemplateCode(preferredValue = "", taskType = "s
   const defaultCode = String(
     storePrepBaleFlow.getStorePrepTemplateDefaultCode
       ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(taskType)
-      : (String(taskType || "").trim().toLowerCase() === "sale" ? "wait_for_sale" : "wait_for_transtoshop")
+      : "store_prep_bale_60x40"
   ).trim().toLowerCase();
   if (warehouseoutTemplates.some((row) => String(row?.template_code || "").trim().toLowerCase() === defaultCode)) {
     return defaultCode;
@@ -20038,7 +20173,7 @@ function getLabelTemplateManagerGroups(rows = labelTemplateState) {
   const normalizedRows = Array.isArray(rows) ? rows : [];
   const allowedCodes = [
     { key: "bale", label: "仓库 raw bale", description: "0.1 条码 / 打印确认 读取这组正式仓库 bale 模版。", codes: ["warehouse_in"] },
-    { key: "warehouseout_bale", label: "送店 / 待送店 bale", description: "送店、待送店、待售卖 bale 标签读取这组正式模版。", codes: ["transtoshop", "wait_for_transtoshop", "wait_for_sale", "store_loose_pick_60x40"] },
+    { key: "warehouseout_bale", label: "送店 / 待送店 bale", description: "送店、待送店、待售卖 bale 标签读取这组正式模版。", codes: ["transtoshop", "wait_for_transtoshop", "wait_for_sale", "store_prep_bale_60x40", "store_loose_pick_60x40"] },
   ];
   return allowedCodes
     .map((group) => ({
@@ -29189,8 +29324,8 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
   const templateCode = String(
     storePrepBaleFlow.getStorePrepTemplateDefaultCode
       ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(taskType)
-      : (taskType === "sale" ? "wait_for_sale" : "wait_for_transtoshop")
-  ).trim().toLowerCase() || "wait_for_transtoshop";
+      : "store_prep_bale_60x40"
+  ).trim().toLowerCase() || "store_prep_bale_60x40";
   const printerName = String(document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim() || "Deli DL-720C";
   const payload = storePrepBaleFlow.buildStorePrepBaleDirectPrintPayload
     ? storePrepBaleFlow.buildStorePrepBaleDirectPrintPayload(row, { printerName, templateCode })
@@ -29261,7 +29396,7 @@ function openCompressionTaskPrintModal(resultRow = {}, printJobs = []) {
     .join(" / ");
   balePrinterConsoleNotice = {
     type: "success",
-    message: `已为 ${jobs.length} 个压缩 bale 准备模板打印任务。先选模板，再确认实体出纸。`,
+    message: `已为 ${jobs.length} 个压缩 bale 准备 SDB 打印任务。模板已锁定，出纸贴好后再确认本包已贴标。`,
   };
   openBalePrintModal({
     shipmentNo: String(resultRow?.task_no || "").trim().toUpperCase(),
@@ -29298,28 +29433,18 @@ async function completeStorePrepBaleTask(taskNo = "", payload = {}) {
     ? result.prepared_bale_nos.length
     : (result.prepared_bale_no ? 1 : 0);
   const completedMessage = String(result.task_type || "").trim().toLowerCase() === "sale"
-    ? `任务 ${normalizedTaskNo} 已完成验收并生成 barcode，已进入待售卖 bale 区，原散件库存口径保持不扣减。`
-    : `任务 ${normalizedTaskNo} 已完成验收并生成 ${generatedBaleCount || 1} 个 barcode，散件已转成待送店 bale，仍留在仓库已分拣服装库存口径里。`;
+    ? `任务 ${normalizedTaskNo} 已完成验收并生成 SDB barcode；待打印并确认贴标后，才进入待售卖 bale 区。`
+    : `任务 ${normalizedTaskNo} 已完成验收并生成 ${generatedBaleCount || 1} 个 SDB barcode；待打印并确认贴标后，才转成待送店 bale 库存。`;
   renderCompressionTaskAcceptanceWindow(completedMessage);
-  renderStorePrepBaleTaskSummary(`${completedTaskTypeLabel}任务已完成：${completedMessage}`);
-  try {
-    await loadSystemPrinters();
-    const printJobs = await queueCompressionTaskPrintJobs(result);
-    closeCompressionTaskAcceptanceModal();
-    openCompressionTaskPrintModal(result, printJobs);
-  } catch (error) {
-    const printMessage = formatErrorMessage(error);
-    renderErrorSummary("#compressionTaskAcceptanceSummary", `${completedMessage} 已完成验收，但没有自动拉起打印窗：${printMessage}`);
-  }
+  closeCompressionTaskAcceptanceModal();
+  renderStorePrepBaleTaskSummary(`${completedTaskTypeLabel}任务已验收：${completedMessage}`);
 }
 
 function openCompressionTaskForAcceptance(taskNo = "") {
   activeCompressionTaskNo = String(taskNo || "").trim().toUpperCase();
   activeCompressionTaskResult = null;
-  renderCompressionTaskAcceptanceWindow();
-  openCompressionTaskAcceptanceModal();
   renderStorePrepBaleTaskSummary();
-  focusElement("#compressionTaskAcceptanceSummary");
+  focusElement("[data-compression-task-inline-panel]");
 }
 
 async function submitStoreDispatchBale(event) {
@@ -32191,11 +32316,28 @@ bindForm("#saleVoidReviewForm", submitSaleVoidReview, "#saleVoidOutput");
 
 document.addEventListener("submit", async (event) => {
   const form = event.target instanceof HTMLFormElement ? event.target : null;
-  if (!(form instanceof HTMLFormElement) || !form.matches("[data-sorting-inline-compression-form]")) {
+  if (!(form instanceof HTMLFormElement) || (!form.matches("[data-sorting-inline-compression-form]") && !form.matches("[data-compression-task-acceptance-form]"))) {
     return;
   }
   event.preventDefault();
   try {
+    if (form.matches("[data-compression-task-acceptance-form]")) {
+      const data = new FormData(form);
+      const taskNo = String(data.get("task_no") || "").trim();
+      if (!taskNo) {
+        throw new Error("请先从压缩工单卡片选中一张任务。");
+      }
+      const payload = {
+        actual_qty: Number(data.get("actual_qty") || 0),
+        note: String(data.get("note") || "").trim(),
+      };
+      const actualWeightRaw = String(data.get("actual_weight_kg") || "").trim();
+      if (actualWeightRaw) {
+        payload.actual_weight_kg = Number(actualWeightRaw);
+      }
+      await completeStorePrepBaleTask(taskNo, payload);
+      return;
+    }
     await submitStorePrepBaleTask({ preventDefault() {}, currentTarget: form });
   } catch (error) {
     const message = formatErrorMessage(error);
@@ -34216,9 +34358,10 @@ document.addEventListener("click", async (event) => {
   }
   const openCreatorButton = target.closest("[data-sorting-compress-category]");
   const acceptanceButton = target.closest("[data-compression-task-open]");
+  const printTaskButton = target.closest("[data-compression-task-print]");
   const closeCreatorButton = target.closest("#sortingCompressionCreatorClose");
   const reprintBaleButton = target.closest("[data-store-prep-bale-reprint]");
-  if (!openCreatorButton && !acceptanceButton && !closeCreatorButton && !reprintBaleButton) {
+  if (!openCreatorButton && !acceptanceButton && !printTaskButton && !closeCreatorButton && !reprintBaleButton) {
     return;
   }
   try {
@@ -34236,6 +34379,23 @@ document.addEventListener("click", async (event) => {
     }
     if (acceptanceButton instanceof HTMLElement) {
       openCompressionTaskForAcceptance(acceptanceButton.dataset.compressionTaskOpen || "");
+      return;
+    }
+    if (printTaskButton instanceof HTMLElement) {
+      const taskNo = String(printTaskButton.dataset.compressionTaskPrint || "").trim().toUpperCase();
+      const row = storePrepBaleTaskState.find((item) => String(item?.task_no || "").trim().toUpperCase() === taskNo) || null;
+      if (!row) {
+        throw new Error(`没有找到 ${taskNo} 的压缩工单。`);
+      }
+      activeCompressionTaskNo = taskNo;
+      activeCompressionTaskResult = row;
+      await loadSystemPrinters();
+      const printJobs = await queueCompressionTaskPrintJobs(row);
+      await loadStorePrepBaleWorkbench({ force: true, focus: false });
+      const refreshedRow = storePrepBaleTaskState.find((item) => String(item?.task_no || "").trim().toUpperCase() === taskNo) || row;
+      activeCompressionTaskResult = refreshedRow;
+      openCompressionTaskPrintModal(refreshedRow, printJobs);
+      renderStorePrepBaleTaskSummary(`${taskNo} 已准备 SDB 标签打印。打印并确认贴标后才会完成工单。`);
       return;
     }
     if (reprintBaleButton instanceof HTMLElement) {

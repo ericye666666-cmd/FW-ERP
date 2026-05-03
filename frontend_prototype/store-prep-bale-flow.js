@@ -139,14 +139,18 @@
       const totalCostKes = Number(row && row.total_cost_kes || 0);
       const updatedAt = normalizeText(row && row.updated_at);
       const taskType = normalizeLower(row && row.task_type);
+      const status = normalizeLower(row && row.status);
+      const readyAsBale = !status || ["waiting_store_dispatch", "waiting_bale_sale", "completed"].includes(status);
       acc.baleCount += 1;
-      if (taskType === "sale") {
-        acc.saleBaleCount += 1;
-      } else {
-        acc.dispatchBaleCount += 1;
+      if (readyAsBale) {
+        if (taskType === "sale") {
+          acc.saleBaleCount += 1;
+        } else {
+          acc.dispatchBaleCount += 1;
+        }
+        acc.totalQty += Number.isFinite(qty) ? qty : 0;
+        acc.totalCostKes = roundToTwo(acc.totalCostKes + (Number.isFinite(totalCostKes) ? totalCostKes : 0));
       }
-      acc.totalQty += Number.isFinite(qty) ? qty : 0;
-      acc.totalCostKes = roundToTwo(acc.totalCostKes + (Number.isFinite(totalCostKes) ? totalCostKes : 0));
       if (!acc.latestUpdatedAt || new Date(updatedAt || 0).getTime() > new Date(acc.latestUpdatedAt || 0).getTime()) {
         acc.latestUpdatedAt = updatedAt;
       }
@@ -166,7 +170,7 @@
     templateCode = "",
   } = {}) {
     const taskType = normalizeLower(row && row.task_type) || "store_dispatch";
-    const resolvedTemplateCode = normalizeText(templateCode) || getStorePrepTemplateDefaultCode(taskType);
+    const resolvedTemplateCode = getStorePrepTemplateDefaultCode(taskType);
     const displayCode = normalizeText(row && (row.scan_token || row.bale_barcode)).toUpperCase();
     const machineCode = normalizeMachineCode(row && (row.machine_code || row.barcode_value));
     const categoryMain = normalizeText(row && row.category_main);
@@ -229,7 +233,7 @@
   }
 
   function getStorePrepTemplateDefaultCode(taskType = "store_dispatch") {
-    return normalizeLower(taskType) === "sale" ? "wait_for_sale" : "wait_for_transtoshop";
+    return "store_prep_bale_60x40";
   }
 
   function pickPreferredStorePrepTemplateCode(templates = [], {
@@ -238,22 +242,14 @@
     currentValue = "",
   } = {}) {
     const rows = Array.isArray(templates) ? templates : [];
+    const lockedCode = getStorePrepTemplateDefaultCode(taskType);
     if (!rows.length) {
-      return getStorePrepTemplateDefaultCode(taskType);
+      return lockedCode;
     }
-    const preferred = normalizeLower(preferredValue);
-    if (preferred && rows.some((row) => normalizeLower(row && row.template_code) === preferred)) {
-      return preferred;
+    if (rows.some((row) => normalizeLower(row && row.template_code) === lockedCode)) {
+      return lockedCode;
     }
-    const current = normalizeLower(currentValue);
-    if (current && rows.some((row) => normalizeLower(row && row.template_code) === current)) {
-      return current;
-    }
-    const defaultCode = getStorePrepTemplateDefaultCode(taskType);
-    if (rows.some((row) => normalizeLower(row && row.template_code) === defaultCode)) {
-      return defaultCode;
-    }
-    return normalizeLower(rows[0] && rows[0].template_code);
+    return lockedCode;
   }
 
   return {
