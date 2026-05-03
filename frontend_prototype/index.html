@@ -3328,8 +3328,8 @@
             <div class="brand-group">
               <div>
                 <p class="eyebrow">BEYOND ERP</p>
-                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">高速收银终端</h3>
-                <p class="cashier-terminal-subcopy" data-terminal-copy="brandSubtitle">只为开单、收款、异常处理和商品身份证绑定服务。</p>
+                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">POS 收银台</h3>
+                <p class="cashier-terminal-subcopy" data-terminal-copy="brandSubtitle">扫码、收款、打印小票和异常恢复集中在一个触控工作台。</p>
               </div>
             </div>
             <div class="topbar-actions">
@@ -3343,15 +3343,15 @@
             </div>
           </header>
 
-          <section id="cashierTerminalStatusBar" class="status-grid cashier-terminal-status"></section>
+          <section id="cashierTerminalStatusBar" class="status-grid cashier-terminal-status cashier-terminal-context-strip"></section>
 
-          <main class="workspace-grid cashier-terminal-body">
+          <main class="workspace-grid cashier-terminal-body cashier-terminal-touch-layout">
             <section class="flow-column cashier-terminal-main">
               <article class="panel panel-scan cashier-terminal-card cashier-terminal-scan-card">
                 <div class="panel-head cashier-terminal-card-head">
                   <div>
-                    <p class="panel-kicker">TERMINAL INPUT</p>
-                    <h3 data-terminal-copy="scanTitle">扫码 / 手动录入</h3>
+                    <p class="panel-kicker">SCAN</p>
+                    <h3 data-terminal-copy="scanTitle">扫码收银</h3>
                   </div>
                   <div class="shortcut-pills">
                     <span class="pill"><kbd>Enter</kbd> <span data-terminal-copy="enterToAdd">直接加入购物篮</span></span>
@@ -3360,7 +3360,7 @@
                 </div>
                 <form id="cashierTerminalScanForm" class="scan-grid cashier-terminal-scan-form">
                   <label class="field scan-field main-field">
-                    <span data-terminal-copy="barcodeField">扫码枪输入 / 商品 barcode</span>
+                    <span data-terminal-copy="barcodeField">扫描 STORE_ITEM 商品码</span>
                     <div class="field-row">
                       <input
                         id="cashierTerminalBarcodeInput"
@@ -3368,13 +3368,13 @@
                         type="text"
                         inputmode="text"
                         autocomplete="off"
-                        placeholder="Scan barcode / 输入条码"
+                        placeholder="扫描 STORE_ITEM 商品码"
                       />
                       <button type="submit" class="primary-inline" data-terminal-submit="add" data-terminal-copy="addToBasket">加入购物篮</button>
                     </div>
                   </label>
                   <label class="field search-field">
-                    <span data-terminal-copy="lookupField">手动搜索 / 只查价</span>
+                    <span data-terminal-copy="lookupField">手动查价</span>
                     <div class="field-row">
                       <input
                         id="cashierTerminalManualInput"
@@ -3382,7 +3382,7 @@
                         type="text"
                         inputmode="text"
                         autocomplete="off"
-                        placeholder="Barcode / identity / price lookup"
+                        placeholder="输入 STORE_ITEM 码查价"
                       />
                       <button type="submit" class="secondary-inline" data-terminal-submit="lookup" data-terminal-copy="lookupOnly">只查价</button>
                     </div>
@@ -3394,7 +3394,7 @@
                   data-empty-text=""
                 ></div>
                 <div id="cashierTerminalLookupCard" class="lookup-preview cashier-terminal-lookup empty-state">
-                  扫码后，这里显示当前商品的门店库存、建议售价、限价和架位。
+                  等待扫码。扫到非 STORE_ITEM 会在这里提示下一步。
                 </div>
               </article>
 
@@ -3402,7 +3402,7 @@
                 <div class="panel-head basket-head cashier-terminal-card-head">
                   <div>
                     <p class="panel-kicker">BASKET</p>
-                    <h3 data-terminal-copy="basketTitle">当前购物篮</h3>
+                    <h3 data-terminal-copy="basketTitle">商品篮</h3>
                   </div>
                   <div class="basket-tools">
                     <label class="field compact-field note-field cashier-terminal-note-field" for="cashierTerminalSaleNote">
@@ -3421,7 +3421,7 @@
             </aside>
           </main>
 
-          <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions">
+          <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions cashier-terminal-status-footer">
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer"><span>班次</span><strong>-</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>作废</span><strong>-</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer"><span>退款</span><strong>-</strong></button>

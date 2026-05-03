@@ -735,17 +735,17 @@ function initializeGlobalI18n() {
 }
 const CASHIER_TERMINAL_LOCALE_COPY = {
   zh: {
-    brandTitle: "高速收银终端",
-    brandSubtitle: "只为开单、收款、异常处理和商品身份证绑定服务。",
+    brandTitle: "POS 收银台",
+    brandSubtitle: "扫码、收款、打印小票和异常恢复集中在一个触控工作台。",
     openShiftCenter: "班次中心",
-    scanTitle: "扫码 / 手动录入",
-    enterToAdd: "直接加入购物篮",
+    scanTitle: "扫码收银",
+    enterToAdd: "回车加入商品篮",
     escToClose: "关闭抽屉",
-    barcodeField: "扫码枪输入 / 商品条码",
-    lookupField: "手动搜索 / 只查价",
+    barcodeField: "扫描 STORE_ITEM 商品码",
+    lookupField: "手动查价",
     addToBasket: "加入购物篮",
     lookupOnly: "只查价",
-    basketTitle: "当前购物篮",
+    basketTitle: "商品篮",
     noteLabel: "交易备注",
     clearBasket: "清空购物篮",
     storeLabel: "门店",
@@ -753,12 +753,12 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     shiftLabel: "班次",
     shiftStatusLabel: "状态",
     networkLabel: "网络",
-    printerLabel: "打印机",
+    printerLabel: "小票打印",
     localeLabel: "语言",
     nowLabel: "当前时间",
     online: "在线正常",
-    offline: "网络离线",
-    printer: "80mm 待接硬件",
+    offline: "离线模式：销售会暂存，联网后同步。",
+    printer: "待打印 / 可重打印",
     noShift: "未开班",
     openShift: "开班中",
     closedShift: "已结班",
@@ -769,8 +769,8 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     suggestedPrice: "建议售价",
     priceCap: "限价",
     rackLabel: "货架位",
-    lookupEmpty: "扫码后，这里显示当前商品的门店库存、建议售价、限价和架位。",
-    cartEmpty: "购物篮还是空的。扫码后按回车，商品会按一件一行进入这里。",
+    lookupEmpty: "等待扫码。扫到非 STORE_ITEM 会在这里提示下一步。",
+    cartEmpty: "商品篮为空。请扫描 STORE_ITEM 商品码。",
     addCurrentLookup: "加入购物篮",
     qty: "数量",
     sellingPrice: "售价",
@@ -784,25 +784,35 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     missingOverrideReason: "缺少 override reason",
     totalItems: "总件数",
     grossAmount: "总金额",
-    paidAmount: "已录付款",
-    balanceAmount: "应收差额",
-    paymentTitle: "支付与结算",
-    cashMethod: "现金",
+    discountAmount: "折扣",
+    receivableAmount: "应收",
+    paidAmount: "已收",
+    balanceAmount: "应收",
+    paymentStatus: "支付状态",
+    paidStatus: "已覆盖",
+    collectStatus: "待收款",
+    scanStatus: "待扫码",
+    paymentTitle: "结账区",
+    cashMethod: "Cash",
     mpesaMethod: "M-Pesa",
-    mixedMethod: "混合",
+    mixedMethod: "Mixed",
     cashReceived: "实收现金",
     changeDue: "找零",
     mpesaAmount: "M-Pesa 到账金额",
     reference: "流水号",
-    mixedHint: "混合支付仍按多行 payments[] 提交。",
+    mixedHint: "添加 Cash / M-Pesa 付款行。",
     addPaymentLine: "新增付款行",
-    completeTrade: "完成交易",
-    receiptReprint: "补打小票",
-    voidAction: "作废草稿",
-    refundAction: "退款 / 退货",
+    completeTrade: "完成销售",
+    receiptReprint: "重打印",
+    voidAction: "作废",
+    refundAction: "退款",
     paymentAnomaly: "支付异常",
-    offlineAction: "离线单",
+    offlineAction: "离线 / 同步",
     shiftAction: "开班",
+    holdAction: "挂单",
+    cancelAction: "取消",
+    syncStatus: "同步状态",
+    receiptStatus: "小票打印",
     receiptPlaceholderTitle: "小票预览 / 补打",
     receiptPlaceholderHint: "本轮不接真实 receipt API，也不拿 print-jobs 冒充小票。",
     printOriginal: "浏览器打印原单",
@@ -843,8 +853,8 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     offlineHint: "断网补同步仍保留现有 offlineSyncForm。本轮只把入口拉进终端，避免改动后端 contract。",
     openOfflineSync: "打开离线同步页",
     localeButtons: { zh: "中文", en: "EN" },
-    barcodePlaceholder: "扫码或输入商品条码",
-    manualPlaceholder: "Barcode / identity / price lookup",
+    barcodePlaceholder: "扫描 STORE_ITEM 商品码",
+    manualPlaceholder: "输入 STORE_ITEM 码查价",
     notePlaceholder: "正常销售备注 / 顾客备注 / 交接说明",
   },
   en: {
@@ -897,8 +907,14 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     missingOverrideReason: "Override reason required",
     totalItems: "Items",
     grossAmount: "Gross amount",
+    discountAmount: "Discount",
+    receivableAmount: "Amount due",
     paidAmount: "Assigned payment",
     balanceAmount: "Outstanding balance",
+    paymentStatus: "Payment status",
+    paidStatus: "Covered",
+    collectStatus: "Collecting",
+    scanStatus: "Waiting for scan",
     paymentTitle: "Payment & Checkout",
     cashMethod: "Cash",
     mpesaMethod: "M-Pesa",
@@ -916,6 +932,10 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     paymentAnomaly: "Payment anomalies",
     offlineAction: "Offline queue",
     shiftAction: "Open Shift",
+    holdAction: "Hold",
+    cancelAction: "Cancel",
+    syncStatus: "Sync status",
+    receiptStatus: "Receipt print",
     receiptPlaceholderTitle: "Receipt Preview / Reprint",
     receiptPlaceholderHint: "This round does not connect a real receipt API and does not fake receipt printing through print-jobs.",
     printOriginal: "Browser print original",
@@ -22831,8 +22851,16 @@ function renderCashierTerminalPaymentPanel() {
   const copy = getCashierTerminalCopy();
   const totals = getCashierTerminalTotals();
   const paymentTotal = getCashierTerminalPaymentAssignedTotal();
-  const amountDue = totals.totalAmount - paymentTotal;
   const changeDue = getCashierTerminalChangeDue();
+  const displayPaidTotal = cashierTerminalState.activePaymentMode === "cash"
+    ? normalizeCashierTerminalNumber(cashierTerminalState.cashReceived)
+    : cashierTerminalState.activePaymentMode === "mpesa"
+      ? normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount)
+      : paymentTotal;
+  const displayAmountDue = Math.max(totals.totalAmount - displayPaidTotal, 0);
+  const paymentStatus = totals.totalItems
+    ? (displayAmountDue <= 0 ? copy.paidStatus : copy.collectStatus)
+    : copy.scanStatus;
   const mixedRows = (cashierTerminalState.paymentLines || [])
     .map((row, index) => `
       <div class="cashier-terminal-payment-line">
@@ -22872,6 +22900,11 @@ function renderCashierTerminalPaymentPanel() {
         <span class="shortcut-chip${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}"><kbd>F4</kbd> ${escapeHtml(copy.mixedMethod)}</span>
       </div>
     </div>
+    <div class="cashier-terminal-grand-total" aria-label="${escapeHtml(copy.grossAmount)}">
+      <span>${escapeHtml(copy.grossAmount)}</span>
+      <strong>${escapeHtml(formatCurrency(totals.totalAmount))}</strong>
+      <small>${escapeHtml(totals.totalItems)} ${escapeHtml(copy.totalItems)} · ${escapeHtml(copy.paymentStatus)}：${escapeHtml(paymentStatus)}</small>
+    </div>
     <div class="payment-methods" role="tablist" aria-label="Payment methods">
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>F2</span><span>${escapeHtml(copy.cashMethod)}</span></button>
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>F3</span><span>${escapeHtml(copy.mpesaMethod)}</span></button>
@@ -22879,9 +22912,10 @@ function renderCashierTerminalPaymentPanel() {
     </div>
     <div class="summary-grid cashier-terminal-total-grid">
       <article class="summary-box"><span>${escapeHtml(copy.totalItems)}</span><strong>${escapeHtml(totals.totalItems)}</strong></article>
-      <article class="summary-box"><span>${escapeHtml(copy.grossAmount)}</span><strong>${escapeHtml(formatCurrency(totals.totalAmount))}</strong></article>
-      <article class="summary-box"><span>${escapeHtml(copy.paidAmount)}</span><strong>${escapeHtml(formatCurrency(paymentTotal))}</strong></article>
-      <article class="summary-box summary-box-strong"><span>${escapeHtml(cashierTerminalState.activePaymentMode === "cash" ? copy.changeDue : copy.balanceAmount)}</span><strong>${escapeHtml(formatCurrency(Math.abs(cashierTerminalState.activePaymentMode === "cash" ? changeDue : amountDue)))}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(copy.discountAmount)}</span><strong>${escapeHtml(formatCurrency(0))}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(copy.receivableAmount)}</span><strong>${escapeHtml(formatCurrency(totals.totalAmount))}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(copy.paidAmount)}</span><strong>${escapeHtml(formatCurrency(displayPaidTotal))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>${escapeHtml(cashierTerminalState.activePaymentMode === "cash" ? copy.changeDue : copy.balanceAmount)}</span><strong>${escapeHtml(formatCurrency(cashierTerminalState.activePaymentMode === "cash" ? changeDue : displayAmountDue))}</strong></article>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
       ${cashierTerminalState.activePaymentMode === "cash"
@@ -22918,9 +22952,11 @@ function renderCashierTerminalPaymentPanel() {
     <div class="payment-actions cashier-terminal-payment-actions">
       <button type="button" class="primary-action" data-terminal-action="complete-sale"><span>F8</span><span>${escapeHtml(copy.completeTrade)}</span></button>
       <div class="secondary-actions">
-        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer">${escapeHtml(copy.receiptReprint)}</button>
+        <button type="button" class="secondary-action" disabled>${escapeHtml(copy.holdAction)}</button>
+        <button type="button" class="secondary-action" data-terminal-action="clear-cart">${escapeHtml(copy.clearBasket)}</button>
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer">${escapeHtml(copy.voidAction)}</button>
-        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer">${escapeHtml(copy.refundAction)}</button>
+        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer">${escapeHtml(copy.receiptReprint)}</button>
+        <button type="button" class="secondary-action" data-terminal-action="clear-lookup">${escapeHtml(copy.cancelAction)}</button>
       </div>
     </div>
     <div class="payment-meta">
@@ -22945,13 +22981,27 @@ function renderCashierTerminalQuickActions() {
   const anomalyCount = Array.isArray(paymentAnomalyState)
     ? paymentAnomalyState.filter((row) => String(row?.status || "").trim().toLowerCase() === "open").length
     : 0;
+  const cashierName = currentSession.user?.full_name || currentSession.user?.username || "cashier";
+  const syncText = cashierTerminalState.networkStatus === "online"
+    ? `${copy.online} · ${offlineCount || 0}`
+    : `${copy.offline} · ${offlineCount || 0}`;
   cashierTerminalQuickActions.innerHTML = `
-    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer"><span>${escapeHtml(copy.shiftAction)}</span><strong>${escapeHtml(cashierTerminalState.shiftNo || copy.noShift)}</strong></button>
-    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>F7</span><strong>${escapeHtml(copy.voidAction)}</strong></button>
-    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer"><span>F9</span><strong>${escapeHtml(copy.refundAction)}</strong></button>
-    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>${escapeHtml(copy.paymentAnomaly)}</span><strong>${escapeHtml(anomalyCount || 0)}</strong></button>
-    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline" data-drawer="offlineDrawer"><span>${escapeHtml(copy.offlineAction)}</span><strong>${escapeHtml(offlineCount || 0)}</strong></button>
-    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.order_no || "-")}</strong></button>
+    <div class="cashier-terminal-status-metrics" aria-label="Cashier status">
+      <span><strong>${escapeHtml(copy.shiftLabel)}</strong>${escapeHtml(cashierTerminalState.shiftNo || copy.noShift)}</span>
+      <span><strong>${escapeHtml(copy.cashierLabel)}</strong>${escapeHtml(cashierName)}</span>
+      <span><strong>${escapeHtml(copy.storeLabel)}</strong>${escapeHtml(getCashierTerminalStoreCode())}</span>
+      <span><strong>${escapeHtml(copy.syncStatus)}</strong>${escapeHtml(syncText)}</span>
+      <span><strong>${escapeHtml(copy.receiptStatus)}</strong>${escapeHtml(copy.printer)}</span>
+      <span><strong>${escapeHtml(copy.latestSale)}</strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.order_no || "-")}</span>
+    </div>
+    <div class="cashier-terminal-footer-actions">
+      <button type="button" class="quick-action-button" disabled><span>${escapeHtml(copy.holdAction)}</span><strong>-</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="clear-cart"><span>${escapeHtml(copy.clearBasket)}</span><strong>${escapeHtml(getCashierTerminalTotals().totalItems)}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>F7</span><strong>${escapeHtml(copy.voidAction)}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.order_no || "-")}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline" data-drawer="offlineDrawer"><span>${escapeHtml(copy.offlineAction)}</span><strong>${escapeHtml(offlineCount || 0)}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>${escapeHtml(copy.paymentAnomaly)}</span><strong>${escapeHtml(anomalyCount || 0)}</strong></button>
+    </div>
   `;
 }
 
@@ -23209,6 +23259,21 @@ function renderCashierTerminalDrawer() {
   `;
 }
 
+function restoreCashierTerminalFixedPaymentLabels() {
+  const paymentLabels = {
+    cash: "Cash",
+    mpesa: "M-Pesa",
+    mixed: "Mixed",
+  };
+  Object.entries(paymentLabels).forEach(([mode, label]) => {
+    document
+      .querySelectorAll(`[data-terminal-payment-mode="${mode}"] span:last-child`)
+      .forEach((node) => {
+        node.textContent = label;
+      });
+  });
+}
+
 function renderCashierTerminal() {
   if (!(cashierTerminalShell instanceof HTMLElement)) {
     return;
@@ -23223,6 +23288,7 @@ function renderCashierTerminal() {
   renderCashierTerminalQuickActions();
   renderCashierTerminalDrawer();
   applyGlobalI18n(cashierTerminalShell, currentLanguage);
+  restoreCashierTerminalFixedPaymentLabels();
 }
 
 function setCashierTerminalPaymentMode(mode) {
@@ -23250,7 +23316,7 @@ function removeCashierTerminalPaymentLine(index) {
 function resolvePosStoreItemTokenByMachineCode(value = "") {
   const machineCode = String(value || "").replace(/[^0-9]/g, "").trim();
   if (!machineCode.startsWith("5")) {
-    throw new Error("这不是商品码，不能收银。请扫描 STORE_ITEM 商品条码。");
+    throw new Error("此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。");
   }
   const token = storeSdoPackageItemTokenState.find((row) => String(row?.machine_code || "").trim() === machineCode);
   if (!token) {
