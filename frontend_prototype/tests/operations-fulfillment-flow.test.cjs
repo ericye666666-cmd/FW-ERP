@@ -955,6 +955,7 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
 test("final transfer dispatch print uses SDO 60x40 payload and machine barcode fields", () => {
   const submitBundleSource = extractFunctionSource(appJs, "submitTransferBundle");
   const sdoModalSource = extractFunctionSource(appJs, "openTransferDispatchPrintTemplateModal");
+  const sdoJobSource = extractFunctionSource(appJs, "buildSDOPrintJobs");
   const sdoPayloadSource = extractFunctionSource(appJs, "buildTransferDispatchPrinterPayloadForRow");
   const previewSource = extractFunctionSource(appJs, "renderDirectOnlyBaleModalPreview");
   const modalRenderSource = extractFunctionSource(appJs, "renderBalePrintModal");
@@ -963,10 +964,17 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
 
   assert.match(appJs, /function getTransferDispatchTemplateCode/);
   assert.match(appJs, /getTransferDispatchTemplateCode\(\)[\s\S]*?return "store_dispatch_60x40"/);
+  assert.match(appJs, /const SDO_PRINT_TASK_TYPE = "store_delivery_execution"/);
   assert.match(submitBundleSource, /const sdoPrintTransfer = \{[\s\S]*store_delivery_execution_order:\s*storeDeliveryExecutionOrder/);
   assert.match(submitBundleSource, /transfer:\s*sdoPrintTransfer/);
-  assert.match(sdoModalSource, /throw new Error\("正式 SDO barcode 缺少 display_code/);
-  assert.match(sdoModalSource, /throw new Error\("正式 SDO barcode 缺少 4 开头 machine_code/);
+  assert.match(sdoModalSource, /const jobs = buildSDOPrintJobs\(\{/);
+  assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 display_code/);
+  assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 4 开头 machine_code/);
+  assert.match(sdoJobSource, /templateCode = getTransferDispatchTemplateCode\(\)/);
+  assert.match(sdoJobSource, /template_code:\s*templateCode/);
+  assert.match(sdoJobSource, /display_code:\s*sdoDisplayCode/);
+  assert.match(sdoJobSource, /machine_code:\s*sdoMachineCode/);
+  assert.match(sdoJobSource, /barcode_value:\s*sdoMachineCode/);
   assert.match(sdoPayloadSource, /entity_type:\s*"STORE_DELIVERY_EXECUTION"/);
   assert.match(sdoPayloadSource, /label_title:\s*"SDO \/ STORE DELIVERY ORDER"/);
   assert.doesNotMatch(sdoPayloadSource, /buildTransferDispatchFallbackBarcode/);
@@ -975,11 +983,11 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(previewSource, /data-sdo-display-code="\$\{escapeHtml\(displayCode\)\}"/);
   assert.match(previewSource, /data-sdo-machine-code="\$\{escapeHtml\(machineCode\)\}"/);
   assert.match(modalRenderSource, /模板已锁定：SDO \/ STORE_DELIVERY_EXECUTION 60x40/);
-  assert.match(warehouseoutPreferenceSource, /normalizedTaskType === "transfer_dispatch"[\s\S]*?return getTransferDispatchTemplateCode\(\)/);
+  assert.match(warehouseoutPreferenceSource, /normalizedTaskType === SDO_PRINT_TASK_TYPE[\s\S]*?return getTransferDispatchTemplateCode\(\)/);
   assert.match(warehouseoutPreferenceSource, /normalizedTaskType === "lpk_shortage_pick"[\s\S]*?return "store_loose_pick_60x40"/);
   assert.match(sdoOptionsSource, /\.filter\(\(row\) => String\(row\?\.template_code/);
   assert.doesNotMatch(sdoOptionsSource, /store_prep_bale_60x40/);
-  assert.match(appJs, /taskType:\s*"transfer_dispatch"/);
+  assert.match(appJs, /taskType:\s*SDO_PRINT_TASK_TYPE/);
   assert.match(appJs, /allowedCodes:\s*\["store_dispatch_60x40"\]/);
   assert.match(appJs, /selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop" \|\| selectedTemplateCode === "wait_for_transtoshop"/);
   assert.match(appJs, /availableCodes\.has\("wait_for_transtoshop"\)/);
@@ -991,7 +999,7 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /`4\$\{displayCode\.slice\(3\)\}`/);
   assert.match(appJs, /const sdoDisplayCode = String\(\s*transfer\?\.store_delivery_execution_order_no\s*\|\|\s*transfer\?\.store_delivery_execution_order\?\.execution_order_no\s*\|\|\s*transfer\?\.store_delivery_execution_order\?\.official_delivery_barcode\s*\|\|\s*transfer\?\.execution_order_no\s*\|\|\s*transfer\?\.official_delivery_barcode/);
   assert.match(appJs, /const sdoMachineCode = sdoMachineCodeFromTransfer\s*\|\|\s*\(\/\^SDO/);
-  assert.match(appJs, /const sdoBoundRow = \{[\s\S]*?store_delivery_execution_order_no:\s*sdoDisplayCode \|\| row\.store_delivery_execution_order_no,[\s\S]*?display_code:\s*sdoDisplayCode \|\| row\.display_code,[\s\S]*?machine_code:\s*sdoMachineCode \|\| row\.machine_code/);
+  assert.match(sdoJobSource, /const sdoBoundRow = \{[\s\S]*?store_delivery_execution_order_no:\s*sdoDisplayCode,[\s\S]*?display_code:\s*sdoDisplayCode,[\s\S]*?machine_code:\s*sdoMachineCode/);
   assert.doesNotMatch(appJs, /store_delivery_execution_order_no:\s*row\.store_delivery_execution_order_no,\s*execution_order_no:\s*row\.execution_order_no,\s*official_delivery_barcode:\s*row\.official_delivery_barcode,\s*display_code:\s*row\.display_code,\s*machine_code:\s*row\.machine_code/);
   assert.match(appJs, /display_code:\s*displayCode \|\| ""/);
   assert.match(appJs, /machine_code:\s*machineCode \|\| derivedMachineCode \|\| ""/);
@@ -1004,7 +1012,7 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /const machineCode = String\(payload\.machine_code \|\| payload\.barcode_value \|\| payload\.scan_token \|\| defaultBarcodeValue\)\.replace\(\/\[\^0-9\]\/g, ""\)\.trim\(\)/);
   assert.match(appJs, /<div class="code">\$\{escapeHtml\(barcodeValue \|\| "NO BARCODE"\)\}<\/div>/);
   assert.match(appJs, /STORE DISPATCH \/ SDO/);
-  assert.match(appJs, /isSdoPrint \? "SDO 门店送货执行单打印"/);
+  assert.match(appJs, /isSdoPrint \? "SDO \/ 门店送货执行单打印"/);
   assert.match(appJs, /SDO 是门店正式收货执行码；门店收货仍只扫 SDO，不扫 SDB \/ LPK。/);
   assert.match(appJs, /正式门店送货执行码/);
   assert.match(appJs, /Display: \$\{displayCode \|\| "-"\}/);
