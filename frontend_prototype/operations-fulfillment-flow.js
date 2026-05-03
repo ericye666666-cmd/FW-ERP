@@ -169,6 +169,51 @@
     return rows;
   }
 
+  function getReplenishmentStockStatus({
+    requestedQty = 0,
+    availableQty = 0,
+    pickableQty = 0,
+    shortageQty = 0,
+  } = {}) {
+    const requested = Math.max(0, Number(requestedQty || 0));
+    const available = Math.max(0, Number(availableQty || 0));
+    const pickable = Math.max(0, Number(pickableQty || 0));
+    const shortage = Math.max(0, Number(shortageQty || 0));
+    if (requested <= 0) {
+      return { key: "pending", badgeLabel: "待处理", suggestedAction: "待处理" };
+    }
+    if (available <= 0 || pickable <= 0) {
+      return { key: "out_of_stock", badgeLabel: "库存不足", suggestedAction: "等待补货" };
+    }
+    if (shortage > 0) {
+      return { key: "partial_pick", badgeLabel: "部分拣货", suggestedAction: "部分拣货" };
+    }
+    return { key: "full_pick", badgeLabel: "可全拣", suggestedAction: "可全拣" };
+  }
+
+  function getLoosePickLineStatus({
+    requestedQty = 0,
+    pickedQty = 0,
+    shortageQty = 0,
+  } = {}) {
+    const requested = Math.max(0, Number(requestedQty || 0));
+    const picked = Math.max(0, Number(pickedQty || 0));
+    const shortage = Math.max(0, Number(shortageQty || 0));
+    if (requested <= 0) {
+      return { key: "pending", label: "待处理" };
+    }
+    if (picked > 0 && shortage > 0) {
+      return { key: "partial_pick", label: "部分拣货" };
+    }
+    if (shortage > 0) {
+      return { key: "out_of_stock", label: "库存不足" };
+    }
+    if (picked > 0) {
+      return { key: "picked", label: "已拣" };
+    }
+    return { key: "pending", label: "待处理" };
+  }
+
   function buildTransferDemandLines(rows) {
     const grouped = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -366,9 +411,18 @@
         rackCodes: new Set(),
         gradeSummary: [],
       };
+      const looseRequiredQty = Math.max(remainingQty, 0);
+      const availableQty = Math.max(0, preparedQty + Number(looseGroup.qtyOnHand || 0));
+      const pickableQty = Math.min(requestedQty, availableQty);
       const looseQtyNeeded = Math.min(remainingQty, Number(looseGroup.qtyOnHand || 0));
-      const shortageQty = Math.max(remainingQty - looseQtyNeeded, 0);
+      const shortageQty = Math.max(requestedQty - pickableQty, 0);
       const plannedLooseBales = splitLooseQtyIntoBales(looseQtyNeeded, looseBaleTargetQty);
+      const stockStatus = getReplenishmentStockStatus({
+        requestedQty,
+        availableQty,
+        pickableQty,
+        shortageQty,
+      });
       let planMode = "none";
       if (shortageQty > 0) {
         planMode = selectedPreparedBales.length || plannedLooseBales.length ? "shortage" : "unavailable";
@@ -383,16 +437,26 @@
         categoryMain,
         categorySub,
         requestedQty,
+        requested_qty: requestedQty,
         preparedQty,
         selectedPreparedBales,
         availablePreparedBaleCount: preparedRows.length,
         availablePreparedQty: preparedRows.reduce((sum, bale) => sum + Number(bale.qty || 0), 0),
+        availableQty,
+        available_qty: availableQty,
+        pickableQty,
+        pickable_qty: pickableQty,
         looseQtyNeeded,
+        looseRequiredQty,
         looseQtyAvailable: Number(looseGroup.qtyOnHand || 0),
         looseRackCodes: Array.from(looseGroup.rackCodes || []),
         looseGradeSummary: looseGroup.gradeSummary || [],
         plannedLooseBales,
         shortageQty,
+        shortage_qty: shortageQty,
+        stockStatus: stockStatus.key,
+        stockBadgeLabel: stockStatus.badgeLabel,
+        suggestedAction: stockStatus.suggestedAction,
         finalDispatchBaleCount: selectedPreparedBales.length + plannedLooseBales.length,
         planMode,
       };
@@ -416,6 +480,24 @@
         baleIndex: bale.baleIndex,
         baleLabel: bale.label,
         qty: bale.qty,
+        requestedQty: row.looseRequiredQty,
+        requested_qty: row.looseRequiredQty,
+        availableQty: row.looseQtyAvailable,
+        available_qty: row.looseQtyAvailable,
+        pickedQty: bale.qty,
+        picked_qty: bale.qty,
+        shortageQty: bale.baleIndex === 1 ? row.shortageQty : 0,
+        shortage_qty: bale.baleIndex === 1 ? row.shortageQty : 0,
+        status: getLoosePickLineStatus({
+          requestedQty: row.looseRequiredQty,
+          pickedQty: bale.qty,
+          shortageQty: bale.baleIndex === 1 ? row.shortageQty : 0,
+        }).key,
+        statusLabel: getLoosePickLineStatus({
+          requestedQty: row.looseRequiredQty,
+          pickedQty: bale.qty,
+          shortageQty: bale.baleIndex === 1 ? row.shortageQty : 0,
+        }).label,
         isPartial: bale.isPartial,
         rackCodes: row.looseRackCodes,
       })),
@@ -526,16 +608,73 @@
   } = {}) {
     const prefix = buildTransferExecutionTaskPrefix(transferNo);
     const looseRows = Array.isArray(plan?.loosePickRows) ? plan.loosePickRows : [];
-    const lines = looseRows
-      .map((row, index) => ({
-        lineNo: index + 1,
-        categoryMain: normalizeText(row?.categoryMain),
-        categorySub: normalizeText(row?.categorySub),
-        baleLabel: normalizeText(row?.baleLabel) || `补差 bale ${index + 1}`,
-        qty: Number(row?.qty || 0),
-        rackCodes: Array.isArray(row?.rackCodes) ? row.rackCodes.map((item) => normalizeText(item).toUpperCase()).filter(Boolean) : [],
-        isPartial: Boolean(row?.isPartial),
-      }))
+    const lineMap = new Map();
+    looseRows.forEach((row, index) => {
+      const categoryMain = normalizeText(row?.categoryMain);
+      const categorySub = normalizeText(row?.categorySub);
+      const key = `${categoryMain.toLowerCase()}::${categorySub.toLowerCase()}`;
+      const rawPickedQty = Math.max(0, Number(row?.pickedQty ?? row?.picked_qty ?? row?.qty ?? 0));
+      const rawAvailableQty = row?.availableQty ?? row?.available_qty;
+      const availableQty = Math.max(0, Number(rawAvailableQty ?? rawPickedQty));
+      const pickedQty = Math.min(rawPickedQty, availableQty);
+      const requestedQty = Math.max(pickedQty, Number(row?.requestedQty ?? row?.requested_qty ?? pickedQty));
+      const shortageQty = Math.max(0, Number(row?.shortageQty ?? row?.shortage_qty ?? Math.max(requestedQty - pickedQty, 0)));
+      if (!categoryMain && !categorySub && pickedQty <= 0) {
+        return;
+      }
+      const current = lineMap.get(key) || {
+        categoryMain,
+        categorySub,
+        baleLabels: [],
+        qty: 0,
+        pickedQty: 0,
+        requestedQty: 0,
+        availableQty: 0,
+        shortageQty: 0,
+        rackCodes: new Set(),
+        isPartial: false,
+      };
+      current.qty += pickedQty;
+      current.pickedQty += pickedQty;
+      current.requestedQty = Math.max(current.requestedQty, requestedQty);
+      current.availableQty = Math.max(current.availableQty, availableQty);
+      current.shortageQty = Math.max(current.shortageQty, shortageQty);
+      current.isPartial = current.isPartial || Boolean(row?.isPartial);
+      const baleLabel = normalizeText(row?.baleLabel) || `补差 bale ${index + 1}`;
+      if (baleLabel) {
+        current.baleLabels.push(baleLabel);
+      }
+      (Array.isArray(row?.rackCodes) ? row.rackCodes : []).forEach((item) => {
+        const rackCode = normalizeText(item).toUpperCase();
+        if (rackCode) {
+          current.rackCodes.add(rackCode);
+        }
+      });
+      lineMap.set(key, current);
+    });
+    const lines = Array.from(lineMap.values())
+      .map((row, index) => {
+        const status = getLoosePickLineStatus(row);
+        return {
+          lineNo: index + 1,
+          categoryMain: row.categoryMain,
+          categorySub: row.categorySub,
+          baleLabel: row.baleLabels.join("、") || `补差 bale ${index + 1}`,
+          qty: row.qty,
+          requestedQty: row.requestedQty,
+          requested_qty: row.requestedQty,
+          availableQty: row.availableQty,
+          available_qty: row.availableQty,
+          pickedQty: row.pickedQty,
+          picked_qty: row.pickedQty,
+          shortageQty: row.shortageQty,
+          shortage_qty: row.shortageQty,
+          rackCodes: Array.from(row.rackCodes),
+          status: status.key,
+          statusLabel: status.label,
+          isPartial: row.isPartial,
+        };
+      })
       .filter((row) => row.qty > 0);
     const shortageLines = (Array.isArray(plan?.categoryCards) ? plan.categoryCards : [])
       .map((row) => ({
@@ -548,6 +687,10 @@
     if (!totalQty) {
       return [];
     }
+    const requestedQty = lines.reduce((sum, row) => sum + Number(row.requestedQty || 0), 0);
+    const availableQty = lines.reduce((sum, row) => sum + Number(row.availableQty || 0), 0);
+    const pickedQty = lines.reduce((sum, row) => sum + Number(row.pickedQty || row.qty || 0), 0);
+    const shortageQty = lines.reduce((sum, row) => sum + Number(row.shortageQty || 0), 0);
     const normalizedPackageLimitQty = normalizeLoosePackageLimitQty(packageLimitQty);
     const taskNo = `LPK-${prefix}-PICK`;
     const shortBarcodeValue = buildShortLpkBarcodeValue(transferNo, taskNo);
@@ -562,6 +705,14 @@
       baleLabel: `补差拣货单 · 小于 ${normalizedPackageLimitQty} 件 / 包`,
       qty: totalQty,
       totalQty,
+      requestedQty,
+      requested_qty: requestedQty,
+      availableQty,
+      available_qty: availableQty,
+      pickedQty,
+      picked_qty: pickedQty,
+      shortageQty,
+      shortage_qty: shortageQty,
       packageLimitQty: normalizedPackageLimitQty,
       plannedPackageCount: Math.max(1, Math.ceil(totalQty / normalizedPackageLimitQty)),
       rackCodes: Array.from(new Set(lines.flatMap((row) => row.rackCodes || []))),
@@ -606,11 +757,32 @@
       .map((line) => {
         const categoryMain = normalizeText(line?.categoryMain);
         const categorySub = normalizeText(line?.categorySub);
-        const qty = Number(line?.qty || 0);
+        const qty = Number(line?.pickedQty ?? line?.picked_qty ?? line?.qty ?? 0);
+        const requestedQty = Math.max(qty, Number(line?.requestedQty ?? line?.requested_qty ?? qty));
+        const shortageQty = Math.max(0, Number(line?.shortageQty ?? line?.shortage_qty ?? 0));
         if (!categoryMain && !categorySub && qty <= 0) {
           return "";
         }
-        return `${categoryMain || "-"} / ${categorySub || "-"} · ${Math.max(0, qty)} 件`;
+        return `${categoryMain || "-"} / ${categorySub || "-"} · ${Math.max(0, qty)} 件${
+          shortageQty > 0 ? `（需求 ${requestedQty} / 缺 ${shortageQty}）` : ""
+        }`;
+      })
+      .filter(Boolean);
+  }
+
+  function formatLoosePickSheetShortageLines(lines = []) {
+    if (!Array.isArray(lines)) {
+      return [];
+    }
+    return lines
+      .map((line) => {
+        const shortageQty = Math.max(0, Number(line?.shortageQty ?? line?.shortage_qty ?? 0));
+        if (shortageQty <= 0) {
+          return "";
+        }
+        const categoryMain = normalizeText(line?.categoryMain);
+        const categorySub = normalizeText(line?.categorySub);
+        return `${categoryMain || "-"} / ${categorySub || "-"} · 缺 ${shortageQty} 件`;
       })
       .filter(Boolean);
   }
@@ -628,8 +800,18 @@
       || "STORE";
     const pickQty = Number(task?.totalQty || task?.qty || 0);
     const packingLines = formatLoosePickSheetPackingLines(task?.lines);
+    const shortageLineRows = Array.isArray(task?.shortageLines) && task.shortageLines.length
+      ? task.shortageLines
+      : (Array.isArray(task?.lines) ? task.lines : [])
+        .map((line) => ({
+          categoryMain: normalizeText(line?.categoryMain),
+          categorySub: normalizeText(line?.categorySub),
+          qty: Number(line?.shortageQty ?? line?.shortage_qty ?? 0),
+        }))
+        .filter((line) => line.qty > 0);
+    const shortageLines = formatLoosePickSheetShortageLines(task?.lines);
     const pickedSummaryLines = formatLoosePickSheetSummaryLines(task?.lines, { limit: 2 });
-    const shortageSummaryLines = formatLoosePickSheetSummaryLines(task?.shortageLines, { limit: 2 });
+    const shortageSummaryLines = formatLoosePickSheetSummaryLines(shortageLineRows, { limit: 2 });
     const readablePackingLines = [
       ...pickedSummaryLines.map((line) => `Pick: ${line}`),
       ...shortageSummaryLines.map((line) => `Short: ${line}`),
@@ -656,6 +838,8 @@
       pickedItemSummary: pickedSummaryLines.join("; "),
       shortageSummary: shortageSummaryLines.join("; "),
       packingList: readablePackingLines.length ? readablePackingLines.join("\n") : packingLines.join("\n"),
+      shortageLines,
+      shortageList: shortageLines.join("\n"),
     };
   }
 
@@ -950,15 +1134,25 @@
     const foundPreparedCount = requiredPreparedKeys.filter((key) => foundSet.has(key)).length;
     const requiredLooseTasks = Array.isArray(looseTasks) ? looseTasks : [];
     const requiredLooseTaskCount = looseRows.length ? (requiredLooseTasks.length || 1) : 0;
-    const completedLooseTaskCount = requiredLooseTasks.filter((row) => normalizeText(row?.status).toLowerCase() === "packed").length;
+    const completedLooseTaskCount = requiredLooseTasks.filter((row) =>
+      normalizeText(row?.status).toLowerCase() === "packed" && Number(row?.shortageQty ?? row?.shortage_qty ?? 0) <= 0
+    ).length;
+    const partialLooseTaskCount = requiredLooseTasks.filter((row) =>
+      normalizeText(row?.status).toLowerCase() === "packed" && Number(row?.shortageQty ?? row?.shortage_qty ?? 0) > 0
+    ).length;
+    const unresolvedShortageQty = Math.max(0, Number(plan?.summary?.shortageQty || 0));
     return {
       requiredPreparedCount: preparedRows.length,
       foundPreparedCount,
       pendingPreparedCount: Math.max(preparedRows.length - foundPreparedCount, 0),
       requiredLooseTaskCount,
       completedLooseTaskCount,
+      partialLooseTaskCount,
       pendingLooseTaskCount: Math.max(requiredLooseTaskCount - completedLooseTaskCount, 0),
-      canPrint: foundPreparedCount >= preparedRows.length && completedLooseTaskCount >= requiredLooseTaskCount,
+      unresolvedShortageQty,
+      canPrint: foundPreparedCount >= preparedRows.length
+        && completedLooseTaskCount >= requiredLooseTaskCount
+        && unresolvedShortageQty <= 0,
     };
   }
 

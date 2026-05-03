@@ -55,6 +55,103 @@ test("LPK print payload uses display code for humans and type-3 machine code for
   assert.notEqual(payload.display_code, payload.barcode_value);
 });
 
+test("LPK shortage plan records requested, available, pickable, and shortage quantities", () => {
+  const flow = loadOperationsFulfillmentFlow();
+  const plan = flow.buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "dress", category_sub: "long dress", requested_qty: 100 },
+    ],
+    preparedBales: [],
+    looseRows: [
+      { category_name: "dress / long dress", qty_on_hand: 60, rack_code: "A-01" },
+    ],
+  });
+
+  const [card] = plan.categoryCards;
+  assert.equal(card.requestedQty, 100);
+  assert.equal(card.availableQty, 60);
+  assert.equal(card.pickableQty, 60);
+  assert.equal(card.shortageQty, 40);
+  assert.equal(card.stockBadgeLabel, "部分拣货");
+  assert.equal(card.suggestedAction, "部分拣货");
+
+  const [task] = flow.buildLoosePackingTasks({
+    transferNo: "TO-20260428-001",
+    plan,
+  });
+  assert.equal(task.totalQty, 60);
+  assert.equal(task.pickedQty, 60);
+  assert.equal(task.requestedQty, 100);
+  assert.equal(task.availableQty, 60);
+  assert.equal(task.shortageQty, 40);
+  assert.notEqual(task.status, "fully_picked");
+  assert.equal(task.lines[0].requestedQty, 100);
+  assert.equal(task.lines[0].pickedQty, 60);
+  assert.equal(task.lines[0].shortageQty, 40);
+});
+
+test("LPK cannot become a completed task when there is no available inventory", () => {
+  const flow = loadOperationsFulfillmentFlow();
+  const plan = flow.buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "dress", category_sub: "long dress", requested_qty: 100 },
+    ],
+    preparedBales: [],
+    looseRows: [
+      { category_name: "dress / long dress", qty_on_hand: 0, rack_code: "A-01" },
+    ],
+  });
+
+  const [card] = plan.categoryCards;
+  assert.equal(card.requestedQty, 100);
+  assert.equal(card.availableQty, 0);
+  assert.equal(card.pickableQty, 0);
+  assert.equal(card.shortageQty, 100);
+  assert.equal(card.stockBadgeLabel, "库存不足");
+
+  const tasks = flow.buildLoosePackingTasks({
+    transferNo: "TO-20260428-001",
+    plan,
+  });
+  assert.equal(tasks.length, 0);
+
+  const readiness = flow.summarizeTransferExecutionReadiness({
+    plan,
+    foundPreparedBarcodes: [],
+    looseTasks: tasks,
+  });
+  assert.equal(readiness.unresolvedShortageQty, 100);
+  assert.equal(readiness.canPrint, false);
+});
+
+test("LPK task generation clamps picked quantity to available inventory", () => {
+  const flow = loadOperationsFulfillmentFlow();
+  const [task] = flow.buildLoosePackingTasks({
+    transferNo: "TO-20260428-001",
+    plan: {
+      loosePickRows: [
+        {
+          categoryMain: "dress",
+          categorySub: "long dress",
+          requestedQty: 100,
+          availableQty: 60,
+          pickedQty: 100,
+          qty: 100,
+          rackCodes: ["A-01"],
+        },
+      ],
+    },
+  });
+
+  assert.equal(task.totalQty, 60);
+  assert.equal(task.pickedQty, 60);
+  assert.equal(task.availableQty, 60);
+  assert.equal(task.shortageQty, 40);
+  assert.equal(task.lines[0].pickedQty, 60);
+  assert.equal(task.lines[0].availableQty, 60);
+  assert.equal(task.lines[0].shortageQty, 40);
+});
+
 test("SDB print payload uses display code for humans and type-2 machine code for barcode", () => {
   const flow = loadStorePrepBaleFlow();
   const payload = flow.buildStorePrepBaleDirectPrintPayload({

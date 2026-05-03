@@ -161,3 +161,82 @@ test("sorting task available bale list uses compact rows instead of oversized st
   assert.match(stylesCss, /\.sorting-stock-row\s*\{[\s\S]*?min-height:\s*0;/);
   assert.match(stylesCss, /\.sorting-stock-list\s*\{[\s\S]*?align-content:\s*start;/);
 });
+
+test("replenishment main flow keeps default cost inside advanced internal estimate options", () => {
+  const headingIndex = indexHtml.indexOf("<h2>4.1 手动补货需求</h2>");
+  assert.ok(headingIndex >= 0, "4.1 transfer section should exist");
+  const sectionStart = indexHtml.lastIndexOf('<section class="panel" data-workspace-panel="warehouse">', headingIndex);
+  const sectionEnd = indexHtml.indexOf('<pre id="transferOutput" class="output hidden-output"></pre>', headingIndex);
+  assert.ok(sectionStart >= 0 && sectionEnd > headingIndex, "4.1 transfer section bounds should exist");
+  const transferHtml = indexHtml.slice(sectionStart, sectionEnd);
+  const advancedOptions = transferHtml.match(/<details class="[^"]*transfer-advanced-options[^"]*">[\s\S]*?<\/details>/);
+  assert.ok(advancedOptions, "default cost should be hidden in advanced options");
+  const beforeAdvanced = transferHtml.slice(0, transferHtml.indexOf(advancedOptions[0]));
+  assert.doesNotMatch(beforeAdvanced, /默认成本价/);
+  assert.match(advancedOptions[0], /内部估算 \/ 高级选项/);
+  assert.match(advancedOptions[0], /默认成本价/);
+  assert.match(advancedOptions[0], /仅用于内部估算，不影响 POS 售价 \/ 条码 \/ 实际库存/);
+});
+
+test("replenishment request summary is compact and uses warehouse prep task wording", () => {
+  const taskPanel = indexHtml.match(/<div class="candidate-summary warehouse-prep-task-summary">[\s\S]*?<div id="pickingWaveList"/);
+  assert.ok(taskPanel, "warehouse prep task summary panel should exist");
+  const taskHtml = taskPanel[0];
+  assert.match(taskHtml, />生成仓库备货任务</);
+  assert.match(taskHtml, /仓库备货任务/);
+  assert.match(taskHtml, /把多个补货品类合成一个仓库拣货任务，仓库按这个任务备货。/);
+  assert.match(taskHtml, /id="pickingWaveSelectedCount"/);
+  assert.match(taskHtml, /id="pickingWaveTotalQty"/);
+  assert.match(taskHtml, /id="pickingWaveCategoryCount"/);
+  assert.match(taskHtml, /id="pickingWaveShortageQty"/);
+  const advancedStart = taskHtml.indexOf("pickingWaveAdvancedSettings");
+  const mainTaskHtml = advancedStart >= 0 ? taskHtml.slice(0, advancedStart) : taskHtml;
+  assert.doesNotMatch(mainTaskHtml, /备货波次/);
+  assert.match(appJs, /\$\{escapeHtml\(storeLabel\)\} 补货单/);
+  assert.match(appJs, /共 \$\{escapeHtml\(totalQty\)\} 件 · \$\{escapeHtml\(categoryCount\)\} 个品类/);
+  assert.match(appJs, />大类<\/th>[\s\S]*?>小类<\/th>[\s\S]*?>需求数量<\/th>[\s\S]*?>可用库存<\/th>[\s\S]*?>可拣数量<\/th>[\s\S]*?>缺货数量<\/th>[\s\S]*?>建议动作<\/th>/);
+  assert.match(appJs, /库存不足/);
+  assert.match(appJs, /部分拣货/);
+  assert.match(appJs, /可全拣/);
+});
+
+test("warehouse prep task advanced wave parameters are collapsed and optional", () => {
+  const taskPanel = indexHtml.match(/<div class="candidate-summary warehouse-prep-task-summary">[\s\S]*?<div id="pickingWaveList"/);
+  assert.ok(taskPanel, "warehouse prep task summary panel should exist");
+  const taskHtml = taskPanel[0];
+  const advancedOptions = taskHtml.match(/<details id="pickingWaveAdvancedSettings"[^>]*>[\s\S]*?<\/details>/);
+  assert.ok(advancedOptions, "advanced wave settings should exist");
+  assert.doesNotMatch(advancedOptions[0].match(/<details[^>]*>/)?.[0] || "", /\sopen(?:\s|>|=)/);
+  assert.match(advancedOptions[0], /高级设置 \/ 备货波次参数/);
+  const visibleMain = taskHtml.slice(0, taskHtml.indexOf(advancedOptions[0]));
+  [
+    "wave_name",
+    "warehouse_code",
+    "planned_picking_date",
+    "required_arrival_date",
+    "selected_replenishment_request_nos",
+    "notes",
+  ].forEach((fieldName) => {
+    assert.doesNotMatch(visibleMain, new RegExp(`name="${fieldName}"`));
+    assert.match(advancedOptions[0], new RegExp(`name="${fieldName}"`));
+  });
+  assert.match(appJs, /function getPickingWaveRequestNos/);
+  assert.match(appJs, /function buildDefaultPickingWaveName/);
+  assert.match(appJs, /const defaultWaveName = buildDefaultPickingWaveName\(requestNos\);/);
+  assert.match(appJs, /selected_replenishment_request_nos:\s*requestNos/);
+  assert.match(appJs, /wave_name:\s*String\(form\.querySelector\("\[name='wave_name'\]"\)\?\.value \|\| defaultWaveName\)\.trim\(\)/);
+  assert.match(appJs, /const defaultWarehouseCode = String\([\s\S]*?"WH1"[\s\S]*?\)\.trim\(\) \|\| "WH1";/);
+  assert.match(appJs, /warehouse_code:\s*String\(defaultWarehouseCode \|\| "WH1"\)\.trim\(\)/);
+});
+
+test("LPK workbench uses a left-right identity and picking-detail layout", () => {
+  assert.match(appJs, /这个 LPK 拣了什么/);
+  assert.match(appJs, /class="split-grid lpk-picking-layout"/);
+  assert.match(appJs, /LPK display_code/);
+  assert.match(appJs, /LPK machine_code/);
+  assert.match(appJs, /拣货明细/);
+  assert.match(appJs, />大类<\/th>[\s\S]*?>小类<\/th>[\s\S]*?>需求数量<\/th>[\s\S]*?>已拣数量<\/th>[\s\S]*?>缺货数量<\/th>[\s\S]*?>来源包 \/ 来源库位<\/th>[\s\S]*?>状态<\/th>/);
+  assert.match(appJs, /buildLpkMachineCode\(task\.transferNo/);
+  assert.match(appJs, /barcode_value:\s*barcodeValue/);
+  assert.doesNotMatch(appJs, /barcode_value:\s*displayCode/);
+});

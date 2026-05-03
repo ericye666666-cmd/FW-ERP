@@ -2223,7 +2223,7 @@
         <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
           这里会显示发运和 shipment session，并展示已关联的正式门店送货执行单 barcode（如已生成）。
         </div>
-        <div id="transferShipWaveSummary" class="candidate-summary empty-state">选择波次后，这里展示波次内可配送 SDO 与未生成 SDO 的申请。</div>
+        <div id="transferShipWaveSummary" class="candidate-summary empty-state">选择仓库备货任务后，这里展示任务内可配送 SDO 与未生成 SDO 的申请。</div>
         <div id="transferDispatchSummary" class="candidate-summary empty-state">
           先创建并审核调拨单，这里再读取最近调拨单，就能看哪些单待仓库配货、待打印和待配送。
         </div>
@@ -2735,7 +2735,7 @@
             <span class="store-flag">3 生成任务</span>
             <span class="store-flag">4 执行/打印</span>
           </div>
-          <div class="subtle small">创建申请后可单独执行，也可加入备货波次（可选）。</div>
+          <div class="subtle small">创建申请后可单独执行，也可加入仓库备货任务（可选）。</div>
         </div>
         <div class="transfer-prep-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
@@ -2764,6 +2764,14 @@
                 </div>
                 <div id="transferItemsBuilder" class="line-builder-body"></div>
               </div>
+              <details class="transfer-advanced-options">
+                <summary>内部估算 / 高级选项</summary>
+                <div class="subtle small">仅用于内部估算，不影响 POS 售价 / 条码 / 实际库存</div>
+                <label class="field-control">
+                  <span>默认成本价</span>
+                  <input type="text" value="由 4.7 默认成本价管理维护" readonly />
+                </label>
+              </details>
               <button type="submit">生成补货申请单</button>
             </form>
           </article>
@@ -2793,22 +2801,31 @@
           </div>
         </div>
         <div id="transferResultSummary" class="candidate-summary empty-state">
-          下一步：可【单独执行该申请】或【加入备货波次】；有缺口去 5.1 生成补差工单，无缺口直接去 6。
+          下一步：可【单独执行该申请】或【加入仓库备货任务】；有缺口去 5.1 生成补差工单，无缺口直接去 6。
         </div>
-        <div class="candidate-summary">
-          <strong>备货波次 / Picking Wave</strong>
-          <div class="subtle small">备货波次是可选工具；补货申请也可以单独执行。</div>
+        <div class="candidate-summary warehouse-prep-task-summary">
+          <strong>仓库备货任务</strong>
+          <div class="subtle small">把多个补货品类合成一个仓库拣货任务，仓库按这个任务备货。</div>
+          <div class="report-summary-grid compact-metrics">
+            <article class="store-metric"><strong>当前选中的补货单数量</strong><span id="pickingWaveSelectedCount">0</span></article>
+            <article class="store-metric"><strong>总需求数量</strong><span id="pickingWaveTotalQty">0 件</span></article>
+            <article class="store-metric"><strong>品类数量</strong><span id="pickingWaveCategoryCount">0</span></article>
+            <article class="store-metric"><strong>缺货数量</strong><span id="pickingWaveShortageQty">0 件</span></article>
+          </div>
           <form id="pickingWaveForm" class="form-grid compact warehouse-prep-toolbar">
-            <input name="wave_name" type="text" placeholder="波次名称（如 WAVE-20260503-A）" />
-            <input name="warehouse_code" type="text" placeholder="仓库代码（WH1）" value="WH1" />
-            <input name="planned_picking_date" type="date" />
-            <input name="required_arrival_date" type="date" />
-            <select name="selected_replenishment_request_nos" multiple size="4"></select>
-            <input name="notes" type="text" placeholder="备注（可选）" />
-            <button type="submit">创建备货波次</button>
+            <button type="submit">生成仓库备货任务</button>
+            <details id="pickingWaveAdvancedSettings" class="transfer-advanced-options picking-wave-advanced-settings">
+              <summary>高级设置 / 备货波次参数</summary>
+              <input name="wave_name" type="text" placeholder="任务名称（如 PREP-20260503-A）" />
+              <input name="warehouse_code" type="text" placeholder="仓库代码（WH1）" value="WH1" />
+              <input name="planned_picking_date" type="date" />
+              <input name="required_arrival_date" type="date" />
+              <select name="selected_replenishment_request_nos" multiple size="4"></select>
+              <input name="notes" type="text" placeholder="备注（可选）" />
+            </details>
           </form>
-          <div id="pickingWaveSummary" class="subtle small">当前波次已接入执行入口；LPK 仍按单张补货申请生成。</div>
-          <div id="pickingWaveList" class="candidate-summary empty-state">暂无波次。</div>
+          <div id="pickingWaveSummary" class="subtle small">当前仓库备货任务已接入执行入口；LPK 仍按单张补货申请生成。</div>
+          <div id="pickingWaveList" class="candidate-summary empty-state">暂无仓库备货任务。</div>
         </div>
         <pre id="transferOutput" class="output hidden-output"></pre>
       </section>
@@ -2819,13 +2836,13 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">1 选申请/波次</span>
+            <span class="store-flag">1 选申请/任务</span>
             <span class="store-flag">2 看缺口</span>
             <span class="store-flag">3 生成任务</span>
             <span class="store-flag">4 执行/打印</span>
           </div>
           <div class="subtle small">LPK = 仓库补差工单码；门店不可扫。</div>
-          <div class="subtle small">当前波次已接入执行入口；LPK 仍按单张补货申请生成。</div>
+          <div class="subtle small">当前仓库备货任务已接入执行入口；LPK 仍按单张补货申请生成。</div>
         </div>
         <div class="transfer-prep-shell replenishment-workorder-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
@@ -2836,7 +2853,7 @@
             </div>
             <form id="loosePackingTaskPlanForm" class="form-grid compact warehouse-prep-toolbar">
               <label class="field-control">
-                <span>选择补货申请 / 选择备货波次</span>
+                <span>选择补货申请 / 选择仓库备货任务</span>
                 <select name="transfer_no">
                   <option value="">请选择补货申请单</option>
                 </select>
@@ -2852,7 +2869,7 @@
               <button type="submit">生成补差拣货单 barcode</button>
             </form>
             <div id="loosePackingTaskPlanNotice" class="inline-notice-slot" aria-live="polite"></div>
-            <div id="loosePackingWaveSummary" class="candidate-summary empty-state">选择波次后，这里展示波次上下文与申请列表。</div>
+            <div id="loosePackingWaveSummary" class="candidate-summary empty-state">选择仓库备货任务后，这里展示任务上下文与申请列表。</div>
             <div id="loosePackingTaskPlanSummary" class="candidate-summary empty-state">
               先读取一张补货申请单，再决定是否需要生成补差拣货单。
             </div>
@@ -2878,13 +2895,13 @@
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
-            <span class="store-flag">1 选申请/波次</span>
+            <span class="store-flag">1 选申请/任务</span>
             <span class="store-flag">2 SDB 核对</span>
             <span class="store-flag">3 LPK 核对</span>
             <span class="store-flag">4 生成 SDO</span>
           </div>
           <div class="subtle small">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
-          <div class="subtle small">SDO 仍按门店/补货申请生成；一个波次可以包含多个 SDO。</div>
+          <div class="subtle small">SDO 仍按门店/补货申请生成；一个仓库备货任务可以包含多个 SDO。</div>
           <div class="subtle small">SDB/LPK = 仓库核对码；门店只扫 SDO。</div>
           <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
         </div>
@@ -2904,7 +2921,7 @@
             <div id="transferWorkbenchSummary" class="candidate-summary empty-state">
               先选择补货申请单，这里会显示仓库执行核对进度。
             </div>
-            <div id="transferWaveSummary" class="candidate-summary empty-state">选择波次后，这里展示每张申请的 SDB/LPK/SDO 执行状态。</div>
+            <div id="transferWaveSummary" class="candidate-summary empty-state">选择仓库备货任务后，这里展示每张申请的 SDB/LPK/SDO 执行状态。</div>
           </article>
 
           <div class="warehouse-prep-main">
