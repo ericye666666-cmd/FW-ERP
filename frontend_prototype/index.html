@@ -3119,11 +3119,11 @@
         <pre id="storeDispatchAssignmentOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-support-panel" data-workspace-panel="store">
+      <section class="panel store-support-panel store-pda-page" data-workspace-panel="store">
         <div class="panel-head">
           <h2>7. 店员 PDA 上架工作台</h2>
         </div>
-        <form id="storeTokenEditDirectoryForm" class="form-grid compact">
+        <form id="storeTokenEditDirectoryForm" class="form-grid compact store-pda-entry-form">
           <input name="store_code" placeholder="门店代码" value="UTAWALA" />
           <input name="bale_no" placeholder="按门店配货 bale 读取" />
           <input name="assigned_employee" list="storeClerkOptions" placeholder="按店员筛选" />
@@ -3131,7 +3131,7 @@
         </form>
         <div id="storeTokenEditNotice" class="inline-notice-slot" aria-live="polite"></div>
         <div id="storeTokenEditSummary" class="candidate-summary empty-state">
-          这是店员端主工作台。系统会按当前 bale 自动分组，店员按品类成批设置默认售价、货架位，再单独补高价值例外，最后批量打印并完成上架。
+          扫描 STORE_ITEM 商品码，确认售价和货架位后上架。
         </div>
         <pre id="storeTokenEditOutput" class="output hidden-output"></pre>
       </section>

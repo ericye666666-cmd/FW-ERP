@@ -1134,6 +1134,7 @@ let storeTokenReceivingSessionState = null;
 let storePdaWorkbenchState = {
   currentBaleNo: "",
   selectedCategoryKey: "",
+  scannedStoreItemCode: "",
   defaultPriceKes: "",
   defaultRackCode: "",
   premiumCount: "",
@@ -15276,6 +15277,7 @@ function resetStorePdaWorkbenchState(currentBaleNo = "") {
   storePdaWorkbenchState = {
     currentBaleNo: String(currentBaleNo || "").trim().toUpperCase(),
     selectedCategoryKey: "",
+    scannedStoreItemCode: "",
     defaultPriceKes: "",
     defaultRackCode: "",
     premiumCount: "",
@@ -15413,6 +15415,10 @@ function syncStorePdaWorkbenchStateFromDom() {
   if (selectedGroup instanceof HTMLInputElement) {
     storePdaWorkbenchState.selectedCategoryKey = String(selectedGroup.value || "").trim();
   }
+  const scanInput = document.querySelector("#storePdaScanInput");
+  if (scanInput instanceof HTMLInputElement) {
+    storePdaWorkbenchState.scannedStoreItemCode = String(scanInput.value || "").trim().toUpperCase();
+  }
   const defaultPrice = document.querySelector("#storePdaDefaultPrice");
   const defaultRack = document.querySelector("#storePdaDefaultRack");
   const premiumCount = document.querySelector("#storePdaPremiumCount");
@@ -15520,6 +15526,97 @@ function renderStorePdaTemplateOptions(selectedCode = "") {
       `)
     : [`<option value="apparel_40x30">Apparel Label 40x30 · 40x30</option>`];
   return options.join("");
+}
+
+function normalizeStorePdaScanDigits(value = "") {
+  return String(value || "").replace(/[^0-9]/g, "").trim();
+}
+
+function getStorePdaScanGuidance(value = "") {
+  const raw = String(value || "").trim().toUpperCase();
+  const digits = normalizeStorePdaScanDigits(raw);
+  if (!raw) {
+    return "请扫描 STORE_ITEM 商品码。";
+  }
+  if (raw.startsWith("SDO") || /^4\d{9}$/.test(digits)) {
+    return "这是 SDO，请去门店收货页面处理。";
+  }
+  if (raw.startsWith("SDB") || raw.startsWith("LPK") || /^2\d{9}$/.test(digits) || /^3\d{9}$/.test(digits)) {
+    return "这是 SDB / LPK 来源包，不能直接上架销售。";
+  }
+  if (raw.startsWith("RAW") || raw.startsWith("BALE") || /^1\d{9}$/.test(digits)) {
+    return "这是 RAW_BALE，门店不能处理。";
+  }
+  if (/^5\d{9}$/.test(digits)) {
+    return "";
+  }
+  return "请扫描 STORE_ITEM 商品码。";
+}
+
+function getStorePdaTokenScanKeys(row = {}) {
+  return [
+    row.token_no,
+    row.barcode,
+    row.barcode_value,
+    row.machine_code,
+    row.display_code,
+    row.identity_no,
+  ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+}
+
+function findStorePdaScannedItem(rows = []) {
+  const raw = String(storePdaWorkbenchState.scannedStoreItemCode || "").trim().toUpperCase();
+  const scanDigits = normalizeStorePdaScanDigits(raw);
+  if (!raw) {
+    return null;
+  }
+  return (Array.isArray(rows) ? rows : []).find((row) => {
+    const keys = getStorePdaTokenScanKeys(row);
+    return keys.some((key) => key === raw || (scanDigits && normalizeStorePdaScanDigits(key) === scanDigits));
+  }) || null;
+}
+
+function getStorePdaCurrentItem(rows = [], fallbackRows = []) {
+  const scanned = findStorePdaScannedItem(rows);
+  if (scanned) {
+    return scanned;
+  }
+  const sourceRows = Array.isArray(fallbackRows) && fallbackRows.length ? fallbackRows : rows;
+  return (Array.isArray(sourceRows) ? sourceRows : []).find((row) => String(row?.status || "").trim() !== "shelved_in_store") || sourceRows[0] || null;
+}
+
+function updateStorePdaScanUi() {
+  const input = document.querySelector("#storePdaScanInput");
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+  storePdaWorkbenchState.scannedStoreItemCode = String(input.value || "").trim().toUpperCase();
+  const messageTarget = document.querySelector("#storePdaScanMessage");
+  const scanGuidance = getStorePdaScanGuidance(storePdaWorkbenchState.scannedStoreItemCode);
+  const hasMatchedScan = Boolean(storePdaWorkbenchState.scannedStoreItemCode && !scanGuidance && findStorePdaScannedItem(filteredItemBarcodeTokenState));
+  const message = scanGuidance || (hasMatchedScan ? "STORE_ITEM 已识别，请确认货架位和售价。" : "STORE_ITEM 已识别，但不在当前任务中。");
+  if (messageTarget instanceof HTMLElement) {
+    messageTarget.textContent = message;
+    messageTarget.className = `store-pda-scan-message ${scanGuidance ? "is-warning" : hasMatchedScan ? "is-success" : "is-warning"}`;
+  }
+  document.querySelectorAll("[data-pda-confirm-putaway]").forEach((button) => {
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = !hasMatchedScan;
+    }
+  });
+}
+
+function getStorePdaItemStatusLabel(status = "") {
+  const normalized = String(status || "").trim();
+  const labels = {
+    pending_edit: "需补价",
+    pending_store_print: "待上架",
+    print_queued: "待同步",
+    print_failed: "异常",
+    printed_in_store: "待上架",
+    shelved_in_store: "已上架",
+  };
+  return labels[normalized] || "待处理";
 }
 
 function getStoreTokenReceivingSessionStatusLabel(status = "") {
@@ -16093,8 +16190,12 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
   }
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) {
-    target.className = "candidate-summary empty-state";
-    target.textContent = "店员端先读取自己被分配的门店配货 bale，再按品类批量定价、识别高价值例外、批量打印并完成上架。";
+    target.className = "candidate-summary empty-state store-pda-mobile-empty";
+    target.innerHTML = `
+      <strong>扫描 STORE_ITEM 商品码</strong>
+      <span>先读取当前店员负责的 bale，再扫描商品码上架。</span>
+      <span class="subtle small">离线暂存，联网后同步。</span>
+    `;
     return;
   }
   const sample = list[0] || {};
@@ -16130,176 +16231,173 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
       ? formatKesAmount(currentGroup.costMinKes)
       : `${formatKesAmount(currentGroup.costMinKes)} - ${formatKesAmount(currentGroup.costMaxKes)}`
     : "待分摊";
-  target.className = "report-summary";
+  const scannedCode = String(storePdaWorkbenchState.scannedStoreItemCode || "").trim().toUpperCase();
+  const scanGuidance = getStorePdaScanGuidance(scannedCode);
+  const scannedItem = findStorePdaScannedItem(list);
+  const currentItem = getStorePdaCurrentItem(list, currentRows);
+  const hasMatchedScan = Boolean(scannedCode && scannedItem && !scanGuidance);
+  const currentItemMachineCode = String(
+    currentItem?.machine_code
+      || currentItem?.barcode_value
+      || currentItem?.barcode
+      || currentItem?.token_no
+      || "-",
+  ).trim();
+  const currentItemDisplayCode = String(currentItem?.display_code || currentItem?.token_no || currentItemMachineCode || "-").trim();
+  const currentItemCategory = String(
+    currentItem?.category_name
+      || [currentItem?.category_main, currentItem?.category_sub].filter(Boolean).join(" / ")
+      || categoryLabel,
+  ).trim();
+  const currentItemStatus = getStorePdaItemStatusLabel(currentItem?.status || "");
+  const scanMessage = scanGuidance || (hasMatchedScan ? "STORE_ITEM 已识别，请确认货架位和售价。" : "STORE_ITEM 已识别，但不在当前任务中。");
+  const scanMessageClass = scanGuidance ? "is-warning" : hasMatchedScan ? "is-success" : "is-warning";
+  const confirmDisabled = hasMatchedScan ? "" : "disabled";
+  const taskRows = currentRows.length ? currentRows : list;
+  target.className = "report-summary store-pda-mobile-shell";
   target.innerHTML = `
-    <div class="alert-banner">${
-      context.lastCompletedGroup
-        ? `分组 ${escapeHtml(context.lastCompletedGroup)} 已完成上架，现在可以继续处理下一组。`
-        : context.lastQueuedCount
-          ? `当前分组已加入 ${context.lastQueuedCount} 张标签到蓝牙打印队列，确认打印成功后再完成本组上架。`
-          : context.lastSavedToken
-            ? `当前 bale 的默认值已更新，高价值例外和打印动作也会沿用这组设置。`
-            : "按 bale 处理、按品类成批挂货。先给本组设默认售价和货架位，再单独补高价值例外，最后批量打印并完成本组上架。"
-    }</div>
-    <div class="report-summary-grid">
-      <article class="store-metric"><strong>当前 bale</strong><span>${escapeHtml(sample.store_dispatch_bale_no || "-")}</span></article>
-      <article class="store-metric"><strong>当前店员</strong><span>${escapeHtml(sample.assigned_employee || "-")}</span></article>
-      <article class="store-metric"><strong>token 数</strong><span>${list.length}</span></article>
-      <article class="store-metric"><strong>品类组数</strong><span>${groups.length}</span></article>
-      <article class="store-metric"><strong>已补售价/货架</strong><span>${editedCount}</span></article>
-      <article class="store-metric"><strong>已入打印队列</strong><span>${queuedCount}</span></article>
-      <article class="store-metric"><strong>已打印</strong><span>${printedCount}</span></article>
-      <article class="store-metric"><strong>已上架</strong><span>${shelvedCount}</span></article>
-      <article class="store-metric"><strong>已完成分组</strong><span>${completedGroups}/${groups.length}</span></article>
-      <article class="store-metric"><strong>上架会话</strong><span>${escapeHtml(storeTokenReceivingSessionState?.session_no || "未开始")}</span></article>
-    </div>
-    <div class="store-pda-workbench">
-      <aside class="store-pda-groups">
-        <div class="store-pda-groups-head">
-          <strong>当前 bale 分组</strong>
-          <span>${groups.length} 组</span>
-        </div>
-        <div class="store-pda-group-list">
-          ${groups
-            .map((group) => `
-              <label class="store-pda-group-card ${group.key === currentGroup?.key ? "is-active" : ""}" data-pda-category-select="${escapeHtml(group.key)}">
-                <input type="radio" name="storePdaSelectedCategory" value="${escapeHtml(group.key)}" ${group.key === currentGroup?.key ? "checked" : ""} data-pda-category-select="${escapeHtml(group.key)}" />
-                <div class="store-pda-group-text">
-                  <strong>${escapeHtml(`${group.main} / ${group.sub}`)}</strong>
-                  <span>${group.tokenCount} 件 · 待编辑 ${group.pendingEditCount} · 待打印 ${group.readyPrintCount}</span>
-                </div>
-                <span class="meta-pill">${group.shelvedCount}/${group.tokenCount} 已上架</span>
-              </label>
-            `)
-            .join("")}
-        </div>
-      </aside>
-      <div class="store-pda-main">
-        <section class="store-pda-panel">
-          <div class="store-pda-panel-head">
-            <div>
-              <span class="subtle small">当前处理分组</span>
-              <h3>${escapeHtml(categoryLabel)}</h3>
-            </div>
-            <div class="store-pda-head-metrics">
-              <span class="meta-pill">${currentRows.length} 件</span>
-              <span class="meta-pill">${escapeHtml(costLabel)}</span>
-            </div>
-          </div>
-          <div class="store-pda-locked-grid">
-            <label><span>商品大类</span><input value="${escapeHtml(currentGroup?.main || "-")}" readonly /></label>
-            <label><span>商品小类</span><input value="${escapeHtml(currentGroup?.sub || "-")}" readonly /></label>
-            <label><span>成本价</span><input value="${escapeHtml(costLabel)}" readonly /></label>
-          </div>
-          <div class="store-pda-edit-grid">
-            <label>
-              <span>默认售价（系统建议售价）</span>
-              <input id="storePdaDefaultPrice" value="${escapeHtml(defaultPriceValue)}" placeholder="${escapeHtml(currentGroup?.suggestedPriceKes ? formatCurrency(currentGroup.suggestedPriceKes) : "按本组统一定价")}" />
-            </label>
-            <label>
-              <span>默认货架位（建议货架位）</span>
-              <input id="storePdaDefaultRack" value="${escapeHtml(defaultRackValue)}" placeholder="${escapeHtml(currentGroup?.suggestedRackCode || "按这一组统一摆放")}" />
-            </label>
-            <label>
-              <span>高价值件数</span>
-              <input id="storePdaPremiumCount" type="number" min="0" max="${escapeHtml(currentRows.length || 0)}" value="${escapeHtml(premiumCountValue)}" placeholder="例如 3" />
-            </label>
-            <label>
-              <span>高价值售价</span>
-              <input id="storePdaPremiumPrice" value="${escapeHtml(premiumPriceValue)}" placeholder="只填高价值例外售价" />
-            </label>
-            <label>
-              <span>蓝牙打印机</span>
-              <input id="storePdaPrinterName" value="${escapeHtml(printerNameValue)}" placeholder="例如 Deli DL-720C" />
-            </label>
-            <label>
-              <span>打印模板</span>
-              <select id="storePdaTemplateCode">${renderStorePdaTemplateOptions(templateCodeValue)}</select>
-            </label>
-          </div>
-          <div class="subtle small">
-            默认值会优先应用到本组未编辑 token；高价值例外会从当前分组里优先取前 N 个未打印 token，方便你先挂同类，再给少量高价值件单独打高价标签。
-          </div>
-          ${printerStatusCard}
-          <div class="button-row store-pda-action-row">
-            <button type="button" class="ghost-button" data-pda-start-session>开始本 bale 上架</button>
-            <button type="button" class="ghost-button" data-pda-apply-default>应用默认到本组</button>
-            <button type="button" class="ghost-button" data-pda-apply-premium>记录高价值例外</button>
-            <button type="button" class="ghost-button" data-pda-queue-group>打印这一组</button>
-            <button type="button" class="ghost-button" data-pda-complete-group>完成这一组上架</button>
-            <button type="button" class="ghost-button" data-pda-finalize-bale>完成本 bale</button>
-          </div>
-        </section>
-        <section class="store-pda-panel">
-          <div class="store-pda-panel-head">
-            <div>
-              <span class="subtle small">本组进度</span>
-              <h3>打印与上架状态</h3>
-            </div>
-            <div class="store-pda-head-metrics">
-              <span class="meta-pill">待编辑 ${currentGroup?.pendingEditCount || 0}</span>
-              <span class="meta-pill">待打印 ${currentGroup?.readyPrintCount || 0}</span>
-              <span class="meta-pill">已上架 ${currentGroup?.shelvedCount || 0}</span>
-            </div>
-          </div>
-          <div class="candidate-list store-pda-token-list">
-            ${currentRows
-              .map((row) => `
-                <article class="candidate-row store-pda-token-row">
-                  <div class="candidate-main">
-                    <strong>${escapeHtml(row.token_no || "-")}</strong>
-                    <div class="subtle small">${escapeHtml(`售价 ${row.selling_price_kes != null ? `KES ${formatCurrency(row.selling_price_kes)}` : "待填写"} · 货架位 ${row.store_rack_code || row.suggested_rack_code || "待填写"}`)}</div>
-                  </div>
-                  <div class="candidate-side">
-                    <span class="meta-pill">${escapeHtml(getItemTokenStatusLabel(row.status || ""))}</span>
-                  </div>
-                </article>
-              `)
-              .join("")}
-          </div>
-          <div class="subtle small">当前分组打印任务</div>
-          ${
-            currentGroupJobs.length
-              ? `
-                <div class="candidate-list">
-                  ${currentGroupJobs
-                    .map((job) => `
-                      <article class="candidate-row selected-bale-row">
-                        <div class="candidate-main">
-                          <strong>${escapeHtml(job.barcode || "-")}</strong>
-                          <div class="subtle small">${escapeHtml(`任务 #${job.id} · ${job.status || "-"} · ${job.printer_name || "-"}`)}</div>
-                        </div>
-                        <div class="button-row selected-bale-actions">
-                          <button type="button" class="ghost-button mini-button" data-item-token-print-action="preview" data-job-id="${escapeHtml(job.id)}">系统打印</button>
-                          ${
-                            String(job.status || "").trim() === "queued"
-                              ? `
-                                <button type="button" class="ghost-button mini-button" data-item-token-print-action="complete" data-job-id="${escapeHtml(job.id)}">已打印</button>
-                                <button type="button" class="ghost-button mini-button" data-item-token-print-action="fail" data-job-id="${escapeHtml(job.id)}">失败</button>
-                              `
-                              : String(job.status || "").trim() === "failed"
-                                ? `
-                                  <button type="button" class="ghost-button mini-button" data-item-token-print-action="retry" data-job-id="${escapeHtml(job.id)}">重新发起</button>
-                                `
-                                : ""
-                          }
-                          ${
-                            String(job.status || "").trim() === "printed"
-                              ? `
-                                <span class="meta-pill">已回写</span>
-                              `
-                              : ""
-                          }
-                        </div>
-                      </article>
-                    `)
-                    .join("")}
-                </div>
-              `
-              : '<div class="empty-state">本组还没有打印任务。挂完这一组后，直接点“打印这一组”。</div>'
-          }
-        </section>
+    <div class="store-pda-mobile-status">
+      <div>
+        <strong>${escapeHtml(sample.store_code || getCurrentStoreCodeFallback() || "-")} · ${escapeHtml(sample.assigned_employee || getCurrentStoreWorkerFallback() || "店员")}</strong>
+        <span>在线 · 待同步 0</span>
       </div>
+      <div>
+        <strong>${escapeHtml(sample.store_dispatch_bale_no || storePdaWorkbenchState.currentBaleNo || "-")}</strong>
+        <span>${escapeHtml(storeTokenReceivingSessionState?.session_no || "未开始")}</span>
+      </div>
+    </div>
+
+    <section class="store-pda-mobile-scan-zone">
+      <div class="store-pda-scan-copy">
+        <span>当前任务</span>
+        <strong>扫描 STORE_ITEM 商品码</strong>
+        <small>离线暂存，联网后同步。</small>
+      </div>
+      <label class="store-pda-scan-input-wrap">
+        <span>商品码</span>
+        <input id="storePdaScanInput" data-pda-scan-input inputmode="numeric" autocomplete="off" value="${escapeHtml(scannedCode)}" placeholder="扫描 STORE_ITEM 商品码" />
+      </label>
+      <button type="button" class="store-pda-scan-button" data-pda-scan-focus>扫描商品码</button>
+      <div class="store-pda-scan-message ${scanMessageClass}" id="storePdaScanMessage" aria-live="polite">${escapeHtml(scanMessage)}</div>
+    </section>
+
+    <section class="store-pda-current-item-card">
+      <div class="store-pda-current-head">
+        <div>
+          <span>当前商品</span>
+          <strong>${escapeHtml(currentItemMachineCode || "等待扫描")}</strong>
+          <small>${escapeHtml(currentItemDisplayCode || "-")}</small>
+        </div>
+        <span class="store-pda-status-badge">${escapeHtml(currentItemStatus)}</span>
+      </div>
+      <div class="store-pda-item-facts">
+        <span><b>品类</b>${escapeHtml(currentItemCategory || "-")}</span>
+        <span><b>售价</b>${escapeHtml(currentItem?.selling_price_kes != null ? formatKesAmount(currentItem.selling_price_kes) : "待确认")}</span>
+        <span><b>货架位</b>${escapeHtml(currentItem?.store_rack_code || currentItem?.suggested_rack_code || "待填写")}</span>
+        <span><b>来源</b>${escapeHtml(`${currentItem?.store_dispatch_bale_no || sample.store_dispatch_bale_no || "-"} · ${currentItem?.source_sdo || currentItem?.shipment_no || "-"}`)}</span>
+      </div>
+    </section>
+
+    <section class="store-pda-putaway-panel">
+      <div class="store-pda-panel-head">
+        <div>
+          <span class="subtle small">上架操作</span>
+          <h3>${escapeHtml(categoryLabel)}</h3>
+        </div>
+        <div class="store-pda-head-metrics">
+          <span class="meta-pill">${currentRows.length} 件</span>
+          <span class="meta-pill">${escapeHtml(costLabel)}</span>
+        </div>
+      </div>
+      <div class="store-pda-edit-grid store-pda-touch-fields">
+        <label>
+          <span>货架位</span>
+          <input id="storePdaDefaultRack" value="${escapeHtml(defaultRackValue)}" placeholder="${escapeHtml(currentGroup?.suggestedRackCode || "输入货架位")}" />
+        </label>
+        <label>
+          <span>售价</span>
+          <input id="storePdaDefaultPrice" inputmode="decimal" value="${escapeHtml(defaultPriceValue)}" placeholder="${escapeHtml(currentGroup?.suggestedPriceKes ? formatCurrency(currentGroup.suggestedPriceKes) : "输入售价")}" />
+        </label>
+      </div>
+      <div class="store-pda-action-row store-pda-touch-actions">
+        <button type="button" class="ghost-button" data-pda-apply-default>确认售价 / 货架位</button>
+      </div>
+      <div class="subtle small">货架位或售价为空时，系统会阻止上架。</div>
+    </section>
+
+    <section class="store-pda-task-list" aria-label="任务明细">
+      <div class="store-pda-task-list-head">
+        <div>
+          <span class="subtle small">任务明细</span>
+          <h3>当前 bale 商品</h3>
+        </div>
+        <span>${editedCount}/${list.length} 已补信息</span>
+      </div>
+      <div class="store-pda-mobile-list">
+        ${taskRows
+          .map((row) => {
+            const rowMachineCode = String(row.machine_code || row.barcode_value || row.barcode || row.token_no || "-").trim();
+            const rowCategory = String(row.category_name || [row.category_main, row.category_sub].filter(Boolean).join(" / ") || "-").trim();
+            return `
+              <article class="store-pda-mobile-row ${row === scannedItem ? "is-current" : ""}">
+                <div>
+                  <strong>${escapeHtml(rowMachineCode.slice(-6) ? `...${rowMachineCode.slice(-6)}` : rowMachineCode)}</strong>
+                  <span>${escapeHtml(rowCategory)}</span>
+                </div>
+                <div>
+                  <span>${escapeHtml(row.store_rack_code || row.suggested_rack_code || "无货架")}</span>
+                  <b>${escapeHtml(getStorePdaItemStatusLabel(row.status || ""))}</b>
+                </div>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+
+    <details class="store-pda-mobile-advanced">
+      <summary>高级：打印和批量设置</summary>
+      <div class="store-pda-category-strip">
+        ${groups
+          .map((group) => `
+            <button type="button" class="ghost-button mini-button ${group.key === currentGroup?.key ? "is-active" : ""}" data-pda-category-select="${escapeHtml(group.key)}">
+              ${escapeHtml(`${group.main} / ${group.sub}`)} · ${group.shelvedCount}/${group.tokenCount}
+            </button>
+          `)
+          .join("")}
+      </div>
+      <div class="store-pda-edit-grid">
+        <label>
+          <span>高价值件数</span>
+          <input id="storePdaPremiumCount" type="number" min="0" max="${escapeHtml(currentRows.length || 0)}" value="${escapeHtml(premiumCountValue)}" placeholder="例如 3" />
+        </label>
+        <label>
+          <span>高价值售价</span>
+          <input id="storePdaPremiumPrice" value="${escapeHtml(premiumPriceValue)}" placeholder="只填高价值例外售价" />
+        </label>
+        <label>
+          <span>蓝牙打印机</span>
+          <input id="storePdaPrinterName" value="${escapeHtml(printerNameValue)}" placeholder="例如 Deli DL-720C" />
+        </label>
+        <label>
+          <span>打印模板</span>
+          <select id="storePdaTemplateCode">${renderStorePdaTemplateOptions(templateCodeValue)}</select>
+        </label>
+      </div>
+      ${printerStatusCard}
+      <div class="button-row store-pda-action-row">
+        <button type="button" class="ghost-button" data-pda-start-session>开始本 bale 上架</button>
+        <button type="button" class="ghost-button" data-pda-apply-premium>记录高价值例外</button>
+        <button type="button" class="ghost-button" data-pda-queue-group>打印这一组</button>
+        <button type="button" class="ghost-button" data-pda-complete-group>完成这一组上架</button>
+        <button type="button" class="ghost-button" data-pda-finalize-bale>完成本 bale</button>
+      </div>
+    </details>
+
+    <div class="store-pda-bottom-actions">
+      <button type="button" class="primary-button" data-pda-confirm-putaway data-pda-complete-group ${confirmDisabled}>确认上架</button>
+      <button type="button" class="ghost-button" data-pda-skip-current>跳过</button>
+      <button type="button" class="ghost-button danger-light" data-pda-report-exception>异常上报</button>
     </div>
   `;
 }
@@ -33629,14 +33727,47 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("input", (event) => {
+  const target = event.target instanceof HTMLElement ? event.target.closest("[data-pda-scan-input]") : null;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  updateStorePdaScanUi();
+});
+
+document.addEventListener("keydown", (event) => {
+  const target = event.target instanceof HTMLElement ? event.target.closest("[data-pda-scan-input]") : null;
+  if (!(target instanceof HTMLInputElement) || event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  updateStorePdaScanUi();
+  renderStoreTokenEditSummary(filteredItemBarcodeTokenState);
+  focusElement("#storePdaDefaultRack");
+});
+
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-pda-category-select], [data-pda-start-session], [data-pda-apply-default], [data-pda-apply-premium], [data-pda-queue-group], [data-pda-complete-group], [data-pda-finalize-bale]")
+    ? event.target.closest("[data-pda-scan-focus], [data-pda-skip-current], [data-pda-report-exception], [data-pda-category-select], [data-pda-start-session], [data-pda-apply-default], [data-pda-apply-premium], [data-pda-queue-group], [data-pda-complete-group], [data-pda-finalize-bale]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
   try {
+    if (button.dataset.pdaScanFocus !== undefined) {
+      focusElement("#storePdaScanInput");
+      return;
+    }
+    if (button.dataset.pdaSkipCurrent !== undefined) {
+      storePdaWorkbenchState.scannedStoreItemCode = "";
+      renderStoreTokenEditSummary(filteredItemBarcodeTokenState);
+      showTransientInlineNotice("#storeTokenEditNotice", "已跳过当前扫码，请扫描下一件 STORE_ITEM。", "success", 1400);
+      return;
+    }
+    if (button.dataset.pdaReportException !== undefined) {
+      showTransientInlineNotice("#storeTokenEditNotice", "异常已记录在当前任务，请交给店长复核。", "error", 1800);
+      return;
+    }
     if (button.dataset.pdaCategorySelect) {
       syncStorePdaWorkbenchStateFromDom();
       storePdaWorkbenchState.selectedCategoryKey = String(button.dataset.pdaCategorySelect || "").trim().toLowerCase();

@@ -12,6 +12,26 @@ function loadStoreExecutionFlow() {
   return globalThis.StoreExecutionFlow;
 }
 
+function extractFunctionSource(source, functionName) {
+  const start = source.indexOf(`function ${functionName}`);
+  assert.notEqual(start, -1, `missing function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `missing function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract ${functionName}`);
+}
+
 const {
   getStoreRoleLanding,
   getStoreWorkerDefault,
@@ -24,10 +44,12 @@ const {
 } = loadStoreExecutionFlow();
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 const storeDispatchSectionHtml = (indexHtml.match(/<section class="panel store-support-panel(?: hidden-screen)?" data-workspace-panel="store">[\s\S]*?<form id="storeDispatchBaleAcceptForm"[\s\S]*?<pre id="storeDispatchBaleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
 const storeDispatchAssignmentSectionHtml = (indexHtml.match(/<form id="storeDispatchAssignmentForm" class="sorting-task-form warehouse-step-form">[\s\S]*?<pre id="storeDispatchAssignmentOutput" class="output hidden-output"><\/pre>/) || [""])[0];
 const testingToolsSectionHtml = (indexHtml.match(/<section class="panel" data-workspace-panel="testing">[\s\S]*?<h2>测试工具<\/h2>[\s\S]*?<pre id="storeRecentSalesSimulationOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
 const storeManagerConsoleSectionHtml = (indexHtml.match(/<section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">[\s\S]*?<h2>5\. 门店收货主控台<\/h2>[\s\S]*?<pre id="storeManagerConsoleOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
+const storePdaWorkbenchSectionHtml = (indexHtml.match(/<section class="panel store-support-panel(?: [^"]*)?" data-workspace-panel="store">[\s\S]*?<h2>7\. 店员 PDA 上架工作台<\/h2>[\s\S]*?<pre id="storeTokenEditOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 
 test("getStoreRoleLanding sends store clerks to my current bale instead of the manager console", () => {
@@ -220,6 +242,37 @@ test("testing tools includes the retail demo seed form and page 5 no longer carr
   assert.equal(Boolean(storeManagerConsoleSectionHtml), true);
   assert.doesNotMatch(storeManagerConsoleSectionHtml, /storeRetailSeedForm/);
   assert.doesNotMatch(storeManagerConsoleSectionHtml, /storeRetailSeedSummary/);
+});
+
+test("store PDA putaway page uses a mobile touch scan-first layout", () => {
+  const summarySource = extractFunctionSource(appJs, "renderStoreTokenEditSummary");
+
+  assert.equal(Boolean(storePdaWorkbenchSectionHtml), true);
+  assert.match(storePdaWorkbenchSectionHtml, /store-pda-page/);
+  assert.match(summarySource, /store-pda-mobile-shell/);
+  assert.match(summarySource, /store-pda-mobile-status/);
+  assert.match(summarySource, /扫描 STORE_ITEM 商品码/);
+  assert.match(summarySource, /store-pda-mobile-scan-zone/);
+  assert.match(summarySource, /store-pda-current-item-card/);
+  assert.match(summarySource, /data-pda-confirm-putaway/);
+  assert.match(summarySource, /store-pda-task-list/);
+  assert.match(summarySource, /store-pda-bottom-actions/);
+  assert.match(summarySource, /离线暂存，联网后同步/);
+  assert.match(stylesCss, /\.store-pda-mobile-shell\s*\{/);
+  assert.match(stylesCss, /\.store-pda-mobile-scan-zone\s*\{/);
+  assert.match(stylesCss, /\.store-pda-bottom-actions\s*\{/);
+});
+
+test("store PDA scan guidance rejects non STORE_ITEM codes with next-step copy", () => {
+  const guidanceSource = extractFunctionSource(appJs, "getStorePdaScanGuidance");
+
+  assert.match(guidanceSource, /请扫描 STORE_ITEM 商品码。/);
+  assert.match(guidanceSource, /这是 SDO，请去门店收货页面处理。/);
+  assert.match(guidanceSource, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
+  assert.match(guidanceSource, /这是 RAW_BALE，门店不能处理。/);
+  assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"RAW_BALE"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
 });
 
 test("bucketStoreManagerDispatchBales keeps received and processing bales visible to the manager console", () => {
