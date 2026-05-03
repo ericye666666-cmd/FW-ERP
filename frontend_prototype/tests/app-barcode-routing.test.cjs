@@ -73,19 +73,27 @@ test("0.1 start print opens the bale print modal before creating backend print j
 test("completed inbound print modal keeps close and completion actions clickable", () => {
   assert.match(appJs, /function isBalePrintModalAlreadyComplete/);
   assert.match(appJs, /completeButton\.disabled = !\["complete_group", "complete_current"\]\.includes\(completionAction\.action\) && !alreadyComplete/);
-  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "本包已贴标，关闭弹窗" : "确认本包已贴标"/);
+  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "当前标签已贴标，关闭弹窗" : "确认当前标签已贴标"/);
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
 
 test("bale print modal keeps field operators on primary print actions", () => {
   assert.match(indexHtml, /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
-  assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认本包已贴标/);
+  assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认当前标签已贴标/);
   assert.match(indexHtml, /id="balePrintModalCloseAndRefreshButton"[\s\S]*?取消并返回/);
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
   assert.ok(primaryActions, "primary print actions should exist");
   assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
   assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?打印助手未连接，请先启动 Windows 打印助手。/);
   assert.doesNotMatch(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?当前打印方式：浏览器打印/);
+});
+
+test("0.1 batch card confirmation is batch-level and calls parcel batch endpoint", () => {
+  assert.match(appJs, /data-bale-batch-complete="[^"]*?"[^>]*>确认本批已贴标<\/button>/);
+  assert.doesNotMatch(appJs, /data-bale-batch-complete="[^"]*?"[^>]*>确认本包已贴标<\/button>/);
+  assert.match(appJs, /function confirmBaleBatchLabelled\(parcelBatchNo = ""\)/);
+  assert.match(appJs, /\/warehouse\/bale-barcodes\/batches\/\$\{encodeURIComponent\(normalizedBatchNo\)\}\/confirm-labelled/);
+  assert.doesNotMatch(appJs, /await confirmSingleBaleBarcodeLabelled\(completionAction\.baleBarcode\)/);
 });
 
 test("bale print modal moves technical print controls into collapsed advanced options", () => {

@@ -184,7 +184,8 @@ test("priority mainline phrases have natural English translations", () => {
     ["账号 / 用户", "Users & Accounts"],
     ["系统管理", "System Admin"],
     ["仓库执行单 / 出库打印", "Warehouse Execution / Dispatch Print"],
-    ["确认本包已贴标", "Mark Package Labeling Completed"],
+    ["确认当前标签已贴标", "Mark Current Label Completed"],
+    ["确认本批已贴标", "Mark Batch Labeling Completed"],
     ["下一阶段：仓库送货执行单 / 配送批次", "Next stage: Store Delivery Order / Delivery Batch"],
     ["添加调拨单 / 加一行", "Add transfer order row"],
     ["开始验收", "Start receiving check"],
@@ -210,14 +211,16 @@ test("priority mainline phrases have natural English translations", () => {
 
 test("global i18n uses natural ERP wording and avoids awkward translations", () => {
   const requiredNaturalPhrases = [
-    "Package Labeling Completed",
+    "Current Label Completed",
+    "Batch Labeling Completed",
     "Ready for Dispatch",
     "Assign to Clerk",
     "Print Item Labels",
     "Create Store Item Barcodes",
     "Sales Records",
     "Business Analytics",
-    "本包已贴标",
+    "当前标签已贴标",
+    "本批已贴标",
     "已贴标待送店",
     "商品码打印",
     "包上架",

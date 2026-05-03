@@ -123,7 +123,7 @@ test("getBaleModalCloseAction always allows closing without marking the class as
 
   const afterBatchPrintBeforeConfirm = getBaleModalCloseAction({ pendingCount: 5, hasSuccessfulBatchPrint: true });
   assert.equal(afterBatchPrintBeforeConfirm.action, "allow_close");
-  assert.match(afterBatchPrintBeforeConfirm.message, /不会自动确认本包已贴标/);
+  assert.match(afterBatchPrintBeforeConfirm.message, /不会自动确认当前标签已贴标/);
 
   const afterConfirm = getBaleModalCloseAction({ pendingCount: 0, hasSuccessfulBatchPrint: true });
   assert.equal(afterConfirm.action, "allow_close");

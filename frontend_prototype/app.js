@@ -219,8 +219,10 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "配送批次 / 门店收货跟踪", en: "Delivery Batch / Store Receiving Tracking" },
   { zh: "生成正式门店送货执行单", en: "Generate Store Delivery Order" },
   { zh: "打印", en: "Print" },
-  { zh: "确认本包已贴标", en: "Mark Package Labeling Completed" },
-  { zh: "本包已贴标", en: "Package Labeling Completed" },
+  { zh: "确认当前标签已贴标", en: "Mark Current Label Completed" },
+  { zh: "当前标签已贴标", en: "Current Label Completed" },
+  { zh: "确认本批已贴标", en: "Mark Batch Labeling Completed" },
+  { zh: "本批已贴标", en: "Batch Labeling Completed" },
   { zh: "已贴标待送店", en: "Ready for Dispatch" },
   { zh: "下一阶段", en: "Next Stage" },
   { zh: "下一阶段：仓库送货执行单 / 配送批次", en: "Next stage: Store Delivery Order / Delivery Batch" },
@@ -13194,7 +13196,7 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
                   </div>
                   <div class="button-row bale-batch-card-actions">
                     <button type="button" class="ghost-button mini-button" data-bale-batch-print="${escapeHtml(groupKey)}">开始打印</button>
-                    <button type="button" class="ghost-button mini-button" data-bale-batch-complete="${escapeHtml(groupKey)}">确认本包已贴标</button>
+                    <button type="button" class="ghost-button mini-button" data-bale-batch-complete="${escapeHtml(groupKey)}">确认本批已贴标</button>
                   </div>
                 </article>
               `;
@@ -17722,7 +17724,7 @@ function renderBalePrintModal() {
   }
   if (completeButton instanceof HTMLButtonElement) {
     completeButton.disabled = !["complete_group", "complete_current"].includes(completionAction.action) && !alreadyComplete;
-    completeButton.textContent = alreadyComplete ? "本包已贴标，关闭弹窗" : "确认本包已贴标";
+    completeButton.textContent = alreadyComplete ? "当前标签已贴标，关闭弹窗" : "确认当前标签已贴标";
   }
   if (closeBalePrintModalButton instanceof HTMLButtonElement) {
     closeBalePrintModalButton.disabled = false;
@@ -18000,7 +18002,7 @@ async function directPrintAllBaleModalJobs() {
   }
   balePrinterConsoleNotice = {
     type: "success",
-    message: `本轮 ${totalJobs} 张标签已全部发送到打印机。请核对实体出纸后，再点“确认本包已贴标”。`,
+    message: `本轮 ${totalJobs} 张标签已全部发送到打印机。请核对实体出纸后，再点“确认当前标签已贴标”。`,
   };
   renderBalePrintModal();
 }
@@ -18130,7 +18132,7 @@ async function completeCurrentBalePrintModalJob() {
     return;
   }
   if (!["complete_group", "complete_current"].includes(completionAction.action)) {
-    throw new Error(`请先打印当前标签，确认实体出纸后，再确认本包已贴标。`);
+    throw new Error(`请先打印当前标签，确认实体出纸后，再确认当前标签已贴标。`);
   }
   const jobsToComplete = templateScope !== "bale" || completionAction.action === "complete_current"
     ? (currentJob ? [currentJob] : [])
@@ -18212,8 +18214,8 @@ async function completeCurrentBalePrintModalJob() {
     baleBarcodeDirectoryNotice = {
       type: "success",
       message: balePrintModalState.jobs.length
-        ? "已确认本包已贴标，已切到下一张待贴标签。"
-        : "已确认本包已贴标，本轮标签已经处理完成。",
+        ? "已确认当前标签已贴标，已切到下一张待贴标签。"
+        : "已确认当前标签已贴标，本轮标签已经处理完成。",
     };
     renderBaleShipmentPrintProgress(shipmentNo);
   }
@@ -28641,6 +28643,16 @@ async function confirmSingleBaleBarcodeLabelled(baleBarcode = "") {
   });
 }
 
+async function confirmBaleBatchLabelled(parcelBatchNo = "") {
+  const normalizedBatchNo = String(parcelBatchNo || "").trim().toUpperCase();
+  if (!normalizedBatchNo) {
+    throw new Error("没有找到当前批次号。");
+  }
+  return request(`/warehouse/bale-barcodes/batches/${encodeURIComponent(normalizedBatchNo)}/confirm-labelled`, {
+    method: "POST",
+  });
+}
+
 async function confirmBalePrintGroup(groupKey = "") {
   const shipmentNo =
     String(document.querySelector("#baleBarcodeViewForm [name='shipment_no']")?.value || "").trim()
@@ -28654,14 +28666,8 @@ async function confirmBalePrintGroup(groupKey = "") {
   if (!targetGroup) {
     throw new Error("没有找到这一类待贴码批次。");
   }
-  const completionAction = balePrintFlow.getBaleGroupCurrentLabelConfirmationAction
-    ? balePrintFlow.getBaleGroupCurrentLabelConfirmationAction(targetGroup)
-    : {
-      action: targetGroup.rows.some((row) => !row.printed_at) ? "complete_current" : "already_complete",
-      pendingCount: targetGroup.rows.filter((row) => !row.printed_at).length,
-      baleBarcode: String((targetGroup.rows.find((row) => !row.printed_at) || {}).bale_barcode || "").trim().toUpperCase(),
-    };
-  if (completionAction.action === "already_complete") {
+  const pendingCount = targetGroup.rows.filter((row) => !row.printed_at).length;
+  if (!pendingCount) {
     baleBarcodeDirectoryNotice = {
       type: "success",
       message: `${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ") || ""} 已经完成贴码。`,
@@ -28673,14 +28679,11 @@ async function confirmBalePrintGroup(groupKey = "") {
     renderBaleBarcodeDirectorySummary(shipmentNo);
     return;
   }
-  if (completionAction.action !== "complete_current" || !completionAction.baleBarcode) {
-    throw new Error("没有找到当前待确认的包。");
-  }
   activeBaleBatchKey = getBaleBatchGroupKey(targetGroup);
   if (activeBaleBatchKey) {
     expandedBaleBatchKeys.add(activeBaleBatchKey);
   }
-  await confirmSingleBaleBarcodeLabelled(completionAction.baleBarcode);
+  const result = await confirmBaleBatchLabelled(targetGroup.batchNo);
   const refreshedRows = await reloadBaleShipmentPrintRows(shipmentNo);
   const refreshedGroups = groupBalesByBatch(refreshedRows);
   const refreshedTargetGroup = refreshedGroups.find((group) => getBaleBatchGroupKey(group) === activeBaleBatchKey);
@@ -28691,8 +28694,8 @@ async function confirmBalePrintGroup(groupKey = "") {
   baleBarcodeDirectoryNotice = {
     type: "success",
     message: remainingInGroup
-      ? `已确认本包已贴标。${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 还剩 ${remainingInGroup} 包待贴码。`
-      : `已确认本包已贴标。${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 这一类已经完成。`,
+      ? `已确认本批已贴标。${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 还剩 ${remainingInGroup} 包待贴码。`
+      : `已确认本批已贴标。${targetGroup.supplierName || "当前类别"} ${[targetGroup.categoryMain, targetGroup.categorySub].filter(Boolean).join(" / ")} 这一批已经完成，共确认 ${Number(result?.confirmed_count || 0)} 包。`,
   };
   activeBaleBatchKey = remainingInGroup ? activeBaleBatchKey : nextPendingKey;
   if (activeBaleBatchKey) {

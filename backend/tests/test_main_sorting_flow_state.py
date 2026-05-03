@@ -172,6 +172,46 @@ class MainSortingFlowStateTest(unittest.TestCase):
         printed_rows = [row for row in rows if row.get("printed_at")]
         self.assertEqual([row["bale_barcode"] for row in printed_rows], [bales[0]["bale_barcode"]])
 
+    def test_confirm_bale_batch_labelled_marks_every_bale_in_parcel_batch(self):
+        shipment, bales = self._create_ready_bales(customs_notice_no="LABELCONFIRMBATCH", package_count=3)
+        other_shipment, other_bales = self._create_ready_bales(customs_notice_no="LABELCONFIRMOTHER", package_count=1)
+        batch_no = bales[0]["parcel_batch_no"]
+
+        result = self.state.confirm_bale_batch_labelled(
+            batch_no,
+            actor_username="warehouse_clerk_1",
+        )
+
+        self.assertEqual(result["parcel_batch_no"], batch_no)
+        self.assertEqual(result["confirmed_count"], 3)
+        self.assertEqual(result["already_confirmed_count"], 0)
+        self.assertEqual(result["affected_bale_barcodes"], [row["bale_barcode"] for row in bales])
+        self.assertEqual(result["status_summary"], {"ready_for_sorting": 3})
+
+        rows = self.state.list_bale_barcodes(shipment_no=shipment["shipment_no"])
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row["printed_at"] for row in rows))
+        self.assertEqual({row["printed_by"] for row in rows}, {"warehouse_clerk_1"})
+        self.assertEqual({row["status"] for row in rows}, {"ready_for_sorting"})
+
+        other_rows = self.state.list_bale_barcodes(shipment_no=other_shipment["shipment_no"])
+        self.assertEqual(len(other_rows), 1)
+        self.assertEqual(other_rows[0]["bale_barcode"], other_bales[0]["bale_barcode"])
+        self.assertIsNone(other_rows[0]["printed_at"])
+        self.assertEqual(other_rows[0]["printed_by"], "")
+
+        second = self.state.confirm_bale_batch_labelled(
+            batch_no,
+            actor_username="warehouse_clerk_1",
+        )
+        self.assertEqual(second["confirmed_count"], 0)
+        self.assertEqual(second["already_confirmed_count"], 3)
+        second_rows = self.state.list_bale_barcodes(shipment_no=shipment["shipment_no"])
+        self.assertEqual(
+            [row["printed_at"] for row in second_rows],
+            [row["printed_at"] for row in rows],
+        )
+
     def test_failed_bale_print_job_does_not_mark_raw_bale_labelled(self):
         shipment, bales = self._create_ready_bales(customs_notice_no="LABELFAIL", package_count=1)
         queued = self.state.queue_bale_barcode_print_jobs(

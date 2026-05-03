@@ -125,6 +125,7 @@ from app.schemas.sorting import (
     ApparelSortingRackCreate,
     ApparelSortingRackResponse,
     ApparelPieceWeightResponse,
+    BaleBatchLabelConfirmationResponse,
     BaleBarcodeResponse,
     ChinaSourceCostUpdateRequest,
     ChinaSourceRecordCreate,
@@ -2624,6 +2625,24 @@ def confirm_bale_barcode_labelled(
     return BaleBarcodeResponse(
         **state.confirm_bale_barcode_labelled(
             bale_barcode,
+            actor_username=current_user["username"],
+        )
+    )
+
+
+@router.post(
+    "/warehouse/bale-barcodes/batches/{parcel_batch_no}/confirm-labelled",
+    response_model=BaleBatchLabelConfirmationResponse,
+    tags=["warehouse", "printing"],
+)
+def confirm_bale_batch_labelled(
+    parcel_batch_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> BaleBatchLabelConfirmationResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return BaleBatchLabelConfirmationResponse(
+        **state.confirm_bale_batch_labelled(
+            parcel_batch_no,
             actor_username=current_user["username"],
         )
     )
