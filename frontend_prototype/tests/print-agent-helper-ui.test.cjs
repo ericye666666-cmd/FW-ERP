@@ -30,7 +30,12 @@ test("print modal advanced options expose only field-safe print helper controls"
   assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>高级：重试本张<\/button>/);
   assert.match(indexHtml, /id="balePrintModalPrintAllButton"[^>]*>高级：批量重试<\/button>/);
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
-  assert.doesNotMatch(advancedSection, /下载 Windows 打印助手/);
+  const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
+  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
+  assert.match(advancedSection, /download/);
+  assert.match(advancedSection, /下载 Windows 打印助手/);
+  assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedSection, /查看安装步骤/);
   assert.doesNotMatch(advancedSection, /直接打印本张/);
   assert.doesNotMatch(advancedSection, /发送到打印站/);
@@ -107,12 +112,18 @@ test("frontend validates local agent label machine code before calling print age
   assert.doesNotMatch(printFunction, /fetch\(`\$\{agentUrl\}\/print\/label`[\s\S]*?validateLocalAgentLabelPayload/);
 });
 
-test("print helper download checks package availability before downloading", () => {
-  assert.match(appJs, /async function downloadWindowsPrintAgentPackage/);
-  assert.match(appJs, /\/downloads\/fw-erp-print-agent-windows\.zip/);
-  assert.match(appJs, /fetch\(downloadUrl,\s*\{\s*method:\s*"HEAD"/);
-  assert.match(appJs, /安装包暂未上传，请联系管理员。/);
-  assert.match(appJs, /balePrintModalDownloadAgentButton/);
+test("print helper exposes a static Windows agent download link in advanced options", () => {
+  const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
+  const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
+  assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
+  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
+  assert.match(advancedSection, /download/);
+  assert.match(advancedSection, /下载 Windows 打印助手/);
+  assert.match(appJs, /Download Windows Print Agent/);
+  assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
+  assert.doesNotMatch(indexHtml, /id="balePrintModalDownloadAgentButton"/);
+  assert.doesNotMatch(appJs, /balePrintModalDownloadAgentButton/);
+  assert.doesNotMatch(appJs, /fetch\(downloadUrl,\s*\{\s*method:\s*"HEAD"/);
 });
 
 test("Windows print agent package script and zip ignore rules are present", () => {
