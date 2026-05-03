@@ -3748,18 +3748,18 @@ const JSON_BUILDERS = {
     fields: [
       {
         key: "category_main",
-        label: "商品大类",
+        label: "大类",
         type: "select",
         options: () => getSortingResultCategoryMainOptions(),
       },
       {
         key: "category_sub",
-        label: "商品小类",
+        label: "小类",
         type: "select",
         options: (row) => getSortingResultCategorySubOptions(row?.category_main || ""),
       },
-      { key: "grade", label: "分级 / Demand type", type: "select", options: SORTING_GRADE_OPTIONS },
-      { key: "requested_qty", label: "调拨件数", type: "number", min: "1", step: "1" },
+      { key: "grade", label: "分级", type: "select", options: SORTING_GRADE_OPTIONS },
+      { key: "requested_qty", label: "件数", type: "number", min: "1", step: "1" },
     ],
     toOutputValue: (rows) =>
       buildTransferDemandDraftRows(rows).map((row) => ({
@@ -3999,9 +3999,15 @@ function renderJsonBuilder(builderId) {
   jsonBuilderState[builderId] = rows;
   container.innerHTML = rows
     .map((row, rowIndex) => {
+      const isTransferItemsBuilder = builderId === "transfer-items";
       const fields = config.fields
         .map((field) => {
           const value = typeof field.getValue === "function" ? field.getValue(row, rowIndex) : (row[field.key] ?? "");
+          const fieldClass = [
+            "line-builder-field",
+            isTransferItemsBuilder ? "transfer-items-table-cell" : "",
+            isTransferItemsBuilder ? `transfer-items-table-cell-${field.key}` : "",
+          ].filter(Boolean).join(" ");
           if (field.type === "select") {
             const optionRows = typeof field.options === "function" ? field.options(row, rowIndex) : (field.options || []);
             const options = optionRows
@@ -4011,7 +4017,7 @@ function renderJsonBuilder(builderId) {
               )
               .join("");
             return `
-              <div class="line-builder-field">
+              <div class="${fieldClass}">
                 <label>${escapeHtml(field.label)}</label>
                 <select data-builder-input="${builderId}" data-row-index="${rowIndex}" data-field-key="${field.key}">
                   ${options}
@@ -4021,7 +4027,7 @@ function renderJsonBuilder(builderId) {
           }
           if (field.type === "display") {
             return `
-              <div class="line-builder-field">
+              <div class="${fieldClass}">
                 <label>${escapeHtml(field.label)}</label>
                 <input
                   type="text"
@@ -4036,7 +4042,7 @@ function renderJsonBuilder(builderId) {
             `;
           }
           return `
-            <div class="line-builder-field">
+            <div class="${fieldClass}">
               <label>${escapeHtml(field.label)}</label>
               <input
                 type="${escapeHtml(field.type || "text")}"
@@ -4054,12 +4060,14 @@ function renderJsonBuilder(builderId) {
         })
         .join("");
       const rowMeta = typeof config.renderRowMeta === "function" ? config.renderRowMeta(row, rowIndex) : "";
+      const rowClass = builderId === "transfer-items" ? "line-builder-row transfer-items-table-row" : "line-builder-row";
+      const removeLabel = builderId === "transfer-items" ? "删除" : "删除这一行";
       return `
-        <div class="line-builder-row">
+        <div class="${rowClass}">
           <div class="line-builder-grid">${fields}</div>
           <div data-builder-row-meta="${escapeHtml(builderId)}" data-row-index="${rowIndex}">${rowMeta || ""}</div>
           <button type="button" class="ghost-button mini-button line-builder-remove" data-builder-remove="${builderId}" data-row-index="${rowIndex}">
-            删除这一行
+            ${removeLabel}
           </button>
         </div>
       `;
@@ -10562,57 +10570,64 @@ function applyRecommendationSelectionToTransferDraft() {
   renderTransferDraftSummary();
 }
 
+function getManualReplenishmentFormMeta() {
+  return {
+    fromWarehouseCode: String(document.querySelector("#transferForm [name='from_warehouse_code']")?.value || "WH1").trim() || "WH1",
+    toStoreCode: String(document.querySelector("#transferForm [name='to_store_code']")?.value || "UTAWALA").trim() || "UTAWALA",
+    requiredArrivalDate: String(document.querySelector("#transferForm [name='required_arrival_date']")?.value || "2026-05-03").trim() || "2026-05-03",
+  };
+}
+
+function renderManualReplenishmentContext(statusLabel = "草稿") {
+  const { fromWarehouseCode, toStoreCode, requiredArrivalDate } = getManualReplenishmentFormMeta();
+  const storeTarget = document.querySelector("#manualReplenishmentContextStore");
+  const warehouseTarget = document.querySelector("#manualReplenishmentContextWarehouse");
+  const arrivalTarget = document.querySelector("#manualReplenishmentContextArrivalDate");
+  const statusTarget = document.querySelector("#manualReplenishmentContextStatus");
+  if (storeTarget instanceof HTMLElement) {
+    storeTarget.textContent = `${toStoreCode || "-"} 门店`;
+  }
+  if (warehouseTarget instanceof HTMLElement) {
+    warehouseTarget.textContent = `${fromWarehouseCode || "-"} 仓库`;
+  }
+  if (arrivalTarget instanceof HTMLElement) {
+    arrivalTarget.textContent = `到货日期 ${requiredArrivalDate || "-"}`;
+  }
+  if (statusTarget instanceof HTMLElement) {
+    statusTarget.textContent = statusLabel || "草稿";
+  }
+}
+
 function renderTransferDraftSummary() {
   const target = document.querySelector("#transferDraftSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  renderManualReplenishmentContext("草稿");
   syncJsonBuilderToField("transfer-items");
   const rows = buildTransferDemandDraftRows(
     parseJsonField(document.querySelector("#transferForm [name='items_json']")?.value || "[]", []),
   );
   if (!rows.length) {
-    target.className = "candidate-summary empty-state";
-    target.textContent = "这里显示本次门店需求。";
+    target.className = "manual-summary-empty empty-state";
+    target.innerHTML = `
+      <div class="manual-summary-line"><strong>0 个品类 · 0 件</strong></div>
+      <div>状态：未提交</div>
+      <div>下一步：添加一行</div>
+    `;
     renderTransferPreparationPlanSummary([]);
     return;
   }
-  const fromWarehouseCode = String(document.querySelector("#transferForm [name='from_warehouse_code']")?.value || "WH1").trim();
-  const toStoreCode = String(document.querySelector("#transferForm [name='to_store_code']")?.value || "UTAWALA").trim();
-  const requiredArrivalDate = String(document.querySelector("#transferForm [name='required_arrival_date']")?.value || "").trim();
+  const { fromWarehouseCode, toStoreCode, requiredArrivalDate } = getManualReplenishmentFormMeta();
   const totalRequested = rows.reduce((sum, row) => sum + Number(row.requested_qty || 0), 0);
-  target.className = "report-summary";
+  target.className = "manual-summary-compact";
   target.innerHTML = `
-    <div class="flow-summary-note">确认后进入仓库执行；门店收货以 SDO barcode 为准。</div>
-    <div class="report-summary-grid">
-      <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(fromWarehouseCode || "-")}</span></article>
-      <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(toStoreCode || "-")}</span></article>
-      <article class="store-metric"><strong>草稿行</strong><span>${rows.length}</span></article>
-      <article class="store-metric"><strong>申请总件数</strong><span>${totalRequested}</span></article>
-      <article class="store-metric"><strong>需到货时间 / Required arrival date</strong><span>${escapeHtml(requiredArrivalDate || "-")}</span></article>
-      <article class="store-metric"><strong>涉及类目</strong><span>${escapeHtml(rows.length)}</span></article>
-    </div>
-    <div class="candidate-list transfer-draft-list">
-      ${rows
-        .map((row) => {
-          return `
-            <article class="candidate-row transfer-draft-row">
-              <div>
-                <strong>${escapeHtml([row.category_main, row.category_sub, row.grade].filter(Boolean).join(" / ") || "未命名类目")}</strong>
-                <div class="subtle small">${escapeHtml(`${row.category_main || "-"} / ${row.category_sub || "-"} / ${row.grade || "-"}`)}</div>
-                <div class="meta-row">
-                  <span class="meta-pill">调拨草稿按类目录入</span>
-                  ${row.source_count ? `<span class="meta-pill">建议来源 ${escapeHtml(row.source_count)} 条</span>` : ""}
-                </div>
-              </div>
-              <div class="candidate-side-actions">
-                <span class="store-flag">${escapeHtml(Number(row.requested_qty || 0))} 件</span>
-              </div>
-            </article>
-          `;
-        })
-        .join("")}
-    </div>
+    <div class="manual-summary-main">${escapeHtml(rows.length)} 个品类 · ${escapeHtml(totalRequested)} 件</div>
+    <div class="manual-summary-pair"><span>状态</span><strong>未提交</strong></div>
+    <div class="manual-summary-pair"><span>下一步</span><strong>生成补货申请单</strong></div>
+    <div class="manual-summary-pair"><span>门店 / 仓库</span><strong>${escapeHtml(toStoreCode || "-")} / ${escapeHtml(fromWarehouseCode || "-")}</strong></div>
+    <div class="manual-summary-pair"><span>到货日期</span><strong>${escapeHtml(requiredArrivalDate || "-")}</strong></div>
+    <div class="manual-summary-note">确认后进入仓库执行；门店收货以 SDO barcode 为准。</div>
   `;
   renderTransferPreparationPlanSummary(rows);
 }
@@ -11498,56 +11513,36 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
   }
   const demandRows = Array.isArray(rows) ? rows : [];
   if (!demandRows.length) {
-    target.className = "candidate-summary empty-state";
-    target.textContent = "这里显示配货建议和下一步动作。";
+    target.className = "manual-summary-empty empty-state";
+    target.innerHTML = `
+      <div class="manual-summary-line"><strong>可拣：0 件</strong></div>
+      <div>缺货：0 件</div>
+      <div>建议：先添加补货明细。</div>
+    `;
     return;
   }
   const plan = buildTransferPreparationPlan(demandRows);
   const summary = plan.summary || {};
-  target.className = "report-summary";
+  const totalRequestedQty = Number(summary.totalRequestedQty || 0);
+  const shortageQty = Number(summary.shortageQty || 0);
+  const pickableQty = Math.max(totalRequestedQty - shortageQty, 0);
+  const riskLabel = shortageQty > 0 ? `缺货 ${shortageQty} 件` : "当前可全拣";
+  target.className = "manual-summary-compact";
   target.innerHTML = `
-    <div class="alert-banner">系统按库存生成配货建议。SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。</div>
-    <div class="report-summary-grid">
-      <article class="store-metric"><strong>需求类目</strong><span>${escapeHtml(plan.demandLineCount || 0)}</span></article>
-      <article class="store-metric"><strong>申请总件数</strong><span>${escapeHtml(summary.totalRequestedQty || 0)}</span></article>
-      <article class="store-metric"><strong>现成待送店包裹</strong><span>${escapeHtml(summary.selectedPreparedBaleCount || 0)} 包</span></article>
-      <article class="store-metric"><strong>现成待送店包覆盖</strong><span>${escapeHtml(summary.selectedPreparedQty || 0)} 件</span></article>
-      <article class="store-metric"><strong>散货补差</strong><span>${escapeHtml(summary.looseQtyToPick || 0)} 件</span></article>
-      <article class="store-metric"><strong>新打补差包</strong><span>${escapeHtml(summary.plannedLooseBaleCount || 0)} 个</span></article>
-      <article class="store-metric"><strong>最终预计送店包</strong><span>${escapeHtml(summary.totalFinalDispatchBaleCount || 0)} 个</span></article>
-      <article class="store-metric"><strong>缺口</strong><span>${escapeHtml(summary.shortageQty || 0)} 件</span></article>
-    </div>
-    <div class="candidate-list transfer-draft-list">
-      ${plan.categoryCards
+    <div class="manual-summary-main">可拣：${escapeHtml(pickableQty)} 件</div>
+    <div class="manual-summary-pair"><span>缺货数量</span><strong>${escapeHtml(shortageQty)} 件</strong></div>
+    <div class="manual-summary-pair"><span>风险提示</span><strong>${escapeHtml(riskLabel)}</strong></div>
+    <div class="manual-summary-pair"><span>下一步</span><strong>先生成补货申请，再生成仓库备货任务</strong></div>
+    <div class="manual-summary-note">系统按库存生成配货建议。SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。</div>
+    <div class="manual-suggestion-list">
+      ${plan.categoryCards.slice(0, 3)
         .map((row) => `
-          <article class="candidate-row transfer-draft-row">
-            <div>
-              <strong>${escapeHtml([row.categoryMain, row.categorySub].filter(Boolean).join(" / ") || "-")}</strong>
-              <div class="subtle small">${escapeHtml(`需求：${row.requestedQty || 0} 件 · ${getTransferPreparationModeLabel(row.planMode)}`)}</div>
-              <div class="meta-row">
-                <span class="meta-pill">现成待送店包：${escapeHtml(row.selectedPreparedBales.length || 0)} 包 / 覆盖 ${escapeHtml(row.preparedQty || 0)} 件</span>
-                <span class="meta-pill">散货补差：${escapeHtml(row.looseQtyNeeded || 0)} 件</span>
-                <span class="meta-pill">新打补差包：${escapeHtml(row.plannedLooseBales.length || 0)} 个</span>
-                <span class="meta-pill">缺口 ${escapeHtml(row.shortageQty || 0)} 件</span>
-                <span class="meta-pill">最终预计送店包：${escapeHtml(row.finalDispatchBaleCount || 0)} 个</span>
-              </div>
-              ${
-                row.selectedPreparedBales.length
-                  ? `<div class="subtle small">现成包裹：${escapeHtml(row.selectedPreparedBales.map((bale) => bale.baleBarcode || bale.baleNo).filter(Boolean).join("、"))}</div>`
-                  : ""
-              }
-              ${
-                row.looseRackCodes.length
-                  ? `<div class="subtle small">散货来源库位：${escapeHtml(row.looseRackCodes.join("、"))}</div>`
-                  : ""
-              }
-            </div>
-            <div class="candidate-side-actions">
-              <span class="store-flag">${escapeHtml(row.finalDispatchBaleCount || 0)} 个送店 bale</span>
-            </div>
-          </article>
-        `)
-        .join("")}
+          <div class="manual-suggestion-row">
+            <span>${escapeHtml([row.categoryMain, row.categorySub].filter(Boolean).join(" / ") || "-")}</span>
+            <strong>${escapeHtml(row.requestedQty || 0)} 件 · 缺 ${escapeHtml(row.shortageQty || 0)}</strong>
+          </div>
+        `).join("")}
+      ${plan.categoryCards.length > 3 ? `<div class="manual-summary-note">+${escapeHtml(plan.categoryCards.length - 3)} 个品类</div>` : ""}
     </div>
   `;
 }
@@ -18234,7 +18229,8 @@ function renderTransferResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示补货申请单创建后的摘要，以及 Step 3 下一步动作。";
+    target.textContent = "生成后这里显示申请单号和下一步动作。";
+    renderManualReplenishmentContext("草稿");
     return;
   }
   const items = Array.isArray(result.items) ? result.items : [];
@@ -18248,6 +18244,7 @@ function renderTransferResultSummary(result) {
   const totalShortageQty = Number(summary.shortageQty || 0);
   const storeLabel = String(result.to_store_code || normalized.to_store_code || "-").trim().toUpperCase() || "-";
   const statusLabel = getTransferOrderStatusLabel(result.status || normalized.lifecycle || "");
+  renderManualReplenishmentContext(statusLabel || "已生成");
   const createdBy = String(result.created_by || result.requested_by || currentSession?.user?.username || "-").trim() || "-";
   const createdAt = String(result.created_at || result.updated_at || new Date().toISOString()).trim();
   const detailRows = plan.categoryCards.length ? plan.categoryCards : demandLines.map((row) => ({
@@ -31919,6 +31916,16 @@ bindForm("#recommendationForm", submitTransferRecommendation, "#recommendationOu
 bindForm("#transferForm", submitTransfer, "#transferOutput");
 bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
 document.querySelector("#pickingWaveForm")?.addEventListener("change", renderPickingWaveTaskSummary);
+["input", "change"].forEach((eventName) => {
+  document.querySelector("#transferForm")?.addEventListener(eventName, (event) => {
+    const target = event.target instanceof HTMLElement
+      ? event.target.closest("[name='from_warehouse_code'], [name='to_store_code'], [name='required_arrival_date']")
+      : null;
+    if (target) {
+      renderTransferDraftSummary();
+    }
+  });
+});
 bindForm("#loosePackingTaskPlanForm", submitLoosePackingTaskPlan, "#loosePackingTaskOutput");
 bindForm("#returnCandidateForm", submitReturnCandidates, "#returnOutput");
 bindForm("#returnSelectionForm", submitReturnSelection, "#returnOutput");
