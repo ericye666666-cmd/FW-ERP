@@ -1018,7 +1018,7 @@
           <div class="modal-head">
             <div>
               <h3 id="balePrintModalTitle">Bale 条码打印窗</h3>
-              <div id="balePrintModalSubhead" class="subtle small">在这里连接打印机并直接打印，不再弹系统大打印框。</div>
+              <div id="balePrintModalSubhead" class="subtle small">连接打印助手后打印标签。</div>
             </div>
             <button id="closeBalePrintModalButton" type="button" class="ghost-button mini-button">关闭</button>
           </div>
@@ -1034,15 +1034,10 @@
                 <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button">下一张</button>
               </div>
               <div id="balePrintModalAgentFallback" class="flow-summary-note warning hidden-screen">
-                <strong>当前打印方式：浏览器打印</strong><br />
-                Windows 打印机：请在系统打印窗口选择 Deli DL-720C<br />
-                本地打印代理：未连接<br />
-                浏览器打印状态：可用<br />
-                推荐操作：点击“打印标签”，在系统打印窗口选择 Deli DL-720C。
+                打印助手未连接，请先启动 Windows 打印助手。
               </div>
               <div class="bale-print-primary-actions">
                 <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">打印标签</button>
-                <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button bale-print-primary-button hidden-screen">打印全部</button>
                 <button id="balePrintModalCompleteButton" type="button" class="ghost-button bale-print-primary-button">确认本包已贴标</button>
                 <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button bale-print-primary-button">取消并返回</button>
               </div>
@@ -1052,12 +1047,13 @@
                   <strong>FW-ERP 打印助手</strong><br />
                   打印助手：未启动<br />
                   本地地址：http://127.0.0.1:8719<br />
-                  当前推荐：Windows 电脑请先启动打印助手，再点击“打印标签”
+                  启动后点击主按钮打印。
                 </div>
                 <div class="button-row">
                   <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测打印助手</button>
                   <button id="balePrintModalCheckLocalPrintersButton" type="button" class="ghost-button mini-button">检测打印机队列</button>
                   <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button">高级：重试本张</button>
+                  <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button mini-button hidden-screen">高级：打印全部</button>
                   <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button">高级：批量重试</button>
                 </div>
                 <div id="balePrintModalScopeNote" class="subtle small"></div>
@@ -2719,7 +2715,7 @@
           <button id="recommendationClearSelectionButton" type="button">清空当前已选</button>
         </div>
         <div id="recommendationCandidateList" class="candidate-list">
-          <div class="empty-state">生成建议后，这里会列出建议类目、建议件数，以及 14 天销量、现货、待上架、在途的扣减依据。直接加入或移出调拨草稿即可。</div>
+          <div class="empty-state">这里显示建议类目和件数。</div>
         </div>
         <pre id="recommendationOutput" class="output hidden-output"></pre>
       </section>
@@ -2742,7 +2738,7 @@
             <div class="transfer-workbench-head">
               <span class="eyebrow">Manual</span>
               <h3>Step 1 创建补货申请</h3>
-              <p>手动录入目标门店、类目和数量；生成后进入仓库侧执行流程。门店收货 barcode 以后续正式送货执行单为准。</p>
+              <p>填写门店、品类和数量，生成补货申请。</p>
             </div>
             <form id="transferForm" class="form-grid compact form-clean-placeholders">
               <input name="from_warehouse_code" placeholder="来源仓，例如 WH1" value="WH1" />
@@ -2758,7 +2754,7 @@
                 <div class="line-builder-head">
                   <div>
                     <strong>补货明细</strong>
-                    <p>一行代表一个商品大类 / 小类 / 分级（P/S）和要发去门店的数量。这里只录需求，不选择具体 token 或成本批次，仓库执行时按 FIFO 成本层和正式 barcode 规则处理。</p>
+                    <p>只填写需求品类和数量；仓库执行时再按库存和 barcode 规则处理。</p>
                   </div>
                   <button type="button" class="ghost-button mini-button" data-builder-add="transfer-items">新增一行</button>
                 </div>
@@ -2781,10 +2777,10 @@
               <div class="transfer-workbench-head is-compact">
                 <span class="eyebrow">Draft</span>
                 <h3>补货需求草稿</h3>
-                <p>这里实时汇总本次门店需求件数与类目，先确认草稿再进入系统建议与仓库动作。</p>
+                <p>这里显示本次补货草稿。</p>
               </div>
               <div id="transferDraftSummary" class="candidate-summary empty-state">
-                先在上一页加入建议类目，或在左侧手动补充大类、小类和件数，这里会实时显示这张门店调拨草稿。
+                这里显示本次门店需求。
               </div>
             </article>
 
@@ -2792,16 +2788,16 @@
               <div class="transfer-workbench-head is-compact">
                 <span class="eyebrow">Plan</span>
                 <h3>Step 2 系统配货建议</h3>
-                <p>系统优先使用现成待送店包，不足部分转为散货补差，并计算新打补差包与最终预计送店包。</p>
+                <p>系统按库存生成配货建议。</p>
               </div>
               <div id="transferPreparationPlanSummary" class="candidate-summary empty-state">
-                这里会把当前调拨草稿拆成仓库真实动作：先拿哪些待送店包裹，再补哪些散货、要新打几个 bale，以及这次最终预计会生成多少个送店 bale。
+                这里显示待送店包、补差和最终送店包。
               </div>
             </article>
           </div>
         </div>
         <div id="transferResultSummary" class="candidate-summary empty-state">
-          下一步：可【单独执行该申请】或【加入仓库备货任务】；有缺口去 5.1 生成补差工单，无缺口直接去 6。
+          下一步：确认申请后进入仓库执行；门店收货以 SDO barcode 为准。
         </div>
         <div class="candidate-summary warehouse-prep-task-summary">
           <strong>仓库备货任务</strong>
