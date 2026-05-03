@@ -333,6 +333,14 @@ class RawBaleStockResponse(BaleBarcodeResponse):
     can_route_to_bale_sales_pool: bool = False
 
 
+class BaleBatchLabelConfirmationResponse(BaseModel):
+    parcel_batch_no: str
+    confirmed_count: int
+    already_confirmed_count: int
+    affected_bale_barcodes: list[str]
+    status_summary: dict[str, int]
+
+
 class FinalItemBarcodeResponse(BaseModel):
     barcode_value: str = ""
     identity_id: str = ""

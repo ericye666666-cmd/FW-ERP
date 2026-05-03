@@ -12020,6 +12020,79 @@ class InMemoryState:
         self._persist()
         return bale
 
+    def confirm_bale_batch_labelled(self, parcel_batch_no: str, actor_username: str) -> dict[str, Any]:
+        actor = self._require_user_role(actor_username, {"admin", "warehouse_clerk", "warehouse_supervisor"})
+        normalized_batch_no = str(parcel_batch_no or "").strip().upper()
+        if not normalized_batch_no:
+            raise HTTPException(status_code=400, detail="parcel_batch_no is required")
+        batch_rows = [
+            row
+            for row in self.bale_barcodes.values()
+            if str(row.get("parcel_batch_no") or "").strip().upper() == normalized_batch_no
+        ]
+        if not batch_rows:
+            raise HTTPException(status_code=404, detail=f"找不到 parcel batch：{normalized_batch_no}")
+        labelled_at = now_iso()
+        confirmed_count = 0
+        already_confirmed_count = 0
+        affected_bale_barcodes: list[str] = []
+        status_summary: dict[str, int] = {}
+        for bale in sorted(batch_rows, key=lambda row: int(row.get("serial_no") or 0)):
+            self._ensure_raw_bale_defaults(bale)
+            existing_printed_at = str(bale.get("printed_at") or "").strip()
+            row_labelled_at = existing_printed_at or labelled_at
+            if existing_printed_at:
+                already_confirmed_count += 1
+            else:
+                confirmed_count += 1
+            bale["printed_at"] = row_labelled_at
+            bale["printed_by"] = str(bale.get("printed_by") or "").strip() or actor["username"]
+            if not existing_printed_at:
+                bale["updated_at"] = row_labelled_at
+            if not str(bale.get("current_location") or "").strip():
+                bale["current_location"] = "warehouse_raw_bale_stock"
+            current_status = str(bale.get("status") or "").strip().lower()
+            if current_status in {"", "pending", "pending_print", "pending_label", "barcode_generated", "label_generated"}:
+                bale["status"] = "ready_for_sorting"
+            bale_barcode = str(bale.get("bale_barcode") or "").strip().upper()
+            legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
+            references = {value for value in {bale_barcode, legacy_bale_barcode, str(bale.get("scan_token") or "").strip().upper()} if value}
+            for job in self.print_jobs:
+                if str(job.get("job_type") or "") != "bale_barcode_label":
+                    continue
+                if str(job.get("barcode") or "").strip().upper() not in references:
+                    continue
+                if str(job.get("status") or "").strip().lower() == "queued":
+                    job["status"] = "printed"
+                    job["printed_at"] = row_labelled_at
+                    job["printed_by"] = actor["username"]
+                    job["error_message"] = ""
+            if bale_barcode:
+                affected_bale_barcodes.append(bale_barcode)
+            status = str(bale.get("status") or "").strip() or "unknown"
+            status_summary[status] = status_summary.get(status, 0) + 1
+        self._log_event(
+            event_type="print.bale_batch_label_confirmed",
+            entity_type="parcel_batch",
+            entity_id=normalized_batch_no,
+            actor=actor["username"],
+            summary=f"Bale batch labels confirmed for {normalized_batch_no}",
+            details={
+                "parcel_batch_no": normalized_batch_no,
+                "confirmed_count": confirmed_count,
+                "already_confirmed_count": already_confirmed_count,
+                "affected_bale_barcodes": affected_bale_barcodes,
+            },
+        )
+        self._persist()
+        return {
+            "parcel_batch_no": normalized_batch_no,
+            "confirmed_count": confirmed_count,
+            "already_confirmed_count": already_confirmed_count,
+            "affected_bale_barcodes": affected_bale_barcodes,
+            "status_summary": status_summary,
+        }
+
     def _build_label_print_job(
         self,
         barcode: str,
