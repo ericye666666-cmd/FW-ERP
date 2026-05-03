@@ -1339,6 +1339,7 @@ class InMemoryState:
             normalized["machine_code"] = machine_code
             normalized["barcode_value"] = machine_code
             normalized["human_readable"] = machine_code
+        normalized.update(self._project_raw_bale_source_cost_status(normalized))
         normalized["is_occupied"] = bool(str(normalized.get("occupied_by_task_no") or "").strip())
         normalized["is_in_bale_sales_pool"] = str(normalized.get("destination_judgement") or "").strip().lower() == "bale_sales_pool"
         normalized["can_route_to_sorting"] = (
@@ -2071,15 +2072,103 @@ class InMemoryState:
                 source_pool_tokens.append(source_pool_token)
         return source_bale_tokens, source_pool_tokens
 
-    def _raw_bale_has_completed_source_cost(self, bale: dict[str, Any]) -> bool:
+    def _project_raw_bale_source_cost_status(self, bale: dict[str, Any]) -> dict[str, Any]:
+        allocated_amount = self._first_positive_float(
+            bale,
+            "source_allocated_cost_kes",
+            "source_total_cost_kes",
+            "source_cost_kes",
+            "source_cost_amount",
+        )
+        source_cost_allocated = bool(bale.get("source_cost_completed") is True or allocated_amount > 0)
         source_bale_token = str(bale.get("source_bale_token") or "").strip()
+        base = {
+            "source_cost_gate_status": "missing_source",
+            "source_cost_allows_sorting": False,
+            "source_cost_gate_message": "该 Bale 缺少中方来源，不能创建分拣任务。请先关联 source_bale_token。",
+            "source_cost_per_kg_kes": None,
+            "source_cost_recorded": False,
+            "source_cost_allocated": source_cost_allocated,
+        }
         if not source_bale_token:
-            return False
+            return base
+
         raw_record, source_line = self._find_china_source_line_by_token(source_bale_token)
         if not raw_record or not source_line:
-            return False
+            return base
+
+        line_package_count = int(self._float_or_default(source_line.get("package_count"), 0))
+        unit_weight_kg = round(self._float_or_default(source_line.get("unit_weight_kg"), 0), 2)
         source_record = self._build_china_source_record_response(raw_record)
-        return self._china_source_cost_per_kg_kes(source_record) > 0
+        total_weight_kg = round(self._float_or_default(source_record.get("domestic_total_weight_kg"), 0), 2)
+        if line_package_count <= 0 or unit_weight_kg <= 0 or total_weight_kg <= 0:
+            return {
+                **base,
+                "source_cost_gate_status": "invalid_weight_or_qty",
+                "source_cost_gate_message": "该 Bale 中方来源包数或重量无效，不能创建分拣任务。请先核对 source line。",
+            }
+
+        goods_cost_kes = round(
+            _convert_amount_to_kes(
+                round(self._float_or_default(source_line.get("unit_cost_amount"), 0) * line_package_count, 2),
+                source_line.get("unit_cost_currency"),
+            ),
+            2,
+        )
+        cost_entries = source_record.get("cost_entries") or {}
+        stage_costs_kes = [
+            _convert_amount_to_kes(
+                (cost_entries.get(key) or {}).get("amount"),
+                (cost_entries.get(key) or {}).get("currency"),
+            )
+            for key in ("head_transport", "customs_clearance", "tail_transport")
+        ]
+        source_cost_recorded = goods_cost_kes > 0 and all(amount > 0 for amount in stage_costs_kes)
+        source_cost_per_kg_kes = self._china_source_cost_per_kg_kes(source_record) if source_cost_recorded else 0.0
+        if not source_cost_recorded or source_cost_per_kg_kes <= 0:
+            return {
+                **base,
+                "source_cost_gate_status": "missing_cost_record",
+                "source_cost_gate_message": "该 Bale 中方来源或三段成本未记录完整，不能创建分拣任务。请先补齐中方来源与三段成本。",
+                "source_cost_per_kg_kes": source_cost_per_kg_kes or None,
+            }
+
+        if source_cost_allocated:
+            return {
+                **base,
+                "source_cost_gate_status": "allocated",
+                "source_cost_allows_sorting": True,
+                "source_cost_gate_message": "来源成本已分摊，可创建分拣任务。",
+                "source_cost_per_kg_kes": source_cost_per_kg_kes,
+                "source_cost_recorded": True,
+                "source_cost_allocated": True,
+            }
+
+        return {
+            **base,
+            "source_cost_gate_status": "recorded_pending_allocation",
+            "source_cost_allows_sorting": True,
+            "source_cost_gate_message": "来源成本已记录，待分摊；可先创建分拣任务。",
+            "source_cost_per_kg_kes": source_cost_per_kg_kes,
+            "source_cost_recorded": True,
+            "source_cost_allocated": False,
+        }
+
+    def _first_positive_float(self, row: dict[str, Any], *field_names: str) -> float:
+        for field_name in field_names:
+            value = row.get(field_name)
+            if value in {None, ""}:
+                continue
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric > 0:
+                return round(numeric, 2)
+        return 0.0
+
+    def _raw_bale_has_completed_source_cost(self, bale: dict[str, Any]) -> bool:
+        return bool(self._project_raw_bale_source_cost_status(bale)["source_cost_allows_sorting"])
 
     def _china_source_combined_cost_kes(self, record: dict[str, Any]) -> float:
         goods_cost_kes = round(
@@ -5561,6 +5650,7 @@ class InMemoryState:
         for row in self.bale_barcodes.values():
             normalized = dict(row)
             self._ensure_raw_bale_defaults(normalized)
+            normalized.update(self._project_raw_bale_source_cost_status(normalized))
             printed_jobs = [
                 job for job in self.print_jobs
                 if str(job.get("job_type") or "") == "bale_barcode_label"
@@ -6050,8 +6140,9 @@ class InMemoryState:
             legacy_bale_barcode = str(bale.get("legacy_bale_barcode") or "").strip().upper()
             if bale["status"] not in {"ready_for_sorting"}:
                 raise HTTPException(status_code=409, detail=f"{bale_reference} 当前状态是 {bale['status']}，不能再加入新分拣单")
-            if not self._raw_bale_has_completed_source_cost(bale):
-                raise HTTPException(status_code=409, detail="该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。")
+            source_cost_gate = self._project_raw_bale_source_cost_status(bale)
+            if not source_cost_gate["source_cost_allows_sorting"]:
+                raise HTTPException(status_code=409, detail=source_cost_gate["source_cost_gate_message"])
             if category_filters:
                 category_key = f"{bale.get('category_main', '')} / {bale.get('category_sub', '')}".strip()
                 if category_key not in category_filters:

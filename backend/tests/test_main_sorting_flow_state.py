@@ -7,9 +7,10 @@ from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core import state as state_module
 from app.core.config import settings
 from app.core.state import InMemoryState
-from app.schemas.sorting import RawBaleStockResponse
+from app.schemas.sorting import BaleBarcodeResponse, RawBaleStockResponse
 
 
 class MainSortingFlowStateTest(unittest.TestCase):
@@ -22,6 +23,12 @@ class MainSortingFlowStateTest(unittest.TestCase):
     def tearDown(self):
         settings.state_file = self.original_state_file
         self.temp_dir.cleanup()
+
+    def test_imports_current_fwerp_backend_state_module(self):
+        expected_backend_root = str(Path(__file__).resolve().parents[1])
+
+        self.assertTrue(str(Path(state_module.__file__).resolve()).startswith(expected_backend_root))
+        self.assertNotIn("retail_ops_system/backend", str(Path(state_module.__file__).resolve()))
 
     def _create_ready_bales(self, customs_notice_no="RAW240421", package_count=2, unit_weight=40):
         shipment = self.state.create_inbound_shipment(
@@ -70,6 +77,10 @@ class MainSortingFlowStateTest(unittest.TestCase):
         category_main, category_sub = [part.strip() for part in category_name.split("/", 1)]
         source_pool_token = f"CN-SRC-{customs_notice_no}-01"
         source_bale_token = f"{source_pool_token}-001"
+        goods_cost_kes = round(total_source_cost_kes * 0.4, 2)
+        head_cost_kes = round(total_source_cost_kes * 0.2, 2)
+        customs_cost_kes = round(total_source_cost_kes * 0.2, 2)
+        tail_cost_kes = round(total_source_cost_kes - goods_cost_kes - head_cost_kes - customs_cost_kes, 2)
         self.state.create_or_update_china_source_record(
             {
                 "source_pool_token": source_pool_token,
@@ -83,7 +94,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                         "category_sub": category_sub,
                         "package_count": package_count,
                         "unit_weight_kg": unit_weight_kg,
-                        "unit_cost_amount": round(total_source_cost_kes / package_count, 2),
+                        "unit_cost_amount": round(goods_cost_kes / package_count, 2),
                         "unit_cost_currency": "KES",
                     }
                 ],
@@ -94,9 +105,9 @@ class MainSortingFlowStateTest(unittest.TestCase):
             source_pool_token,
             {
                 "cost_entries": {
-                    "head_transport": {"amount": 1200, "currency": "CNY"},
-                    "customs_clearance": {"amount": 80000, "currency": "KES"},
-                    "tail_transport": {"amount": 12000, "currency": "KES"},
+                    "head_transport": {"amount": head_cost_kes, "currency": "KES"},
+                    "customs_clearance": {"amount": customs_cost_kes, "currency": "KES"},
+                    "tail_transport": {"amount": tail_cost_kes, "currency": "KES"},
                 }
             },
             updated_by="warehouse_supervisor_1",
@@ -749,7 +760,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
             )
 
     def test_ready_bale_can_create_sorting_task_without_route_judgement(self):
-        shipment, bales = self._create_ready_bales(customs_notice_no="RAW240424")
+        shipment, bales, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240424")
         task = self.state.create_sorting_task(
             {
                 "bale_barcodes": [bales[0]["bale_barcode"]],
@@ -766,6 +777,10 @@ class MainSortingFlowStateTest(unittest.TestCase):
 
     def test_raw_bale_without_source_cost_cannot_create_sorting_task(self):
         _, bales = self._create_ready_bales(customs_notice_no="RAW240428")
+        listed_bale = self.state.list_raw_bales(shipment_no=bales[0]["shipment_no"])[0]
+
+        self.assertEqual(listed_bale["source_cost_gate_status"], "missing_source")
+        self.assertFalse(listed_bale["source_cost_allows_sorting"])
 
         with self.assertRaises(HTTPException) as ctx:
             self.state.create_sorting_task(
@@ -778,10 +793,135 @@ class MainSortingFlowStateTest(unittest.TestCase):
             )
 
         self.assertEqual(ctx.exception.status_code, 409)
-        self.assertEqual(ctx.exception.detail, "该 Bale 来源成本未完成，不能创建分拣任务。请先补齐中方来源与三段成本。")
+        self.assertIn("缺少中方来源", ctx.exception.detail)
+
+    def test_raw_bale_with_source_recorded_but_unallocated_cost_can_create_sorting_task(self):
+        shipment, bales, _, _ = self._create_ready_bales_with_source_cost(
+            customs_notice_no="GOSUQIN686202601",
+            total_source_cost_kes=427,
+            package_count=1,
+            unit_weight_kg=95,
+            category_name="DRESS / Dress",
+        )
+        listed_bale = self.state.list_raw_bales(shipment_no=shipment["shipment_no"])[0]
+
+        self.assertIsNone(listed_bale.get("source_allocated_cost_kes"))
+        self.assertEqual(listed_bale["source_cost_gate_status"], "recorded_pending_allocation")
+        self.assertTrue(listed_bale["source_cost_allows_sorting"])
+        self.assertTrue(listed_bale["source_cost_recorded"])
+        self.assertFalse(listed_bale["source_cost_allocated"])
+        self.assertGreater(listed_bale["source_cost_per_kg_kes"], 0)
+        self.assertIn("待分摊", listed_bale["source_cost_gate_message"])
+
+        task = self.state.create_sorting_task(
+            {
+                "bale_barcodes": [listed_bale["machine_code"]],
+                "handler_names": ["warehouse_clerk_1"],
+                "note": "recorded source cost can enter sorting before allocation",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+
+        updated_bale = self.state.list_raw_bales(shipment_no=shipment["shipment_no"])[0]
+        self.assertEqual(task["bale_barcodes"], [listed_bale["bale_barcode"]])
+        self.assertNotEqual(task["bale_barcodes"], [listed_bale["machine_code"]])
+        self.assertEqual(updated_bale["status"], "sorting_in_progress")
+        self.assertEqual(updated_bale["occupied_by_task_no"], task["task_no"])
+
+    def test_bale_barcodes_expose_source_cost_gate_projection(self):
+        shipment, _, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240429LIST")
+
+        listed_bale = self.state.list_bale_barcodes(shipment_no=shipment["shipment_no"])[0]
+
+        self.assertEqual(listed_bale["source_cost_gate_status"], "recorded_pending_allocation")
+        self.assertTrue(listed_bale["source_cost_allows_sorting"])
+        response = BaleBarcodeResponse(**listed_bale)
+        self.assertEqual(response.source_cost_gate_status, "recorded_pending_allocation")
+        self.assertTrue(response.source_cost_allows_sorting)
+
+    def test_raw_bale_with_source_line_but_missing_cost_entries_cannot_create_sorting_task(self):
+        source_pool_token = "CN-SRC-RAWMISSINGCOST-01"
+        source_bale_token = f"{source_pool_token}-001"
+        self.state.create_or_update_china_source_record(
+            {
+                "source_pool_token": source_pool_token,
+                "container_type": "40HQ",
+                "customs_notice_no": "RAWMISSINGCOST",
+                "lines": [
+                    {
+                        "source_bale_token": source_bale_token,
+                        "supplier_name": "Youxun Demo",
+                        "category_main": "dress",
+                        "category_sub": "2 pieces",
+                        "package_count": 1,
+                        "unit_weight_kg": 40,
+                        "unit_cost_amount": 800,
+                        "unit_cost_currency": "KES",
+                    }
+                ],
+            },
+            created_by="warehouse_clerk_1",
+        )
+        shipment = self.state.create_inbound_shipment(
+            {
+                "shipment_type": "sea",
+                "customs_notice_no": "RAWMISSINGCOST",
+                "unload_date": "2026-04-21",
+                "coc_goods_manifest": "source exists without recorded cost entries",
+                "note": "",
+                "coc_documents": [],
+            }
+        )
+        self.state.create_parcel_batch(
+            {
+                "intake_type": "sea_freight",
+                "inbound_shipment_no": shipment["shipment_no"],
+                "source_bale_token": source_bale_token,
+                "supplier_name": "Youxun Demo",
+                "cargo_type": "summer apparel",
+                "category_main": "dress",
+                "category_sub": "2 pieces",
+                "package_count": 1,
+                "total_weight": 40,
+                "received_by": "warehouse_clerk_1",
+                "note": "raw bale page test",
+            }
+        )
+        self.state.confirm_inbound_shipment_intake(
+            shipment["shipment_no"],
+            {
+                "declared_total_packages": 1,
+                "confirmed_by": "warehouse_supervisor_1",
+                "note": "confirmed for missing cost test",
+            },
+        )
+        bales = self.state.generate_bale_barcodes(shipment["shipment_no"], "warehouse_supervisor_1")
+        listed_bale = self.state.list_raw_bales(shipment_no=shipment["shipment_no"])[0]
+
+        self.assertEqual(listed_bale["source_cost_gate_status"], "missing_cost_record")
+        self.assertFalse(listed_bale["source_cost_allows_sorting"])
+
+        with self.assertRaises(HTTPException) as ctx:
+            self.state.create_sorting_task(
+                {
+                    "bale_barcodes": [bales[0]["bale_barcode"]],
+                    "handler_names": ["warehouse_clerk_1"],
+                    "note": "source line exists but cost entries missing",
+                    "created_by": "warehouse_supervisor_1",
+                }
+            )
+
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertIn("三段成本", ctx.exception.detail)
 
     def test_raw_bale_with_source_cost_can_create_sorting_task(self):
         shipment, bales, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240429")
+        self.state.bale_barcodes[bales[0]["bale_barcode"]]["source_allocated_cost_kes"] = 800
+        listed_bale = self.state.list_raw_bales(shipment_no=shipment["shipment_no"])[0]
+
+        self.assertEqual(listed_bale["source_cost_gate_status"], "allocated")
+        self.assertTrue(listed_bale["source_cost_allows_sorting"])
+        self.assertTrue(listed_bale["source_cost_allocated"])
 
         task = self.state.create_sorting_task(
             {
@@ -2077,8 +2217,8 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(job["print_payload"]["template_code"], "warehouse_in")
 
     def test_sorting_task_can_mix_bales_from_multiple_shipments(self):
-        first_shipment, first_bales = self._create_ready_bales(customs_notice_no="RAW240425")
-        second_shipment, second_bales = self._create_ready_bales(customs_notice_no="RAW240426")
+        first_shipment, first_bales, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240425")
+        second_shipment, second_bales, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240426")
 
         task = self.state.create_sorting_task(
             {
@@ -2094,62 +2234,22 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(task["shipment_no"], "MULTI")
         self.assertEqual(task["customs_notice_no"], "MULTI")
 
-    def test_sorting_results_keep_pending_cost_when_source_link_missing_even_if_client_forces_lock(self):
+    def test_sorting_task_blocks_when_source_link_missing_even_if_client_would_force_lock(self):
         shipment, bales = self._create_ready_bales(customs_notice_no="RAW240428A")
-        task = self.state.create_sorting_task(
-            {
-                "bale_barcodes": [bales[0]["bale_barcode"]],
-                "handler_names": ["warehouse_clerk_1"],
-                "note": "backend must decide pending cost",
-                "created_by": "warehouse_supervisor_1",
-            }
-        )
 
-        result = self.state.submit_sorting_task_results(
-            task["task_no"],
-            {
-                "created_by": "warehouse_supervisor_1",
-                "result_items": [
-                    {
-                        "category_name": "tops / lady tops",
-                        "grade": "P",
-                        "actual_weight_kg": 2,
-                        "qty": 2,
-                        "confirm_to_inventory": True,
-                    }
-                ],
-                "note": "client tried to force lock without source link",
-                "mark_task_completed": True,
-                "cost_status_override": "cost_locked",
-                "estimated_unit_cost_kes": 999,
-                "cost_model_code": "fake_client_model",
-                "source_bale_tokens": ["CLIENT-WRONG-001"],
-                "source_pool_tokens": ["CLIENT-WRONG"],
-            },
-        )
+        with self.assertRaises(HTTPException) as ctx:
+            self.state.create_sorting_task(
+                {
+                    "bale_barcodes": [bales[0]["bale_barcode"]],
+                    "handler_names": ["warehouse_clerk_1"],
+                    "note": "backend must block missing source before sorting result cost overrides",
+                    "created_by": "warehouse_supervisor_1",
+                }
+            )
 
-        self.assertEqual(result["shipment_no"], shipment["shipment_no"])
-        self.assertEqual(result["cost_status"], "pending_source_link")
-        self.assertIsNone(result["unit_cost_kes"])
-        self.assertEqual(result["cost_model_code"], "")
-        self.assertIsNone(result["cost_locked_at"])
-        self.assertEqual(result["source_bale_token_count"], 0)
-        self.assertEqual(result["source_pool_token_count"], 0)
-        self.assertEqual(result["result_items"][0]["cost_status"], "pending_source_link")
-        self.assertIsNone(result["result_items"][0]["unit_cost_kes"])
-        self.assertIsNone(result["result_items"][0]["total_cost_kes"])
-
-        stock_row = next(row for row in self.state.list_sorting_stock() if row["sku_code"] == "TOPSLADY-P-018500")
-        self.assertEqual(stock_row["default_cost_kes"], 185)
-        self.assertIsNone(stock_row["unit_cost_kes"])
-        self.assertIsNone(stock_row["total_cost_kes"])
-
-        token_rows = self.state.list_item_barcode_tokens(task_no=task["task_no"])
-        self.assertEqual(len(token_rows), 2)
-        self.assertTrue(all(row["cost_status"] == "pending_source_link" for row in token_rows))
-        self.assertTrue(all(row["unit_cost_kes"] is None for row in token_rows))
-        self.assertTrue(all(row["cost_model_code"] == "" for row in token_rows))
-        self.assertTrue(all(row["source_pool_tokens"] == [] for row in token_rows))
+        self.assertEqual(shipment["customs_notice_no"], "RAW240428A")
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertIn("缺少中方来源", ctx.exception.detail)
 
     def test_sorting_results_backend_computes_weighted_cost_and_ignores_client_overrides(self):
         shipment, bales, source_pool_token, source_bale_token = self._create_ready_bales_with_source_cost(
@@ -2615,7 +2715,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 },
             )
 
-    def test_sorting_results_keep_partial_cost_when_only_some_bales_have_source_link(self):
+    def test_sorting_task_blocks_when_only_some_bales_have_source_link(self):
         linked_shipment, linked_bales, source_pool_token, source_bale_token = self._create_ready_bales_with_source_cost(
             customs_notice_no="RAW240428PARTA",
             total_source_cost_kes=400,
@@ -2628,62 +2728,23 @@ class MainSortingFlowStateTest(unittest.TestCase):
             package_count=1,
             unit_weight=20,
         )
-        task = self.state.create_sorting_task(
-            {
-                "bale_barcodes": [linked_bales[0]["bale_barcode"], unlinked_bales[0]["bale_barcode"]],
-                "handler_names": ["warehouse_clerk_1"],
-                "note": "partial source linkage should stay unlocked",
-                "created_by": "warehouse_supervisor_1",
-            }
-        )
 
-        result = self.state.submit_sorting_task_results(
-            task["task_no"],
-            {
-                "created_by": "warehouse_supervisor_1",
-                "result_items": [
-                    {
-                        "category_name": "tops / lady tops",
-                        "grade": "P",
-                        "actual_weight_kg": 10,
-                        "qty": 2,
-                        "confirm_to_inventory": True,
-                    }
-                ],
-                "note": "one bale linked and one bale missing source token",
-                "mark_task_completed": True,
-                "cost_status_override": "cost_locked",
-                "estimated_unit_cost_kes": 999,
-                "cost_model_code": "fake_client_model",
-                "source_bale_tokens": ["CLIENT-WRONG-001"],
-                "source_pool_tokens": ["CLIENT-WRONG"],
-            },
-        )
+        with self.assertRaises(HTTPException) as ctx:
+            self.state.create_sorting_task(
+                {
+                    "bale_barcodes": [linked_bales[0]["bale_barcode"], unlinked_bales[0]["bale_barcode"]],
+                    "handler_names": ["warehouse_clerk_1"],
+                    "note": "partial source linkage should be blocked at task creation",
+                    "created_by": "warehouse_supervisor_1",
+                }
+            )
 
-        self.assertEqual(result["shipment_no"], "MULTI")
-        self.assertEqual(result["shipment_nos"], [linked_shipment["shipment_no"], unlinked_shipment["shipment_no"]])
-        self.assertEqual(result["cost_status"], "partial_source_link")
-        self.assertIsNone(result["unit_cost_kes"])
-        self.assertEqual(result["cost_model_code"], "")
-        self.assertIsNone(result["cost_locked_at"])
-        self.assertEqual(result["source_bale_token_count"], 1)
-        self.assertEqual(result["source_pool_token_count"], 1)
-        self.assertEqual(result["result_items"][0]["cost_status"], "partial_source_link")
-        self.assertIsNone(result["result_items"][0]["unit_cost_kes"])
-        self.assertIsNone(result["result_items"][0]["total_cost_kes"])
-
-        stock_row = next(row for row in self.state.list_sorting_stock() if row["sku_code"] == "TOPSLADY-P-018500")
-        self.assertEqual(stock_row["default_cost_kes"], 185)
-        self.assertIsNone(stock_row["unit_cost_kes"])
-        self.assertIsNone(stock_row["total_cost_kes"])
-
-        token_rows = self.state.list_item_barcode_tokens(task_no=task["task_no"])
-        self.assertEqual(len(token_rows), 2)
-        self.assertTrue(all(row["cost_status"] == "partial_source_link" for row in token_rows))
-        self.assertTrue(all(row["unit_cost_kes"] is None for row in token_rows))
-        self.assertTrue(all(row["cost_model_code"] == "" for row in token_rows))
-        self.assertTrue(all(row["source_bale_tokens"] == [source_bale_token] for row in token_rows))
-        self.assertTrue(all(row["source_pool_tokens"] == [source_pool_token] for row in token_rows))
+        self.assertEqual(linked_shipment["customs_notice_no"], "RAW240428PARTA")
+        self.assertEqual(unlinked_shipment["customs_notice_no"], "RAW240428PARTB")
+        self.assertEqual(source_pool_token, "CN-SRC-RAW240428PARTA-01")
+        self.assertEqual(source_bale_token, f"{source_pool_token}-001")
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertIn("缺少中方来源", ctx.exception.detail)
 
     def test_sorting_results_with_different_default_costs_cannot_share_same_rack(self):
         shipment, bales = self._create_ready_bales(customs_notice_no="RAW240429")

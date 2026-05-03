@@ -315,6 +315,17 @@ class BaleBarcodeResponse(BaseModel):
     entered_bale_sales_pool_by: str = ""
     printed_at: Optional[str] = None
     printed_by: str = ""
+    source_cost_completed: Optional[bool] = None
+    source_cost_kes: Optional[float] = None
+    source_cost_amount: Optional[float] = None
+    source_total_cost_kes: Optional[float] = None
+    source_allocated_cost_kes: Optional[float] = None
+    source_cost_gate_status: str = ""
+    source_cost_allows_sorting: bool = False
+    source_cost_gate_message: str = ""
+    source_cost_per_kg_kes: Optional[float] = None
+    source_cost_recorded: bool = False
+    source_cost_allocated: bool = False
     created_at: str
     updated_at: str
 
