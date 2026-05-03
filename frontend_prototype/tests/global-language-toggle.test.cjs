@@ -24,11 +24,73 @@ const requiredTerms = [
   ["销售记录", "Sales Records"],
 ];
 
+const preQaTerms = [
+  ["手动补货申请", "Manual Replenishment Request"],
+  ["仓库备货任务", "Warehouse Prep Task"],
+  ["补货申请单", "Replenishment Request"],
+  ["补差拣货单", "LPK Shortage Pick Task"],
+  ["仓库执行", "Warehouse Execution"],
+  ["门店收货", "Store Receiving"],
+  ["店员上架", "Clerk Putaway"],
+  ["商品篮", "Basket"],
+  ["结账区", "Checkout"],
+  ["完成销售", "Complete Sale"],
+  ["打印助手", "Print Agent"],
+];
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 test("global language toggle is available outside the POS terminal", () => {
   assert.match(indexHtml, /data-global-language="zh"/);
   assert.match(indexHtml, /data-global-language="en"/);
   assert.match(indexHtml, /id="authLanguageToggle"/);
   assert.match(indexHtml, /id="workspaceLanguageToggle"/);
+});
+
+test("pre-QA terminology uses the approved bilingual glossary", () => {
+  for (const [zh, en] of preQaTerms) {
+    assert.match(appJs + indexHtml, new RegExp(escapeRegex(zh)));
+    assert.match(appJs, new RegExp(escapeRegex(en)));
+  }
+  [
+    "Payment & Checkout",
+    "Outstanding balance",
+    "Barcode / identity / price lookup",
+    "补差打包工单",
+    "Shortage Pick-Pack Order",
+    "备货波次",
+    "Step 1",
+    "Step 2",
+    "Lane A",
+    "Lane B",
+    "Lane C",
+    "shipment_batch_no",
+    "driver/vehicle",
+    "shipment session",
+    "路线 / stops",
+    "目标门店 / target stores",
+  ].forEach((copy) => {
+    assert.doesNotMatch(appJs + indexHtml, new RegExp(escapeRegex(copy)));
+  });
+});
+
+test("pre-QA error and empty-state copy gives a clear next step in both languages", () => {
+  const requiredCopy = [
+    ["打印助手未连接，请先启动 Windows 打印助手。", "Print Agent is not connected. Please start the Windows Print Agent first."],
+    ["此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。", "This code cannot be sold in POS. Please scan a STORE_ITEM code."],
+    ["这是 SDO，请去门店收货页面处理。", "This is an SDO. Please process it on the Store Receiving page."],
+    ["这是 SDB / LPK 来源包，不能直接上架销售。", "This is an SDB / LPK source package. It cannot be put away for sale directly."],
+    ["这是 RAW_BALE，门店不能处理。", "This is a RAW_BALE. Stores cannot process it."],
+    ["请扫描 STORE_ITEM 商品码。", "Please scan a STORE_ITEM code."],
+    ["商品篮为空。请扫描 STORE_ITEM 商品码。", "The basket is empty. Please scan a STORE_ITEM code."],
+    ["暂无仓库备货任务。请先生成补货申请单，再生成仓库备货任务。", "No Warehouse Prep Task yet. Create a Replenishment Request first, then generate a Warehouse Prep Task."],
+  ];
+  for (const [zh, en] of requiredCopy) {
+    assert.match(appJs + indexHtml, new RegExp(escapeRegex(zh)));
+    assert.match(appJs, new RegExp(escapeRegex(en)));
+  }
 });
 
 test("global i18n glossary contains the required business terms", () => {
@@ -82,7 +144,7 @@ test("first batch workspace page titles and core business terms have natural Eng
     ["0.1.2 压缩工单管理", "0.1.2 Compression Work Orders"],
     ["4. 门店补货建议", "4. Store Replenishment Suggestions"],
     ["4.1 手动补货需求", "4.1 Manual Replenishment Request"],
-    ["5.1 补差打包工单", "5.1 Shortage Pick-Pack Order"],
+    ["5.1 LPK 补差拣货", "5.1 LPK Shortage Pick Task"],
     ["6. 仓库执行单 / 出库打印", "6. Warehouse Execution / Dispatch Print"],
     ["6.1 配送批次 / 门店收货跟踪", "6.1 Delivery Batch / Store Receiving Tracking"],
     ["5. 门店收货主控台", "5. Store Receiving Command Center"],
@@ -133,7 +195,7 @@ test("priority mainline phrases have natural English translations", () => {
     ["包上架 / 商品码打印", "Package Shelving / Item Label Printing"],
     ["选择售价", "Select selling price"],
     ["生成 STORE_ITEM 商品码", "Create Store Item Barcodes"],
-    ["完成交易", "Complete Sale"],
+    ["完成销售", "Complete Sale"],
     ["这不是商品码，不能收银。请扫描 STORE_ITEM 商品条码。", "This is not an item barcode and cannot be sold. Please scan a STORE_ITEM barcode."],
     ["全部销售数据", "All Sales Data"],
     ["门店销售汇总", "Store Sales Summary"],
