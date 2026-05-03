@@ -139,6 +139,29 @@
     return getBaleReferenceCandidates(row).includes(normalizedCode);
   }
 
+  function mergeSortingTaskLookupBales(baleBarcodeRows, rawBaleRows) {
+    const mergedByBaleBarcode = new Map();
+    const orderedKeys = [];
+    const upsertRow = (row) => {
+      const baleBarcode = normalizeShipmentNo(row && row.bale_barcode);
+      if (!baleBarcode) {
+        return;
+      }
+      if (!mergedByBaleBarcode.has(baleBarcode)) {
+        orderedKeys.push(baleBarcode);
+      }
+      const existing = mergedByBaleBarcode.get(baleBarcode) || {};
+      mergedByBaleBarcode.set(baleBarcode, {
+        ...existing,
+        ...row,
+        bale_barcode: baleBarcode,
+      });
+    };
+    (Array.isArray(baleBarcodeRows) ? baleBarcodeRows : []).forEach(upsertRow);
+    (Array.isArray(rawBaleRows) ? rawBaleRows : []).forEach(upsertRow);
+    return orderedKeys.map((key) => mergedByBaleBarcode.get(key)).filter(Boolean);
+  }
+
   function isSelectableRawBale(row) {
     return (
       normalizeSearchValue(row && row.status) === "ready_for_sorting"
@@ -435,5 +458,6 @@
     findSortingTaskLookupMatches,
     getSortingScannerDiagnostic,
     isSelectableRawBale,
+    mergeSortingTaskLookupBales,
   };
 });

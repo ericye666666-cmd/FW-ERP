@@ -6,9 +6,134 @@ const SortingTaskFlow = Object.keys(loadedFlow).length ? loadedFlow : (globalThi
 const {
   findSortingTaskLookupMatches,
   addBaleToSortingTaskSelection,
+  mergeSortingTaskLookupBales,
   getSortingScannerDiagnostic,
   buildSortingTaskManagerBuckets,
 } = SortingTaskFlow;
+
+test("mergeSortingTaskLookupBales keeps raw bale machine_code for sorting lookup", () => {
+  const merged = mergeSortingTaskLookupBales(
+    [
+      {
+        bale_barcode: "RB260427AAAUB",
+        scan_token: "RB260427AAAUB",
+        status: "ready_for_sorting",
+      },
+    ],
+    [
+      {
+        bale_barcode: "RB260427AAAUB",
+        machine_code: "1260427521",
+        barcode_value: "1260427521",
+        human_readable: "1260427521",
+        status: "ready_for_sorting",
+        occupied_by_task_no: "",
+        can_route_to_sorting: true,
+        source_cost_completed: true,
+      },
+    ],
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].bale_barcode, "RB260427AAAUB");
+  assert.equal(merged[0].scan_token, "RB260427AAAUB");
+  assert.equal(merged[0].machine_code, "1260427521");
+  assert.equal(merged[0].barcode_value, "1260427521");
+  assert.equal(merged[0].human_readable, "1260427521");
+  assert.equal(merged[0].can_route_to_sorting, true);
+});
+
+test("mergeSortingTaskLookupBales gives raw bale stock fields priority", () => {
+  const merged = mergeSortingTaskLookupBales(
+    [
+      {
+        bale_barcode: "rb260427aaaub",
+        status: "pending_print",
+        occupied_by_task_no: "ST-OLD",
+        current_location: "intake",
+        source_cost_completed: false,
+      },
+    ],
+    [
+      {
+        bale_barcode: "RB260427AAAUB",
+        status: "ready_for_sorting",
+        occupied_by_task_no: "",
+        current_location: "warehouse_raw_bale_stock",
+        source_cost_completed: true,
+        machine_code: "1260427521",
+      },
+    ],
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].bale_barcode, "RB260427AAAUB");
+  assert.equal(merged[0].status, "ready_for_sorting");
+  assert.equal(merged[0].occupied_by_task_no, "");
+  assert.equal(merged[0].current_location, "warehouse_raw_bale_stock");
+  assert.equal(merged[0].source_cost_completed, true);
+  assert.equal(merged[0].machine_code, "1260427521");
+});
+
+test("merged sorting lookup accepts real RAW_BALE machine_code and stores canonical bale_barcode", () => {
+  const merged = mergeSortingTaskLookupBales(
+    [
+      {
+        bale_barcode: "RB260427AAAUB",
+        scan_token: "RB260427AAAUB",
+        status: "ready_for_sorting",
+      },
+    ],
+    [
+      {
+        bale_barcode: "RB260427AAAUB",
+        machine_code: "1260427521",
+        barcode_value: "1260427521",
+        human_readable: "1260427521",
+        status: "ready_for_sorting",
+        occupied_by_task_no: "",
+        source_cost_completed: true,
+      },
+    ],
+  );
+
+  const result = addBaleToSortingTaskSelection({
+    allBales: merged,
+    selectedBaleCodes: [],
+    baleCode: "1260427521",
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.selectedBaleCodes, ["RB260427AAAUB"]);
+  assert.notDeepEqual(result.selectedBaleCodes, ["1260427521"]);
+});
+
+test("merged sorting lookup still rejects non-RAW_BALE machine_code prefixes", () => {
+  const merged = mergeSortingTaskLookupBales(
+    [],
+    ["2260427521", "3260427521", "4260427521", "5260427521"].map((machineCode) => ({
+      bale_barcode: `RB-${machineCode}`,
+      machine_code: machineCode,
+      barcode_value: machineCode,
+      human_readable: machineCode,
+      status: "ready_for_sorting",
+      occupied_by_task_no: "",
+      source_cost_completed: true,
+    })),
+  );
+
+  for (const machineCode of ["2260427521", "3260427521", "4260427521", "5260427521"]) {
+    const result = addBaleToSortingTaskSelection({
+      allBales: merged,
+      selectedBaleCodes: [],
+      baleCode: machineCode,
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /RAW_BALE/);
+    assert.deepEqual(result.selectedBaleCodes, []);
+  }
+});
 
 test("findSortingTaskLookupMatches searches ready bales across shipments", () => {
   const rows = [

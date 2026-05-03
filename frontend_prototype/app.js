@@ -4524,6 +4524,14 @@ function mergeBaleRows(rows = []) {
   ];
 }
 
+function getSortingTaskLookupBales() {
+  const merger = sortingTaskFlow.mergeSortingTaskLookupBales;
+  if (typeof merger === "function") {
+    return merger(baleBarcodeState, rawBaleStockState);
+  }
+  return baleBarcodeState;
+}
+
 function upsertRawBaleState(rows = []) {
   const incomingRows = Array.isArray(rows) ? rows.filter((row) => row && row.bale_barcode) : [];
   const incomingCodes = new Set(incomingRows.map((row) => String(row.bale_barcode || "").trim().toUpperCase()));
@@ -9824,7 +9832,7 @@ function refreshSortingShipmentOptions() {
   if (!(flowSummary instanceof HTMLElement) || !(selectedSummary instanceof HTMLElement) || !(baleContainer instanceof HTMLElement)) {
     return;
   }
-  const allBales = baleBarcodeState
+  const allBales = getSortingTaskLookupBales()
     .slice()
     .sort((left, right) => {
       const shipmentCompare = String(left.shipment_no || "").localeCompare(String(right.shipment_no || ""), "zh-CN");
@@ -10045,8 +10053,9 @@ function getSortingSelectedBaleWeightKg(bale = {}, sourceLine = null) {
 
 function getSortingTaskSourceWeightKg(task = {}) {
   const baleCodes = Array.isArray(task?.bale_barcodes) ? task.bale_barcodes : [];
+  const lookupBales = getSortingTaskLookupBales();
   return roundToTwo(baleCodes.reduce((sum, code) => {
-    const bale = baleBarcodeState.find((row) => String(row?.bale_barcode || "").trim().toUpperCase() === String(code || "").trim().toUpperCase());
+    const bale = lookupBales.find((row) => String(row?.bale_barcode || "").trim().toUpperCase() === String(code || "").trim().toUpperCase());
     const sourceBaleToken = String(bale?.source_bale_token || "").trim();
     if (!bale || !sourceBaleToken) {
       return sum;
@@ -10225,8 +10234,9 @@ async function buildSortingLossRecordPayload(form) {
 
 function getSortingTaskFormalCostPayload(task = {}, resultItems = [], lossRecordOverride = null) {
   const baleCodes = Array.isArray(task?.bale_barcodes) ? task.bale_barcodes : [];
+  const lookupBales = getSortingTaskLookupBales();
   const baleRows = baleCodes
-    .map((code) => baleBarcodeState.find((row) => String(row?.bale_barcode || "").trim().toUpperCase() === String(code || "").trim().toUpperCase()))
+    .map((code) => lookupBales.find((row) => String(row?.bale_barcode || "").trim().toUpperCase() === String(code || "").trim().toUpperCase()))
     .filter(Boolean);
   const sourceLineMap = new Map();
   const sourcePoolMap = new Map();
@@ -28885,7 +28895,7 @@ async function addSortingLookupBaleToSelection() {
     };
   });
   const result = resolver({
-    allBales: baleBarcodeState,
+    allBales: getSortingTaskLookupBales(),
     selectedBaleCodes: [...selectedSortingBales],
     baleCode,
   });
@@ -28964,7 +28974,7 @@ async function submitSortingTask(event) {
   delete payload.bale_search;
   delete payload.handler_names_json;
   await syncSortingFlowSnapshot();
-  const selectedRows = baleBarcodeState.filter(
+  const selectedRows = getSortingTaskLookupBales().filter(
     (row) => selectedSortingBales.has(row.bale_barcode) && isRawBaleEligibleForSortingTask(row),
   );
   payload.bale_barcodes = selectedRows.map((row) => row.bale_barcode).filter(Boolean);
