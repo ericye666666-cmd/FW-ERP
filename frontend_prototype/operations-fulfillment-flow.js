@@ -1329,7 +1329,7 @@
         duplicate: true,
         matchedRow,
         canonicalBarcode: canonicalKey,
-        message: "该 SDB 已经在本单现成包清单中。",
+        message: "该 SDB 已经扫码确认过。",
         foundPreparedBarcodes: Array.from(current),
       };
     }
@@ -1355,7 +1355,7 @@
       canonicalBarcode: canonicalKey,
       message: addedByDemandMatch
         ? "该 SDB 符合当前调拨需求，已加入本单现成包清单。"
-        : "该 SDB 已经在本单现成包清单中。",
+        : "已确认该现成 SDB，已加入本单出库核对。",
       foundPreparedBarcodes: Array.from(current),
     };
   }

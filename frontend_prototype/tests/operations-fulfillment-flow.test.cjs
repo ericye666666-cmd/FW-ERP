@@ -194,7 +194,7 @@ test("warehouse execution accepts any available matching SDB scanned by machine 
   assert.equal(result.matchedRow.baleBarcode, "SDB260503AAG");
   assert.equal(result.matchedRow.machineCode, "2260503006");
   assert.deepEqual(result.foundPreparedBarcodes, ["SDB260503AAG"]);
-  assert.match(result.message, /已经在本单现成包清单中/);
+  assert.equal(result.message, "已确认该现成 SDB，已加入本单出库核对。");
 });
 
 test("warehouse execution can dynamically add an available matching SDB that was not preselected", () => {
@@ -241,7 +241,7 @@ test("warehouse execution can dynamically add an available matching SDB that was
   assert.equal(result.addedByDemandMatch, true);
   assert.equal(result.canonicalBarcode, "SDB260503AAG");
   assert.deepEqual(result.foundPreparedBarcodes, ["SDB260503AAG"]);
-  assert.match(result.message, /符合当前调拨需求，已加入本单现成包清单/);
+  assert.equal(result.message, "该 SDB 符合当前调拨需求，已加入本单现成包清单。");
 
   const readiness = summarizeTransferExecutionReadiness({
     plan,
@@ -313,7 +313,7 @@ test("warehouse execution rejects duplicate, mismatched, occupied, and missing S
   });
   assert.equal(duplicate.ok, true);
   assert.equal(duplicate.duplicate, true);
-  assert.match(duplicate.message, /已经在本单现成包清单中/);
+  assert.equal(duplicate.message, "该 SDB 已经扫码确认过。");
   assert.deepEqual(duplicate.foundPreparedBarcodes, ["SDB260503AAG"]);
 
   const mismatch = registerPreparedBaleScan({
