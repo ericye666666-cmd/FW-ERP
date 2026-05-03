@@ -144,6 +144,7 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "结账区", en: "Checkout" },
   { zh: "完成销售", en: "Complete Sale" },
   { zh: "打印助手", en: "Print Agent" },
+  { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -17186,32 +17187,23 @@ async function checkLocalPrintAgentPrinters() {
 }
 
 function getWindowsPrintAgentDownloadUrl() {
-  const button = document.querySelector("#balePrintModalDownloadAgentButton");
-  const configuredUrl = button instanceof HTMLElement
-    ? String(button.dataset.downloadUrl || "").trim()
+  const link = document.querySelector("#balePrintModalDownloadAgentLink");
+  const configuredUrl = link instanceof HTMLAnchorElement
+    ? String(link.getAttribute("href") || "").trim()
     : "";
   return configuredUrl || WINDOWS_PRINT_AGENT_DOWNLOAD_URL;
 }
 
 async function downloadWindowsPrintAgentPackage() {
   const downloadUrl = getWindowsPrintAgentDownloadUrl();
-  try {
-    const response = await fetch(downloadUrl, { method: "HEAD", cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`download package unavailable (${response.status})`);
-    }
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = "fw-erp-print-agent-windows.zip";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手。");
-    renderBalePrintModal();
-  } catch (error) {
-    setLocalPrintAgentMessage("error", "安装包暂未上传，请联系管理员。");
-    renderBalePrintModal();
-  }
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = "fw-erp-print-agent-windows.zip";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手。");
+  renderBalePrintModal();
 }
 
 function getCurrentBalePreviewHtml() {
@@ -32463,12 +32455,6 @@ document.querySelector("#balePrintModalCheckLocalPrintersButton")?.addEventListe
 document.querySelector("#balePrintModalInstallStepsButton")?.addEventListener("click", () => {
   localPrintAgentState.installStepsVisible = !localPrintAgentState.installStepsVisible;
   renderBalePrintModal();
-});
-document.querySelector("#balePrintModalDownloadAgentButton")?.addEventListener("click", () => {
-  downloadWindowsPrintAgentPackage().catch((error) => {
-    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
-    renderBalePrintModal();
-  });
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {

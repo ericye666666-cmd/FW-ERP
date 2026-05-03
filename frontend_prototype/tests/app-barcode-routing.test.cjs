@@ -92,6 +92,8 @@ test("bale print modal moves technical print controls into collapsed advanced op
   const advancedOptions = indexHtml.match(/<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<\/details>/);
   assert.ok(advancedOptions, "advanced print options should exist");
   const advancedHtml = advancedOptions[0];
+  const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
+  assert.ok(primaryActions, "primary print actions should exist");
   assert.match(advancedHtml, /<summary>高级打印选项<\/summary>/);
   assert.doesNotMatch(indexHtml, /<details id="balePrintModalAdvancedOptions"[^>]*open/);
   assert.match(advancedHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印助手/);
@@ -99,7 +101,11 @@ test("bale print modal moves technical print controls into collapsed advanced op
   assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?高级：重试本张/);
   assert.match(advancedHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?高级：打印全部/);
   assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?高级：批量重试/);
-  assert.doesNotMatch(advancedHtml, /下载 Windows 打印助手/);
+  assert.match(advancedHtml, /id="balePrintModalDownloadAgentLink"/);
+  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
+  assert.match(advancedHtml, /download/);
+  assert.match(advancedHtml, /下载 Windows 打印助手/);
+  assert.doesNotMatch(primaryActions[0], /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedHtml, /查看安装步骤/);
   assert.doesNotMatch(advancedHtml, /直接打印本张/);
   assert.doesNotMatch(advancedHtml, /发送到打印站/);
@@ -137,6 +143,8 @@ test("field advanced print controls stay limited to safe operator actions", () =
   assert.match(advancedHtml, /高级：重试本张/);
   assert.match(advancedHtml, /高级：打印全部/);
   assert.match(advancedHtml, /高级：批量重试/);
+  assert.match(advancedHtml, /下载 Windows 打印助手/);
+  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
   assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalSendStationButton/);

@@ -36,6 +36,7 @@ const preQaTerms = [
   ["结账区", "Checkout"],
   ["完成销售", "Complete Sale"],
   ["打印助手", "Print Agent"],
+  ["下载 Windows 打印助手", "Download Windows Print Agent"],
 ];
 
 function escapeRegex(value) {
