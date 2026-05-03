@@ -2803,17 +2803,26 @@
         <div id="transferResultSummary" class="candidate-summary empty-state">
           下一步：可【单独执行该申请】或【加入仓库备货任务】；有缺口去 5.1 生成补差工单，无缺口直接去 6。
         </div>
-        <div class="candidate-summary">
+        <div class="candidate-summary warehouse-prep-task-summary">
           <strong>仓库备货任务</strong>
           <div class="subtle small">把多个补货品类合成一个仓库拣货任务，仓库按这个任务备货。</div>
+          <div class="report-summary-grid compact-metrics">
+            <article class="store-metric"><strong>当前选中的补货单数量</strong><span id="pickingWaveSelectedCount">0</span></article>
+            <article class="store-metric"><strong>总需求数量</strong><span id="pickingWaveTotalQty">0 件</span></article>
+            <article class="store-metric"><strong>品类数量</strong><span id="pickingWaveCategoryCount">0</span></article>
+            <article class="store-metric"><strong>缺货数量</strong><span id="pickingWaveShortageQty">0 件</span></article>
+          </div>
           <form id="pickingWaveForm" class="form-grid compact warehouse-prep-toolbar">
-            <input name="wave_name" type="text" placeholder="任务名称（如 PREP-20260503-A）" />
-            <input name="warehouse_code" type="text" placeholder="仓库代码（WH1）" value="WH1" />
-            <input name="planned_picking_date" type="date" />
-            <input name="required_arrival_date" type="date" />
-            <select name="selected_replenishment_request_nos" multiple size="4"></select>
-            <input name="notes" type="text" placeholder="备注（可选）" />
             <button type="submit">生成仓库备货任务</button>
+            <details id="pickingWaveAdvancedSettings" class="transfer-advanced-options picking-wave-advanced-settings">
+              <summary>高级设置 / 备货波次参数</summary>
+              <input name="wave_name" type="text" placeholder="任务名称（如 PREP-20260503-A）" />
+              <input name="warehouse_code" type="text" placeholder="仓库代码（WH1）" value="WH1" />
+              <input name="planned_picking_date" type="date" />
+              <input name="required_arrival_date" type="date" />
+              <select name="selected_replenishment_request_nos" multiple size="4"></select>
+              <input name="notes" type="text" placeholder="备注（可选）" />
+            </details>
           </form>
           <div id="pickingWaveSummary" class="subtle small">当前仓库备货任务已接入执行入口；LPK 仍按单张补货申请生成。</div>
           <div id="pickingWaveList" class="candidate-summary empty-state">暂无仓库备货任务。</div>

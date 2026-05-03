@@ -18703,6 +18703,71 @@ function getTransferRequestedQtyForDisplay(transfer = {}) {
   return items.reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0);
 }
 
+function getTodayInputValue() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getPickingWaveRequestNos(form = document.querySelector("#pickingWaveForm")) {
+  const selected = form instanceof HTMLElement
+    ? [...form.querySelectorAll("[name='selected_replenishment_request_nos'] option:checked")]
+      .map((option) => String(option.value || "").trim().toUpperCase())
+      .filter(Boolean)
+      .filter((value) => !isWaveSelectionValue(value))
+    : [];
+  if (selected.length) {
+    return Array.from(new Set(selected));
+  }
+  const activeNo = String(activeTransferPreparationNo || "").trim().toUpperCase();
+  if (activeNo && getTransferPreparationOrder(activeNo)) {
+    return [activeNo];
+  }
+  return [];
+}
+
+function buildDefaultPickingWaveName(requestNos = []) {
+  const count = Math.max(1, Array.isArray(requestNos) ? requestNos.length : 0);
+  return `PREP-${getTodayInputValue().replace(/-/g, "")}-${String(count).padStart(2, "0")}`;
+}
+
+function getDefaultPickingWaveRequiredArrivalDate(requestNos = []) {
+  const rows = (Array.isArray(requestNos) ? requestNos : [])
+    .map((requestNo) => getTransferPreparationOrder(requestNo))
+    .filter(Boolean);
+  return rows.map((row) => String(row.required_arrival_date || row.required_arrival_on || "").trim()).find(Boolean) || "";
+}
+
+function renderPickingWaveTaskSummary() {
+  const countTarget = document.querySelector("#pickingWaveSelectedCount");
+  const totalTarget = document.querySelector("#pickingWaveTotalQty");
+  const categoryTarget = document.querySelector("#pickingWaveCategoryCount");
+  const shortageTarget = document.querySelector("#pickingWaveShortageQty");
+  if (
+    !(countTarget instanceof HTMLElement)
+    || !(totalTarget instanceof HTMLElement)
+    || !(categoryTarget instanceof HTMLElement)
+    || !(shortageTarget instanceof HTMLElement)
+  ) {
+    return;
+  }
+  const requestNos = getPickingWaveRequestNos();
+  const transfers = requestNos.map((requestNo) => getTransferPreparationOrder(requestNo)).filter(Boolean);
+  const totals = transfers.reduce((acc, transfer) => {
+    const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer));
+    acc.totalQty += Number(plan.summary?.totalRequestedQty || getTransferRequestedQtyForDisplay(transfer) || 0);
+    acc.categoryCount += Number(plan.demandLineCount || plan.categoryCards?.length || 0);
+    acc.shortageQty += Number(plan.summary?.shortageQty || 0);
+    return acc;
+  }, {
+    totalQty: 0,
+    categoryCount: 0,
+    shortageQty: 0,
+  });
+  countTarget.textContent = String(requestNos.length);
+  totalTarget.textContent = `${totals.totalQty} 件`;
+  categoryTarget.textContent = String(totals.categoryCount);
+  shortageTarget.textContent = `${totals.shortageQty} 件`;
+}
+
 
 function buildWaveRequestRows(wave = null) {
   if (!wave) return [];
@@ -18807,13 +18872,17 @@ function populateTransferOrderSelectors() {
 async function refreshPickingWavePanel() {
   const select = document.querySelector("#pickingWaveForm [name='selected_replenishment_request_nos']");
   if (select instanceof HTMLSelectElement) {
+    const currentRequestNos = new Set(getPickingWaveRequestNos().map((item) => String(item || "").trim().toUpperCase()));
     select.innerHTML = transferOrderState.map((row) => {
       const total = Number((row?.items || []).reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0));
       const shortage = Number((row?.items || []).reduce((sum, item) => sum + Math.max(Number(item?.requested_qty || 0) - Number(item?.approved_qty || 0), 0), 0));
       const required = String(row?.required_arrival_date || "-");
       const label = `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / required ${required} / total ${total} 件 / shortage ${shortage} 件`;
-      return `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(label)}</option>`;
+      const transferNo = String(row.transfer_no || "").trim().toUpperCase();
+      const selected = currentRequestNos.has(transferNo) ? " selected" : "";
+      return `<option value="${escapeHtml(row.transfer_no || "")}"${selected}>${escapeHtml(label)}</option>`;
     }).join("");
+    renderPickingWaveTaskSummary();
   }
   const list = document.querySelector("#pickingWaveList");
   if (!(list instanceof HTMLElement)) return;
@@ -18828,6 +18897,7 @@ async function refreshPickingWavePanel() {
     list.className = "candidate-summary";
     list.innerHTML = waves.map((wave) => `${escapeHtml(wave.wave_no || "-")} | ${(wave.stores_included || []).length} stores | ${Number(wave.total_requested_qty || 0)} 件 | 缺口 ${Number(wave.total_shortage_qty || 0)} 件 | ${Number(wave.sdb_count || 0)} SDB | ${Number(wave.lpk_count || 0)} LPK`).map((line) => `<div>${line}</div>`).join("");
   } catch (_error) {}
+  renderPickingWaveTaskSummary();
 }
 
 function renderTransferDispatchSummary(rows = transferOrderState) {
@@ -30738,12 +30808,19 @@ async function submitTransfer(event) {
 async function submitPickingWave(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const requestNos = [...form.querySelectorAll("[name='selected_replenishment_request_nos'] option:checked")].map((option) => option.value);
+  const requestNos = getPickingWaveRequestNos(form);
+  if (!requestNos.length) {
+    throw new Error("请先选择或创建一张补货申请单。");
+  }
+  const defaultWaveName = buildDefaultPickingWaveName(requestNos);
+  const defaultWarehouseCode = String(form.querySelector("[name='warehouse_code']")?.value || currentSession?.user?.warehouse_code || "WH1").trim() || "WH1";
+  const defaultPlannedDate = String(form.querySelector("[name='planned_picking_date']")?.value || getTodayInputValue()).trim();
+  const defaultRequiredArrivalDate = String(form.querySelector("[name='required_arrival_date']")?.value || getDefaultPickingWaveRequiredArrivalDate(requestNos)).trim();
   const payload = {
-    wave_name: String(form.querySelector("[name='wave_name']")?.value || "").trim(),
-    warehouse_code: String(form.querySelector("[name='warehouse_code']")?.value || "").trim(),
-    planned_picking_date: String(form.querySelector("[name='planned_picking_date']")?.value || "").trim(),
-    required_arrival_date: String(form.querySelector("[name='required_arrival_date']")?.value || "").trim(),
+    wave_name: String(form.querySelector("[name='wave_name']")?.value || defaultWaveName).trim(),
+    warehouse_code: String(defaultWarehouseCode || "WH1").trim(),
+    planned_picking_date: defaultPlannedDate,
+    required_arrival_date: defaultRequiredArrivalDate,
     selected_replenishment_request_nos: requestNos,
     notes: String(form.querySelector("[name='notes']")?.value || "").trim(),
   };
@@ -31839,6 +31916,7 @@ bindForm("#receiptForm", submitReceipt, "#receiptOutput");
 bindForm("#recommendationForm", submitTransferRecommendation, "#recommendationOutput");
 bindForm("#transferForm", submitTransfer, "#transferOutput");
 bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
+document.querySelector("#pickingWaveForm")?.addEventListener("change", renderPickingWaveTaskSummary);
 bindForm("#loosePackingTaskPlanForm", submitLoosePackingTaskPlan, "#loosePackingTaskOutput");
 bindForm("#returnCandidateForm", submitReturnCandidates, "#returnOutput");
 bindForm("#returnSelectionForm", submitReturnSelection, "#returnOutput");
