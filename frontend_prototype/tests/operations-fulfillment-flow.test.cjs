@@ -330,8 +330,8 @@ test("loose pick sheet prints through warehouseout template payload instead of b
   assert.equal(payload.code, "3260423003");
   assert.equal(payload.dispatch_bale_no, "3260423003");
   assert.equal(payload.transfer_order_no, "TO-20260423-003");
-  assert.match(payload.packing_list, /dress \/ 2 pieces · 50 件/);
-  assert.match(payload.packing_list, /tops \/ lady tops · 5 件/);
+  assert.match(payload.packing_list, /Pick: dress\/2 pieces x50/);
+  assert.match(payload.packing_list, /Pick: tops\/lady tops x5/);
   assert.doesNotMatch(payload.packing_list, /A-DR-2P-P-01|A-TS-LT-P-01|A-TS-LT-S-01/);
   assert.equal(payload.copies, 1);
 });
@@ -721,7 +721,7 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /printableBarcode/);
   assert.match(appJs, /Store: \$\{escapeHtml\(storeName \|\| "-"\)\}<br>Request: \$\{escapeHtml\(requestNo \|\| "-"\)\}/);
   assert.match(appJs, /data-barcode-renderer="svg-code128"/);
-  assert.match(appJs, /LPK SHORTAGE PICK/);
+  assert.match(appJs, /LPK \/ SHORTAGE PICK/);
   assert.doesNotMatch(appJs, /lpk_shortage_pick[\s\S]*allowedCodes:\s*\["transtoshop"/);
   assert.match(indexHtml, /id="balePrintModalScopeNote"/);
 });

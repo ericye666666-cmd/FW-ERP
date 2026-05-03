@@ -505,6 +505,29 @@ def _first_label_value(payload: dict, *keys: str, default: object = "") -> objec
     return default
 
 
+def _label_category_path(payload: dict) -> str:
+    category_main = str(_first_label_value(payload, "category_main", "cat", "category", default="")).strip()
+    category_sub = str(_first_label_value(payload, "category_sub", "sub", "subcategory", default="")).strip()
+    if category_main and category_sub and category_sub.lower() != category_main.lower():
+        return f"{category_main}/{category_sub}"
+    return category_main or category_sub or "-"
+
+
+def _summary_items(value: object, *, limit: int = 2) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    items = [item.strip() for item in re.split(r"\s*;\s*|\r?\n", text) if item.strip()]
+    if not items:
+        return []
+    visible_limit = max(1, int(limit or 1))
+    visible = items[:visible_limit]
+    hidden_count = max(len(items) - visible_limit, 0)
+    if hidden_count:
+        visible[-1] = f"{visible[-1]} +{hidden_count} more"
+    return visible
+
+
 def _label_template_family(payload: dict) -> str:
     template_code = str(payload.get("template_code") or "").strip().lower()
     if template_code in {"warehouse_in", "warehouse_in_60x40", "raw_bale_60x40"}:
@@ -549,22 +572,26 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
     if family == "store_prep_bale":
         return [
             (20, 8, "SDB / STORE PREP BALE", 2, 2, 25),
-            (20, 46, f"Category: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}", 1, 1, 34),
-            (20, 76, f"Qty: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}", 1, 1, 24),
-            (252, 76, f"Store: {_first_label_value(payload, 'store', 'store_code', 'destination', default='-')}", 1, 1, 22),
-            (20, 110, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 136, f"Machine: {barcode_value}", 1, 1, 34),
-            (20, 162, f"Encoded: {barcode_value}", 1, 1, 34),
+            (20, 42, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', 'destination', default='-')}", 1, 1, 24),
+            (252, 42, f"Qty: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}", 1, 1, 20),
+            (20, 70, f"Cat: {_label_category_path(payload)}", 1, 1, 34),
+            (20, 98, f"Grade: {_first_label_value(payload, 'grade', 'grade_summary', default='-')}", 1, 1, 24),
+            (252, 98, f"Src: {_first_label_value(payload, 'source_reference', 'source_bale_no', 'source', default='-')}", 1, 1, 22),
+            (20, 126, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 154, f"Code: {barcode_value}", 1, 1, 34),
         ]
     if family == "loose_pick_task":
+        picked_items = _summary_items(_first_label_value(payload, "picked_item_summary", "pick_summary", "packing_list", default=""), limit=2)
+        shortage_items = _summary_items(_first_label_value(payload, "shortage_summary", "short_summary", default=""), limit=1)
         return [
-            (20, 8, "LPK SHORTAGE PICK", 2, 2, 24),
-            (20, 46, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
-            (20, 76, f"Qty: {_first_label_value(payload, 'qty', 'item_count', 'quantity', default='-')}", 1, 1, 22),
-            (252, 76, f"Category: {_first_label_value(payload, 'category', 'category_main', 'category_summary', default='-')}", 1, 1, 22),
-            (20, 110, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 136, f"Machine: {barcode_value}", 1, 1, 34),
-            (20, 162, f"Encoded: {barcode_value}", 1, 1, 34),
+            (20, 8, "LPK / SHORTAGE PICK", 2, 2, 24),
+            (20, 42, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
+            (20, 68, f"Req: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
+            (20, 94, f"Pick1: {picked_items[0] if len(picked_items) > 0 else '-'}", 1, 1, 34),
+            (20, 120, f"Pick2: {picked_items[1] if len(picked_items) > 1 else '-'}", 1, 1, 34),
+            (20, 146, f"Short: {shortage_items[0] if shortage_items else '-'}", 1, 1, 34),
+            (20, 172, f"Display: {display_code or '-'}", 1, 1, 34),
+            (20, 198, f"Code: {barcode_value}", 1, 1, 34),
         ]
     if family == "store_delivery_execution":
         return [
@@ -598,6 +625,7 @@ def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
     barcode_value = str(label_payload.get("barcode_value") or label_payload.get("machine_code") or "").strip()
     if not _looks_like_machine_code(barcode_value):
         raise ValueError(MISSING_MACHINE_CODE_MESSAGE)
+    family = _label_template_family(label_payload)
 
     commands = [
         "SIZE 60 mm,40 mm",
@@ -610,7 +638,8 @@ def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
     ]
     for x, y, text, x_scale, y_scale, max_len in _build_tspl_label_lines(label_payload):
         commands.append(_tspl_text(x, y, text, x_scale=x_scale, y_scale=y_scale, max_len=max_len))
-    commands.append("BAR 20,126,436,3")
+    if family not in {"store_prep_bale", "loose_pick_task"}:
+        commands.append("BAR 20,126,436,3")
     commands.extend(
         [
             f'BARCODE 24,232,"128",72,1,0,2,2,"{barcode_value}"',

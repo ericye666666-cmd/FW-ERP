@@ -27,8 +27,8 @@ test("print modal advanced options expose only field-safe print helper controls"
   assert.match(indexHtml, /本地地址：http:\/\/127\.0\.0\.1:8719/);
   assert.match(indexHtml, /检测打印助手/);
   assert.match(indexHtml, /检测打印机队列/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>打印标签<\/button>/);
-  assert.match(indexHtml, /id="balePrintModalPrintAllButton"[^>]*>打印本轮全部标签<\/button>/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>高级：重试本张<\/button>/);
+  assert.match(indexHtml, /id="balePrintModalPrintAllButton"[^>]*>高级：批量重试<\/button>/);
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   assert.doesNotMatch(advancedSection, /下载 Windows 打印助手/);
   assert.doesNotMatch(advancedSection, /查看安装步骤/);

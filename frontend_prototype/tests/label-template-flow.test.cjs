@@ -285,7 +285,7 @@ test("createTemplateDemoData returns warehouseout dispatch fields for transtosho
 
   assert.match(demo.store_name, /[A-Z]/);
   assert.match(demo.transfer_order_no, /^TRF-/);
-  assert.match(demo.dispatch_bale_no, /^(SPB|2404|2504|2604)/);
+  assert.match(demo.dispatch_bale_no, /^(SDB|2404|2504|2604)/);
   assert.ok(demo.packing_list.length > 0);
 });
 

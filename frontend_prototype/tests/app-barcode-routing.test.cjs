@@ -67,8 +67,8 @@ test("bale print modal moves technical print controls into collapsed advanced op
   assert.doesNotMatch(indexHtml, /<details id="balePrintModalAdvancedOptions"[^>]*open/);
   assert.match(advancedHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印助手/);
   assert.match(advancedHtml, /id="balePrintModalCheckLocalPrintersButton"[\s\S]*?检测打印机队列/);
-  assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?打印标签/);
-  assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?打印本轮全部标签/);
+  assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?高级：重试本张/);
+  assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?高级：批量重试/);
   assert.doesNotMatch(advancedHtml, /下载 Windows 打印助手/);
   assert.doesNotMatch(advancedHtml, /查看安装步骤/);
   assert.doesNotMatch(advancedHtml, /直接打印本张/);
@@ -78,7 +78,7 @@ test("bale print modal moves technical print controls into collapsed advanced op
 });
 
 test("primary bale print action requires local agent and keeps browser print in advanced fallback", () => {
-  assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?本地打印代理未启动，请先启动 FW-ERP Print Agent/);
+  assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?打印助手未连接，请先启动 Windows 打印助手/);
   assert.match(appJs, /document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click"/);
   assert.match(appJs, /当前打印方式：等待本地打印代理/);
   assert.match(appJs, /selectedPrinterName = "Deli DL-720C"/);
@@ -95,7 +95,7 @@ test("bale print modal includes local print agent status and controls", () => {
   assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*FW-ERP 打印助手/);
   assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*本地地址：http:\/\/127\.0\.0\.1:8719/);
   assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印助手/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*打印标签/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*高级：重试本张/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/label`, \{/);
 });
@@ -106,11 +106,25 @@ test("field advanced print controls stay limited to safe operator actions", () =
   const advancedHtml = advancedOptions[0];
   assert.match(advancedHtml, /检测打印助手/);
   assert.match(advancedHtml, /检测打印机队列/);
-  assert.match(advancedHtml, /打印标签/);
-  assert.match(advancedHtml, /打印本轮全部标签/);
+  assert.match(advancedHtml, /高级：重试本张/);
+  assert.match(advancedHtml, /高级：批量重试/);
   assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalSendStationButton/);
+});
+
+test("SDO modal primary action has one clear main print button and local-agent offline error", () => {
+  const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
+  assert.ok(primaryActions, "primary print actions should exist");
+  assert.match(primaryActions[0], /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
+  assert.doesNotMatch(primaryActions[0], /打印本轮全部标签/);
+  assert.match(appJs, /const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop"/);
+  assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint \? "打印 SDO 条码"/);
+  assert.match(appJs, /message: "打印助手未连接，请先启动 Windows 打印助手"/);
+  assert.match(appJs, /throw new Error\("打印助手未连接，请先启动 Windows 打印助手。"\)/);
+  const primaryActionFunction = appJs.match(/async function printCurrentBaleModalPrimaryAction\(\) \{[\s\S]*?\n\}/);
+  assert.ok(primaryActionFunction, "primary print action should exist");
+  assert.doesNotMatch(primaryActionFunction[0], /browserPrintCurrentBaleModalJob\(\)/);
 });
 
 test("store dispatch print confirmation completes only the current modal job", () => {

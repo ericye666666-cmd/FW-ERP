@@ -537,6 +537,13 @@
         isPartial: Boolean(row?.isPartial),
       }))
       .filter((row) => row.qty > 0);
+    const shortageLines = (Array.isArray(plan?.categoryCards) ? plan.categoryCards : [])
+      .map((row) => ({
+        categoryMain: normalizeText(row?.categoryMain),
+        categorySub: normalizeText(row?.categorySub),
+        qty: Number(row?.shortageQty || 0),
+      }))
+      .filter((row) => row.qty > 0);
     const totalQty = lines.reduce((sum, row) => sum + Number(row.qty || 0), 0);
     if (!totalQty) {
       return [];
@@ -559,10 +566,36 @@
       plannedPackageCount: Math.max(1, Math.ceil(totalQty / normalizedPackageLimitQty)),
       rackCodes: Array.from(new Set(lines.flatMap((row) => row.rackCodes || []))),
       lines,
+      shortageLines,
       isPartial: totalQty < normalizedPackageLimitQty,
       status: "pending_pick",
       createdAt: normalizeText(now) || new Date().toISOString(),
     }];
+  }
+
+  function formatLoosePickSheetSummaryLine(line = {}) {
+    const categoryMain = normalizeText(line?.categoryMain);
+    const categorySub = normalizeText(line?.categorySub);
+    const qty = Number(line?.qty || 0);
+    if (!categoryMain && !categorySub && qty <= 0) {
+      return "";
+    }
+    return `${categoryMain || "-"}${categorySub ? `/${categorySub}` : ""} x${Math.max(0, qty)}`;
+  }
+
+  function formatLoosePickSheetSummaryLines(lines = [], { limit = 2 } = {}) {
+    const normalized = (Array.isArray(lines) ? lines : [])
+      .map(formatLoosePickSheetSummaryLine)
+      .filter(Boolean);
+    if (!normalized.length) {
+      return [];
+    }
+    const visibleCount = Math.max(1, Number(limit || 2));
+    const visible = normalized.slice(0, visibleCount);
+    if (normalized.length > visibleCount) {
+      visible.push(`+${normalized.length - visibleCount} more`);
+    }
+    return visible;
   }
 
   function formatLoosePickSheetPackingLines(lines = []) {
@@ -595,7 +628,14 @@
       || "STORE";
     const pickQty = Number(task?.totalQty || task?.qty || 0);
     const packingLines = formatLoosePickSheetPackingLines(task?.lines);
+    const pickedSummaryLines = formatLoosePickSheetSummaryLines(task?.lines, { limit: 2 });
+    const shortageSummaryLines = formatLoosePickSheetSummaryLines(task?.shortageLines, { limit: 2 });
+    const readablePackingLines = [
+      ...pickedSummaryLines.map((line) => `Pick: ${line}`),
+      ...shortageSummaryLines.map((line) => `Short: ${line}`),
+    ];
     return {
+      labelTitle: "LPK / SHORTAGE PICK",
       templateCode: "store_loose_pick_60x40",
       templateName: "门店补差拣货单 60x40",
       templateScope: "warehouseout_bale",
@@ -611,7 +651,11 @@
       taskNo: normalizeText(task?.taskNo).toUpperCase(),
       packageLimitQty: normalizeLoosePackageLimitQty(task?.packageLimitQty),
       packingLines,
-      packingList: packingLines.join("\n"),
+      pickedSummaryLines,
+      shortageSummaryLines,
+      pickedItemSummary: pickedSummaryLines.join("; "),
+      shortageSummary: shortageSummaryLines.join("; "),
+      packingList: readablePackingLines.length ? readablePackingLines.join("\n") : packingLines.join("\n"),
     };
   }
 
@@ -633,6 +677,7 @@
       template_code: "store_loose_pick_60x40",
       template_scope: "warehouseout_bale",
       copies: 1,
+      label_title: label.labelTitle || "LPK / SHORTAGE PICK",
       display_code: normalizeText(label.barcodeValue || label.taskNo).toUpperCase(),
       machine_code: machineCode,
       barcode_value: barcodeValue,
@@ -654,6 +699,8 @@
       transfer_order_no: label.transferNo,
       bale_piece_summary: "补差拣货单",
       total_quantity: `${pickQty} pcs`,
+      picked_item_summary: label.pickedItemSummary || "",
+      shortage_summary: label.shortageSummary || "",
       packing_list: label.packingList || "",
       dispatch_bale_no: barcodeValue,
       outbound_time: "",

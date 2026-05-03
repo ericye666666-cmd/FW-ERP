@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -15,6 +16,12 @@ spec.loader.exec_module(agent)
 
 
 class WindowsLocalPrintAgentTest(unittest.TestCase):
+    def _tspl_text_y_values(self, tspl):
+        return [int(match.group(1)) for match in re.finditer(r"^TEXT\s+\d+,(\d+),", tspl, re.MULTILINE)]
+
+    def _tspl_barcode_values(self, tspl):
+        return re.findall(r'^BARCODE\s+[^"]+"128"[^"]+"([^"]+)"', tspl, re.MULTILINE)
+
     def test_parse_windows_get_printer_json_returns_status_and_default(self):
         raw = json.dumps(
             [
@@ -168,7 +175,7 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
     def test_tspl_uses_type_prefixed_machine_codes_for_all_label_types(self):
         cases = [
             ("store_prep_bale_60x40", "warehouseout_bale", "SDB260429AAB", "2260429001", "SDB / STORE PREP BALE", {"category": "long dress", "item_count": 100, "store": "UTAWALA"}),
-            ("store_loose_pick_60x40", "warehouseout_bale", "LPK260429001", "3260429001", "LPK SHORTAGE PICK", {"transfer_order_no": "TO-001", "qty": 12, "category": "kids"}),
+            ("store_loose_pick_60x40", "warehouseout_bale", "LPK260429001", "3260429001", "LPK / SHORTAGE PICK", {"transfer_order_no": "TO-001", "qty": 12, "category": "kids"}),
             ("store_dispatch_60x40", "warehouseout_bale", "SDO260429002", "4260429002", "STORE DISPATCH / SDO", {"store": "UTAWALA", "request": "TO-001", "packages": 3, "packing_list": "SDB/LPK"}),
             ("store_item_60x40", "product", "STOREITEM260429001", "5260429001", "STORE ITEM", {"price": 150, "rack": "A-01", "category": "tops"}),
         ]
@@ -188,10 +195,120 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
                 self.assertIsNone(error)
                 tspl = agent._build_tspl_60x40_label(normalized["label_payload"], copies=1)
                 self.assertIn(title, tspl)
-                self.assertIn(f"Machine: {barcode_value}", tspl)
-                self.assertIn(f"Encoded: {barcode_value}", tspl)
+                if template_code in {"store_prep_bale_60x40", "store_loose_pick_60x40"}:
+                    self.assertIn(f"Code: {barcode_value}", tspl)
+                    self.assertNotIn(f"Machine: {barcode_value}", tspl)
+                    self.assertNotIn(f"Encoded: {barcode_value}", tspl)
+                else:
+                    self.assertIn(f"Machine: {barcode_value}", tspl)
+                    self.assertIn(f"Encoded: {barcode_value}", tspl)
                 self.assertIn(f'"{barcode_value}"', tspl)
                 self.assertNotIn(f'BARCODE 40,220,"128",80,1,0,2,2,"{display_code}"', tspl)
+
+    def test_tspl_sdb_and_lpk_labels_prioritize_subcategory_and_pick_summary(self):
+        sdb_payload = {
+            "display_code": "SDB260429AAB",
+            "machine_code": "2260429001",
+            "barcode_value": "2260429001",
+            "template_code": "store_prep_bale_60x40",
+            "category_main": "dress",
+            "category_sub": "long dress",
+            "qty": 120,
+            "grade": "A",
+            "store": "UTAWALA",
+            "source_reference": "RB260429XYZ",
+        }
+        sdb_tspl = agent._build_tspl_60x40_label(sdb_payload, copies=1)
+
+        self.assertIn("SDB / STORE PREP BALE", sdb_tspl)
+        self.assertIn("Store: UTAWALA", sdb_tspl)
+        self.assertIn("Cat: dress/long dress", sdb_tspl)
+        self.assertIn("Qty: 120", sdb_tspl)
+        self.assertIn("Grade: A", sdb_tspl)
+        self.assertIn("Display: SDB260429AAB", sdb_tspl)
+        self.assertIn("Code: 2260429001", sdb_tspl)
+        self.assertIn('"2260429001"', sdb_tspl)
+        self.assertNotIn('"SDB260429AAB"', sdb_tspl.split("BARCODE", 1)[1])
+
+        lpk_payload = {
+            "display_code": "LPK260429001",
+            "machine_code": "3260429001",
+            "barcode_value": "3260429001",
+            "template_code": "store_loose_pick_60x40",
+            "transfer_order_no": "TO-001",
+            "store": "UTAWALA",
+            "picked_item_summary": "dress/long dress x80; tops/lady tops x40; +1 more",
+            "shortage_summary": "dress/short dress x20",
+        }
+        lpk_tspl = agent._build_tspl_60x40_label(lpk_payload, copies=1)
+
+        self.assertIn("LPK / SHORTAGE PICK", lpk_tspl)
+        self.assertIn("Store: UTAWALA", lpk_tspl)
+        self.assertIn("Pick1: dress/long dress x80", lpk_tspl)
+        self.assertIn("Pick2: tops/lady tops x40 +1 more", lpk_tspl)
+        self.assertIn("Short: dress/short dress x20", lpk_tspl)
+        self.assertIn("Display: LPK260429001", lpk_tspl)
+        self.assertIn("Code: 3260429001", lpk_tspl)
+        self.assertIn('"3260429001"', lpk_tspl)
+        self.assertNotIn('"LPK260429001"', lpk_tspl.split("BARCODE", 1)[1])
+
+    def test_sdb_lpk_tspl_text_stays_clear_of_barcode_area(self):
+        cases = [
+            (
+                "SDB",
+                {
+                    "display_code": "SDB260429AAB",
+                    "machine_code": "2260429001",
+                    "barcode_value": "2260429001",
+                    "template_code": "store_prep_bale_60x40",
+                    "category_main": "dress",
+                    "category_sub": "long dress",
+                    "qty": 120,
+                    "grade": "A",
+                    "store": "UTAWALA",
+                    "source_reference": "RB260429XYZ",
+                },
+                "2260429001",
+                "SDB260429AAB",
+            ),
+            (
+                "LPK",
+                {
+                    "display_code": "LPK260429001",
+                    "machine_code": "3260429001",
+                    "barcode_value": "3260429001",
+                    "template_code": "store_loose_pick_60x40",
+                    "transfer_order_no": "TO-001",
+                    "store": "UTAWALA",
+                    "picked_item_summary": "dress/long dress x80; tops/lady tops x40; kids/skirt x10",
+                    "shortage_summary": "dress/short dress x20; shoes/sneaker x5",
+                },
+                "3260429001",
+                "LPK260429001",
+            ),
+        ]
+
+        for label_type, payload, machine_code, display_code in cases:
+            with self.subTest(label_type=label_type):
+                tspl = agent._build_tspl_60x40_label(payload, copies=1)
+                text_y_values = self._tspl_text_y_values(tspl)
+                barcode_values = self._tspl_barcode_values(tspl)
+
+                self.assertTrue(text_y_values)
+                self.assertLessEqual(max(text_y_values), 198)
+                self.assertNotIn(210, text_y_values)
+                self.assertNotIn("BAR 20,126,436,3", tspl)
+                self.assertEqual(barcode_values, [machine_code])
+                self.assertRegex(machine_code, r"^[1-5]\d{9}$")
+                self.assertNotIn(f'"{display_code}"', "\n".join(line for line in tspl.splitlines() if line.startswith("BARCODE")))
+
+        sdb_tspl = agent._build_tspl_60x40_label(cases[0][1], copies=1)
+        self.assertIn("Cat: dress/long dress", sdb_tspl)
+
+        lpk_tspl = agent._build_tspl_60x40_label(cases[1][1], copies=1)
+        self.assertIn("Pick1: dress/long dress x80", lpk_tspl)
+        self.assertIn("Pick2: tops/lady tops x40 +1 more", lpk_tspl)
+        self.assertIn("Short: dress/short dress x20", lpk_tspl)
 
     def test_print_label_request_rejects_display_code_as_barcode_value(self):
         _, error = agent._normalize_print_label_request(
