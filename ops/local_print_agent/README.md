@@ -278,6 +278,7 @@ Legacy `POST /print/html` is browser/HTML fallback only. On Windows, if a reques
 
 - `/health` does not open: the agent is not running, or another process owns port `8719`.
 - `/printers` does not list Deli: install the Deli DL-720C driver and confirm Windows can print a test page.
+- `/print/label` says the printer is not available: turn off **Use Printer Offline**, reconnect the Deli printer, clear paused/error jobs in the Windows queue, print a Windows test page, then retry in FW-ERP.
 - `/print/label` rejects barcode: confirm `barcode_value` is the numeric machine code, not RB/SDB/LPK/SDO/STOREITEM display code.
 - Paper feeds but layout is wrong: check the Deli driver paper size is configured as 60mm x 40mm.
 
