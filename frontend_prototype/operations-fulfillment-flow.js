@@ -59,8 +59,8 @@
   }
 
   function resolveCategoryPair(row) {
-    const directMain = normalizeText(row && row.category_main);
-    const directSub = normalizeText(row && row.category_sub);
+    const directMain = normalizeText(row && (row.category_main || row.categoryMain));
+    const directSub = normalizeText(row && (row.category_sub || row.categorySub));
     if (directMain || directSub) {
       return { categoryMain: directMain, categorySub: directSub };
     }
@@ -79,6 +79,164 @@
     const main = normalizeText(categoryMain);
     const sub = normalizeText(categorySub);
     return main && sub ? `${normalizeKey(main)}||${normalizeKey(sub)}` : "";
+  }
+
+  function normalizeIdentity(value) {
+    return normalizeText(value).replace(/\s+/g, "").toUpperCase();
+  }
+
+  function normalizeGrade(value) {
+    const normalized = normalizeText(value).toUpperCase();
+    if (["P", "S"].includes(normalized)) {
+      return normalized;
+    }
+    const match = normalized.match(/\b(P|S)\b/);
+    return match ? match[1] : "";
+  }
+
+  function getPreparedBaleCanonicalBarcode(row = {}) {
+    const candidates = [
+      row.baleBarcode,
+      row.bale_barcode,
+      row.displayCode,
+      row.display_code,
+      row.scanToken,
+      row.scan_token,
+      row.baleNo,
+      row.bale_no,
+    ].map(normalizeIdentity).filter(Boolean);
+    return candidates.find((value) => value.startsWith("SDB")) || candidates[0] || "";
+  }
+
+  function normalizePreparedBale(row = {}) {
+    const pair = resolveCategoryPair(row);
+    const baleNo = normalizeIdentity(row && (row.baleNo || row.bale_no));
+    const displayCode = getPreparedBaleCanonicalBarcode(row);
+    const machineCode = normalizeIdentity(row && (row.machineCode || row.machine_code || row.barcodeValue || row.barcode_value));
+    const barcodeValue = normalizeIdentity(row && (row.barcodeValue || row.barcode_value || row.machineCode || row.machine_code));
+    const scanToken = normalizeIdentity(row && (row.scanToken || row.scan_token));
+    const humanReadable = normalizeIdentity(row && (row.humanReadable || row.human_readable));
+    const grade = normalizeGrade(row && (row.grade || row.gradeSummary || row.grade_summary || row.ratio_label || row.ratioSummary || row.ratio_summary));
+    const qty = Number(row && (row.qty ?? row.item_count ?? row.pieces_per_bale ?? row.package_qty) || 0);
+    return {
+      ...row,
+      baleNo,
+      baleBarcode: displayCode,
+      displayCode,
+      scanToken,
+      machineCode,
+      barcodeValue,
+      humanReadable,
+      categoryMain: pair.categoryMain,
+      categorySub: pair.categorySub,
+      grade,
+      qty,
+      rackCode: normalizeText(row && (row.rackCode || row.rack_code)).toUpperCase(),
+      status: normalizeText(row && row.status).toLowerCase(),
+      taskType: normalizeText(row && (row.taskType || row.task_type)).toLowerCase(),
+      updatedAt: normalizeText(row && (row.updatedAt || row.updated_at)),
+      identityValues: [
+        baleNo,
+        displayCode,
+        scanToken,
+        machineCode,
+        barcodeValue,
+        humanReadable,
+        normalizeIdentity(row && row.display_code),
+        normalizeIdentity(row && row.bale_barcode),
+        normalizeIdentity(row && row.scan_token),
+      ].filter(Boolean),
+    };
+  }
+
+  function isPreparedBaleAvailableForDispatch(row = {}) {
+    const taskType = normalizeKey(row.taskType || row.task_type);
+    if (taskType && !["store_dispatch", "dispatch", "store_prep_bale"].includes(taskType)) {
+      return false;
+    }
+    const status = normalizeKey(row.status);
+    return !status || ["waiting_store_dispatch", "ready_dispatch", "completed"].includes(status);
+  }
+
+  function getPreparedBaleOccupancyReference(row = {}, currentTransferNo = "") {
+    const current = normalizeIdentity(currentTransferNo);
+    const fields = [
+      row.occupied_by_transfer_no,
+      row.occupiedByTransferNo,
+      row.bound_transfer_no,
+      row.transfer_no,
+      row.store_delivery_execution_order_no,
+      row.sdo_no,
+      row.occupied_by_sdo_no,
+      row.official_delivery_barcode,
+      row.delivery_batch_no,
+    ];
+    for (const value of fields) {
+      const normalized = normalizeIdentity(value);
+      if (normalized && normalized !== current) {
+        return normalized;
+      }
+    }
+    const status = normalizeKey(row.status);
+    if (["in_transit", "shipped", "received", "assigned", "sold", "closed", "cancelled"].includes(status)) {
+      return status;
+    }
+    return "";
+  }
+
+  function doesPreparedBaleMatchDemand(row = {}, demand = {}) {
+    const candidate = normalizePreparedBale(row);
+    const categoryMatches = buildCategoryKey(candidate.categoryMain, candidate.categorySub)
+      === buildCategoryKey(demand.category_main || demand.categoryMain, demand.category_sub || demand.categorySub);
+    if (!categoryMatches) {
+      return false;
+    }
+    const requiredGrade = normalizeGrade(demand.grade || demand.grade_summary || demand.gradeSummary);
+    return !requiredGrade || candidate.grade === requiredGrade;
+  }
+
+  function getPreparedDemandQtySpecs(plan = {}, demand = {}) {
+    const directSpecs = [
+      demand.package_qty,
+      demand.packageQty,
+      demand.pieces_per_bale,
+      demand.piecesPerBale,
+    ].map((value) => Number(value || 0)).filter((value) => value > 0);
+    const preparedSpecs = (Array.isArray(plan?.preparedPickRows) ? plan.preparedPickRows : [])
+      .filter((row) => doesPreparedBaleMatchDemand(row, demand))
+      .map((row) => Number(row?.qty || 0))
+      .filter((value) => value > 0);
+    return new Set([...directSpecs, ...preparedSpecs]);
+  }
+
+  function doesPreparedBaleMatchQuantitySpec(plan = {}, candidate = {}, demand = {}) {
+    const specs = getPreparedDemandQtySpecs(plan, demand);
+    if (!specs.size) {
+      return true;
+    }
+    return specs.has(Number(candidate?.qty || 0));
+  }
+
+  function findPreparedBaleByBarcode(rows = [], barcode = "") {
+    const normalizedBarcode = normalizeIdentity(barcode);
+    if (!normalizedBarcode) {
+      return null;
+    }
+    return (Array.isArray(rows) ? rows : [])
+      .map((row) => normalizePreparedBale(row))
+      .find((row) => row.identityValues.includes(normalizedBarcode)) || null;
+  }
+
+  function getPreparedDemandRows(plan = {}) {
+    if (Array.isArray(plan?.demandLines) && plan.demandLines.length) {
+      return plan.demandLines;
+    }
+    return Array.isArray(plan?.categoryCards) ? plan.categoryCards.map((row) => ({
+      category_main: row.categoryMain,
+      category_sub: row.categorySub,
+      grade: row.grade,
+      requested_qty: row.requestedQty,
+    })) : [];
   }
 
   function buildLooseInventoryMap(rows) {
@@ -114,24 +272,17 @@
   function buildPreparedBaleMap(rows) {
     const grouped = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
-      const taskType = normalizeKey(row && row.task_type);
-      if (taskType === "sale") {
+      const candidate = normalizePreparedBale(row);
+      if (!isPreparedBaleAvailableForDispatch(candidate)) {
         return;
       }
-      const pair = resolveCategoryPair(row);
-      const key = buildCategoryKey(pair.categoryMain, pair.categorySub);
-      const qty = Number(row && row.qty || 0);
-      if (!key || qty <= 0) {
+      const key = buildCategoryKey(candidate.categoryMain, candidate.categorySub);
+      if (!key || candidate.qty <= 0) {
         return;
       }
       const current = grouped.get(key) || [];
       current.push({
-        baleNo: normalizeText(row && row.bale_no).toUpperCase(),
-        baleBarcode: normalizeText(row && (row.bale_barcode || row.scan_token)).toUpperCase(),
-        qty,
-        rackCode: normalizeText(row && row.rack_code).toUpperCase(),
-        status: normalizeText(row && row.status),
-        updatedAt: normalizeText(row && row.updated_at),
+        ...candidate,
       });
       grouped.set(key, current);
     });
@@ -228,10 +379,12 @@
       const current = grouped.get(key) || {
         category_main,
         category_sub,
-        grade,
         requested_qty: 0,
         source_count: 0,
       };
+      if (grade) {
+        current.grade = grade;
+      }
       current.requested_qty += requested_qty;
       current.source_count += 1;
       grouped.set(key, current);
@@ -394,9 +547,10 @@
     const categoryCards = normalizedDemandLines.map((row) => {
       const categoryMain = normalizeText(row && row.category_main);
       const categorySub = normalizeText(row && row.category_sub);
+      const grade = normalizeGrade(row && row.grade);
       const requestedQty = Number(row && row.requested_qty || 0);
       const key = buildCategoryKey(categoryMain, categorySub);
-      const preparedRows = [...(preparedMap.get(key) || [])];
+      const preparedRows = [...(preparedMap.get(key) || [])].filter((bale) => !grade || normalizeGrade(bale.grade) === grade);
       const selectedPreparedBales = [];
       let remainingQty = requestedQty;
       preparedRows.forEach((bale) => {
@@ -436,6 +590,7 @@
       return {
         categoryMain,
         categorySub,
+        grade,
         requestedQty,
         requested_qty: requestedQty,
         preparedQty,
@@ -465,11 +620,18 @@
       row.selectedPreparedBales.map((bale) => ({
         categoryMain: row.categoryMain,
         categorySub: row.categorySub,
+        grade: row.grade,
         sourceType: "prepared",
         baleNo: bale.baleNo,
         baleBarcode: bale.baleBarcode,
+        scanToken: bale.scanToken,
+        displayCode: bale.displayCode,
+        machineCode: bale.machineCode,
+        barcodeValue: bale.barcodeValue,
+        humanReadable: bale.humanReadable,
         qty: bale.qty,
         rackCode: bale.rackCode,
+        status: bale.status,
       })),
     );
     const loosePickRows = categoryCards.flatMap((row) =>
@@ -522,6 +684,20 @@
     ];
     return {
       demandLineCount: categoryCards.length,
+      demandLines: normalizedDemandLines,
+      availablePreparedBales: (Array.isArray(preparedBales) ? preparedBales : [])
+        .map((row) => normalizePreparedBale(row))
+        .filter((row) => row.qty > 0 && isPreparedBaleAvailableForDispatch(row)),
+      matchingAvailablePreparedBales: (Array.isArray(preparedBales) ? preparedBales : [])
+        .map((row) => normalizePreparedBale(row))
+        .filter((candidate) =>
+          candidate.qty > 0
+          && isPreparedBaleAvailableForDispatch(candidate)
+          && normalizedDemandLines.some((line) =>
+            doesPreparedBaleMatchDemand(candidate, line)
+            && doesPreparedBaleMatchQuantitySpec({ preparedPickRows }, candidate, line)
+          )
+        ),
       categoryCards,
       preparedPickRows,
       loosePickRows,
@@ -894,15 +1070,19 @@
       grade: `PKG<${packageLimitQty}`,
       qty: String(Math.max(0, pickQty)),
       weight: "",
-      code: normalizeText(label.barcodeValue || label.taskNo).toUpperCase(),
+      code: barcodeValue,
     };
   }
 
   function buildTransferDispatchRows({
     plan = {},
     looseTasks = [],
+    foundPreparedBarcodes = [],
   } = {}) {
-    const preparedRows = Array.isArray(plan?.preparedPickRows) ? plan.preparedPickRows : [];
+    const foundPreparedRows = getFoundPreparedBaleRows(plan, foundPreparedBarcodes);
+    const preparedRows = foundPreparedRows.length
+      ? foundPreparedRows
+      : (Array.isArray(plan?.preparedPickRows) ? plan.preparedPickRows : []);
     const looseRows = Array.isArray(plan?.loosePickRows) ? plan.loosePickRows : [];
     const dispatchRows = preparedRows.map((row) => ({
       ...row,
@@ -915,7 +1095,7 @@
         normalizeText(task?.taskType).toLowerCase() === "loose_pick_sheet"
         || normalizeText(task?.taskNo).toUpperCase().includes("-PICK")
       ) || {};
-      const taskBarcode = normalizeText(looseTask?.taskBarcode || looseTask?.taskNo).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      const taskBarcode = normalizeText(looseTask?.printableBarcode || looseTask?.taskBarcode || looseTask?.taskNo).replace(/[^A-Za-z0-9]/g, "").toUpperCase();
       dispatchRows.push({
         categoryMain: "多类目补差",
         categorySub: `${looseRows.length} 个类目`,
@@ -940,9 +1120,10 @@
     result = {},
     plan = {},
     looseTasks = [],
+    foundPreparedBarcodes = [],
   } = {}) {
     const resultRows = Array.isArray(result?.store_dispatch_bales) ? result.store_dispatch_bales : [];
-    const dispatchRows = buildTransferDispatchRows({ plan, looseTasks });
+    const dispatchRows = buildTransferDispatchRows({ plan, looseTasks, foundPreparedBarcodes });
     if (!dispatchRows.length) {
       return resultRows;
     }
@@ -1054,15 +1235,65 @@
   }
 
   function getPreparedPickCanonicalKey(row = {}) {
-    return normalizeText(row?.baleBarcode || row?.baleNo).toUpperCase();
+    return getPreparedBaleCanonicalBarcode(row);
+  }
+
+  function getPreparedBaleSpecLabel(row = {}) {
+    const candidate = normalizePreparedBale(row);
+    return `${candidate.categoryMain || "-"} / ${candidate.categorySub || "-"} / ${candidate.grade || "mixed"} / ${candidate.qty || 0} 件`;
+  }
+
+  function getPreparedScanCandidateRows(plan = {}) {
+    const rowsByKey = new Map();
+    [
+      ...(Array.isArray(plan?.availablePreparedBales) ? plan.availablePreparedBales : []),
+      ...(Array.isArray(plan?.matchingAvailablePreparedBales) ? plan.matchingAvailablePreparedBales : []),
+      ...(Array.isArray(plan?.preparedPickRows) ? plan.preparedPickRows : []),
+    ].forEach((row) => {
+      const candidate = normalizePreparedBale(row);
+      const key = getPreparedPickCanonicalKey(candidate);
+      if (key) {
+        rowsByKey.set(key, candidate);
+      }
+    });
+    return Array.from(rowsByKey.values());
+  }
+
+  function getFoundPreparedBaleRows(plan = {}, foundPreparedBarcodes = []) {
+    const candidates = getPreparedScanCandidateRows(plan);
+    return (Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : [])
+      .map((barcode) => findPreparedBaleByBarcode(candidates, barcode))
+      .filter(Boolean);
+  }
+
+  function getDemandFulfilledQty(plan = {}, demand = {}, foundPreparedBarcodes = []) {
+    return getFoundPreparedBaleRows(plan, foundPreparedBarcodes)
+      .filter((row) => doesPreparedBaleMatchDemand(row, demand))
+      .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+  }
+
+  function findMatchingUnmetPreparedDemand(plan = {}, candidate = {}, foundPreparedBarcodes = []) {
+    const demandRows = getPreparedDemandRows(plan);
+    return demandRows.find((demand) => {
+      if (!doesPreparedBaleMatchDemand(candidate, demand)) {
+        return false;
+      }
+      if (!doesPreparedBaleMatchQuantitySpec(plan, candidate, demand)) {
+        return false;
+      }
+      const requestedQty = Number(demand.requested_qty ?? demand.requestedQty ?? 0);
+      const fulfilledQty = getDemandFulfilledQty(plan, demand, foundPreparedBarcodes);
+      return requestedQty > fulfilledQty && Number(candidate.qty || 0) <= requestedQty - fulfilledQty;
+    }) || null;
   }
 
   function registerPreparedBaleScan({
     plan = {},
     foundPreparedBarcodes = [],
     barcode = "",
+    transferNo = "",
   } = {}) {
-    const normalizedBarcode = normalizeText(barcode).toUpperCase();
+    const normalizedBarcode = normalizeIdentity(barcode);
     if (!normalizedBarcode) {
       return {
         ok: false,
@@ -1071,28 +1302,60 @@
       };
     }
     const preparedRows = Array.isArray(plan?.preparedPickRows) ? plan.preparedPickRows : [];
-    const matchedRow = preparedRows.find((row) => {
-      const barcodeKey = normalizeText(row?.baleBarcode).toUpperCase();
-      const baleNoKey = normalizeText(row?.baleNo).toUpperCase();
-      return normalizedBarcode === barcodeKey || normalizedBarcode === baleNoKey;
-    });
+    const candidateRows = getPreparedScanCandidateRows(plan);
+    const matchedRow = findPreparedBaleByBarcode(candidateRows, normalizedBarcode);
     if (!matchedRow) {
       return {
         ok: false,
-        error: "这包不在当前调拨单的现成待送店包裹清单里。",
+        error: "未找到这个 SDB，请确认是否已经完成压缩、打印并贴标。",
+        foundPreparedBarcodes: Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : [],
+      };
+    }
+    const occupiedBy = getPreparedBaleOccupancyReference(matchedRow, transferNo);
+    if (occupiedBy) {
+      return {
+        ok: false,
+        error: "该 SDB 已被其他调拨单或送货执行单占用，不能加入本单。",
+        matchedRow,
         foundPreparedBarcodes: Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : [],
       };
     }
     const canonicalKey = getPreparedPickCanonicalKey(matchedRow);
-    const current = new Set((Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : []).map((item) => normalizeText(item).toUpperCase()).filter(Boolean));
+    const current = new Set((Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : []).map((item) => normalizeIdentity(item)).filter(Boolean));
     const duplicate = current.has(canonicalKey);
+    if (duplicate) {
+      return {
+        ok: true,
+        duplicate: true,
+        matchedRow,
+        canonicalBarcode: canonicalKey,
+        message: "该 SDB 已经在本单现成包清单中。",
+        foundPreparedBarcodes: Array.from(current),
+      };
+    }
+    const preselectedKeys = new Set(preparedRows.map((row) => getPreparedPickCanonicalKey(row)).filter(Boolean));
+    const matchingDemand = findMatchingUnmetPreparedDemand(plan, matchedRow, foundPreparedBarcodes);
+    if (!matchingDemand) {
+      return {
+        ok: false,
+        error: `该 SDB 是 ${getPreparedBaleSpecLabel(matchedRow)}，但当前调拨单不需要这个型号或该型号数量已满足。`,
+        matchedRow,
+        foundPreparedBarcodes: Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : [],
+      };
+    }
+    const addedByDemandMatch = !preselectedKeys.has(canonicalKey);
     if (!duplicate) {
       current.add(canonicalKey);
     }
     return {
       ok: true,
-      duplicate,
+      duplicate: false,
+      addedByDemandMatch,
       matchedRow,
+      canonicalBarcode: canonicalKey,
+      message: addedByDemandMatch
+        ? "该 SDB 符合当前调拨需求，已加入本单现成包清单。"
+        : "该 SDB 已经在本单现成包清单中。",
       foundPreparedBarcodes: Array.from(current),
     };
   }
@@ -1129,9 +1392,13 @@
   } = {}) {
     const preparedRows = Array.isArray(plan?.preparedPickRows) ? plan.preparedPickRows : [];
     const looseRows = Array.isArray(plan?.loosePickRows) ? plan.loosePickRows : [];
-    const foundSet = new Set((Array.isArray(foundPreparedBarcodes) ? foundPreparedBarcodes : []).map((item) => normalizeText(item).toUpperCase()).filter(Boolean));
-    const requiredPreparedKeys = preparedRows.map((row) => getPreparedPickCanonicalKey(row)).filter(Boolean);
-    const foundPreparedCount = requiredPreparedKeys.filter((key) => foundSet.has(key)).length;
+    const demandRows = getPreparedDemandRows(plan);
+    const matchingFoundPreparedRows = getFoundPreparedBaleRows(plan, foundPreparedBarcodes)
+      .filter((row) => demandRows.some((demand) =>
+        doesPreparedBaleMatchDemand(row, demand)
+        && doesPreparedBaleMatchQuantitySpec(plan, row, demand)
+      ));
+    const foundPreparedCount = Math.min(preparedRows.length, matchingFoundPreparedRows.length);
     const requiredLooseTasks = Array.isArray(looseTasks) ? looseTasks : [];
     const requiredLooseTaskCount = looseRows.length ? (requiredLooseTasks.length || 1) : 0;
     const completedLooseTaskCount = requiredLooseTasks.filter((row) =>

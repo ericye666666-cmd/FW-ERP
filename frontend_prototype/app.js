@@ -11725,7 +11725,11 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
     ? `仓库核对尚未完成：现成待送店包 ${readiness.foundPreparedCount || 0}/${readiness.requiredPreparedCount || 0}，补差工单 ${readiness.completedLooseTaskCount || 0}/${readiness.requiredLooseTaskCount || 0}。`
     : "仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。";
   const dispatchRows = typeof operationsFulfillmentFlow.buildTransferDispatchRows === "function"
-    ? operationsFulfillmentFlow.buildTransferDispatchRows({ plan, looseTasks: executionRecord.looseTasks })
+    ? operationsFulfillmentFlow.buildTransferDispatchRows({
+      plan,
+      looseTasks: executionRecord.looseTasks,
+      foundPreparedBarcodes: executionRecord.foundPreparedBarcodes,
+    })
     : plan.finalDispatchRows;
   const looseDispatchRows = dispatchRows.filter((row) => row.finalType === "loose_pick_sheet_dispatch");
   setInputValue("#preparedBaleRegistrationForm [name='transfer_no']", transfer.transfer_no);
@@ -11737,6 +11741,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   summaryTarget.innerHTML = `
     <div class="alert-banner">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
     <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
+    <div class="subtle small">可扫描任意符合本单型号和数量要求的可用 SDB，不要求必须是预先指定包号。</div>
     <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(transfer.from_warehouse_code || "-")}</span></article>
@@ -11758,29 +11763,64 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>已扫码登记</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} 包</span></article>
       <article class="store-metric"><strong>还差</strong><span>${escapeHtml(readiness.pendingPreparedCount || 0)} 包</span></article>
     </div>
-    <div class="subtle small">扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。</div>
+    <div class="subtle small">扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。可扫描任意符合本单型号和数量要求的可用 SDB。</div>
   `;
-  if (plan.preparedPickRows.length) {
+  const getPreparedCardKey = (row = {}) => String(
+    row.baleBarcode || row.displayCode || row.scanToken || row.baleNo || row.humanReadable || "",
+  ).trim().toUpperCase();
+  const foundPreparedSet = new Set((executionRecord.foundPreparedBarcodes || [])
+    .map((item) => String(item || "").trim().toUpperCase())
+    .filter(Boolean));
+  const preselectedPreparedSet = new Set((plan.preparedPickRows || [])
+    .map((row) => getPreparedCardKey(row))
+    .filter(Boolean));
+  const visiblePreparedRowsByKey = new Map();
+  [
+    ...(Array.isArray(plan.preparedPickRows) ? plan.preparedPickRows : []),
+    ...(Array.isArray(plan.matchingAvailablePreparedBales) ? plan.matchingAvailablePreparedBales : []),
+  ].forEach((row) => {
+    const key = getPreparedCardKey(row);
+    if (key && !visiblePreparedRowsByKey.has(key)) {
+      visiblePreparedRowsByKey.set(key, row);
+    }
+  });
+  const visiblePreparedRows = Array.from(visiblePreparedRowsByKey.entries())
+    .map(([canonicalKey, row]) => ({
+      ...row,
+      canonicalKey,
+      isFound: foundPreparedSet.has(canonicalKey),
+      isPreselected: preselectedPreparedSet.has(canonicalKey),
+    }))
+    .sort((left, right) => {
+      if (left.isFound !== right.isFound) {
+        return left.isFound ? -1 : 1;
+      }
+      if (left.isPreselected !== right.isPreselected) {
+        return left.isPreselected ? -1 : 1;
+      }
+      return String(left.canonicalKey || "").localeCompare(String(right.canonicalKey || ""));
+    });
+  if (visiblePreparedRows.length) {
     preparedTarget.className = "candidate-list transfer-draft-list";
-    preparedTarget.innerHTML = plan.preparedPickRows
+    preparedTarget.innerHTML = visiblePreparedRows
       .map((row) => {
-        const canonicalKey = String(row.baleBarcode || row.baleNo || "").trim().toUpperCase();
-        const found = executionRecord.foundPreparedBarcodes
-          .map((item) => String(item || "").trim().toUpperCase())
-          .includes(canonicalKey);
+        const found = Boolean(row.isFound);
+        const statusLabel = found ? "已扫码登记" : (row.isPreselected ? "已选 / 待扫码 SDB" : "可用匹配 SDB");
+        const displayCode = row.baleBarcode || row.displayCode || row.baleNo || row.scanToken || "-";
         return `
         <article class="candidate-row transfer-draft-row">
           <div>
-            <strong>${escapeHtml(row.baleBarcode || row.baleNo || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${row.categoryMain || "-"} / ${row.categorySub || "-"} · ${row.qty || 0} 件`)}</div>
+            <strong>${escapeHtml(displayCode)}</strong>
+            <div class="subtle small">${escapeHtml(`${row.categoryMain || "-"} / ${row.categorySub || "-"}${row.grade ? ` / ${row.grade}` : ""} · ${row.qty || 0} 件`)}</div>
             <div class="meta-row">
               <span class="meta-pill">现成待送店包裹</span>
               ${row.rackCode ? `<span class="meta-pill">库位 ${escapeHtml(row.rackCode)}</span>` : ""}
-              <span class="meta-pill">${escapeHtml(found ? "已扫码登记" : "待扫码登记")}</span>
+              ${row.machineCode || row.barcodeValue ? `<span class="meta-pill">machine_code ${escapeHtml(row.machineCode || row.barcodeValue)}</span>` : ""}
+              <span class="meta-pill">${escapeHtml(statusLabel)}</span>
             </div>
           </div>
           <div class="candidate-side-actions">
-            <span class="store-flag">${escapeHtml(found ? "已并入本次送店" : "优先找货")}</span>
+            <span class="store-flag">${escapeHtml(found ? "已并入本次送店" : "可扫码加入")}</span>
           </div>
         </article>
       `;
@@ -11788,7 +11828,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       .join("");
   } else {
     preparedTarget.className = "candidate-summary empty-state";
-    preparedTarget.textContent = "这单没有可直接并入的现成待送店包裹，仓库会直接走散货补差拣货单。";
+    preparedTarget.textContent = "这单没有可直接并入的可用匹配 SDB，仓库会直接走散货补差拣货单。";
   }
   looseProgressTarget.className = "report-summary";
   looseProgressTarget.innerHTML = `
@@ -31412,6 +31452,7 @@ async function submitPreparedBaleRegistration(event) {
       plan,
       foundPreparedBarcodes: executionRecord.foundPreparedBarcodes,
       barcode,
+      transferNo,
     })
     : { ok: false, error: "现成包扫码登记能力还没加载。", foundPreparedBarcodes: executionRecord.foundPreparedBarcodes };
   if (!scanResult.ok) {
@@ -31427,8 +31468,10 @@ async function submitPreparedBaleRegistration(event) {
   activeTransferPreparationNo = transferNo;
   writeOutput("#preparedBaleRegistrationOutput", {
     transfer_no: transferNo,
-    barcode,
+    scanned_barcode: barcode,
+    canonical_barcode: scanResult.canonicalBarcode || barcode,
     duplicate: scanResult.duplicate,
+    message: scanResult.message || "",
     matched_row: scanResult.matchedRow || null,
   });
   renderReplenishmentFlowSummary(transfer);
@@ -31441,9 +31484,9 @@ async function submitPreparedBaleRegistration(event) {
   }
   showTransientInlineNotice(
     "#preparedBaleRegistrationNotice",
-    scanResult.duplicate
-      ? `${barcode} 之前已经登记过，保留当前状态。`
-      : `已登记 ${barcode}，可以继续找下一包现成包。`,
+    scanResult.message || (scanResult.duplicate
+      ? `${scanResult.canonicalBarcode || barcode} 之前已经登记过，保留当前状态。`
+      : `已登记 ${scanResult.canonicalBarcode || barcode}，可以继续找下一包现成包。`),
     "success",
     2200,
   );
@@ -31675,6 +31718,7 @@ async function submitTransferBundle(event) {
       result,
       plan,
       looseTasks: executionRecord.looseTasks,
+      foundPreparedBarcodes: executionRecord.foundPreparedBarcodes,
     })
     : result.store_dispatch_bales;
   const storeDeliveryExecutionOrder = await request(`/transfers/${transferNo}/store-delivery-execution-orders`, {

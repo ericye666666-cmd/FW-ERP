@@ -18,7 +18,16 @@ const {
   updateLoosePackingTaskStatus,
   normalizeTransferForOperationsFulfillment,
   summarizeOperationsFulfillment,
-} = require("../operations-fulfillment-flow.js");
+} = (() => {
+  const filename = path.join(__dirname, "../operations-fulfillment-flow.js");
+  const localModule = { exports: {} };
+  Function("module", "exports", "globalThis", `${fs.readFileSync(filename, "utf8")}\n//# sourceURL=${filename}`)(
+    localModule,
+    localModule.exports,
+    globalThis,
+  );
+  return localModule.exports;
+})();
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
@@ -146,6 +155,198 @@ test("buildTransferPreparationPlan prefers waiting-store-dispatch bales before l
       },
     ],
   );
+});
+
+test("warehouse execution accepts any available matching SDB scanned by machine code", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "pants", category_sub: "jeans pant", grade: "P", requested_qty: 100 },
+    ],
+    preparedBales: [
+      {
+        bale_no: "SPB-20260503-006",
+        bale_barcode: "SDB260503AAG",
+        scan_token: "SDB260503AAG",
+        display_code: "SDB260503AAG",
+        machine_code: "2260503006",
+        barcode_value: "2260503006",
+        human_readable: "2260503006",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "jeans pant",
+        grade_summary: "P",
+        qty: 100,
+      },
+    ],
+  });
+
+  const result = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: [],
+    barcode: "2260503006",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.duplicate, false);
+  assert.equal(result.addedByDemandMatch, false);
+  assert.equal(result.canonicalBarcode, "SDB260503AAG");
+  assert.equal(result.matchedRow.baleBarcode, "SDB260503AAG");
+  assert.equal(result.matchedRow.machineCode, "2260503006");
+  assert.deepEqual(result.foundPreparedBarcodes, ["SDB260503AAG"]);
+  assert.match(result.message, /已经在本单现成包清单中/);
+});
+
+test("warehouse execution can dynamically add an available matching SDB that was not preselected", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "pants", category_sub: "jeans pant", grade: "P", requested_qty: 100 },
+    ],
+    preparedBales: [
+      {
+        bale_no: "SPB-20260503-001",
+        bale_barcode: "SDB260503AAA",
+        machine_code: "2260503001",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "jeans pant",
+        grade_summary: "P",
+        qty: 100,
+      },
+      {
+        bale_no: "SPB-20260503-006",
+        bale_barcode: "SDB260503AAG",
+        scan_token: "SDB260503AAG",
+        display_code: "SDB260503AAG",
+        machine_code: "2260503006",
+        barcode_value: "2260503006",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "jeans pant",
+        grade_summary: "P",
+        qty: 100,
+      },
+    ],
+  });
+
+  const result = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: [],
+    barcode: "SDB260503AAG",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.addedByDemandMatch, true);
+  assert.equal(result.canonicalBarcode, "SDB260503AAG");
+  assert.deepEqual(result.foundPreparedBarcodes, ["SDB260503AAG"]);
+  assert.match(result.message, /符合当前调拨需求，已加入本单现成包清单/);
+
+  const readiness = summarizeTransferExecutionReadiness({
+    plan,
+    foundPreparedBarcodes: result.foundPreparedBarcodes,
+    looseTasks: [],
+  });
+  assert.equal(readiness.canPrint, true);
+  assert.equal(readiness.pendingPreparedCount, 0);
+});
+
+test("warehouse execution rejects duplicate, mismatched, occupied, and missing SDB scans with specific messages", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "pants", category_sub: "jeans pant", grade: "P", requested_qty: 100 },
+    ],
+    preparedBales: [
+      {
+        bale_no: "SPB-MATCH",
+        bale_barcode: "SDB260503AAG",
+        machine_code: "2260503006",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "jeans pant",
+        grade_summary: "P",
+        qty: 100,
+      },
+      {
+        bale_no: "SPB-WRONG",
+        bale_barcode: "SDB260503AAH",
+        machine_code: "2260503007",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "tops",
+        category_sub: "lady tops",
+        grade_summary: "S",
+        qty: 100,
+      },
+      {
+        bale_no: "SPB-WRONG-QTY",
+        bale_barcode: "SDB260503AAK",
+        machine_code: "2260503009",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "jeans pant",
+        grade_summary: "P",
+        qty: 50,
+      },
+      {
+        bale_no: "SPB-OCCUPIED",
+        bale_barcode: "SDB260503AAJ",
+        machine_code: "2260503008",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        occupied_by_transfer_no: "TO-OTHER",
+        category_main: "pants",
+        category_sub: "jeans pant",
+        grade_summary: "P",
+        qty: 100,
+      },
+    ],
+  });
+
+  const duplicate = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: ["SDB260503AAG"],
+    barcode: "2260503006",
+  });
+  assert.equal(duplicate.ok, true);
+  assert.equal(duplicate.duplicate, true);
+  assert.match(duplicate.message, /已经在本单现成包清单中/);
+  assert.deepEqual(duplicate.foundPreparedBarcodes, ["SDB260503AAG"]);
+
+  const mismatch = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: [],
+    barcode: "2260503007",
+  });
+  assert.equal(mismatch.ok, false);
+  assert.match(mismatch.error, /该 SDB 是 tops \/ lady tops \/ S \/ 100 件，但当前调拨单不需要这个型号或该型号数量已满足。/);
+
+  const quantityMismatch = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: [],
+    barcode: "2260503009",
+  });
+  assert.equal(quantityMismatch.ok, false);
+  assert.match(quantityMismatch.error, /该 SDB 是 pants \/ jeans pant \/ P \/ 50 件，但当前调拨单不需要这个型号或该型号数量已满足。/);
+
+  const occupied = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: [],
+    barcode: "2260503008",
+  });
+  assert.equal(occupied.ok, false);
+  assert.match(occupied.error, /已被其他调拨单或送货执行单占用/);
+
+  const missing = registerPreparedBaleScan({
+    plan,
+    foundPreparedBarcodes: [],
+    barcode: "2260599999",
+  });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /未找到这个 SDB，请确认是否已经完成压缩、打印并贴标。/);
 });
 
 test("interpretTransferExecutionError explains why transfer locking still shows available zero", () => {
@@ -864,6 +1065,7 @@ test("phase 2B page 6 copy clarifies warehouse verification and warehouse-only b
   assert.match(indexHtml, /这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。/);
   assert.match(indexHtml, /通道 A：现成待送店包核对/);
   assert.match(indexHtml, /扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。/);
+  assert.match(appJs, /可扫描任意符合本单型号和数量要求的可用 SDB，不要求必须是预先指定包号。/);
   assert.match(indexHtml, /通道 B：补差包核对/);
   assert.match(indexHtml, /LPK 是仓库补差拣货工单码。补差完成后形成仓库内部补差包，用于本单后续送货执行。/);
   assert.match(indexHtml, /通道 C：正式门店送货执行单/);
@@ -921,36 +1123,39 @@ test("phase 2C page 6.1 summary cards and per-store grouping copy are present", 
   assert.match(appJs, /当前还没有多个仓库执行单可加入同一配送批次。Phase 2C 先建立配送批次视图；正式多单绑定将在后续执行单模型完善后接入。/);
 });
 
-test("page 6 to 6.1 carries current transfer and shipment draft uses real SDO package counts", () => {
-  assert.match(indexHtml, /id="transferShipLinkedOrdersSummary"/);
-  assert.match(indexHtml, /id="addTransferShipRowButton"[\s\S]*添加调拨单 \/ 加一行/);
+test("page 6.1 shipment draft uses current SDO package counts", () => {
+  assert.match(indexHtml, /id="transferShipForm"/);
+  assert.match(indexHtml, /id="transferShipTargetHint"/);
+  assert.match(indexHtml, /id="transferTrackingResultSummary"/);
+  assert.match(indexHtml, /id="transferShipWaveSummary"/);
+  assert.match(indexHtml, /id="transferDispatchSummary"/);
   assert.match(appJs, /function getTransferShipmentPackageCount/);
   assert.match(
     appJs,
     /store_delivery_execution_order\?\.packages[\s\S]*display_store_dispatch_bales[\s\S]*store_dispatch_bales[\s\S]*delivery_batch\?\.bale_count[\s\S]*dispatch_bale_count/,
   );
   assert.match(appJs, /getTransferShipmentPackageCount\(row\)/);
-  assert.match(appJs, /function openTransferShipmentPanelForTransfer/);
-  assert.match(appJs, /data-transfer-ship-fill="\$\{escapeHtml\(action\.transferShipNo\)\}"/);
-  assert.match(appJs, /ensureTransferShipmentDraftRows\(transferNo\)/);
-  assert.match(appJs, /function renderTransferShipmentDraftSummary/);
+  assert.match(appJs, /function renderTransferShipTargetHint/);
+  assert.match(appJs, /function loadTransferShipTargetHint/);
+  assert.match(appJs, /data-transfer-ship-fill="\$\{escapeHtml\(row\.transfer_no \|\| ""\)\}"/);
+  assert.match(appJs, /function populateTransferOrderSelectors/);
+  assert.match(appJs, /#transferShipForm \[name='transfer_no'\]/);
   assert.match(appJs, /涉及门店数/);
   assert.match(appJs, /总包数/);
   assert.match(appJs, /总件数/);
-  assert.match(appJs, /stops \/ 路线/);
-  assert.match(appJs, /data-transfer-ship-row-select/);
-  assert.match(appJs, /data-transfer-ship-row-remove/);
+  assert.match(indexHtml, /路线 \/ 站点/);
+  assert.match(appJs, /#transferShipForm/);
 });
 
 
-test("warehouse access profiles follow the approved six warehouse menu groups", () => {
-  assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "general", "china", "admin"\]/);
+test("warehouse access profiles follow the current warehouse menu groups", () => {
+  assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "baleSales", "general"\]/);
   assert.match(
     appJs,
-    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder", "replenishment", "general", "china", "admin"\]/,
+    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["overview", "warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder", "replenishment", "baleSales", "general"\]/,
   );
   assert.match(
     appJs,
-    /warehouseWorkerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["workorder"\]/,
+    /warehouseWorkerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder"\]/,
   );
 });
