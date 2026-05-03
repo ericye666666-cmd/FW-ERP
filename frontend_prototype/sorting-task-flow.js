@@ -25,8 +25,40 @@
     return normalizeText(value).toLowerCase();
   }
 
+  function isRawBaleMachineCode(value) {
+    return /^1\d{9}$/.test(normalizeShipmentNo(value));
+  }
+
+  function isNonRawBaleMachineCode(value) {
+    return /^[2-5]\d{9}$/.test(normalizeShipmentNo(value));
+  }
+
   function isWarehouseShortCode(value) {
     return /^RB[A-Z0-9]{6,}$/.test(normalizeShipmentNo(value));
+  }
+
+  function getBaleReferenceCandidates(row) {
+    const candidates = [
+      row && row.bale_barcode,
+      row && row.legacy_bale_barcode,
+      row && row.scan_token,
+    ];
+    const machineCode = normalizeShipmentNo(row && row.machine_code);
+    const barcodeValue = normalizeShipmentNo(row && row.barcode_value);
+    const humanReadable = normalizeShipmentNo(row && row.human_readable);
+    if (isRawBaleMachineCode(machineCode)) {
+      candidates.push(machineCode);
+    }
+    if (isRawBaleMachineCode(barcodeValue)) {
+      candidates.push(barcodeValue);
+    }
+    if (
+      isRawBaleMachineCode(humanReadable)
+      && (humanReadable === machineCode || humanReadable === barcodeValue)
+    ) {
+      candidates.push(humanReadable);
+    }
+    return candidates.map((item) => normalizeShipmentNo(item)).filter(Boolean);
   }
 
   function computeEditDistance(leftValue, rightValue, maxDistance) {
@@ -101,11 +133,10 @@
     if (!normalizedCode) {
       return false;
     }
-    return (
-      normalizeShipmentNo(row && row.bale_barcode) === normalizedCode
-      || normalizeShipmentNo(row && row.legacy_bale_barcode) === normalizedCode
-      || normalizeShipmentNo(row && row.scan_token) === normalizedCode
-    );
+    if (isNonRawBaleMachineCode(normalizedCode)) {
+      return false;
+    }
+    return getBaleReferenceCandidates(row).includes(normalizedCode);
   }
 
   function isSelectableRawBale(row) {
@@ -148,6 +179,9 @@
           row && row.bale_barcode,
           row && row.legacy_bale_barcode,
           row && row.scan_token,
+          row && row.machine_code,
+          row && row.barcode_value,
+          row && row.human_readable,
           row && row.shipment_no,
           row && row.supplier_name,
           row && row.category_main,
@@ -170,6 +204,13 @@
         selectedBaleCodes,
       };
     }
+    if (isNonRawBaleMachineCode(baleCode)) {
+      return {
+        ok: false,
+        error: "0.1 创建分拣任务只能扫描 RAW_BALE 入仓包码，SDB / LPK / SDO / STORE_ITEM 不能加入分拣任务。",
+        selectedBaleCodes,
+      };
+    }
     let matchedRow = allBales.find((row) => matchesBaleReference(row, baleCode)) || null;
     let approximate = false;
     if (!matchedRow) {
@@ -187,7 +228,9 @@
     if (!matchedRow) {
       return {
         ok: false,
-        error: `${baleCode} 不存在，不能加入分拣任务。`,
+        error: isRawBaleMachineCode(baleCode)
+          ? "未找到这个 RAW_BALE machine_code，请确认该标签是否已经完成 RAW_BALE 入库。"
+          : `${baleCode} 不存在，不能加入分拣任务。`,
         selectedBaleCodes,
       };
     }

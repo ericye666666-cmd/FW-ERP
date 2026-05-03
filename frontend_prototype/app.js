@@ -28840,13 +28840,38 @@ async function addSortingLookupBaleToSelection() {
     const allBales = Array.isArray(options.allBales) ? options.allBales : [];
     const selectedBaleCodes = Array.isArray(options.selectedBaleCodes) ? options.selectedBaleCodes : [];
     const normalizedCode = String(options.baleCode || "").trim().toUpperCase();
-    const matchedRow = allBales.find((row) => (
-      String(row?.bale_barcode || "").trim().toUpperCase() === normalizedCode
-      || String(row?.legacy_bale_barcode || "").trim().toUpperCase() === normalizedCode
-      || String(row?.scan_token || "").trim().toUpperCase() === normalizedCode
-    ));
+    if (/^[2-5]\d{9}$/.test(normalizedCode)) {
+      return {
+        ok: false,
+        error: "0.1 创建分拣任务只能扫描 RAW_BALE 入仓包码，SDB / LPK / SDO / STORE_ITEM 不能加入分拣任务。",
+        selectedBaleCodes,
+      };
+    }
+    const matchedRow = allBales.find((row) => {
+      const machineCode = String(row?.machine_code || "").trim().toUpperCase();
+      const barcodeValue = String(row?.barcode_value || "").trim().toUpperCase();
+      const humanReadable = String(row?.human_readable || "").trim().toUpperCase();
+      return (
+        String(row?.bale_barcode || "").trim().toUpperCase() === normalizedCode
+        || String(row?.legacy_bale_barcode || "").trim().toUpperCase() === normalizedCode
+        || String(row?.scan_token || "").trim().toUpperCase() === normalizedCode
+        || (/^1\d{9}$/.test(machineCode) && machineCode === normalizedCode)
+        || (/^1\d{9}$/.test(barcodeValue) && barcodeValue === normalizedCode)
+        || (
+          /^1\d{9}$/.test(humanReadable)
+          && (humanReadable === machineCode || humanReadable === barcodeValue)
+          && humanReadable === normalizedCode
+        )
+      );
+    });
     if (!matchedRow) {
-      return { ok: false, error: "没有找到这个 bale barcode。", selectedBaleCodes };
+      return {
+        ok: false,
+        error: /^1\d{9}$/.test(normalizedCode)
+          ? "未找到这个 RAW_BALE machine_code，请确认该标签是否已经完成 RAW_BALE 入库。"
+          : "没有找到这个 bale barcode。",
+        selectedBaleCodes,
+      };
     }
     if (!isRawBaleEligibleForSortingTask(matchedRow)) {
       return { ok: false, error: `${options.baleCode} 当前不能加入分拣任务。`, selectedBaleCodes };

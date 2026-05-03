@@ -1,17 +1,19 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const loadedFlow = require("../sorting-task-flow.js");
+const SortingTaskFlow = Object.keys(loadedFlow).length ? loadedFlow : (globalThis.SortingTaskFlow || {});
 const {
   findSortingTaskLookupMatches,
   addBaleToSortingTaskSelection,
   getSortingScannerDiagnostic,
   buildSortingTaskManagerBuckets,
-} = require("../sorting-task-flow.js");
+} = SortingTaskFlow;
 
 test("findSortingTaskLookupMatches searches ready bales across shipments", () => {
   const rows = [
-    { bale_barcode: "RB260421000001", legacy_bale_barcode: "BALE-001", shipment_no: "SHIP-1", supplier_name: "Youxun", category_main: "SummerA+", category_sub: "SummerA+", status: "ready_for_sorting" },
-    { bale_barcode: "RB260421000002", legacy_bale_barcode: "BALE-002", shipment_no: "SHIP-2", supplier_name: "Youxun", category_main: "SummerA+", category_sub: "SummerA+", status: "ready_for_sorting" },
+    { bale_barcode: "RB260421000001", legacy_bale_barcode: "BALE-001", shipment_no: "SHIP-1", supplier_name: "Youxun", category_main: "SummerA+", category_sub: "SummerA+", status: "ready_for_sorting", source_cost_completed: true },
+    { bale_barcode: "RB260421000002", legacy_bale_barcode: "BALE-002", shipment_no: "SHIP-2", supplier_name: "Youxun", category_main: "SummerA+", category_sub: "SummerA+", status: "ready_for_sorting", source_cost_completed: true },
     { bale_barcode: "RB260421000003", legacy_bale_barcode: "BALE-003", shipment_no: "SHIP-3", supplier_name: "Other", category_main: "WinterA+", category_sub: "WinterA+", status: "in_bale_sales_pool" },
   ];
 
@@ -26,8 +28,8 @@ test("findSortingTaskLookupMatches searches ready bales across shipments", () =>
 
 test("addBaleToSortingTaskSelection allows adding ready bales from multiple shipments", () => {
   const rows = [
-    { bale_barcode: "RB260421000001", legacy_bale_barcode: "BALE-001", shipment_no: "SHIP-1", status: "ready_for_sorting", occupied_by_task_no: "" },
-    { bale_barcode: "RB260421000002", legacy_bale_barcode: "BALE-002", shipment_no: "SHIP-2", status: "ready_for_sorting", occupied_by_task_no: "" },
+    { bale_barcode: "RB260421000001", legacy_bale_barcode: "BALE-001", shipment_no: "SHIP-1", status: "ready_for_sorting", occupied_by_task_no: "", source_cost_completed: true },
+    { bale_barcode: "RB260421000002", legacy_bale_barcode: "BALE-002", shipment_no: "SHIP-2", status: "ready_for_sorting", occupied_by_task_no: "", source_cost_completed: true },
   ];
 
   const first = addBaleToSortingTaskSelection({
@@ -46,7 +48,7 @@ test("addBaleToSortingTaskSelection allows adding ready bales from multiple ship
 
 test("addBaleToSortingTaskSelection accepts legacy bale code but keeps short bale code as canonical selection", () => {
   const rows = [
-    { bale_barcode: "RB260421000001", legacy_bale_barcode: "BALE-BL-001-001", scan_token: "RB260421000001", shipment_no: "SHIP-1", status: "ready_for_sorting", occupied_by_task_no: "" },
+    { bale_barcode: "RB260421000001", legacy_bale_barcode: "BALE-BL-001-001", scan_token: "RB260421000001", shipment_no: "SHIP-1", status: "ready_for_sorting", occupied_by_task_no: "", source_cost_completed: true },
   ];
 
   const result = addBaleToSortingTaskSelection({
@@ -62,9 +64,149 @@ test("addBaleToSortingTaskSelection accepts legacy bale code but keeps short bal
   assert.deepEqual(result.selectedBaleCodes, ["RB260421000001"]);
 });
 
+test("addBaleToSortingTaskSelection accepts RAW_BALE machine_code but keeps canonical bale_barcode", () => {
+  const rows = [
+    {
+      bale_barcode: "RB260427AAAQH",
+      legacy_bale_barcode: "BALE-BL-001-001",
+      scan_token: "RB260427AAAQH",
+      machine_code: "1260427396",
+      barcode_value: "1260427396",
+      human_readable: "1260427396",
+      shipment_no: "SHIP-1",
+      status: "ready_for_sorting",
+      occupied_by_task_no: "",
+      source_cost_completed: true,
+    },
+  ];
+
+  const result = addBaleToSortingTaskSelection({
+    allBales: rows,
+    selectedBaleCodes: [],
+    baleCode: "1260427396",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.duplicate, false);
+  assert.equal(result.matchedRow?.bale_barcode, "RB260427AAAQH");
+  assert.deepEqual(result.selectedBaleCodes, ["RB260427AAAQH"]);
+  assert.notDeepEqual(result.selectedBaleCodes, ["1260427396"]);
+});
+
+test("addBaleToSortingTaskSelection accepts RAW_BALE barcode_value and human_readable machine code", () => {
+  const rows = [
+    {
+      bale_barcode: "RB260427AAARB",
+      legacy_bale_barcode: "BALE-BL-001-002",
+      scan_token: "RB260427AAARB",
+      barcode_value: "1260427397",
+      shipment_no: "SHIP-1",
+      status: "ready_for_sorting",
+      occupied_by_task_no: "",
+      source_cost_completed: true,
+    },
+    {
+      bale_barcode: "RB260427AAAHR",
+      legacy_bale_barcode: "BALE-BL-001-003",
+      scan_token: "RB260427AAAHR",
+      machine_code: "1260427398",
+      human_readable: "1260427398",
+      shipment_no: "SHIP-1",
+      status: "ready_for_sorting",
+      occupied_by_task_no: "",
+      source_cost_completed: true,
+    },
+  ];
+
+  const byBarcodeValue = addBaleToSortingTaskSelection({
+    allBales: rows,
+    selectedBaleCodes: [],
+    baleCode: "1260427397",
+  });
+  const byHumanReadable = addBaleToSortingTaskSelection({
+    allBales: rows,
+    selectedBaleCodes: [],
+    baleCode: "1260427398",
+  });
+
+  assert.equal(byBarcodeValue.ok, true);
+  assert.deepEqual(byBarcodeValue.selectedBaleCodes, ["RB260427AAARB"]);
+  assert.equal(byHumanReadable.ok, true);
+  assert.deepEqual(byHumanReadable.selectedBaleCodes, ["RB260427AAAHR"]);
+});
+
+test("addBaleToSortingTaskSelection rejects non-RAW_BALE machine_code prefixes", () => {
+  for (const machineCode of ["2260427396", "3260427396", "4260427396", "5260427396"]) {
+    const result = addBaleToSortingTaskSelection({
+      allBales: [
+        {
+          bale_barcode: `RB-${machineCode}`,
+          machine_code: machineCode,
+          barcode_value: machineCode,
+          human_readable: machineCode,
+          status: "ready_for_sorting",
+          occupied_by_task_no: "",
+          source_cost_completed: true,
+        },
+      ],
+      selectedBaleCodes: [],
+      baleCode: machineCode,
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /RAW_BALE/);
+    assert.deepEqual(result.selectedBaleCodes, []);
+  }
+});
+
+test("addBaleToSortingTaskSelection keeps status and source-cost gates after machine_code match", () => {
+  const blockedByStatus = addBaleToSortingTaskSelection({
+    allBales: [
+      {
+        bale_barcode: "RB260427AAAST",
+        machine_code: "1260427399",
+        status: "sorting_in_progress",
+        occupied_by_task_no: "",
+        source_cost_completed: true,
+      },
+    ],
+    selectedBaleCodes: [],
+    baleCode: "1260427399",
+  });
+  const blockedByCost = addBaleToSortingTaskSelection({
+    allBales: [
+      {
+        bale_barcode: "RB260427AAASC",
+        machine_code: "1260427400",
+        status: "ready_for_sorting",
+        occupied_by_task_no: "",
+        source_cost_completed: false,
+      },
+    ],
+    selectedBaleCodes: [],
+    baleCode: "1260427400",
+  });
+
+  assert.equal(blockedByStatus.ok, false);
+  assert.match(blockedByStatus.error, /当前状态不能加入分拣任务/);
+  assert.equal(blockedByCost.ok, false);
+  assert.match(blockedByCost.error, /来源成本未完成/);
+});
+
+test("addBaleToSortingTaskSelection gives RAW_BALE machine_code not-found guidance", () => {
+  const result = addBaleToSortingTaskSelection({
+    allBales: [],
+    selectedBaleCodes: [],
+    baleCode: "1260427396",
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /未找到这个 RAW_BALE machine_code/);
+});
+
 test("addBaleToSortingTaskSelection accepts a uniquely truncated short code from scanner loss", () => {
   const rows = [
-    { bale_barcode: "RB042120000002", legacy_bale_barcode: "BALE-BL-001-002", scan_token: "RB042120000002", shipment_no: "SHIP-1", status: "ready_for_sorting", occupied_by_task_no: "" },
+    { bale_barcode: "RB042120000002", legacy_bale_barcode: "BALE-BL-001-002", scan_token: "RB042120000002", shipment_no: "SHIP-1", status: "ready_for_sorting", occupied_by_task_no: "", source_cost_completed: true },
   ];
 
   const result = addBaleToSortingTaskSelection({

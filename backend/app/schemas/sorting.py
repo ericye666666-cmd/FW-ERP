@@ -324,6 +324,9 @@ class RawBaleRouteRequest(BaseModel):
 
 
 class RawBaleStockResponse(BaleBarcodeResponse):
+    machine_code: str = ""
+    barcode_value: str = ""
+    human_readable: str = ""
     is_occupied: bool = False
     is_in_bale_sales_pool: bool = False
     can_route_to_sorting: bool = False
