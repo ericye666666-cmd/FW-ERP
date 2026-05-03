@@ -7,6 +7,26 @@ const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 
+function extractFunctionSource(source, functionName) {
+  const start = source.indexOf(`function ${functionName}`);
+  assert.notEqual(start, -1, `missing function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `missing function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract ${functionName}`);
+}
+
 test("formal app loads barcode resolver before app.js", () => {
   assert.match(indexHtml, /<script src="\.\/barcode-resolver-flow\.js(?:\?v=[^"]+)?"><\/script>[\s\S]*<script src="\.\/app\.js(?:\?v=[^"]+)?"><\/script>/);
 });
@@ -214,6 +234,28 @@ test("print modal labels primary print button by barcode type without changing b
 
 test("store dispatch print confirmation completes only the current modal job", () => {
   assert.match(appJs, /const jobsToComplete = templateScope !== "bale" \|\| completionAction\.action === "complete_current"\s*\?\s*\(currentJob \? \[currentJob\] : \[\]\)\s*:\s*\[\.\.\.jobs\]/);
+});
+
+test("0.3 SDB reprint opens a locked direct-only print modal without queuing a new bale", () => {
+  const reprintSource = extractFunctionSource(appJs, "directPrintStorePrepBaleHistoricalBarcode");
+  const modalSource = extractFunctionSource(appJs, "openCompressionTaskPrintModal");
+  const completionSource = extractFunctionSource(appJs, "completeCurrentBalePrintModalJob");
+
+  assert.match(reprintSource, /buildStorePrepBaleReprintPrintJob/);
+  assert.match(reprintSource, /openCompressionTaskPrintModal\(/);
+  assert.match(reprintSource, /task_type:\s*"store_prep_reprint"/);
+  assert.doesNotMatch(reprintSource, /request\("\/print-jobs\/bale-direct\/print"/);
+  assert.doesNotMatch(reprintSource, /queueCompressionTaskPrintJobs?/);
+  assert.match(appJs, /data-store-prep-bale-reprint=/);
+  assert.match(appJs, /data-store-prep-bale-display-code=/);
+  assert.match(appJs, /data-store-prep-bale-machine-code=/);
+  assert.match(appJs, /没有找到 \$\{baleNo\} 的已打成包记录。/);
+  assert.match(appJs, /renderErrorSummary\("#sortingStockNotice", message\)/);
+  assert.match(modalSource, /taskType/);
+  assert.match(appJs, /"store_prep_reprint"/);
+  assert.match(appJs, /allowedCodes:\s*\["store_prep_bale_60x40"\]/);
+  assert.match(completionSource, /activeTaskType === "store_prep_reprint"[\s\S]*?SDB 补打标签已确认/);
+  assert.doesNotMatch(completionSource, /store_prep_reprint"[\s\S]{0,220}loadStorePrepBaleWorkbench/);
 });
 
 test("browser print fallback does not auto-run bale completion confirmation", () => {

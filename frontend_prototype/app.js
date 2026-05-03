@@ -15264,6 +15264,8 @@ function renderSortingStockSummary(data) {
                               type="button"
                               class="ghost-button mini-button"
                               data-store-prep-bale-reprint="${escapeHtml(row.bale_no || "")}"
+                              data-store-prep-bale-display-code="${escapeHtml(row.scan_token || row.bale_barcode || "")}"
+                              data-store-prep-bale-machine-code="${escapeHtml(row.machine_code || row.barcode_value || "")}"
                             >
                               ${escapeHtml(chooseI18nLabel("补打 barcode", "Reprint Barcode"))}
                             </button>
@@ -17590,7 +17592,7 @@ function renderBalePrintModal() {
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
   const isLpkPrint = templateScope === "warehouseout_bale" && activeTaskType === "lpk_shortage_pick";
-  const isStorePrepCompressionPrint = templateScope === "warehouseout_bale" && ["store_dispatch", "sale"].includes(activeTaskType);
+  const isStorePrepCompressionPrint = templateScope === "warehouseout_bale" && isStorePrepBaleModalTaskType(activeTaskType);
   const completionAction = templateScope !== "bale"
     ? {
       action: jobs.length ? "complete_group" : "already_complete",
@@ -18281,7 +18283,25 @@ async function completeCurrentBalePrintModalJob() {
   }
   if (templateScope !== "bale") {
     const activeTaskType = getActiveBaleModalTaskType();
-    if (templateScope === "warehouseout_bale" && ["store_dispatch", "sale"].includes(activeTaskType)) {
+    if (templateScope === "warehouseout_bale" && activeTaskType === "store_prep_reprint") {
+      balePrinterConsoleNotice = {
+        type: "success",
+        message: `${jobsToComplete.length} 张 SDB 补打标签已确认。`,
+      };
+      showTransientInlineNotice(
+        "#sortingStockNotice",
+        `${jobsToComplete.length} 张 SDB 补打标签已确认；库存和工单状态未变更。`,
+        "success",
+        2200,
+      );
+      if (!balePrintModalState.jobs.length) {
+        closeBalePrintModal({ force: true });
+      } else {
+        renderBalePrintModal();
+      }
+      return;
+    }
+    if (templateScope === "warehouseout_bale" && isStorePrepBaleCompletionTaskType(activeTaskType)) {
       const taskNo = String(balePrintModalState.shipmentNo || "").trim().toUpperCase();
       await loadStorePrepBaleWorkbench({ force: true, focus: false });
       if (taskNo) {
@@ -19683,7 +19703,7 @@ function getBaleModalTemplateOptions(templateScope = "bale", selectedTemplateCod
         selected: true,
       }];
   }
-  if (normalizedScope === "warehouseout_bale" && ["store_dispatch", "sale"].includes(getActiveBaleModalTaskType()) && labelTemplateFlow.buildLockedTemplateOptions) {
+  if (normalizedScope === "warehouseout_bale" && isStorePrepBaleModalTaskType() && labelTemplateFlow.buildLockedTemplateOptions) {
     const rows = labelTemplateFlow.buildLockedTemplateOptions(labelTemplateState, {
       allowedCodes: ["store_prep_bale_60x40"],
       selectedCode: "store_prep_bale_60x40",
@@ -19804,6 +19824,14 @@ function getActiveBaleTemplateScope() {
 
 function getActiveBaleModalTaskType() {
   return String(balePrintModalState.taskType || "").trim().toLowerCase() || "store_dispatch";
+}
+
+function isStorePrepBaleModalTaskType(taskType = getActiveBaleModalTaskType()) {
+  return ["store_dispatch", "sale", "store_prep_reprint"].includes(String(taskType || "").trim().toLowerCase());
+}
+
+function isStorePrepBaleCompletionTaskType(taskType = getActiveBaleModalTaskType()) {
+  return ["store_dispatch", "sale"].includes(String(taskType || "").trim().toLowerCase());
 }
 
 function getActiveBaleTemplateCode(preferredValue = "") {
@@ -29314,71 +29342,34 @@ async function queueCompressionTaskPrintJobs(resultRow = {}) {
 
 async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
   const baleNo = String(row?.bale_no || "").trim().toUpperCase();
-  const displayCode = String(row?.scan_token || row?.bale_barcode || "").trim().toUpperCase();
-  const barcodeValue = String(row?.machine_code || row?.barcode_value || "").replace(/[^0-9]/g, "").trim();
-  if (!baleNo || !barcodeValue) {
-    throw new Error("当前这张压缩 bale 还没有历史 barcode，不能直接补打。");
+  if (!baleNo) {
+    throw new Error("当前这张 SDB bale 缺少 bale_no，不能补打 barcode。");
+  }
+  if (typeof storePrepBaleFlow.buildStorePrepBaleReprintPrintJob !== "function") {
+    throw new Error("当前页面缺少 SDB 补打工具，请刷新页面后再试。");
   }
   await loadSystemPrinters();
-  const taskType = String(row?.task_type || "store_dispatch").trim().toLowerCase() || "store_dispatch";
-  const templateCode = String(
-    storePrepBaleFlow.getStorePrepTemplateDefaultCode
-      ? storePrepBaleFlow.getStorePrepTemplateDefaultCode(taskType)
-      : "store_prep_bale_60x40"
-  ).trim().toLowerCase() || "store_prep_bale_60x40";
   const printerName = String(document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim() || "Deli DL-720C";
-  const payload = storePrepBaleFlow.buildStorePrepBaleDirectPrintPayload
-    ? storePrepBaleFlow.buildStorePrepBaleDirectPrintPayload(row, { printerName, templateCode })
-    : {
-      printer_name: printerName,
-      template_code: templateCode,
-      copies: 1,
-      barcode_value: barcodeValue,
-      scan_token: barcodeValue,
-      bale_barcode: String(row?.bale_barcode || "").trim().toUpperCase(),
-      legacy_bale_barcode: "",
-      display_code: displayCode,
-      machine_code: barcodeValue,
-      human_readable: barcodeValue,
-      supplier_name: "SORTED STOCK",
-      category_main: String(row?.category_main || "").trim(),
-      category_sub: String(row?.category_sub || "").trim(),
-      category_display: [String(row?.category_main || "").trim(), String(row?.category_sub || "").trim()].filter(Boolean).join(" / "),
-      package_position_label: `${Number(row?.qty || 0)} 件`,
-      serial_no: 1,
-      total_packages: 1,
-      shipment_no: String(row?.task_no || "").trim().toUpperCase(),
-      parcel_batch_no: baleNo,
-      unload_date: String(row?.updated_at || row?.created_at || "").trim(),
-      template_scope: "warehouseout_bale",
-      dispatch_bale_no: barcodeValue,
-      status: taskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH",
-      cat: String(row?.category_main || "").trim(),
-      sub: String(row?.category_sub || "").trim(),
-      grade: String(row?.grade_summary || "").trim(),
-      qty: String(Number(row?.qty || 0)),
-      weight: row?.actual_weight_kg ? `${row.actual_weight_kg} KG` : "",
-      code: displayCode,
-    };
-  const result = await request("/print-jobs/bale-direct/print", {
-    method: "POST",
-    body: JSON.stringify(payload),
+  const job = storePrepBaleFlow.buildStorePrepBaleReprintPrintJob(row, {
+    printerName,
+    templateCode: "store_prep_bale_60x40",
   });
   writeOutput("#compressionTaskOutput", {
-    action: "reprint_store_prep_bale_barcode",
+    action: "open_store_prep_bale_barcode_reprint",
     bale_no: baleNo,
-    barcode: barcodeValue,
+    display_code: job.print_payload?.display_code || job.barcode || "",
+    barcode: job.print_payload?.barcode_value || job.print_payload?.machine_code || "",
     printer_name: printerName,
-    template_code: templateCode,
-    result,
+    template_code: "store_prep_bale_60x40",
   });
-  showTransientInlineNotice(
-    "#sortingStockNotice",
-    `${baleNo} 的历史 barcode ${barcodeValue} 已发送补打。请确认标签机是否开始出纸。`,
-    "success",
-    2200,
-  );
-  return result;
+  openCompressionTaskPrintModal({
+    ...row,
+    prepared_bale_no: baleNo,
+    prepared_bale_nos: [baleNo],
+    task_no: String(row?.task_no || baleNo).trim().toUpperCase(),
+    task_type: "store_prep_reprint",
+  }, [job]);
+  return job;
 }
 
 function openCompressionTaskPrintModal(resultRow = {}, printJobs = []) {
@@ -29394,9 +29385,12 @@ function openCompressionTaskPrintModal(resultRow = {}, printJobs = []) {
   const categoryDisplay = [String(resultRow?.category_main || "").trim(), String(resultRow?.category_sub || "").trim()]
     .filter(Boolean)
     .join(" / ");
+  const isReprint = taskType === "store_prep_reprint";
   balePrinterConsoleNotice = {
     type: "success",
-    message: `已为 ${jobs.length} 个压缩 bale 准备 SDB 打印任务。模板已锁定，出纸贴好后再确认本包已贴标。`,
+    message: isReprint
+      ? `已打开 ${String(jobs[0]?.barcode || resultRow?.prepared_bale_no || "").trim().toUpperCase()} 的 SDB 补打窗口。模板已锁定，不会生成新 bale。`
+      : `已为 ${jobs.length} 个压缩 bale 准备 SDB 打印任务。模板已锁定，出纸贴好后再确认本包已贴标。`,
   };
   openBalePrintModal({
     shipmentNo: String(resultRow?.task_no || "").trim().toUpperCase(),

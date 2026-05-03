@@ -232,6 +232,50 @@
     };
   }
 
+  function buildStorePrepBaleReprintPrintJob(row = {}, {
+    printerName = "",
+    templateCode = "",
+  } = {}) {
+    const baleNo = normalizeText(row && row.bale_no).toUpperCase();
+    if (!baleNo) {
+      throw new Error("当前这张 SDB bale 缺少 bale_no，不能补打 barcode。");
+    }
+    const payload = buildStorePrepBaleDirectPrintPayload(row, { printerName, templateCode });
+    const displayCode = normalizeText(payload.display_code || row && (row.scan_token || row.bale_barcode)).toUpperCase();
+    if (!/^SDB[A-Z0-9]{6,}$/.test(displayCode)) {
+      throw new Error("当前这张 SDB bale 缺少 SDB display_code，不能补打 barcode。");
+    }
+    const machineCode = normalizeMachineCode(payload.machine_code || row && (row.machine_code || row.barcode_value));
+    if (!/^2\d{9}$/.test(machineCode)) {
+      throw new Error("当前这张 SDB bale 缺少 2 开头 machine_code，不能补打 barcode。");
+    }
+    const printPayload = {
+      ...payload,
+      template_code: getStorePrepTemplateDefaultCode(row && row.task_type),
+      barcode_value: machineCode,
+      scan_token: machineCode,
+      display_code: displayCode,
+      bale_barcode: displayCode,
+      machine_code: machineCode,
+      human_readable: machineCode,
+      dispatch_bale_no: machineCode,
+      parcel_batch_no: displayCode,
+      code: displayCode,
+    };
+    return {
+      id: null,
+      job_type: "bale_barcode_label",
+      status: "direct_reprint",
+      barcode: displayCode,
+      product_name: printPayload.category_display || displayCode,
+      template_code: "store_prep_bale_60x40",
+      label_size: "60x40",
+      copies: 1,
+      printer_name: normalizeText(printerName),
+      print_payload: printPayload,
+    };
+  }
+
   function getStorePrepTemplateDefaultCode(taskType = "store_dispatch") {
     return "store_prep_bale_60x40";
   }
@@ -254,6 +298,7 @@
 
   return {
     buildStorePrepBaleDirectPrintPayload,
+    buildStorePrepBaleReprintPrintJob,
     buildStorePrepCategoryOptions,
     estimateSaleBaleGradeMix,
     getStorePrepTemplateDefaultCode,

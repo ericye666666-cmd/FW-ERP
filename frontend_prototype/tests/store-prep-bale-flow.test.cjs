@@ -6,6 +6,7 @@ const vm = require("node:vm");
 
 const {
   buildStorePrepBaleDirectPrintPayload,
+  buildStorePrepBaleReprintPrintJob,
   buildStorePrepCategoryOptions,
   estimateSaleBaleGradeMix,
   getStorePrepTemplateDefaultCode,
@@ -160,6 +161,63 @@ test("buildStorePrepBaleDirectPrintPayload does not extract machine code from SD
   assert.equal(payload.barcode_value, "");
   assert.equal(payload.scan_token, "");
   assert.equal(payload.dispatch_bale_no, "");
+});
+
+test("buildStorePrepBaleReprintPrintJob opens a direct-only SDB modal job with existing barcode identities", () => {
+  const job = buildStorePrepBaleReprintPrintJob(
+    {
+      bale_no: "SPB-20260502-004",
+      bale_barcode: "SDB260502AAD",
+      scan_token: "SDB260502AAD",
+      machine_code: "2260502004",
+      task_no: "SPT-20260502-004",
+      task_type: "store_dispatch",
+      category_main: "jacket",
+      category_sub: "baseball jacket",
+      grade_summary: "P 100 件",
+      qty: 100,
+      actual_weight_kg: 42,
+    },
+    {
+      printerName: "Deli DL-720C",
+      templateCode: "wait_for_sale",
+    },
+  );
+
+  assert.equal(job.id, null);
+  assert.equal(job.status, "direct_reprint");
+  assert.equal(job.barcode, "SDB260502AAD");
+  assert.equal(job.template_code, "store_prep_bale_60x40");
+  assert.equal(job.print_payload.display_code, "SDB260502AAD");
+  assert.equal(job.print_payload.bale_barcode, "SDB260502AAD");
+  assert.equal(job.print_payload.machine_code, "2260502004");
+  assert.equal(job.print_payload.barcode_value, "2260502004");
+  assert.equal(job.print_payload.scan_token, "2260502004");
+  assert.equal(job.print_payload.dispatch_bale_no, "2260502004");
+  assert.equal(job.print_payload.parcel_batch_no, "SDB260502AAD");
+});
+
+test("buildStorePrepBaleReprintPrintJob blocks missing historical SDB data instead of deriving codes", () => {
+  assert.throws(
+    () => buildStorePrepBaleReprintPrintJob({
+      bale_no: "SPB-20260427-001",
+      bale_barcode: "SDB260427AAAQH",
+      scan_token: "SDB260427AAAQH",
+      machine_code: "",
+      barcode_value: "SDB260427AAAQH",
+      task_type: "store_dispatch",
+    }),
+    /缺少 2 开头 machine_code/,
+  );
+
+  assert.throws(
+    () => buildStorePrepBaleReprintPrintJob({
+      bale_no: "SPB-20260427-002",
+      machine_code: "2260427002",
+      task_type: "store_dispatch",
+    }),
+    /缺少 SDB display_code/,
+  );
 });
 
 test("store prep bale workbench is a dedicated warehouse panel", () => {
