@@ -267,6 +267,57 @@ test("global shell styling is dark-sidebar compact-density ERP", () => {
   assert.match(stylesCss, /\.transfer-advanced-options\s*\{[\s\S]*?padding:\s*10px 12px;/);
 });
 
+test("4.1 replenishment form uses neutral compact controls and copy", () => {
+  const headingIndex = indexHtml.indexOf("<h2>4.1 手动补货需求</h2>");
+  assert.ok(headingIndex > -1, "4.1 replenishment heading should exist");
+  const sectionStart = indexHtml.lastIndexOf("<section", headingIndex);
+  const outputIndex = indexHtml.indexOf('<pre id="transferOutput"', headingIndex);
+  assert.ok(sectionStart > -1 && outputIndex > headingIndex, "4.1 replenishment panel should be bounded");
+  const panelHtml = indexHtml.slice(sectionStart, outputIndex);
+  [
+    "填写门店、品类和数量，生成补货申请。",
+    "只填写需求品类和数量；仓库执行时再按库存和 barcode 规则处理。",
+    "这里显示本次补货草稿。",
+    "系统按库存生成配货建议。",
+    "下一步：确认申请后进入仓库执行；门店收货以 SDO barcode 为准。",
+  ].forEach((copy) => assert.match(panelHtml, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+  [
+    "手动录入目标门店、类目和数量",
+    "一行代表一个商品大类",
+    "这里实时汇总本次门店需求件数",
+    "系统优先使用现成待送店包",
+  ].forEach((copy) => assert.doesNotMatch(panelHtml, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+  [
+    "这里显示本次门店需求。",
+    "确认后进入仓库执行；门店收货以 SDO barcode 为准。",
+    "这里显示配货建议和下一步动作。",
+    "SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。",
+    "这里显示建议类目和件数。",
+  ].forEach((copy) => assert.match(appJs, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+  [
+    "先在上一页加入建议类目",
+    "这里会实时显示这张门店调拨草稿",
+    "这里会按“补货需求草稿 / 系统配货建议 / 下一步动作”展示仓库执行拆解",
+    "系统已把当前补货需求拆成仓库动作",
+    "生成建议后，这里会列出建议类目",
+  ].forEach((copy) => assert.doesNotMatch(appJs, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+
+  assert.match(stylesCss, /input,\s*select,\s*textarea\s*\{[\s\S]*?background:\s*#ffffff;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?color:\s*#0f172a;[\s\S]*?border-radius:\s*6px;[\s\S]*?min-height:\s*36px;[\s\S]*?padding:\s*7px 10px;/);
+  assert.match(stylesCss, /input:focus,\s*select:focus,\s*textarea:focus\s*\{[\s\S]*?border-color:\s*#2563eb;[\s\S]*?box-shadow:\s*0 0 0 2px rgba\(37,\s*99,\s*235,\s*0\.12\);/);
+  assert.match(stylesCss, /\.line-builder\s*\{[\s\S]*?background:\s*#ffffff;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?border-radius:\s*8px;[\s\S]*?padding:\s*12px;/);
+  assert.match(stylesCss, /\.line-builder-row\s*\{[\s\S]*?background:\s*#f8fafc;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?border-radius:\s*6px;[\s\S]*?padding:\s*10px;[\s\S]*?gap:\s*8px;/);
+  assert.match(stylesCss, /\.line-builder \[data-builder-add\],\s*\.line-builder-remove,\s*\.mini-button\s*\{[\s\S]*?background:\s*#ffffff;[\s\S]*?border:\s*1px solid #cbd5e1;[\s\S]*?color:\s*#2563eb;[\s\S]*?min-height:\s*32px;[\s\S]*?padding:\s*6px 10px;[\s\S]*?font-size:\s*13px;/);
+  assert.match(stylesCss, /\.line-builder-remove\s*\{[\s\S]*?border-color:\s*#fecaca;[\s\S]*?color:\s*#dc2626;/);
+  assert.match(stylesCss, /\.line-builder-head p\s*\{[\s\S]*?font-size:\s*12px;[\s\S]*?line-height:\s*1\.4;[\s\S]*?color:\s*#64748b;/);
+
+  const lineBuilderBlock = [
+    stylesCss.match(/\.line-builder\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.line-builder-head\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.line-builder-row\s*\{[\s\S]*?\n\}/)?.[0] || "",
+  ].join("\n");
+  assert.doesNotMatch(lineBuilderBlock, /#fffaf0|#fff7ed|#fef3c7|#f8f1e5|#f4ede1|#eadfc8|rgba\(207,\s*192,\s*170|rgba\(205,\s*191,\s*165|rgba\(187,\s*169,\s*139/);
+});
+
 test("LPK workbench uses a left-right identity and picking-detail layout", () => {
   assert.match(appJs, /这个 LPK 拣了什么/);
   assert.match(appJs, /class="split-grid lpk-picking-layout"/);

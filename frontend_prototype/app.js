@@ -10573,7 +10573,7 @@ function renderTransferDraftSummary() {
   );
   if (!rows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先在上一页加入建议类目，或在左侧手动补充大类、小类和件数，这里会实时显示这张门店调拨草稿。";
+    target.textContent = "这里显示本次门店需求。";
     renderTransferPreparationPlanSummary([]);
     return;
   }
@@ -10583,7 +10583,7 @@ function renderTransferDraftSummary() {
   const totalRequested = rows.reduce((sum, row) => sum + Number(row.requested_qty || 0), 0);
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="flow-summary-note">这张门店调拨草稿确认成正式调拨单后，下一步就进入仓库执行单 / 出库打印；门店签收暂时不在这页回写。</div>
+    <div class="flow-summary-note">确认后进入仓库执行；门店收货以 SDO barcode 为准。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(fromWarehouseCode || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(toStoreCode || "-")}</span></article>
@@ -11499,14 +11499,14 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
   const demandRows = Array.isArray(rows) ? rows : [];
   if (!demandRows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会按“补货需求草稿 / 系统配货建议 / 下一步动作”展示仓库执行拆解。";
+    target.textContent = "这里显示配货建议和下一步动作。";
     return;
   }
   const plan = buildTransferPreparationPlan(demandRows);
   const summary = plan.summary || {};
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">系统已把当前补货需求拆成仓库动作。SDB 是仓库内部待送店包码，不是门店收货 barcode。门店收货需等待后续正式送货执行单 barcode。</div>
+    <div class="alert-banner">系统按库存生成配货建议。SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>需求类目</strong><span>${escapeHtml(plan.demandLineCount || 0)}</span></article>
       <article class="store-metric"><strong>申请总件数</strong><span>${escapeHtml(summary.totalRequestedQty || 0)}</span></article>
@@ -18185,7 +18185,7 @@ function renderRecommendationCandidates() {
     return;
   }
   if (!recommendationCandidatesState.length) {
-    target.innerHTML = `<div class="empty-state">生成建议后，这里会列出建议类目、件数，以及 14 天销量和门店供给扣减依据。直接加入或移出调拨草稿即可。</div>`;
+    target.innerHTML = `<div class="empty-state">这里显示建议类目和件数。</div>`;
     return;
   }
   target.innerHTML = recommendationCandidatesState
