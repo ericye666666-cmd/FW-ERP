@@ -135,13 +135,22 @@ test("print modal uses neutral compact ERP visual styling", () => {
   assert.match(stylesCss, /\.bale-print-advanced\s*\{[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?border-radius:\s*8px;[\s\S]*?background:\s*#ffffff;[\s\S]*?padding:\s*10px 12px;/);
   assert.match(stylesCss, /\.bale-print-advanced summary\s*\{[\s\S]*?font-weight:\s*600;[\s\S]*?color:\s*#475569;[\s\S]*?min-height:\s*32px;/);
   assert.match(stylesCss, /\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?border-color:\s*#fecaca;[\s\S]*?background:\s*#fef2f2;[\s\S]*?color:\s*#991b1b;/);
+  assert.match(stylesCss, /\.bale-modal-status-row \.warning-pill\s*\{[\s\S]*?border:\s*1px solid #fecaca;[\s\S]*?background:\s*#fef2f2;[\s\S]*?color:\s*#991b1b;/);
   assert.match(stylesCss, /\.bale-print-modal-side \.candidate-row\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
+  assert.match(stylesCss, /\.bale-preview-card,\n\.printer-status-card\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
+  assert.match(stylesCss, /\.bale-print-panel-head,\n\.bale-print-workbench-head\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
   const printModalCss = [
     stylesCss.match(/\.modal-card\s*\{[\s\S]*?\n\}/)?.[0] || "",
     stylesCss.match(/\.bale-print-modal-preview\s*\{[\s\S]*?\n\}/)?.[0] || "",
     stylesCss.match(/\.bale-print-advanced\s*\{[\s\S]*?\n\}/)?.[0] || "",
     stylesCss.match(/\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-modal-status-row \.warning-pill\s*\{[\s\S]*?\n\}/)?.[0] || "",
     stylesCss.match(/\.bale-print-modal-side \.candidate-row\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-preview-card,\n\.printer-status-card\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.completed-bale-card\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-print-panel-head,\n\.bale-print-workbench-head\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-compact-stat\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-completed-panel\s*\{[\s\S]*?\n\}/)?.[0] || "",
     appJs.match(/function renderDirectOnlyBaleModalPreview[\s\S]*?function deriveBaleLabelDisplayParts/)?.[0] || "",
   ].join("\n");
   assert.doesNotMatch(printModalCss, /#fffaf0|#fff7ed|#fef3c7|#f8f1e5|#f4ede1|#eadfc8|#fffdf9|#f8f3e9|#fff7e7|rgba\(207,\s*192,\s*170|rgba\(205,\s*191,\s*165|rgba\(187,\s*169,\s*139/);

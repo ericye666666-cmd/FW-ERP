@@ -16604,7 +16604,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   <meta charset="utf-8">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8fafc; color: #111; font-family: Arial, sans-serif; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #ffffff; color: #111; font-family: Arial, sans-serif; }
     .label { width: 420px; min-height: 280px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
     h1 { margin: 4px 0 4px; font-size: 26px; line-height: 1.05; letter-spacing: .03em; }
     .sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #475569; }
@@ -16646,7 +16646,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: #f8fafc;
+      background: #ffffff;
       color: #111;
       font-family: Arial, sans-serif;
     }
@@ -16711,7 +16711,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: #f8fafc;
+      background: #ffffff;
       color: #111;
       font-family: Arial, sans-serif;
     }
