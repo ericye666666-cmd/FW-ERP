@@ -641,60 +641,60 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
     family = _label_template_family(payload)
     if family == "raw_bale":
         return [
-            (20, 8, "RAW_BALE / WAREHOUSE IN", 2, 2, 24),
+            (20, 8, "RAW_BALE", 2, 2, 12),
             (20, 42, f"SUP: {_first_label_value(payload, 'supplier_name', 'supplier', default='-')}", 1, 1, 28),
             (20, 68, f"CAT: {_first_label_value(payload, 'category_main', 'category', default='-')}", 1, 1, 28),
             (20, 94, f"SUB: {_first_label_value(payload, 'category_sub', 'subcategory', default='-')}", 1, 1, 28),
             (328, 42, f"No: {_first_label_value(payload, 'serial_no', 'package_no', default='-')}", 1, 1, 16),
             (328, 68, f"Total: {_first_label_value(payload, 'total_packages', default='-')}", 1, 1, 16),
-            (250, 166, f"Display: {display_code or '-'}", 1, 1, 28),
-            (250, 192, f"Machine: {barcode_value}", 1, 1, 28),
-            (250, 218, f"Encoded: {barcode_value}", 1, 1, 28),
+            (20, 136, f"Display: {display_code or '-'}", 1, 1, 30),
+            (20, 162, f"MCode: {barcode_value}", 1, 1, 24),
+            (20, 188, f"Enc: {barcode_value}", 1, 1, 20),
         ]
     if family == "store_prep_bale":
         return [
-            (20, 8, "SDB / STORE PREP BALE", 2, 2, 25),
+            (20, 8, "SDB / PREP", 2, 2, 12),
             (20, 42, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', 'destination', default='-')}", 1, 1, 24),
             (252, 42, f"Qty: {_first_label_value(payload, 'item_count', 'qty', 'quantity', default='-')}", 1, 1, 20),
             (20, 70, f"Cat: {_label_category_path(payload)}", 1, 1, 34),
             (20, 98, f"Grade: {_first_label_value(payload, 'grade', 'grade_summary', default='-')}", 1, 1, 24),
             (252, 98, f"Src: {_first_label_value(payload, 'source_reference', 'source_bale_no', 'source', default='-')}", 1, 1, 22),
-            (20, 126, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 154, f"Code: {barcode_value}", 1, 1, 34),
+            (20, 126, f"Display: {display_code or '-'}", 1, 1, 30),
+            (20, 154, f"Enc: {barcode_value}", 1, 1, 20),
         ]
     if family == "loose_pick_task":
         picked_items = _summary_items(_first_label_value(payload, "picked_item_summary", "pick_summary", "packing_list", default=""), limit=2)
         shortage_items = _summary_items(_first_label_value(payload, "shortage_summary", "short_summary", default=""), limit=1)
         return [
-            (20, 8, "LPK / SHORTAGE PICK", 2, 2, 24),
+            (20, 8, "LPK / PICK", 2, 2, 12),
             (20, 42, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
             (20, 68, f"Req: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
             (20, 94, f"Pick1: {picked_items[0] if len(picked_items) > 0 else '-'}", 1, 1, 34),
             (20, 120, f"Pick2: {picked_items[1] if len(picked_items) > 1 else '-'}", 1, 1, 34),
             (20, 146, f"Short: {shortage_items[0] if shortage_items else '-'}", 1, 1, 34),
-            (20, 172, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 198, f"Code: {barcode_value}", 1, 1, 34),
+            (20, 172, f"Display: {display_code or '-'}", 1, 1, 30),
+            (20, 198, f"Enc: {barcode_value}", 1, 1, 20),
         ]
     if family == "store_delivery_execution":
         return [
-            (20, 8, "STORE DISPATCH / SDO", 2, 2, 24),
+            (20, 8, "SDO / DELIVERY", 2, 2, 16),
             (20, 46, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
             (20, 74, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
-            (20, 102, f"Packages: {_first_label_value(payload, 'packages', 'package_count', 'bale_count', default='-')}", 1, 1, 24),
-            (252, 102, f"Packing List: {_first_label_value(payload, 'packing_list', default='-')}", 1, 1, 24),
-            (20, 136, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 162, f"Machine: {barcode_value}", 1, 1, 34),
-            (20, 188, f"Encoded: {barcode_value}", 1, 1, 34),
+            (20, 102, f"Pkg: {_first_label_value(payload, 'packages', 'package_count', 'bale_count', default='-')}", 1, 1, 18),
+            (252, 102, f"Pack: {_first_label_value(payload, 'packing_list', default='-')}", 1, 1, 20),
+            (20, 136, f"Display: {display_code or '-'}", 1, 1, 30),
+            (20, 162, f"MCode: {barcode_value}", 1, 1, 24),
+            (20, 188, f"Enc: {barcode_value}", 1, 1, 20),
         ]
     if family == "store_item":
         return [
-            (20, 8, "STORE ITEM", 2, 2, 20),
+            (20, 8, "STORE_ITEM", 2, 2, 12),
             (20, 44, f"Price: {_first_label_value(payload, 'price', 'selected_price', default='-')}", 2, 2, 18),
             (250, 44, f"Rack: {_first_label_value(payload, 'rack', 'store_rack_code', default='-')}", 1, 1, 18),
-            (20, 86, f"Category: {_first_label_value(payload, 'category', 'category_summary', default='-')}", 1, 1, 34),
-            (20, 118, f"Display: {display_code or '-'}", 1, 1, 34),
-            (20, 144, f"Machine: {barcode_value}", 1, 1, 34),
-            (20, 170, f"Encoded: {barcode_value}", 1, 1, 34),
+            (20, 86, f"Cat: {_first_label_value(payload, 'category', 'category_summary', default='-')}", 1, 1, 34),
+            (20, 118, f"Display: {display_code or '-'}", 1, 1, 30),
+            (20, 144, f"MCode: {barcode_value}", 1, 1, 24),
+            (20, 170, f"Enc: {barcode_value}", 1, 1, 20),
         ]
     return [
         (20, 8, f"Display: {display_code or '-'}", 1, 1, 34),
