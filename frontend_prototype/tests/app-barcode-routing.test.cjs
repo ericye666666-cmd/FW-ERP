@@ -36,6 +36,22 @@ test("PDA putaway remains STORE_ITEM-only and keeps wrong barcode types out of s
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
 });
 
+test("pre-QA POS and PDA wrong barcode guidance remains short and actionable", () => {
+  const posResolver = appJs.match(/function resolvePosStoreItemTokenByMachineCode\(value = ""\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(posResolver, /throw new Error\("此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。"\)/);
+  assert.match(appJs, /This code cannot be sold in POS\. Please scan a STORE_ITEM code\./);
+
+  const pdaGuidance = appJs.match(/function getStorePdaScanGuidance\(value = ""\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(pdaGuidance, /这是 SDO，请去门店收货页面处理。/);
+  assert.match(pdaGuidance, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
+  assert.match(pdaGuidance, /这是 RAW_BALE，门店不能处理。/);
+  assert.match(pdaGuidance, /请扫描 STORE_ITEM 商品码。/);
+  assert.match(appJs, /This is an SDO\. Please process it on the Store Receiving page\./);
+  assert.match(appJs, /This is an SDB \/ LPK source package\. It cannot be put away for sale directly\./);
+  assert.match(appJs, /This is a RAW_BALE\. Stores cannot process it\./);
+  assert.match(appJs, /Please scan a STORE_ITEM code\./);
+});
+
 test("POS lookup preserves backend canonical product barcode after resolver approval", () => {
   assert.match(appJs, /getCanonicalBarcodeForContext\(\{\s*inputBarcode:\s*payload\.barcode,\s*resolved,\s*stockResult:\s*result,\s*context:\s*"pos",\s*\}\)/);
 });
@@ -134,7 +150,7 @@ test("SDO modal primary action has one clear main print button and local-agent o
   assert.doesNotMatch(primaryActions[0], /打印本轮全部标签/);
   assert.match(appJs, /const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop"/);
   assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint[\s\S]*?\? "打印 SDO 条码"/);
-  assert.match(appJs, /message: "打印助手未连接，请先启动 Windows 打印助手"/);
+  assert.match(appJs, /message: "打印助手未连接，请先启动 Windows 打印助手。"/);
   assert.match(appJs, /throw new Error\("打印助手未连接，请先启动 Windows 打印助手。"\)/);
   const primaryActionFunction = appJs.match(/async function printCurrentBaleModalPrimaryAction\(\) \{[\s\S]*?\n\}/);
   assert.ok(primaryActionFunction, "primary print action should exist");
@@ -321,7 +337,7 @@ test("warehouse prep task advanced wave parameters are collapsed and optional", 
   const advancedOptions = taskHtml.match(/<details id="pickingWaveAdvancedSettings"[^>]*>[\s\S]*?<\/details>/);
   assert.ok(advancedOptions, "advanced wave settings should exist");
   assert.doesNotMatch(advancedOptions[0].match(/<details[^>]*>/)?.[0] || "", /\sopen(?:\s|>|=)/);
-  assert.match(advancedOptions[0], /高级设置 \/ 备货波次参数/);
+  assert.match(advancedOptions[0], /高级设置 \/ 仓库备货任务参数/);
   const visibleMain = taskHtml.slice(0, taskHtml.indexOf(advancedOptions[0]));
   [
     "wave_name",

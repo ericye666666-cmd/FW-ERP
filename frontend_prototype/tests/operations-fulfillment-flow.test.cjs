@@ -656,7 +656,7 @@ test("transfer drafting and warehouse execution pages use the new replenishment 
   assert.match(appJs, /builderId === "transfer-items"[\s\S]*?fieldKey === "category_main"[\s\S]*?autoFillTransferCategorySub/);
   assert.match(appJs, /builderId === "transfer-items"[\s\S]*?lastRowWithCategory[\s\S]*?autoFillTransferCategorySub\(rows, rows\.length - 1\)/);
   assert.match(appJs, /builderId === "transfer-items"[\s\S]*?setJsonBuilderRows\(builderId, rows\)/);
-  assert.match(indexHtml, /<h2>5\.1 补差打包工单<\/h2>/);
+  assert.match(indexHtml, /<h2>5\.1 LPK 补差拣货<\/h2>/);
   assert.match(indexHtml, />生成补差拣货单 barcode</);
   assert.match(indexHtml, /name="package_limit_qty"/);
   assert.match(indexHtml, /小于 50 件/);
@@ -670,12 +670,12 @@ test("transfer drafting and warehouse execution pages use the new replenishment 
   assert.match(indexHtml, /补货明细/);
   assert.match(indexHtml, /备货执行总览/);
   assert.match(indexHtml, /现成待送店包裹/);
-  assert.match(indexHtml, /补差打包/);
+  assert.match(indexHtml, /补差拣货/);
   assert.match(indexHtml, /最终送店打印/);
   assert.match(indexHtml, />扫描确认现成包</);
   assert.doesNotMatch(indexHtml, />确认生成门店调拨单</);
   assert.match(indexHtml, /现成待送店包裹/);
-  assert.doesNotMatch(indexHtml, /散货补差打包区/);
+  assert.doesNotMatch(indexHtml, /散货补差拣货区/);
   assert.doesNotMatch(indexHtml, /送店 bale \/ 箱单打印区/);
   assert.match(indexHtml, />生成正式门店送货执行单 barcode</);
   assert.doesNotMatch(indexHtml, />只生成出库打印任务</);
@@ -703,7 +703,8 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /const CODE128_PATTERNS = \[/);
   assert.match(appJs, /function renderCode128Svg/);
   assert.match(appJs, /data-barcode-standard="CODE128"/);
-  assert.match(appJs, /data-code128-start="104"/);
+  assert.match(appJs, /const startCode = 104/);
+  assert.match(appJs, /data-code128-start="\$\{startCode\}"/);
   assert.match(appJs, /data-code128-stop="106"/);
   assert.doesNotMatch(appJs, /char\.charCodeAt\(0\) \+ index \* 7/);
   assert.match(appJs, /taskType:\s*"lpk_shortage_pick"/);
@@ -713,8 +714,9 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(appJs, /isLpkPrint \|\| isBaleModalDirectOnlyJob\(currentJob\)/);
   assert.match(appJs, /data-print-template="store_loose_pick_60x40"/);
   assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
-  assert.match(appJs, /const displayCode = String\(payload\.display_code \|\| payload\.human_readable \|\| payload\.dispatch_bale_no \|\| ""\)\.trim\(\)\.toUpperCase\(\)/);
-  assert.match(appJs, /const barcodeValue = String\(payload\.machine_code \|\| payload\.barcode_value \|\| payload\.scan_token \|\| job\.barcode \|\| ""\)\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(appJs, /const displayCode = String\(payload\.display_code \|\| payload\.bale_barcode \|\| payload\.code \|\| ""\)\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(appJs, /const machineCode = String\(payload\.machine_code \|\| payload\.barcode_value \|\| payload\.scan_token \|\| defaultBarcodeValue \|\| ""\)\.replace\(\/\[\^0-9\]\/g, ""\)\.trim\(\)/);
+  assert.match(appJs, /const barcodeValue = machineCode/);
   assert.match(appJs, /Display: \$\{escapeHtml\(displayCode \|\| "-"\)\}/);
   assert.match(appJs, /Request: \$\{escapeHtml\(requestNo \|\| "-"\)\}/);
   assert.match(appJs, /data-lpk-barcode-value="\$\{escapeHtml\(barcodeValue\)\}"/);
@@ -802,7 +804,7 @@ test("store replenishment panels move under warehouse workspace and out of opera
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>门店补货流程页<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>4\. 门店补货建议<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>4\.1 手动补货需求<\/h2>/);
-  assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>5\.1 补差打包工单<\/h2>/);
+  assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>5\.1 LPK 补差拣货<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>6\. 仓库执行单 \/ 出库打印<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>6\.1 配送批次 \/ 门店收货跟踪<\/h2>/);
   assert.doesNotMatch(indexHtml, /<section class="panel" data-workspace-panel="operations">\s*<div class="panel-head">\s*<h2>4\. 门店补货建议<\/h2>/);
@@ -813,7 +815,7 @@ test("warehouse nav exposes 门店补货 and operations nav drops the replenishm
   assert.match(warehousePanelMetaJs, /match: "门店补货流程页"/);
   assert.match(warehousePanelMetaJs, /match: "4\. 门店补货建议"/);
   assert.match(warehousePanelMetaJs, /match: "4\.1 手动补货需求"/);
-  assert.match(warehousePanelMetaJs, /match: "5\.1 补差打包工单",\n\s*section: "replenishment"/);
+  assert.match(warehousePanelMetaJs, /match: "5\.1 LPK 补差拣货",\n\s*section: "replenishment"/);
   assert.match(warehousePanelMetaJs, /match: "6\. 仓库执行单 \/ 出库打印"/);
   assert.match(warehousePanelMetaJs, /match: "6\.1 配送批次 \/ 门店收货跟踪"/);
   assert.doesNotMatch(operationsPanelMetaJs, /4\. 门店补货建议/);
@@ -835,7 +837,7 @@ test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1"
 test("phase 2A page 5.1 copy uses request number label and warehouse-only LPK guidance", () => {
   assert.match(indexHtml, /选择补货申请 \/ 选择仓库备货任务/);
   assert.match(indexHtml, /LPK = 仓库补差工单码；门店不可扫。/);
-  assert.match(appJs, /该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。/);
+  assert.match(appJs, /该补货申请没有散货缺口，无需生成补差拣货单。请回到 6 仓库执行单继续。/);
 });
 
 test("phase B2 warehouse prep task panel supports request multi-select", () => {
@@ -856,15 +858,15 @@ test("phase 2A copy keeps package count and piece count separated on 4.1", () =>
 });
 
 test("phase 2B page 6 copy clarifies warehouse verification and warehouse-only barcode boundary", () => {
-  assert.match(indexHtml, /仓库执行核对 \/ 出库打印/);
+  assert.match(indexHtml, /仓库执行单 \/ 出库打印/);
   assert.match(indexHtml, /按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。/);
   assert.match(indexHtml, /SDB\/LPK = 仓库核对码；门店只扫 SDO。/);
   assert.match(indexHtml, /这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。/);
-  assert.match(indexHtml, /Lane A：现成待送店包核对/);
+  assert.match(indexHtml, /通道 A：现成待送店包核对/);
   assert.match(indexHtml, /扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。/);
-  assert.match(indexHtml, /Lane B：补差包核对/);
+  assert.match(indexHtml, /通道 B：补差包核对/);
   assert.match(indexHtml, /LPK 是仓库补差拣货工单码。补差完成后形成仓库内部补差包，用于本单后续送货执行。/);
-  assert.match(indexHtml, /Lane C：正式门店送货执行单/);
+  assert.match(indexHtml, /通道 C：正式门店送货执行单/);
   assert.match(indexHtml, /生成正式门店送货执行单 barcode/);
 });
 
@@ -890,19 +892,19 @@ test("phase 2C page 6.1 copy clarifies shipment batch scope and barcode boundary
 });
 
 test("phase 2C page 6.1 shows required shipment-batch fields and statuses", () => {
-  assert.match(indexHtml, /配送批次号 \/ shipment_batch_no/);
-  assert.match(indexHtml, /司机 \/ driver/);
-  assert.match(indexHtml, /车辆 \/ vehicle/);
-  assert.match(indexHtml, /预计出发时间 \/ departure time/);
-  assert.match(indexHtml, /路线 \/ stops/);
-  assert.match(indexHtml, /关联仓库执行单 \/ linked execution orders/);
-  assert.match(indexHtml, /目标门店 \/ target stores/);
-  assert.match(indexHtml, /每个门店收货状态 \/ per-store receiving status/);
-  assert.match(appJs, /return "待发车";/);
-  assert.match(appJs, /return "运输中";/);
-  assert.match(appJs, /return "部分门店已收货";/);
-  assert.match(appJs, /return "全部收货完成";/);
-  assert.match(appJs, /return "异常 \/ 退回";/);
+  assert.match(indexHtml, /配送批次号/);
+  assert.match(indexHtml, /司机/);
+  assert.match(indexHtml, /车辆/);
+  assert.match(indexHtml, /预计出发时间/);
+  assert.match(indexHtml, /路线 \/ 站点/);
+  assert.match(indexHtml, /关联仓库执行单/);
+  assert.match(indexHtml, /目标门店/);
+  assert.match(indexHtml, /每个门店收货状态/);
+  assert.match(appJs, /return chooseI18nLabel\("待发车", "Pending Dispatch"\);/);
+  assert.match(appJs, /return chooseI18nLabel\("运输中", "In Transit"\);/);
+  assert.match(appJs, /return chooseI18nLabel\("部分门店已收货", "Partially Received"\);/);
+  assert.match(appJs, /return chooseI18nLabel\("全部收货完成", "Receiving Complete"\);/);
+  assert.match(appJs, /return chooseI18nLabel\("异常 \/ 退回", "Exception \/ Return"\);/);
 });
 
 test("phase 2C page 6.1 summary cards and per-store grouping copy are present", () => {

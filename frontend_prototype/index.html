@@ -623,7 +623,7 @@
             <section class="sorting-task-panel">
               <div class="sorting-task-panel-head">
                 <div>
-                  <span class="eyebrow">Step 1</span>
+                  <span class="eyebrow">步骤 1</span>
                   <strong>扫码 / 检索加入包裹</strong>
                   <p>从当前原始 bale 库存里检索可分拣 bale。可以跨船单加入，但每包都要保留 bale 级追溯。</p>
                 </div>
@@ -635,7 +635,7 @@
             <section class="sorting-task-panel sorting-task-panel-selected">
               <div class="sorting-task-panel-head">
                 <div>
-                  <span class="eyebrow">Step 2</span>
+                  <span class="eyebrow">步骤 2</span>
                   <strong>绑定分拣人</strong>
                   <p>确认右侧已加入的 bale，再绑定这次负责分拣的处理人。</p>
                 </div>
@@ -2195,14 +2195,14 @@
           <div class="subtle small">当前版本先按已生成 SDO 展示配送批次视图；后续会支持把多个 SDO 绑定到同一车次。</div>
         </div>
         <div class="candidate-summary">
-          <div class="subtle small">配送批次号 / shipment_batch_no</div>
-          <div class="subtle small">司机 / driver</div>
-          <div class="subtle small">车辆 / vehicle</div>
-          <div class="subtle small">预计出发时间 / departure time</div>
-          <div class="subtle small">路线 / stops</div>
-          <div class="subtle small">关联仓库执行单 / linked execution orders</div>
-          <div class="subtle small">目标门店 / target stores</div>
-          <div class="subtle small">每个门店收货状态 / per-store receiving status</div>
+          <div class="subtle small">配送批次号</div>
+          <div class="subtle small">司机</div>
+          <div class="subtle small">车辆</div>
+          <div class="subtle small">预计出发时间</div>
+          <div class="subtle small">路线 / 站点</div>
+          <div class="subtle small">关联仓库执行单</div>
+          <div class="subtle small">目标门店</div>
+          <div class="subtle small">每个门店收货状态</div>
         </div>
         <form id="transferShipForm" class="form-grid compact">
           <select name="transfer_no">
@@ -2212,12 +2212,12 @@
           <input name="driver_name" placeholder="司机，例如 Driver A" value="Driver A" />
           <input name="vehicle_no" placeholder="车辆，例如 KDM-001A" value="KDM-001A" />
           <input name="departure_time" placeholder="预计出发时间，例如 2026-04-28 10:30" />
-          <input name="route_stops" placeholder="路线 / stops，例如 WH1 → Utawala → Kawangware" />
+          <input name="route_stops" placeholder="路线 / 站点，例如 WH1 → Utawala → Kawangware" />
           <textarea name="note" rows="3" placeholder="发运备注，例如 本批次包含多个仓库执行单。"></textarea>
-          <button type="submit">确认发运 / 建 shipment session</button>
+          <button type="submit">确认发运</button>
         </form>
         <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
-          这里会显示发运和 shipment session，并展示已关联的正式门店送货执行单 barcode（如已生成）。
+          这里会显示发运记录，并展示已关联的正式门店送货执行单 barcode（如已生成）。
         </div>
         <div id="transferShipWaveSummary" class="candidate-summary empty-state">选择仓库备货任务后，这里展示任务内可配送 SDO 与未生成 SDO 的申请。</div>
         <div id="transferDispatchSummary" class="candidate-summary empty-state">
@@ -2678,7 +2678,7 @@
           <div class="transfer-flow-strip">
             <span class="store-flag">4. 补货建议</span>
             <span class="store-flag">5. 调拨确认</span>
-            <span class="store-flag">5.1 补差工单</span>
+            <span class="store-flag">5.1 LPK</span>
             <span class="store-flag">6. 现成包登记 / 最终打印</span>
             <span class="store-flag">6.1 配送签收</span>
           </div>
@@ -2834,7 +2834,7 @@
           <form id="pickingWaveForm" class="form-grid compact warehouse-prep-toolbar">
             <button id="pickingWaveSubmitButton" type="submit" disabled>生成仓库备货任务</button>
             <details id="pickingWaveAdvancedSettings" class="transfer-advanced-options picking-wave-advanced-settings">
-              <summary>高级设置 / 备货波次参数</summary>
+              <summary>高级设置 / 仓库备货任务参数</summary>
               <input name="wave_name" type="text" placeholder="任务名称（如 PREP-20260503-A）" />
               <input name="warehouse_code" type="text" placeholder="仓库代码（WH1）" value="WH1" />
               <input name="planned_picking_date" type="date" />
@@ -2844,14 +2844,14 @@
             </details>
           </form>
           <div id="pickingWaveSummary" class="subtle small">当前仓库备货任务已接入执行入口；LPK 仍按单张补货申请生成。</div>
-          <div id="pickingWaveList" class="candidate-summary empty-state">暂无仓库备货任务。</div>
+          <div id="pickingWaveList" class="candidate-summary empty-state">暂无仓库备货任务。请先生成补货申请单，再生成仓库备货任务。</div>
         </div>
         <pre id="transferOutput" class="output hidden-output"></pre>
       </section>
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>5.1 补差打包工单</h2>
+          <h2>5.1 LPK 补差拣货</h2>
         </div>
         <div class="candidate-summary">
           <div class="transfer-flow-strip">
@@ -2866,7 +2866,7 @@
         <div class="transfer-prep-shell replenishment-workorder-shell">
           <article class="transfer-ops-card transfer-prep-form-card">
             <div class="transfer-workbench-head">
-              <span class="eyebrow">Step 3</span>
+              <span class="eyebrow">步骤 3</span>
               <h3>补差拣货单生成器</h3>
               <p>先从下拉框选择补货申请单，再选择封包上限。系统只在有散货缺口时生成 1 张带 barcode 的补差拣货单。工人按这张单拣货，拣完直接贴到补差包上。</p>
             </div>
@@ -2896,7 +2896,7 @@
 
           <article class="transfer-ops-card transfer-prep-summary-card">
             <div class="transfer-workbench-head">
-              <span class="eyebrow">Workorders</span>
+              <span class="eyebrow">补差任务</span>
               <h3>当前补差拣货单</h3>
               <p>右侧只保留一张可贴包的 barcode 拣货单。工人按单拣货，完成后点一次确认封包，最终送店打印才会放行。</p>
             </div>
@@ -2927,7 +2927,7 @@
         <div class="warehouse-prep-shell">
           <article class="transfer-ops-card warehouse-prep-card warehouse-prep-overview">
             <div class="transfer-workbench-head">
-              <span class="eyebrow">Step 2</span>
+              <span class="eyebrow">步骤 2</span>
               <h3>备货执行总览</h3>
               <p>仓库执行台现在只做真动作：先读取当前执行单，再扫现成包、核补差工单完成度，最后生成最终送店执行码并打印。</p>
             </div>
@@ -2947,7 +2947,7 @@
             <div class="warehouse-prep-lanes">
               <article class="transfer-ops-card warehouse-prep-card">
                 <div class="transfer-workbench-head is-compact">
-                  <span class="eyebrow">Lane A：现成待送店包核对</span>
+                  <span class="eyebrow">通道 A：现成待送店包核对</span>
                   <h3>现成 SDB 包仓库核对</h3>
                   <p>扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。</p>
                 </div>
@@ -2969,7 +2969,7 @@
 
               <article class="transfer-ops-card warehouse-prep-card">
                 <div class="transfer-workbench-head is-compact">
-                  <span class="eyebrow">Lane B：补差包核对</span>
+                  <span class="eyebrow">通道 B：补差包核对</span>
                   <h3>LPK 补差工单仓库核对</h3>
                   <p>LPK 是仓库补差拣货工单码。补差完成后形成仓库内部补差包，用于本单后续送货执行。</p>
                 </div>
@@ -2984,7 +2984,7 @@
 
             <article class="transfer-ops-card warehouse-prep-card warehouse-prep-print-card">
               <div class="transfer-workbench-head is-compact">
-                <span class="eyebrow">Lane C：正式门店送货执行单</span>
+                <span class="eyebrow">通道 C：正式门店送货执行单</span>
                 <h3>生成正式门店送货执行单 barcode</h3>
                 <p>仓库核对完成后，在这里生成并打印正式门店送货执行单 barcode（60x40）。</p>
               </div>
@@ -3354,7 +3354,7 @@
                     <h3 data-terminal-copy="scanTitle">扫码收银</h3>
                   </div>
                   <div class="shortcut-pills">
-                    <span class="pill"><kbd>Enter</kbd> <span data-terminal-copy="enterToAdd">直接加入购物篮</span></span>
+                    <span class="pill"><kbd>Enter</kbd> <span data-terminal-copy="enterToAdd">直接加入商品篮</span></span>
                     <span class="pill"><kbd>ESC</kbd> <span data-terminal-copy="escToClose">关闭抽屉</span></span>
                   </div>
                 </div>
@@ -3370,7 +3370,7 @@
                         autocomplete="off"
                         placeholder="扫描 STORE_ITEM 商品码"
                       />
-                      <button type="submit" class="primary-inline" data-terminal-submit="add" data-terminal-copy="addToBasket">加入购物篮</button>
+                      <button type="submit" class="primary-inline" data-terminal-submit="add" data-terminal-copy="addToBasket">加入商品篮</button>
                     </div>
                   </label>
                   <label class="field search-field">
@@ -3401,7 +3401,7 @@
               <article class="panel panel-basket cashier-terminal-card cashier-terminal-cart-card">
                 <div class="panel-head basket-head cashier-terminal-card-head">
                   <div>
-                    <p class="panel-kicker">BASKET</p>
+                    <p class="panel-kicker">商品篮</p>
                     <h3 data-terminal-copy="basketTitle">商品篮</h3>
                   </div>
                   <div class="basket-tools">
@@ -3409,7 +3409,7 @@
                       <span data-terminal-copy="noteLabel">交易备注</span>
                       <input id="cashierTerminalSaleNote" type="text" placeholder="正常销售 / 顾客备注 / 交接说明" />
                     </label>
-                    <button type="button" class="secondary-ghost" data-terminal-action="clear-cart" data-terminal-copy="clearBasket">清空购物篮</button>
+                    <button type="button" class="secondary-ghost" data-terminal-action="clear-cart" data-terminal-copy="clearBasket">清空商品篮</button>
                   </div>
                 </div>
                 <div id="cashierTerminalCart" class="basket-list cashier-terminal-cart"></div>

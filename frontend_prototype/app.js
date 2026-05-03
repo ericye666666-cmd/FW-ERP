@@ -133,9 +133,19 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "标记本次已打印", en: "Mark Printed" },
   { zh: "经营分析", en: "Business Analytics" },
   { zh: "销售记录", en: "Sales Records" },
+  { zh: "手动补货申请", en: "Manual Replenishment Request" },
+  { zh: "仓库备货任务", en: "Warehouse Prep Task" },
+  { zh: "补货申请单", en: "Replenishment Request" },
   { zh: "原始 Bale 总库存", en: "Raw Bale Inventory" },
+  { zh: "仓库执行", en: "Warehouse Execution" },
+  { zh: "门店收货", en: "Store Receiving" },
+  { zh: "店员上架", en: "Clerk Putaway" },
+  { zh: "商品篮", en: "Basket" },
+  { zh: "结账区", en: "Checkout" },
+  { zh: "完成销售", en: "Complete Sale" },
+  { zh: "打印助手", en: "Print Agent" },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
-  { zh: "补差打包工单", en: "Shortage Pick-Pack Order" },
+  { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
   { zh: "收银销售", en: "Cashier Shift & POS Sales" },
   { zh: "高速收银终端", en: "Fast POS Terminal" },
@@ -203,7 +213,7 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "下一页", en: "Next" },
   { zh: "门店补货建议", en: "Store Replenishment Suggestions" },
   { zh: "手动补货需求", en: "Manual Replenishment Request" },
-  { zh: "补差打包工单", en: "Shortage Pick-Pack Order" },
+  { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "配送批次 / 门店收货跟踪", en: "Delivery Batch / Store Receiving Tracking" },
   { zh: "生成正式门店送货执行单", en: "Generate Store Delivery Order" },
@@ -279,13 +289,21 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "扫码输入", en: "Scan input" },
   { zh: "扫码 / 手动录入", en: "Scan / Manual Entry" },
   { zh: "扫码枪输入 / 商品 barcode", en: "Scanner input / item barcode" },
-  { zh: "加入购物篮", en: "Add to Basket" },
+  { zh: "加入商品篮", en: "Add to Basket" },
+  { zh: "商品篮为空。请扫描 STORE_ITEM 商品码。", en: "The basket is empty. Please scan a STORE_ITEM code." },
   { zh: "现金", en: "Cash" },
   { zh: "混合", en: "Mixed" },
-  { zh: "完成交易", en: "Complete Sale" },
+  { zh: "完成销售", en: "Complete Sale" },
   { zh: "作废草稿", en: "Void draft" },
   { zh: "退款 / 退货", en: "Refund / Return" },
   { zh: "这不是商品码，不能收银。请扫描 STORE_ITEM 商品条码。", en: "This is not an item barcode and cannot be sold. Please scan a STORE_ITEM barcode." },
+  { zh: "此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。", en: "This code cannot be sold in POS. Please scan a STORE_ITEM code." },
+  { zh: "打印助手未连接，请先启动 Windows 打印助手。", en: "Print Agent is not connected. Please start the Windows Print Agent first." },
+  { zh: "这是 SDO，请去门店收货页面处理。", en: "This is an SDO. Please process it on the Store Receiving page." },
+  { zh: "这是 SDB / LPK 来源包，不能直接上架销售。", en: "This is an SDB / LPK source package. It cannot be put away for sale directly." },
+  { zh: "这是 RAW_BALE，门店不能处理。", en: "This is a RAW_BALE. Stores cannot process it." },
+  { zh: "请扫描 STORE_ITEM 商品码。", en: "Please scan a STORE_ITEM code." },
+  { zh: "暂无仓库备货任务。请先生成补货申请单，再生成仓库备货任务。", en: "No Warehouse Prep Task yet. Create a Replenishment Request first, then generate a Warehouse Prep Task." },
   { zh: "全部销售数据", en: "All Sales Data" },
   { zh: "门店销售汇总", en: "Store Sales Summary" },
   { zh: "销售额", en: "Sales Amount" },
@@ -327,7 +345,7 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "压缩工单管理", en: "Compression Work Orders" },
   { zh: "4. 门店补货建议", en: "4. Store Replenishment Suggestions" },
   { zh: "4.1 手动补货需求", en: "4.1 Manual Replenishment Request" },
-  { zh: "5.1 补差打包工单", en: "5.1 Shortage Pick-Pack Order" },
+  { zh: "5.1 LPK 补差拣货", en: "5.1 LPK Shortage Pick Task" },
   { zh: "6. 仓库执行单 / 出库打印", en: "6. Warehouse Execution / Dispatch Print" },
   { zh: "6.1 配送批次 / 门店收货跟踪", en: "6.1 Delivery Batch / Store Receiving Tracking" },
   { zh: "5. 门店收货主控台", en: "5. Store Receiving Command Center" },
@@ -743,11 +761,11 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     escToClose: "关闭抽屉",
     barcodeField: "扫描 STORE_ITEM 商品码",
     lookupField: "手动查价",
-    addToBasket: "加入购物篮",
+    addToBasket: "加入商品篮",
     lookupOnly: "只查价",
     basketTitle: "商品篮",
     noteLabel: "交易备注",
-    clearBasket: "清空购物篮",
+    clearBasket: "清空商品篮",
     storeLabel: "门店",
     cashierLabel: "收银员",
     shiftLabel: "班次",
@@ -771,7 +789,7 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     rackLabel: "货架位",
     lookupEmpty: "等待扫码。扫到非 STORE_ITEM 会在这里提示下一步。",
     cartEmpty: "商品篮为空。请扫描 STORE_ITEM 商品码。",
-    addCurrentLookup: "加入购物篮",
+    addCurrentLookup: "加入商品篮",
     qty: "数量",
     sellingPrice: "售价",
     subtotal: "小计",
@@ -862,15 +880,15 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     brandSubtitle: "Built only for selling, collecting payment, handling exceptions, and binding every sale to an item identity.",
     openShiftCenter: "Shift Center",
     scanTitle: "Scan / Manual Entry",
-    enterToAdd: "Add to basket",
+    enterToAdd: "Add to Basket",
     escToClose: "Close drawer",
-    barcodeField: "Scanner input / item barcode",
-    lookupField: "Manual search / price lookup",
-    addToBasket: "Add to basket",
+    barcodeField: "Scan STORE_ITEM code",
+    lookupField: "Manual STORE_ITEM lookup",
+    addToBasket: "Add to Basket",
     lookupOnly: "Lookup only",
-    basketTitle: "Current Basket",
+    basketTitle: "Basket",
     noteLabel: "Transaction note",
-    clearBasket: "Clear basket",
+    clearBasket: "Clear Basket",
     storeLabel: "Store",
     cashierLabel: "Cashier",
     shiftLabel: "Shift",
@@ -892,9 +910,9 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     suggestedPrice: "Suggested price",
     priceCap: "Price cap",
     rackLabel: "Rack",
-    lookupEmpty: "After a scan, this area shows store stock, suggested price, price cap, and rack.",
-    cartEmpty: "The basket is empty. Each scan lands here as one physical line item.",
-    addCurrentLookup: "Add to basket",
+    lookupEmpty: "Waiting for scan. Non-STORE_ITEM codes show the next step here.",
+    cartEmpty: "The basket is empty. Please scan a STORE_ITEM code.",
+    addCurrentLookup: "Add to Basket",
     qty: "Qty",
     sellingPrice: "Selling price",
     subtotal: "Subtotal",
@@ -910,12 +928,12 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     discountAmount: "Discount",
     receivableAmount: "Amount due",
     paidAmount: "Assigned payment",
-    balanceAmount: "Outstanding balance",
+    balanceAmount: "Amount due",
     paymentStatus: "Payment status",
     paidStatus: "Covered",
     collectStatus: "Collecting",
     scanStatus: "Waiting for scan",
-    paymentTitle: "Payment & Checkout",
+    paymentTitle: "Checkout",
     cashMethod: "Cash",
     mpesaMethod: "M-Pesa",
     mixedMethod: "Mixed",
@@ -976,8 +994,8 @@ const CASHIER_TERMINAL_LOCALE_COPY = {
     offlineHint: "Offline sync still uses the existing offlineSyncForm. This round only moves the entry into the terminal.",
     openOfflineSync: "Open offline sync page",
     localeButtons: { zh: "中文", en: "EN" },
-    barcodePlaceholder: "Scan barcode / type barcode",
-    manualPlaceholder: "Barcode / identity / price lookup",
+    barcodePlaceholder: "Scan STORE_ITEM code",
+    manualPlaceholder: "Enter STORE_ITEM code",
     notePlaceholder: "Normal sale / customer note / handover note",
   },
 };
@@ -1864,12 +1882,12 @@ const WAREHOUSE_PANEL_NAV_META = [
     navTitleEn: "4.1 Manual Replenishment Request",
   },
   {
-    match: "5.1 补差打包工单",
+    match: "5.1 LPK 补差拣货",
     section: "replenishment",
     order: 127.5,
     icon: "工",
-    navTitle: "5.1 补差打包工单",
-    navTitleEn: "5.1 Shortage Pick-Pack Order",
+    navTitle: "5.1 LPK 补差拣货",
+    navTitleEn: "5.1 LPK Shortage Pick Task",
   },
   {
     match: "6. 仓库执行单 / 出库打印",
@@ -3312,7 +3330,7 @@ function setActivePanel(panelKey, options = {}) {
     && [
       getPanelKeyByTitle("warehouse", "门店补货流程页"),
       getPanelKeyByTitle("warehouse", "4.1 手动补货需求"),
-      getPanelKeyByTitle("warehouse", "5.1 补差打包工单"),
+      getPanelKeyByTitle("warehouse", "5.1 LPK 补差拣货"),
       getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"),
     ].includes(panelKey)
   ) {
@@ -11416,7 +11434,7 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
     ${renderSummaryActions([
       { panelKey: getPanelKeyByTitle("warehouse", "4. 门店补货建议"), label: "从补货建议开始" },
       { panelKey: getPanelKeyByTitle("warehouse", "4.1 手动补货需求"), label: "去手动补货需求" },
-      { panelKey: getPanelKeyByTitle("warehouse", "5.1 补差打包工单"), label: "去补差打包工单" },
+      { panelKey: getPanelKeyByTitle("warehouse", "5.1 LPK 补差拣货"), label: "去补差拣货单" },
       { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "去仓库执行台" },
     ])}
   `;
@@ -11433,7 +11451,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
     summaryTarget.className = "candidate-summary empty-state";
     summaryTarget.textContent = "先读取一张补货申请单号（来自 4.1），再决定是否需要生成补差拣货单。";
     listTarget.className = "candidate-summary empty-state";
-    listTarget.textContent = "如果当前调拨单有散货补差需求，这里会生成并显示补差打包工单。";
+    listTarget.textContent = "如果当前调拨单有散货补差需求，这里会生成并显示补差拣货单。";
     return;
   }
   const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer));
@@ -11451,7 +11469,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
       : "已完成";
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差打包工单码，不是门店收货码。</div>
+    <div class="alert-banner">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差拣货单码，不是门店收货码。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>补货申请单号</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
@@ -11474,7 +11492,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
     listTarget.className = "candidate-summary empty-state";
     listTarget.textContent = unresolvedShortageQty > 0
       ? "当前可用库存为 0，不能生成已完成 LPK。请等待补货，或取消缺货行后再继续。"
-      : "该补货申请没有散货缺口，无需生成补差打包工单。请回到 6 仓库执行单继续。";
+      : "该补货申请没有散货缺口，无需生成补差拣货单。请回到 6 仓库执行单继续。";
     return;
   }
   if (!tasks.length) {
@@ -11754,7 +11772,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>待完成</strong><span>${escapeHtml(readiness.pendingLooseTaskCount || 0)}</span></article>
     </div>
     ${renderSummaryActions([
-      { panelKey: getPanelKeyByTitle("warehouse", "5.1 补差打包工单"), label: "去 5.1 跟进补差工单" },
+      { panelKey: getPanelKeyByTitle("warehouse", "5.1 LPK 补差拣货"), label: "去 5.1 跟进补差工单" },
     ])}
   `;
   if (plan.loosePickRows.length) {
@@ -11784,7 +11802,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       : '<div class="empty-state">这张调拨单有散货补差，但拣货单还没生成。先去 5.1 生成补差拣货单 barcode。</div>';
   } else {
     looseTarget.className = "candidate-summary empty-state";
-    looseTarget.textContent = "现成待送店包裹已经覆盖当前需求，不需要再做散货补差打包。";
+    looseTarget.textContent = "现成待送店包裹已经覆盖当前需求，不需要再做散货补差拣货。";
   }
   dispatchTarget.className = "report-summary";
   dispatchTarget.innerHTML = `
@@ -17131,7 +17149,7 @@ async function checkLocalPrintAgentHealth() {
     localPrintAgentState.connected = false;
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = "health failed";
-    setLocalPrintAgentMessage("error", "打印助手未连接，请先启动 Windows 打印助手");
+    setLocalPrintAgentMessage("error", "打印助手未连接，请先启动 Windows 打印助手。");
     renderBalePrintModal();
     throw error;
   }
@@ -17383,7 +17401,7 @@ async function printCurrentBaleModalPrimaryAction() {
   }
   balePrinterConsoleNotice = {
     type: "error",
-    message: "打印助手未连接，请先启动 Windows 打印助手",
+    message: "打印助手未连接，请先启动 Windows 打印助手。",
   };
   renderBalePrintModal();
   throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
@@ -17405,7 +17423,7 @@ async function printAllBaleModalPrimaryAction() {
   if (!localPrintAgentState.connected) {
     balePrinterConsoleNotice = {
       type: "error",
-      message: "打印助手未连接，请先启动 Windows 打印助手",
+      message: "打印助手未连接，请先启动 Windows 打印助手。",
     };
     renderBalePrintModal();
     throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
@@ -18993,19 +19011,27 @@ function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
   target.className = "candidate-summary";
   target.innerHTML = `
     <div class="alert-banner">已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。</div>
-    <div class="subtle small">${escapeHtml(`${waveNo} / ${(wave?.stores_included || []).length} stores / ${Number(wave?.total_requested_qty || 0)} 件`)}</div>
+    <div class="subtle small">${escapeHtml(currentLanguage === "en"
+      ? `${waveNo} / ${(wave?.stores_included || []).length} stores / ${Number(wave?.total_requested_qty || 0)} items`
+      : `${waveNo} / ${(wave?.stores_included || []).length} 个门店 / ${Number(wave?.total_requested_qty || 0)} 件`)}</div>
     <div class="candidate-list transfer-draft-list">
       ${rows.map((row) => {
         const required = String(row.transfer?.required_arrival_date || row.transfer?.required_arrival_on || "-");
         const sdo = String(row.transfer?.store_delivery_execution_order_no || "").trim();
         if (mode === "ship") {
-          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || "SDO 未生成")} / ${escapeHtml(row.transfer?.to_store_code || "-")} / ${escapeHtml(String(row.transfer?.delivery_batch?.bale_count || 0))} 包 / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : "待生成")}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? "可进入发运" : "SDO 未生成，请先去 6 仓库执行核对"}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">查看 SDO</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">进入该申请仓库执行</button>`}</div></article>`;
+          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || chooseI18nLabel("SDO 未生成", "SDO Not Generated"))} / ${escapeHtml(row.transfer?.to_store_code || "-")} / ${escapeHtml(formatI18nCount(row.transfer?.delivery_batch?.bale_count || 0, "包", "packages"))} / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : chooseI18nLabel("待生成", "Pending"))}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? chooseI18nLabel("可进入发运", "Ready to dispatch") : chooseI18nLabel("SDO 未生成，请先去 6 仓库执行核对", "SDO not generated. Check Warehouse Execution first.")}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">${escapeHtml(chooseI18nLabel("查看 SDO", "View SDO"))}</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${escapeHtml(chooseI18nLabel("进入该申请仓库执行", "Open Warehouse Execution"))}</button>`}</div></article>`;
         }
         if (mode === "exec") {
-          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} / ${row.transfer?.to_store_code || '-'} / SDB ${row.transfer?.delivery_batch?.bale_count || 0} / LPK ${row.shortage > 0 ? '1/1' : '0/0'} / SDO ${sdo ? '已生成' : '未生成'}`)}</strong><div class="subtle small">${escapeHtml(`required ${required} / total ${row.total} 件 / shortage ${row.shortage} 件`)}</div></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${sdo ? '查看/生成 SDO' : '进入执行'}</button></div></article>`;
+          const detail = currentLanguage === "en"
+            ? `required ${required} / total ${row.total} items / shortage ${row.shortage} items`
+            : `到货 ${required} / 总量 ${row.total} 件 / 缺货 ${row.shortage} 件`;
+          return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} / ${row.transfer?.to_store_code || '-'} / SDB ${row.transfer?.delivery_batch?.bale_count || 0} / LPK ${row.shortage > 0 ? '1/1' : '0/0'} / SDO ${sdo ? chooseI18nLabel('已生成', 'generated') : chooseI18nLabel('未生成', 'not generated')}`)}</strong><div class="subtle small">${escapeHtml(detail)}</div></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${escapeHtml(sdo ? chooseI18nLabel('查看/生成 SDO', 'View / Generate SDO') : chooseI18nLabel('进入执行', 'Open Execution'))}</button></div></article>`;
         }
-        return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(`${row.requestNo} | ${row.transfer?.to_store_code || '-'} | required ${required} | total ${row.total} 件 | shortage ${row.shortage} 件`)}</strong></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="lpk">${row.shortage > 0 ? '进入该申请补差' : '无缺口，去仓库执行'}</button></div></article>`;
-      }).join("") || '<div class="empty-state">该仓库备货任务暂无可展示的补货申请。</div>'}
+        const detail = currentLanguage === "en"
+          ? `${row.requestNo} | ${row.transfer?.to_store_code || '-'} | required ${required} | total ${row.total} items | shortage ${row.shortage} items`
+          : `${row.requestNo} | ${row.transfer?.to_store_code || '-'} | 到货 ${required} | 总量 ${row.total} 件 | 缺货 ${row.shortage} 件`;
+        return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(detail)}</strong></div><div class="candidate-side-actions"><button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="lpk">${escapeHtml(row.shortage > 0 ? chooseI18nLabel('进入该申请补差', 'Open shortage pick') : chooseI18nLabel('无缺口，去仓库执行', 'No shortage. Open execution'))}</button></div></article>`;
+      }).join("") || '<div class="empty-state">该仓库备货任务暂无补货申请。请先绑定补货申请单。</div>'}
     </div>`;
 }
 function populateTransferOrderSelectors() {
@@ -19048,7 +19074,12 @@ function populateTransferOrderSelectors() {
     });
     const requestOptions = rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("");
     const waveOptions = waves
-      .map((wave) => `<option value="WAVE:${escapeHtml(wave.wave_no || "")}">${escapeHtml(`${wave.wave_no || "-"} / ${(wave.stores_included || []).length} stores / ${Number(wave.total_requested_qty || 0)} 件 / 缺口 ${Number(wave.total_shortage_qty || 0)} 件`)}</option>`)
+      .map((wave) => {
+        const label = currentLanguage === "en"
+          ? `${wave.wave_no || "-"} / ${(wave.stores_included || []).length} stores / ${Number(wave.total_requested_qty || 0)} items / shortage ${Number(wave.total_shortage_qty || 0)} items`
+          : `${wave.wave_no || "-"} / ${(wave.stores_included || []).length} 个门店 / ${Number(wave.total_requested_qty || 0)} 件 / 缺货 ${Number(wave.total_shortage_qty || 0)} 件`;
+        return `<option value="WAVE:${escapeHtml(wave.wave_no || "")}">${escapeHtml(label)}</option>`;
+      })
       .join("");
     select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${requestOptions}${waveOptions}`;
     if (previousValue && (rows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue) || (isWaveSelectionValue(previousValue) && waves.some((wave) => `WAVE:${String(wave?.wave_no || "").trim().toUpperCase()}` === previousValue)))) {
@@ -19066,7 +19097,9 @@ async function refreshPickingWavePanel() {
       const total = Number((row?.items || []).reduce((sum, item) => sum + Number(item?.requested_qty || 0), 0));
       const shortage = Number((row?.items || []).reduce((sum, item) => sum + Math.max(Number(item?.requested_qty || 0) - Number(item?.approved_qty || 0), 0), 0));
       const required = String(row?.required_arrival_date || "-");
-      const label = `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / required ${required} / total ${total} 件 / shortage ${shortage} 件`;
+      const label = currentLanguage === "en"
+        ? `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / required ${required} / total ${total} items / shortage ${shortage} items`
+        : `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / 到货 ${required} / 总量 ${total} 件 / 缺货 ${shortage} 件`;
       const transferNo = String(row.transfer_no || "").trim().toUpperCase();
       const selected = currentRequestNos.has(transferNo) ? " selected" : "";
       return `<option value="${escapeHtml(row.transfer_no || "")}"${selected}>${escapeHtml(label)}</option>`;
@@ -19080,11 +19113,16 @@ async function refreshPickingWavePanel() {
     window.__pickingWaveCache = Array.isArray(waves) ? waves : [];
     if (!Array.isArray(waves) || !waves.length) {
       list.className = "candidate-summary empty-state";
-      list.textContent = "暂无仓库备货任务。";
+      list.textContent = "暂无仓库备货任务。请先生成补货申请单，再生成仓库备货任务。";
       return;
     }
     list.className = "candidate-summary";
-    list.innerHTML = waves.map((wave) => `${escapeHtml(wave.wave_no || "-")} | ${(wave.stores_included || []).length} stores | ${Number(wave.total_requested_qty || 0)} 件 | 缺口 ${Number(wave.total_shortage_qty || 0)} 件 | ${Number(wave.sdb_count || 0)} SDB | ${Number(wave.lpk_count || 0)} LPK`).map((line) => `<div>${line}</div>`).join("");
+    list.innerHTML = waves.map((wave) => {
+      const line = currentLanguage === "en"
+        ? `${wave.wave_no || "-"} | ${(wave.stores_included || []).length} stores | ${Number(wave.total_requested_qty || 0)} items | shortage ${Number(wave.total_shortage_qty || 0)} items | ${Number(wave.sdb_count || 0)} SDB | ${Number(wave.lpk_count || 0)} LPK`
+        : `${wave.wave_no || "-"} | ${(wave.stores_included || []).length} 个门店 | ${Number(wave.total_requested_qty || 0)} 件 | 缺货 ${Number(wave.total_shortage_qty || 0)} 件 | ${Number(wave.sdb_count || 0)} SDB | ${Number(wave.lpk_count || 0)} LPK`;
+      return `<div>${escapeHtml(line)}</div>`;
+    }).join("");
   } catch (_error) {}
   renderPickingWaveTaskSummary();
 }
@@ -19098,7 +19136,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   const list = baseList.map((row) => normalizeTransferForOperationsSummary(row));
   if (!list.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先创建门店补货申请并生成仓库执行单，这里再读取最近数据，就能看配送批次、driver/vehicle 与收货跟踪。";
+    target.textContent = "先创建门店补货申请并生成仓库执行单，这里再读取最近数据，就能看配送批次、司机、车辆与收货跟踪。";
     return;
   }
   const summary = summarizeOperationsTransferRows(baseList);
@@ -23724,7 +23762,7 @@ async function submitCashierTerminalLookup({ addToCart = false } = {}) {
   cashierTerminalState.currentLookupResult = result;
   if (addToCart) {
     upsertCashierTerminalCartItem(result);
-    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物篮：${result.product_name || result.barcode}`, "success", 1400);
+    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入商品篮：${result.product_name || result.barcode}`, "success", 1400);
     clearCashierTerminalLookupInputs();
   }
   renderCashierTerminal();
@@ -23871,7 +23909,7 @@ async function handleCashierTerminalAction(action, target) {
         throw new Error("当前还没有查到商品。");
       }
       upsertCashierTerminalCartItem(cashierTerminalState.currentLookupResult);
-      showTransientInlineNotice("#cashierTerminalInlineNotice", "已加入购物篮。", "success", 1400);
+      showTransientInlineNotice("#cashierTerminalInlineNotice", "已加入商品篮。", "success", 1400);
       focusCashierTerminalScanInput();
       return;
     case "clear-cart":
