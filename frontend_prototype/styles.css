@@ -4226,7 +4226,7 @@ th {
 .modal-shell {
   position: fixed;
   inset: 0;
-  background: rgba(20, 44, 49, 0.52);
+  background: rgba(15, 23, 42, 0.52);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -4237,13 +4237,13 @@ th {
 
 .modal-card {
   width: min(720px, 100%);
-  border-radius: 24px;
-  background: linear-gradient(180deg, #fffdf9 0%, #f8f3e9 100%);
-  border: 1px solid rgba(205, 191, 165, 0.9);
-  box-shadow: 0 24px 80px rgba(17, 47, 53, 0.18);
-  padding: 22px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  padding: 16px;
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .modal-card-wide {
@@ -4258,7 +4258,9 @@ th {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .bale-print-modal-layout {
@@ -4270,10 +4272,10 @@ th {
 }
 
 .bale-print-modal-preview {
-  border-radius: 20px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(205, 191, 165, 0.9);
-  background: #fff;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
   min-height: clamp(260px, 50vh, 560px);
   height: clamp(260px, 50vh, 560px);
 }
@@ -4298,29 +4300,29 @@ th {
 
 .bale-print-primary-actions {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .bale-print-primary-button {
   width: 100%;
-  min-height: 52px;
+  min-height: 38px;
   justify-content: center;
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .bale-print-advanced {
-  border: 1px solid rgba(205, 191, 165, 0.9);
-  border-radius: 16px;
-  background: rgba(255, 253, 249, 0.72);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
   padding: 10px 12px;
 }
 
 .bale-print-advanced summary {
   cursor: pointer;
-  font-weight: 800;
-  color: #0b5358;
-  min-height: 38px;
+  font-weight: 600;
+  color: #475569;
+  min-height: 32px;
   display: flex;
   align-items: center;
 }
@@ -4335,10 +4337,10 @@ th {
 }
 
 .bale-print-modal-side .flow-summary-note.warning {
-  border-color: rgba(191, 124, 45, 0.35);
-  background: #fff7e7;
-  color: #8a4a07;
-  font-weight: 700;
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  font-weight: 600;
 }
 
 .bale-shipment-lock-form {
@@ -4407,6 +4409,19 @@ th {
   overflow: auto;
 }
 
+.bale-print-modal-side .candidate-row {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  gap: 8px;
+}
+
+.bale-print-modal-side .selected-bale-row strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
 @media (max-width: 1180px) {
   .modal-card-wide {
     width: min(1000px, calc(100vw - 16px));
@@ -4427,12 +4442,12 @@ th {
     bottom: 0;
     z-index: 2;
     padding: 10px 0 0;
-    background: linear-gradient(180deg, rgba(248, 243, 233, 0) 0%, #f8f3e9 26%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #ffffff 26%);
   }
 
   .bale-print-primary-button {
-    min-height: 58px;
-    font-size: 1.05rem;
+    min-height: 42px;
+    font-size: 14px;
   }
 }
 

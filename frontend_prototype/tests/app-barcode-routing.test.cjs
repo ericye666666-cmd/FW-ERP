@@ -50,13 +50,13 @@ test("completed inbound print modal keeps close and completion actions clickable
 
 test("bale print modal keeps field operators on primary print actions", () => {
   assert.match(indexHtml, /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
-  assert.match(indexHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?打印全部/);
   assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认本包已贴标/);
   assert.match(indexHtml, /id="balePrintModalCloseAndRefreshButton"[\s\S]*?取消并返回/);
-  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?当前打印方式：浏览器打印/);
-  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?Windows 打印机：请在系统打印窗口选择 Deli DL-720C/);
-  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?本地打印代理：未连接/);
-  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?推荐操作：点击“打印标签”，在系统打印窗口选择 Deli DL-720C。/);
+  const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
+  assert.ok(primaryActions, "primary print actions should exist");
+  assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
+  assert.match(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?打印助手未连接，请先启动 Windows 打印助手。/);
+  assert.doesNotMatch(indexHtml, /id="balePrintModalAgentFallback"[\s\S]*?当前打印方式：浏览器打印/);
 });
 
 test("bale print modal moves technical print controls into collapsed advanced options", () => {
@@ -68,6 +68,7 @@ test("bale print modal moves technical print controls into collapsed advanced op
   assert.match(advancedHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印助手/);
   assert.match(advancedHtml, /id="balePrintModalCheckLocalPrintersButton"[\s\S]*?检测打印机队列/);
   assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?高级：重试本张/);
+  assert.match(advancedHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?高级：打印全部/);
   assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?高级：批量重试/);
   assert.doesNotMatch(advancedHtml, /下载 Windows 打印助手/);
   assert.doesNotMatch(advancedHtml, /查看安装步骤/);
@@ -80,11 +81,9 @@ test("bale print modal moves technical print controls into collapsed advanced op
 test("primary bale print action requires local agent and keeps browser print in advanced fallback", () => {
   assert.match(appJs, /async function printCurrentBaleModalPrimaryAction\(\)[\s\S]*?localPrintAgentState\.connected[\s\S]*?printCurrentBaleModalViaLocalAgent\(\)[\s\S]*?checkLocalPrintAgentHealth\(\)[\s\S]*?打印助手未连接，请先启动 Windows 打印助手/);
   assert.match(appJs, /document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click"/);
-  assert.match(appJs, /当前打印方式：等待本地打印代理/);
   assert.match(appJs, /selectedPrinterName = "Deli DL-720C"/);
-  assert.match(appJs, /Windows 打印机：\$\{escapeHtml\(printerName\.replace/);
-  assert.match(appJs, /本地打印代理：未启动/);
-  assert.match(appJs, /本地代理队列暂不支持/);
+  assert.match(appJs, /打印助手未连接，请先启动 Windows 打印助手。/);
+  assert.match(appJs, /浏览器打印仅作高级备用。/);
   assert.doesNotMatch(appJs, /待安装打印机/);
   assert.doesNotMatch(appJs, /当前队列不支持/);
   assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
@@ -107,6 +106,7 @@ test("field advanced print controls stay limited to safe operator actions", () =
   assert.match(advancedHtml, /检测打印助手/);
   assert.match(advancedHtml, /检测打印机队列/);
   assert.match(advancedHtml, /高级：重试本张/);
+  assert.match(advancedHtml, /高级：打印全部/);
   assert.match(advancedHtml, /高级：批量重试/);
   assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
@@ -117,14 +117,45 @@ test("SDO modal primary action has one clear main print button and local-agent o
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
   assert.ok(primaryActions, "primary print actions should exist");
   assert.match(primaryActions[0], /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
+  assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
   assert.doesNotMatch(primaryActions[0], /打印本轮全部标签/);
   assert.match(appJs, /const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop"/);
-  assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint \? "打印 SDO 条码"/);
+  assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint[\s\S]*?\? "打印 SDO 条码"/);
   assert.match(appJs, /message: "打印助手未连接，请先启动 Windows 打印助手"/);
   assert.match(appJs, /throw new Error\("打印助手未连接，请先启动 Windows 打印助手。"\)/);
   const primaryActionFunction = appJs.match(/async function printCurrentBaleModalPrimaryAction\(\) \{[\s\S]*?\n\}/);
   assert.ok(primaryActionFunction, "primary print action should exist");
   assert.doesNotMatch(primaryActionFunction[0], /browserPrintCurrentBaleModalJob\(\)/);
+});
+
+test("print modal uses neutral compact ERP visual styling", () => {
+  assert.match(stylesCss, /\.modal-card\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?background:\s*#ffffff;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?box-shadow:\s*0 12px 28px rgba\(15,\s*23,\s*42,\s*0\.12\);/);
+  assert.match(stylesCss, /\.bale-print-modal-preview\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
+  assert.match(stylesCss, /\.bale-print-primary-button\s*\{[\s\S]*?min-height:\s*38px;[\s\S]*?font-size:\s*14px;/);
+  assert.match(stylesCss, /\.bale-print-advanced\s*\{[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?border-radius:\s*8px;[\s\S]*?background:\s*#ffffff;[\s\S]*?padding:\s*10px 12px;/);
+  assert.match(stylesCss, /\.bale-print-advanced summary\s*\{[\s\S]*?font-weight:\s*600;[\s\S]*?color:\s*#475569;[\s\S]*?min-height:\s*32px;/);
+  assert.match(stylesCss, /\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?border-color:\s*#fecaca;[\s\S]*?background:\s*#fef2f2;[\s\S]*?color:\s*#991b1b;/);
+  assert.match(stylesCss, /\.bale-print-modal-side \.candidate-row\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
+  const printModalCss = [
+    stylesCss.match(/\.modal-card\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-print-modal-preview\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-print-advanced\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    stylesCss.match(/\.bale-print-modal-side \.candidate-row\s*\{[\s\S]*?\n\}/)?.[0] || "",
+    appJs.match(/function renderDirectOnlyBaleModalPreview[\s\S]*?function deriveBaleLabelDisplayParts/)?.[0] || "",
+  ].join("\n");
+  assert.doesNotMatch(printModalCss, /#fffaf0|#fff7ed|#fef3c7|#f8f1e5|#f4ede1|#eadfc8|#fffdf9|#f8f3e9|#fff7e7|rgba\(207,\s*192,\s*170|rgba\(205,\s*191,\s*165|rgba\(187,\s*169,\s*139/);
+  assert.doesNotMatch(printModalCss, /#fffaf1|#f7f1e6|#d7c8b2|#f7f2e7/);
+});
+
+test("print modal labels primary print button by barcode type without changing barcode rules", () => {
+  assert.match(appJs, /isSdoPrint[\s\S]*?\? "打印 SDO 条码"/);
+  assert.match(appJs, /isLpkPrint[\s\S]*?\? "打印 LPK 条码"/);
+  assert.match(appJs, /isSdbPrint[\s\S]*?\? "打印 SDB 标签"/);
+  assert.match(appJs, /isStoreItemPrint[\s\S]*?\? "打印 STORE_ITEM 标签"/);
+  assert.match(appJs, /isRawBalePrint[\s\S]*?\? "打印 RAW_BALE 标签"/);
+  assert.match(appJs, /barcode_value:\s*barcodeValue/);
+  assert.doesNotMatch(appJs, /barcode_value:\s*displayCode/);
 });
 
 test("store dispatch print confirmation completes only the current modal job", () => {

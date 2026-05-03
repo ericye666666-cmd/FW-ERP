@@ -1018,7 +1018,7 @@
           <div class="modal-head">
             <div>
               <h3 id="balePrintModalTitle">Bale 条码打印窗</h3>
-              <div id="balePrintModalSubhead" class="subtle small">在这里连接打印机并直接打印，不再弹系统大打印框。</div>
+              <div id="balePrintModalSubhead" class="subtle small">连接打印助手后打印标签。</div>
             </div>
             <button id="closeBalePrintModalButton" type="button" class="ghost-button mini-button">关闭</button>
           </div>
@@ -1034,15 +1034,10 @@
                 <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button">下一张</button>
               </div>
               <div id="balePrintModalAgentFallback" class="flow-summary-note warning hidden-screen">
-                <strong>当前打印方式：浏览器打印</strong><br />
-                Windows 打印机：请在系统打印窗口选择 Deli DL-720C<br />
-                本地打印代理：未连接<br />
-                浏览器打印状态：可用<br />
-                推荐操作：点击“打印标签”，在系统打印窗口选择 Deli DL-720C。
+                打印助手未连接，请先启动 Windows 打印助手。
               </div>
               <div class="bale-print-primary-actions">
                 <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">打印标签</button>
-                <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button bale-print-primary-button hidden-screen">打印全部</button>
                 <button id="balePrintModalCompleteButton" type="button" class="ghost-button bale-print-primary-button">确认本包已贴标</button>
                 <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button bale-print-primary-button">取消并返回</button>
               </div>
@@ -1052,12 +1047,13 @@
                   <strong>FW-ERP 打印助手</strong><br />
                   打印助手：未启动<br />
                   本地地址：http://127.0.0.1:8719<br />
-                  当前推荐：Windows 电脑请先启动打印助手，再点击“打印标签”
+                  启动后点击主按钮打印。
                 </div>
                 <div class="button-row">
                   <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测打印助手</button>
                   <button id="balePrintModalCheckLocalPrintersButton" type="button" class="ghost-button mini-button">检测打印机队列</button>
                   <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button">高级：重试本张</button>
+                  <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button mini-button hidden-screen">高级：打印全部</button>
                   <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button">高级：批量重试</button>
                 </div>
                 <div id="balePrintModalScopeNote" class="subtle small"></div>

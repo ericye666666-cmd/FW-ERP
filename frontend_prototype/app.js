@@ -16604,13 +16604,13 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   <meta charset="utf-8">
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f1e6; color: #111; font-family: Arial, sans-serif; }
-    .label { width: 420px; min-height: 280px; padding: 18px; border: 2px solid #c6dadd; border-radius: 16px; background: #fffaf1; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8fafc; color: #111; font-family: Arial, sans-serif; }
+    .label { width: 420px; min-height: 280px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }
     h1 { margin: 4px 0 4px; font-size: 26px; line-height: 1.05; letter-spacing: .03em; }
-    .sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #0b6268; }
-    .pick-summary { margin: 0 0 8px; padding: 7px 8px; border: 1px solid #1d4f55; background: #eef9f7; font-size: 13px; line-height: 1.35; font-weight: 800; color: #10292d; }
-    .meta { margin: 0 0 8px; font-size: 12px; color: #463f37; line-height: 1.4; }
-    .barcode-wrap { padding: 8px 10px; border-radius: 10px; background: #fff; border: 1px solid #d7c8b2; }
+    .sub { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #475569; }
+    .pick-summary { margin: 0 0 8px; padding: 7px 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 13px; line-height: 1.35; font-weight: 800; color: #0f172a; }
+    .meta { margin: 0 0 8px; font-size: 12px; color: #334155; line-height: 1.4; }
+    .barcode-wrap { padding: 8px 10px; border-radius: 8px; background: #ffffff; border: 1px solid #e2e8f0; }
     .code { margin-top: 6px; font-size: 16px; font-weight: 900; letter-spacing: .07em; word-break: break-all; text-align: center; }
   </style>
 </head>
@@ -16646,7 +16646,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: #f7f1e6;
+      background: #f8fafc;
       color: #111;
       font-family: Arial, sans-serif;
     }
@@ -16654,25 +16654,25 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       width: 520px;
       min-height: 330px;
       padding: 18px;
-      border: 2px solid #c6dadd;
-      border-radius: 14px;
-      background: #fffaf1;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
       display: grid;
       grid-template-columns: 1fr 130px;
       gap: 14px;
     }
     .left { display: grid; gap: 10px; align-content: start; }
-    .right { border-left: 1px solid #d7c8b2; padding-left: 12px; display: grid; align-content: start; gap: 8px; }
-    .kicker { font-size: 13px; font-weight: 800; color: #0b6268; letter-spacing: .08em; text-transform: uppercase; }
+    .right { border-left: 1px solid #e2e8f0; padding-left: 12px; display: grid; align-content: start; gap: 8px; }
+    .kicker { font-size: 13px; font-weight: 800; color: #2563eb; letter-spacing: .08em; text-transform: uppercase; }
     h1 { margin: 0; font-size: 28px; line-height: 1.05; }
-    .meta { margin: 0; font-size: 15px; color: #5e564d; }
-    .badge { display: inline-block; padding: 5px 8px; border-radius: 8px; background: #eef5f2; color: #0b6268; font-weight: 800; font-size: 12px; }
+    .meta { margin: 0; font-size: 15px; color: #475569; }
+    .badge { display: inline-block; padding: 5px 8px; border-radius: 6px; background: #eff6ff; color: #2563eb; font-weight: 800; font-size: 12px; }
     .barcode-wrap { display: grid; gap: 6px; align-content: start; }
     .barcode-wrap svg { width: 100%; max-width: 340px; height: 96px; display: block; }
     .code { font-size: 24px; font-weight: 900; letter-spacing: .06em; word-break: break-all; }
     .right strong { font-size: 13px; }
-    .right div { font-size: 12px; line-height: 1.25; color: #5e564d; word-break: break-word; }
-    .foot { font-size: 11px; color: #766d62; display: flex; justify-content: space-between; gap: 10px; }
+    .right div { font-size: 12px; line-height: 1.25; color: #475569; word-break: break-word; }
+    .foot { font-size: 11px; color: #64748b; display: flex; justify-content: space-between; gap: 10px; }
   </style>
 </head>
 <body>
@@ -16711,7 +16711,7 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: #f7f1e6;
+      background: #f8fafc;
       color: #111;
       font-family: Arial, sans-serif;
     }
@@ -16719,34 +16719,35 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
       width: 420px;
       min-height: 280px;
       padding: 24px;
-      border: 2px solid #c6dadd;
-      border-radius: 18px;
-      background: #fffaf1;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #ffffff;
     }
-    .kicker { font-size: 14px; font-weight: 700; color: #0b6268; letter-spacing: .08em; text-transform: uppercase; }
+    .kicker { font-size: 14px; font-weight: 700; color: #2563eb; letter-spacing: .08em; text-transform: uppercase; }
     h1 { margin: 10px 0 6px; font-size: 30px; line-height: 1.1; }
-    .meta { margin: 0 0 18px; font-size: 18px; color: #5e564d; }
+    .meta { margin: 0 0 18px; font-size: 18px; color: #475569; }
     .details {
       margin: 0 0 16px;
       display: grid;
       gap: 6px;
       font-size: 13px;
       font-weight: 700;
-      color: #0b6268;
+      color: #0f172a;
     }
     .details div {
       padding: 5px 8px;
-      border-radius: 9px;
-      background: #eef5f2;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
     }
     .barcode {
       height: 92px;
-      border-radius: 14px;
+      border-radius: 8px;
       background:
         repeating-linear-gradient(90deg, #111 0 5px, transparent 5px 9px, #111 9px 12px, transparent 12px 18px);
     }
     .code { margin-top: 12px; font-size: 26px; font-weight: 900; letter-spacing: .08em; word-break: break-all; }
-    .foot { margin-top: 16px; font-size: 14px; color: #766d62; display: flex; justify-content: space-between; gap: 12px; }
+    .foot { margin-top: 16px; font-size: 14px; color: #64748b; display: flex; justify-content: space-between; gap: 12px; }
   </style>
 </head>
 <body>
@@ -16884,15 +16885,15 @@ function renderBaleLocalPrintAgentStatus() {
   const statusText = localPrintAgentState.checking
     ? "检测中"
     : (localPrintAgentState.connected ? "已连接" : "未启动");
-  const modeText = localPrintAgentState.connected ? "本地打印代理直打" : "请先启动 FW-ERP Print Agent";
+  const modeText = localPrintAgentState.connected ? "已连接" : "未连接";
   const agentClass = localPrintAgentState.connected ? "flow-summary-note success" : "flow-summary-note warning";
   const printers = Array.isArray(localPrintAgentState.printers) ? localPrintAgentState.printers : [];
   const printerText = localPrintAgentState.printerChecking
     ? "正在检测本机打印队列..."
     : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印队列");
   const helperMessage = localPrintAgentState.connected
-    ? "显示已连接后，可以点击“打印标签”。"
-    : "请先下载并启动 Windows 打印助手";
+    ? "可以点击主按钮打印。"
+    : "请先启动 Windows 打印助手。";
   const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
   statusArea.className = "candidate-summary";
   statusArea.innerHTML = `
@@ -16900,8 +16901,7 @@ function renderBaleLocalPrintAgentStatus() {
       <strong>FW-ERP 打印助手</strong>
       <div>打印助手：${escapeHtml(statusText)}</div>
       <div>本地地址：${escapeHtml(agentUrl)}</div>
-      <div>当前推荐：Windows 电脑请先启动打印助手，再点击“打印标签”</div>
-      <div>当前打印方式：${escapeHtml(modeText)}</div>
+      <div>状态：${escapeHtml(modeText)}</div>
       <div>${escapeHtml(helperMessage)}</div>
       ${suffix}
     </div>
@@ -16915,27 +16915,19 @@ function renderBalePrintMethodStatus({
   supportsTemplate = true,
   usesTsplMode = false,
 } = {}) {
-  const printerName = String(selectedPrinterName || "Deli DL-720C").trim() || "Deli DL-720C";
   const sizeLabel = getSelectedBaleTemplateSizeLabel(selectedTemplate || {});
   const queueNote = !supportsTemplate && !usesTsplMode
-    ? `<div>本地代理队列暂不支持 ${escapeHtml(sizeLabel)}，浏览器打印仍可使用。</div>`
+    ? `<div>${escapeHtml(sizeLabel)} 可用浏览器备用打印。</div>`
     : "";
   if (localPrintAgentState.connected) {
     return `
-      <strong>当前打印方式：本地打印代理</strong>
-      <div>本地打印代理：已连接</div>
-      <div>浏览器打印状态：可用作备用</div>
-      <div>推荐操作：点击“打印标签”，Deli 标签机会按 TSPL 原始指令直接出纸。</div>
+      <strong>打印助手已连接</strong>
+      <div>点击主按钮打印。</div>
       ${queueNote}
     `;
   }
   return `
-    <strong>当前打印方式：等待本地打印代理</strong>
-    <div>Windows 打印机：${escapeHtml(printerName.replace(/_/g, " "))}</div>
-    <div>本地打印代理：未启动</div>
-    <div>浏览器打印状态：高级选项中可手动备用</div>
-    <div>推荐操作：先启动 FW-ERP Print Agent，再点击“打印标签”。</div>
-    ${queueNote}
+    <strong>打印助手未连接，请先启动 Windows 打印助手。</strong>
   `;
 }
 
@@ -17239,10 +17231,10 @@ async function printAllBaleModalPrimaryAction() {
   if (!localPrintAgentState.connected) {
     balePrinterConsoleNotice = {
       type: "error",
-      message: "本地打印代理未启动，请先启动 FW-ERP Print Agent。浏览器打印保留在高级选项中。",
+      message: "打印助手未连接，请先启动 Windows 打印助手",
     };
     renderBalePrintModal();
-    throw new Error("本地打印代理未启动，请先启动 FW-ERP Print Agent。");
+    throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
   }
   const originalIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0));
   let printedCount = 0;
@@ -17320,6 +17312,8 @@ function renderBalePrintModal() {
   const selectedTemplateCode = getActiveBaleTemplateCode(balePrintModalState.preferredTemplateCode || currentJob?.template_code || currentJob?.print_payload?.template_code || "");
   const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" || selectedTemplateCode === "transtoshop";
   const isSdbPrint = selectedTemplateCode === "store_prep_bale_60x40" || selectedTemplateCode === "wait_for_transtoshop" || selectedTemplateCode === "wait_for_sale";
+  const isStoreItemPrint = templateScope === "product" || selectedTemplateCode === "store_item_60x40";
+  const isRawBalePrint = templateScope === "bale" || selectedTemplateCode === "warehouse_in" || selectedTemplateCode === "warehouse_in_60x40";
   balePrintModalState.preferredTemplateCode = selectedTemplateCode;
   const selectedTemplate = getSelectedBaleTemplate(selectedTemplateCode, templateScope, activeTaskType);
   const selectedPrinterName = String(document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "Deli DL-720C").trim();
@@ -17365,8 +17359,8 @@ function renderBalePrintModal() {
   }
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
-      ? "浏览器打印/PDF会输出与预览一致的 LPK 标签 HTML（含条码值），可直接用于仓库工单留档。"
-      : "高级说明：浏览器打印只作为备用选项。正式标签打印请先启动 FW-ERP Print Agent，再点击主按钮。";
+      ? "浏览器打印仅作 LPK 留档备用。"
+      : "浏览器打印仅作高级备用。";
   }
   if (agentFallback instanceof HTMLElement) {
     agentFallback.className = `flow-summary-note ${localPrintAgentState.connected ? "success" : "warning"}${currentJob ? "" : " hidden-screen"}`;
@@ -17411,8 +17405,8 @@ function renderBalePrintModal() {
         <div class="button-row bale-modal-status-row">
           <span class="meta-pill">${escapeHtml(selectedTemplate.barcode_type || "Code128")} 一维码</span>
           <span class="meta-pill">当前测试 ${selectedTemplate.width_mm || 60}x${selectedTemplate.height_mm || 40}</span>
-          <span class="meta-pill">${escapeHtml(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "Windows 打印窗口选择打印机")}</span>
-          <span class="meta-pill ${supportsTemplate ? "" : "warning-pill"}">${usesTsplMode ? "标签机 TSPL 直打" : (supportsTemplate ? `本地代理队列支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}` : `本地代理队列暂不支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}，浏览器打印仍可使用。`)}</span>
+          <span class="meta-pill">${escapeHtml(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "未检测打印机")}</span>
+          <span class="meta-pill ${supportsTemplate ? "" : "warning-pill"}">${usesTsplMode ? "本机直打" : (supportsTemplate ? `本机直打 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}` : `${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))} 高级备用`)}</span>
           ${
             balePrinterConsoleNotice
               ? `<span class="meta-pill">${escapeHtml(balePrinterConsoleNotice.message)}</span>`
@@ -17420,13 +17414,13 @@ function renderBalePrintModal() {
           }
         </div>
         ${selectedPrinter && !supportsTemplate && !usesTsplMode
-          ? `<div class="alert-banner">本地代理队列暂不支持 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}，浏览器打印仍可使用。请点击“打印标签”，在系统打印窗口选择 ${escapeHtml(selectedPrinterName.replace(/_/g, " "))}。</div>`
+          ? `<div class="alert-banner">此模板尺寸请在高级选项使用浏览器备用打印。</div>`
           : ""}
         ${selectedPrinter && usesTsplMode
-          ? `<div class="flow-summary-note success">当前已切换为 TSPL 原始指令直打，不依赖 Edge/Chrome 浏览器打印。请直接测试 Deli 标签机是否正常出纸。</div>`
+          ? `<div class="flow-summary-note success">TSPL 直打已启用。点击主按钮测试出纸。</div>`
           : ""}
         ${closeAction.action !== "allow_close"
-          ? `<div class="flow-summary-note">当前这轮贴码流程不会因为关闭弹窗而结束。核对实体出纸后，请点“确认本包已贴标”。</div>`
+          ? `<div class="flow-summary-note">核对出纸后再确认已贴标。</div>`
           : ""}
       </div>
     `;
@@ -17485,11 +17479,19 @@ function renderBalePrintModal() {
   }
   if (primaryPrintButton instanceof HTMLButtonElement) {
     primaryPrintButton.disabled = !currentJob;
-    primaryPrintButton.textContent = isSdoPrint ? "打印 SDO 条码" : (isLpkPrint ? "打印 LPK 条码" : (isSdbPrint ? "打印 SDB 标签" : (jobs.length > 1 ? "打印当前张" : "打印标签")));
+    primaryPrintButton.textContent = isSdoPrint
+      ? "打印 SDO 条码"
+      : (isLpkPrint
+        ? "打印 LPK 条码"
+        : (isSdbPrint
+          ? "打印 SDB 标签"
+          : (isStoreItemPrint
+            ? "打印 STORE_ITEM 标签"
+            : (isRawBalePrint ? "打印 RAW_BALE 标签" : "打印标签"))));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
-    primaryPrintAllButton.textContent = "打印全部";
+    primaryPrintAllButton.textContent = "高级：打印全部";
     primaryPrintAllButton.classList.toggle("hidden-screen", jobs.length <= 1);
   }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
