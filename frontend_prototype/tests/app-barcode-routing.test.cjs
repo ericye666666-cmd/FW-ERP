@@ -23,6 +23,19 @@ test("high-risk scan pages call the global resolver with explicit context", () =
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
 });
 
+test("PDA putaway remains STORE_ITEM-only and keeps wrong barcode types out of shelving", () => {
+  assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
+  assert.match(appJs, /function getStorePdaScanGuidance/);
+  assert.match(appJs, /请扫描 STORE_ITEM 商品码。/);
+  assert.match(appJs, /这是 SDO，请去门店收货页面处理。/);
+  assert.match(appJs, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
+  assert.match(appJs, /这是 RAW_BALE，门店不能处理。/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"RAW_BALE"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"STORE_PREP_BALE"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"LOOSE_PICK_TASK"/);
+  assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
+});
+
 test("POS lookup preserves backend canonical product barcode after resolver approval", () => {
   assert.match(appJs, /getCanonicalBarcodeForContext\(\{\s*inputBarcode:\s*payload\.barcode,\s*resolved,\s*stockResult:\s*result,\s*context:\s*"pos",\s*\}\)/);
 });
