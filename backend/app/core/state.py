@@ -1334,6 +1334,11 @@ class InMemoryState:
     def _build_raw_bale_row(self, row: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(row)
         self._ensure_raw_bale_defaults(normalized)
+        machine_code = str(normalized.get("machine_code") or "").strip().upper()
+        if self._is_raw_bale_machine_code(machine_code):
+            normalized["machine_code"] = machine_code
+            normalized["barcode_value"] = machine_code
+            normalized["human_readable"] = machine_code
         normalized["is_occupied"] = bool(str(normalized.get("occupied_by_task_no") or "").strip())
         normalized["is_in_bale_sales_pool"] = str(normalized.get("destination_judgement") or "").strip().lower() == "bale_sales_pool"
         normalized["can_route_to_sorting"] = (

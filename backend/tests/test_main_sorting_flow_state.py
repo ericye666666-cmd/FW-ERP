@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.core.state import InMemoryState
+from app.schemas.sorting import RawBaleStockResponse
 
 
 class MainSortingFlowStateTest(unittest.TestCase):
@@ -789,6 +790,30 @@ class MainSortingFlowStateTest(unittest.TestCase):
 
         self.assertEqual(task["bale_barcodes"], [first_bale["bale_barcode"]])
         self.assertEqual(task["legacy_bale_barcodes"], [first_bale["legacy_bale_barcode"]])
+
+    def test_raw_bale_list_exposes_machine_code_lookup_fields_for_sorting_page(self):
+        shipment, _, _, _ = self._create_ready_bales_with_source_cost(customs_notice_no="RAW240430")
+        listed_bale = self.state.list_raw_bales(shipment_no=shipment["shipment_no"])[0]
+
+        self.assertRegex(listed_bale["machine_code"], r"^1\d{9}$")
+        self.assertEqual(listed_bale["barcode_value"], listed_bale["machine_code"])
+        self.assertEqual(listed_bale["human_readable"], listed_bale["machine_code"])
+
+        response = RawBaleStockResponse(**listed_bale)
+        self.assertEqual(response.machine_code, listed_bale["machine_code"])
+        self.assertEqual(response.barcode_value, listed_bale["machine_code"])
+        self.assertEqual(response.human_readable, listed_bale["machine_code"])
+
+        task = self.state.create_sorting_task(
+            {
+                "bale_barcodes": [listed_bale["machine_code"]],
+                "handler_names": ["warehouse_clerk_1"],
+                "note": "machine_code can be canonicalized",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+        self.assertEqual(task["bale_barcodes"], [listed_bale["bale_barcode"]])
+        self.assertNotEqual(task["bale_barcodes"], [listed_bale["machine_code"]])
 
     def test_store_prep_bale_task_moves_sorted_inventory_into_waiting_dispatch_bale_view(self):
         _, _, result = self._create_confirmed_sorting_inventory()
