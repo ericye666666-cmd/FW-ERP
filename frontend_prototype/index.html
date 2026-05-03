@@ -2724,41 +2724,58 @@
         <div class="panel-head">
           <h2>4.1 手动补货需求</h2>
         </div>
-        <div class="candidate-summary">
-          <div class="transfer-flow-strip">
-            <span class="store-flag">1 选申请</span>
-            <span class="store-flag">2 看建议</span>
-            <span class="store-flag">3 生成任务</span>
-            <span class="store-flag">4 执行/打印</span>
+        <div class="manual-replenishment-context">
+          <div>
+            <h3>手动补货申请</h3>
+            <p>填写门店、品类和数量，生成补货申请。</p>
           </div>
-          <div class="subtle small">创建申请后可单独执行，也可加入仓库备货任务（可选）。</div>
+          <div class="manual-replenishment-meta manual-context-controls">
+            <label class="manual-context-control">
+              <span>仓库</span>
+              <input data-manual-context-field="from_warehouse_code" value="WH1" />
+            </label>
+            <label class="manual-context-control">
+              <span>门店</span>
+              <input data-manual-context-field="to_store_code" value="UTAWALA" />
+            </label>
+            <label class="manual-context-control">
+              <span>到货</span>
+              <input data-manual-context-field="required_arrival_date" type="date" value="2026-05-03" />
+            </label>
+            <span id="manualReplenishmentContextStatus">草稿</span>
+          </div>
         </div>
-        <div class="transfer-prep-shell">
-          <article class="transfer-ops-card transfer-prep-form-card">
-            <div class="transfer-workbench-head">
-              <span class="eyebrow">Manual</span>
-              <h3>Step 1 创建补货申请</h3>
-              <p>填写门店、品类和数量，生成补货申请。</p>
+        <div class="manual-replenishment-layout">
+          <article class="transfer-ops-card manual-replenishment-entry-card">
+            <div class="manual-panel-head">
+              <h3>补货明细工作区</h3>
             </div>
-            <form id="transferForm" class="form-grid compact form-clean-placeholders">
-              <input name="from_warehouse_code" placeholder="来源仓，例如 WH1" value="WH1" />
-              <input name="to_store_code" placeholder="目标门店，例如 UTAWALA" value="UTAWALA" />
-              <input name="required_arrival_date" type="date" value="2026-05-03" />
+            <form id="transferForm" class="manual-replenishment-form form-clean-placeholders">
+              <input name="from_warehouse_code" type="hidden" value="WH1" />
+              <input name="to_store_code" type="hidden" value="UTAWALA" />
+              <input name="required_arrival_date" type="hidden" value="2026-05-03" />
               <textarea
                 name="items_json"
                 class="json-raw-field hidden-screen"
                 rows="5"
                 placeholder='[{"category_main":"pants","category_sub":"jeans pant","requested_qty":5}]'
               >[]</textarea>
-              <div class="line-builder" data-builder="transfer-items">
+              <div class="line-builder transfer-items-compact-table" data-builder="transfer-items">
                 <div class="line-builder-head">
                   <div>
                     <strong>补货明细</strong>
                     <p>只填写需求品类和数量；仓库执行时再按库存和 barcode 规则处理。</p>
                   </div>
-                  <button type="button" class="ghost-button mini-button" data-builder-add="transfer-items">新增一行</button>
+                  <button type="button" class="ghost-button mini-button" data-builder-add="transfer-items">添加一行</button>
                 </div>
-                <div id="transferItemsBuilder" class="line-builder-body"></div>
+                <div class="transfer-items-table-head" aria-hidden="true">
+                  <span>大类</span>
+                  <span>小类</span>
+                  <span>分级</span>
+                  <span>件数</span>
+                  <span>操作</span>
+                </div>
+                <div id="transferItemsBuilder" class="line-builder-body transfer-items-table-body"></div>
               </div>
               <details class="transfer-advanced-options">
                 <summary>内部估算 / 高级选项</summary>
@@ -2768,40 +2785,46 @@
                   <input type="text" value="由 4.7 默认成本价管理维护" readonly />
                 </label>
               </details>
-              <button type="submit">生成补货申请单</button>
             </form>
           </article>
 
-          <div class="transfer-prep-stack">
-            <article class="transfer-ops-card transfer-prep-summary-card">
-              <div class="transfer-workbench-head is-compact">
-                <span class="eyebrow">Draft</span>
-                <h3>补货需求草稿</h3>
-                <p>这里显示本次补货草稿。</p>
+          <article class="transfer-ops-card manual-replenishment-status-card">
+            <div class="manual-panel-head">
+              <h3>下一步动作</h3>
+            </div>
+            <section class="manual-summary-section">
+              <div class="manual-summary-title">
+                <strong>本次补货</strong>
               </div>
               <div id="transferDraftSummary" class="candidate-summary empty-state">
-                这里显示本次门店需求。
+                请先添加补货明细。
               </div>
-            </article>
-
-            <article class="transfer-ops-card transfer-prep-summary-card">
-              <div class="transfer-workbench-head is-compact">
-                <span class="eyebrow">Plan</span>
-                <h3>Step 2 系统配货建议</h3>
-                <p>系统按库存生成配货建议。</p>
+            </section>
+            <section class="manual-summary-section">
+              <div class="manual-summary-title">
+                <strong>系统建议</strong>
+                <span>可拣数量 / 缺货数量</span>
               </div>
               <div id="transferPreparationPlanSummary" class="candidate-summary empty-state">
-                这里显示待送店包、补差和最终送店包。
+                添加品类后，系统按库存生成配货建议。
               </div>
-            </article>
-          </div>
+            </section>
+            <section class="manual-summary-section manual-next-action-panel">
+              <div class="manual-summary-title">
+                <strong>下一步</strong>
+              </div>
+              <button id="transferActionSubmitButton" type="submit" form="transferForm" disabled>生成补货申请单</button>
+              <div id="transferActionHint" class="subtle small">请先添加补货明细</div>
+            </section>
+          </article>
         </div>
-        <div id="transferResultSummary" class="candidate-summary empty-state">
+        <div id="transferResultSummary" class="candidate-summary empty-state manual-replenishment-result">
           下一步：确认申请后进入仓库执行；门店收货以 SDO barcode 为准。
         </div>
         <div class="candidate-summary warehouse-prep-task-summary">
           <strong>仓库备货任务</strong>
           <div class="subtle small">把多个补货品类合成一个仓库拣货任务，仓库按这个任务备货。</div>
+          <div id="pickingWaveStageHint" class="warehouse-prep-stage-hint">请先生成补货申请单</div>
           <div class="report-summary-grid compact-metrics">
             <article class="store-metric"><strong>当前选中的补货单数量</strong><span id="pickingWaveSelectedCount">0</span></article>
             <article class="store-metric"><strong>总需求数量</strong><span id="pickingWaveTotalQty">0 件</span></article>
@@ -2809,7 +2832,7 @@
             <article class="store-metric"><strong>缺货数量</strong><span id="pickingWaveShortageQty">0 件</span></article>
           </div>
           <form id="pickingWaveForm" class="form-grid compact warehouse-prep-toolbar">
-            <button type="submit">生成仓库备货任务</button>
+            <button id="pickingWaveSubmitButton" type="submit" disabled>生成仓库备货任务</button>
             <details id="pickingWaveAdvancedSettings" class="transfer-advanced-options picking-wave-advanced-settings">
               <summary>高级设置 / 备货波次参数</summary>
               <input name="wave_name" type="text" placeholder="任务名称（如 PREP-20260503-A）" />

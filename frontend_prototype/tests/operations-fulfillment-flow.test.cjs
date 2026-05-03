@@ -626,8 +626,8 @@ test("recommendation and transfer copy use draft plus transfer wording without a
   assert.doesNotMatch(recommendationSectionHtml, /recommendationGoTransferButton/);
   assert.doesNotMatch(recommendationSectionHtml, />去确认补货单</);
   assert.doesNotMatch(recommendationSectionHtml, />去确认门店调拨单</);
-  assert.match(indexHtml, /<h3>补货需求草稿<\/h3>/);
-  assert.match(indexHtml, />手动生成补货申请</);
+  assert.match(indexHtml, /<strong>本次补货<\/strong>/);
+  assert.match(indexHtml, />生成补货申请单</);
   assert.doesNotMatch(indexHtml, /门店补货需求单/);
   assert.doesNotMatch(indexHtml, /这里完成补货单审核/);
   assert.doesNotMatch(appJs, /填写补货单号；创建补货单后会自动带出。/);
@@ -638,9 +638,12 @@ test("recommendation and transfer copy use draft plus transfer wording without a
 
 test("transfer drafting and warehouse execution pages use the new replenishment planning workbench structure", () => {
   assert.match(indexHtml, /<h2>门店补货流程页<\/h2>/);
-  assert.match(indexHtml, /<h2>4\.1 手动补货需求 \/ Manual replenishment request<\/h2>/);
-  assert.match(indexHtml, />手动生成补货申请/);
-  assert.match(indexHtml, /手动补货需求只定义门店需要补什么/);
+  assert.match(indexHtml, /<h2>4\.1 手动补货需求<\/h2>/);
+  assert.match(indexHtml, /<h3>手动补货申请<\/h3>/);
+  assert.match(indexHtml, /填写门店、品类和数量，生成补货申请。/);
+  assert.match(indexHtml, /class="manual-replenishment-layout"/);
+  assert.match(indexHtml, /class="transfer-items-table-head"/);
+  assert.match(indexHtml, />生成补货申请单/);
   assert.doesNotMatch(indexHtml, />一键生成配货任务</);
   assert.match(appJs, /function canAttachSubCategoryToMain/);
   assert.match(appJs, /function appendCategoryPairToTree/);
@@ -662,11 +665,11 @@ test("transfer drafting and warehouse execution pages use the new replenishment 
   assert.match(appJs, /store_loose_pick_60x40/);
   assert.match(appJs, /发送标签机打印/);
   assert.match(appJs, /门店补差拣货单 60x40/);
-  assert.match(indexHtml, /系统配货建议/);
-  assert.match(indexHtml, /优先吃掉已打包待送店包裹/);
-  assert.match(indexHtml, /补货需求录入/);
+  assert.match(indexHtml, /系统建议/);
+  assert.match(indexHtml, /可拣数量/);
+  assert.match(indexHtml, /补货明细/);
   assert.match(indexHtml, /备货执行总览/);
-  assert.match(indexHtml, /优先现成包/);
+  assert.match(indexHtml, /现成待送店包裹/);
   assert.match(indexHtml, /补差打包/);
   assert.match(indexHtml, /最终送店打印/);
   assert.match(indexHtml, />扫描确认现成包</);
@@ -674,7 +677,7 @@ test("transfer drafting and warehouse execution pages use the new replenishment 
   assert.match(indexHtml, /现成待送店包裹/);
   assert.doesNotMatch(indexHtml, /散货补差打包区/);
   assert.doesNotMatch(indexHtml, /送店 bale \/ 箱单打印区/);
-  assert.match(indexHtml, />批量打印送店 barcode \+ 箱单</);
+  assert.match(indexHtml, />生成正式门店送货执行单 barcode</);
   assert.doesNotMatch(indexHtml, />只生成出库打印任务</);
   assert.doesNotMatch(indexHtml, />生成门店配货单 \+ 标签打印任务</);
   assert.doesNotMatch(indexHtml, /id="directHangTransferForm"/);
@@ -798,7 +801,7 @@ test("warehouseout modal can be closed without confirming labels as completed", 
 test("store replenishment panels move under warehouse workspace and out of operations primary nav", () => {
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>门店补货流程页<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>4\. 门店补货建议<\/h2>/);
-  assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>4\.1 手动补货需求 \/ Manual replenishment request<\/h2>/);
+  assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>4\.1 手动补货需求<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>5\.1 补差打包工单<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>6\. 仓库执行单 \/ 出库打印<\/h2>/);
   assert.match(indexHtml, /<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>6\.1 配送批次 \/ 门店收货跟踪<\/h2>/);
@@ -822,9 +825,9 @@ test("warehouse nav exposes 门店补货 and operations nav drops the replenishm
 
 
 test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1", () => {
-  assert.match(indexHtml, /1 选申请/);
-  assert.match(indexHtml, /2 看建议/);
-  assert.match(indexHtml, /3 生成任务/);
+  assert.match(indexHtml, /手动补货申请/);
+  assert.match(indexHtml, /下一步动作/);
+  assert.match(indexHtml, /生成补货申请单/);
   assert.match(appJs, /\$\{escapeHtml\(storeLabel\)\} 补货单/);
   assert.match(appJs, /生成仓库备货任务/);
 });
@@ -846,11 +849,10 @@ test("phase B2 warehouse prep task panel supports request multi-select", () => {
 });
 
 test("phase 2A copy keeps package count and piece count separated on 4.1", () => {
-  assert.match(appJs, /需求：\$\{row\.requestedQty \|\| 0\} 件/);
-  assert.match(appJs, /现成待送店包：\$\{escapeHtml\(row\.selectedPreparedBales\.length \|\| 0\)\} 包 \/ 覆盖 \$\{escapeHtml\(row\.preparedQty \|\| 0\)\} 件/);
-  assert.match(appJs, /散货补差：\$\{escapeHtml\(row\.looseQtyNeeded \|\| 0\)\} 件/);
-  assert.match(appJs, /新打补差包：\$\{escapeHtml\(row\.plannedLooseBales\.length \|\| 0\)\} 个/);
-  assert.match(appJs, /最终预计送店包：\$\{escapeHtml\(row\.finalDispatchBaleCount \|\| 0\)\} 个/);
+  assert.match(appJs, /const pickableQty = Math\.max\(totalRequestedQty - shortageQty, 0\);/);
+  assert.match(appJs, /可拣：\$\{escapeHtml\(pickableQty\)\} 件/);
+  assert.match(appJs, /<span>缺货数量<\/span><strong>\$\{escapeHtml\(shortageQty\)\} 件<\/strong>/);
+  assert.match(appJs, /系统按库存生成配货建议。SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。/);
 });
 
 test("phase 2B page 6 copy clarifies warehouse verification and warehouse-only barcode boundary", () => {

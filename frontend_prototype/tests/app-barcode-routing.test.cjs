@@ -240,10 +240,71 @@ test("replenishment request summary is compact and uses warehouse prep task word
   assert.match(appJs, /可全拣/);
 });
 
+test("4.1 manual replenishment page uses compact warehouse workbench layout", () => {
+  const headingIndex = indexHtml.indexOf("<h2>4.1 手动补货需求</h2>");
+  assert.ok(headingIndex >= 0, "4.1 transfer section should exist");
+  const sectionStart = indexHtml.lastIndexOf('<section class="panel" data-workspace-panel="warehouse">', headingIndex);
+  const sectionEnd = indexHtml.indexOf('<pre id="transferOutput" class="output hidden-output"></pre>', headingIndex);
+  assert.ok(sectionStart >= 0 && sectionEnd > headingIndex, "4.1 transfer section bounds should exist");
+  const transferHtml = indexHtml.slice(sectionStart, sectionEnd);
+
+  assert.match(transferHtml, /class="manual-replenishment-context"/);
+  assert.match(transferHtml, /<h3>手动补货申请<\/h3>/);
+  assert.match(transferHtml, /class="manual-replenishment-meta manual-context-controls"/);
+  assert.match(transferHtml, /data-manual-context-field="from_warehouse_code"/);
+  assert.match(transferHtml, /data-manual-context-field="to_store_code"/);
+  assert.match(transferHtml, /data-manual-context-field="required_arrival_date"/);
+  assert.match(transferHtml, /id="manualReplenishmentContextStatus"/);
+  assert.match(transferHtml, /填写门店、品类和数量，生成补货申请。/);
+  assert.match(transferHtml, /<input name="from_warehouse_code" type="hidden" value="WH1" \/>/);
+  assert.match(transferHtml, /<input name="to_store_code" type="hidden" value="UTAWALA" \/>/);
+  assert.match(transferHtml, /<input name="required_arrival_date" type="hidden" value="2026-05-03" \/>/);
+  assert.match(appJs, /function syncManualReplenishmentContextToForm/);
+  assert.match(appJs, /syncManualReplenishmentContextToForm\(\);\n\s*const form = new FormData\(event\.currentTarget\);/);
+
+  assert.match(transferHtml, /class="manual-replenishment-layout"/);
+  assert.match(transferHtml, /class="transfer-ops-card manual-replenishment-entry-card"/);
+  assert.match(transferHtml, /class="transfer-ops-card manual-replenishment-status-card"/);
+  const entryCard = transferHtml.match(/<article class="transfer-ops-card manual-replenishment-entry-card">[\s\S]*?<\/article>/)?.[0] || "";
+  assert.doesNotMatch(entryCard, />调出仓库</);
+  assert.doesNotMatch(entryCard, />调入门店</);
+  assert.doesNotMatch(entryCard, />Required Arrival Date</);
+  assert.match(transferHtml, /补货明细/);
+  assert.match(transferHtml, /class="transfer-items-table-head"/);
+  [">大类<", ">小类<", ">分级<", ">件数<", ">操作<"].forEach((copy) => {
+    assert.match(transferHtml, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  });
+  assert.match(transferHtml, />添加一行</);
+  assert.match(transferHtml, /id="transferActionSubmitButton"[\s\S]*?form="transferForm"[\s\S]*?>生成补货申请单</);
+  assert.match(appJs, /transferActionSubmitButton[\s\S]*?disabled = !hasRows/);
+
+  assert.match(transferHtml, /下一步动作/);
+  assert.match(transferHtml, /本次补货/);
+  assert.match(transferHtml, /系统建议/);
+  assert.match(transferHtml, /请先添加补货明细/);
+  assert.doesNotMatch(transferHtml, /Required Arrival Date/);
+  assert.doesNotMatch(transferHtml, /MANUAL|DRAFT|PLAN|Demand type/);
+  assert.doesNotMatch(transferHtml, /<span class="eyebrow">Draft<\/span>/);
+  assert.doesNotMatch(transferHtml, /<span class="eyebrow">Plan<\/span>/);
+  assert.doesNotMatch(transferHtml, /Step 1 创建补货申请/);
+  assert.doesNotMatch(transferHtml, /Step 2 系统配货建议/);
+
+  assert.match(stylesCss, /\.manual-replenishment-context\s*\{[\s\S]*?background:\s*#ffffff;[\s\S]*?border:\s*1px solid #e2e8f0;/);
+  assert.match(stylesCss, /\.manual-replenishment-layout\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*3fr\) minmax\(320px,\s*2fr\);/);
+  assert.match(stylesCss, /\.transfer-items-compact-table\s*\{[\s\S]*?background:\s*#ffffff;[\s\S]*?border:\s*1px solid #e2e8f0;/);
+  assert.match(stylesCss, /\.transfer-items-table-head\s*\{[\s\S]*?grid-template-columns:\s*minmax\(120px,\s*1fr\) minmax\(120px,\s*1fr\) minmax\(80px,\s*0\.6fr\) minmax\(82px,\s*0\.6fr\) 72px;/);
+  assert.match(appJs, /builderId === "transfer-items" \? "删除" : "删除这一行"/);
+  assert.match(appJs, /transfer-items-table-row/);
+});
+
 test("warehouse prep task advanced wave parameters are collapsed and optional", () => {
   const taskPanel = indexHtml.match(/<div class="candidate-summary warehouse-prep-task-summary">[\s\S]*?<div id="pickingWaveList"/);
   assert.ok(taskPanel, "warehouse prep task summary panel should exist");
   const taskHtml = taskPanel[0];
+  assert.match(taskHtml, /id="pickingWaveStageHint"[\s\S]*?请先生成补货申请单/);
+  assert.match(taskHtml, /id="pickingWaveSubmitButton"[\s\S]*?disabled[\s\S]*?>生成仓库备货任务/);
+  assert.match(appJs, /pickingWaveStageHint/);
+  assert.match(appJs, /pickingWaveSubmitButton[\s\S]*?disabled = !hasRequests/);
   const advancedOptions = taskHtml.match(/<details id="pickingWaveAdvancedSettings"[^>]*>[\s\S]*?<\/details>/);
   assert.ok(advancedOptions, "advanced wave settings should exist");
   assert.doesNotMatch(advancedOptions[0].match(/<details[^>]*>/)?.[0] || "", /\sopen(?:\s|>|=)/);
@@ -317,8 +378,9 @@ test("4.1 replenishment form uses neutral compact controls and copy", () => {
   [
     "填写门店、品类和数量，生成补货申请。",
     "只填写需求品类和数量；仓库执行时再按库存和 barcode 规则处理。",
-    "这里显示本次补货草稿。",
-    "系统按库存生成配货建议。",
+    "本次补货",
+    "系统建议",
+    "可拣数量 / 缺货数量",
     "下一步：确认申请后进入仓库执行；门店收货以 SDO barcode 为准。",
   ].forEach((copy) => assert.match(panelHtml, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
   [
@@ -328,9 +390,9 @@ test("4.1 replenishment form uses neutral compact controls and copy", () => {
     "系统优先使用现成待送店包",
   ].forEach((copy) => assert.doesNotMatch(panelHtml, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
   [
-    "这里显示本次门店需求。",
-    "确认后进入仓库执行；门店收货以 SDO barcode 为准。",
-    "这里显示配货建议和下一步动作。",
+    "下一步：请先添加补货明细",
+    "确认后进入仓库执行；门店收货使用 SDO barcode。",
+    "先生成补货申请，再生成仓库备货任务",
     "SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。",
     "这里显示建议类目和件数。",
   ].forEach((copy) => assert.match(appJs, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
