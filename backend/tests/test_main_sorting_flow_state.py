@@ -1772,18 +1772,19 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(created["available_qty"], 0)
         self.assertEqual(created["suspended_qty"], 5)
 
-    def test_store_prep_bale_can_queue_warehouseout_print_job_for_bale_modal_preview(self):
+    def test_store_prep_bale_requires_label_attached_before_completed_inventory(self):
         self._create_confirmed_sorting_inventory(
             customs_notice_no="SORT240423PRINTP",
             category_name="dress / 2 pieces",
             grade="P",
-            qty=5,
+            qty=100,
             estimated_unit_cost_kes=80,
         )
         created = self.state.create_store_prep_bale_task(
             {
                 "category_sub": "2 pieces",
-                "target_qty": 5,
+                "pieces_per_bale": 100,
+                "bale_count": 1,
                 "assigned_employee": "warehouse_clerk_1",
                 "note": "ready for print queue",
                 "created_by": "warehouse_supervisor_1",
@@ -1793,28 +1794,61 @@ class MainSortingFlowStateTest(unittest.TestCase):
             created["task_no"],
             {
                 "updated_by": "warehouse_supervisor_1",
-                "actual_qty": 5,
+                "actual_qty": 100,
                 "note": "主管评价：验收完成",
             },
         )
 
+        self.assertEqual(completed["status"], "barcode_generated")
+        self.assertIsNone(completed.get("completed_at"))
+        self.assertEqual(self.state.list_store_prep_bales(status="waiting_store_dispatch"), [])
+        generated_bale = self.state.list_store_prep_bales()[0]
+        self.assertEqual(generated_bale["status"], "barcode_generated")
+        self.assertRegex(generated_bale["machine_code"], r"^2\d{9}$")
+        self.assertEqual(generated_bale["barcode_value"], generated_bale["machine_code"])
+
+        with self.assertRaises(HTTPException) as template_ctx:
+            self.state.queue_store_prep_bale_print_job(
+                completed["prepared_bale_no"],
+                requested_by="warehouse_supervisor_1",
+                template_code="wait_for_transtoshop",
+            )
+        self.assertEqual(template_ctx.exception.status_code, 400)
+        self.assertIn("模板已锁定", str(template_ctx.exception.detail))
+
         job = self.state.queue_store_prep_bale_print_job(
             completed["prepared_bale_no"],
             requested_by="warehouse_supervisor_1",
-            template_code="wait_for_transtoshop",
         )
 
         self.assertEqual(job["job_type"], "bale_barcode_label")
         self.assertEqual(job["barcode"], completed["prepared_bale_barcode"])
         self.assertEqual(job["print_payload"]["bale_barcode"], completed["prepared_bale_barcode"])
         self.assertEqual(job["print_payload"]["parcel_batch_no"], completed["prepared_bale_no"])
-        self.assertEqual(job["template_code"], "wait_for_transtoshop")
+        self.assertEqual(job["template_code"], "store_prep_bale_60x40")
         self.assertEqual(job["print_payload"]["template_scope"], "warehouseout_bale")
         self.assertEqual(job["print_payload"]["status"], "WAITING FOR STORE DISPATCH")
-        self.assertEqual(job["print_payload"]["qty"], "5")
-        self.assertEqual(job["print_payload"]["dispatch_bale_no"], completed["prepared_bale_barcode"])
+        self.assertEqual(job["print_payload"]["qty"], "100")
+        self.assertRegex(job["print_payload"]["machine_code"], r"^2\d{9}$")
+        self.assertEqual(job["print_payload"]["barcode_value"], job["print_payload"]["machine_code"])
+        self.assertEqual(job["print_payload"]["dispatch_bale_no"], job["print_payload"]["machine_code"])
 
-    def test_store_prep_sale_bale_defaults_to_wait_for_sale_template(self):
+        queued_bale = self.state.list_store_prep_bales()[0]
+        self.assertEqual(queued_bale["status"], "printed_pending_label")
+        self.assertEqual(self.state.list_store_prep_bales(status="waiting_store_dispatch"), [])
+
+        printed_job = self.state.mark_print_job_printed(job["id"], "warehouse_supervisor_1")
+        self.assertEqual(printed_job["status"], "printed")
+
+        final_task = self.state.list_store_prep_bale_tasks(status="completed")[0]
+        final_bale = self.state.list_store_prep_bales(status="waiting_store_dispatch")[0]
+        self.assertEqual(final_task["task_no"], completed["task_no"])
+        self.assertEqual(final_task["status"], "completed")
+        self.assertTrue(final_task["label_attached_at"])
+        self.assertEqual(final_bale["bale_no"], completed["prepared_bale_no"])
+        self.assertTrue(final_bale["label_attached_at"])
+
+    def test_store_prep_sale_bale_also_uses_locked_sdb_template(self):
         self._create_confirmed_sorting_inventory(
             customs_notice_no="SORT240423SALEP",
             category_name="dress / 2 pieces",
@@ -1855,9 +1889,11 @@ class MainSortingFlowStateTest(unittest.TestCase):
             requested_by="warehouse_supervisor_1",
         )
 
-        self.assertEqual(job["template_code"], "wait_for_sale")
+        self.assertEqual(job["template_code"], "store_prep_bale_60x40")
         self.assertEqual(job["print_payload"]["template_scope"], "warehouseout_bale")
         self.assertEqual(job["print_payload"]["status"], "wait for sale")
+        self.assertRegex(job["print_payload"]["machine_code"], r"^2\d{9}$")
+        self.assertEqual(job["print_payload"]["barcode_value"], job["print_payload"]["machine_code"])
 
     def test_reload_preserves_existing_main_flow_records(self):
         self.state.create_or_update_china_source_record(

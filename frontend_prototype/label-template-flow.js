@@ -72,7 +72,7 @@
       key: "warehouseout_bale",
       label: "送店 / 待送店 bale",
       description: "送店、待送店、待售卖 bale 标签读取这组正式模版。",
-      codes: ["transtoshop", "wait_for_transtoshop", "wait_for_sale", "store_loose_pick_60x40"],
+      codes: ["transtoshop", "wait_for_transtoshop", "wait_for_sale", "store_prep_bale_60x40", "store_loose_pick_60x40"],
     },
   ];
   const MANAGED_TEMPLATE_CALIBRATION_META = {

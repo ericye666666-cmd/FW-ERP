@@ -664,10 +664,14 @@ class StorePrepBaleTaskResponse(BaseModel):
     total_cost_kes: Optional[float] = None
     label_summary: str = ""
     created_at: str
+    accepted_at: Optional[str] = None
     completed_at: Optional[str] = None
+    label_attached_at: Optional[str] = None
     updated_at: str
     created_by: str = ""
+    accepted_by: str = ""
     completed_by: str = ""
+    label_attached_by: str = ""
     note: str = ""
 
 
@@ -676,6 +680,9 @@ class StorePrepBaleResponse(BaseModel):
     bale_no: str
     bale_barcode: str = ""
     scan_token: str = ""
+    machine_code: str = ""
+    barcode_value: str = ""
+    human_readable: str = ""
     task_no: str
     task_type: str = "store_dispatch"
     category_main: str = ""
@@ -695,5 +702,13 @@ class StorePrepBaleResponse(BaseModel):
     total_cost_kes: Optional[float] = None
     label_summary: str = ""
     staging_area: str = ""
+    label_print_job_id: Optional[int] = None
+    label_print_queued_at: Optional[str] = None
+    label_attached_at: Optional[str] = None
+    label_attached_by: str = ""
+    printed_at: Optional[str] = None
+    printed_by: str = ""
+    inventory_converted_at: Optional[str] = None
+    inventory_converted_by: str = ""
     created_at: str
     updated_at: str
