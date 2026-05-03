@@ -184,7 +184,7 @@ test("SDO modal primary action has one clear main print button and local-agent o
   assert.match(primaryActions[0], /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
   assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
   assert.doesNotMatch(primaryActions[0], /打印本轮全部标签/);
-  assert.match(appJs, /const isSdoPrint = selectedTemplateCode === "store_dispatch_60x40" \|\| selectedTemplateCode === "transtoshop"/);
+  assert.match(appJs, /const isSdoPrint = templateScope === "warehouseout_bale" && isSDOPrintModalTaskType\(activeTaskType\)/);
   assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint[\s\S]*?\? "打印 SDO 条码"/);
   assert.match(appJs, /message: "打印助手未连接，请先启动 Windows 打印助手。"/);
   assert.match(appJs, /throw new Error\("打印助手未连接，请先启动 Windows 打印助手。"\)/);
