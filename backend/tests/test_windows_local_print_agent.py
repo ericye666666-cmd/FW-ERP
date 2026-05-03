@@ -82,6 +82,118 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertEqual(resolved, "Deli_DL_720C")
         self.assertIn("Matched requested printer", warning)
 
+    def test_windows_label_print_refuses_offline_queue_before_raw_print(self):
+        normalized, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "template_code": "store_prep_bale_60x40",
+                "label_payload": {
+                    "display_code": "SDB260429AAB",
+                    "machine_code": "2260429001",
+                    "barcode_value": "2260429001",
+                    "category": "long dress",
+                    "item_count": 100,
+                },
+            }
+        )
+        self.assertIsNone(error)
+
+        offline_printers = [
+            {
+                "name": "Deli DL-720C",
+                "is_default": False,
+                "status": "offline",
+                "raw_status": "Offline",
+                "work_offline": True,
+                "available": False,
+            }
+        ]
+
+        with patch.object(agent.platform, "system", return_value="Windows"), \
+            patch.object(agent, "_list_printers_windows", return_value=(offline_printers, None)), \
+            patch.object(agent, "_send_raw_to_windows_printer", return_value=(True, "raw ok")) as raw_sender:
+            success, message, resolved_printer, tspl = agent._print_label_windows(normalized)
+
+        self.assertFalse(success)
+        self.assertEqual(resolved_printer, "Deli DL-720C")
+        self.assertEqual(tspl, "")
+        self.assertIn("is not available", message)
+        self.assertIn("Use Printer Offline", message)
+        raw_sender.assert_not_called()
+
+    def test_windows_label_print_uses_available_normalized_queue_instead_of_stale_offline_queue(self):
+        normalized, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "template_code": "store_prep_bale_60x40",
+                "label_payload": {
+                    "display_code": "SDB260429AAB",
+                    "machine_code": "2260429001",
+                    "barcode_value": "2260429001",
+                    "category": "long dress",
+                    "item_count": 100,
+                },
+            }
+        )
+        self.assertIsNone(error)
+
+        printers = [
+            {
+                "name": "Deli DL-720C",
+                "is_default": False,
+                "status": "offline",
+                "raw_status": "Offline",
+                "work_offline": True,
+                "available": False,
+            },
+            {
+                "name": "Deli_DL_720C",
+                "is_default": False,
+                "status": "available",
+                "raw_status": "Normal",
+                "work_offline": False,
+                "available": True,
+            },
+        ]
+
+        with patch.object(agent.platform, "system", return_value="Windows"), \
+            patch.object(agent, "_list_printers_windows", return_value=(printers, None)), \
+            patch.object(agent, "_send_raw_to_windows_printer", return_value=(True, "raw ok")) as raw_sender:
+            success, message, resolved_printer, tspl = agent._print_label_windows(normalized)
+
+        self.assertTrue(success)
+        self.assertEqual(resolved_printer, "Deli_DL_720C")
+        self.assertIn("Matched requested printer", message)
+        self.assertIn('"2260429001"', tspl)
+        raw_sender.assert_called_once()
+        self.assertEqual(raw_sender.call_args.args[0], "Deli_DL_720C")
+
+    def test_print_station_text_print_refuses_offline_queue_before_out_printer(self):
+        offline_printers = [
+            {
+                "name": "Deli DL-720C",
+                "is_default": False,
+                "status": "paused",
+                "raw_status": "Paused",
+                "work_offline": False,
+                "available": False,
+            }
+        ]
+
+        with patch.object(agent.platform, "system", return_value="Windows"), \
+            patch.object(agent, "_list_printers_windows", return_value=(offline_printers, None)), \
+            patch.object(agent.subprocess, "run") as out_printer:
+            printed, message, temp_path = agent._print_text_windows(
+                printer_name="Deli DL-720C",
+                text_content="FW-ERP label",
+            )
+
+        self.assertFalse(printed)
+        self.assertIsNone(temp_path)
+        self.assertIn("is not available", message)
+        self.assertIn("Paused", message)
+        out_printer.assert_not_called()
+
     def test_print_html_request_prefers_machine_barcode_over_display_code(self):
         normalized, error = agent._normalize_print_html_request(
             {
@@ -396,7 +508,7 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertIsNone(error)
 
         with patch.object(agent.platform, "system", return_value="Windows"), \
-            patch.object(agent, "_resolve_printer_name_windows", return_value=("Deli DL-720C", None)), \
+            patch.object(agent, "_resolve_available_printer_name_windows", return_value=("Deli DL-720C", None, None)), \
             patch.object(agent, "_send_raw_to_windows_printer", return_value=(True, "raw ok")) as raw_sender, \
             patch.object(agent, "_build_windows_html_print_script", side_effect=AssertionError("browser kiosk should not be used")):
             success, message, resolved_printer, tspl = agent._print_label_windows(normalized)

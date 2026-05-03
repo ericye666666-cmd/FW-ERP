@@ -206,6 +206,83 @@ def _resolve_printer_name_windows(requested_printer: str) -> tuple[str, str | No
     return requested, warning or "No Windows printers were found by Get-Printer."
 
 
+def _is_windows_printer_available(printer: dict) -> bool:
+    if "available" in printer:
+        return bool(printer.get("available"))
+    status = str(printer.get("status") or "").strip().lower()
+    raw_status = str(printer.get("raw_status") or "").strip().lower()
+    work_offline = _coerce_bool(printer.get("work_offline") or printer.get("WorkOffline"))
+    problem_status = any(
+        marker in f"{status} {raw_status}"
+        for marker in ("offline", "error", "paper", "jam", "paused", "unavailable")
+    )
+    return not work_offline and not problem_status
+
+
+def _windows_printer_unavailable_message(printer: dict) -> str:
+    name = str(printer.get("name") or "").strip() or "(unknown printer)"
+    status = str(printer.get("status") or "").strip()
+    raw_status = str(printer.get("raw_status") or "").strip()
+    work_offline = _coerce_bool(printer.get("work_offline") or printer.get("WorkOffline"))
+    details = []
+    if status:
+        details.append(f"status={status}")
+    if raw_status:
+        details.append(f"raw_status={raw_status}")
+    if work_offline:
+        details.append("WorkOffline=True")
+    detail_text = ", ".join(details) or "Windows reports the queue is unavailable"
+    return (
+        f"Printer '{name}' is not available ({detail_text}). "
+        "Turn off Use Printer Offline, reconnect the printer, clear paused/error jobs, "
+        "confirm a Windows test page prints, then retry."
+    )
+
+
+def _matching_windows_printers(printers: list[dict], requested_printer: str) -> list[tuple[dict, str | None]]:
+    requested = str(requested_printer or "").strip()
+    requested_norm = _normalize_printer_name(requested)
+    exact_matches: list[tuple[dict, str | None]] = []
+    normalized_matches: list[tuple[dict, str | None]] = []
+    for printer in printers:
+        name = str(printer.get("name") or "").strip()
+        if not name:
+            continue
+        if name == requested:
+            exact_matches.append((printer, None))
+            continue
+        if not requested_norm:
+            continue
+        printer_norm = _normalize_printer_name(name)
+        if not printer_norm:
+            continue
+        if printer_norm == requested_norm or printer_norm.startswith(requested_norm) or requested_norm.startswith(printer_norm):
+            normalized_matches.append((printer, f"Matched requested printer '{requested}' to Windows queue '{name}'."))
+    return exact_matches + normalized_matches
+
+
+def _resolve_available_printer_name_windows(requested_printer: str) -> tuple[str, str | None, str | None]:
+    requested = str(requested_printer or "").strip()
+    if not requested:
+        return requested, None, "No printer name was provided."
+
+    printers, warning = _list_printers_windows()
+    matches = _matching_windows_printers(printers, requested)
+    if matches:
+        first_unavailable: dict | None = None
+        for printer, match_warning in matches:
+            name = str(printer.get("name") or "").strip()
+            if _is_windows_printer_available(printer):
+                return name, match_warning or warning, None
+            if first_unavailable is None:
+                first_unavailable = printer
+        return str(first_unavailable.get("name") or requested), warning, _windows_printer_unavailable_message(first_unavailable)
+
+    if printers:
+        return requested, warning, f"Requested printer '{requested}' was not found. Available printers: {', '.join(str(p.get('name') or '') for p in printers)}"
+    return requested, None, warning or "No Windows printers were found by Get-Printer."
+
+
 def _print_html_unix(printer: str, html_path: str) -> tuple[bool, str, str]:
     if not shutil.which("lp"):
         return False, "lp command is not available. Install CUPS or use browser print fallback.", printer
@@ -264,6 +341,10 @@ def _print_text_windows(printer_name: str, text_content: str) -> tuple[bool, str
     if platform.system() != "Windows":
         return False, "Windows print-station mode must run on Windows.", None
 
+    resolved_printer, warning, printer_error = _resolve_available_printer_name_windows(printer_name)
+    if printer_error:
+        return False, printer_error, None
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as temp_file:
         temp_file.write(text_content)
         text_path = temp_file.name
@@ -274,8 +355,8 @@ def _print_text_windows(printer_name: str, text_content: str) -> tuple[bool, str
         "-Command",
         (
             "$ErrorActionPreference = 'Stop'; "
-            f"Get-Content -LiteralPath '{text_path}' | "
-            f"Out-Printer -Name '{printer_name}'"
+            f"Get-Content -LiteralPath '{_powershell_single_quote(text_path)}' | "
+            f"Out-Printer -Name '{_powershell_single_quote(resolved_printer)}'"
         ),
     ]
 
@@ -288,7 +369,8 @@ def _print_text_windows(printer_name: str, text_content: str) -> tuple[bool, str
         )
         return False, message, text_path
 
-    return True, f"Printed via Windows Out-Printer to '{printer_name}'.", text_path
+    prefix = f"{warning} " if warning else ""
+    return True, f"{prefix}Printed via Windows Out-Printer to '{resolved_printer}'.", text_path
 
 
 def _clean_positive_int(value: object, *, default: int = 1, maximum: int = 20) -> int:
@@ -734,7 +816,10 @@ def _print_html_windows(
     if platform.system() != "Windows":
         return False, "Windows HTML print is only available when the agent runs on Windows.", printer
 
-    resolved_printer, warning = _resolve_printer_name_windows(printer)
+    resolved_printer, warning, printer_error = _resolve_available_printer_name_windows(printer)
+    if printer_error:
+        return False, printer_error, resolved_printer
+
     browser_path = _find_windows_browser()
     if not browser_path:
         return (
@@ -841,7 +926,10 @@ def _print_label_windows(normalized: dict) -> tuple[bool, str, str, str]:
         return False, "Windows TSPL label print is only available when the agent runs on Windows.", normalized.get("printer_name", ""), ""
 
     requested_printer = str(normalized.get("printer_name") or "").strip()
-    resolved_printer, warning = _resolve_printer_name_windows(requested_printer)
+    resolved_printer, warning, printer_error = _resolve_available_printer_name_windows(requested_printer)
+    if printer_error:
+        return False, printer_error, resolved_printer, ""
+
     try:
         tspl = _build_tspl_60x40_label(
             normalized.get("label_payload") if isinstance(normalized.get("label_payload"), dict) else {},
