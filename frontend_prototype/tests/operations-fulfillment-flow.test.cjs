@@ -626,7 +626,7 @@ test("recommendation and transfer copy use draft plus transfer wording without a
   assert.doesNotMatch(recommendationSectionHtml, /recommendationGoTransferButton/);
   assert.doesNotMatch(recommendationSectionHtml, />去确认补货单</);
   assert.doesNotMatch(recommendationSectionHtml, />去确认门店调拨单</);
-  assert.match(indexHtml, /<strong>本次补货草稿<\/strong>/);
+  assert.match(indexHtml, /<strong>本次补货<\/strong>/);
   assert.match(indexHtml, />生成补货申请单</);
   assert.doesNotMatch(indexHtml, /门店补货需求单/);
   assert.doesNotMatch(indexHtml, /这里完成补货单审核/);
@@ -826,7 +826,7 @@ test("warehouse nav exposes 门店补货 and operations nav drops the replenishm
 
 test("phase 2A copy clarifies step flow and request number carry for 4.1 -> 5.1", () => {
   assert.match(indexHtml, /手动补货申请/);
-  assert.match(indexHtml, /状态 \/ 下一步/);
+  assert.match(indexHtml, /下一步动作/);
   assert.match(indexHtml, /生成补货申请单/);
   assert.match(appJs, /\$\{escapeHtml\(storeLabel\)\} 补货单/);
   assert.match(appJs, /生成仓库备货任务/);

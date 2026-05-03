@@ -1559,6 +1559,7 @@ h3 {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .manual-replenishment-meta span {
@@ -1572,6 +1573,55 @@ h3 {
   color: #334155;
   font-size: 12px;
   font-weight: 600;
+}
+
+.manual-context-controls {
+  gap: 8px;
+}
+
+.manual-context-control {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+  padding: 3px 7px;
+}
+
+.manual-context-control span {
+  display: inline-flex;
+  min-height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.manual-context-control input {
+  min-height: 24px;
+  width: 112px;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+  box-shadow: none;
+}
+
+.manual-context-control input[type="date"] {
+  width: 132px;
+}
+
+.manual-context-control:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  background: #ffffff;
 }
 
 .manual-replenishment-layout {
@@ -1658,10 +1708,10 @@ h3 {
 .manual-summary-compact {
   display: grid;
   gap: 8px;
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 10px;
+  padding: 9px;
 }
 
 .manual-summary-main {
@@ -1706,31 +1756,47 @@ h3 {
 .transfer-items-compact-table {
   background: #ffffff;
   border: 1px solid #e2e8f0;
+  padding: 10px;
 }
 
 .transfer-items-table-head {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(80px, 0.6fr) minmax(82px, 0.6fr) 72px;
   gap: 8px;
+  align-items: center;
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
-  padding: 0 2px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px 7px 0 0;
+  padding: 7px 8px;
 }
 
 .transfer-items-table-body {
-  gap: 6px;
+  gap: 0;
+  border: 1px solid #e2e8f0;
+  border-top: 0;
+  border-radius: 0 0 7px 7px;
+  overflow: hidden;
 }
 
 .transfer-items-table-row {
   grid-template-columns: minmax(0, 1fr) 72px;
-  align-items: end;
-  padding: 8px;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 5px 8px;
+  background: #ffffff;
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  border-radius: 0;
 }
 
 .transfer-items-table-row .line-builder-grid {
   grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(80px, 0.6fr) minmax(82px, 0.6fr);
   gap: 8px;
+  align-items: center;
 }
 
 .transfer-items-table-row [data-builder-row-meta] {
@@ -1741,9 +1807,37 @@ h3 {
   display: none;
 }
 
+.transfer-items-table-cell {
+  gap: 0;
+}
+
+.transfer-items-table-cell input,
+.transfer-items-table-cell select {
+  min-height: 34px;
+  border-color: #e2e8f0;
+  background: #ffffff;
+  font-size: 13px;
+  padding: 5px 8px;
+}
+
 .transfer-items-table-row .line-builder-remove {
   justify-self: stretch;
-  align-self: end;
+  align-self: center;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.manual-next-action-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.manual-next-action-panel button {
+  min-height: 40px;
+  width: 100%;
 }
 
 .replenishment-workorder-shell {
@@ -5482,6 +5576,7 @@ textarea:focus-visible,
   padding: 12px;
   background: var(--fw-surface);
   border: 1px solid var(--fw-border);
+  margin-top: 12px;
 }
 
 .transfer-advanced-options {
@@ -5496,6 +5591,49 @@ textarea:focus-visible,
   color: var(--fw-text);
   font-size: 13px;
   font-weight: 700;
+}
+
+.transfer-advanced-options[open] {
+  display: grid;
+  gap: 8px;
+}
+
+.manual-replenishment-entry-card .transfer-advanced-options,
+.warehouse-prep-task-summary .transfer-advanced-options {
+  padding: 7px 0 0;
+  border: 0;
+  border-top: 1px solid var(--fw-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.manual-replenishment-entry-card .transfer-advanced-options summary,
+.warehouse-prep-task-summary .transfer-advanced-options summary {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.warehouse-prep-stage-hint {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+#pickingWaveSubmitButton:disabled {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .inbound-flow-context {

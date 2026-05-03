@@ -10510,8 +10510,8 @@ function hydrateRecommendationForms(recommendation) {
   if (!recommendation) {
     return;
   }
-  setInputValue("#transferForm [name='from_warehouse_code']", recommendation.from_warehouse_code || "WH1");
-  setInputValue("#transferForm [name='to_store_code']", recommendation.to_store_code || "UTAWALA");
+  setManualReplenishmentFieldValue("from_warehouse_code", recommendation.from_warehouse_code || "WH1");
+  setManualReplenishmentFieldValue("to_store_code", recommendation.to_store_code || "UTAWALA");
   if (Array.isArray(recommendation.items) && recommendation.items.length) {
     recommendationCandidatesState = recommendation.items;
     selectedRecommendationKeys = new Set(recommendation.items.map((item) => getRecommendationRowKey(item)).filter(Boolean));
@@ -10570,31 +10570,92 @@ function applyRecommendationSelectionToTransferDraft() {
   renderTransferDraftSummary();
 }
 
+const MANUAL_REPLENISHMENT_CONTEXT_FIELDS = [
+  "from_warehouse_code",
+  "to_store_code",
+  "required_arrival_date",
+];
+
+function getManualReplenishmentFormInput(name = "") {
+  const safeName = String(name || "").trim();
+  if (!safeName) {
+    return null;
+  }
+  return document.querySelector(`#transferForm [name='${safeName}']`);
+}
+
+function getManualReplenishmentContextControl(name = "") {
+  const safeName = String(name || "").trim();
+  if (!safeName) {
+    return null;
+  }
+  return document.querySelector(`[data-manual-context-field='${safeName}']`);
+}
+
+function setManualReplenishmentFieldValue(name = "", value = "") {
+  const normalizedValue = String(value || "").trim();
+  const formInput = getManualReplenishmentFormInput(name);
+  if (formInput instanceof HTMLInputElement) {
+    formInput.value = normalizedValue;
+  }
+  const contextControl = getManualReplenishmentContextControl(name);
+  if (contextControl instanceof HTMLInputElement) {
+    contextControl.value = normalizedValue;
+  }
+}
+
+function syncManualReplenishmentContextToForm() {
+  MANUAL_REPLENISHMENT_CONTEXT_FIELDS.forEach((name) => {
+    const contextControl = getManualReplenishmentContextControl(name);
+    if (contextControl instanceof HTMLInputElement) {
+      const formInput = getManualReplenishmentFormInput(name);
+      if (formInput instanceof HTMLInputElement) {
+        formInput.value = String(contextControl.value || "").trim();
+      }
+    }
+  });
+}
+
+function syncManualReplenishmentContextFromForm() {
+  MANUAL_REPLENISHMENT_CONTEXT_FIELDS.forEach((name) => {
+    const formInput = getManualReplenishmentFormInput(name);
+    if (formInput instanceof HTMLInputElement) {
+      const contextControl = getManualReplenishmentContextControl(name);
+      if (contextControl instanceof HTMLInputElement) {
+        contextControl.value = String(formInput.value || "").trim();
+      }
+    }
+  });
+}
+
 function getManualReplenishmentFormMeta() {
+  syncManualReplenishmentContextToForm();
   return {
-    fromWarehouseCode: String(document.querySelector("#transferForm [name='from_warehouse_code']")?.value || "WH1").trim() || "WH1",
-    toStoreCode: String(document.querySelector("#transferForm [name='to_store_code']")?.value || "UTAWALA").trim() || "UTAWALA",
-    requiredArrivalDate: String(document.querySelector("#transferForm [name='required_arrival_date']")?.value || "2026-05-03").trim() || "2026-05-03",
+    fromWarehouseCode: String(getManualReplenishmentFormInput("from_warehouse_code")?.value || "WH1").trim() || "WH1",
+    toStoreCode: String(getManualReplenishmentFormInput("to_store_code")?.value || "UTAWALA").trim() || "UTAWALA",
+    requiredArrivalDate: String(getManualReplenishmentFormInput("required_arrival_date")?.value || "2026-05-03").trim() || "2026-05-03",
   };
 }
 
 function renderManualReplenishmentContext(statusLabel = "草稿") {
-  const { fromWarehouseCode, toStoreCode, requiredArrivalDate } = getManualReplenishmentFormMeta();
-  const storeTarget = document.querySelector("#manualReplenishmentContextStore");
-  const warehouseTarget = document.querySelector("#manualReplenishmentContextWarehouse");
-  const arrivalTarget = document.querySelector("#manualReplenishmentContextArrivalDate");
+  syncManualReplenishmentContextFromForm();
   const statusTarget = document.querySelector("#manualReplenishmentContextStatus");
-  if (storeTarget instanceof HTMLElement) {
-    storeTarget.textContent = `${toStoreCode || "-"} 门店`;
-  }
-  if (warehouseTarget instanceof HTMLElement) {
-    warehouseTarget.textContent = `${fromWarehouseCode || "-"} 仓库`;
-  }
-  if (arrivalTarget instanceof HTMLElement) {
-    arrivalTarget.textContent = `到货日期 ${requiredArrivalDate || "-"}`;
-  }
   if (statusTarget instanceof HTMLElement) {
     statusTarget.textContent = statusLabel || "草稿";
+  }
+}
+
+function updateManualReplenishmentActionPanel(rows = []) {
+  const hasRows = Array.isArray(rows) && rows.length > 0;
+  const transferActionSubmitButton = document.querySelector("#transferActionSubmitButton");
+  const hint = document.querySelector("#transferActionHint");
+  if (transferActionSubmitButton instanceof HTMLButtonElement) {
+    transferActionSubmitButton.disabled = !hasRows;
+  }
+  if (hint instanceof HTMLElement) {
+    hint.textContent = hasRows
+      ? "确认后进入仓库执行；门店收货使用 SDO barcode。"
+      : "请先添加补货明细";
   }
 }
 
@@ -10603,31 +10664,31 @@ function renderTransferDraftSummary() {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  syncManualReplenishmentContextToForm();
   renderManualReplenishmentContext("草稿");
   syncJsonBuilderToField("transfer-items");
   const rows = buildTransferDemandDraftRows(
     parseJsonField(document.querySelector("#transferForm [name='items_json']")?.value || "[]", []),
   );
   if (!rows.length) {
+    updateManualReplenishmentActionPanel(rows);
     target.className = "manual-summary-empty empty-state";
     target.innerHTML = `
       <div class="manual-summary-line"><strong>0 个品类 · 0 件</strong></div>
       <div>状态：未提交</div>
-      <div>下一步：添加一行</div>
+      <div>下一步：请先添加补货明细</div>
     `;
     renderTransferPreparationPlanSummary([]);
     return;
   }
-  const { fromWarehouseCode, toStoreCode, requiredArrivalDate } = getManualReplenishmentFormMeta();
   const totalRequested = rows.reduce((sum, row) => sum + Number(row.requested_qty || 0), 0);
+  updateManualReplenishmentActionPanel(rows);
   target.className = "manual-summary-compact";
   target.innerHTML = `
     <div class="manual-summary-main">${escapeHtml(rows.length)} 个品类 · ${escapeHtml(totalRequested)} 件</div>
     <div class="manual-summary-pair"><span>状态</span><strong>未提交</strong></div>
     <div class="manual-summary-pair"><span>下一步</span><strong>生成补货申请单</strong></div>
-    <div class="manual-summary-pair"><span>门店 / 仓库</span><strong>${escapeHtml(toStoreCode || "-")} / ${escapeHtml(fromWarehouseCode || "-")}</strong></div>
-    <div class="manual-summary-pair"><span>到货日期</span><strong>${escapeHtml(requiredArrivalDate || "-")}</strong></div>
-    <div class="manual-summary-note">确认后进入仓库执行；门店收货以 SDO barcode 为准。</div>
+    <div class="manual-summary-note">确认后进入仓库执行；门店收货使用 SDO barcode。</div>
   `;
   renderTransferPreparationPlanSummary(rows);
 }
@@ -18740,6 +18801,8 @@ function renderPickingWaveTaskSummary() {
   const totalTarget = document.querySelector("#pickingWaveTotalQty");
   const categoryTarget = document.querySelector("#pickingWaveCategoryCount");
   const shortageTarget = document.querySelector("#pickingWaveShortageQty");
+  const stageHint = document.querySelector("#pickingWaveStageHint");
+  const pickingWaveSubmitButton = document.querySelector("#pickingWaveSubmitButton");
   if (
     !(countTarget instanceof HTMLElement)
     || !(totalTarget instanceof HTMLElement)
@@ -18749,6 +18812,7 @@ function renderPickingWaveTaskSummary() {
     return;
   }
   const requestNos = getPickingWaveRequestNos();
+  const hasRequests = requestNos.length > 0;
   const transfers = requestNos.map((requestNo) => getTransferPreparationOrder(requestNo)).filter(Boolean);
   const totals = transfers.reduce((acc, transfer) => {
     const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer));
@@ -18765,6 +18829,14 @@ function renderPickingWaveTaskSummary() {
   totalTarget.textContent = `${totals.totalQty} 件`;
   categoryTarget.textContent = String(totals.categoryCount);
   shortageTarget.textContent = `${totals.shortageQty} 件`;
+  if (stageHint instanceof HTMLElement) {
+    stageHint.textContent = hasRequests
+      ? `已选补货单 ${requestNos.length} · 总需求 ${totals.totalQty} · 品类 ${totals.categoryCount} · 缺货 ${totals.shortageQty}`
+      : "请先生成补货申请单";
+  }
+  if (pickingWaveSubmitButton instanceof HTMLButtonElement) {
+    pickingWaveSubmitButton.disabled = !hasRequests;
+  }
 }
 
 
@@ -21780,7 +21852,7 @@ async function generateStoreReplenishmentDemo() {
   writeOutput("#storeReplenishmentDemoOutput", result);
   applyStoreContext(result.store_code || "UTAWALA");
   setInputValue("#recommendationForm [name='to_store_code']", result.store_code || "UTAWALA");
-  setInputValue("#transferForm [name='to_store_code']", result.store_code || "UTAWALA");
+  setManualReplenishmentFieldValue("to_store_code", result.store_code || "UTAWALA");
   setInputValue("#storeRetailSeedForm [name='store_code']", result.store_code || "UTAWALA");
   setInputValue("#storeRecentSalesSimulationForm [name='store_code']", result.store_code || "UTAWALA");
   await loadDashboard();
@@ -22226,6 +22298,7 @@ function hydrateStoreDefaults() {
       input.value = storeCode;
     }
   });
+  syncManualReplenishmentContextFromForm();
   refreshAssignableUserPickers({ rerenderPanels: false });
 }
 
@@ -30770,6 +30843,7 @@ async function submitPrintJobFail(event) {
 async function submitTransfer(event) {
   event.preventDefault();
   syncJsonBuilderToField("transfer-items");
+  syncManualReplenishmentContextToForm();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
   payload.items = parseJsonField(payload.items_json, []);
@@ -31917,6 +31991,15 @@ bindForm("#transferForm", submitTransfer, "#transferOutput");
 bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
 document.querySelector("#pickingWaveForm")?.addEventListener("change", renderPickingWaveTaskSummary);
 ["input", "change"].forEach((eventName) => {
+  document.addEventListener(eventName, (event) => {
+    const target = event.target instanceof HTMLElement
+      ? event.target.closest("[data-manual-context-field]")
+      : null;
+    if (target instanceof HTMLInputElement) {
+      syncManualReplenishmentContextToForm();
+      renderTransferDraftSummary();
+    }
+  });
   document.querySelector("#transferForm")?.addEventListener(eventName, (event) => {
     const target = event.target instanceof HTMLElement
       ? event.target.closest("[name='from_warehouse_code'], [name='to_store_code'], [name='required_arrival_date']")
@@ -32573,9 +32656,10 @@ document.querySelector("#transferDispatchSummary")?.addEventListener("click", (e
   hydrateTransferForms({ transfer_no: transferNo });
   const row = transferOrderState.find((item) => String(item.transfer_no || "").trim() === transferNo);
   if (row) {
-    setInputValue("#transferForm [name='from_warehouse_code']", row.from_warehouse_code || "WH1");
-    setInputValue("#transferForm [name='to_store_code']", row.to_store_code || "UTAWALA");
-    setInputValue("#transferForm [name='required_arrival_date']", row.required_arrival_date || row.required_arrival_on || "");
+    setManualReplenishmentFieldValue("from_warehouse_code", row.from_warehouse_code || "WH1");
+    setManualReplenishmentFieldValue("to_store_code", row.to_store_code || "UTAWALA");
+    setManualReplenishmentFieldValue("required_arrival_date", row.required_arrival_date || row.required_arrival_on || "");
+    renderTransferDraftSummary();
   }
   const panelKey = getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印");
   if (panelKey) {
