@@ -610,6 +610,59 @@ def _summary_items(value: object, *, limit: int = 2) -> list[str]:
     return visible
 
 
+def _sdo_package_position(payload: dict) -> str:
+    raw_position = str(_first_label_value(payload, "package_position_label", "package_position", default="")).strip()
+    if raw_position:
+        slash_match = re.search(r"(\d+)\s*/\s*(\d+)", raw_position)
+        if slash_match:
+            return f"{slash_match.group(1)}/{slash_match.group(2)}"
+        chinese_match = re.search(r"第\s*(\d+)\s*包\s*/\s*共\s*(\d+)\s*包", raw_position)
+        if chinese_match:
+            return f"{chinese_match.group(1)}/{chinese_match.group(2)}"
+
+    current = _first_label_value(payload, "serial_no", "package_index", "package_no", default=1)
+    total = _first_label_value(payload, "total_packages", "package_count", "packages", "bale_count", default=current)
+    try:
+        current_int = max(1, int(current))
+    except (TypeError, ValueError):
+        current_int = 1
+    try:
+        total_int = max(current_int, int(total))
+    except (TypeError, ValueError):
+        total_int = current_int
+    return f"{current_int}/{total_int}"
+
+
+def _sdo_source_codes(payload: dict) -> list[str]:
+    raw_values = []
+    for key in ("source_package_summary", "source_bales", "source_packages", "packing_list"):
+        value = payload.get(key)
+        if isinstance(value, (list, tuple)):
+            raw_values.extend(str(item or "") for item in value)
+        else:
+            raw_values.append(str(value or ""))
+    text = "\n".join(raw_values).upper()
+    return list(dict.fromkeys(re.findall(r"\b(?:SDB|LPK)[A-Z0-9]+\b", text)))
+
+
+def _sdo_packing_lines(payload: dict) -> list[str]:
+    source_codes = _sdo_source_codes(payload)
+    sdb_count = sum(1 for code in source_codes if code.startswith("SDB"))
+    lpk_count = sum(1 for code in source_codes if code.startswith("LPK"))
+    total = _first_label_value(payload, "packages", "package_count", "total_packages", "bale_count", default="")
+    if source_codes:
+        return [
+            f"Total: {total or len(source_codes)}",
+            f"SDB: {sdb_count}",
+            f"LPK: {lpk_count}",
+        ]
+
+    if total:
+        return [f"Total: {total}", "SDB: -", "LPK: -"]
+
+    return ["Total: -", "SDB: -", "LPK: -"]
+
+
 def _label_template_family(payload: dict) -> str:
     template_code = str(payload.get("template_code") or "").strip().lower()
     if template_code in {"warehouse_in", "warehouse_in_60x40", "raw_bale_60x40"}:
@@ -676,15 +729,18 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
             (20, 198, f"Enc: {barcode_value}", 1, 1, 20),
         ]
     if family == "store_delivery_execution":
+        packing_lines = _sdo_packing_lines(payload)
         return [
-            (20, 8, "SDO / DELIVERY", 2, 2, 16),
-            (20, 46, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
-            (20, 74, f"Request: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 34),
-            (20, 102, f"Pkg: {_first_label_value(payload, 'packages', 'package_count', 'bale_count', default='-')}", 1, 1, 18),
-            (252, 102, f"Pack: {_first_label_value(payload, 'packing_list', default='-')}", 1, 1, 20),
-            (20, 136, f"Display: {display_code or '-'}", 1, 1, 30),
-            (20, 162, f"MCode: {barcode_value}", 1, 1, 24),
-            (20, 188, f"Enc: {barcode_value}", 1, 1, 20),
+            (20, 8, "SDO / DELIVERY", 2, 2, 14),
+            (20, 44, f"Store: {_first_label_value(payload, 'store', 'store_code', 'store_name', default='-')}", 1, 1, 28),
+            (20, 68, f"Req: {_first_label_value(payload, 'request', 'transfer_order_no', 'request_no', default='-')}", 1, 1, 32),
+            (20, 92, f"Package: {_sdo_package_position(payload)}", 1, 1, 26),
+            (20, 116, f"SDO: {display_code or '-'}", 1, 1, 30),
+            (20, 140, f"MCode: {barcode_value}", 1, 1, 24),
+            (300, 8, "PACKING", 1, 2, 12),
+            (300, 44, packing_lines[0], 1, 1, 18),
+            (300, 68, packing_lines[1], 1, 1, 18),
+            (300, 92, packing_lines[2], 1, 1, 18),
         ]
     if family == "store_item":
         return [
@@ -720,7 +776,7 @@ def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
     ]
     for x, y, text, x_scale, y_scale, max_len in _build_tspl_label_lines(label_payload):
         commands.append(_tspl_text(x, y, text, x_scale=x_scale, y_scale=y_scale, max_len=max_len))
-    if family not in {"store_prep_bale", "loose_pick_task"}:
+    if family not in {"store_prep_bale", "loose_pick_task", "store_delivery_execution"}:
         commands.append("BAR 20,126,436,3")
     commands.extend(
         [

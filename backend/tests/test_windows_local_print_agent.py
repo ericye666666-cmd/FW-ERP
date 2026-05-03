@@ -333,7 +333,11 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
                     self.assertNotIn(f"Encoded: {barcode_value}", tspl)
                 else:
                     self.assertIn(f"MCode: {barcode_value}", tspl)
-                    self.assertIn(f"Enc: {barcode_value}", tspl)
+                    if template_code == "store_dispatch_60x40":
+                        self.assertIn(f"SDO: {display_code}", tspl)
+                        self.assertNotIn(f"Enc: {barcode_value}", tspl)
+                    else:
+                        self.assertIn(f"Enc: {barcode_value}", tspl)
                 self.assertIn(f'"{barcode_value}"', tspl)
                 self.assertNotIn(f'BARCODE 40,220,"128",80,1,0,2,2,"{display_code}"', tspl)
 
@@ -470,10 +474,13 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
                 identity_commands = [
                     command
                     for command in text_commands
-                    if any(token in command["text"] for token in ("Display:", "MCode:", "Machine:", "Enc:", "Encoded:", "Code:"))
+                    if any(token in command["text"] for token in ("Display:", "SDO:", "MCode:", "Machine:", "Enc:", "Encoded:", "Code:"))
                 ]
                 self.assertTrue(identity_commands)
-                self.assertTrue(any(command["text"].startswith("Display:") for command in identity_commands))
+                if template_code == "store_dispatch_60x40":
+                    self.assertTrue(any(command["text"].startswith("SDO:") for command in identity_commands))
+                else:
+                    self.assertTrue(any(command["text"].startswith("Display:") for command in identity_commands))
                 self.assertTrue(any(machine_code in command["text"] for command in identity_commands))
                 for command in identity_commands:
                     self.assertLessEqual(command["x"], 40, f"{short_title} identity text should start near the left edge: {command}")
@@ -529,6 +536,45 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertIn("Enc: 3260429001", lpk_tspl)
         self.assertIn('"3260429001"', lpk_tspl)
         self.assertNotIn('"LPK260429001"', lpk_tspl.split("BARCODE", 1)[1])
+
+    def test_sdo_tspl_matches_preview_identity_layout_without_long_packing_text(self):
+        payload = {
+            "display_code": "SDO260503004",
+            "machine_code": "4260503004",
+            "barcode_value": "4260503004",
+            "template_code": "store_dispatch_60x40",
+            "template_scope": "warehouseout_bale",
+            "store": "UTAWALA",
+            "request": "TO-20260503-016",
+            "serial_no": 1,
+            "total_packages": 2,
+            "package_count": 2,
+            "source_package_summary": "SDB260503AAG, LPK260503001",
+            "packing_list": "pants / jeans pant · 100 件\n来源 bales: SDB260503AAG, LPK260503001",
+        }
+
+        tspl = agent._build_tspl_60x40_label(payload, copies=1)
+        barcode_lines = "\n".join(line for line in tspl.splitlines() if line.startswith("BARCODE"))
+
+        self.assertIn("SDO / DELIVERY", tspl)
+        self.assertIn("Store: UTAWALA", tspl)
+        self.assertIn("Req: TO-20260503-016", tspl)
+        self.assertIn("Package: 1/2", tspl)
+        self.assertIn("SDO: SDO260503004", tspl)
+        self.assertIn("MCode: 4260503004", tspl)
+        self.assertIn("PACKING", tspl)
+        self.assertIn("SDB: 1", tspl)
+        self.assertIn("LPK: 1", tspl)
+        self.assertEqual(self._tspl_barcode_values(tspl), ["4260503004"])
+        self.assertIn('"4260503004"', barcode_lines)
+        self.assertNotIn('"SDO260503004"', barcode_lines)
+        self.assertNotIn('"SDB260503AAG"', barcode_lines)
+        self.assertNotIn('"2260503006"', barcode_lines)
+        self.assertNotIn("Pkg:", tspl)
+        self.assertNotIn("Pack:", tspl)
+        self.assertNotIn("????", tspl)
+        self.assertNotIn("pants / jeans pant", tspl)
+        self.assertNotIn("来源", tspl)
 
     def test_sdb_lpk_tspl_text_stays_clear_of_barcode_area(self):
         cases = [
