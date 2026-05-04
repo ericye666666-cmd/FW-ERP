@@ -27416,6 +27416,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
           <button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单</button>
           ${commandCenter.step !== "list" ? '<button type="button" class="ghost-button mini-button" data-store-receipt-step="list">返回到货列表</button>' : ""}
         </div>
+        <div class="subtle small">本 PR 只完成店长端前端对象切换；SDP 收货、异常和分配状态当前是本机前端状态，不提供跨设备后端持久化。后续 PR 需要把 SDP received / assigned / exception 状态写入后端。</div>
         ${commandCenter.step === "list" ? `
           <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
         ` : commandCenter.selected ? `
@@ -30329,7 +30330,7 @@ async function submitStoreDispatchBaleAccept(event) {
   if (/^(SDB|LPK)/.test(scannedCodes[0]) || /^[23]\d{9}$/.test(scannedDigits)) {
     throw new Error("SDB / LPK 是仓库来源包，请扫描 SDO 或 SDP 实体包码。");
   }
-  if (/^5\d{9}$/.test(scannedDigits)) {
+  if (/^5\d{9}$/.test(scannedDigits) || /^5\d{12}$/.test(scannedDigits)) {
     throw new Error("STORE_ITEM 只能用于 POS 销售。");
   }
   if (scannedCodes.length === 1) {
@@ -34403,6 +34404,7 @@ document.addEventListener("click", async (event) => {
       return;
     }
     if (button.dataset.storeReceiptLoadRecent !== undefined) {
+      await loadTransferOrders();
       renderStoreManagerConsoleSummary({
         store_code: getCurrentStoreCodeFallback(),
         last_action_message: "已读取最近 SDO / SDP 包。请扫描 SDO 主单码或点击 SDP 包卡片。",

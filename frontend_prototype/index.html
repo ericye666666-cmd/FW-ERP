@@ -3064,7 +3064,7 @@
         </form>
         <div id="storeDispatchBaleNotice" class="inline-notice-slot" aria-live="polite"></div>
         <div id="storeDispatchBaleSummary" class="candidate-summary empty-state">
-          店长端只按 SDO / SDP 收货。SDB / LPK 是仓库来源包，不是门店正式收货对象。
+          店长端只按 SDO / SDP 收货。SDB / LPK 是仓库来源包，不是门店正式收货对象。本 PR 只完成店长端前端对象切换，不提供跨设备后端持久化。
         </div>
         <pre id="storeDispatchBaleOutput" class="output hidden-output"></pre>
       </section>
@@ -3115,7 +3115,7 @@
           </div>
         </form>
         <div id="storeDispatchAssignmentSummary" class="candidate-summary empty-state">
-          店长从 SDO 主单进入，只能把已收货、非异常的 SDP 实体包分配给店员。SDB / LPK 仅作 source_code 核对。
+          店长从 SDO 主单进入，只能把已收货、非异常的 SDP 实体包分配给店员。SDB / LPK 仅作 source_code 核对。后续 PR 需要把 SDP received / assigned / exception 状态写入后端。
         </div>
         <pre id="storeDispatchAssignmentOutput" class="output hidden-output"></pre>
       </section>

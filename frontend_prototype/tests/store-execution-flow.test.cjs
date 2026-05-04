@@ -195,7 +195,10 @@ test("store receiving surfaces use SDP package projection instead of source bale
   assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\], "store_receiving", \["STORE_DELIVERY_EXECUTION", "STORE_DELIVERY_PACKAGE"\]\)/);
   assert.match(appJs, /SDB \/ LPK 是仓库来源包，请扫描 SDO 或 SDP 实体包码。/);
   assert.match(appJs, /STORE_ITEM 只能用于 POS 销售。/);
+  assert.match(appJs, /\^5\\d\{9\}\$[\s\S]*\^5\\d\{12\}\$/);
   assert.match(appJs, /SDB \/ LPK 只作为来源码显示，不作为门店正式收货对象/);
+  assert.match(indexHtml, /不提供跨设备后端持久化/);
+  assert.match(indexHtml, /后续 PR 需要把 SDP received \/ assigned \/ exception 状态写入后端/);
   assert.doesNotMatch(appJs, /当前版本先完成识别与信息展示；逐包收货回写将在后续版本补充/);
   assert.match(appJs, /#storeDispatchBaleAcceptForm \[name='bale_no'\][\s\S]*addEventListener\("input"/);
 });
@@ -218,6 +221,9 @@ test("page 5 statistics are counted by SDP packages", () => {
 test("store receiving scan routing opens SDO package lists and SDP package detail", () => {
   const submitSource = extractFunctionSource(appJs, "submitStoreDispatchBaleAccept");
 
+  assert.match(submitSource, /\^5\\d\{9\}\$/);
+  assert.match(submitSource, /\^5\\d\{12\}\$/);
+  assert.match(submitSource, /STORE_ITEM 只能用于 POS 销售。/);
   assert.match(submitSource, /resolvedType === "STORE_DELIVERY_EXECUTION"/);
   assert.match(submitSource, /storeCommandCenterState\.selected_sdo_code =/);
   assert.match(submitSource, /storeCommandCenterState\.step = "sdo_packages"/);
@@ -227,6 +233,10 @@ test("store receiving scan routing opens SDO package lists and SDP package detai
   assert.match(submitSource, /storeCommandCenterState\.step = "package_detail"/);
   assert.match(submitSource, /renderStoreReceivingPackageDetail/);
   assert.doesNotMatch(submitSource, /请先选择调拨单，再验收这张调拨单下的门店配货 bale/);
+});
+
+test("page 5 load recent refreshes SDO package data before rendering", () => {
+  assert.match(appJs, /button\.dataset\.storeReceiptLoadRecent !== undefined[\s\S]*await loadTransferOrders\(\);[\s\S]*renderStoreManagerConsoleSummary/);
 });
 
 test("page 6 package detail exposes SDP identity and clear flow return buttons", () => {
