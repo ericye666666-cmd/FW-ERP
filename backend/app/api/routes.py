@@ -192,6 +192,8 @@ from app.schemas.transfers import (
     StoreDeliveryPackageAssignRequest,
     StoreDeliveryPackageExceptionRequest,
     StoreDeliveryPackageReceiveRequest,
+    StoreDeliveryPackageStoreItemGenerateRequest,
+    StoreDeliveryPackageStoreItemGenerateResponse,
     StoreDeliveryExecutionOrderCreateRequest,
     StoreDeliveryExecutionOrderResponse,
     StoreDeliveryExecutionPackageDetailResponse,
@@ -3944,6 +3946,30 @@ def assign_store_delivery_package(
     data["assigned_by"] = current_user["username"]
     data["store_code"] = data.get("store_code") or current_user.get("store_code", "")
     return StoreDeliveryExecutionPackageDetailResponse(**state.assign_store_delivery_package(package_code, data))
+
+
+@router.post(
+    "/store-delivery-packages/{package_code}/store-items/generate",
+    response_model=StoreDeliveryPackageStoreItemGenerateResponse,
+    tags=["stores", "transfers"],
+)
+def generate_store_items_for_sdo_package(
+    package_code: str,
+    payload: StoreDeliveryPackageStoreItemGenerateRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryPackageStoreItemGenerateResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    if _is_store_clerk_user(current_user):
+        data["store_code"] = str(current_user.get("store_code") or data.get("store_code") or "").strip().upper()
+        data["clerk"] = str(current_user.get("username") or data.get("clerk") or "").strip()
+    else:
+        data["store_code"] = str(data.get("store_code") or current_user.get("store_code") or "").strip().upper()
+        data["clerk"] = str(data.get("clerk") or current_user.get("username") or "").strip()
+    data["generated_by"] = current_user["username"]
+    return StoreDeliveryPackageStoreItemGenerateResponse(
+        **state.generate_store_items_for_sdo_package(package_code, data)
+    )
 
 
 @router.get(

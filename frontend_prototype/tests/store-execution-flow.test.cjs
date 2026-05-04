@@ -407,7 +407,33 @@ test("store PDA SDP scan validates assigned package ownership before entering de
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
   assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
   assert.doesNotMatch(appJs, /const machineCode = `5\$\{/);
-  assert.match(appJs, /STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。/);
+  assert.match(appJs, /STORE_ITEM machine_code 必须由后端统一发号/);
+});
+
+test("store PDA generates STORE_ITEM from assigned SDP through backend only", () => {
+  const stepSource = extractFunctionSource(appJs, "renderStorePackageShelvingStep");
+  const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
+
+  assert.match(stepSource, /name="category_main"/);
+  assert.match(stepSource, /name="category_sub"/);
+  assert.match(stepSource, /name="grade"/);
+  assert.match(stepSource, /name="quantity"/);
+  assert.match(stepSource, /data-store-package-generate-quantity/);
+  assert.match(appJs, /async function generateStoreItemTokensForSdoPackage/);
+  assert.match(generateSource, /\/store-delivery-packages\/\$\{encodeURIComponent\(packageCode\)\}\/store-items\/generate/);
+  assert.match(generateSource, /rack_code/);
+  assert.match(generateSource, /selected_price/);
+  assert.match(generateSource, /category_main/);
+  assert.match(generateSource, /category_sub/);
+  assert.match(generateSource, /grade/);
+  assert.match(generateSource, /quantity/);
+  assert.match(generateSource, /store_items/);
+  assert.match(generateSource, /package_progress/);
+  assert.match(appJs, /function normalizeGeneratedStoreItemToken/);
+  assert.match(appJs, /await generateStoreItemTokensForSdoPackage/);
+  assert.doesNotMatch(generateSource, /STORE_ITEM machine_code 必须由后端统一发号/);
+  assert.doesNotMatch(generateSource, /machineCode = `5/);
+  assert.doesNotMatch(generateSource, /localStorage\.length|Date\.now\(\)|new Date\(\)\.getTime/);
 });
 
 test("bucketStoreManagerDispatchBales keeps received and processing bales visible to the manager console", () => {

@@ -1833,6 +1833,9 @@ class InMemoryState:
                     normalized.get("assignment_status")
                     or ("assigned" if str(normalized.get("assigned_clerk") or normalized.get("assigned_employee") or "").strip() else "unassigned")
                 ).strip().lower() or "unassigned",
+                "generated_store_item_count": int(normalized.get("generated_store_item_count") or 0),
+                "remaining_store_item_count": int(normalized.get("remaining_store_item_count") or 0),
+                "putaway_status": str(normalized.get("putaway_status") or "").strip().lower(),
                 "received_at": normalized.get("received_at"),
                 "received_by": str(normalized.get("received_by") or "").strip(),
                 "printed_at": normalized.get("printed_at"),
@@ -13793,6 +13796,203 @@ class InMemoryState:
         )
         self._persist()
         return saved
+
+    def _store_items_for_sdo_package(self, package: dict[str, Any]) -> list[dict[str, Any]]:
+        normalized_package = self._normalize_store_delivery_package(package)
+        package_codes = {
+            str(normalized_package.get("display_code") or "").strip().upper(),
+            str(normalized_package.get("machine_code") or "").strip().upper(),
+            str(normalized_package.get("barcode_value") or "").strip().upper(),
+        }
+        package_codes = {value for value in package_codes if value}
+        rows = [
+            row
+            for row in self.item_barcode_tokens.values()
+            if str(row.get("entity_type") or "").strip().upper() == "STORE_ITEM"
+            and (
+                str(row.get("sdo_package_display_code") or "").strip().upper() in package_codes
+                or str(row.get("sdo_package_machine_code") or "").strip().upper() in package_codes
+                or str(row.get("source_package") or "").strip().upper() in package_codes
+                or str(row.get("source_package_key") or "").strip().upper() in package_codes
+            )
+        ]
+        return sorted(
+            rows,
+            key=lambda row: (
+                int(row.get("qty_index") or 0),
+                str(row.get("created_at") or ""),
+                str(row.get("token_no") or ""),
+            ),
+        )
+
+    def _store_delivery_package_store_item_progress(self, package: dict[str, Any]) -> dict[str, Any]:
+        normalized_package = self._normalize_store_delivery_package(package)
+        item_count = self._parse_optional_nonnegative_int(normalized_package.get("item_count")) or 0
+        generated_count = len(self._store_items_for_sdo_package(normalized_package))
+        remaining_count = max(item_count - generated_count, 0) if item_count else 0
+        putaway_status = "completed" if item_count and generated_count >= item_count else "in_progress" if generated_count else "pending"
+        return {
+            "generated_store_item_count": generated_count,
+            "remaining_store_item_count": remaining_count,
+            "putaway_status": putaway_status,
+        }
+
+    def generate_store_items_for_sdo_package(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        package = self._find_store_delivery_package_by_code(package_code)
+        package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))
+        clerk = str(payload.get("clerk") or payload.get("assigned_clerk") or payload.get("generated_by") or "").strip()
+        if not clerk:
+            raise HTTPException(status_code=400, detail="clerk is required")
+        actor_name = str(payload.get("generated_by") or clerk).strip()
+        actor = self._require_user_role(actor_name, {"store_clerk", "store_manager", "area_supervisor"}, store_code=package_store or None)
+        assigned_clerk = str(package.get("assigned_clerk") or "").strip()
+        if str(package.get("received_status") or "").strip().lower() != "received":
+            raise HTTPException(status_code=409, detail="这个包还未被店长确认收货，不能生成 STORE_ITEM。")
+        if str(package.get("exception_status") or "").strip().lower() == "exception":
+            raise HTTPException(status_code=409, detail="异常包不能生成 STORE_ITEM。")
+        if str(package.get("assignment_status") or "").strip().lower() != "assigned" or not assigned_clerk:
+            raise HTTPException(status_code=409, detail="这个 SDP 还没有分配给店员，不能生成 STORE_ITEM。")
+        if assigned_clerk.lower() != clerk.lower():
+            raise HTTPException(status_code=403, detail="这个包没有分配给你，请找店长确认。")
+        if actor.get("role_code") == "store_clerk" and str(actor.get("username") or "").strip().lower() != clerk.lower():
+            raise HTTPException(status_code=403, detail="当前登录店员和生成请求店员不匹配。")
+
+        quantity = self._parse_optional_nonnegative_int(payload.get("quantity")) or 0
+        if quantity <= 0:
+            raise HTTPException(status_code=400, detail="STORE_ITEM 生成数量必须大于 0。")
+        item_count = self._parse_optional_nonnegative_int(package.get("item_count"))
+        if item_count is None or item_count <= 0:
+            raise HTTPException(status_code=409, detail="SDP item_count 未确认，不能生成 STORE_ITEM。")
+        if quantity > item_count:
+            raise HTTPException(status_code=409, detail="生成数量不能超过本包件数。")
+
+        existing_items = self._store_items_for_sdo_package(package)
+        existing_count = len(existing_items)
+        remaining_count = max(item_count - existing_count, 0)
+        if remaining_count <= 0:
+            raise HTTPException(status_code=409, detail="这个 SDP 已完成 STORE_ITEM 生成，不能重复生成。")
+        if quantity > remaining_count:
+            raise HTTPException(status_code=409, detail="重复生成会超过本包件数，不能继续生成。")
+
+        rack_code = str(payload.get("rack_code") or payload.get("store_rack_code") or "").strip().upper()
+        if not rack_code:
+            raise HTTPException(status_code=400, detail="rack_code is required")
+        try:
+            selected_price = round(float(payload.get("selected_price")), 2)
+        except (TypeError, ValueError):
+            selected_price = 0.0
+        if selected_price <= 0:
+            raise HTTPException(status_code=400, detail="selected_price must be greater than 0")
+
+        timestamp = now_iso()
+        category_main = str(payload.get("category_main") or "").strip()
+        category_sub = str(payload.get("category_sub") or "").strip()
+        grade = str(payload.get("grade") or "").strip()
+        category_name = str(
+            payload.get("category_name")
+            or " / ".join(value for value in [category_main, category_sub, grade] if value)
+            or package.get("category_name")
+            or package.get("category_summary")
+            or package.get("content_summary")
+            or ""
+        ).strip()
+        generated_items: list[dict[str, Any]] = []
+        for offset in range(quantity):
+            machine_code = self._allocate_store_item_barcode(timestamp)
+            display_code = f"STOREITEM{machine_code[1:12]}"
+            token_no = display_code
+            while token_no in self.item_barcode_tokens:
+                token_no = f"{display_code}-R{len(self.item_barcode_tokens) + 1}"
+            qty_index = existing_count + offset + 1
+            token_row = {
+                "display_code": display_code,
+                "token_no": token_no,
+                "identity_no": token_no,
+                "entity_type": "STORE_ITEM",
+                "machine_code": machine_code,
+                "barcode_value": machine_code,
+                "final_item_barcode": {
+                    "barcode_value": machine_code,
+                    "identity_id": token_no,
+                },
+                "status": "pending_print",
+                "print_status": "pending_print",
+                "sale_status": "pending_putaway",
+                "task_no": str(package.get("parent_sdo_display_code") or package.get("execution_order_no") or "").strip().upper(),
+                "shipment_no": str(package.get("transfer_no") or "").strip().upper(),
+                "customs_notice_no": "",
+                "source_bale_barcodes": [str(package.get("source_code") or "").strip().upper()] if str(package.get("source_code") or "").strip() else [],
+                "source_legacy_bale_barcodes": [],
+                "source_pool_tokens": [],
+                "source_bale_tokens": [],
+                "cost_source_refs": list(package.get("cost_source_refs") or []),
+                "source_token_refs": list(package.get("source_token_refs") or []),
+                "category_name": category_name,
+                "category_main": category_main,
+                "category_sub": category_sub,
+                "grade": grade,
+                "sku_code": "",
+                "rack_code": rack_code,
+                "store_rack_code": rack_code,
+                "suggested_rack_code": rack_code,
+                "selected_price": selected_price,
+                "selling_price_kes": selected_price,
+                "suggested_price_kes": selected_price,
+                "qty_index": qty_index,
+                "qty_total": item_count,
+                "token_group_no": int(package.get("package_no") or 1),
+                "store_code": package_store,
+                "assigned_clerk": assigned_clerk,
+                "assigned_employee": assigned_clerk,
+                "generated_by": actor["username"],
+                "created_by": actor["username"],
+                "generated_at": timestamp,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "sdo_package_display_code": str(package.get("display_code") or "").strip().upper(),
+                "sdo_package_machine_code": str(package.get("machine_code") or "").strip().upper(),
+                "source_package": str(package.get("display_code") or "").strip().upper(),
+                "source_package_key": str(package.get("display_code") or "").strip().upper(),
+                "parent_sdo_display_code": str(package.get("parent_sdo_display_code") or "").strip().upper(),
+                "parent_sdo_machine_code": str(package.get("parent_sdo_machine_code") or "").strip().upper(),
+                "source_type": str(package.get("source_type") or "").strip().upper(),
+                "source_code": str(package.get("source_code") or "").strip().upper(),
+                "source_machine_code": str(package.get("source_machine_code") or "").strip().upper(),
+                "cost_status": "pending_cost_inheritance",
+                "unit_cost_kes": None,
+                "cost_model_code": "",
+                "cost_locked_at": None,
+            }
+            self.item_barcode_tokens[token_no] = token_row
+            generated_items.append(token_row)
+
+        progress = self._store_delivery_package_store_item_progress(package)
+        package.update(progress)
+        package["updated_at"] = timestamp
+        saved_package = self._save_store_delivery_package(package)
+        progress = self._store_delivery_package_store_item_progress(saved_package)
+        saved_package.update(progress)
+        saved_package = self._save_store_delivery_package(saved_package)
+        self._log_event(
+            event_type="store_delivery_package.store_items_generated",
+            entity_type="store_delivery_package",
+            entity_id=saved_package["display_code"],
+            actor=actor["username"],
+            summary=f"Generated {len(generated_items)} STORE_ITEM barcodes from SDP {saved_package['display_code']}",
+            details={
+                "store_code": saved_package.get("store_code", ""),
+                "assigned_clerk": assigned_clerk,
+                "quantity": len(generated_items),
+                "generated_store_item_count": progress["generated_store_item_count"],
+                "remaining_store_item_count": progress["remaining_store_item_count"],
+            },
+        )
+        self._persist()
+        return {
+            "package": saved_package,
+            "package_progress": progress,
+            "store_items": generated_items,
+        }
 
     def ensure_store_delivery_execution_order_packages(self, transfer_no: str, execution_order_no: str, payload: dict[str, Any]) -> dict[str, Any]:
         actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})

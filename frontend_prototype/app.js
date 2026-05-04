@@ -28307,10 +28307,13 @@ function getStorePackageTokens(actionKey = "") {
 function getStorePackageTokenCounts(row = {}) {
   const actionKey = getStorePackageActionKey(row);
   const tokens = getStorePackageTokens(actionKey);
+  const backendGenerated = Number(row?.generated_store_item_count || row?.package_progress?.generated_store_item_count || 0);
+  const backendRemaining = Number(row?.remaining_store_item_count || row?.package_progress?.remaining_store_item_count || 0);
   return {
-    generated: tokens.length,
+    generated: Math.max(tokens.length, Number.isFinite(backendGenerated) ? backendGenerated : 0),
     printed: tokens.filter((token) => String(token?.print_status || "").trim() === "printed").length,
     pendingPrint: tokens.filter((token) => String(token?.print_status || "").trim() === "pending_print").length,
+    remaining: Number.isFinite(backendRemaining) ? backendRemaining : 0,
   };
 }
 
@@ -28373,13 +28376,76 @@ function getSelectedStorePackagePrice(row = {}, actionKey = getStorePackageActio
   throw new Error("请先选择售价");
 }
 
-function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
+function normalizeGeneratedStoreItemToken(token = {}, row = {}, actionKey = "") {
+  const machineCode = String(token?.machine_code || token?.barcode_value || "").replace(/[^0-9]/g, "").trim();
+  const sdoPackageCode = getStoreReceivingPackageCode(row);
+  return {
+    ...token,
+    display_code: String(token?.display_code || token?.token_no || "").trim().toUpperCase(),
+    token_no: String(token?.token_no || token?.display_code || "").trim().toUpperCase(),
+    identity_no: String(token?.identity_no || token?.token_no || token?.display_code || "").trim().toUpperCase(),
+    machine_code: machineCode,
+    barcode_value: machineCode,
+    print_status: String(token?.print_status || "pending_print").trim().toLowerCase(),
+    status: String(token?.status || "pending_print").trim().toLowerCase(),
+    sale_status: String(token?.sale_status || "pending_putaway").trim().toLowerCase(),
+    source_package_key: actionKey,
+    source_package: String(token?.source_package || sdoPackageCode || "").trim().toUpperCase(),
+    sdo_package_display_code: String(token?.sdo_package_display_code || sdoPackageCode || "").trim().toUpperCase(),
+    sdo_package_machine_code: String(token?.sdo_package_machine_code || getStoreReceivingPackageMachineCode(row) || "").trim().toUpperCase(),
+    store_rack_code: String(token?.store_rack_code || token?.rack_code || "").trim().toUpperCase(),
+    rack_code: String(token?.rack_code || token?.store_rack_code || "").trim().toUpperCase(),
+    selected_price: Number(token?.selected_price || token?.selling_price_kes || 0),
+  };
+}
+
+function mergeGeneratedStoreItemsIntoPackageState(row = {}, generatedTokens = [], packageRow = null) {
   const actionKey = getStorePackageActionKey(row);
-  const existingTokens = getStorePackageTokens(actionKey);
-  if (existingTokens.length) {
-    return existingTokens;
+  const normalizedTokens = generatedTokens
+    .map((token) => normalizeGeneratedStoreItemToken(token, row, actionKey))
+    .filter((token) => token.machine_code && token.token_no);
+  const knownKeys = new Set(normalizedTokens.flatMap((token) => [token.token_no, token.machine_code]).filter(Boolean));
+  storeSdoPackageItemTokenState = [
+    ...storeSdoPackageItemTokenState.filter((token) => !knownKeys.has(String(token?.token_no || "").trim().toUpperCase()) && !knownKeys.has(String(token?.machine_code || "").trim())),
+    ...normalizedTokens,
+  ];
+  if (packageRow) {
+    const normalizedPackage = normalizeStoreAssignedSdoPackageTask(packageRow);
+    if (normalizedPackage) {
+      storeAssignedSdoPackageTasksState = [
+        ...storeAssignedSdoPackageTasksState.filter((item) => getStorePackageActionKey(item) !== getStorePackageActionKey(normalizedPackage)),
+        normalizedPackage,
+      ];
+      cacheStoreReceivingPackageBackendState(normalizedPackage);
+    }
   }
-  throw new Error("STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。STORE_ITEM machine_code 必须由后端统一发号。");
+  persistStoreSdoPackageItemTokenState();
+  return getStorePackageTokens(actionKey);
+}
+
+async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
+  const actionKey = getStorePackageActionKey(row);
+  const packageCode = getStoreReceivingPackageCode(row) || getStoreReceivingPackageMachineCode(row);
+  if (!packageCode) {
+    throw new Error("当前 SDP 缺少实体包码，不能生成 STORE_ITEM。");
+  }
+  const payload = {
+    store_code: String(options.store_code || row?.store_code || getCurrentStoreCodeFallback() || "").trim().toUpperCase(),
+    clerk: String(options.clerk || row?.assigned_clerk || row?.assigned_employee || storeClerkHomeState.assigned_employee || getCurrentStoreWorkerFallback() || "").trim(),
+    rack_code: String(options.rack_code || options.store_rack_code || "").trim().toUpperCase(),
+    selected_price: Number(options.selected_price || 0),
+    category_main: String(options.category_main || row?.category_main || "").trim(),
+    category_sub: String(options.category_sub || row?.category_sub || "").trim(),
+    grade: String(options.grade || row?.grade || "").trim(),
+    quantity: Math.max(1, Number(options.quantity || 1)),
+  };
+  const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/store-items/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const packageProgress = result?.package_progress || {};
+  const packageRow = result?.package ? { ...result.package, package_progress: packageProgress } : null;
+  return mergeGeneratedStoreItemsIntoPackageState(row, Array.isArray(result?.store_items) ? result.store_items : [], packageRow);
 }
 
 function buildStorePackagePrintPreviewTokens(row = {}, quantity = null) {
@@ -28476,6 +28542,8 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
   const rackOptions = getStoreRackOptionsForPackage(row?.store_code);
   const selectedRack = String(context.selected_rack || "").trim().toUpperCase();
   const defaultPrintQty = Math.min(unprinted || itemCount || 0, 20);
+  const remainingForGenerate = Math.max((itemCount || 0) - counts.generated, 0);
+  const defaultGenerateQty = Math.max(remainingForGenerate || itemCount || 1, 1);
   const sdoPackageCode = getStoreReceivingPackageCode(row);
   const sdoPackageMachineCode = getStoreReceivingPackageMachineCode(row);
   return `
@@ -28487,7 +28555,7 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
           <h3>SDP 包任务详情</h3>
         </div>
       </div>
-      ${renderStatusAlert("STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。", "info")}
+      ${renderStatusAlert("STORE_ITEM machine_code 必须由后端统一发号；本 PR 不做完整 token/cost inheritance。", "info")}
       <div class="report-summary-grid">
         <article class="store-metric"><strong>SDP</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageCode || "-")}</span></article>
         <article class="store-metric"><strong>6 开头机报码</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageMachineCode || "-")}</span></article>
@@ -28530,7 +28598,25 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
       </section>
       <section class="store-package-flow-block">
         <h4>STORE_ITEM 生成区</h4>
-        <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}">${counts.generated ? "已生成 STORE_ITEM" : "生成 STORE_ITEM 商品码"}</button>
+        <div class="form-grid compact">
+          <label>
+            <span>主类</span>
+            <input name="category_main" data-store-package-category-main="${escapeHtml(actionKey)}" value="${escapeHtml(row?.category_main || "")}" placeholder="pants" />
+          </label>
+          <label>
+            <span>子类</span>
+            <input name="category_sub" data-store-package-category-sub="${escapeHtml(actionKey)}" value="${escapeHtml(row?.category_sub || "")}" placeholder="jeans pant" />
+          </label>
+          <label>
+            <span>等级</span>
+            <input name="grade" data-store-package-grade="${escapeHtml(actionKey)}" value="${escapeHtml(row?.grade || "")}" placeholder="P" />
+          </label>
+          <label>
+            <span>生成数量</span>
+            <input name="quantity" type="number" min="1" max="${escapeHtml(Math.max(remainingForGenerate, 1))}" value="${escapeHtml(Math.min(defaultGenerateQty, Math.max(remainingForGenerate, 1)))}" data-store-package-generate-quantity="${escapeHtml(actionKey)}" />
+          </label>
+        </div>
+        <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}" ${remainingForGenerate <= 0 ? "disabled" : ""}>${remainingForGenerate <= 0 ? "已完成生成" : "生成 STORE_ITEM 商品码"}</button>
       </section>
       <section class="store-package-flow-block">
         <h4>商品码打印区</h4>
@@ -34655,9 +34741,19 @@ document.addEventListener("click", async (event) => {
           throw new Error("请先选择货架位");
         }
         const selectedPrice = getSelectedStorePackagePrice(row, actionKey);
-        const tokens = generateStoreItemTokensForSdoPackage(row, {
+        const categoryMainInput = document.querySelector(`[data-store-package-category-main="${CSS.escape(actionKey)}"]`);
+        const categorySubInput = document.querySelector(`[data-store-package-category-sub="${CSS.escape(actionKey)}"]`);
+        const gradeInput = document.querySelector(`[data-store-package-grade="${CSS.escape(actionKey)}"]`);
+        const quantityInput = document.querySelector(`[data-store-package-generate-quantity="${CSS.escape(actionKey)}"]`);
+        const tokens = await generateStoreItemTokensForSdoPackage(row, {
+          store_code: storeClerkHomeState.store_code,
+          clerk: storeClerkHomeState.assigned_employee,
           store_rack_code: rackCode,
           selected_price: selectedPrice,
+          category_main: String(categoryMainInput?.value || "").trim(),
+          category_sub: String(categorySubInput?.value || "").trim(),
+          grade: String(gradeInput?.value || "").trim(),
+          quantity: Number(quantityInput?.value || 0),
         });
         writeOutput("#storeClerkHomeOutput", tokens);
         renderStoreClerkHomeSummary({

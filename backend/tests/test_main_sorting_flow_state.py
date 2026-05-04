@@ -527,6 +527,274 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertIn("_is_store_clerk_user(current_user)", routes_source)
         self.assertIn("state.list_assigned_store_delivery_packages", routes_source)
 
+    def _create_ready_assigned_sdo_package_for_store_item_generation(self, *, assigned_clerk="Austin", item_count=3):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+        package["item_count"] = item_count
+        self.state._save_store_delivery_package(package)
+        self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        assigned = self.state.assign_store_delivery_package(
+            package["display_code"],
+            {
+                "assigned_clerk": assigned_clerk,
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        return order, assigned
+
+    def test_backend_generates_store_items_from_ready_assigned_sdo_package(self):
+        order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=3)
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 2,
+            },
+        )
+
+        self.assertEqual(result["package_progress"]["generated_store_item_count"], 2)
+        self.assertEqual(result["package_progress"]["remaining_store_item_count"], 1)
+        self.assertEqual(result["package_progress"]["putaway_status"], "in_progress")
+        listed_package = self.state.list_store_delivery_execution_orders(transfer_no=order["source_transfer_no"])[0]["packages"][0]
+        self.assertEqual(listed_package["generated_store_item_count"], 2)
+        self.assertEqual(listed_package["remaining_store_item_count"], 1)
+        self.assertEqual(listed_package["putaway_status"], "in_progress")
+        self.assertEqual(len(result["store_items"]), 2)
+        for index, token in enumerate(result["store_items"], start=1):
+            self.assertRegex(token["machine_code"], r"^5\d{12}$")
+            self.assertTrue(self.state._is_valid_store_item_v2_barcode(token["machine_code"]))
+            self.assertEqual(token["barcode_value"], token["machine_code"])
+            self.assertEqual(token["entity_type"], "STORE_ITEM")
+            self.assertEqual(token["store_code"], "UTAWALA")
+            self.assertEqual(token["assigned_clerk"], "Austin")
+            self.assertEqual(token["assigned_employee"], "Austin")
+            self.assertEqual(token["generated_by"], "Austin")
+            self.assertEqual(token["rack_code"], "A-01")
+            self.assertEqual(token["store_rack_code"], "A-01")
+            self.assertEqual(token["selected_price"], 150)
+            self.assertEqual(token["selling_price_kes"], 150)
+            self.assertEqual(token["category_main"], "pants")
+            self.assertEqual(token["category_sub"], "jeans pant")
+            self.assertEqual(token["grade"], "P")
+            self.assertEqual(token["sdo_package_display_code"], package["display_code"])
+            self.assertEqual(token["sdo_package_machine_code"], package["machine_code"])
+            self.assertEqual(token["parent_sdo_display_code"], order["execution_order_no"])
+            self.assertEqual(token["parent_sdo_machine_code"], order["machine_code"])
+            self.assertEqual(token["source_type"], "SDB")
+            self.assertEqual(token["source_code"], "SDB260503AAG")
+            self.assertEqual(token["qty_index"], index)
+            self.assertEqual(token["qty_total"], 3)
+
+        resolved = self.state.resolve_barcode(result["store_items"][0]["machine_code"], context="pos")
+        self.assertEqual(resolved["barcode_type"], "STORE_ITEM")
+        self.assertEqual(resolved["object_id"], result["store_items"][0]["token_no"])
+        self.assertEqual(resolved["identity_id"], result["store_items"][0]["identity_no"])
+        self.assertEqual(self.state.resolve_barcode(package["machine_code"], context="pos")["barcode_type"], "STORE_DELIVERY_PACKAGE")
+        self.assertTrue(self.state.resolve_barcode(package["machine_code"], context="pos")["reject_reason"])
+
+    def test_store_item_generation_rejects_unready_or_wrong_clerk_sdo_package(self):
+        order = self._create_store_delivery_package_state_order()
+        base_package = order["packages"][0]
+
+        def package_variant(display_code, machine_code, **overrides):
+            row = {
+                **base_package,
+                "id": overrides.pop("id", 950),
+                "display_code": display_code,
+                "package_id": display_code,
+                "machine_code": machine_code,
+                "barcode_value": machine_code,
+                "item_count": 2,
+                "received_status": "received",
+                "exception_status": "normal",
+                "exception_reason": "",
+                "assigned_clerk": "Austin",
+                "assignment_status": "assigned",
+                "status": "assigned",
+                **overrides,
+            }
+            return self.state._save_store_delivery_package(row)
+
+        unreceived = package_variant(
+            "SDP260504971",
+            "6260504971",
+            id=971,
+            received_status="pending",
+        )
+
+        with self.assertRaises(HTTPException) as unreceived_error:
+            self.state.generate_store_items_for_sdo_package(
+                unreceived["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(unreceived_error.exception.status_code, 409)
+
+        exception_package = package_variant(
+            "SDP260504972",
+            "6260504972",
+            id=972,
+            exception_status="exception",
+            exception_reason="damaged",
+            status="exception",
+        )
+        with self.assertRaises(HTTPException) as exception_error:
+            self.state.generate_store_items_for_sdo_package(
+                exception_package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(exception_error.exception.status_code, 409)
+
+        unassigned_package = package_variant(
+            "SDP260504973",
+            "6260504973",
+            id=973,
+            assigned_clerk="",
+            assignment_status="unassigned",
+            status="received_unassigned",
+        )
+        with self.assertRaises(HTTPException) as unassigned_error:
+            self.state.generate_store_items_for_sdo_package(
+                unassigned_package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(unassigned_error.exception.status_code, 409)
+
+        mary_package = package_variant(
+            "SDP260504974",
+            "6260504974",
+            id=974,
+            assigned_clerk="Mary",
+        )
+        with self.assertRaises(HTTPException) as wrong_clerk_error:
+            self.state.generate_store_items_for_sdo_package(
+                mary_package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(wrong_clerk_error.exception.status_code, 403)
+
+    def test_store_item_generation_quantity_cannot_exceed_sdo_package_item_count(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=3)
+
+        with self.assertRaises(HTTPException) as too_many:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 4,
+                },
+            )
+        self.assertEqual(too_many.exception.status_code, 409)
+
+        first = self.state.generate_store_items_for_sdo_package(
+            package["machine_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "quantity": 2,
+            },
+        )
+        self.assertEqual(first["package_progress"]["generated_store_item_count"], 2)
+
+        with self.assertRaises(HTTPException) as duplicate_too_many:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 2,
+                },
+            )
+        self.assertEqual(duplicate_too_many.exception.status_code, 409)
+
+        final = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "quantity": 1,
+            },
+        )
+        self.assertEqual(final["package_progress"]["generated_store_item_count"], 3)
+        self.assertEqual(final["package_progress"]["remaining_store_item_count"], 0)
+        self.assertEqual(final["package_progress"]["putaway_status"], "completed")
+
+        with self.assertRaises(HTTPException) as completed:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(completed.exception.status_code, 409)
+
+    def test_store_item_generation_endpoint_is_declared_for_pda(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/store-delivery-packages/{package_code}/store-items/generate"', routes_source)
+        self.assertIn("def generate_store_items_for_sdo_package(", routes_source)
+        self.assertIn("state.generate_store_items_for_sdo_package", routes_source)
+
     def _create_ready_bales(self, customs_notice_no="RAW240421", package_count=2, unit_weight=40):
         shipment = self.state.create_inbound_shipment(
             {
