@@ -3054,17 +3054,17 @@
 
       <section class="panel store-support-panel hidden-screen" data-workspace-panel="store">
         <div class="panel-head">
-          <h2>内部兼容：门店验收配货 bale（已并入主控台）</h2>
+          <h2>内部兼容：门店验收 SDO / SDP（已并入主控台）</h2>
         </div>
         <form id="storeDispatchBaleAcceptForm" class="form-grid compact">
           <input name="transfer_no" placeholder="先选择调拨单，例如 TO-20260425-010" />
-          <textarea name="bale_no" class="bulk-scan-input" rows="7" placeholder="优先扫描正式门店送货执行单 barcode（SDO...）；如需兼容旧流程，也可逐行输入本调拨单下全部门店配货 bale barcode。"></textarea>
-          <input name="note" placeholder="验收备注，如包装完好 / 少一包待查" value="门店整单验收完成" />
-          <button type="submit">验收完成：批量确认本调拨单全部 bale</button>
+          <textarea name="bale_no" class="bulk-scan-input" rows="7" placeholder="扫描 SDO 主单码或 SDP 实体包码；SDB / LPK 只作来源码核对。"></textarea>
+          <input name="note" placeholder="验收备注，如包装完好 / 少一包待查" value="门店 SDP 包验收" />
+          <button type="submit">打开 SDO / SDP 收货</button>
         </form>
         <div id="storeDispatchBaleNotice" class="inline-notice-slot" aria-live="polite"></div>
         <div id="storeDispatchBaleSummary" class="candidate-summary empty-state">
-          这是店长端入口。门店收货应先扫描正式门店送货执行单 barcode（SDO...）；SDB/LPK 不是门店收货码。当前版本保留逐包验收兼容。
+          店长端只按 SDO / SDP 收货。SDB / LPK 是仓库来源包，不是门店正式收货对象。本 PR 只完成店长端前端对象切换，不提供跨设备后端持久化。
         </div>
         <pre id="storeDispatchBaleOutput" class="output hidden-output"></pre>
       </section>
@@ -3079,7 +3079,7 @@
             <article class="sorting-task-flow-step is-active">
               <span class="sorting-task-flow-no">01</span>
               <strong>选择已验收总单</strong>
-              <p>按总单加载可分配 bale。</p>
+              <p>按 SDO 加载已收货 SDP。</p>
             </article>
             <article class="sorting-task-flow-step is-pending">
               <span class="sorting-task-flow-no">02</span>
@@ -3089,7 +3089,7 @@
             <article class="sorting-task-flow-step is-pending">
               <span class="sorting-task-flow-no">03</span>
               <strong>确认分配</strong>
-              <p>每个具体 bale 只能对应一个店员。</p>
+              <p>每个 SDP 只能对应一个店员。</p>
             </article>
           </div>
           <div class="sorting-task-layout">
@@ -3097,25 +3097,25 @@
               <div class="sorting-task-panel-head">
                 <span class="eyebrow">Transfer</span>
                 <strong>待分配总单</strong>
-                <p>从已整单验收的调拨单开始分配。</p>
+                <p>从已收货的 SDP 包开始分配。</p>
               </div>
-              <input name="transfer_no" placeholder="总单 / 调拨单号，例如 TO-20260425-010" />
-              <textarea name="bale_no" rows="5" placeholder="系统会自动带出本单已验收未分配 bale；也可手工增减，一行一个。"></textarea>
+              <input name="transfer_no" placeholder="SDO 主单或调拨单号，例如 SDO261240004" />
+              <textarea name="bale_no" rows="5" placeholder="系统会自动带出已收货未分配 SDP；也可手工增减，一行一个。"></textarea>
             </section>
             <section class="sorting-task-panel sorting-task-panel-selected">
               <div class="sorting-task-panel-head">
                 <span class="eyebrow">Clerk</span>
                 <strong>分配给店员</strong>
-                <p>店员从 6.2 我的当前 bale 进入处理。</p>
+                <p>本 PR 只切换店长端分配对象，不生成 STORE_ITEM。</p>
               </div>
               <input name="employee_name" list="storeClerkOptions" placeholder="选择可分配店员" />
-              <input name="note" placeholder="分配备注，例如这张总单下的这批 bale 交给同一店员处理" value="按总单批量分配；每个具体 bale 只对应一个店员" />
+              <input name="note" placeholder="分配备注，例如这张 SDO 下的 SDP 交给同一店员处理" value="按 SDP 分配；每个 SDP 只对应一个店员" />
               <button type="submit" class="flow-primary-action">确认批量分配给店员</button>
             </section>
           </div>
         </form>
         <div id="storeDispatchAssignmentSummary" class="candidate-summary empty-state">
-          这是店长端入口。店长从一张总单 / 调拨单开始，可以一次把这张单下的多个门店配货 bale 绑定给同一店员；每个具体 bale 只能对应一个店员。可选店员来自系统管理中的 active store_clerk，并按当前门店过滤。分配完成后，店员要先从“6.2 我的当前 bale”进入，再去自己的工作台。
+          店长从 SDO 主单进入，只能把已收货、非异常的 SDP 实体包分配给店员。SDB / LPK 仅作 source_code 核对。后续 PR 需要把 SDP received / assigned / exception 状态写入后端。
         </div>
         <pre id="storeDispatchAssignmentOutput" class="output hidden-output"></pre>
       </section>
