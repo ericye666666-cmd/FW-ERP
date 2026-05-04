@@ -11022,7 +11022,11 @@ function buildWarehouseoutModalPrintJobFromPayload(payload = {}, {
   const displayCode = String(payload.display_code || payload.bale_barcode || payload.code || barcodeValue || "").trim().toUpperCase();
   return {
     id: null,
-    job_type: entityType === "STORE_DELIVERY_EXECUTION" ? "store_delivery_execution_direct_label" : "warehouseout_bale_direct_label",
+    job_type: entityType === "STORE_DELIVERY_PACKAGE"
+      ? "store_delivery_package_direct_label"
+      : entityType === "STORE_DELIVERY_EXECUTION"
+        ? "store_delivery_execution_direct_label"
+        : "warehouseout_bale_direct_label",
     entity_type: entityType || "",
     status: "queued",
     created_at: new Date().toISOString(),
@@ -11088,16 +11092,40 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
 } = {}) {
   const sourceBales = Array.isArray(row.source_bales) ? row.source_bales.filter(Boolean) : [];
   const packageIndex = Math.max(1, Number(row.package_index || row.packageIndex || rowIndex + 1) || 1);
-  const packageCount = Math.max(packageIndex, Number(row.package_count || row.packageCount || totalRows || 1) || 1);
-  const displayCode = String(
-    row.store_delivery_execution_order_no
-    || row.execution_order_no
-    || row.official_delivery_barcode
-    || row.display_code
+  const packageCount = Math.max(packageIndex, Number(row.package_total || row.package_count || row.packageCount || totalRows || 1) || 1);
+  const entityType = String(row.entity_type || "").trim().toUpperCase();
+  const isSdoPackage = entityType === "STORE_DELIVERY_PACKAGE"
+    || /^SDP\d{9}$/.test(String(row.display_code || row.package_id || "").trim().toUpperCase())
+    || /^6\d{9}$/.test(String(row.machine_code || row.barcode_value || "").replace(/[^0-9]/g, "").trim());
+  const parentSdoDisplayCode = String(
+    row.parent_sdo_display_code
+    || row.parent_sdo_order_no
+    || transfer?.store_delivery_execution_order_no
+    || transfer?.store_delivery_execution_order?.execution_order_no
+    || transfer?.store_delivery_execution_order?.official_delivery_barcode
+    || transfer?.execution_order_no
+    || transfer?.official_delivery_barcode
     || "",
   ).trim().toUpperCase();
+  const parentSdoMachineCode = String(
+    row.parent_sdo_machine_code
+    || transfer?.store_delivery_execution_order?.machine_code
+    || transfer?.machine_code
+    || "",
+  ).replace(/[^0-9]/g, "").trim();
+  const displayCode = String(
+    isSdoPackage
+      ? (row.display_code || row.package_id || row.sdo_package_code || "")
+      : (
+        row.store_delivery_execution_order_no
+        || row.execution_order_no
+        || row.official_delivery_barcode
+        || row.display_code
+        || ""
+      ),
+  ).trim().toUpperCase();
   const machineCode = String(row.machine_code || "").replace(/[^0-9]/g, "").trim();
-  const derivedMachineCode = /^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(displayCode)
+  const derivedMachineCode = !isSdoPackage && /^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(displayCode)
     ? `4${displayCode.slice(3)}`
     : "";
   const finalBaleNo = String(row.dispatch_bale_no || row.dispatchBaleNo || row.bale_no || row.baleNo || "").trim();
@@ -11107,12 +11135,13 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
   const storeCode = String(row.store_code || transfer?.to_store_code || "").trim().toUpperCase();
   const sourceLabel = String(row.source_label || (row.source_type === "loose_pick_sheet" ? "补差拣货单" : "现成待送店包裹")).trim();
   const itemCount = Number(row.item_count || row.qty || 0) || 0;
+  const sourceCode = String(row.source_code || finalBaleNo || sourceBales[0] || "").trim().toUpperCase();
   return {
     printer_name: String(printerName || "").trim(),
     template_code: String(templateCode || getTransferDispatchTemplateCode()).trim().toLowerCase(),
     template_scope: "warehouseout_bale",
-    entity_type: "STORE_DELIVERY_EXECUTION",
-    label_title: "SDO / STORE DELIVERY ORDER",
+    entity_type: isSdoPackage ? "STORE_DELIVERY_PACKAGE" : "STORE_DELIVERY_EXECUTION",
+    label_title: isSdoPackage ? "SDO / DELIVERY" : "SDO / STORE DELIVERY ORDER",
     copies: 1,
     barcode_value: barcodeValue,
     display_code: displayCode || "",
@@ -11136,15 +11165,19 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     store_code: storeCode || "STORE",
     request: String(transfer?.transfer_no || row.transfer_no || "").trim().toUpperCase(),
     packages: packageCount,
-    source_package_summary: sourceBales.length ? sourceBales.join(", ") : String(row.source_code || finalBaleNo || "").trim().toUpperCase(),
-    store_delivery_execution_order_no: displayCode || "",
-    official_delivery_barcode: displayCode || "",
+    source_package_summary: sourceBales.length ? sourceBales.join(", ") : sourceCode,
+    parent_sdo_display_code: parentSdoDisplayCode,
+    parent_sdo_machine_code: parentSdoMachineCode,
+    parent_sdo_order_no: parentSdoDisplayCode,
+    store_delivery_execution_order_no: parentSdoDisplayCode || displayCode || "",
+    official_delivery_barcode: parentSdoDisplayCode || displayCode || "",
     transfer_order_no: String(transfer?.transfer_no || row.transfer_no || "").trim().toUpperCase(),
     bale_piece_summary: `第 ${packageIndex} 包 / 共 ${packageCount} 包 · ${itemCount} 件`,
     total_quantity: `${itemCount} pcs`,
     packing_list: [
       `${categorySummary} · ${itemCount} 件`,
-      sourceBales.length ? `来源 bales: ${sourceBales.join(", ")}` : "",
+      sourceCode ? `来源包: ${sourceCode}` : "",
+      parentSdoDisplayCode ? `父级 SDO: ${parentSdoDisplayCode}` : "",
       Array.isArray(row.lines)
         ? row.lines.map((line) => `${String(line?.categoryMain || "").trim()} / ${String(line?.categorySub || "").trim()} x${Number(line?.qty || 0)}`).join("\n")
         : "",
@@ -11157,6 +11190,11 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     grade: String(row.grade || "").trim(),
     qty: String(Math.max(0, itemCount)),
     weight: "",
+    source_code: sourceCode,
+    item_count: itemCount,
+    content_summary: String(row.content_summary || categorySummary).trim(),
+    package_no: packageIndex,
+    package_total: packageCount,
     code: displayCode || finalBaleNo || barcodeValue,
   };
 }
@@ -11166,7 +11204,11 @@ function buildSDOPrintJobs({
   transfer = {},
   displayRows = [],
 } = {}) {
-  const rows = Array.isArray(displayRows) ? displayRows : [];
+  const packageRows = Array.isArray(transfer?.store_delivery_execution_order?.packages) && transfer.store_delivery_execution_order.packages.length
+    ? transfer.store_delivery_execution_order.packages
+    : (Array.isArray(displayRows) ? displayRows : []);
+  const sourceDisplayRows = Array.isArray(displayRows) ? displayRows : [];
+  const rows = packageRows;
   if (!rows.length) {
     throw new Error("当前没有可打印的送店 barcode。");
   }
@@ -11196,29 +11238,49 @@ function buildSDOPrintJobs({
   }
   const sdoPackageCount = Math.max(rows.length, Number(transfer?.store_delivery_execution_order?.package_count || transfer?.package_count || 0) || 0);
   return rows.map((row, index) => {
-    const sdoBoundRow = {
+    const sourceRow = sourceDisplayRows[index] || {};
+    const packageDisplayCode = String(row?.display_code || row?.package_id || row?.sdo_package_code || "").trim().toUpperCase();
+    const packageMachineCode = String(row?.machine_code || row?.barcode_value || row?.scan_token || "").replace(/[^0-9]/g, "").trim();
+    if (!/^SDP\d{9}$/.test(packageDisplayCode)) {
+      throw new Error("正式 SDO package barcode 缺少 display_code，不能打开空打印窗。");
+    }
+    if (!/^6\d{9}$/.test(packageMachineCode)) {
+      throw new Error("正式 SDO package barcode 缺少 6 开头 machine_code，不能打开空打印窗。");
+    }
+    const packageNo = Math.max(1, Number(row?.package_no || index + 1) || index + 1);
+    const sdoPackageRow = {
+      ...sourceRow,
       ...row,
       store_delivery_execution_order_no: sdoDisplayCode,
       execution_order_no: sdoDisplayCode,
       official_delivery_barcode: sdoDisplayCode,
-      display_code: sdoDisplayCode,
-      machine_code: sdoMachineCode,
-      barcode_value: sdoMachineCode,
+      parent_sdo_display_code: sdoDisplayCode,
+      parent_sdo_machine_code: sdoMachineCode,
+      parent_sdo_order_no: sdoDisplayCode,
+      display_code: packageDisplayCode,
+      machine_code: packageMachineCode,
+      barcode_value: packageMachineCode,
+      human_readable: packageMachineCode,
+      package_index: packageNo,
+      package_no: packageNo,
+      package_total: sdoPackageCount,
       package_count: sdoPackageCount,
       total_packages: sdoPackageCount,
-      entity_type: "STORE_DELIVERY_EXECUTION",
+      entity_type: "STORE_DELIVERY_PACKAGE",
     };
     const payload = {
-      ...buildTransferDispatchPrinterPayloadForRow(sdoBoundRow, transfer, {
+      ...buildTransferDispatchPrinterPayloadForRow(sdoPackageRow, transfer, {
         templateCode,
         rowIndex: index,
         totalRows: rows.length,
       }),
       template_code: templateCode,
-      display_code: sdoDisplayCode,
-      machine_code: sdoMachineCode,
-      barcode_value: sdoMachineCode,
-      human_readable: sdoMachineCode,
+      display_code: packageDisplayCode,
+      machine_code: packageMachineCode,
+      barcode_value: packageMachineCode,
+      human_readable: packageMachineCode,
+      parent_sdo_display_code: sdoDisplayCode,
+      parent_sdo_machine_code: sdoMachineCode,
       transfer_no: String(transferNo || transfer?.transfer_no || row?.transfer_no || "").trim().toUpperCase(),
     };
     return buildWarehouseoutModalPrintJobFromPayload(payload, {
@@ -11263,7 +11325,7 @@ function openTransferDispatchPrintTemplateModal({
 } = {}) {
   const rows = Array.isArray(displayRows) ? displayRows : [];
   const jobs = buildSDOPrintJobs({ transferNo, transfer, displayRows: rows });
-  const sdoDisplayCode = String(jobs[0]?.print_payload?.display_code || "").trim().toUpperCase();
+  const sdoDisplayCode = String(jobs[0]?.print_payload?.parent_sdo_display_code || jobs[0]?.print_payload?.store_delivery_execution_order_no || "").trim().toUpperCase();
   const templateCode = getTransferDispatchTemplateCode();
   balePrinterConsoleNotice = {
     type: "success",
@@ -15756,8 +15818,8 @@ function getStorePdaScanGuidance(value = "") {
   if (!raw) {
     return "请扫描 STORE_ITEM 商品码。";
   }
-  if (raw.startsWith("SDO") || /^4\d{9}$/.test(digits)) {
-    return "这是 SDO，请去门店收货页面处理。";
+  if (raw.startsWith("SDO") || raw.startsWith("SDP") || /^4\d{9}$/.test(digits) || /^6\d{9}$/.test(digits)) {
+    return "这是 SDO / SDP，请去门店收货页面处理。";
   }
   if (raw.startsWith("SDB") || raw.startsWith("LPK") || /^2\d{9}$/.test(digits) || /^3\d{9}$/.test(digits)) {
     return "这是 SDB / LPK 来源包，不能直接上架销售。";
@@ -17026,6 +17088,13 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
     const displayCode = String(payload.display_code || payload.parcel_batch_no || payload.dispatch_bale_no || "").trim().toUpperCase();
     const machineCode = String(payload.machine_code || payload.barcode_value || payload.scan_token || defaultBarcodeValue).replace(/[^0-9]/g, "").trim();
     const barcodeValue = machineCode;
+    const entityType = String(payload.entity_type || job.entity_type || "").trim().toUpperCase();
+    const isSdoPackage = entityType === "STORE_DELIVERY_PACKAGE" || displayCode.startsWith("SDP") || barcodeValue.startsWith("6");
+    const parentSdoDisplayCode = String(payload.parent_sdo_display_code || payload.store_delivery_execution_order_no || payload.official_delivery_barcode || "").trim().toUpperCase();
+    const parentSdoMachineCode = String(payload.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim();
+    const packageNo = String(payload.package_no || payload.serial_no || "").trim();
+    const packageTotal = String(payload.package_total || payload.total_packages || payload.package_count || "").trim();
+    const sourceCode = String(payload.source_code || payload.source_package_summary || "").trim().toUpperCase();
     const barcodeSvg = renderCode128Svg(barcodeValue, { width: 340, height: 96, quietZoneModules: 12, moduleWidth: 1.7 });
     return `<!doctype html>
 <html>
@@ -17068,12 +17137,12 @@ function renderDirectOnlyBaleModalPreview(job = {}, selectedTemplate = {}) {
   </style>
 </head>
 <body>
-  <section class="label" data-print-template="store_dispatch_60x40" data-sdo-display-code="${escapeHtml(displayCode)}" data-sdo-machine-code="${escapeHtml(machineCode)}" data-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
+  <section class="label" data-print-template="store_dispatch_60x40" data-sdo-display-code="${escapeHtml(isSdoPackage ? parentSdoDisplayCode : displayCode)}" data-sdo-package-display-code="${escapeHtml(isSdoPackage ? displayCode : "")}" data-sdo-machine-code="${escapeHtml(isSdoPackage ? parentSdoMachineCode : machineCode)}" data-barcode-value="${escapeHtml(barcodeValue)}" data-barcode-standard="CODE128">
     <div class="left">
       <div class="kicker">${escapeHtml(sizeLabel)} · STORE DISPATCH</div>
-      <h1>${escapeHtml("STORE DISPATCH / SDO")}</h1>
-      <p class="meta">${escapeHtml("正式门店送货执行码")}</p>
-      <p class="meta">${escapeHtml(`Display: ${displayCode || "-"}`)}<br>${escapeHtml(`Machine: ${machineCode || "-"}`)}<br>${escapeHtml(`Encoded: ${barcodeValue || "-"}`)}<br>${escapeHtml(`Store: ${storeName || "-"}`)}<br>${escapeHtml(`Request: ${transferNo || "-"}`)}<br>${escapeHtml(`Packages: ${String(payload.package_count || payload.total_packages || "").trim() || "-"}`)}</p>
+      <h1>${escapeHtml(isSdoPackage ? "SDO / DELIVERY" : "STORE DISPATCH / SDO")}</h1>
+      <p class="meta">${escapeHtml(isSdoPackage ? "门店送货实体包码" : "正式门店送货执行码")}</p>
+      <p class="meta">${escapeHtml(`Display: ${displayCode || "-"}`)}<br>${escapeHtml(`Machine: ${machineCode || "-"}`)}<br>${escapeHtml(`Encoded: ${barcodeValue || "-"}`)}<br>${escapeHtml(`Store: ${storeName || "-"}`)}<br>${escapeHtml(`Request: ${transferNo || "-"}`)}${isSdoPackage ? `<br>${escapeHtml(`Package: ${packageNo || "-"} / ${packageTotal || "-"}`)}<br>${escapeHtml(`Parent SDO: ${parentSdoDisplayCode || "-"}`)}<br>${escapeHtml(`Source: ${sourceCode || "-"}`)}` : `<br>${escapeHtml(`Packages: ${String(payload.package_count || payload.total_packages || "").trim() || "-"}`)}`}</p>
       <div><span class="badge">${escapeHtml(packageLabel || qty || "送店包")}</span></div>
       <div class="barcode-wrap">
         ${barcodeSvg}
@@ -29712,15 +29781,35 @@ async function submitStoreDispatchBaleAccept(event) {
   const rawScanText = String(payload.bale_no || "").trim().toUpperCase();
   payload.transfer_no = String(payload.transfer_no || "").trim().toUpperCase();
   if (!rawScanText) {
-    throw new Error("请先扫描正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
+    throw new Error("请先扫描正式门店送货执行码或实体包码（STORE_DELIVERY_EXECUTION / SDO...，STORE_DELIVERY_PACKAGE / SDP...）。");
   }
   if (!payload.transfer_no) {
     throw new Error("请先选择调拨单，再验收这张调拨单下的门店配货 bale。");
   }
   const scannedCodes = rawScanText.split(/\r?\n+/).map((row) => String(row || "").trim().toUpperCase()).filter(Boolean);
   if (scannedCodes.length === 1) {
-    const resolved = await resolveBarcodeForContext(scannedCodes[0], "store_receiving", ["STORE_DELIVERY_EXECUTION"]);
-    if (String(resolved?.barcode_type || "").trim().toUpperCase() === "STORE_DELIVERY_EXECUTION") {
+    const resolved = await resolveBarcodeForContext(scannedCodes[0], "store_receiving", ["STORE_DELIVERY_EXECUTION", "STORE_DELIVERY_PACKAGE"]);
+    const resolvedType = String(resolved?.barcode_type || "").trim().toUpperCase();
+    if (resolvedType === "STORE_DELIVERY_PACKAGE") {
+      writeOutput("#storeDispatchBaleOutput", resolved);
+      const summaryTarget = document.querySelector("#storeDispatchBaleSummary");
+      if (summaryTarget instanceof HTMLElement) {
+        summaryTarget.className = "report-summary";
+        summaryTarget.innerHTML = `
+          <div class="alert-banner">已识别门店送货实体包码：${escapeHtml(scannedCodes[0])}。</div>
+          <div class="report-summary-grid">
+            <article class="store-metric"><strong>父级 SDO</strong><span>${escapeHtml(resolved.parent_sdo_display_code || "-")}</span></article>
+            <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(resolved.store_code || "-")}</span></article>
+            <article class="store-metric"><strong>包序号</strong><span>${escapeHtml(`${resolved.package_no || "-"} / ${resolved.package_total || "-"}`)}</span></article>
+            <article class="store-metric"><strong>来源包</strong><span>${escapeHtml(resolved.source_code || "-")}</span></article>
+          </div>
+          <div class="subtle small">这是正式 SDO 下的实体包码。当前版本先完成识别与信息展示；逐包收货回写将在后续版本补充。</div>
+        `;
+      }
+      showTransientInlineNotice("#storeDispatchBaleNotice", "已识别门店送货实体包码。当前版本先完成识别与信息展示；逐包收货回写将在后续版本补充。", "success", 2400);
+      return;
+    }
+    if (resolvedType === "STORE_DELIVERY_EXECUTION") {
       const orders = await request(`/transfers/${encodeURIComponent(payload.transfer_no)}/store-delivery-execution-orders`);
       const matched = Array.isArray(orders)
         ? orders.find((row) => String(row?.official_delivery_barcode || "").trim().toUpperCase() === scannedCodes[0])
@@ -29744,7 +29833,7 @@ async function submitStoreDispatchBaleAccept(event) {
       showTransientInlineNotice("#storeDispatchBaleNotice", "已识别正式门店送货执行码。当前版本先完成识别与信息展示；收货回写将在后续版本补充。", "success", 2400);
       return;
     }
-    throw new Error("门店收货只扫正式门店送货执行码（STORE_DELIVERY_EXECUTION / SDO...）。");
+    throw new Error("门店收货只扫正式门店送货执行码或实体包码（STORE_DELIVERY_EXECUTION / SDO...，STORE_DELIVERY_PACKAGE / SDP...）。");
   }
   payload.store_code = String(payload.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const rows = await refreshStoreDispatchBaleDirectoryFromForm({ store_code: payload.store_code, transfer_no: payload.transfer_no });
@@ -30583,7 +30672,7 @@ async function submitItemIdentityLedger(event) {
   }
   let ledgerLookupValue = identityNo;
   try {
-    const resolved = await resolveBarcodeForContext(identityNo, "identity_ledger", ["RAW_BALE", "DISPATCH_BALE", "STORE_PREP_BALE", "LOOSE_PICK_TASK", "STORE_DELIVERY_EXECUTION", "STORE_ITEM"]);
+    const resolved = await resolveBarcodeForContext(identityNo, "identity_ledger", ["RAW_BALE", "DISPATCH_BALE", "STORE_PREP_BALE", "LOOSE_PICK_TASK", "STORE_DELIVERY_EXECUTION", "STORE_DELIVERY_PACKAGE", "STORE_ITEM"]);
     if (window.barcodeResolverFlow && typeof window.barcodeResolverFlow.getIdentityLedgerLookupValue === "function") {
       ledgerLookupValue = window.barcodeResolverFlow.getIdentityLedgerLookupValue(identityNo, resolved);
     } else {

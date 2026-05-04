@@ -33,12 +33,12 @@ test("formal app loads barcode resolver before app.js", () => {
 
 test("high-risk scan pages call the global resolver with explicit context", () => {
   assert.match(appJs, /resolveBarcodeForContext\(baleCode,\s*"warehouse_sorting_create",\s*\["RAW_BALE"\]\)/);
-  assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\],\s*"store_receiving",\s*\["STORE_DELIVERY_EXECUTION"\]\)/);
+  assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\],\s*"store_receiving",\s*\["STORE_DELIVERY_EXECUTION",\s*"STORE_DELIVERY_PACKAGE"\]\)/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\(baleNo,\s*"store_receiving",\s*\["DISPATCH_BALE"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.bale_no,\s*"store_pda",\s*\["DISPATCH_BALE"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.barcode,\s*"pos",\s*\["STORE_ITEM"\]\)/);
-  assert.match(appJs, /resolveBarcodeForContext\(identityNo,\s*"identity_ledger",\s*\["RAW_BALE",\s*"DISPATCH_BALE",\s*"STORE_PREP_BALE",\s*"LOOSE_PICK_TASK",\s*"STORE_DELIVERY_EXECUTION",\s*"STORE_ITEM"\]\)/);
+  assert.match(appJs, /resolveBarcodeForContext\(identityNo,\s*"identity_ledger",\s*\["RAW_BALE",\s*"DISPATCH_BALE",\s*"STORE_PREP_BALE",\s*"LOOSE_PICK_TASK",\s*"STORE_DELIVERY_EXECUTION",\s*"STORE_DELIVERY_PACKAGE",\s*"STORE_ITEM"\]\)/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"RAW_BALE"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
 });
@@ -47,7 +47,7 @@ test("PDA putaway remains STORE_ITEM-only and keeps wrong barcode types out of s
   assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
   assert.match(appJs, /function getStorePdaScanGuidance/);
   assert.match(appJs, /请扫描 STORE_ITEM 商品码。/);
-  assert.match(appJs, /这是 SDO，请去门店收货页面处理。/);
+  assert.match(appJs, /这是 SDO \/ SDP，请去门店收货页面处理。/);
   assert.match(appJs, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
   assert.match(appJs, /这是 RAW_BALE，门店不能处理。/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"RAW_BALE"/);
@@ -62,7 +62,7 @@ test("pre-QA POS and PDA wrong barcode guidance remains short and actionable", (
   assert.match(appJs, /This code cannot be sold in POS\. Please scan a STORE_ITEM code\./);
 
   const pdaGuidance = appJs.match(/function getStorePdaScanGuidance\(value = ""\) \{[\s\S]*?\n\}/)?.[0] || "";
-  assert.match(pdaGuidance, /这是 SDO，请去门店收货页面处理。/);
+  assert.match(pdaGuidance, /这是 SDO \/ SDP，请去门店收货页面处理。/);
   assert.match(pdaGuidance, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
   assert.match(pdaGuidance, /这是 RAW_BALE，门店不能处理。/);
   assert.match(pdaGuidance, /请扫描 STORE_ITEM 商品码。/);

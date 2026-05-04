@@ -158,11 +158,40 @@ class StoreDeliveryExecutionOrderCreateRequest(BaseModel):
 
 
 class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
+    id: int = 0
+    package_id: str = ""
+    display_code: str = ""
+    machine_code: str = ""
+    barcode_value: str = ""
+    human_readable: str = ""
+    entity_type: str = ""
+    parent_entity_type: str = ""
+    parent_sdo_display_code: str = ""
+    parent_sdo_machine_code: str = ""
+    parent_sdo_order_no: str = ""
+    execution_order_no: str = ""
+    transfer_no: str = ""
+    store_code: str = ""
+    package_no: int = 0
+    package_total: int = 0
     source_type: str = ""
     source_code: str = ""
+    source_machine_code: str = ""
     item_count: Optional[int] = None
+    content_summary: str = ""
     category_summary: str = ""
     category_name: str = ""
+    source_token_refs: List[str] = Field(default_factory=list)
+    cost_source_refs: List[str] = Field(default_factory=list)
+    status: str = "created"
+    assigned_clerk: str = ""
+    received_at: Optional[str] = None
+    received_by: str = ""
+    printed_at: Optional[str] = None
+    printed_by: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    print_payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class StoreDeliveryExecutionOrderResponse(BaseModel):

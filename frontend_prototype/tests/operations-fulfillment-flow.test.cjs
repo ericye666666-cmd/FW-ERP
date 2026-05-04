@@ -952,7 +952,7 @@ test("lpk print modal uses dedicated LPK identity copy and locked 60x40 template
   assert.match(indexHtml, /id="balePrintModalScopeNote"/);
 });
 
-test("final transfer dispatch print uses SDO 60x40 payload and machine barcode fields", () => {
+test("final transfer dispatch print uses SDO_PACKAGE 60x40 payload and package machine barcode fields", () => {
   const submitBundleSource = extractFunctionSource(appJs, "submitTransferBundle");
   const sdoModalSource = extractFunctionSource(appJs, "openTransferDispatchPrintTemplateModal");
   const sdoJobSource = extractFunctionSource(appJs, "buildSDOPrintJobs");
@@ -970,18 +970,25 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(sdoModalSource, /const jobs = buildSDOPrintJobs\(\{/);
   assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 display_code/);
   assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 4 开头 machine_code/);
+  assert.match(sdoJobSource, /transfer\?\.store_delivery_execution_order\?\.packages/);
+  assert.match(sdoJobSource, /const packageDisplayCode = String\(row\?\.display_code/);
+  assert.match(sdoJobSource, /throw new Error\("正式 SDO package barcode 缺少 display_code/);
+  assert.match(sdoJobSource, /throw new Error\("正式 SDO package barcode 缺少 6 开头 machine_code/);
   assert.match(sdoJobSource, /templateCode = getTransferDispatchTemplateCode\(\)/);
   assert.match(sdoJobSource, /template_code:\s*templateCode/);
-  assert.match(sdoJobSource, /display_code:\s*sdoDisplayCode/);
-  assert.match(sdoJobSource, /machine_code:\s*sdoMachineCode/);
-  assert.match(sdoJobSource, /barcode_value:\s*sdoMachineCode/);
-  assert.match(sdoPayloadSource, /entity_type:\s*"STORE_DELIVERY_EXECUTION"/);
-  assert.match(sdoPayloadSource, /label_title:\s*"SDO \/ STORE DELIVERY ORDER"/);
+  assert.match(sdoJobSource, /display_code:\s*packageDisplayCode/);
+  assert.match(sdoJobSource, /machine_code:\s*packageMachineCode/);
+  assert.match(sdoJobSource, /barcode_value:\s*packageMachineCode/);
+  assert.match(sdoJobSource, /parent_sdo_display_code:\s*sdoDisplayCode/);
+  assert.match(sdoJobSource, /parent_sdo_machine_code:\s*sdoMachineCode/);
+  assert.match(sdoJobSource, /entity_type:\s*"STORE_DELIVERY_PACKAGE"/);
+  assert.match(sdoPayloadSource, /entity_type:\s*isSdoPackage \? "STORE_DELIVERY_PACKAGE" : "STORE_DELIVERY_EXECUTION"/);
+  assert.match(sdoPayloadSource, /label_title:\s*isSdoPackage \? "SDO \/ DELIVERY" : "SDO \/ STORE DELIVERY ORDER"/);
   assert.doesNotMatch(sdoPayloadSource, /buildTransferDispatchFallbackBarcode/);
   assert.doesNotMatch(sdoPayloadSource, /isWarehouseoutDispatchBarcode/);
   assert.match(previewSource, /data-print-template="store_dispatch_60x40"/);
-  assert.match(previewSource, /data-sdo-display-code="\$\{escapeHtml\(displayCode\)\}"/);
-  assert.match(previewSource, /data-sdo-machine-code="\$\{escapeHtml\(machineCode\)\}"/);
+  assert.match(previewSource, /data-sdo-package-display-code/);
+  assert.match(previewSource, /SDO \/ DELIVERY/);
   assert.match(modalRenderSource, /模板已锁定：SDO \/ STORE_DELIVERY_EXECUTION 60x40/);
   assert.match(warehouseoutPreferenceSource, /normalizedTaskType === SDO_PRINT_TASK_TYPE[\s\S]*?return getTransferDispatchTemplateCode\(\)/);
   assert.match(warehouseoutPreferenceSource, /normalizedTaskType === "lpk_shortage_pick"[\s\S]*?return "store_loose_pick_60x40"/);
@@ -994,17 +1001,19 @@ test("final transfer dispatch print uses SDO 60x40 payload and machine barcode f
   assert.match(appJs, /selectedCode:\s*\["store_dispatch_60x40", "transtoshop", "wait_for_transtoshop"\]\.includes/);
   assert.doesNotMatch(appJs, /门店送货执行单 60x40[\s\S]*wait for transtoshop/);
   assert.match(appJs, /function isWarehouseoutDispatchBarcode/);
-  assert.match(appJs, /const displayCode = String\(\s*row\.store_delivery_execution_order_no\s*\|\|\s*row\.execution_order_no\s*\|\|\s*row\.official_delivery_barcode\s*\|\|\s*row\.display_code\s*\|\|\s*""/);
+  assert.match(appJs, /const displayCode = String\(\s*isSdoPackage/);
   assert.match(appJs, /const machineCode = String\(row\.machine_code \|\| ""\)/);
-  assert.match(appJs, /const derivedMachineCode = \/\^SDO/);
+  assert.match(appJs, /const derivedMachineCode = !isSdoPackage && \/\^SDO/);
   assert.match(appJs, /`4\$\{displayCode\.slice\(3\)\}`/);
   assert.match(appJs, /const sdoDisplayCode = String\(\s*transfer\?\.store_delivery_execution_order_no\s*\|\|\s*transfer\?\.store_delivery_execution_order\?\.execution_order_no\s*\|\|\s*transfer\?\.store_delivery_execution_order\?\.official_delivery_barcode\s*\|\|\s*transfer\?\.execution_order_no\s*\|\|\s*transfer\?\.official_delivery_barcode/);
   assert.match(appJs, /const sdoMachineCode = sdoMachineCodeFromTransfer\s*\|\|\s*\(\/\^SDO/);
-  assert.match(sdoJobSource, /const sdoBoundRow = \{[\s\S]*?store_delivery_execution_order_no:\s*sdoDisplayCode,[\s\S]*?display_code:\s*sdoDisplayCode,[\s\S]*?machine_code:\s*sdoMachineCode/);
-  assert.doesNotMatch(appJs, /store_delivery_execution_order_no:\s*row\.store_delivery_execution_order_no,\s*execution_order_no:\s*row\.execution_order_no,\s*official_delivery_barcode:\s*row\.official_delivery_barcode,\s*display_code:\s*row\.display_code,\s*machine_code:\s*row\.machine_code/);
+  assert.match(sdoJobSource, /const sdoPackageRow = \{[\s\S]*?store_delivery_execution_order_no:\s*sdoDisplayCode,[\s\S]*?display_code:\s*packageDisplayCode,[\s\S]*?machine_code:\s*packageMachineCode/);
+  assert.doesNotMatch(sdoJobSource, /display_code:\s*sdoDisplayCode,\s*\n\s*machine_code:\s*sdoMachineCode/);
   assert.match(appJs, /display_code:\s*displayCode \|\| ""/);
   assert.match(appJs, /machine_code:\s*machineCode \|\| derivedMachineCode \|\| ""/);
   assert.match(appJs, /barcode_value:\s*barcodeValue/);
+  assert.match(appJs, /parent_sdo_display_code:\s*parentSdoDisplayCode/);
+  assert.match(appJs, /source_code:\s*sourceCode/);
   assert.doesNotMatch(appJs, /display_code:\s*displayCode \|\| normalizedFinal/);
   assert.match(appJs, /package_count:\s*packageCount/);
   assert.match(appJs, /package_position_label:\s*`第 \$\{packageIndex\} 包 \/ 共 \$\{packageCount\} 包`/);

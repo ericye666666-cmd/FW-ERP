@@ -444,6 +444,115 @@ def test_create_store_delivery_execution_order_and_resolve_in_store_receiving(st
     assert pos_result["reject_reason"]
 
 
+def test_sdo_package_resolves_for_store_receiving_and_is_rejected_by_pos(state):
+    _seed_transfer_with_dispatch_for_execution(state, transfer_no="TO-20260428-SDP")
+    state.store_dispatch_bales.clear()
+    state.store_dispatch_bales["SDB260503AAG"] = {
+        "bale_no": "SDB260503AAG",
+        "machine_code": "2260503006",
+        "transfer_no": "TO-20260428-SDP",
+        "source_type": "SDB",
+        "source_code": "SDB260503AAG",
+        "source_bales": ["SDB260503AAG"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 100,
+        "category_summary": "pants / jeans pant / P",
+        "token_nos": [],
+    }
+    state.store_dispatch_bales["LPK260504001"] = {
+        "bale_no": "LPK260504001",
+        "machine_code": "3260504001",
+        "transfer_no": "TO-20260428-SDP",
+        "source_type": "LPK",
+        "source_code": "LPK260504001",
+        "source_bales": ["LPK260504001"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 40,
+        "category_summary": "pants / jeans pant / P",
+        "token_nos": [],
+    }
+    created = state.create_store_delivery_execution_order(
+        "TO-20260428-SDP",
+        {"created_by": "warehouse_clerk_1", "notes": "warehouse verified"},
+    )
+    package = created["packages"][0]
+
+    receiving_result = state.resolve_barcode(package["machine_code"], context="store_receiving")
+    assert receiving_result["barcode_type"] == "STORE_DELIVERY_PACKAGE"
+    assert receiving_result["business_object"]["kind"] == "STORE_DELIVERY_PACKAGE"
+    assert receiving_result["object_type"] == "store_delivery_package"
+    assert receiving_result["reject_reason"] == ""
+    assert receiving_result["parent_entity_type"] == "STORE_DELIVERY_EXECUTION"
+    assert receiving_result["parent_sdo_machine_code"] == created["machine_code"]
+    assert receiving_result["parent_sdo_display_code"] == created["execution_order_no"]
+    assert receiving_result["package_no"] == 1
+    assert receiving_result["package_total"] == 2
+    assert receiving_result["store_code"] == "UTAWALA"
+    assert receiving_result["source_type"] in {"SDB", "LPK"}
+    assert "store_receiving" in receiving_result["allowed_contexts"]
+    assert "identity_ledger" in receiving_result["allowed_contexts"]
+    assert receiving_result["pos_allowed"] is False
+
+    display_result = state.resolve_barcode(package["display_code"], context="store_receiving")
+    assert display_result["barcode_type"] == "STORE_DELIVERY_PACKAGE"
+    assert display_result["object_id"] == package["display_code"]
+
+    pos_result = state.resolve_barcode(package["machine_code"], context="pos")
+    assert pos_result["barcode_type"] == "STORE_DELIVERY_PACKAGE"
+    assert pos_result["pos_allowed"] is False
+    assert pos_result["reject_reason"] == "POS 只允许扫描已激活的 STORE_ITEM 商品码，不能扫描仓库/送店 bale 码。"
+
+    sdb_result = state.resolve_barcode("2260503006", context="store_receiving")
+    assert sdb_result["barcode_type"] in {"STORE_PREP_BALE", "DISPATCH_BALE"}
+    assert sdb_result["reject_reason"]
+
+    lpk_result = state.resolve_barcode("3260504001", context="store_receiving")
+    assert lpk_result["barcode_type"] == "LOOSE_PICK_TASK"
+    assert lpk_result["reject_reason"]
+
+
+def test_list_store_delivery_execution_orders_does_not_create_sdo_packages_or_persist(state):
+    state.store_delivery_execution_orders["SDO260504001"] = {
+        "execution_order_no": "SDO260504001",
+        "official_delivery_barcode": "SDO260504001",
+        "source_transfer_no": "TO-20260504-SDP",
+        "from_warehouse_code": "WH1",
+        "to_store_code": "UTAWALA",
+        "package_count": 2,
+        "packages": [
+            {
+                "source_type": "SDB",
+                "source_code": "SDB260503AAG",
+                "item_count": 100,
+                "category_summary": "pants / jeans pant / P",
+            },
+            {
+                "source_type": "LPK",
+                "source_code": "LPK260504001",
+                "item_count": 40,
+                "category_summary": "pants / jeans pant / P",
+            },
+        ],
+        "status": "pending_print",
+        "created_by": "warehouse_clerk_1",
+        "created_at": "2026-05-04T00:00:00+03:00",
+    }
+
+    def fail_on_persist():
+        raise AssertionError("list_store_delivery_execution_orders must not persist")
+
+    state._persist = fail_on_persist
+
+    rows = state.list_store_delivery_execution_orders()
+
+    assert len(rows) == 1
+    assert state.store_delivery_packages == {}
+    assert [package["source_code"] for package in rows[0]["packages"]] == ["SDB260503AAG", "LPK260504001"]
+    assert not any(str(package.get("display_code") or "").startswith("SDP") for package in rows[0]["packages"])
+
+
 def test_create_store_delivery_execution_order_rejects_when_transfer_has_no_dispatch_rows(state):
     _seed_transfer_with_dispatch_for_execution(state, transfer_no="TO-20260428-EMPTY")
     state.store_dispatch_bales.clear()
