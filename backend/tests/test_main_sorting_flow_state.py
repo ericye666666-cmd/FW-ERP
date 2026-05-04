@@ -527,10 +527,12 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertIn("_is_store_clerk_user(current_user)", routes_source)
         self.assertIn("state.list_assigned_store_delivery_packages", routes_source)
 
-    def _create_ready_assigned_sdo_package_for_store_item_generation(self, *, assigned_clerk="Austin", item_count=3):
+    def _create_ready_assigned_sdo_package_for_store_item_generation(self, *, assigned_clerk="Austin", item_count=3, package_overrides=None):
         order = self._create_store_delivery_package_state_order()
         package = order["packages"][0]
         package["item_count"] = item_count
+        if package_overrides:
+            package.update(package_overrides)
         self.state._save_store_delivery_package(package)
         self.state.receive_store_delivery_package(
             package["display_code"],
@@ -606,6 +608,150 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(resolved["identity_id"], result["store_items"][0]["identity_no"])
         self.assertEqual(self.state.resolve_barcode(package["machine_code"], context="pos")["barcode_type"], "STORE_DELIVERY_PACKAGE")
         self.assertTrue(self.state.resolve_barcode(package["machine_code"], context="pos")["reject_reason"])
+
+    def test_store_item_generation_inherits_sdo_package_token_and_cost_lineage(self):
+        order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
+            item_count=2,
+            package_overrides={
+                "source_token_refs": ["TOK-SORT-001", "TOK-SORT-002"],
+                "token_nos": ["TOK-SORT-001", "TOK-SORT-002"],
+                "cost_source_refs": ["COST-LAYER-001"],
+                "source_cost_layer": {"layer_id": "COST-LAYER-001", "unit_cost_kes": 72},
+                "content_summary": "pants / jeans pant / P",
+            },
+        )
+        self.state.store_dispatch_bales["SDB260503AAG"].update(
+            {
+                "sorting_task_no": "SORT260503001",
+                "source_bale_token": "SRC-BALE-001",
+                "raw_bale_barcode": "RB260501001",
+                "raw_bale_machine_code": "1260501001",
+                "source_batch_no": "BATCH-001",
+                "source_supplier": "Youxun Demo",
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "unit_cost_kes": 72,
+                "cost_status": "known",
+            }
+        )
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 1,
+            },
+        )
+
+        token = result["store_items"][0]
+        self.assertEqual(token["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(token["sdo_package_machine_code"], package["machine_code"])
+        self.assertEqual(token["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(token["parent_sdo_machine_code"], order["machine_code"])
+        self.assertEqual(token["source_type"], "SDB")
+        self.assertEqual(token["source_code"], "SDB260503AAG")
+        self.assertEqual(token["source_machine_code"], "2260503006")
+        self.assertEqual(token["source_token_refs"], ["TOK-SORT-001", "TOK-SORT-002"])
+        self.assertEqual(token["token_nos"], ["TOK-SORT-001", "TOK-SORT-002"])
+        self.assertEqual(token["cost_source_refs"], ["COST-LAYER-001"])
+        self.assertEqual(token["source_cost_layer"]["layer_id"], "COST-LAYER-001")
+        self.assertEqual(token["sorting_task_no"], "SORT260503001")
+        self.assertEqual(token["source_bale_token"], "SRC-BALE-001")
+        self.assertEqual(token["raw_bale_barcode"], "RB260501001")
+        self.assertEqual(token["raw_bale_machine_code"], "1260501001")
+        self.assertEqual(token["source_batch_no"], "BATCH-001")
+        self.assertEqual(token["source_supplier"], "Youxun Demo")
+        self.assertEqual(token["unit_cost_kes"], 72)
+        self.assertEqual(token["cost_status"], "known")
+        self.assertEqual(token["lineage_status"], "complete")
+
+        resolved = self.state.resolve_barcode(token["machine_code"], context="pos")
+        self.assertEqual(resolved["barcode_type"], "STORE_ITEM")
+        self.assertEqual(resolved["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(resolved["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(resolved["source_type"], "SDB")
+        self.assertEqual(resolved["source_code"], "SDB260503AAG")
+        self.assertEqual(resolved["cost_status"], "known")
+        self.assertEqual(resolved["lineage_status"], "complete")
+
+        self.state._ensure_item_token_product_exists(token["token_no"], actor="Austin", rack_code="A-01")
+        self.state._add_store_lot(
+            "UTAWALA",
+            token["machine_code"],
+            1,
+            token["unit_cost_kes"],
+            "store_item",
+            token["token_no"],
+            store_rack_code="A-01",
+        )
+        shift = self.state.open_cashier_shift(
+            {
+                "opened_by": "store_manager_1",
+                "store_code": "UTAWALA",
+                "opening_float_cash": 0,
+                "note": "lineage sale smoke",
+            }
+        )
+        sale = self.state.create_sale_transaction(
+            {
+                "order_no": "SALE-SDP-LINEAGE-001",
+                "store_code": "UTAWALA",
+                "cashier_name": "store_manager_1",
+                "shift_no": shift["shift_no"],
+                "sold_at": "2026-05-04T10:00:00+03:00",
+                "items": [{"barcode": token["machine_code"], "qty": 1, "selling_price": 150}],
+                "payments": [{"method": "cash", "amount": 150}],
+            }
+        )
+        sale_item = sale["items"][0]
+        self.assertEqual(sale_item["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(sale_item["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(sale_item["source_type"], "SDB")
+        self.assertEqual(sale_item["source_code"], "SDB260503AAG")
+        self.assertEqual(sale_item["cost_status"], "known")
+
+    def test_store_item_generation_keeps_partial_lineage_without_faking_cost(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
+            item_count=1,
+            package_overrides={
+                "source_token_refs": [],
+                "token_nos": [],
+                "cost_source_refs": [],
+                "source_cost_layer": None,
+            },
+        )
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["machine_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 1,
+            },
+        )
+
+        token = result["store_items"][0]
+        self.assertEqual(token["source_code"], "SDB260503AAG")
+        self.assertEqual(token["lineage_status"], "partial")
+        self.assertIn(token["cost_status"], {"pending", "unknown"})
+        self.assertIsNone(token["unit_cost_kes"])
+        self.assertIsNone(token.get("cost_price"))
+        self.assertEqual(token["source_token_refs"], [])
+        self.assertEqual(token["cost_source_refs"], [])
 
     def test_store_item_generation_rejects_unready_or_wrong_clerk_sdo_package(self):
         order = self._create_store_delivery_package_state_order()
