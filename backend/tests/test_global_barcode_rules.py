@@ -91,6 +91,15 @@ class GlobalBarcodeRulesTest(unittest.TestCase):
         self.state.store_delivery_execution_orders[order["execution_order_no"]] = order
         return order
 
+    def _seed_sdo_package(self):
+        order = self._seed_sdo()
+        packages = self.state._ensure_store_delivery_packages_for_order(
+            order,
+            order["packages"],
+            actor="warehouse_clerk_1",
+        )
+        return self.state.store_delivery_execution_orders[order["execution_order_no"]], packages[0]
+
     def test_raw_bale_uses_type_1_machine_code_and_context_rules(self):
         raw_bale = self._seed_raw_bale()
 
@@ -120,7 +129,7 @@ class GlobalBarcodeRulesTest(unittest.TestCase):
         self.assertEqual(pos_result["barcode_type"], "DISPATCH_BALE")
         self.assertTrue(pos_result["reject_reason"])
 
-    def test_sdo_is_only_official_store_receiving_code(self):
+    def test_sdo_and_sdo_package_are_official_store_receiving_codes(self):
         sdo = self._seed_sdo()
 
         self.assertRegex(sdo["machine_code"], r"^4\d{9}$")
@@ -130,6 +139,14 @@ class GlobalBarcodeRulesTest(unittest.TestCase):
 
         self.assertTrue(self.state.resolve_barcode(sdo["machine_code"], context="pos")["reject_reason"])
         self.assertTrue(self.state.resolve_barcode(sdo["machine_code"], context="warehouse_sorting_create")["reject_reason"])
+
+        _, sdo_package = self._seed_sdo_package()
+        self.assertRegex(sdo_package["machine_code"], r"^6\d{9}$")
+        package_receiving_result = self.state.resolve_barcode(sdo_package["machine_code"], context="store_receiving")
+        self.assertEqual(package_receiving_result["barcode_type"], "STORE_DELIVERY_PACKAGE")
+        self.assertEqual(package_receiving_result["reject_reason"], "")
+        self.assertFalse(package_receiving_result["pos_allowed"])
+        self.assertTrue(self.state.resolve_barcode(sdo_package["machine_code"], context="pos")["reject_reason"])
 
     def test_store_item_machine_code_is_type_5_and_pos_only(self):
         token = self._seed_store_item()
