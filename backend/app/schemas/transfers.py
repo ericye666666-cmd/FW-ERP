@@ -191,6 +191,9 @@ class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
     assigned_at: Optional[str] = None
     assigned_by: str = ""
     assignment_status: str = "unassigned"
+    generated_store_item_count: int = 0
+    remaining_store_item_count: int = 0
+    putaway_status: str = ""
     received_at: Optional[str] = None
     received_by: str = ""
     printed_at: Optional[str] = None
@@ -218,6 +221,23 @@ class StoreDeliveryPackageAssignRequest(BaseModel):
     assigned_by: str = ""
     store_code: str = ""
     note: str = ""
+
+
+class StoreDeliveryPackageStoreItemGenerateRequest(BaseModel):
+    store_code: str = ""
+    clerk: str = ""
+    rack_code: str = Field(min_length=1)
+    selected_price: float = Field(gt=0)
+    category_main: str = ""
+    category_sub: str = ""
+    grade: str = ""
+    quantity: int = Field(ge=1)
+
+
+class StoreDeliveryPackageStoreItemGenerateResponse(BaseModel):
+    package: StoreDeliveryExecutionPackageDetailResponse
+    package_progress: dict[str, Any] = Field(default_factory=dict)
+    store_items: List[dict[str, Any]] = Field(default_factory=list)
 
 
 class StoreDeliveryExecutionOrderResponse(BaseModel):
