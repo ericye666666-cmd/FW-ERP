@@ -6,6 +6,7 @@ from itertools import count
 import math
 import random
 import re
+import threading
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
@@ -170,6 +171,7 @@ class InMemoryState:
     def __init__(self) -> None:
         self._state_file = settings.state_file
         self._bootstrapping_from_disk = True
+        self._barcode_generation_lock = threading.RLock()
         self._reset_runtime()
         try:
             self._load_from_disk()
@@ -198,6 +200,7 @@ class InMemoryState:
         self.goods_receipts: list[dict[str, Any]] = []
         self.print_jobs: list[dict[str, Any]] = []
         self.print_station_jobs: list[dict[str, Any]] = []
+        self._store_item_barcode_allocation_cache: dict[str, dict[str, Any]] = {}
         self.warehouse_stock: dict[str, dict[str, Any]] = defaultdict(dict)
         self.warehouse_lots: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.store_stock: dict[str, dict[str, Any]] = defaultdict(dict)
@@ -758,6 +761,105 @@ class InMemoryState:
             return date_source[:6]
         return datetime.now(NAIROBI_TZ).strftime("%y%m%d") if fallback_now else "000000"
 
+    def _datetime_from_barcode_seed(self, value: Any, fallback_now: bool = False) -> Optional[datetime]:
+        if isinstance(value, datetime):
+            return value.astimezone(NAIROBI_TZ) if value.tzinfo else value.replace(tzinfo=NAIROBI_TZ)
+        text = str(value or "").strip()
+        if text:
+            try:
+                parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                return parsed.astimezone(NAIROBI_TZ) if parsed.tzinfo else parsed.replace(tzinfo=NAIROBI_TZ)
+            except ValueError:
+                pass
+            digit_groups = re.findall(r"\d+", text)
+            joined_digits = "".join(digit_groups)
+            candidates: list[str] = []
+            candidates.extend(group[:8] for group in digit_groups if len(group) >= 8 and group.startswith(("19", "20")))
+            if len(joined_digits) >= 8 and joined_digits.startswith(("19", "20")):
+                candidates.append(joined_digits[:8])
+            candidates.extend(group[:6] for group in digit_groups if len(group) >= 6)
+            if len(joined_digits) >= 6:
+                candidates.append(joined_digits[:6])
+            for candidate in candidates:
+                try:
+                    if len(candidate) == 8:
+                        parsed = datetime.strptime(candidate, "%Y%m%d")
+                    else:
+                        parsed = datetime.strptime(f"20{candidate}", "%Y%m%d")
+                    return parsed.replace(tzinfo=NAIROBI_TZ)
+                except ValueError:
+                    continue
+        return datetime.now(NAIROBI_TZ) if fallback_now else None
+
+    def _barcode_v2_day_fragment_from_value(self, value: Any, fallback_now: bool = False) -> str:
+        parsed = self._datetime_from_barcode_seed(value, fallback_now=fallback_now)
+        if not parsed:
+            return "00000"
+        return f"{parsed:%y}{parsed.timetuple().tm_yday:03d}"
+
+    def _ean13_check_digit(self, body12: Any) -> str:
+        digits = str(body12 or "").strip()
+        if not re.fullmatch(r"\d{12}", digits):
+            raise ValueError("EAN-13 body must be exactly 12 digits")
+        total = sum(int(digit) if index % 2 == 0 else int(digit) * 3 for index, digit in enumerate(digits))
+        return str((10 - (total % 10)) % 10)
+
+    def _store_item_barcode_v2_value(self, value: Any, sequence: int) -> str:
+        serial_no = int(sequence or 0)
+        if serial_no < 1 or serial_no > 999999:
+            raise HTTPException(status_code=409, detail="STORE_ITEM 当天 5 类型 barcode 流水已超过 999999，不能继续发号。")
+        day_fragment = self._barcode_v2_day_fragment_from_value(value, fallback_now=True)
+        body = f"5{day_fragment}{serial_no:06d}"
+        return f"{body}{self._ean13_check_digit(body)}"
+
+    def _is_valid_store_item_v2_barcode(self, value: Any) -> bool:
+        machine_code = str(value or "").strip().upper()
+        if not re.fullmatch(r"5\d{12}", machine_code):
+            return False
+        try:
+            return self._ean13_check_digit(machine_code[:12]) == machine_code[-1]
+        except ValueError:
+            return False
+
+    def _is_legacy_store_item_barcode(self, value: Any) -> bool:
+        return bool(re.fullmatch(r"5\d{9}", str(value or "").strip().upper()))
+
+    def _is_store_item_machine_code(self, value: Any) -> bool:
+        return self._is_valid_store_item_v2_barcode(value) or self._is_legacy_store_item_barcode(value)
+
+    def _store_item_barcode_allocation_state(self, day_fragment: str) -> dict[str, Any]:
+        machine_prefix = f"5{day_fragment}"
+        cached = self._store_item_barcode_allocation_cache.get(machine_prefix)
+        if cached:
+            return cached
+        existing_codes = {
+            code
+            for code in self._collect_existing_machine_codes()
+            if re.fullmatch(rf"{re.escape(machine_prefix)}\d{{7}}", code)
+        }
+        existing_sequences = [int(code[6:12]) for code in existing_codes]
+        cached = {
+            "existing_codes": existing_codes,
+            "next_sequence": max(existing_sequences, default=0) + 1,
+        }
+        self._store_item_barcode_allocation_cache[machine_prefix] = cached
+        return cached
+
+    def _allocate_store_item_barcode(self, created_at: Any = "") -> str:
+        with self._barcode_generation_lock:
+            day_fragment = self._barcode_v2_day_fragment_from_value(created_at, fallback_now=True)
+            allocation_state = self._store_item_barcode_allocation_state(day_fragment)
+            existing_codes = allocation_state["existing_codes"]
+            next_sequence = int(allocation_state.get("next_sequence") or 1)
+            while next_sequence <= 999999:
+                machine_code = self._store_item_barcode_v2_value(created_at, next_sequence)
+                if machine_code not in existing_codes:
+                    existing_codes.add(machine_code)
+                    allocation_state["next_sequence"] = next_sequence + 1
+                    return machine_code
+                next_sequence += 1
+            raise HTTPException(status_code=409, detail="STORE_ITEM 当天 5 类型 barcode 流水已超过 999999，不能继续发号。")
+
     def _serial_seed_from_task_group(self, task_no: str, token_group_no: int) -> int:
         task_code = str(task_no or "").strip().upper()
         match = re.search(r"(\d+)$", task_code)
@@ -769,12 +871,7 @@ class InMemoryState:
         return f"TOK-{task_code}-{serial_no:04d}"
 
     def _store_item_barcode_value(self, task_no: str, serial_no: int, created_at: Any = "") -> str:
-        display_seed = f"{str(task_no or '').strip().upper()}-{max(int(serial_no or 0), 1):04d}"
-        machine_code = self._physical_label_machine_code(display_seed, "STORE_ITEM")
-        if re.fullmatch(r"5\d{9}", machine_code):
-            return machine_code
-        date_fragment = self._date_fragment_from_value(created_at or task_no, fallback_now=True)
-        return f"5{date_fragment}{max(int(serial_no or 0), 1) % 1000:03d}"
+        return self._allocate_store_item_barcode(created_at or task_no)
 
     def _raw_bale_machine_code(self, row: dict[str, Any]) -> str:
         existing = str(row.get("machine_code") or "").strip().upper()
@@ -1550,13 +1647,15 @@ class InMemoryState:
         if not normalized_display or not type_digit:
             return normalized_display
         if normalized_type == "STORE_ITEM":
-            date_fragment = self._date_fragment_from_value(normalized_display)
+            date_fragment = self._barcode_v2_day_fragment_from_value(normalized_display)
             serial_groups = re.findall(r"\d+", normalized_display)
-            serial_fragment = "001"
+            serial_no = 1
             if serial_groups:
-                serial_fragment = f"{max(int(serial_groups[-1] or 1), 1) % 1000:03d}"
-            if date_fragment != "000000":
-                return f"{type_digit}{date_fragment}{serial_fragment}"
+                serial_no = max(int(serial_groups[-1] or 1), 1)
+            if date_fragment != "00000":
+                serial_no = min(serial_no, 999999)
+                body = f"{type_digit}{date_fragment}{serial_no:06d}"
+                return f"{body}{self._ean13_check_digit(body)}"
         digits_source = normalized_display
         if normalized_type == "LPK" and normalized_source_reference:
             digits_source = normalized_source_reference
@@ -1564,6 +1663,37 @@ class InMemoryState:
         if len(compact_digits) >= 9:
             return f"{type_digit}{compact_digits[-9:]}"
         return normalized_display
+
+    def _collect_existing_machine_codes(self) -> set[str]:
+        machine_codes: set[str] = set()
+        barcode_keys = {"machine_code", "barcode_value", "scan_token", "human_readable"}
+
+        def walk(value: Any) -> None:
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    if key in barcode_keys:
+                        normalized = str(child or "").strip().upper()
+                        if re.fullmatch(r"\d{10}|\d{13}", normalized):
+                            machine_codes.add(normalized)
+                    if isinstance(child, (dict, list)):
+                        walk(child)
+                return
+            if isinstance(value, list):
+                for child in value:
+                    if isinstance(child, (dict, list)):
+                        walk(child)
+
+        for collection in (
+            self.bale_barcodes,
+            self.store_prep_bales,
+            self.store_dispatch_bales,
+            self.store_delivery_execution_orders,
+            self.item_barcode_tokens,
+            self.print_jobs,
+            self.print_station_jobs,
+        ):
+            walk(collection)
+        return machine_codes
 
     def _normalize_store_delivery_execution_order(self, row: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(row or {})
@@ -3515,25 +3645,36 @@ class InMemoryState:
             product_id = self.product_by_barcode.get(official_machine_code) or self.product_by_barcode.get(token_no)
             allowed_contexts = ["store_pda", "identity_ledger"]
             scanned_official_machine_code = bool(
-                re.fullmatch(r"5\d{9}", normalized_barcode)
+                self._is_store_item_machine_code(normalized_barcode)
                 and normalized_barcode == official_machine_code
             )
             if scanned_official_machine_code and (
                 status in {"printed_in_store", "shelved", "sold", "returned_to_warehouse"} or product_id is not None
             ):
                 allowed_contexts.append("pos")
-            matches.append(
-                self._build_barcode_resolve_result(
-                    barcode_value=normalized_barcode,
-                    barcode_type="STORE_ITEM",
-                    object_type="store_item",
-                    object_id=token_no,
-                    identity_id=identity_id,
-                    template_scope="product",
-                    allowed_contexts=allowed_contexts,
-                    context=normalized_context,
-                )
+            token_result = self._build_barcode_resolve_result(
+                barcode_value=normalized_barcode,
+                barcode_type="STORE_ITEM",
+                object_type="store_item",
+                object_id=token_no,
+                identity_id=identity_id,
+                template_scope="product",
+                allowed_contexts=allowed_contexts,
+                context=normalized_context,
             )
+            if (
+                normalized_context == "pos"
+                and re.fullmatch(r"5\d{12}", normalized_barcode)
+                and normalized_barcode == official_machine_code
+                and not self._is_valid_store_item_v2_barcode(normalized_barcode)
+            ):
+                reject_reason = "STORE_ITEM EAN-13 校验位不正确，不能 POS 销售。"
+                token_result["pos_allowed"] = False
+                token_result["allowed_contexts"] = [ctx for ctx in token_result["allowed_contexts"] if ctx != "pos"]
+                token_result["reject_reason"] = reject_reason
+                token_result["rejection_message"] = reject_reason
+                token_result["operational_next_step"] = "请重新扫描正确的 STORE_ITEM 商品码；若标签错误，请重新由后端发号并打印。"
+            matches.append(token_result)
 
         self._rebuild_store_dispatch_bales()
         dispatch_bale = self.store_dispatch_bales.get(normalized_barcode)
@@ -8261,7 +8402,7 @@ class InMemoryState:
         )
         display_name = f"{category_name} · {str(token.get('grade') or '').strip()}".strip(" ·")
         barcode_value = str(token.get("barcode_value") or "").strip().upper()
-        if not re.fullmatch(r"5\d{9}", barcode_value):
+        if not self._is_store_item_machine_code(barcode_value):
             barcode_value = self._store_item_barcode_value(str(token.get("task_no") or ""), int(token.get("qty_index") or 1), token.get("created_at"))
             token["barcode_value"] = barcode_value
         token["barcode_value"] = barcode_value
@@ -13367,7 +13508,7 @@ class InMemoryState:
                 token["status"] = "printed_in_store"
                 token["identity_no"] = token_no
                 barcode_value = str((job.get("print_payload") or {}).get("barcode_value") or token.get("barcode_value") or "").strip().upper()
-                if not re.fullmatch(r"5\d{9}", barcode_value):
+                if not self._is_store_item_machine_code(barcode_value):
                     barcode_value = self._store_item_barcode_value(
                         str(token.get("task_no") or ""),
                         int(token.get("qty_index") or 1),

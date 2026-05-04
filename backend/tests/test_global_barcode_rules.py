@@ -144,6 +144,33 @@ class GlobalBarcodeRulesTest(unittest.TestCase):
         self.assertTrue(self.state.resolve_barcode(token["barcode_value"], context="store_receiving")["reject_reason"])
         self.assertTrue(self.state.resolve_barcode(token["barcode_value"], context="warehouse_sorting_create")["reject_reason"])
 
+    def test_store_item_v2_machine_code_is_13_digit_ean13_and_pos_only(self):
+        token = self._seed_store_item()
+        token["barcode_value"] = "5261240000013"
+        token["final_item_barcode"] = {"barcode_value": "5261240000013"}
+
+        self.assertRegex(token["barcode_value"], r"^5\d{12}$")
+        self.assertTrue(self.state._is_valid_store_item_v2_barcode(token["barcode_value"]))
+        pos_result = self.state.resolve_barcode(token["barcode_value"], context="pos")
+        self.assertEqual(pos_result["barcode_type"], "STORE_ITEM")
+        self.assertEqual(pos_result["object_id"], token["token_no"])
+        self.assertEqual(pos_result["identity_id"], token["token_no"])
+        self.assertTrue(pos_result["pos_allowed"])
+        self.assertEqual(pos_result["reject_reason"], "")
+
+        self.assertTrue(self.state.resolve_barcode("1261240001", context="pos")["reject_reason"])
+        self.assertTrue(self.state.resolve_barcode("2261240001", context="pos")["reject_reason"])
+        self.assertTrue(self.state.resolve_barcode("3261240001", context="pos")["reject_reason"])
+        self.assertTrue(self.state.resolve_barcode("4261240001", context="pos")["reject_reason"])
+        self.assertTrue(self.state.resolve_barcode("6261240001", context="pos")["reject_reason"])
+
+        token["barcode_value"] = "5261240000010"
+        token["final_item_barcode"] = {"barcode_value": "5261240000010"}
+        checksum_result = self.state.resolve_barcode("5261240000010", context="pos")
+        self.assertEqual(checksum_result["barcode_type"], "STORE_ITEM")
+        self.assertFalse(checksum_result["pos_allowed"])
+        self.assertEqual(checksum_result["reject_reason"], "STORE_ITEM EAN-13 校验位不正确，不能 POS 销售。")
+
     def test_lpk_is_warehouse_only_typed_code(self):
         self.assertEqual(
             self.state.resolve_barcode("3260425001", context="warehouse_shortage_pick")["barcode_type"],
