@@ -640,6 +640,80 @@ function getI18nText(entryOrZh = "", fallbackEn = "", language = currentLanguage
   return chooseI18nLabel(zh, en, language);
 }
 
+function getStatusAccent(status = "") {
+  const normalized = normalizeStatusKey(status).replace(/[\s-]+/g, "_");
+  if (["success", "warning", "danger", "info", "neutral"].includes(normalized)) {
+    return normalized;
+  }
+  const text = normalizeI18nText(status).toLowerCase();
+  const source = `${normalized} ${text}`;
+  if (/(error|exception|blocked|rejected|failed|danger|wrong|forbidden|voided|breach|异常|失败|错误|阻塞|拒绝|不可|不能|红色预警|超限)/.test(source)) {
+    return "danger";
+  }
+  if (/(neutral|source|reference|closed|history|archived|empty|draft|来源|仅供核对|普通|历史|草稿|已关闭)/.test(source)) {
+    return "neutral";
+  }
+  if (/(completed|complete|ready|done|success|received|printed|paid|covered|connected|accepted|packed|sold|shelved|generated|可全拣|可分拣|已完成|已验收|已收货|已收到|已贴|已拣|已封包|已生成|已连接|已上架|已售|已处理|已并入|当前可全拣)/.test(source)) {
+    return "success";
+  }
+  if (/(active|in_progress|processing|scanning|current|open|picking|queued|ready_dispatch|in_transit|进行中|当前|正在|可扫码|可用匹配|打包中|仓库核对|可打印|待送店|待售卖)/.test(source)) {
+    return "info";
+  }
+  if (/(pending|waiting|shortage|partial|unsubmitted|not_set|missing|fallback|offline|缺货|待|部分|未提交|待贴|待验收|待分配|待处理|待完成|待打印|待生成|待扫码|待拣货|未满|件数待确认|未连接|备用|待补录)/.test(source)) {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function getBarcodeEntityAccent(entityType = "") {
+  const normalized = String(entityType || "").trim().toUpperCase();
+  if (["STORE_ITEM"].includes(normalized)) {
+    return "success";
+  }
+  if (["STORE_DELIVERY_EXECUTION", "SDO", "STORE_DELIVERY_PACKAGE", "SDO_PACKAGE", "SDP"].includes(normalized)) {
+    return "info";
+  }
+  if (["STORE_PREP_BALE", "SDB", "LOOSE_PICK_TASK", "LPK"].includes(normalized)) {
+    return "info";
+  }
+  if (["RAW_BALE"].includes(normalized)) {
+    return "neutral";
+  }
+  return "neutral";
+}
+
+function renderStatusBadge(label = "", status = label, extraClass = "") {
+  const accent = getStatusAccent(status || label);
+  const classes = ["status-badge", `status-badge--${accent}`, extraClass].filter(Boolean).join(" ");
+  const displayLabel = label === null || label === undefined || String(label).trim() === "" ? "-" : label;
+  return `<span class="${classes}">${escapeHtml(displayLabel)}</span>`;
+}
+
+function renderBarcodeEntityBadge(entityType = "", label = entityType, extraClass = "") {
+  const accent = getBarcodeEntityAccent(entityType);
+  const classes = ["status-badge", `status-badge--${accent}`, "barcode-entity-badge", extraClass].filter(Boolean).join(" ");
+  const displayLabel = label === null || label === undefined || String(label).trim() === "" ? (entityType || "-") : label;
+  return `<span class="${classes}">${escapeHtml(displayLabel)}</span>`;
+}
+
+function renderStatusBlock(message = "", status = "info", extraClass = "") {
+  const accent = getStatusAccent(status || message);
+  const classes = ["status-block", `status-block--${accent}`, extraClass].filter(Boolean).join(" ");
+  const displayMessage = message === null || message === undefined || String(message).trim() === "" ? "-" : message;
+  return `<div class="${classes}">${escapeHtml(displayMessage)}</div>`;
+}
+
+function renderStatusAlert(message = "", status = "info", extraClass = "") {
+  const accent = getStatusAccent(status || message);
+  const classes = ["alert-banner", `${accent}-banner`, extraClass].filter(Boolean).join(" ");
+  const displayMessage = message === null || message === undefined || String(message).trim() === "" ? "-" : message;
+  return `<div class="${classes}">${escapeHtml(displayMessage)}</div>`;
+}
+
+function getStatusCardClass(status = "") {
+  return `status-card--${getStatusAccent(status)}`;
+}
+
 function formatI18nCount(value, zhUnit = "", enUnit = "", language = currentLanguage) {
   const normalizedValue = Number.isFinite(Number(value)) ? Number(value) : value;
   return language === "en"
@@ -4374,7 +4448,7 @@ function renderErrorSummary(selector, message) {
     return;
   }
   target.className = "candidate-summary";
-  target.innerHTML = `<div class="alert-banner">${escapeHtml(message || "发生错误，请检查输入后重试。")}</div>`;
+  target.innerHTML = renderStatusAlert(message || "发生错误，请检查输入后重试。", "danger", "status-error-banner");
 }
 
 function getTransferExecutionErrorInfo(message) {
@@ -4396,7 +4470,7 @@ function renderTransferExecutionErrorSummary(selector, message) {
   }
   target.className = "candidate-summary transfer-error-summary";
   target.innerHTML = `
-    <div class="alert-banner">${escapeHtml(errorInfo.heading)}</div>
+    ${renderStatusAlert(errorInfo.heading, "danger", "status-error-banner")}
     <div class="candidate-summary-grid compact-metrics">
       <article class="store-metric"><strong>类目</strong><span>${escapeHtml(errorInfo.subject || "-")}</span></article>
       <article class="store-metric"><strong>申请件数</strong><span>${escapeHtml(errorInfo.requestedQty || 0)}</span></article>
@@ -10708,7 +10782,7 @@ function renderManualReplenishmentContext(statusLabel = "草稿") {
   syncManualReplenishmentContextFromForm();
   const statusTarget = document.querySelector("#manualReplenishmentContextStatus");
   if (statusTarget instanceof HTMLElement) {
-    statusTarget.textContent = statusLabel || "草稿";
+    statusTarget.innerHTML = renderStatusBadge(statusLabel || "草稿", statusLabel || "草稿");
   }
 }
 
@@ -10742,8 +10816,8 @@ function renderTransferDraftSummary() {
     target.className = "manual-summary-empty empty-state";
     target.innerHTML = `
       <div class="manual-summary-line"><strong>0 个品类 · 0 件</strong></div>
-      <div>状态：未提交</div>
-      <div>下一步：请先添加补货明细</div>
+      <div>状态：${renderStatusBadge("未提交", "neutral")}</div>
+      <div>下一步：${renderStatusBadge("请先添加补货明细", "warning")}</div>
     `;
     renderTransferPreparationPlanSummary([]);
     return;
@@ -10753,8 +10827,8 @@ function renderTransferDraftSummary() {
   target.className = "manual-summary-compact";
   target.innerHTML = `
     <div class="manual-summary-main">${escapeHtml(rows.length)} 个品类 · ${escapeHtml(totalRequested)} 件</div>
-    <div class="manual-summary-pair"><span>状态</span><strong>未提交</strong></div>
-    <div class="manual-summary-pair"><span>下一步</span><strong>生成补货申请单</strong></div>
+    <div class="manual-summary-pair"><span>状态</span><strong>${renderStatusBadge("未提交", "neutral")}</strong></div>
+    <div class="manual-summary-pair"><span>下一步</span><strong>${renderStatusBadge("生成补货申请单", "info")}</strong></div>
     <div class="manual-summary-note">确认后进入仓库执行；门店收货使用 SDO barcode。</div>
   `;
   renderTransferPreparationPlanSummary(rows);
@@ -11645,17 +11719,17 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
       : "已完成";
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差拣货单码，不是门店收货码。</div>
+    ${renderStatusAlert("本页只处理该补货申请中的散货缺口。现成 SDB 待送店包不在这里处理。LPK barcode 是仓库拣货/补差拣货单码，不是门店收货码。", "warning")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>补货申请单号</strong><span>${escapeHtml(transfer.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
       <article class="store-metric"><strong>需到货时间</strong><span>${escapeHtml(transfer.required_arrival_date || transfer.required_arrival_on || "-")}</span></article>
       <article class="store-metric"><strong>申请总件数</strong><span>${escapeHtml(plan.summary?.totalRequestedQty || 0)} 件</span></article>
-      <article class="store-metric"><strong>散货补差件数</strong><span>${escapeHtml(plan.summary?.looseQtyToPick || 0)}</span></article>
-      <article class="store-metric"><strong>缺货件数</strong><span>${escapeHtml(unresolvedShortageQty)}</span></article>
+      <article class="store-metric"><strong>散货补差件数</strong><span>${renderStatusBadge(plan.summary?.looseQtyToPick || 0, plan.summary?.looseQtyToPick ? "info" : "neutral")}</span></article>
+      <article class="store-metric"><strong>缺货件数</strong><span>${renderStatusBadge(unresolvedShortageQty, unresolvedShortageQty > 0 ? "warning" : "neutral")}</span></article>
       <article class="store-metric"><strong>封包上限</strong><span>小于 ${escapeHtml(packageLimitQty)} 件 / 包</span></article>
-      <article class="store-metric"><strong>建议补差包</strong><span>${escapeHtml(plannedPackageCount)} 个</span></article>
-      <article class="store-metric"><strong>拣货单状态</strong><span>${escapeHtml(looseTaskStatusLabel)}</span></article>
+      <article class="store-metric"><strong>建议补差包</strong><span>${renderBarcodeEntityBadge("LPK", `${plannedPackageCount} 个`)}</span></article>
+      <article class="store-metric"><strong>拣货单状态</strong><span>${renderStatusBadge(looseTaskStatusLabel, looseTaskStatusLabel)}</span></article>
     </div>
     ${renderSummaryActions([
       { panelKey: getPanelKeyByTitle("warehouse", "6. 仓库执行单 / 出库打印"), label: "补差完成后回仓库执行台" },
@@ -11694,7 +11768,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
       ? `<span class="store-flag">${escapeHtml(statusLabel)}</span>`
       : `<button type="button" class="ghost-button mini-button" data-loose-task-action="pack" data-loose-task-no="${escapeHtml(task.taskNo || "")}" data-transfer-no="${escapeHtml(task.transferNo || "")}">${escapeHtml(taskShortageQty > 0 ? "确认按现有库存部分拣货并封包" : "确认已拣货并封包")}</button>`;
     return `
-      <article class="candidate-row transfer-draft-row loose-pick-sheet-card">
+      <article class="candidate-row transfer-draft-row loose-pick-sheet-card ${getStatusCardClass(statusLabel)}">
         <div class="split-grid lpk-picking-layout">
           <section class="loose-pick-sheet-main">
             <div class="transfer-workbench-head is-compact">
@@ -11706,16 +11780,16 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
               <strong>${escapeHtml(displayCode || "-")}</strong>
             </div>
             <div class="report-summary-grid compact-metrics">
-              <article class="store-metric"><strong>LPK display_code</strong><span>${escapeHtml(displayCode || "-")}</span></article>
-              <article class="store-metric"><strong>LPK machine_code</strong><span>${escapeHtml(machineCode || "-")}</span></article>
+              <article class="store-metric"><strong>LPK display_code</strong><span>${renderBarcodeEntityBadge("LPK", displayCode || "-")}</span></article>
+              <article class="store-metric"><strong>LPK machine_code</strong><span>${renderBarcodeEntityBadge("LPK", machineCode || "-")}</span></article>
               <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(storeName || "-")}</span></article>
-              <article class="store-metric"><strong>状态</strong><span>${escapeHtml(statusLabel)}</span></article>
+              <article class="store-metric"><strong>状态</strong><span>${renderStatusBadge(statusLabel, statusLabel)}</span></article>
               <article class="store-metric"><strong>关联补货单 / SDO / request</strong><span>${escapeHtml(requestNo)}</span></article>
             </div>
             <div class="meta-row">
-              <span class="meta-pill">${escapeHtml(`已拣 ${taskPickedQty} 件`)}</span>
-              <span class="meta-pill">${escapeHtml(`缺货 ${taskShortageQty} 件`)}</span>
-              <span class="meta-pill">${escapeHtml(`小于 ${task.packageLimitQty || 200} 件 / 包`)}</span>
+              ${renderStatusBadge(`已拣 ${taskPickedQty} 件`, taskPickedQty > 0 ? "success" : "neutral")}
+              ${renderStatusBadge(`缺货 ${taskShortageQty} 件`, taskShortageQty > 0 ? "warning" : "neutral")}
+              ${renderStatusBadge(`小于 ${task.packageLimitQty || 200} 件 / 包`, "neutral")}
             </div>
             ${renderLoosePickSheetTemplateCard(printLabel)}
             <div class="button-row">
@@ -11757,7 +11831,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
                         <td>${escapeHtml(pickedQty)}</td>
                         <td>${escapeHtml(shortageQty)}</td>
                         <td>${escapeHtml(sourceLabel)}</td>
-                        <td><span class="meta-pill">${escapeHtml(getLoosePickLineStatusLabel(line))}</span></td>
+                        <td>${renderStatusBadge(getLoosePickLineStatusLabel(line), getLoosePickLineStatusLabel(line))}</td>
                       </tr>
                     `;
                   }).join("")}
@@ -11792,8 +11866,8 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
     target.className = "manual-summary-empty empty-state";
     target.innerHTML = `
       <div class="manual-summary-line"><strong>可拣：0 件</strong></div>
-      <div>缺货：0 件</div>
-      <div>建议：先添加补货明细。</div>
+      <div>缺货：${renderStatusBadge("0 件", "neutral")}</div>
+      <div>建议：${renderStatusBadge("先添加补货明细", "warning")}</div>
     `;
     return;
   }
@@ -11806,16 +11880,16 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
   target.className = "manual-summary-compact";
   target.innerHTML = `
     <div class="manual-summary-main">可拣：${escapeHtml(pickableQty)} 件</div>
-    <div class="manual-summary-pair"><span>缺货数量</span><strong>${escapeHtml(shortageQty)} 件</strong></div>
-    <div class="manual-summary-pair"><span>风险提示</span><strong>${escapeHtml(riskLabel)}</strong></div>
-    <div class="manual-summary-pair"><span>下一步</span><strong>先生成补货申请，再生成仓库备货任务</strong></div>
+    <div class="manual-summary-pair"><span>缺货数量</span><strong>${renderStatusBadge(`${shortageQty} 件`, shortageQty > 0 ? "warning" : "neutral")}</strong></div>
+    <div class="manual-summary-pair"><span>风险提示</span><strong>${renderStatusBadge(riskLabel, shortageQty > 0 ? "warning" : "success")}</strong></div>
+    <div class="manual-summary-pair"><span>下一步</span><strong>${renderStatusBadge("先生成补货申请，再生成仓库备货任务", "info")}</strong></div>
     <div class="manual-summary-note">系统按库存生成配货建议。SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。</div>
     <div class="manual-suggestion-list">
       ${plan.categoryCards.slice(0, 3)
         .map((row) => `
           <div class="manual-suggestion-row">
             <span>${escapeHtml([row.categoryMain, row.categorySub].filter(Boolean).join(" / ") || "-")}</span>
-            <strong>${escapeHtml(row.requestedQty || 0)} 件 · 缺 ${escapeHtml(row.shortageQty || 0)}</strong>
+            <strong>${renderStatusBadge(`${row.requestedQty || 0} 件 · 缺 ${row.shortageQty || 0}`, Number(row.shortageQty || 0) > 0 ? "warning" : "success")}</strong>
           </div>
         `).join("")}
       ${plan.categoryCards.length > 3 ? `<div class="manual-summary-note">+${escapeHtml(plan.categoryCards.length - 3)} 个品类</div>` : ""}
@@ -11888,29 +11962,29 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   setInputValue("#transferPrintForm [name='transfer_no']", transfer.transfer_no);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。</div>
+    ${renderStatusAlert("按已生成的补货申请和配货建议，核对 SDB 包与 LPK 补差包；核对完成后生成正式 SDO 门店送货执行码。", "info")}
     <div class="subtle small">SDB 和 LPK 只用于仓库核对，不是门店收货 barcode。</div>
     <div class="subtle small">可扫描任意符合本单型号和数量要求的可用 SDB，不要求必须是预先指定包号。</div>
     <div class="subtle small">这是门店收货唯一可扫的送货 barcode。SDB 和 LPK 仍然只是仓库内部核对码。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>来源仓</strong><span>${escapeHtml(transfer.from_warehouse_code || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transfer.to_store_code || "-")}</span></article>
-      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(normalized.lifecycle_label || "-")}</span></article>
-      <article class="store-metric"><strong>执行阶段</strong><span>仓库核对 / 出库打印</span></article>
-      <article class="store-metric"><strong>现成待送店包裹</strong><span>${escapeHtml(summary.selectedPreparedBaleCount || 0)} 包</span></article>
-      <article class="store-metric"><strong>现成 SDB 包</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} / ${escapeHtml(readiness.requiredPreparedCount || 0)} 已核对</span></article>
-      <article class="store-metric"><strong>补差工单</strong><span>${escapeHtml(readiness.completedLooseTaskCount || 0)} / ${escapeHtml(readiness.requiredLooseTaskCount || 0)} 已完成</span></article>
-      <article class="store-metric"><strong>正式送货执行码</strong><span>${escapeHtml(officialDeliveryCodeLabel)}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${renderStatusBadge(normalized.lifecycle_label || "-", normalized.lifecycle_status || normalized.status || normalized.lifecycle_label || "-")}</span></article>
+      <article class="store-metric"><strong>执行阶段</strong><span>${renderStatusBadge("仓库核对 / 出库打印", verificationPending ? "info" : "success")}</span></article>
+      <article class="store-metric"><strong>现成待送店包裹</strong><span>${renderBarcodeEntityBadge("SDB", `${summary.selectedPreparedBaleCount || 0} 包`)}</span></article>
+      <article class="store-metric"><strong>现成 SDB 包</strong><span>${renderStatusBadge(`${readiness.foundPreparedCount || 0} / ${readiness.requiredPreparedCount || 0} 已核对`, readiness.pendingPreparedCount ? "warning" : "success")}</span></article>
+      <article class="store-metric"><strong>补差工单</strong><span>${renderStatusBadge(`${readiness.completedLooseTaskCount || 0} / ${readiness.requiredLooseTaskCount || 0} 已完成`, readiness.pendingLooseTaskCount ? "warning" : "success")}</span></article>
+      <article class="store-metric"><strong>正式送货执行码</strong><span>${renderBarcodeEntityBadge("SDO", officialDeliveryCodeLabel)}</span></article>
       <article class="store-metric"><strong>预计送店 bale</strong><span>${escapeHtml(dispatchRows.length || 0)} 个</span></article>
-      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${escapeHtml(normalized.dispatch_bales?.length || 0)}</span></article>
+      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(normalized.dispatch_bales?.length || 0, normalized.dispatch_bales?.length ? "success" : "warning")}</span></article>
     </div>
   `;
   preparedProgressTarget.className = "report-summary";
   preparedProgressTarget.innerHTML = `
     <div class="report-summary-grid compact-metrics">
-      <article class="store-metric"><strong>需找现成包</strong><span>${escapeHtml(readiness.requiredPreparedCount || 0)} 包</span></article>
-      <article class="store-metric"><strong>已扫码登记</strong><span>${escapeHtml(readiness.foundPreparedCount || 0)} 包</span></article>
-      <article class="store-metric"><strong>还差</strong><span>${escapeHtml(readiness.pendingPreparedCount || 0)} 包</span></article>
+      <article class="store-metric"><strong>需找现成包</strong><span>${renderBarcodeEntityBadge("SDB", `${readiness.requiredPreparedCount || 0} 包`)}</span></article>
+      <article class="store-metric"><strong>已扫码登记</strong><span>${renderStatusBadge(`${readiness.foundPreparedCount || 0} 包`, readiness.foundPreparedCount ? "success" : "neutral")}</span></article>
+      <article class="store-metric"><strong>还差</strong><span>${renderStatusBadge(`${readiness.pendingPreparedCount || 0} 包`, readiness.pendingPreparedCount ? "warning" : "success")}</span></article>
     </div>
     <div class="subtle small">扫描 SDB 只是在仓库确认本单要使用的现成待送店包，不是门店收货。可扫描任意符合本单型号和数量要求的可用 SDB。</div>
   `;
@@ -11957,19 +12031,19 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
         const statusLabel = found ? "已扫码登记" : (row.isPreselected ? "已选 / 待扫码 SDB" : "可用匹配 SDB");
         const displayCode = row.baleBarcode || row.displayCode || row.baleNo || row.scanToken || "-";
         return `
-        <article class="candidate-row transfer-draft-row">
+        <article class="candidate-row transfer-draft-row ${getStatusCardClass(found ? "success" : "warning")}">
           <div>
             <strong>${escapeHtml(displayCode)}</strong>
             <div class="subtle small">${escapeHtml(`${row.categoryMain || "-"} / ${row.categorySub || "-"}${row.grade ? ` / ${row.grade}` : ""} · ${row.qty || 0} 件`)}</div>
             <div class="meta-row">
-              <span class="meta-pill">现成待送店包裹</span>
+              ${renderBarcodeEntityBadge("SDB", "现成待送店包裹")}
               ${row.rackCode ? `<span class="meta-pill">库位 ${escapeHtml(row.rackCode)}</span>` : ""}
               ${row.machineCode || row.barcodeValue ? `<span class="meta-pill">machine_code ${escapeHtml(row.machineCode || row.barcodeValue)}</span>` : ""}
-              <span class="meta-pill">${escapeHtml(statusLabel)}</span>
+              ${renderStatusBadge(statusLabel, statusLabel)}
             </div>
           </div>
           <div class="candidate-side-actions">
-            <span class="store-flag">${escapeHtml(found ? "已并入本次送店" : "可扫码加入")}</span>
+            ${renderStatusBadge(found ? "已并入本次送店" : "可扫码加入", found ? "success" : "info")}
           </div>
         </article>
       `;
@@ -11982,10 +12056,10 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   looseProgressTarget.className = "report-summary";
   looseProgressTarget.innerHTML = `
     <div class="report-summary-grid compact-metrics">
-      <article class="store-metric"><strong>散货补差</strong><span>${escapeHtml(summary.looseQtyToPick || 0)} 件</span></article>
-      <article class="store-metric"><strong>拣货单</strong><span>${escapeHtml(readiness.requiredLooseTaskCount || 0)} 张</span></article>
-      <article class="store-metric"><strong>已封包</strong><span>${escapeHtml(readiness.completedLooseTaskCount || 0)}</span></article>
-      <article class="store-metric"><strong>待完成</strong><span>${escapeHtml(readiness.pendingLooseTaskCount || 0)}</span></article>
+      <article class="store-metric"><strong>散货补差</strong><span>${renderStatusBadge(`${summary.looseQtyToPick || 0} 件`, summary.looseQtyToPick ? "info" : "neutral")}</span></article>
+      <article class="store-metric"><strong>拣货单</strong><span>${renderBarcodeEntityBadge("LPK", `${readiness.requiredLooseTaskCount || 0} 张`)}</span></article>
+      <article class="store-metric"><strong>已封包</strong><span>${renderStatusBadge(readiness.completedLooseTaskCount || 0, readiness.completedLooseTaskCount ? "success" : "neutral")}</span></article>
+      <article class="store-metric"><strong>待完成</strong><span>${renderStatusBadge(readiness.pendingLooseTaskCount || 0, readiness.pendingLooseTaskCount ? "warning" : "success")}</span></article>
     </div>
     ${renderSummaryActions([
       { panelKey: getPanelKeyByTitle("warehouse", "5.1 LPK 补差拣货"), label: "去 5.1 跟进补差工单" },
@@ -11999,18 +12073,19 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
         const status = String(task.status || "pending_pick").trim().toLowerCase();
         const statusLabel = status === "packed" ? "已封包" : status === "picking" ? "打包中" : "待拣货";
         return `
-        <article class="candidate-row transfer-draft-row">
+        <article class="candidate-row transfer-draft-row ${getStatusCardClass(statusLabel)}">
           <div>
             <strong>${escapeHtml(task.taskNo || "-")}</strong>
             <div class="subtle small">${escapeHtml(`${task.categoryMain || "-"} / ${task.categorySub || "-"} · ${task.qty || 0} 件 · ${task.baleLabel || "补差 bale"}`)}</div>
             <div class="meta-row">
-              <span class="meta-pill">${escapeHtml(statusLabel)}</span>
-              <span class="meta-pill">${escapeHtml(task.isPartial ? "未满 200 的补差 bale" : "标准 200 件 bale")}</span>
+              ${renderBarcodeEntityBadge("LPK", "LPK")}
+              ${renderStatusBadge(statusLabel, statusLabel)}
+              ${renderStatusBadge(task.isPartial ? "未满 200 的补差 bale" : "标准 200 件 bale", task.isPartial ? "warning" : "neutral")}
               ${Array.isArray(task.rackCodes) && task.rackCodes.length ? `<span class="meta-pill">库位 ${escapeHtml(task.rackCodes.join("、"))}</span>` : ""}
             </div>
           </div>
           <div class="candidate-side-actions">
-            <span class="store-flag">${escapeHtml(statusLabel)}</span>
+            ${renderStatusBadge(statusLabel, statusLabel)}
           </div>
         </article>
       `;
@@ -12023,31 +12098,29 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
   dispatchTarget.className = "report-summary";
   dispatchTarget.innerHTML = `
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>最终送店 bale</strong><span>${escapeHtml(dispatchRows.length || 0)} 个</span></article>
-      <article class="store-metric"><strong>现成包裹直转</strong><span>${escapeHtml(summary.selectedPreparedBaleCount || 0)} 个</span></article>
-      <article class="store-metric"><strong>补差拣货单</strong><span>${escapeHtml(looseDispatchRows.length || 0)} 张</span></article>
-      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${escapeHtml(normalized.dispatch_bales?.length || 0)}</span></article>
+      <article class="store-metric"><strong>最终送店 bale</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", `${dispatchRows.length || 0} 个`)}</span></article>
+      <article class="store-metric"><strong>现成包裹直转</strong><span>${renderBarcodeEntityBadge("SDB", `${summary.selectedPreparedBaleCount || 0} 个`)}</span></article>
+      <article class="store-metric"><strong>补差拣货单</strong><span>${renderBarcodeEntityBadge("LPK", `${looseDispatchRows.length || 0} 张`)}</span></article>
+      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(normalized.dispatch_bales?.length || 0, normalized.dispatch_bales?.length ? "success" : "warning")}</span></article>
     </div>
-    <div class="subtle small">${escapeHtml(
-      verificationHint,
-    )}</div>
+    ${renderStatusBlock(verificationHint, verificationPending ? "warning" : "success")}
     <div class="candidate-list transfer-draft-list">
       ${dispatchRows.length
         ? dispatchRows
           .map((row) => `
-            <article class="candidate-row transfer-draft-row">
+            <article class="candidate-row transfer-draft-row ${getStatusCardClass(row?.status || (verificationPending ? "warning" : "success"))}">
               <div>
                 <strong>${escapeHtml(`${row.categoryMain || "-"} / ${row.categorySub || "-"}`)}</strong>
                 <div class="subtle small">${escapeHtml(`${row.finalLabel || "最终送店 bale"} · ${row.qty || 0} 件`)}</div>
                 <div class="meta-row">
-                  <span class="meta-pill">${escapeHtml(row.finalType === "prepared_dispatch" ? "源头：现成待送店包裹" : "源头：补差拣货单")}</span>
+                  ${row.finalType === "prepared_dispatch" ? renderBarcodeEntityBadge("SDB", "源头：现成待送店包裹") : renderBarcodeEntityBadge("LPK", "源头：补差拣货单")}
                   ${row.baleBarcode ? `<span class="meta-pill">源 barcode ${escapeHtml(row.baleBarcode)}</span>` : ""}
-                  ${row.plannedPackageCount ? `<span class="meta-pill">建议补差包 ${escapeHtml(row.plannedPackageCount)} 个</span>` : ""}
-                  <span class="meta-pill">正式送货执行码：${escapeHtml(officialDeliveryCodeLabel)}</span>
+                  ${row.plannedPackageCount ? renderStatusBadge(`建议补差包 ${row.plannedPackageCount} 个`, "warning") : ""}
+                  ${renderBarcodeEntityBadge("SDO", `正式送货执行码：${officialDeliveryCodeLabel}`)}
                 </div>
               </div>
               <div class="candidate-side-actions">
-                <span class="store-flag">${escapeHtml(translateStatusLabel(row?.status || "pending_print", "store_dispatch_bale"))}</span>
+                ${renderStatusBadge(translateStatusLabel(row?.status || "pending_print", "store_dispatch_bale"), row?.status || "pending_print")}
               </div>
             </article>
           `)
@@ -13332,7 +13405,7 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
   target.innerHTML = `
     ${
       baleBarcodeDirectoryNotice
-        ? `<div class="flow-summary-note ${baleBarcodeDirectoryNotice.type === "success" ? "success" : ""}">${escapeHtml(baleBarcodeDirectoryNotice.message)}</div>`
+        ? renderStatusBlock(baleBarcodeDirectoryNotice.message, baleBarcodeDirectoryNotice.type || "info")
         : ""
     }
     <div class="bale-print-shell bale-print-shell-clean">
@@ -13344,10 +13417,10 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
             <div class="subtle small">先选任意一类，再进打印窗直连打印。当前使用 ${escapeHtml(`${selectedTemplate.barcode_type || "Code128"} · ${selectedTemplate.width_mm || 60}x${selectedTemplate.height_mm || 40}`)}。</div>
           </div>
           <div class="bale-print-inline-stats">
-            <span class="meta-pill">${rows.length} 包</span>
-            <span class="meta-pill">${printedCount} 已贴</span>
-            <span class="meta-pill">${pendingCount} 待贴</span>
-            <span class="meta-pill">${categoryCount} 类</span>
+            ${renderStatusBadge(`${rows.length} 包`, "neutral")}
+            ${renderStatusBadge(`${printedCount} 已贴`, "success")}
+            ${renderStatusBadge(`${pendingCount} 待贴`, pendingCount ? "warning" : "success")}
+            ${renderStatusBadge(`${categoryCount} 类`, "neutral")}
           </div>
         </div>
         <div class="button-row bale-workbench-list-actions">
@@ -13365,22 +13438,22 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
               const isExpanded = expandedBaleBatchKeys.has(groupKey);
               const isActive = groupKey === activeBaleBatchKey;
               return `
-                <article class="bale-batch-card ${isActive ? "is-active" : ""}">
+                <article class="bale-batch-card ${isActive ? "is-active" : ""} ${getStatusCardClass(isActive ? "current" : pendingInBatch ? "pending" : "completed")}">
                   <div class="bale-batch-head">
                     <div class="bale-batch-title">
                       <strong>${escapeHtml(group.supplierName)}</strong>
                       <span>${escapeHtml(categoryDisplay)}</span>
                     </div>
                     <div class="bale-batch-head-actions">
-                      <div class="bale-batch-progress">${group.printedCount}/${group.totalPackages} 已贴码</div>
+                      ${renderStatusBadge(`${group.printedCount}/${group.totalPackages} 已贴码`, pendingInBatch ? "warning" : "success", "bale-batch-progress")}
                       <button type="button" class="ghost-button mini-button" data-bale-batch-activate="${escapeHtml(groupKey)}">${isActive ? "当前贴这一类" : "先贴这一类"}</button>
                       <button type="button" class="ghost-button mini-button" data-bale-batch-toggle="${escapeHtml(groupKey)}">${isExpanded ? "收起" : "展开"}</button>
                     </div>
                   </div>
                   <div class="chip-row bale-batch-meta">
-                    <span class="meta-pill">批次 ${escapeHtml(group.batchNo)}</span>
-                    <span class="meta-pill">共 ${group.totalPackages} 包</span>
-                    <span class="meta-pill">待贴 ${pendingInBatch} 包</span>
+                    ${renderStatusBadge(`批次 ${group.batchNo}`, "neutral")}
+                    ${renderStatusBadge(`共 ${group.totalPackages} 包`, "neutral")}
+                    ${renderStatusBadge(`待贴 ${pendingInBatch} 包`, pendingInBatch ? "warning" : "success")}
                   </div>
                   <div class="bale-batch-items ${isExpanded ? "" : "hidden-screen"}">
                     ${group.rows
@@ -13391,7 +13464,7 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
                               <strong>${escapeHtml(row.bale_barcode || "-")}</strong>
                               <span>${escapeHtml(formatBalePackagePosition(row, group.totalPackages))}</span>
                             </div>
-                            <span class="bale-status-pill ${row.printed_at ? "is-done" : "is-pending"}">${row.printed_at ? "已贴码" : "待贴码"}</span>
+                            ${renderStatusBadge(row.printed_at ? "已贴码" : "待贴码", row.printed_at ? "success" : "warning", "bale-status-pill")}
                           </div>
                         `,
                       )
@@ -13409,7 +13482,7 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
         </div>
       </section>
       <aside class="bale-print-finished">
-        <section class="printer-status-card bale-completed-panel">
+        <section class="printer-status-card bale-completed-panel ${getStatusCardClass(completedGroups.length ? "success" : "neutral")}">
           <span class="inbound-flow-eyebrow">已完成打印的类别</span>
           <strong class="bale-completed-title">${completedGroups.length ? `已完成 ${completedGroups.length} 类` : "还没有完成的类别"}</strong>
           ${
@@ -13423,8 +13496,8 @@ function renderBaleBarcodeDirectorySummary(shipmentNo = document.querySelector("
                           <strong>${escapeHtml(group.supplierName)}</strong>
                           <span>${escapeHtml(categoryDisplay)}</span>
                           <div class="chip-row">
-                            <span class="meta-pill">批次 ${escapeHtml(group.batchNo)}</span>
-                            <span class="meta-pill">${group.printedCount}/${group.totalPackages} 已完成</span>
+                            ${renderStatusBadge(`批次 ${group.batchNo}`, "neutral")}
+                            ${renderStatusBadge(`${group.printedCount}/${group.totalPackages} 已完成`, "success")}
                           </div>
                         </article>
                       `;
@@ -13584,19 +13657,17 @@ function renderStorePrinterStatusCard({
     ? `${getPrintJobStatusLabel(latestJob.status || "")} · #${latestJob.id}`
     : "暂无任务";
   return `
-    <section class="printer-status-card store-printer-status">
+    <section class="printer-status-card store-printer-status ${getStatusCardClass(context.failedCount ? "danger" : (context.matchedPrinter ? "success" : "warning"))}">
       <div class="subtle small">${escapeHtml(title)}</div>
       <div class="printer-status-name">${escapeHtml(context.printerName)}</div>
-      <div class="printer-status-flag ${context.matchedPrinter ? "is-ready" : "is-waiting"}">
-        ${context.printerStatusLabel}
-      </div>
+      ${renderStatusBadge(context.printerStatusLabel, context.matchedPrinter ? "success" : "warning", `printer-status-flag ${context.matchedPrinter ? "is-ready" : "is-waiting"}`)}
       <div class="printer-status-meta">
-        <div><strong>系统打印机</strong><span>${context.installedCount} 台</span></div>
-        <div><strong>排队中</strong><span>${context.queuedCount}</span></div>
-        <div><strong>失败任务</strong><span>${context.failedCount}</span></div>
-        <div><strong>最近结果</strong><span>${escapeHtml(latestLabel)}</span></div>
+        <div><strong>系统打印机</strong><span>${renderStatusBadge(`${context.installedCount} 台`, context.installedCount ? "success" : "warning")}</span></div>
+        <div><strong>排队中</strong><span>${renderStatusBadge(context.queuedCount, context.queuedCount ? "warning" : "neutral")}</span></div>
+        <div><strong>失败任务</strong><span>${renderStatusBadge(context.failedCount, context.failedCount ? "danger" : "neutral")}</span></div>
+        <div><strong>最近结果</strong><span>${renderStatusBadge(latestLabel, latestJob?.status || "neutral")}</span></div>
         ${extraMeta
-          .map((item) => `<div><strong>${escapeHtml(item.label || "-")}</strong><span>${escapeHtml(item.value || "-")}</span></div>`)
+          .map((item) => `<div><strong>${escapeHtml(item.label || "-")}</strong><span>${renderStatusBadge(item.value || "-", item.status || item.value || "neutral")}</span></div>`)
           .join("")}
       </div>
     </section>
@@ -13659,25 +13730,25 @@ function renderBalePrinterConsoleSummary(shipmentNo = document.querySelector("#b
   target.innerHTML = `
     ${
       balePrinterConsoleNotice
-        ? `<div class="alert-banner ${balePrinterConsoleNotice.type === "success" ? "success-banner" : ""}">${escapeHtml(balePrinterConsoleNotice.message)}</div>`
+        ? renderStatusAlert(balePrinterConsoleNotice.message, balePrinterConsoleNotice.type === "error" ? "danger" : (balePrinterConsoleNotice.type || "info"))
         : ""
     }
     <div class="report-summary-grid">
       <article class="store-metric"><strong>船单</strong><span>${escapeHtml(normalizedShipmentNo)}</span></article>
       <article class="store-metric"><strong>打印机</strong><span>${escapeHtml(selectedPrinterName)}</span></article>
-      <article class="store-metric"><strong>设备状态</strong><span>${escapeHtml(getPrinterConnectionStatusLabel(selectedPrinter))}</span></article>
-      <article class="store-metric"><strong>标签尺寸</strong><span>${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}</span></article>
-      <article class="store-metric"><strong>待打任务</strong><span>${queuedJobs.length}</span></article>
-      <article class="store-metric"><strong>系统打印机</strong><span>${hasInstalledPrinters ? `${systemPrinterState.length} 台` : "0 台"}</span></article>
+      <article class="store-metric"><strong>设备状态</strong><span>${renderStatusBadge(getPrinterConnectionStatusLabel(selectedPrinter), selectedPrinter ? "success" : "warning")}</span></article>
+      <article class="store-metric"><strong>标签尺寸</strong><span>${renderStatusBadge(getSelectedBaleTemplateSizeLabel(selectedTemplate), supportsTemplate ? "success" : "warning")}</span></article>
+      <article class="store-metric"><strong>待打任务</strong><span>${renderStatusBadge(queuedJobs.length, queuedJobs.length ? "warning" : "neutral")}</span></article>
+      <article class="store-metric"><strong>系统打印机</strong><span>${renderStatusBadge(hasInstalledPrinters ? `${systemPrinterState.length} 台` : "0 台", hasInstalledPrinters ? "success" : "warning")}</span></article>
     </div>
     ${
       hasInstalledPrinters
         ? (!isPrinterConnected
-            ? `<div class="alert-banner">系统里已经有打印机，但还没有找到名为 ${escapeHtml(selectedPrinterName)} 的打印机。请检查打印机名称，或在系统设置里重新添加。</div>`
+            ? renderStatusAlert(`系统里已经有打印机，但还没有找到名为 ${selectedPrinterName} 的打印机。请检查打印机名称，或在系统设置里重新添加。`, "danger")
             : `${supportsTemplate
                 ? `<div class="subtle small">打印机队列已安装，当前显示为 ${escapeHtml(selectedPrinter?.status_text || "就绪")}。你可以先打测试单确认是否真实出纸。</div>`
-                : `<div class="alert-banner">当前系统打印机队列没有暴露 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))} 标签纸尺寸。现在点打印，任务可能会发出去，但打印机不一定出纸。建议先把 Deli 队列重新配置成标签机纸张。</div>`}`)
-        : `<div class="alert-banner">这台 Mac 当前没有安装任何系统打印机。先去「系统设置 > 打印机与扫描仪」添加 Deli DL-720C，然后回来点“检测系统打印机”。</div>`
+                : renderStatusAlert(`当前系统打印机队列没有暴露 ${getSelectedBaleTemplateSizeLabel(selectedTemplate)} 标签纸尺寸。现在点打印，任务可能会发出去，但打印机不一定出纸。建议先把 Deli 队列重新配置成标签机纸张。`, "warning")}`)
+        : renderStatusAlert("这台 Mac 当前没有安装任何系统打印机。先去「系统设置 > 打印机与扫描仪」添加 Deli DL-720C，然后回来点“检测系统打印机”。", "danger")
     }
     ${
       queuedJobs.length
@@ -14241,19 +14312,19 @@ function renderCompressionTaskAcceptanceWindow(message = "") {
   const acceptanceNotice = message || `这一步由仓库主管做压缩工单验收。确认后会生成${taskTypeLabel} barcode，并自动弹出模板打印窗。`;
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(acceptanceNotice)}</div>
+    ${renderStatusAlert(acceptanceNotice, String(task.status || "").trim() === "completed" ? "success" : "info")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>任务号</strong><span>${escapeHtml(task.task_no || "-")}</span></article>
-      <article class="store-metric"><strong>任务类型</strong><span>${escapeHtml(taskTypeLabel)}</span></article>
+      <article class="store-metric"><strong>任务类型</strong><span>${renderBarcodeEntityBadge(isSaleTask ? "RAW_BALE" : "SDB", taskTypeLabel)}</span></article>
       <article class="store-metric"><strong>小类</strong><span>${escapeHtml(task.category_sub || "-")}</span></article>
       <article class="store-metric"><strong>目标件数</strong><span>${escapeHtml(task.target_qty || 0)}</span></article>
       ${!isSaleTask ? `<article class="store-metric"><strong>每包件数</strong><span>${escapeHtml(task.pieces_per_bale || task.target_qty || 0)}</span></article>` : ""}
       ${!isSaleTask ? `<article class="store-metric"><strong>本次包数</strong><span>${escapeHtml(task.bale_count || 1)}</span></article>` : ""}
       <article class="store-metric"><strong>已悬挂件数</strong><span>${escapeHtml(task.suspended_qty || 0)}</span></article>
       <article class="store-metric"><strong>负责员工</strong><span>${escapeHtml(task.assigned_employee || "-")}</span></article>
-      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(String(task.status || "").trim() === "completed" ? "已验收" : "待验收")}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${renderStatusBadge(String(task.status || "").trim() === "completed" ? "已验收" : "待验收", String(task.status || "").trim() === "completed" ? "success" : "warning")}</span></article>
       <article class="store-metric"><strong>当前剩余可新建</strong><span>${escapeHtml(task.available_qty || 0)}</span></article>
-      <article class="store-metric"><strong>等级结构</strong><span>${escapeHtml(task.grade_summary || "待生成")}</span></article>
+      <article class="store-metric"><strong>等级结构</strong><span>${renderStatusBadge(task.grade_summary || "待生成", task.grade_summary ? "neutral" : "warning")}</span></article>
       ${Array.isArray(resultRow?.prepared_bale_nos) && resultRow.prepared_bale_nos.length > 1 ? `<article class="store-metric"><strong>生成条码</strong><span>${escapeHtml(resultRow.prepared_bale_nos.length)} 个</span></article>` : ""}
       ${isSaleTask ? `<article class="store-metric"><strong>目标重量</strong><span>${escapeHtml(task.target_weight_kg ? `${task.target_weight_kg} KG` : "-")}</span></article>` : ""}
       ${isSaleTask && resultRow?.actual_weight_kg ? `<article class="store-metric"><strong>实际重量</strong><span>${escapeHtml(`${resultRow.actual_weight_kg} KG`)}</span></article>` : ""}
@@ -14292,26 +14363,27 @@ function renderStorePrepBaleTaskSummary(message = "") {
   }
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(message || "这里统一管理压缩 bale 工单。点卡片右侧按钮后，在卡片内完成验收、打印 SDB 标签并确认贴标。")}</div>
+    ${renderStatusAlert(message || "这里统一管理压缩 bale 工单。点卡片右侧按钮后，在卡片内完成验收、打印 SDB 标签并确认贴标。", message ? "success" : "info")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>筛选日期</strong><span>${escapeHtml(activeDate)}</span></article>
-      <article class="store-metric"><strong>待验收</strong><span>${openRows.length}</span></article>
-      <article class="store-metric"><strong>已完成（当日）</strong><span>${completedRows.length}</span></article>
-      <article class="store-metric"><strong>已生成 bale</strong><span>${baleSummary.baleCount}</span></article>
-      <article class="store-metric"><strong>仓库待送店包</strong><span>${baleSummary.dispatchBaleCount || 0}</span></article>
-      <article class="store-metric"><strong>待售卖 bale</strong><span>${baleSummary.saleBaleCount || 0}</span></article>
+      <article class="store-metric"><strong>待验收</strong><span>${renderStatusBadge(openRows.length, openRows.length ? "warning" : "neutral")}</span></article>
+      <article class="store-metric"><strong>已完成（当日）</strong><span>${renderStatusBadge(completedRows.length, completedRows.length ? "success" : "neutral")}</span></article>
+      <article class="store-metric"><strong>已生成 bale</strong><span>${renderStatusBadge(baleSummary.baleCount, baleSummary.baleCount ? "success" : "neutral")}</span></article>
+      <article class="store-metric"><strong>仓库待送店包</strong><span>${renderBarcodeEntityBadge("SDB", baleSummary.dispatchBaleCount || 0)}</span></article>
+      <article class="store-metric"><strong>待售卖 bale</strong><span>${renderStatusBadge(baleSummary.saleBaleCount || 0, baleSummary.saleBaleCount ? "info" : "neutral")}</span></article>
       <article class="store-metric"><strong>压缩件数</strong><span>${baleSummary.totalQty}</span></article>
       <article class="store-metric"><strong>压缩总成本</strong><span>${escapeHtml(formatKesAmount(baleSummary.totalCostKes || 0, "KES 0.00"))}</span></article>
     </div>
   `;
   listTarget.innerHTML = visibleRows.length
     ? visibleRows.map((row) => `
-      <article class="sorting-stock-row">
+      <article class="sorting-stock-row ${getStatusCardClass(row.status || "pending")}">
         <div class="sorting-stock-row-head">
           <div>
             <strong>${escapeHtml(row.label_summary || `${row.category_sub || "-"} · ${row.target_qty || 0} 件`)}</strong>
             <div class="subtle small">${escapeHtml(`${row.task_no || "-"} · ${getCompressionTaskStatusLabel(row.status || "")}`)}</div>
           </div>
+          ${renderStatusBadge(getCompressionTaskStatusLabel(row.status || ""), row.status || "")}
           <button type="button" class="ghost-button mini-button" data-compression-task-open="${escapeHtml(row.task_no || "")}">
             ${escapeHtml(getCompressionTaskActionLabel(row.status || ""))}
           </button>
@@ -14386,7 +14458,7 @@ function renderSortingTaskManagerSummary(kind, data) {
   ).size;
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">这里先展示所有还没确认分拣结果的任务；所选日期只用于补看已完成任务。仓库主管先核对目录，再进入下一步录入分拣件数结果。</div>
+    ${renderStatusAlert("这里先展示所有还没确认分拣结果的任务；所选日期只用于补看已完成任务。仓库主管先核对目录，再进入下一步录入分拣件数结果。", "info")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>已完成筛选日期</strong><span>${escapeHtml(activeDate)}</span></article>
       <article class="store-metric"><strong>目录显示</strong><span>${visibleRows.length}</span></article>
@@ -14401,14 +14473,15 @@ function renderSortingTaskManagerSummary(kind, data) {
           const totalWeight = detailRows.reduce((sum, detail) => sum + Number(detail.perPackageWeight || 0), 0);
           const costMeta = getSortingTaskCostStatusMeta(row);
           const shipmentMeta = getSortingTaskShipmentMeta(row);
+          const taskStatus = String(row.status || "").trim() === "open" ? "进行中" : "已完成";
           return `
-            <article class="task-manager-card ${String(row.status || "").trim() === "open" ? "is-open" : "is-done"}">
+            <article class="task-manager-card ${String(row.status || "").trim() === "open" ? "is-open" : "is-done"} ${getStatusCardClass(taskStatus)}">
               <div class="task-manager-head">
                 <div>
                   <strong>${escapeHtml(row.task_no || "-")}</strong>
                   <div class="subtle small">${escapeHtml(shipmentMeta.summaryLine)}</div>
                 </div>
-                <span class="store-status-chip ${String(row.status || "").trim() === "open" ? "warning" : ""}">${escapeHtml(String(row.status || "").trim() === "open" ? "进行中" : "已完成")}</span>
+                ${renderStatusBadge(taskStatus, taskStatus)}
               </div>
               <div class="task-manager-time-grid task-manager-time-grid--wide">
                 <div class="task-manager-time-item">
@@ -14437,11 +14510,11 @@ function renderSortingTaskManagerSummary(kind, data) {
                 </div>
                 <div class="task-manager-time-item">
                   <strong>商品 token</strong>
-                  <span>${escapeHtml(Number(row.generated_token_count || 0) ? `${row.generated_token_count} 个` : "待生成")}</span>
+                  <span>${renderStatusBadge(Number(row.generated_token_count || 0) ? `${row.generated_token_count} 个` : "待生成", Number(row.generated_token_count || 0) ? "success" : "warning")}</span>
                 </div>
                 <div class="task-manager-time-item">
                   <strong>成本口径</strong>
-                  <span>${escapeHtml(costMeta.label)}</span>
+                  <span>${renderStatusBadge(costMeta.label, costMeta.label)}</span>
                 </div>
               </div>
               <div class="meta">${escapeHtml(costMeta.detail)}</div>
@@ -14491,17 +14564,17 @@ function renderSortingResultSubmitSummary(result) {
   const lossRecord = getNormalizedSortingLossRecord(result.loss_record || null);
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">分拣结果已提交，分拣库存已更新，并已为门店后续贴码生成商品 token。</div>
+    ${renderStatusAlert("分拣结果已提交，分拣库存已更新，并已为门店后续贴码生成商品 token。", "success")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>任务号</strong><span>${escapeHtml(result.task_no || "-")}</span></article>
       <article class="store-metric"><strong>结果条数</strong><span>${items.length}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${totalQty}</span></article>
       <article class="store-metric"><strong>生成 token</strong><span>${escapeHtml(generatedTokenCount || 0)}</span></article>
-      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(result.status || "-")}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${renderStatusBadge(result.status || "-", result.status || "success")}</span></article>
       <article class="store-metric"><strong>关联批次</strong><span>${escapeHtml((result.parcel_batch_nos || []).length)}</span></article>
       <article class="store-metric"><strong>处理人</strong><span>${escapeHtml((result.handler_names || []).join(" / ") || "-")}</span></article>
-      <article class="store-metric"><strong>成本口径</strong><span>${escapeHtml(costMeta.label)}</span></article>
-      <article class="store-metric"><strong>损耗品</strong><span>${escapeHtml(lossRecord.has_loss ? `${lossRecord.loss_qty} 件` : "无")}</span></article>
+      <article class="store-metric"><strong>成本口径</strong><span>${renderStatusBadge(costMeta.label, costMeta.label)}</span></article>
+      <article class="store-metric"><strong>损耗品</strong><span>${renderStatusBadge(lossRecord.has_loss ? `${lossRecord.loss_qty} 件` : "无", lossRecord.has_loss ? "warning" : "neutral")}</span></article>
       <article class="store-metric"><strong>损耗总重</strong><span>${escapeHtml(lossRecord.has_loss ? `${formatCurrency(lossRecord.loss_weight_kg)} KG` : "-")}</span></article>
     </div>
     <div class="meta">${escapeHtml(costMeta.detail)}</div>
@@ -14648,6 +14721,23 @@ function getWarehouseStageTitleLabel(stage = {}) {
   return translateI18nText(stage.title || "-", currentLanguage);
 }
 
+function getWarehouseStageAccent(stage = {}) {
+  const key = String(stage.key || "").trim();
+  if (key === "unsorted") {
+    return "info";
+  }
+  if (key === "sorted_garments") {
+    return "success";
+  }
+  if (key === "packed_dispatch") {
+    return "info";
+  }
+  if (key === "packed_sale") {
+    return "neutral";
+  }
+  return "neutral";
+}
+
 function renderRawBaleStockSummary(data = rawBaleStockState, notice = "") {
   const summaryTarget = document.querySelector("#rawBaleStockSummary");
   const listTarget = document.querySelector("#rawBaleStockList");
@@ -14720,12 +14810,13 @@ function renderRawBaleStockSummary(data = rawBaleStockState, notice = "") {
   });
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(notice ? translateI18nText(notice, currentLanguage) : rawBaleCopy.stageNotice)}</div>
+    ${renderStatusAlert(notice ? translateI18nText(notice, currentLanguage) : rawBaleCopy.stageNotice, "info")}
     <div class="warehouse-stage-board">
       ${stageBoard.map((stage) => `
-        <article class="warehouse-stage-card" data-warehouse-stage="${escapeHtml(stage.key || "")}">
+        <article class="warehouse-stage-card ${getStatusCardClass(getWarehouseStageAccent(stage))}" data-warehouse-stage="${escapeHtml(stage.key || "")}">
           <div class="warehouse-stage-title-row">
             <strong>${escapeHtml(getWarehouseStageTitleLabel(stage))}</strong>
+            ${renderStatusBadge(getWarehouseStageTitleLabel(stage), getWarehouseStageAccent(stage))}
           </div>
           <div class="warehouse-stage-primary">
             <span class="warehouse-stage-primary-value">${escapeHtml(formatWholeAmount(stage.primaryValue, "0"))}</span>
@@ -14747,11 +14838,11 @@ function renderRawBaleStockSummary(data = rawBaleStockState, notice = "") {
     <div class="report-summary-grid warehouse-secondary-summary">
       <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已贴码入仓 bale", "Labelled Inbound Bales"))}</strong><span>${summary.totalCount}</span></article>
       <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("当前现有总库存", "Current Warehouse Inventory"))}</strong><span>${summary.currentCount}</span></article>
-      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("可继续分拣", "Ready for Sorting"))}</strong><span>${summary.readyCount}</span></article>
-      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已被分拣占用", "Reserved by Sorting"))}</strong><span>${summary.sortingInProgressCount}</span></article>
-      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已进销售池未售", "In Bale Sales Pool"))}</strong><span>${summary.baleSalesPoolCount}</span></article>
-      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已售出扣减", "Sold Deductions"))}</strong><span>${summary.soldCount}</span></article>
-      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("分拣完成扣减", "Sorted Deductions"))}</strong><span>${summary.sortedCount}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("可继续分拣", "Ready for Sorting"))}</strong><span>${renderStatusBadge(summary.readyCount, summary.readyCount ? "success" : "neutral")}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已被分拣占用", "Reserved by Sorting"))}</strong><span>${renderStatusBadge(summary.sortingInProgressCount, summary.sortingInProgressCount ? "info" : "neutral")}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已进销售池未售", "In Bale Sales Pool"))}</strong><span>${renderStatusBadge(summary.baleSalesPoolCount, summary.baleSalesPoolCount ? "neutral" : "neutral")}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("已售出扣减", "Sold Deductions"))}</strong><span>${renderStatusBadge(summary.soldCount, summary.soldCount ? "neutral" : "neutral")}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("分拣完成扣减", "Sorted Deductions"))}</strong><span>${renderStatusBadge(summary.sortedCount, summary.sortedCount ? "success" : "neutral")}</span></article>
       <article class="store-metric"><strong>${escapeHtml(chooseI18nLabel("当前库存重量 KG", "Current Inventory Weight KG"))}</strong><span>${formatKgLabel(summary.currentWeightKg, "0 KG")}</span></article>
     </div>
     <div class="subtle small">${escapeHtml(chooseI18nLabel(
@@ -14767,16 +14858,17 @@ function renderRawBaleStockSummary(data = rawBaleStockState, notice = "") {
             ? chooseI18nLabel(`已占用 ${row.occupied_by_task_no}`, `Reserved ${row.occupied_by_task_no}`)
             : chooseI18nLabel("未占用", "Not Reserved");
           return `
-            <article class="sorting-stock-row">
+            <article class="sorting-stock-row ${getStatusCardClass(isRawBaleEligibleForSortingTask(row) ? "success" : (row.occupied_by_task_no ? "info" : row.status || "neutral"))}">
               <div class="sorting-stock-row-head">
                 <div>
                   <strong>${escapeHtml(row.bale_barcode || "-")}</strong>
                   <div class="subtle small">${escapeHtml(`${row.supplier_name || "-"} · ${row.category_main || "-"} / ${row.category_sub || "-"}`)}</div>
                 </div>
                 <div class="chip-row">
-                  <span class="meta-pill">${escapeHtml(getRawBaleStatusLabel(row.status))}</span>
-                  <span class="meta-pill">${escapeHtml(isRawBaleEligibleForSortingTask(row) ? chooseI18nLabel("可分拣", "Ready for Sorting") : chooseI18nLabel("当前不可分拣", "Not Ready for Sorting"))}</span>
-                  <span class="meta-pill">${escapeHtml(occupancyLabel)}</span>
+                  ${renderBarcodeEntityBadge("RAW_BALE", "RAW_BALE")}
+                  ${renderStatusBadge(getRawBaleStatusLabel(row.status), row.status)}
+                  ${renderStatusBadge(isRawBaleEligibleForSortingTask(row) ? chooseI18nLabel("可分拣", "Ready for Sorting") : chooseI18nLabel("当前不可分拣", "Not Ready for Sorting"), isRawBaleEligibleForSortingTask(row) ? "success" : "neutral")}
+                  ${renderStatusBadge(occupancyLabel, row.occupied_by_task_no ? "info" : "neutral")}
                 </div>
               </div>
               <div class="sorting-stock-meta">
@@ -14799,14 +14891,14 @@ function renderRawBaleStockSummary(data = rawBaleStockState, notice = "") {
         <div class="candidate-list">
           ${historyRows
             .map((row) => `
-              <article class="candidate-row">
+              <article class="candidate-row ${getStatusCardClass(row.type === "sold" ? "neutral" : "success")}">
                 <div class="candidate-main">
                   <strong>${escapeHtml(row.bale_barcode || "-")}</strong>
                   <div class="subtle small">${escapeHtml(`${row.type === "sold" ? chooseI18nLabel("已售出 raw bale", "Sold Raw Bale") : chooseI18nLabel("已完成分拣", "Sorting Completed")} · ${row.shipment_no || "-"}`)}</div>
                   <div class="subtle small">${escapeHtml(formatLocalDateTime(row.occurred_at) || row.occurred_at || "-")}</div>
                 </div>
                 <div class="candidate-side">
-                  <span class="meta-pill">${escapeHtml(row.type === "sold" ? chooseI18nLabel("已售", "Sold") : chooseI18nLabel("已分拣", "Sorted"))}</span>
+                  ${renderStatusBadge(row.type === "sold" ? chooseI18nLabel("已售", "Sold") : chooseI18nLabel("已分拣", "Sorted"), row.type === "sold" ? "neutral" : "success")}
                 </div>
               </article>
             `)
@@ -14834,19 +14926,19 @@ function renderWarehouseSortedInventorySection(message = "") {
   const prepSummary = summarizeStorePrepBales(prepRows);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="alert-banner">${escapeHtml(message || "这里同步显示仓库已分拣服装，和 0.3 分拣库存 / 中转区库存页面保持一致。待送店 / 待售卖 bale 都仍算仓库已分拣服装库存，只是列示形态改成包裹。")}</div>
+    ${renderStatusAlert(message || "这里同步显示仓库已分拣服装，和 0.3 分拣库存 / 中转区库存页面保持一致。待送店 / 待售卖 bale 都仍算仓库已分拣服装库存，只是列示形态改成包裹。", "info")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>库存行数</strong><span>${summary.totalRowCount}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${summary.totalQty + prepSummary.totalQty}</span></article>
       <article class="store-metric"><strong>货架位数</strong><span>${summary.rackCount}</span></article>
-      <article class="store-metric"><strong>仓库待送店包</strong><span>${prepSummary.dispatchBaleCount || 0}</span></article>
-      <article class="store-metric"><strong>待售卖 bale</strong><span>${prepSummary.saleBaleCount || 0}</span></article>
+      <article class="store-metric"><strong>仓库待送店包</strong><span>${renderBarcodeEntityBadge("SDB", prepSummary.dispatchBaleCount || 0)}</span></article>
+      <article class="store-metric"><strong>待售卖 bale</strong><span>${renderStatusBadge(prepSummary.saleBaleCount || 0, prepSummary.saleBaleCount ? "neutral" : "neutral")}</span></article>
       <article class="store-metric"><strong>最近更新时间</strong><span>${escapeHtml(formatLocalDateTime(summary.latestUpdatedAt) || "-")}</span></article>
     </div>
   `;
   listTarget.innerHTML = `
     ${rows.map((row) => `
-    <article class="sorting-stock-row">
+    <article class="sorting-stock-row ${getStatusCardClass(row.status || "info")}">
       <div class="sorting-stock-row-head">
         <div>
           <strong>${escapeHtml(row.category_name || "-")}</strong>
@@ -14879,7 +14971,7 @@ function renderWarehouseSortedInventorySection(message = "") {
           <strong>${escapeHtml(row.bale_no || "-")}</strong>
           <div class="subtle small">${escapeHtml(`${row.category_sub || "-"} · ${getCompressionTaskTypeLabel(row.task_type || "")}`)}</div>
         </div>
-        <span class="meta-pill">${escapeHtml(getCompressionBaleStatusLabel(row.status || "-"))}</span>
+        ${renderStatusBadge(getCompressionBaleStatusLabel(row.status || "-"), row.status || "-")}
       </div>
       <div class="sorting-stock-meta">
         <span>件数：${escapeHtml(row.qty || 0)}</span>
@@ -15142,15 +15234,15 @@ function renderSortingStockSummary(data) {
           `Loose Items ${group.looseQty || 0} items · Reserved ${group.suspendedQty || 0} items · Available to Pack ${group.availableLooseQty || 0} items · Finished Packages ${packedBaleCount} packages · Ready for Store Dispatch ${storeDispatchBaleCount} packages · Bale Sale ${saleBaleCount} packages`,
         );
         return `
-        <article class="sorting-stock-group-card">
+        <article class="sorting-stock-group-card ${getStatusCardClass(Number(group.availableLooseQty || 0) > 0 ? "info" : "neutral")}">
           <div class="sorting-stock-group-head">
             <div class="sorting-stock-group-head-copy">
               <strong class="sorting-stock-group-title">${escapeHtml(`${group.categoryMain || "-"} / ${group.categorySub || "-"}`)}</strong>
               <div class="sorting-stock-group-summary-line">${escapeHtml(groupSummaryLine)}</div>
               <div class="sorting-stock-kpi-row">
-                <span class="sorting-stock-kpi-pill">${formatSortingStockMetric("散件", "Loose Items", group.looseQty || 0)}</span>
-                <span class="sorting-stock-kpi-pill">${formatSortingStockMetric("成品包", "Finished Packages", packedBaleCount, "包", "packages")}</span>
-                <span class="sorting-stock-kpi-pill">${formatSortingStockMoneyMetric("当前货值", "Current Value", (group.looseValueKes || 0) + (group.packedValueKes || 0))}</span>
+                ${renderStatusBadge(formatSortingStockMetric("散件", "Loose Items", group.looseQty || 0), group.looseQty ? "info" : "neutral", "sorting-stock-kpi-pill")}
+                ${renderStatusBadge(formatSortingStockMetric("成品包", "Finished Packages", packedBaleCount, "包", "packages"), packedBaleCount ? "success" : "neutral", "sorting-stock-kpi-pill")}
+                ${renderStatusBadge(formatSortingStockMoneyMetric("当前货值", "Current Value", (group.looseValueKes || 0) + (group.packedValueKes || 0)), "neutral", "sorting-stock-kpi-pill")}
               </div>
             </div>
             <div class="sorting-stock-item-meta">
@@ -15351,7 +15443,7 @@ function renderSortingStockSummary(data) {
               ${
                 looseGradeCards.length
                   ? looseGradeCards.map((gradeCard) => `
-                    <article class="sorting-stock-inline-card sorting-stock-grade-card">
+                    <article class="sorting-stock-inline-card sorting-stock-grade-card ${getStatusCardClass(gradeCard.qty > 0 ? "info" : "neutral")}">
                       <div class="sorting-stock-row-head">
                         <div>
                           <strong>${escapeHtml(chooseI18nLabel(`${gradeCard.grade || "-"} 等级散件`, `${gradeCard.grade || "-"} Grade Loose Items`))}</strong>
@@ -15372,14 +15464,14 @@ function renderSortingStockSummary(data) {
                                 ${escapeHtml(chooseI18nLabel("编辑货架位", "Edit Rack"))}
                               </button>
                             `
-                            : `<span class="meta-pill">${escapeHtml(chooseI18nLabel(`${gradeCard.rows.length} 档散件`, `${gradeCard.rows.length} loose item records`))}</span>`
+                            : renderStatusBadge(chooseI18nLabel(`${gradeCard.rows.length} 档散件`, `${gradeCard.rows.length} loose item records`), "neutral")
                         }
                       </div>
                       <div class="sorting-stock-metric-row">
-                        <span class="sorting-stock-summary-pill">${formatSortingStockMetric("散件", "Loose Items", gradeCard.qty || 0)}</span>
-                        <span class="sorting-stock-summary-pill">${escapeHtml(chooseI18nLabel("货架位", "Rack"))} ${escapeHtml((gradeCard.rackCodes || []).join(" / ") || "-")}</span>
-                        <span class="sorting-stock-summary-pill">${escapeHtml(chooseI18nLabel("等级总成本", "Grade Total Cost"))} ${escapeHtml(formatKesAmount(gradeCard.totalCostKes || 0, chooseI18nLabel("待补录", "Not Set")))}</span>
-                        <span class="sorting-stock-summary-pill">${escapeHtml(chooseI18nLabel("更新时间", "Updated At"))} ${escapeHtml(formatLocalDateTime(gradeCard.latestUpdatedAt) || gradeCard.latestUpdatedAt || "-")}</span>
+                        ${renderStatusBadge(formatSortingStockMetric("散件", "Loose Items", gradeCard.qty || 0), gradeCard.qty ? "info" : "neutral", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(`${chooseI18nLabel("货架位", "Rack")} ${(gradeCard.rackCodes || []).join(" / ") || "-"}`, "neutral", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(`${chooseI18nLabel("等级总成本", "Grade Total Cost")} ${formatKesAmount(gradeCard.totalCostKes || 0, chooseI18nLabel("待补录", "Not Set"))}`, gradeCard.totalCostKes ? "neutral" : "warning", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(`${chooseI18nLabel("更新时间", "Updated At")} ${formatLocalDateTime(gradeCard.latestUpdatedAt) || gradeCard.latestUpdatedAt || "-"}`, "neutral", "sorting-stock-summary-pill")}
                       </div>
                       ${
                         gradeCard.rows.length > 1
@@ -15421,7 +15513,7 @@ function renderSortingStockSummary(data) {
               ${
                 packedTaskCards.length
                   ? packedTaskCards.map((taskCard) => `
-                    <article class="sorting-stock-inline-card sorting-stock-packed-summary-card">
+                    <article class="sorting-stock-inline-card sorting-stock-packed-summary-card ${getStatusCardClass(taskCard.taskType === "sale" ? "neutral" : "info")}">
                       <div class="sorting-stock-row-head">
                         <div>
                           <strong>${escapeHtml(taskCard.taskType === "sale"
@@ -15431,13 +15523,13 @@ function renderSortingStockSummary(data) {
                             ? chooseI18nLabel("货架挂不下先压成待售包", "Packed for bale sale because racks are full.")
                             : chooseI18nLabel("任务类型：仓库待送店包；门店可扫：否，需后续生成 SDO 正式送货执行码", "Task type: store dispatch package. Store scan: no. Generate an SDO before delivery."))}</div>
                         </div>
-                        <span class="meta-pill">${escapeHtml(chooseI18nLabel(`${taskCard.baleCount || 0} 包`, `${taskCard.baleCount || 0} packages`))}</span>
+                        ${renderStatusBadge(chooseI18nLabel(`${taskCard.baleCount || 0} 包`, `${taskCard.baleCount || 0} packages`), taskCard.baleCount ? "success" : "neutral")}
                       </div>
                       <div class="sorting-stock-metric-row">
-                        <span class="sorting-stock-summary-pill">${formatSortingStockMetric("成品包", "Finished Packages", taskCard.baleCount || 0, "包", "packages")}</span>
-                        <span class="sorting-stock-summary-pill">${formatSortingStockMetric("总件数", "Total Items", taskCard.qty || 0)}</span>
-                        <span class="sorting-stock-summary-pill">${escapeHtml(chooseI18nLabel("等级结构", "Grade Mix"))} ${escapeHtml((taskCard.gradeSummaries || []).join(" / ") || chooseI18nLabel("待补录", "Not Set"))}</span>
-                        <span class="sorting-stock-summary-pill">${escapeHtml(chooseI18nLabel("总成本", "Total Cost"))} ${escapeHtml(formatKesAmount(taskCard.totalCostKes || 0, chooseI18nLabel("待补录", "Not Set")))}</span>
+                        ${renderStatusBadge(formatSortingStockMetric("成品包", "Finished Packages", taskCard.baleCount || 0, "包", "packages"), taskCard.baleCount ? "success" : "neutral", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(formatSortingStockMetric("总件数", "Total Items", taskCard.qty || 0), taskCard.qty ? "success" : "neutral", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(`${chooseI18nLabel("等级结构", "Grade Mix")} ${(taskCard.gradeSummaries || []).join(" / ") || chooseI18nLabel("待补录", "Not Set")}`, taskCard.gradeSummaries?.length ? "neutral" : "warning", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(`${chooseI18nLabel("总成本", "Total Cost")} ${formatKesAmount(taskCard.totalCostKes || 0, chooseI18nLabel("待补录", "Not Set"))}`, taskCard.totalCostKes ? "neutral" : "warning", "sorting-stock-summary-pill")}
                       </div>
                       <div class="sorting-stock-secondary-list">
                         ${taskCard.rows.map((row) => `
@@ -16188,7 +16280,7 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   target.className = "report-summary";
   if (!transferRows.length) {
     target.innerHTML = `
-      <div class="alert-banner">SDO ${escapeHtml(normalizedSdoCode)} 还没加载到本页。先回 Page 5 读取最近送货单，或确认仓库已生成 SDO。</div>
+      ${renderStatusAlert(`SDO ${normalizedSdoCode} 还没加载到本页。先回 Page 5 读取最近送货单，或确认仓库已生成 SDO。`, "warning")}
       <div class="empty-state">加载后这里会显示该 SDO 的包裹明细（来源码，仅供核对）。</div>
     `;
     return;
@@ -16205,14 +16297,14 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
   const normalizedTransferNo = String(transferRows[0]?.transfer_no || "").trim().toUpperCase();
   const sdoMachineCode = String(transferRows[0]?.machine_code || "").replace(/[^0-9]/g, "").trim() || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(normalizedSdoCode) ? `4${normalizedSdoCode.slice(3)}` : "-");
   target.innerHTML = `
-    <div class="alert-banner">送货单验收详情（SDO）：${escapeHtml(normalizedSdoCode)}。请逐包标记“已收到”或“异常”；全部处理后可点击“整单验收完成”。</div>
+    ${renderStatusAlert(`送货单验收详情（SDO）：${normalizedSdoCode}。请逐包标记“已收到”或“异常”；全部处理后可点击“整单验收完成”。`, "info")}
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>SDO 显示码</strong><span>${escapeHtml(normalizedSdoCode)}</span></article>
-      <article class="store-metric"><strong>SDO 机报码</strong><span>${escapeHtml(sdoMachineCode)}</span></article>
+      <article class="store-metric"><strong>SDO 显示码</strong><span>${renderBarcodeEntityBadge("SDO", normalizedSdoCode)}</span></article>
+      <article class="store-metric"><strong>SDO 机报码</strong><span>${renderBarcodeEntityBadge("SDO", sdoMachineCode)}</span></article>
       <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(normalizedTransferNo || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(transferRows[0]?.store_code || getCurrentStoreCodeFallback() || "-")}</span></article>
-      <article class="store-metric"><strong>总包裹数</strong><span>${escapeHtml(transferRows.length)}</span></article>
-      <article class="store-metric"><strong>验收状态</strong><span>${escapeHtml(getStoreReceiptSdoStatusText(shownRows, isCompleted))}</span></article>
+      <article class="store-metric"><strong>总包裹数</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", transferRows.length)}</span></article>
+      <article class="store-metric"><strong>验收状态</strong><span>${renderStatusBadge(getStoreReceiptSdoStatusText(shownRows, isCompleted), getStoreReceiptSdoStatusText(shownRows, isCompleted))}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${escapeHtml(totalItems)}</span></article>
     </div>
     <div class="subtle small">本页仅展示送货单包裹明细；SDB / LPK 作为来源码，仅供核对。</div>
@@ -16221,12 +16313,15 @@ function renderStoreReceiptTransferBaleList(transferNo = "", rows = null) {
         const badge = getStoreReceiptPackageStatusLabel(row.receipt_status);
         const baleNo = String(row.bale_no || "").trim().toUpperCase();
         return `
-        <article class="candidate-row">
+        <article class="candidate-row ${getStatusCardClass(row.receipt_status || "pending")}">
           <div class="candidate-main">
             <strong>${escapeHtml(`第 ${getStoreReceiptBaleSequence(row.bale_no || "") || "-"} 包 / 共 ${transferRows.length} 包`)}</strong>
             <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
-            <div class="subtle small">${escapeHtml(`来源 ${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${row.bale_no || "-"}（来源码，仅供核对）`)}</div>
-            <div class="subtle small">${escapeHtml(`验收状态 ${badge}`)}</div>
+            <div class="meta-row">
+              ${String(row.bale_no || "").startsWith("LPK") ? renderBarcodeEntityBadge("LPK", `来源补差包 · ${row.bale_no || "-"}`) : renderBarcodeEntityBadge("SDB", `来源现成包 · ${row.bale_no || "-"}`)}
+              ${renderStatusBadge("来源码，仅供核对", "neutral")}
+              ${renderStatusBadge(`验收状态 ${badge}`, row.receipt_status || "pending")}
+            </div>
           </div>
           <div class="candidate-side">
             <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(normalizedSdoCode)}" data-store-receipt-package="${escapeHtml(baleNo)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
@@ -16259,18 +16354,18 @@ function renderStoreDispatchAssignmentResultSummary(result) {
     const totalItems = result.reduce((sum, row) => sum + Number(row?.item_count || 0), 0);
     const transferNos = [...new Set(result.map((row) => String(row?.transfer_no || "").trim().toUpperCase()).filter(Boolean))];
     target.innerHTML = `
-      <div class="alert-banner">${escapeHtml(`已把 ${result.length} 个门店配货 bale 批量绑定给 ${first.assigned_employee || "-"}。店员下一步从“${assignmentPlan.clerkHomePanelTitle}”进入。`)}</div>
+      ${renderStatusAlert(`已把 ${result.length} 个门店配货 bale 批量绑定给 ${first.assigned_employee || "-"}。店员下一步从“${assignmentPlan.clerkHomePanelTitle}”进入。`, "success")}
       <div class="report-summary-grid">
         <article class="store-metric"><strong>总单</strong><span>${escapeHtml(transferNos.join("、") || "-")}</span></article>
         <article class="store-metric"><strong>店员</strong><span>${escapeHtml(first.assigned_employee || "-")}</span></article>
-        <article class="store-metric"><strong>已分配 bale</strong><span>${escapeHtml(result.length)}</span></article>
-        <article class="store-metric"><strong>总件数</strong><span>${escapeHtml(totalItems)}</span></article>
+        <article class="store-metric"><strong>已分配 bale</strong><span>${renderStatusBadge(result.length, "success")}</span></article>
+        <article class="store-metric"><strong>总件数</strong><span>${renderStatusBadge(totalItems, "neutral")}</span></article>
       </div>
       <div class="candidate-list compact-list">
         ${result.map((row) => `
           <article class="mini-record">
             <strong>${escapeHtml(row.bale_no || "-")}</strong>
-            <span>${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件 · ${getStoreDispatchBaleStatusLabel(row.status || "")}`)}</span>
+            <span>${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)} · ${renderStatusBadge(getStoreDispatchBaleStatusLabel(row.status || ""), row.status || "")}</span>
           </article>
         `).join("")}
       </div>
@@ -16289,14 +16384,14 @@ function renderStoreDispatchAssignmentResultSummary(result) {
   const assignmentPlan = getStoreAssignmentNavigationPlan(result.flow_type || "", result.assigned_employee || "");
   const clerkAssignment = buildStoreClerkAssignmentView(result);
   target.innerHTML = `
-    <div class="alert-banner">${escapeHtml(assignmentPlan.assignmentMessage)}</div>
+    ${renderStatusAlert(assignmentPlan.assignmentMessage, "success")}
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>当前 bale</strong><span>${escapeHtml(result.bale_no || "-")}</span></article>
+      <article class="store-metric"><strong>当前 bale</strong><span>${String(result.bale_no || "").startsWith("LPK") ? renderBarcodeEntityBadge("LPK", result.bale_no || "-") : renderBarcodeEntityBadge("SDB", result.bale_no || "-")}</span></article>
       <article class="store-metric"><strong>任务号</strong><span>${escapeHtml(result.task_no || "-")}</span></article>
       <article class="store-metric"><strong>店员</strong><span>${escapeHtml(result.assigned_employee || "-")}</span></article>
-      <article class="store-metric"><strong>件数</strong><span>${escapeHtml(result.item_count || 0)}</span></article>
-      <article class="store-metric"><strong>已编辑</strong><span>${escapeHtml(result.edited_count || 0)}</span></article>
-      <article class="store-metric"><strong>已打印</strong><span>${escapeHtml(result.printed_count || 0)}</span></article>
+      <article class="store-metric"><strong>件数</strong><span>${renderStatusBadge(result.item_count || 0, "neutral")}</span></article>
+      <article class="store-metric"><strong>已编辑</strong><span>${renderStatusBadge(result.edited_count || 0, result.edited_count ? "success" : "warning")}</span></article>
+      <article class="store-metric"><strong>已打印</strong><span>${renderStatusBadge(result.printed_count || 0, result.printed_count ? "success" : "warning")}</span></article>
     </div>
     <div class="subtle small">${escapeHtml(`clerk_assignment：${clerkAssignment.baleNo || "-"} -> ${clerkAssignment.assignedEmployee || "-"} · ${clerkAssignment.itemCount || 0} 件 · ${clerkAssignment.status || "-"}`)}</div>
     <div class="subtle small">店长侧到这里为止。店员要先从“${escapeHtml(assignmentPlan.clerkHomePanelTitle)}”确认自己当前处理的 bale，再进入“${escapeHtml(assignmentPlan.workbenchTitle)}”。</div>
@@ -16330,15 +16425,15 @@ function renderStoreDispatchAssignmentOverview(target) {
   const assignedCount = group.rows.filter((row) => String(assignmentMap[String(row?.bale_no || "").trim().toUpperCase()] || "").trim()).length;
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">分配给店员：先选店员，再勾选包裹。SDB / LPK 仅作来源码核对。</div>
+    ${renderStatusAlert("分配给店员：先选店员，再勾选包裹。SDB / LPK 仅作来源码核对。", "info")}
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>SDO 显示码</strong><span>${escapeHtml(group.sdo_display_code)}</span></article>
-      <article class="store-metric"><strong>SDO 机报码</strong><span>${escapeHtml(group.sdo_machine_code || "-")}</span></article>
+      <article class="store-metric"><strong>SDO 显示码</strong><span>${renderBarcodeEntityBadge("SDO", group.sdo_display_code)}</span></article>
+      <article class="store-metric"><strong>SDO 机报码</strong><span>${renderBarcodeEntityBadge("SDO", group.sdo_machine_code || "-")}</span></article>
       <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(group.transfer_no || "-")}</span></article>
       <article class="store-metric"><strong>门店</strong><span>${escapeHtml(group.store_code || storeCode || "-")}</span></article>
-      <article class="store-metric"><strong>已验收包数</strong><span>${group.rows.length}</span></article>
-      <article class="store-metric"><strong>未分配</strong><span>${Math.max(group.rows.length - assignedCount, 0)}</span></article>
-      <article class="store-metric"><strong>已分配</strong><span>${assignedCount}</span></article>
+      <article class="store-metric"><strong>已验收包数</strong><span>${renderStatusBadge(group.rows.length, "success")}</span></article>
+      <article class="store-metric"><strong>未分配</strong><span>${renderStatusBadge(Math.max(group.rows.length - assignedCount, 0), Math.max(group.rows.length - assignedCount, 0) ? "warning" : "success")}</span></article>
+      <article class="store-metric"><strong>已分配</strong><span>${renderStatusBadge(assignedCount, assignedCount ? "success" : "neutral")}</span></article>
     </div>
     <div class="button-row" style="margin:8px 0;">
       ${acceptedGroups.map((item) => `<button type="button" class="ghost-button mini-button" data-store-assignment-sdo-fill="${escapeHtml(item.sdo_display_code)}">${escapeHtml(item.sdo_display_code)}</button>`).join("")}
@@ -16349,13 +16444,15 @@ function renderStoreDispatchAssignmentOverview(target) {
       const receiveStatus = getStoreReceiptPackageStatusLabel((storeReceiptPackageStatusState[group.sdo_display_code] || {})[baleNo] || "pending");
       const assigned = String(assignmentMap[baleNo] || "").trim();
       return `
-        <article class="manager-console-row">
+        <article class="manager-console-row ${getStatusCardClass(assigned ? "success" : "warning")}">
           <div class="manager-console-row-main">
             <strong>${escapeHtml(`第 ${index + 1} 包 / 共 ${group.rows.length} 包`)}</strong>
             <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count || 0} 件`)}</div>
-            <div class="subtle small">${escapeHtml(`来源 ${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${baleNo}（来源码，仅供核对）`)}</div>
-            <div class="subtle small">${escapeHtml(`验收状态：${receiveStatus}${receiveStatus === "异常" ? "（异常包）" : ""}`)}</div>
-            <div class="subtle small">${escapeHtml(assigned ? `已分配：${assigned}` : "未分配")}</div>
+            <div class="meta-row">
+              ${String(row.bale_no || "").startsWith("LPK") ? renderBarcodeEntityBadge("LPK", `来源补差包 · ${baleNo}`) : renderBarcodeEntityBadge("SDB", `来源现成包 · ${baleNo}`)}
+              ${renderStatusBadge(`验收状态：${receiveStatus}${receiveStatus === "异常" ? "（异常包）" : ""}`, receiveStatus)}
+              ${renderStatusBadge(assigned ? `已分配：${assigned}` : "未分配", assigned ? "success" : "warning")}
+            </div>
           </div>
           <div class="manager-console-row-side">
             <label><input type="checkbox" data-store-assignment-pkg="${escapeHtml(baleNo)}"> 选择</label>
@@ -17401,11 +17498,11 @@ function renderBaleLocalPrintAgentStatus() {
   const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
   statusArea.className = "candidate-summary";
   statusArea.innerHTML = `
-    <div class="${agentClass}">
+    <div class="${agentClass} status-block status-block--${localPrintAgentState.connected ? "success" : "warning"}">
       <strong>FW-ERP 打印助手</strong>
-      <div>打印助手：${escapeHtml(statusText)}</div>
+      <div>打印助手：${renderStatusBadge(statusText, localPrintAgentState.connected ? "success" : "warning")}</div>
       <div>本地地址：${escapeHtml(agentUrl)}</div>
-      <div>状态：${escapeHtml(modeText)}</div>
+      <div>状态：${renderStatusBadge(modeText, localPrintAgentState.connected ? "success" : "warning")}</div>
       <div>${escapeHtml(helperMessage)}</div>
       ${suffix}
     </div>
@@ -17962,24 +18059,24 @@ function renderBalePrintModal() {
           </label>
         </div>
         <div class="button-row bale-modal-status-row">
-          <span class="meta-pill">${escapeHtml(selectedTemplate.barcode_type || "Code128")} 一维码</span>
-          <span class="meta-pill">当前测试 ${selectedTemplate.width_mm || 60}x${selectedTemplate.height_mm || 40}</span>
-          <span class="meta-pill">${escapeHtml(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "未检测打印机")}</span>
-          <span class="meta-pill ${supportsTemplate ? "" : "warning-pill"}">${usesTsplMode ? "本机直打" : (supportsTemplate ? `本机直打 ${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))}` : `${escapeHtml(getSelectedBaleTemplateSizeLabel(selectedTemplate))} 高级备用`)}</span>
+          ${renderStatusBadge(`${selectedTemplate.barcode_type || "Code128"} 一维码`, "neutral")}
+          ${renderStatusBadge(`当前测试 ${selectedTemplate.width_mm || 60}x${selectedTemplate.height_mm || 40}`, "neutral")}
+          ${renderStatusBadge(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "未检测打印机", selectedPrinter ? "success" : "warning")}
+          ${renderStatusBadge(usesTsplMode ? "本机直打" : (supportsTemplate ? `本机直打 ${getSelectedBaleTemplateSizeLabel(selectedTemplate)}` : `${getSelectedBaleTemplateSizeLabel(selectedTemplate)} 高级备用`), supportsTemplate || usesTsplMode ? "success" : "warning", supportsTemplate ? "" : "warning-pill")}
           ${
             balePrinterConsoleNotice
-              ? `<span class="meta-pill">${escapeHtml(balePrinterConsoleNotice.message)}</span>`
+              ? renderStatusBadge(balePrinterConsoleNotice.message, balePrinterConsoleNotice.type === "error" ? "danger" : (balePrinterConsoleNotice.type || "info"))
               : ""
           }
         </div>
         ${selectedPrinter && !supportsTemplate && !usesTsplMode
-          ? `<div class="alert-banner">此模板尺寸请在高级选项使用浏览器备用打印。</div>`
+          ? renderStatusAlert("此模板尺寸请在高级选项使用浏览器备用打印。", "warning")
           : ""}
         ${selectedPrinter && usesTsplMode
-          ? `<div class="flow-summary-note success">TSPL 直打已启用。点击主按钮测试出纸。</div>`
+          ? renderStatusBlock("TSPL 直打已启用。点击主按钮测试出纸。", "success")
           : ""}
         ${closeAction.action !== "allow_close"
-          ? `<div class="flow-summary-note">核对出纸后再确认已贴标。</div>`
+          ? renderStatusBlock("核对出纸后再确认已贴标。", "warning")
           : ""}
       </div>
     `;
@@ -26876,7 +26973,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
             <div class="subtle small">${escapeHtml(timeValue ? formatLocalDateTime(timeValue) : "待更新时间")}</div>
           </div>
           <div class="manager-console-row-side">
-            <span class="meta-pill">${escapeHtml(getStoreDispatchBaleStatusLabel(row.status || ""))}</span>
+            ${renderStatusBadge(getStoreDispatchBaleStatusLabel(row.status || ""), row.status || "")}
             ${actionButton}
           </div>
         </article>
@@ -26908,16 +27005,20 @@ function renderStoreManagerConsoleSummary(context = {}) {
         ? "件数待确认"
         : `${group.known_item_count} 件`;
       return `
-        <article class="manager-console-row">
+        <article class="manager-console-row ${getStatusCardClass(currentStatus)}">
           <div class="manager-console-row-main">
             <strong>${escapeHtml(group.sdo_display_code || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`机报码 ${group.sdo_machine_code || "-"} · TO ${group.transfer_no || "-"}`)}</div>
+            <div class="meta-row">
+              ${renderBarcodeEntityBadge("SDO", group.sdo_display_code || "-")}
+              ${renderBarcodeEntityBadge("SDO", `机报码 ${group.sdo_machine_code || "-"}`)}
+              ${renderStatusBadge(`TO ${group.transfer_no || "-"}`, "neutral")}
+            </div>
             <div class="subtle small">${escapeHtml(`${group.store_code || storeCode || "-"} · ${group.rows.length} 包 · ${itemCountLabel}`)}</div>
             <div class="subtle small">${escapeHtml(group.latest_at ? formatLocalDateTime(group.latest_at) : "待更新时间")}</div>
-            <div class="subtle small">${escapeHtml("来源码，仅供核对")}</div>
+            ${renderStatusBadge("来源码，仅供核对", "neutral")}
           </div>
           <div class="manager-console-row-side">
-            <span class="meta-pill">${escapeHtml(currentStatus || "待验收")}</span>
+            ${renderStatusBadge(currentStatus || "待验收", currentStatus || "待验收")}
             <button type="button" class="ghost-button mini-button" data-store-receipt-transfer-fill="${escapeHtml(group.sdo_display_code)}">${currentStatus === "已验收待分配" ? "分配店员" : currentStatus === "已完成" ? "查看分配" : "开始验收"}</button>
           </div>
         </article>
@@ -26949,12 +27050,12 @@ function renderStoreManagerConsoleSummary(context = {}) {
 
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">${escapeHtml(context.last_action_message || `${storeCode || "当前门店"} 到货工作台已加载。请扫描送货单上的 SDO 条码。SDB / LPK 只是来源码，仅供核对。`)}</div>
+    ${renderStatusAlert(context.last_action_message || `${storeCode || "当前门店"} 到货工作台已加载。请扫描送货单上的 SDO 条码。SDB / LPK 只是来源码，仅供核对。`, "info")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCode || operating?.store_code || "-")}</span></article>
-      <article class="store-metric"><strong>待验收</strong><span>${inTransitSdoGroups.length}</span></article>
-      <article class="store-metric"><strong>待分配</strong><span>${acceptedRows.length}</span></article>
-      <article class="store-metric"><strong>异常</strong><span>${attentionRows.length + exceptionFlags.length}</span></article>
+      <article class="store-metric"><strong>待验收</strong><span>${renderStatusBadge(inTransitSdoGroups.length, inTransitSdoGroups.length ? "warning" : "neutral")}</span></article>
+      <article class="store-metric"><strong>待分配</strong><span>${renderStatusBadge(acceptedRows.length, acceptedRows.length ? "warning" : "neutral")}</span></article>
+      <article class="store-metric"><strong>异常</strong><span>${renderStatusBadge(attentionRows.length + exceptionFlags.length, attentionRows.length + exceptionFlags.length ? "danger" : "neutral")}</span></article>
     </div>
     <div class="manager-console-grid">
       <section class="manager-console-panel" style="grid-column: 1 / -1;">
@@ -26964,10 +27065,10 @@ function renderStoreManagerConsoleSummary(context = {}) {
         </div>
         <div class="subtle small">扫描或输入 SDO 码后，按步骤在本页完成收货。</div>
         <div class="transfer-flow-strip" style="margin:8px 0 6px;">
-          <span class="store-flag ${commandCenter.step === "list" ? "is-active" : ""}">1 到货列表</span>
-          <span class="store-flag ${commandCenter.step === "receiving" ? "is-active" : ""}">2 验收详情</span>
-          <span class="store-flag ${commandCenter.step === "assignment" ? "is-active" : ""}">3 分配店员</span>
-          <span class="store-flag ${commandCenter.step === "completed" ? "is-active" : ""}">4 已完成</span>
+          ${renderStatusBadge("1 到货列表", commandCenter.step === "list" ? "info" : "neutral", commandCenter.step === "list" ? "is-active" : "")}
+          ${renderStatusBadge("2 验收详情", commandCenter.step === "receiving" ? "info" : "neutral", commandCenter.step === "receiving" ? "is-active" : "")}
+          ${renderStatusBadge("3 分配店员", commandCenter.step === "assignment" ? "info" : "neutral", commandCenter.step === "assignment" ? "is-active" : "")}
+          ${renderStatusBadge("4 已完成", commandCenter.step === "completed" ? "success" : "neutral", commandCenter.step === "completed" ? "is-active" : "")}
         </div>
         <div class="button-row" style="margin:8px 0 6px;">
           <button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单</button>
@@ -26977,24 +27078,27 @@ function renderStoreManagerConsoleSummary(context = {}) {
           <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
         ` : commandCenter.selected ? `
           <div class="report-summary" style="margin-top:10px;">
-            <div class="alert-banner">已选择 ${escapeHtml(commandCenter.selected.sdo_display_code)}，请在本页继续处理。</div>
+            ${renderStatusAlert(`已选择 ${commandCenter.selected.sdo_display_code}，请在本页继续处理。`, "info")}
             <div class="report-summary-grid">
-              <article class="store-metric"><strong>SDO 显示码</strong><span>${escapeHtml(commandCenter.selected.sdo_display_code)}</span></article>
-              <article class="store-metric"><strong>机报码</strong><span>${escapeHtml(commandCenter.selected.sdo_machine_code || "-")}</span></article>
+              <article class="store-metric"><strong>SDO 显示码</strong><span>${renderBarcodeEntityBadge("SDO", commandCenter.selected.sdo_display_code)}</span></article>
+              <article class="store-metric"><strong>机报码</strong><span>${renderBarcodeEntityBadge("SDO", commandCenter.selected.sdo_machine_code || "-")}</span></article>
               <article class="store-metric"><strong>TO 参考</strong><span>${escapeHtml(commandCenter.selected.transfer_no || "-")}</span></article>
               <article class="store-metric"><strong>门店</strong><span>${escapeHtml(commandCenter.selected.store_code || storeCode || "-")}</span></article>
-              <article class="store-metric"><strong>包裹</strong><span>${escapeHtml(commandCenter.selected.packages.length)}</span></article>
-              <article class="store-metric"><strong>件数</strong><span>${commandCenter.selected.unknown_item_count > 0 ? "件数待确认" : `${escapeHtml(commandCenter.selected.known_item_count)} 件`}</span></article>
+              <article class="store-metric"><strong>包裹</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", commandCenter.selected.packages.length)}</span></article>
+              <article class="store-metric"><strong>件数</strong><span>${renderStatusBadge(commandCenter.selected.unknown_item_count > 0 ? "件数待确认" : `${commandCenter.selected.known_item_count} 件`, commandCenter.selected.unknown_item_count > 0 ? "warning" : "neutral")}</span></article>
             </div>
             ${commandCenter.step === "receiving" ? `
               <div class="candidate-list compact-list" style="margin-top:10px;">
                 ${commandCenter.selected.packages.map((row) => `
-                  <article class="candidate-row">
+                  <article class="candidate-row ${getStatusCardClass(row.receipt_status || "pending")}">
                     <div class="candidate-main">
                       <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
                       <div class="subtle small">${escapeHtml(`${row.category_summary || row.category_name || "-"} · ${row.item_count === null || row.item_count === undefined || row.item_count === "" ? "件数待确认" : `${Number(row.item_count)} 件`}`)}</div>
-                      <div class="subtle small">${escapeHtml(`${String(row.bale_no || "").startsWith("LPK") ? "补差包" : "现成包"} · ${row.bale_no || "-"}（来源码，仅供核对）`)}</div>
-                      <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)}`)}</div>
+                      <div class="meta-row">
+                        ${String(row.bale_no || "").startsWith("LPK") ? renderBarcodeEntityBadge("LPK", `补差包 · ${row.bale_no || "-"}`) : renderBarcodeEntityBadge("SDB", `现成包 · ${row.bale_no || "-"}`)}
+                        ${renderStatusBadge("来源码，仅供核对", "neutral")}
+                        ${renderStatusBadge(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)}`, row.receipt_status || "pending")}
+                      </div>
                     </div>
                     <div class="candidate-side">
                       <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(commandCenter.selected.sdo_display_code)}" data-store-receipt-package="${escapeHtml(row.bale_no)}" ${row.receipt_status === "received" ? "disabled" : ""}>确认收到此包</button>
@@ -27014,11 +27118,11 @@ function renderStoreManagerConsoleSummary(context = {}) {
                     ${commandCenterClerkOptionsHtml}
                   </select>
                 </label>
-                ${hasCommandCenterClerks ? "" : `<span class="store-flag danger">${escapeHtml(getNoActiveStaffLabel())}</span>`}
+                ${hasCommandCenterClerks ? "" : renderStatusBadge(getNoActiveStaffLabel(), "danger")}
               </div>
               <div class="candidate-list compact-list" style="margin-top:10px;">
                 ${commandCenter.selected.packages.map((row) => `
-                  <article class="candidate-row">
+                  <article class="candidate-row ${getStatusCardClass(row.assigned_clerk ? "success" : "warning")}">
                     <div class="candidate-main">
                       <strong>${escapeHtml(`第 ${row.sequence} 包 / 共 ${commandCenter.selected.packages.length} 包`)}</strong>
                       <div class="subtle small">${escapeHtml(`${row.bale_no || "-"} · ${row.item_count === null || row.item_count === undefined || row.item_count === "" ? "件数待确认" : `${Number(row.item_count)} 件`}`)}</div>
@@ -27033,15 +27137,15 @@ function renderStoreManagerConsoleSummary(context = {}) {
               </div>
             ` : ""}
             ${commandCenter.step === "completed" ? `
-              <div class="alert-banner" style="margin-top:10px;">本单已完成：验收与分配均已完成。</div>
+              <div style="margin-top:10px;">${renderStatusAlert("本单已完成：验收与分配均已完成。", "success")}</div>
               <div class="candidate-list compact-list" style="margin-top:10px;">
                 ${commandCenter.selected.packages.map((row) => `
-                  <article class="candidate-row">
+                  <article class="candidate-row ${getStatusCardClass("success")}">
                     <div class="candidate-main">
                       <strong>${escapeHtml(row.bale_no || "-")}</strong>
                       <div class="subtle small">${escapeHtml(`验收：${getStoreReceiptPackageStatusLabel(row.receipt_status)} · 店员：${row.assigned_clerk || "未分配"}`)}</div>
                     </div>
-                    <div class="candidate-side"><span class="meta-pill">已完成</span></div>
+                    <div class="candidate-side">${renderStatusBadge("已完成", "success")}</div>
                   </article>`).join("")}
               </div>
               <div class="button-row" style="margin-top:10px;">
@@ -27052,7 +27156,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
         ` : `<div class="empty-state" style="margin-top:10px;">请先选择一张 SDO 卡片。</div>`}
         <div style="margin-top:12px;">
           <div class="manager-console-flags">
-            ${(exceptionFlags.length ? exceptionFlags : ["当前没有异常或例外待处理"]).map((flag) => `<span class="store-flag ${flag === "当前没有异常或例外待处理" ? "" : "danger"}">${escapeHtml(flag)}</span>`).join("")}
+            ${(exceptionFlags.length ? exceptionFlags : ["当前没有异常或例外待处理"]).map((flag) => renderStatusBadge(flag, flag === "当前没有异常或例外待处理" ? "success" : "danger")).join("")}
           </div>
           <div class="manager-console-actions">
             ${renderSummaryActions([{ panelKey: getPanelKeyByTitle("store", "10. 周期退仓"), label: "去处理退仓" }])}
@@ -27680,23 +27784,23 @@ function renderStorePackageListCard(row = {}) {
   const sourceType = getStorePackageSourceType(row);
   const status = String(row?.status || "assigned").trim();
   return `
-    <article class="store-package-card">
+    <article class="store-package-card ${getStatusCardClass(status)}">
       <div class="store-package-card-main">
         <div class="store-package-card-head">
           <div>
             <span class="eyebrow">SDO</span>
             <strong>${escapeHtml(getStorePackageSdoCode(row) || "-")}</strong>
           </div>
-          <span class="meta-pill">${escapeHtml(translateStatusLabel(status, "store_dispatch_bale"))}</span>
+          ${renderStatusBadge(translateStatusLabel(status, "store_dispatch_bale"), status)}
         </div>
-        <div class="store-package-title">${escapeHtml(sourceCode || "-")} <span class="meta-pill">${escapeHtml(sourceType === "LPK" ? "补差包" : "现成包")}</span></div>
+        <div class="store-package-title">${escapeHtml(sourceCode || "-")} ${sourceType === "LPK" ? renderBarcodeEntityBadge("LPK", "补差包") : renderBarcodeEntityBadge("SDB", "现成包")}</div>
         <div class="store-package-grid">
-          <span><b>来源类型</b>${escapeHtml(sourceType === "LPK" ? "补差包 / LPK" : "现成包 / SDB")}</span>
+          <span><b>来源类型</b>${sourceType === "LPK" ? renderBarcodeEntityBadge("LPK", "补差包 / LPK") : renderBarcodeEntityBadge("SDB", "现成包 / SDB")}</span>
           <span><b>品类</b>${escapeHtml(getStorePackageCategoryLabel(row))}</span>
-          <span><b>件数</b>${escapeHtml(itemCount == null ? "件数待确认" : `${itemCount}`)}</span>
-          <span><b>成本状态</b>${escapeHtml(getStorePackageCostLabel(row))}</span>
-          <span><b>已生成 STORE_ITEM</b>${counts.generated}</span>
-          <span><b>已打印</b>${counts.printed}</span>
+          <span><b>件数</b>${renderStatusBadge(itemCount == null ? "件数待确认" : `${itemCount}`, itemCount == null ? "warning" : "neutral")}</span>
+          <span><b>成本状态</b>${renderStatusBadge(getStorePackageCostLabel(row), getStorePackageCostLabel(row))}</span>
+          <span><b>已生成 STORE_ITEM</b>${renderBarcodeEntityBadge("STORE_ITEM", counts.generated)}</span>
+          <span><b>已打印</b>${renderStatusBadge(counts.printed, counts.printed ? "success" : "warning")}</span>
         </div>
       </div>
       <div class="store-package-card-action">

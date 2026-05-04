@@ -1124,7 +1124,7 @@ test("phase B2 warehouse prep task panel supports request multi-select", () => {
 test("phase 2A copy keeps package count and piece count separated on 4.1", () => {
   assert.match(appJs, /const pickableQty = Math\.max\(totalRequestedQty - shortageQty, 0\);/);
   assert.match(appJs, /可拣：\$\{escapeHtml\(pickableQty\)\} 件/);
-  assert.match(appJs, /<span>缺货数量<\/span><strong>\$\{escapeHtml\(shortageQty\)\} 件<\/strong>/);
+  assert.match(appJs, /<span>缺货数量<\/span><strong>\$\{renderStatusBadge\(`\$\{shortageQty\} 件`, shortageQty > 0 \? "warning" : "neutral"\)\}<\/strong>/);
   assert.match(appJs, /系统按库存生成配货建议。SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。/);
 });
 
@@ -1143,10 +1143,10 @@ test("phase 2B page 6 copy clarifies warehouse verification and warehouse-only b
 });
 
 test("phase 2B page 6 state labels and gating copy are visible in workbench summary", () => {
-  assert.match(appJs, /<strong>执行阶段<\/strong><span>仓库核对 \/ 出库打印<\/span>/);
-  assert.match(appJs, /<strong>现成 SDB 包<\/strong><span>\$\{escapeHtml\(readiness\.foundPreparedCount \|\| 0\)\} \/ \$\{escapeHtml\(readiness\.requiredPreparedCount \|\| 0\)\} 已核对<\/span>/);
-  assert.match(appJs, /<strong>补差工单<\/strong><span>\$\{escapeHtml\(readiness\.completedLooseTaskCount \|\| 0\)\} \/ \$\{escapeHtml\(readiness\.requiredLooseTaskCount \|\| 0\)\} 已完成<\/span>/);
-  assert.match(appJs, /<strong>正式送货执行码<\/strong><span>\$\{escapeHtml\(officialDeliveryCodeLabel\)\}<\/span>/);
+  assert.match(appJs, /<strong>执行阶段<\/strong><span>\$\{renderStatusBadge\("仓库核对 \/ 出库打印", verificationPending \? "info" : "success"\)\}<\/span>/);
+  assert.match(appJs, /<strong>现成 SDB 包<\/strong><span>\$\{renderStatusBadge\(`\$\{readiness\.foundPreparedCount \|\| 0\} \/ \$\{readiness\.requiredPreparedCount \|\| 0\} 已核对`, readiness\.pendingPreparedCount \? "warning" : "success"\)\}<\/span>/);
+  assert.match(appJs, /<strong>补差工单<\/strong><span>\$\{renderStatusBadge\(`\$\{readiness\.completedLooseTaskCount \|\| 0\} \/ \$\{readiness\.requiredLooseTaskCount \|\| 0\} 已完成`, readiness\.pendingLooseTaskCount \? "warning" : "success"\)\}<\/span>/);
+  assert.match(appJs, /<strong>正式送货执行码<\/strong><span>\$\{renderBarcodeEntityBadge\("SDO", officialDeliveryCodeLabel\)\}<\/span>/);
   assert.match(appJs, /仓库核对尚未完成：现成待送店包 \$\{readiness\.foundPreparedCount \|\| 0\}\/\$\{readiness\.requiredPreparedCount \|\| 0\}，补差工单 \$\{readiness\.completedLooseTaskCount \|\| 0\}\/\$\{readiness\.requiredLooseTaskCount \|\| 0\}。/);
   assert.match(appJs, /仓库核对已完成。请生成正式门店送货执行单 barcode，并用于门店收货扫码。/);
   assert.doesNotMatch(indexHtml, /打印后给店长扫码验收/);

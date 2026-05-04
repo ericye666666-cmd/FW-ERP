@@ -191,7 +191,7 @@ test("store dispatch acceptance page removes directory filters and keeps only ba
   assert.match(appJs, /function getStoreReceiptSdoStatusText/);
   assert.match(appJs, /function normalizeStoreReceiptBaleInputFromForm/);
   assert.match(appJs, /function renderStoreReceiptTransferBaleList/);
-  assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\], "store_receiving", \["STORE_DELIVERY_EXECUTION"\]\)/);
+  assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\], "store_receiving", \["STORE_DELIVERY_EXECUTION", "STORE_DELIVERY_PACKAGE"\]\)/);
   assert.match(appJs, /门店收货只扫正式门店送货执行码/);
   assert.match(appJs, /SDB 和 LPK 仍然只是仓库内部核对码/);
   assert.match(appJs, /#storeDispatchBaleAcceptForm \[name='bale_no'\][\s\S]*addEventListener\("input"/);
@@ -267,7 +267,7 @@ test("store PDA scan guidance rejects non STORE_ITEM codes with next-step copy",
   const guidanceSource = extractFunctionSource(appJs, "getStorePdaScanGuidance");
 
   assert.match(guidanceSource, /请扫描 STORE_ITEM 商品码。/);
-  assert.match(guidanceSource, /这是 SDO，请去门店收货页面处理。/);
+  assert.match(guidanceSource, /这是 SDO \/ SDP，请去门店收货页面处理。/);
   assert.match(guidanceSource, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
   assert.match(guidanceSource, /这是 RAW_BALE，门店不能处理。/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
