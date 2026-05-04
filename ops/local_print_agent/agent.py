@@ -388,7 +388,7 @@ def _normalize_template_size(value: object) -> str:
     return raw or "60x40"
 
 
-MACHINE_CODE_RE = re.compile(r"^[1-5][0-9]{9}$")
+MACHINE_CODE_RE = re.compile(r"^[1-6][0-9]{9}$")
 
 TEMPLATE_MACHINE_PREFIXES = {
     "warehouse_in": "1",
@@ -413,7 +413,18 @@ DISPLAY_MACHINE_PREFIXES = [
     (re.compile(r"^SDB"), "2"),
     (re.compile(r"^LPK"), "3"),
     (re.compile(r"^SDO"), "4"),
+    (re.compile(r"^SDP"), "6"),
 ]
+
+ENTITY_MACHINE_PREFIXES = {
+    "RAW_BALE": "1",
+    "STORE_PREP_BALE": "2",
+    "DISPATCH_BALE": "2",
+    "LOOSE_PICK_TASK": "3",
+    "STORE_DELIVERY_EXECUTION": "4",
+    "STORE_ITEM": "5",
+    "STORE_DELIVERY_PACKAGE": "6",
+}
 
 MISSING_MACHINE_CODE_MESSAGE = "Missing valid 10-digit machine_code. Display code cannot be used as barcode."
 
@@ -437,6 +448,10 @@ def _display_machine_prefix(display_code: object) -> str:
         if pattern.match(normalized):
             return prefix
     return ""
+
+
+def _entity_machine_prefix(entity_type: object) -> str:
+    return ENTITY_MACHINE_PREFIXES.get(str(entity_type or "").strip().upper(), "")
 
 
 def _select_barcode_value(payload: dict) -> tuple[str, str | None]:
@@ -488,14 +503,26 @@ def _validate_label_type_contract(
     *,
     template_code: object,
     display_code: object,
+    entity_type: object = "",
     machine_code: str,
 ) -> str | None:
     template_prefix = _template_machine_prefix(template_code)
     display_prefix = _display_machine_prefix(display_code)
+    entity_prefix = _entity_machine_prefix(entity_type)
     machine_prefix = str(machine_code or "")[:1]
-    if template_prefix and template_prefix != machine_prefix:
+    if entity_prefix and entity_prefix != machine_prefix:
         return "machine_code does not match template/display type."
     if display_prefix and display_prefix != machine_prefix:
+        return "machine_code does not match template/display type."
+    if template_prefix and template_prefix != machine_prefix:
+        normalized_template = str(template_code or "").strip().lower()
+        is_sdo_package_on_dispatch_template = (
+            normalized_template in {"store_dispatch_60x40", "transtoshop"}
+            and machine_prefix == "6"
+            and (entity_prefix == "6" or display_prefix == "6" or not display_prefix)
+        )
+        if is_sdo_package_on_dispatch_template:
+            return None
         return "machine_code does not match template/display type."
     return None
 
@@ -516,6 +543,7 @@ def _normalize_print_label_request(payload: dict) -> tuple[dict, str | None]:
     type_error = _validate_label_type_contract(
         template_code=template_code,
         display_code=display_code,
+        entity_type=merged_payload.get("entity_type"),
         machine_code=barcode_value,
     )
     if type_error:
@@ -621,7 +649,7 @@ def _sdo_package_position(payload: dict) -> str:
             return f"{chinese_match.group(1)}/{chinese_match.group(2)}"
 
     current = _first_label_value(payload, "serial_no", "package_index", "package_no", default=1)
-    total = _first_label_value(payload, "total_packages", "package_count", "packages", "bale_count", default=current)
+    total = _first_label_value(payload, "total_packages", "package_total", "package_count", "packages", "bale_count", default=current)
     try:
         current_int = max(1, int(current))
     except (TypeError, ValueError):
@@ -665,6 +693,13 @@ def _sdo_packing_lines(payload: dict) -> list[str]:
 
 def _label_template_family(payload: dict) -> str:
     template_code = str(payload.get("template_code") or "").strip().lower()
+    entity_prefix = _entity_machine_prefix(payload.get("entity_type"))
+    display_prefix = _display_machine_prefix(payload.get("display_code"))
+    machine_prefix = str(payload.get("barcode_value") or payload.get("machine_code") or "")[:1]
+    if entity_prefix == "6" or display_prefix == "6" or machine_prefix == "6":
+        return "store_delivery_package"
+    if entity_prefix == "4" or display_prefix == "4":
+        return "store_delivery_execution"
     if template_code in {"warehouse_in", "warehouse_in_60x40", "raw_bale_60x40"}:
         return "raw_bale"
     if template_code in {"store_prep_bale_60x40", "wait_for_transtoshop", "wait_for_sale"}:
@@ -676,8 +711,6 @@ def _label_template_family(payload: dict) -> str:
     if template_code in {"store_item_60x40", "apparel_60x40", "clothes_retail"}:
         return "store_item"
 
-    display_prefix = _display_machine_prefix(payload.get("display_code"))
-    machine_prefix = str(payload.get("barcode_value") or payload.get("machine_code") or "")[:1]
     prefix = display_prefix or machine_prefix
     return {
         "1": "raw_bale",
@@ -685,6 +718,7 @@ def _label_template_family(payload: dict) -> str:
         "3": "loose_pick_task",
         "4": "store_delivery_execution",
         "5": "store_item",
+        "6": "store_delivery_package",
     }.get(prefix, "")
 
 
@@ -742,6 +776,19 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
             (300, 68, packing_lines[1], 1, 1, 18),
             (300, 92, packing_lines[2], 1, 1, 18),
         ]
+    if family == "store_delivery_package":
+        store = _first_label_value(payload, "store", "store_code", "store_name", default="-")
+        package_position = _sdo_package_position(payload)
+        source_code = _first_label_value(payload, "source_code", "source_package_summary", "source_reference", default="-")
+        item_count = _first_label_value(payload, "item_count", "qty", "quantity", default="-")
+        content_summary = _first_label_value(payload, "content_summary", "category_display", "category_summary", default="")
+        return [
+            (20, 8, "SDO / DELIVERY", 2, 2, 14),
+            (20, 44, f"{store} - Pkg {package_position}", 1, 1, 32),
+            (20, 76, display_code or "-", 2, 2, 14),
+            (20, 118, f"{source_code} - {item_count} pcs", 1, 1, 34),
+            (20, 146, f"Item: {content_summary or '-'}", 1, 1, 34),
+        ]
     if family == "store_item":
         return [
             (20, 8, "STORE_ITEM", 2, 2, 12),
@@ -776,7 +823,7 @@ def _build_tspl_60x40_label(label_payload: dict, *, copies: int = 1) -> str:
     ]
     for x, y, text, x_scale, y_scale, max_len in _build_tspl_label_lines(label_payload):
         commands.append(_tspl_text(x, y, text, x_scale=x_scale, y_scale=y_scale, max_len=max_len))
-    if family not in {"store_prep_bale", "loose_pick_task", "store_delivery_execution"}:
+    if family not in {"store_prep_bale", "loose_pick_task", "store_delivery_execution", "store_delivery_package"}:
         commands.append("BAR 20,126,436,3")
     commands.extend(
         [

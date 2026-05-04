@@ -576,6 +576,54 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertNotIn("pants / jeans pant", tspl)
         self.assertNotIn("来源", tspl)
 
+    def test_sdo_package_tspl_uses_package_machine_code_and_compact_layout(self):
+        payload = {
+            "entity_type": "STORE_DELIVERY_PACKAGE",
+            "display_code": "SDP261240003",
+            "machine_code": "6261240003",
+            "barcode_value": "6261240003",
+            "template_code": "store_dispatch_60x40",
+            "template_scope": "warehouseout_bale",
+            "parent_sdo_display_code": "SDO260429001",
+            "parent_sdo_machine_code": "4260429001",
+            "store_code": "UTAWALA",
+            "package_no": 1,
+            "package_total": 2,
+            "source_type": "SDB",
+            "source_code": "SDB-TO202604-001",
+            "source_machine_code": "2260429001",
+            "item_count": 120,
+            "content_summary": "tops / lady tops",
+        }
+
+        normalized, error = agent._normalize_print_label_request(
+            {
+                "printer_name": "Deli DL-720C",
+                "template_code": "store_dispatch_60x40",
+                "template_scope": "warehouseout_bale",
+                "label_payload": payload,
+            }
+        )
+        self.assertIsNone(error)
+        self.assertEqual(normalized["barcode_value"], "6261240003")
+
+        tspl = agent._build_tspl_60x40_label(normalized["label_payload"], copies=1)
+        barcode_lines = "\n".join(line for line in tspl.splitlines() if line.startswith("BARCODE"))
+
+        self.assertIn("SDO / DELIVERY", tspl)
+        self.assertIn("UTAWALA - Pkg 1/2", tspl)
+        self.assertIn("SDP261240003", tspl)
+        self.assertIn("SDB-TO202604-001", tspl)
+        self.assertIn("120 pcs", tspl)
+        self.assertEqual(self._tspl_barcode_values(tspl), ["6261240003"])
+        self.assertIn('"6261240003"', barcode_lines)
+        self.assertNotIn('"4260429001"', barcode_lines)
+        self.assertNotIn('"2260429001"', barcode_lines)
+        self.assertNotIn('"SDP261240003"', barcode_lines)
+        self.assertNotIn("Pkg:", tspl)
+        self.assertNotIn("Pack:", tspl)
+        self.assertNotIn("????", tspl)
+
     def test_sdb_lpk_tspl_text_stays_clear_of_barcode_area(self):
         cases = [
             (

@@ -185,7 +185,7 @@ test("SDO modal primary action has one clear main print button and local-agent o
   assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
   assert.doesNotMatch(primaryActions[0], /打印本轮全部标签/);
   assert.match(appJs, /const isSdoPrint = templateScope === "warehouseout_bale" && isSDOPrintModalTaskType\(activeTaskType\)/);
-  assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint[\s\S]*?\? "打印 SDO 条码"/);
+  assert.match(appJs, /primaryPrintButton\.textContent = isSdoPrint[\s\S]*?\? "打印 SDO 实体包标签"/);
   assert.match(appJs, /message: "打印助手未连接，请先启动 Windows 打印助手。"/);
   assert.match(appJs, /throw new Error\("打印助手未连接，请先启动 Windows 打印助手。"\)/);
   const primaryActionFunction = appJs.match(/async function printCurrentBaleModalPrimaryAction\(\) \{[\s\S]*?\n\}/);
@@ -223,7 +223,7 @@ test("print modal uses neutral compact ERP visual styling", () => {
 });
 
 test("print modal labels primary print button by barcode type without changing barcode rules", () => {
-  assert.match(appJs, /isSdoPrint[\s\S]*?\? "打印 SDO 条码"/);
+  assert.match(appJs, /isSdoPrint[\s\S]*?\? "打印 SDO 实体包标签"/);
   assert.match(appJs, /isLpkPrint[\s\S]*?\? "打印 LPK 条码"/);
   assert.match(appJs, /isSdbPrint[\s\S]*?\? "打印 SDB 标签"/);
   assert.match(appJs, /isStoreItemPrint[\s\S]*?\? "打印 STORE_ITEM 标签"/);
