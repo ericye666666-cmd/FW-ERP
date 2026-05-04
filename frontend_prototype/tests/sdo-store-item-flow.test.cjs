@@ -135,7 +135,8 @@ test("clerk 6.2 home is a PDA package list and moves package actions into shelvi
   assert.match(stepSource, /选择货架位/);
   assert.match(extractFunctionSource(appJs, "getStorePackageCostLabel"), /成本待确认/);
   assert.match(appJs, /A-01[\s\S]*A-02[\s\S]*B-01[\s\S]*B-02[\s\S]*C-01/);
-  assert.match(generateSource, /后端统一发号/);
+  assert.match(generateSource, /store-items\/generate/);
+  assert.match(generateSource, /request/);
 });
 
 test("clerk package cards open shelving even when SDO code is missing", () => {
@@ -178,7 +179,10 @@ test("clerk package shelving step supports price selection and batch print previ
   assert.match(stepSource, /标记本次已打印/);
   assert.match(appJs, /STORE_ITEM machine_code barcode/);
 
-  assert.match(generateSource, /STORE_ITEM machine_code 必须由后端统一发号/);
+  assert.match(appJs, /STORE_ITEM machine_code 必须由后端统一发号/);
+  assert.match(generateSource, /store-items\/generate/);
+  assert.match(generateSource, /selected_price/);
+  assert.match(generateSource, /quantity/);
   assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
   assert.doesNotMatch(generateSource, /barcode_value:\s*machineCode/);
   assert.doesNotMatch(generateSource, /machine_code:\s*machineCode/);
