@@ -603,6 +603,14 @@ def _tspl_text_value(value: object, *, max_len: int = 34) -> str:
     return cleaned[:max_len]
 
 
+def _tspl_ascii_value(value: object, *, max_len: int = 34, default: str = "-") -> str:
+    cleaned = re.sub(r"[\r\n\t]+", " ", str(value or "").strip())
+    cleaned = cleaned.replace('"', "'")
+    cleaned = "".join(ch if 32 <= ord(ch) <= 126 else " " for ch in cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return (cleaned or default)[:max_len]
+
+
 def _tspl_text(x: int, y: int, text: str, *, x_scale: int = 1, y_scale: int = 1, max_len: int = 34) -> str:
     return f'TEXT {int(x)},{int(y)},"0",0,{int(x_scale)},{int(y_scale)},"{_tspl_text_value(text, max_len=max_len)}"'
 
@@ -777,17 +785,19 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
             (300, 92, packing_lines[2], 1, 1, 18),
         ]
     if family == "store_delivery_package":
-        store = _first_label_value(payload, "store", "store_code", "store_name", default="-")
+        store = _tspl_ascii_value(_first_label_value(payload, "store", "store_code", "store_name", default="-"), max_len=10)
         package_position = _sdo_package_position(payload)
-        source_code = _first_label_value(payload, "source_code", "source_package_summary", "source_reference", default="-")
-        item_count = _first_label_value(payload, "item_count", "qty", "quantity", default="-")
-        content_summary = _first_label_value(payload, "content_summary", "category_display", "category_summary", default="")
+        source_code = _tspl_ascii_value(
+            _first_label_value(payload, "source_code", "source_package_summary", "source_reference", default="-"),
+            max_len=22,
+        )
+        item_count = _tspl_ascii_value(_first_label_value(payload, "item_count", "qty", "quantity", default="-"), max_len=8)
         return [
-            (20, 8, "SDO / DELIVERY", 2, 2, 14),
-            (20, 44, f"{store} - Pkg {package_position}", 1, 1, 32),
+            (20, 8, "SDO DELIVERY", 2, 2, 14),
+            (20, 44, f"{store}  PKG {package_position}", 1, 1, 28),
             (20, 76, display_code or "-", 2, 2, 14),
-            (20, 118, f"{source_code} - {item_count} pcs", 1, 1, 34),
-            (20, 146, f"Item: {content_summary or '-'}", 1, 1, 34),
+            (20, 118, f"SRC {source_code}", 1, 1, 26),
+            (20, 146, f"QTY {item_count}", 1, 1, 14),
         ]
     if family == "store_item":
         return [
