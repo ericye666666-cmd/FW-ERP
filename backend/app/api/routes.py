@@ -3887,6 +3887,31 @@ def receive_store_delivery_package(
     return StoreDeliveryExecutionPackageDetailResponse(**state.receive_store_delivery_package(package_code, data))
 
 
+@router.get(
+    "/store-delivery-packages/assigned",
+    response_model=list[StoreDeliveryExecutionPackageDetailResponse],
+    tags=["stores", "transfers"],
+)
+def list_assigned_store_delivery_packages(
+    store_code: Optional[str] = Query(default=None),
+    assigned_clerk: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> list[StoreDeliveryExecutionPackageDetailResponse]:
+    current_user = _require_current_user(authorization=authorization)
+    effective_store_code = str(store_code or "").strip().upper()
+    effective_assigned_clerk = str(assigned_clerk or "").strip()
+    if _is_store_clerk_user(current_user):
+        effective_store_code = str(current_user.get("store_code") or effective_store_code or "").strip().upper()
+        effective_assigned_clerk = str(current_user.get("username") or effective_assigned_clerk or "").strip()
+    if not effective_assigned_clerk:
+        raise HTTPException(status_code=400, detail="assigned_clerk is required")
+    rows = state.list_assigned_store_delivery_packages(
+        store_code=effective_store_code,
+        assigned_clerk=effective_assigned_clerk,
+    )
+    return [StoreDeliveryExecutionPackageDetailResponse(**row) for row in rows]
+
+
 @router.post(
     "/store-delivery-packages/{package_code}/exception",
     response_model=StoreDeliveryExecutionPackageDetailResponse,

@@ -235,6 +235,8 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "我的当前 bale", en: "My Current Bales" },
   { zh: "我的待上架包", en: "My Ready-for-Shelf Packages" },
   { zh: "我的待上架包列表", en: "My Ready-for-Shelf Packages" },
+  { zh: "我的 SDP 包任务", en: "My SDP Package Tasks" },
+  { zh: "SDP 包任务详情", en: "SDP Package Task Detail" },
   { zh: "包上架 / 商品码打印", en: "Package Shelving / Item Label Printing" },
   { zh: "选择货架位", en: "Select rack" },
   { zh: "选择售价", en: "Select selling price" },
@@ -303,7 +305,10 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。", en: "This code cannot be sold in POS. Please scan a STORE_ITEM code." },
   { zh: "打印助手未连接，请先启动 Windows 打印助手。", en: "Print Agent is not connected. Please start the Windows Print Agent first." },
   { zh: "这是 SDO，请去门店收货页面处理。", en: "This is an SDO. Please process it on the Store Receiving page." },
+  { zh: "这是整张送货单，请由店长在门店收货页面处理。", en: "This is a full SDO. Ask the store manager to process it on Store Receiving." },
+  { zh: "扫描 SDP 实体包后会校验是否分配给你。", en: "Scanning an SDP package will verify whether it is assigned to you." },
   { zh: "这是 SDB / LPK 来源包，不能直接上架销售。", en: "This is an SDB / LPK source package. It cannot be put away for sale directly." },
+  { zh: "这是 SDB / LPK 来源包，不能直接上架。", en: "This is an SDB / LPK source package. It cannot be put away directly." },
   { zh: "这是 RAW_BALE，门店不能处理。", en: "This is a RAW_BALE. Stores cannot process it." },
   { zh: "请扫描 STORE_ITEM 商品码。", en: "Please scan a STORE_ITEM code." },
   { zh: "暂无仓库备货任务。请先生成补货申请单，再生成仓库备货任务。", en: "No Warehouse Prep Task yet. Create a Replenishment Request first, then generate a Warehouse Prep Task." },
@@ -1213,6 +1218,7 @@ let storeDispatchBaleState = [];
 let filteredStoreDispatchBaleState = [];
 let storeReceiptPackageStatusState = {};
 let storeReceiptPackageAssignmentState = {};
+let storeAssignedSdoPackageTasksState = [];
 let storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), []);
 let storePackagePrintPreviewState = {};
 let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
@@ -15954,16 +15960,19 @@ function getStorePdaScanGuidance(value = "") {
   if (!raw) {
     return "请扫描 STORE_ITEM 商品码。";
   }
-  if (raw.startsWith("SDO") || raw.startsWith("SDP") || /^4\d{9}$/.test(digits) || /^6\d{9}$/.test(digits)) {
-    return "这是 SDO / SDP，请去门店收货页面处理。";
+  if (raw.startsWith("SDP") || /^6\d{9}$/.test(digits)) {
+    return "扫描 SDP 实体包后会校验是否分配给你。";
+  }
+  if (raw.startsWith("SDO") || /^4\d{9}$/.test(digits)) {
+    return "这是整张送货单，请由店长在门店收货页面处理。";
   }
   if (raw.startsWith("SDB") || raw.startsWith("LPK") || /^2\d{9}$/.test(digits) || /^3\d{9}$/.test(digits)) {
-    return "这是 SDB / LPK 来源包，不能直接上架销售。";
+    return "这是 SDB / LPK 来源包，不能直接上架。";
   }
   if (raw.startsWith("RAW") || raw.startsWith("BALE") || /^1\d{9}$/.test(digits)) {
     return "这是 RAW_BALE，门店不能处理。";
   }
-  if (/^5\d{9}$/.test(digits)) {
+  if (/^5\d{9}$/.test(digits) || /^5\d{12}$/.test(digits)) {
     return "";
   }
   return "请扫描 STORE_ITEM 商品码。";
@@ -16589,6 +16598,189 @@ function buildStoreReceivingPackageRowFromResolver(resolved = {}, scannedCode = 
   }, {});
 }
 
+function normalizeStoreAssignedSdoPackageTask(row = {}) {
+  const normalized = normalizeStoreReceivingPackageRow(row, {});
+  if (!normalized) {
+    return null;
+  }
+  const packageCode = getStoreReceivingPackageCode(normalized);
+  if (!packageCode) {
+    return null;
+  }
+  return {
+    ...normalized,
+    entity_type: "STORE_DELIVERY_PACKAGE",
+    sdo_package_display_code: normalized.sdo_package_display_code || packageCode,
+    sdo_package_machine_code: normalized.sdo_package_machine_code || getStoreReceivingPackageMachineCode(normalized),
+    assigned_employee: String(normalized.assigned_clerk || row?.assigned_employee || "").trim(),
+    source_sdo: normalized.parent_sdo_display_code || "",
+    status: String(normalized.status || getStoreReceivingPackageStatus(normalized) || "assigned").trim().toLowerCase(),
+  };
+}
+
+function getStorePdaAssignedPackageRows(storeCode = "", assignedEmployee = "") {
+  const normalizedStoreCode = String(storeCode || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const normalizedEmployee = String(assignedEmployee || getCurrentStoreWorkerFallback()).trim().toLowerCase();
+  return (Array.isArray(storeAssignedSdoPackageTasksState) ? storeAssignedSdoPackageTasksState : [])
+    .map((row) => normalizeStoreAssignedSdoPackageTask(row))
+    .filter(Boolean)
+    .filter((row) => !normalizedStoreCode || String(row?.store_code || "").trim().toUpperCase() === normalizedStoreCode)
+    .filter((row) => !normalizedEmployee || String(row?.assigned_clerk || row?.assigned_employee || "").trim().toLowerCase() === normalizedEmployee)
+    .filter((row) => String(row?.received_status || "").trim().toLowerCase() === "received")
+    .filter((row) => String(row?.exception_status || "").trim().toLowerCase() !== "exception")
+    .filter((row) => String(row?.assignment_status || "").trim().toLowerCase() === "assigned");
+}
+
+async function loadStoreAssignedSdoPackageTasks({ store_code = "", assigned_clerk = "" } = {}, { render = true } = {}) {
+  const storeCode = String(store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const assignedClerk = String(assigned_clerk || getCurrentStoreWorkerFallback()).trim();
+  if (!assignedClerk) {
+    storeAssignedSdoPackageTasksState = [];
+    if (render) {
+      renderStoreClerkHomeSummary({ store_code: storeCode, assigned_employee: assignedClerk });
+      renderStoreTokenEditSummary(filteredItemBarcodeTokenState);
+    }
+    return [];
+  }
+  const params = new URLSearchParams();
+  if (storeCode) {
+    params.set("store_code", storeCode);
+  }
+  params.set("assigned_clerk", assignedClerk);
+  const rows = await request(`/store-delivery-packages/assigned?${params.toString()}`);
+  storeAssignedSdoPackageTasksState = (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const normalized = normalizeStoreAssignedSdoPackageTask(row);
+      return normalized ? cacheStoreReceivingPackageBackendState(normalized) || normalized : null;
+    })
+    .filter(Boolean);
+  if (render) {
+    renderStoreClerkHomeSummary({
+      store_code: storeCode,
+      assigned_employee: assignedClerk,
+      last_action_message: `${assignedClerk} 的我的 SDP 包任务已刷新。`,
+    });
+    renderStoreTokenEditSummary(filteredItemBarcodeTokenState, {
+      store_code: storeCode,
+      assigned_employee: assignedClerk,
+      last_action_message: `${assignedClerk} 的我的 SDP 包任务已刷新。`,
+    });
+  }
+  return getStorePdaAssignedPackageRows(storeCode, assignedClerk);
+}
+
+function getStorePdaSdpScanType(value = "") {
+  const raw = String(value || "").trim().toUpperCase();
+  const digits = normalizeStorePdaScanDigits(raw);
+  if (!raw) return "";
+  if (raw.startsWith("SDP") || /^6\d{9}$/.test(digits)) return "sdp";
+  if (raw.startsWith("SDO") || /^4\d{9}$/.test(digits)) return "sdo";
+  if (raw.startsWith("SDB") || raw.startsWith("LPK") || /^2\d{9}$/.test(digits) || /^3\d{9}$/.test(digits)) return "source";
+  if (raw.startsWith("RAW") || raw.startsWith("BALE") || /^1\d{9}$/.test(digits)) return "raw";
+  if (/^5\d{9}$/.test(digits) || /^5\d{12}$/.test(digits)) return "store_item";
+  return "";
+}
+
+function findStorePdaAssignedPackageByCode(scanCode = "", rows = null) {
+  const normalized = String(scanCode || "").trim().toUpperCase();
+  const digits = normalizeStorePdaScanDigits(normalized);
+  if (!normalized) {
+    return null;
+  }
+  const sourceRows = Array.isArray(rows)
+    ? rows
+    : getStorePdaAssignedPackageRows(storeClerkHomeState.store_code, storeClerkHomeState.assigned_employee);
+  return sourceRows.find((row) => {
+    const keys = [
+      getStoreReceivingPackageCode(row),
+      row?.sdo_package_display_code,
+      row?.sdo_package_machine_code,
+      row?.display_code,
+      row?.machine_code,
+      row?.barcode_value,
+    ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+    return keys.some((key) => key === normalized || (digits && normalizeStorePdaScanDigits(key) === digits));
+  }) || null;
+}
+
+async function handleStorePdaSdoPackageScan(scanCode = "", context = {}) {
+  scanCode = String(scanCode || "").trim().toUpperCase();
+  const scanType = getStorePdaSdpScanType(scanCode);
+  if (scanType === "sdo") {
+    throw new Error("这是整张送货单，请由店长在门店收货页面处理。");
+  }
+  if (scanType === "source") {
+    throw new Error("这是 SDB / LPK 来源包，不能直接上架。");
+  }
+  if (scanType === "raw") {
+    throw new Error("这是 RAW_BALE，门店不能处理。");
+  }
+  if (scanType !== "sdp") {
+    return null;
+  }
+  const storeCode = String(context.store_code || storeClerkHomeState.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const assignedEmployee = String(context.assigned_employee || storeClerkHomeState.assigned_employee || getCurrentStoreWorkerFallback()).trim();
+  const taskRows = context.taskRows || await loadStoreAssignedSdoPackageTasks(
+    { store_code: storeCode, assigned_clerk: assignedEmployee },
+    { render: false },
+  );
+  let taskRow = findStorePdaAssignedPackageByCode(scanCode, taskRows);
+  let resolvedRow = taskRow;
+  if (!taskRow) {
+    try {
+      const resolved = await resolveBarcodeForContext(scanCode, "clerk_putaway", ["STORE_DELIVERY_PACKAGE"]);
+      resolvedRow = buildStoreReceivingPackageRowFromResolver(resolved, scanCode);
+    } catch (_error) {
+      throw new Error("没有找到这个 SDP 实体包。");
+    }
+    if (!resolvedRow) {
+      throw new Error("没有找到这个 SDP 实体包。");
+    }
+    cacheStoreReceivingPackageBackendState(resolvedRow);
+    const resolvedStatus = String(resolvedRow.status || "").trim().toLowerCase();
+    if (["completed", "closed", "shelved", "done"].includes(resolvedStatus)) {
+      throw new Error("这个 SDP 包任务已完成。");
+    }
+    if (String(resolvedRow.received_status || "").trim().toLowerCase() !== "received") {
+      throw new Error("这个包还未被店长确认收货。");
+    }
+    if (String(resolvedRow.exception_status || "").trim().toLowerCase() === "exception") {
+      throw new Error("这个包已标记异常，不能上架。");
+    }
+    if (
+      String(resolvedRow.assignment_status || "").trim().toLowerCase() !== "assigned"
+      || String(resolvedRow.assigned_clerk || "").trim().toLowerCase() !== assignedEmployee.toLowerCase()
+    ) {
+      throw new Error("这个包没有分配给你，请找店长确认。");
+    }
+    taskRow = normalizeStoreAssignedSdoPackageTask(resolvedRow);
+    storeAssignedSdoPackageTasksState = [
+      ...storeAssignedSdoPackageTasksState.filter((row) => getStoreReceivingPackageCode(row) !== getStoreReceivingPackageCode(taskRow)),
+      taskRow,
+    ];
+  }
+  const actionKey = getStorePackageActionKey(taskRow);
+  storeClerkHomeState.active_package_key = actionKey;
+  storeClerkHomeState.store_code = storeCode;
+  storeClerkHomeState.assigned_employee = assignedEmployee;
+  storePdaWorkbenchState.currentBaleNo = getStoreReceivingPackageCode(taskRow);
+  itemBarcodeTokenState = [];
+  filteredItemBarcodeTokenState = [];
+  renderStoreClerkHomeSummary({
+    store_code: storeCode,
+    assigned_employee: assignedEmployee,
+    active_package_key: actionKey,
+    last_action_message: `已进入 SDP ${getStoreReceivingPackageCode(taskRow)} 包任务详情。`,
+  });
+  renderStoreTokenEditSummary(filteredItemBarcodeTokenState, {
+    store_code: storeCode,
+    assigned_employee: assignedEmployee,
+    active_package_key: actionKey,
+    last_action_message: `已进入 SDP ${getStoreReceivingPackageCode(taskRow)} 包任务详情。`,
+  });
+  return taskRow;
+}
+
 function getStoreReceiptSdoStatusText(packageRows = [], completed = false) {
   const rows = Array.isArray(packageRows) ? packageRows : [];
   if (!rows.length) return "待验收";
@@ -17075,11 +17267,42 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
   }
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) {
+    const storeCode = String(context.store_code || document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")?.value || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
+    const assignedEmployee = String(context.assigned_employee || document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")?.value || getCurrentStoreWorkerFallback() || "").trim();
+    const assignedPackages = getStorePdaAssignedPackageRows(storeCode, assignedEmployee);
+    if (assignedPackages.length) {
+      const activePackage = findStorePackageByActionKey(context.active_package_key || storeClerkHomeState.active_package_key, assignedPackages);
+      if (activePackage) {
+        target.className = "report-summary clerk-pda-shell";
+        target.innerHTML = renderStorePackageShelvingStep(activePackage, context);
+        applyGlobalI18n(target, currentLanguage);
+        return;
+      }
+      target.className = "report-summary store-pda-mobile-shell";
+      target.innerHTML = `
+        <div class="store-pda-mobile-status">
+          <div>
+            <strong>${escapeHtml(storeCode || "-")} · ${escapeHtml(assignedEmployee || "店员")}</strong>
+            <span>我的 SDP 包任务</span>
+          </div>
+          <div>
+            <strong>${assignedPackages.length}</strong>
+            <span>已分配 SDP</span>
+          </div>
+        </div>
+        ${renderStatusAlert(context.last_action_message || "请选择一个 assigned SDP 包任务，或直接扫描 6 开头 SDP 实体包。", "info")}
+        <div class="store-package-card-list">
+          ${assignedPackages.map((row) => renderStorePackageListCard(row)).join("")}
+        </div>
+      `;
+      applyGlobalI18n(target, currentLanguage);
+      return;
+    }
     target.className = "candidate-summary empty-state store-pda-mobile-empty";
     target.innerHTML = `
-      <strong>扫描 STORE_ITEM 商品码</strong>
-      <span>先读取当前店员负责的 bale，再扫描商品码上架。</span>
-      <span class="subtle small">离线暂存，联网后同步。</span>
+      <strong>我的 SDP 包任务</strong>
+      <span>先读取分配给当前店员的 SDP 实体包；扫 6 开头 SDP 后会校验是否属于当前店员。</span>
+      <span class="subtle small">STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。</span>
     `;
     return;
   }
@@ -27958,7 +28181,12 @@ function getStoreClerkAssignedBales(storeCode = "", assignedEmployee = "") {
   if (!normalizedEmployee) {
     return [];
   }
-  return getStoreManagerConsoleRows(normalizedStoreCode).filter((row) => String(row?.assigned_employee || "").trim() === normalizedEmployee);
+  const assignedTaskState = storeAssignedSdoPackageTasksState;
+  if (!Array.isArray(assignedTaskState)) {
+    return [];
+  }
+  return getStorePdaAssignedPackageRows(normalizedStoreCode, normalizedEmployee)
+    .filter((row) => String(row?.assigned_clerk || row?.assigned_employee || "").trim() === normalizedEmployee);
 }
 
 function persistStoreSdoPackageItemTokenState() {
@@ -27970,7 +28198,7 @@ function persistPosStoreItemSaleRecordState() {
 }
 
 function getStorePackageSdoCode(row = {}) {
-  return String(row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || row?.source_sdo || "").trim().toUpperCase();
+  return String(row?.parent_sdo_display_code || row?.store_delivery_execution_order_no || row?.execution_order_no || row?.official_delivery_barcode || row?.source_sdo || "").trim().toUpperCase();
 }
 
 function getStorePackageSourceCode(row = {}) {
@@ -27999,6 +28227,10 @@ function getStorePackageSourceType(row = {}) {
 }
 
 function getStorePackageActionKey(row = {}) {
+  const sdoPackageCode = getStoreReceivingPackageCode(row);
+  if (sdoPackageCode) {
+    return `SDO_PACKAGE::${sdoPackageCode}`;
+  }
   const transferNo = String(row?.transfer_no || "").trim().toUpperCase();
   const shipmentNo = String(row?.shipment_no || row?.task_no || "").trim().toUpperCase();
   const storeCode = String(row?.store_code || row?.to_store_code || row?.target_store_code || "").trim().toUpperCase();
@@ -28006,7 +28238,7 @@ function getStorePackageActionKey(row = {}) {
   const sourceCode = getStorePackageSourceCode(row);
   const sdoCode = getStorePackageSdoCode(row);
   const scopeCode = sdoCode || transferNo || shipmentNo || storeCode || assignedEmployee;
-  return sourceCode ? `${scopeCode || "STORE_PACKAGE"}::${sourceCode}` : "";
+  return sourceCode ? `SOURCE_REF::${scopeCode || "STORE_PACKAGE"}::${sourceCode}` : "";
 }
 
 function findStorePackageByActionKey(actionKey = "", rows = null) {
@@ -28147,7 +28379,7 @@ function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
   if (existingTokens.length) {
     return existingTokens;
   }
-  throw new Error("STORE_ITEM machine_code 必须由后端统一发号；当前前端/PDA 不允许本地生成 STORE_ITEM。");
+  throw new Error("STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。STORE_ITEM machine_code 必须由后端统一发号。");
 }
 
 function buildStorePackagePrintPreviewTokens(row = {}, quantity = null) {
@@ -28184,24 +28416,27 @@ function renderStorePackageListCard(row = {}) {
   const sourceCode = getStorePackageSourceCode(row);
   const sourceType = getStorePackageSourceType(row);
   const status = String(row?.status || "assigned").trim();
+  const sdoPackageCode = getStoreReceivingPackageCode(row);
+  const sdoPackageMachineCode = getStoreReceivingPackageMachineCode(row);
   return `
     <article class="store-package-card ${getStatusCardClass(status)}">
       <div class="store-package-card-main">
         <div class="store-package-card-head">
           <div>
-            <span class="eyebrow">SDO</span>
-            <strong>${escapeHtml(getStorePackageSdoCode(row) || "-")}</strong>
+            <span class="eyebrow">SDO_PACKAGE / SDP</span>
+            <strong>${escapeHtml(sdoPackageCode || "-")}</strong>
+            <small>${escapeHtml(sdoPackageMachineCode || "-")}</small>
           </div>
           ${renderStatusBadge(translateStatusLabel(status, "store_dispatch_bale"), status)}
         </div>
-        <div class="store-package-title">${escapeHtml(sourceCode || "-")} ${sourceType === "LPK" ? renderBarcodeEntityBadge("LPK", "补差包") : renderBarcodeEntityBadge("SDB", "现成包")}</div>
+        <div class="store-package-title">${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageCode || "-")} ${renderBarcodeEntityBadge("SDO", getStorePackageSdoCode(row) || "-")}</div>
         <div class="store-package-grid">
-          <span><b>来源类型</b>${sourceType === "LPK" ? renderBarcodeEntityBadge("LPK", "补差包 / LPK") : renderBarcodeEntityBadge("SDB", "现成包 / SDB")}</span>
-          <span><b>品类</b>${escapeHtml(getStorePackageCategoryLabel(row))}</span>
+          <span><b>source_code</b>${renderBarcodeEntityBadge(sourceType || "MIXED", sourceCode || "-")}</span>
+          <span><b>parent SDO</b>${escapeHtml(getStorePackageSdoCode(row) || "-")}</span>
+          <span><b>内容</b>${escapeHtml(getStorePackageCategoryLabel(row))}</span>
           <span><b>件数</b>${renderStatusBadge(itemCount == null ? "件数待确认" : `${itemCount}`, itemCount == null ? "warning" : "neutral")}</span>
-          <span><b>成本状态</b>${renderStatusBadge(getStorePackageCostLabel(row), getStorePackageCostLabel(row))}</span>
-          <span><b>已生成 STORE_ITEM</b>${renderBarcodeEntityBadge("STORE_ITEM", counts.generated)}</span>
-          <span><b>已打印</b>${renderStatusBadge(counts.printed, counts.printed ? "success" : "warning")}</span>
+          <span><b>STORE_ITEM 预计</b>${renderBarcodeEntityBadge("STORE_ITEM", itemCount == null ? "待接入" : itemCount)}</span>
+          <span><b>已生成 / 打印</b>${renderStatusBadge(counts.generated || counts.printed ? `${counts.generated} / ${counts.printed}` : "待接入", counts.generated || counts.printed ? "info" : "neutral")}</span>
         </div>
       </div>
       <div class="store-package-card-action">
@@ -28241,22 +28476,28 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
   const rackOptions = getStoreRackOptionsForPackage(row?.store_code);
   const selectedRack = String(context.selected_rack || "").trim().toUpperCase();
   const defaultPrintQty = Math.min(unprinted || itemCount || 0, 20);
+  const sdoPackageCode = getStoreReceivingPackageCode(row);
+  const sdoPackageMachineCode = getStoreReceivingPackageMachineCode(row);
   return `
     <section class="store-package-shelving-step">
       <div class="store-package-step-head">
         <button type="button" class="ghost-button mini-button" data-store-package-back>返回包列表</button>
         <div>
           <span class="eyebrow">PDA 上架</span>
-          <h3>包上架 / 商品码打印</h3>
+          <h3>SDP 包任务详情</h3>
         </div>
       </div>
+      ${renderStatusAlert("STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。", "info")}
       <div class="report-summary-grid">
-        <article class="store-metric"><strong>SDO</strong><span>${escapeHtml(getStorePackageSdoCode(row) || "-")}</span></article>
-        <article class="store-metric"><strong>来源包码</strong><span>${escapeHtml(getStorePackageSourceCode(row) || "-")}</span></article>
-        <article class="store-metric"><strong>来源类型</strong><span>${escapeHtml(getStorePackageSourceType(row))}</span></article>
-        <article class="store-metric"><strong>品类</strong><span>${escapeHtml(getStorePackageCategoryLabel(row))}</span></article>
+        <article class="store-metric"><strong>SDP</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageCode || "-")}</span></article>
+        <article class="store-metric"><strong>6 开头机报码</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageMachineCode || "-")}</span></article>
+        <article class="store-metric"><strong>parent SDO</strong><span>${escapeHtml(getStorePackageSdoCode(row) || "-")}</span></article>
+        <article class="store-metric"><strong>source_code</strong><span>${renderBarcodeEntityBadge(getStorePackageSourceType(row), getStorePackageSourceCode(row) || "-")}</span></article>
+        <article class="store-metric"><strong>内容</strong><span>${escapeHtml(getStorePackageCategoryLabel(row))}</span></article>
         <article class="store-metric"><strong>件数</strong><span>${escapeHtml(itemCount == null ? "件数待确认" : `${itemCount}`)}</span></article>
-        <article class="store-metric"><strong>成本价</strong><span>${escapeHtml(getStorePackageCostLabel(row))}</span></article>
+        <article class="store-metric"><strong>分配店员</strong><span>${escapeHtml(row?.assigned_clerk || row?.assigned_employee || "-")}</span></article>
+        <article class="store-metric"><strong>收货状态</strong><span>${renderStatusBadge(row?.received_status === "received" ? "已收货" : "待收货", row?.received_status || "pending")}</span></article>
+        <article class="store-metric"><strong>异常状态</strong><span>${renderStatusBadge(row?.exception_status === "exception" ? "异常" : "正常", row?.exception_status === "exception" ? "danger" : "success")}</span></article>
         <article class="store-metric"><strong>已生成 STORE_ITEM</strong><span>${counts.generated} / ${escapeHtml(itemCount ?? "-")}</span></article>
         <article class="store-metric"><strong>已打印</strong><span>${counts.printed} / ${escapeHtml(itemCount ?? "-")}</span></article>
         <article class="store-metric"><strong>未打印</strong><span>${unprinted}</span></article>
@@ -28289,7 +28530,7 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
       </section>
       <section class="store-package-flow-block">
         <h4>STORE_ITEM 生成区</h4>
-        <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}" ${counts.generated ? "disabled" : ""}>${counts.generated ? "已生成 STORE_ITEM" : "生成 STORE_ITEM 商品码"}</button>
+        <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}">${counts.generated ? "已生成 STORE_ITEM" : "生成 STORE_ITEM 商品码"}</button>
       </section>
       <section class="store-package-flow-block">
         <h4>商品码打印区</h4>
@@ -28329,12 +28570,12 @@ function renderStoreClerkHomeSummary(context = {}) {
   const rows = getStoreClerkAssignedBales(storeCode, assignedEmployee);
   if (!assignedEmployee) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "先确定当前店员账号，再读取分配给自己的 bale。";
+    target.textContent = "先确定当前店员账号，再读取分配给自己的 SDP 实体包。";
     return;
   }
   if (!rows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = `${assignedEmployee} 当前还没有被分配的 bale。等店长分配后，再回来从这里进入工作台。`;
+    target.textContent = `${assignedEmployee} 当前还没有被分配的 SDP 包任务。等店长收货并分配后，再回来从这里进入工作台。`;
     return;
   }
 
@@ -28356,11 +28597,11 @@ function renderStoreClerkHomeSummary(context = {}) {
   target.innerHTML = `
     <div class="clerk-pda-head">
       <span class="eyebrow">PDA 首页</span>
-      <h3>我的待上架包列表</h3>
-      <p>${escapeHtml(context.last_action_message || `${assignedEmployee} 的当前 bale 已刷新。`)}</p>
+      <h3>我的 SDP 包任务</h3>
+      <p>${escapeHtml(context.last_action_message || `${assignedEmployee} 的 assigned SDP 包任务已刷新。`)}</p>
     </div>
     <div class="report-summary-grid clerk-pda-metrics">
-      <article class="store-metric"><strong>待上架包数</strong><span>${rows.length}</span></article>
+      <article class="store-metric"><strong>assigned SDP</strong><span>${rows.length}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${totals.itemCount}</span></article>
       <article class="store-metric"><strong>已生成商品码</strong><span>${totals.generated}</span></article>
       <article class="store-metric"><strong>已打印商品码</strong><span>${totals.printed}</span></article>
@@ -30363,24 +30604,15 @@ async function submitStoreClerkHome(event) {
     payload.assigned_employee = getCurrentStoreWorkerFallback();
     setInputValue("#storeClerkHomeForm [name='assigned_employee']", payload.assigned_employee);
   }
-  const query = buildStoreDispatchBaleQuery({
+  const rows = await loadStoreAssignedSdoPackageTasks({
     store_code: payload.store_code,
-    assigned_employee: payload.assigned_employee,
-  });
-  const rows = await request(`/stores/dispatch-bales${query ? `?${query}` : ""}`);
-  storeDispatchBaleState = Array.isArray(rows) ? rows : [];
-  filteredStoreDispatchBaleState = [
-    ...storeDispatchBaleState,
-    ...filterDirectHangDispatchBales({
-      store_code: payload.store_code,
-      assigned_employee: payload.assigned_employee,
-    }),
-  ];
-  writeOutput("#storeClerkHomeOutput", filteredStoreDispatchBaleState.length ? filteredStoreDispatchBaleState : "当前没有分配给这位店员的 bale。");
+    assigned_clerk: payload.assigned_employee,
+  }, { render: false });
+  writeOutput("#storeClerkHomeOutput", rows.length ? rows : "当前没有分配给这位店员的 SDP 包任务。");
   renderStoreClerkHomeSummary({
     store_code: payload.store_code,
     assigned_employee: payload.assigned_employee,
-    last_action_message: `${String(payload.assigned_employee || "").trim() || "当前店员"} 的当前 bale 已刷新。`,
+    last_action_message: `${String(payload.assigned_employee || "").trim() || "当前店员"} 的我的 SDP 包任务已刷新。`,
   });
 }
 
@@ -30569,34 +30801,46 @@ async function submitStoreTokenEditDirectory(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const baleNo = String(payload.bale_no || "").trim().toUpperCase();
-  if (!baleNo) {
-    throw new Error("请先读取一个已分配店员的门店配货 bale。");
-  }
-  let rows = await request(`/stores/dispatch-bales/${encodeURIComponent(baleNo)}/tokens`);
-  rows = Array.isArray(rows) ? rows : [];
+  const scanCode = String(payload.bale_no || "").trim().toUpperCase();
   const assignedEmployee = String(payload.assigned_employee || "").trim();
-  if (assignedEmployee) {
-    rows = rows.filter((row) => String(row.assigned_employee || "").trim() === assignedEmployee);
+  const storeCode = String(payload.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const assignedRows = await loadStoreAssignedSdoPackageTasks({
+    store_code: storeCode,
+    assigned_clerk: assignedEmployee,
+  }, { render: false });
+  if (scanCode && getStorePdaSdpScanType(scanCode) !== "store_item") {
+    const task = await handleStorePdaSdoPackageScan(scanCode, {
+      store_code: storeCode,
+      assigned_employee: assignedEmployee,
+      taskRows: assignedRows,
+    });
+    writeOutput("#storeTokenEditOutput", task || assignedRows);
+    return;
   }
-  if (String(storePdaWorkbenchState.currentBaleNo || "").trim().toUpperCase() !== baleNo) {
-    resetStorePdaWorkbenchState(baleNo);
+  const currentPackageCode = String(storePdaWorkbenchState.currentBaleNo || "").trim().toUpperCase();
+  if (!currentPackageCode && assignedRows[0]) {
+    resetStorePdaWorkbenchState(getStoreReceivingPackageCode(assignedRows[0]));
   }
   if (!storePdaWorkbenchState.templateCode) {
     storePdaWorkbenchState.templateCode = getPreferredItemTokenTemplateCode();
   }
-  itemBarcodeTokenState = rows;
-  filteredItemBarcodeTokenState = rows;
+  itemBarcodeTokenState = [];
+  filteredItemBarcodeTokenState = [];
   await loadItemTokenPrintJobs();
   populateStoreFlowFormsFromContext({
-    bale_no: baleNo,
-    assigned_employee: assignedEmployee || rows[0]?.assigned_employee || "",
-    task_no: rows[0]?.task_no || "",
-    shipment_no: rows[0]?.shipment_no || "",
-    store_code: String(payload.store_code || rows[0]?.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase(),
+    bale_no: scanCode || getStoreReceivingPackageCode(assignedRows[0]) || "",
+    assigned_employee: assignedEmployee || assignedRows[0]?.assigned_clerk || "",
+    task_no: assignedRows[0]?.parent_sdo_display_code || "",
+    shipment_no: assignedRows[0]?.transfer_no || "",
+    store_code: storeCode,
   });
-  writeOutput("#storeTokenEditOutput", rows.length ? rows : "当前 bale 下没有待编辑 token。");
-  renderStoreTokenEditSummary(rows, event?.__context || {});
+  writeOutput("#storeTokenEditOutput", assignedRows.length ? assignedRows : "当前没有分配给这位店员的 SDP 包任务。");
+  renderStoreTokenEditSummary([], {
+    ...(event?.__context || {}),
+    store_code: storeCode,
+    assigned_employee: assignedEmployee,
+    last_action_message: assignedRows.length ? "我的 SDP 包任务已读取；选择一个 SDP 或扫描 6 开头 SDP。" : "",
+  });
 }
 
 async function submitDirectHangStoreWorkbenchDirectory(event) {
@@ -32277,6 +32521,12 @@ async function loadTransferOrders() {
   populateTransferOrderSelectors();
   renderTransferDispatchSummary(transferOrderState);
   renderStoreManagerConsoleSummary({ store_code: getCurrentStoreCodeFallback() });
+  if (getCurrentStoreWorkerFallback()) {
+    await loadStoreAssignedSdoPackageTasks({
+      store_code: getCurrentStoreCodeFallback(),
+      assigned_clerk: getCurrentStoreWorkerFallback(),
+    }, { render: false });
+  }
   renderStoreClerkHomeSummary({
     store_code: getCurrentStoreCodeFallback(),
     assigned_employee: getCurrentStoreWorkerFallback(),
@@ -34365,11 +34615,21 @@ document.addEventListener("click", async (event) => {
         assigned_employee: storeClerkHomeState.assigned_employee,
         active_package_key: storeClerkHomeState.active_package_key,
       });
+      renderStoreTokenEditSummary(filteredItemBarcodeTokenState, {
+        store_code: storeClerkHomeState.store_code,
+        assigned_employee: storeClerkHomeState.assigned_employee,
+        active_package_key: storeClerkHomeState.active_package_key,
+      });
       return;
     }
     if (button.dataset.storePackageBack !== undefined) {
       storeClerkHomeState.active_package_key = "";
       renderStoreClerkHomeSummary({
+        store_code: storeClerkHomeState.store_code,
+        assigned_employee: storeClerkHomeState.assigned_employee,
+        active_package_key: "",
+      });
+      renderStoreTokenEditSummary(filteredItemBarcodeTokenState, {
         store_code: storeClerkHomeState.store_code,
         assigned_employee: storeClerkHomeState.assigned_employee,
         active_package_key: "",
@@ -34789,13 +35049,27 @@ document.addEventListener("input", (event) => {
   updateStorePdaScanUi();
 });
 
-document.addEventListener("keydown", (event) => {
+document.addEventListener("keydown", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-pda-scan-input]") : null;
   if (!(target instanceof HTMLInputElement) || event.key !== "Enter") {
     return;
   }
   event.preventDefault();
   updateStorePdaScanUi();
+  const scanCode = String(target.value || "").trim().toUpperCase();
+  const scanType = getStorePdaSdpScanType(scanCode);
+  if (scanType && scanType !== "store_item") {
+    try {
+      const result = await handleStorePdaSdoPackageScan(scanCode);
+      writeOutput("#storeTokenEditOutput", result);
+      showTransientInlineNotice("#storeTokenEditNotice", `已进入 SDP ${getStoreReceivingPackageCode(result)} 包任务详情。`, "success", 1600);
+    } catch (error) {
+      const message = formatErrorMessage(error);
+      writeOutput("#storeTokenEditOutput", message);
+      renderErrorSummary("#storeTokenEditSummary", message);
+    }
+    return;
+  }
   renderStoreTokenEditSummary(filteredItemBarcodeTokenState);
   focusElement("#storePdaDefaultRack");
 });
@@ -34809,6 +35083,15 @@ document.addEventListener("click", async (event) => {
   }
   try {
     if (button.dataset.pdaScanFocus !== undefined) {
+      const scanInput = document.querySelector("#storePdaScanInput");
+      const scanCode = String(scanInput?.value || "").trim().toUpperCase();
+      const scanType = getStorePdaSdpScanType(scanCode);
+      if (scanType && scanType !== "store_item") {
+        const result = await handleStorePdaSdoPackageScan(scanCode);
+        writeOutput("#storeTokenEditOutput", result);
+        showTransientInlineNotice("#storeTokenEditNotice", `已进入 SDP ${getStoreReceivingPackageCode(result)} 包任务详情。`, "success", 1600);
+        return;
+      }
       focusElement("#storePdaScanInput");
       return;
     }
