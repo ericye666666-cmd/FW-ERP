@@ -3047,7 +3047,7 @@
           <button type="submit">刷新我的任务</button>
         </form>
         <div id="storeClerkHomeSummary" class="candidate-summary empty-state">
-          这是店员端首页。这里只看分配给我的 bale，先确认今天处理哪一包，再进入主工作台或直挂工作台。
+          这是店员端首页。这里只看分配给我的 SDP 实体包。我的 SDP 包任务来自店长已收货、非异常、已分配的 SDO_PACKAGE。
         </div>
         <pre id="storeClerkHomeOutput" class="output hidden-output"></pre>
       </section>
@@ -3126,13 +3126,13 @@
         </div>
         <form id="storeTokenEditDirectoryForm" class="form-grid compact store-pda-entry-form">
           <input name="store_code" placeholder="门店代码" value="UTAWALA" />
-          <input name="bale_no" placeholder="按门店配货 bale 读取" />
+          <input name="bale_no" placeholder="扫描 SDP 实体包或 STORE_ITEM 商品码" />
           <input name="assigned_employee" list="storeClerkOptions" placeholder="按店员筛选" />
-          <button type="submit">进入当前 bale 工作台</button>
+          <button type="submit">读取我的 SDP 包任务</button>
         </form>
         <div id="storeTokenEditNotice" class="inline-notice-slot" aria-live="polite"></div>
         <div id="storeTokenEditSummary" class="candidate-summary empty-state">
-          扫描 STORE_ITEM 商品码，确认售价和货架位后上架。
+          我的 SDP 包任务会按当前店员从后端读取；STORE_ITEM 生成后续接后端发号接口。
         </div>
         <pre id="storeTokenEditOutput" class="output hidden-output"></pre>
       </section>

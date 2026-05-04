@@ -13653,6 +13653,46 @@ class InMemoryState:
         )
         return rows
 
+    def list_assigned_store_delivery_packages(self, store_code: str = "", assigned_clerk: str = "") -> list[dict[str, Any]]:
+        normalized_store_code = str(store_code or "").strip().upper()
+        normalized_clerk = str(assigned_clerk or "").strip().lower()
+        if not normalized_clerk:
+            return []
+
+        packages_by_code: dict[str, dict[str, Any]] = {}
+
+        def add_package(row: dict[str, Any]) -> None:
+            if not isinstance(row, dict):
+                return
+            normalized = self._normalize_store_delivery_package(row)
+            display_code = str(normalized.get("display_code") or "").strip().upper()
+            if display_code:
+                packages_by_code[display_code] = normalized
+
+        for order in self.store_delivery_execution_orders.values():
+            for package in order.get("packages") if isinstance(order.get("packages"), list) else []:
+                add_package(package)
+        for package in self.store_delivery_packages.values():
+            add_package(package)
+
+        rows = [
+            row
+            for row in packages_by_code.values()
+            if (not normalized_store_code or str(row.get("store_code") or "").strip().upper() == normalized_store_code)
+            and str(row.get("assigned_clerk") or "").strip().lower() == normalized_clerk
+            and str(row.get("received_status") or "").strip().lower() == "received"
+            and str(row.get("exception_status") or "").strip().lower() != "exception"
+            and str(row.get("assignment_status") or "").strip().lower() == "assigned"
+        ]
+        rows.sort(
+            key=lambda row: (
+                str(row.get("parent_sdo_display_code") or row.get("execution_order_no") or ""),
+                int(row.get("package_no") or 0),
+                str(row.get("display_code") or ""),
+            )
+        )
+        return rows
+
     def receive_store_delivery_package(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         package = self._find_store_delivery_package_by_code(package_code)
         package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))

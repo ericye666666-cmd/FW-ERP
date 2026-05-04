@@ -414,6 +414,119 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(resolved["source_type"], "SDB")
         self.assertEqual(resolved["source_code"], "SDB260503AAG")
 
+    def test_list_assigned_store_delivery_packages_filters_clerk_ready_sdp_tasks(self):
+        order = self._create_store_delivery_package_state_order()
+        mary_package = order["packages"][0]
+        jane_package = order["packages"][1]
+
+        self.state.receive_store_delivery_package(
+            mary_package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        self.state.assign_store_delivery_package(
+            mary_package["display_code"],
+            {
+                "assigned_clerk": "Mary",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        self.state.receive_store_delivery_package(
+            jane_package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        self.state.assign_store_delivery_package(
+            jane_package["display_code"],
+            {
+                "assigned_clerk": "Jane",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        excluded_rows = [
+            {
+                **mary_package,
+                "id": 901,
+                "display_code": "SDP260504991",
+                "package_id": "SDP260504991",
+                "machine_code": "6260504991",
+                "barcode_value": "6260504991",
+                "source_code": "SDB260503UNR",
+                "source_machine_code": "2260503991",
+                "package_no": 3,
+                "package_total": 5,
+                "received_status": "pending",
+                "exception_status": "normal",
+                "assigned_clerk": "Mary",
+                "assignment_status": "assigned",
+                "status": "assigned",
+            },
+            {
+                **mary_package,
+                "id": 902,
+                "display_code": "SDP260504992",
+                "package_id": "SDP260504992",
+                "machine_code": "6260504992",
+                "barcode_value": "6260504992",
+                "source_code": "SDB260503EXC",
+                "source_machine_code": "2260503992",
+                "package_no": 4,
+                "package_total": 5,
+                "received_status": "received",
+                "exception_status": "exception",
+                "exception_reason": "damaged",
+                "assigned_clerk": "Mary",
+                "assignment_status": "assigned",
+                "status": "exception",
+            },
+            {
+                **mary_package,
+                "id": 903,
+                "display_code": "SDP260504993",
+                "package_id": "SDP260504993",
+                "machine_code": "6260504993",
+                "barcode_value": "6260504993",
+                "source_code": "SDB260503UNA",
+                "source_machine_code": "2260503993",
+                "package_no": 5,
+                "package_total": 5,
+                "received_status": "received",
+                "exception_status": "normal",
+                "assigned_clerk": "",
+                "assignment_status": "unassigned",
+                "status": "received_unassigned",
+            },
+        ]
+        for row in excluded_rows:
+            self.state._save_store_delivery_package(row)
+
+        rows = self.state.list_assigned_store_delivery_packages(store_code="utawala", assigned_clerk="mary")
+
+        self.assertEqual([row["display_code"] for row in rows], [mary_package["display_code"]])
+        self.assertEqual(rows[0]["barcode_value"], mary_package["machine_code"])
+        self.assertEqual(rows[0]["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(rows[0]["parent_sdo_machine_code"], order["machine_code"])
+        self.assertEqual(rows[0]["source_code"], "SDB260503AAG")
+        self.assertEqual(rows[0]["item_count"], 100)
+        self.assertEqual(rows[0]["status"], "assigned")
+        self.assertEqual(rows[0]["received_status"], "received")
+        self.assertEqual(rows[0]["exception_status"], "normal")
+        self.assertEqual(rows[0]["assignment_status"], "assigned")
+
+    def test_assigned_store_delivery_packages_endpoint_is_declared_for_pda(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/store-delivery-packages/assigned"', routes_source)
+        self.assertIn("def list_assigned_store_delivery_packages(", routes_source)
+        self.assertIn("_is_store_clerk_user(current_user)", routes_source)
+        self.assertIn("state.list_assigned_store_delivery_packages", routes_source)
+
     def _create_ready_bales(self, customs_notice_no="RAW240421", package_count=2, unit_weight=40):
         shipment = self.state.create_inbound_shipment(
             {

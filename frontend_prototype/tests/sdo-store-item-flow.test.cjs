@@ -124,14 +124,14 @@ test("clerk 6.2 home is a PDA package list and moves package actions into shelvi
   const stepSource = extractFunctionSource(appJs, "renderStorePackageShelvingStep");
   const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
 
-  assert.match(homeSource, /我的待上架包列表/);
-  assert.match(homeSource, /待上架包数/);
+  assert.match(homeSource, /我的 SDP 包任务/);
+  assert.match(homeSource, /assigned SDP/);
   assert.match(homeSource, /已打印商品码/);
   assert.match(cardSource, />去上架</);
   assert.doesNotMatch(cardSource, /data-store-package-generate-items|data-store-package-print-items|查看已生成商品码/);
   assert.doesNotMatch(homeSource, /Support|打印 \/ 异常入口|renderSummaryActions|clerk-home-grid/);
 
-  assert.match(stepSource, /包上架 \/ 商品码打印/);
+  assert.match(stepSource, /SDP 包任务详情/);
   assert.match(stepSource, /选择货架位/);
   assert.match(extractFunctionSource(appJs, "getStorePackageCostLabel"), /成本待确认/);
   assert.match(appJs, /A-01[\s\S]*A-02[\s\S]*B-01[\s\S]*B-02[\s\S]*C-01/);
@@ -142,9 +142,11 @@ test("clerk package cards open shelving even when SDO code is missing", () => {
   const keySource = extractFunctionSource(appJs, "getStorePackageActionKey");
   const cardSource = extractFunctionSource(appJs, "renderStorePackageListCard");
 
+  assert.match(keySource, /getStoreReceivingPackageCode/);
+  assert.match(keySource, /SDO_PACKAGE::/);
   assert.match(keySource, /transfer_no[\s\S]*shipment_no[\s\S]*store_code[\s\S]*assigned_employee/);
   assert.match(keySource, /STORE_PACKAGE/);
-  assert.match(keySource, /sourceCode \? `\$\{scopeCode \|\| "STORE_PACKAGE"\}::\$\{sourceCode\}` : ""/);
+  assert.match(keySource, /SOURCE_REF::\$\{scopeCode \|\| "STORE_PACKAGE"\}::\$\{sourceCode\}/);
   assert.doesNotMatch(cardSource, /row\?\.flow_type === "direct_hang" \|\| !actionKey/);
   assert.match(cardSource, /data-store-package-process="\$\{escapeHtml\(actionKey\)\}"/);
 });

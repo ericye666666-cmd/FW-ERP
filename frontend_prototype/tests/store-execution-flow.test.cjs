@@ -350,14 +350,30 @@ test("testing tools includes the retail demo seed form and page 5 no longer carr
   assert.doesNotMatch(storeManagerConsoleSectionHtml, /storeRetailSeedSummary/);
 });
 
-test("store PDA putaway page uses a mobile touch scan-first layout", () => {
+test("store PDA putaway page uses assigned SDP package tasks", () => {
   const summarySource = extractFunctionSource(appJs, "renderStoreTokenEditSummary");
+  const homeSource = extractFunctionSource(appJs, "renderStoreClerkHomeSummary");
+  const loadSource = extractFunctionSource(appJs, "loadStoreAssignedSdoPackageTasks");
+  const assignedSource = extractFunctionSource(appJs, "getStoreClerkAssignedBales");
+  const keySource = extractFunctionSource(appJs, "getStorePackageActionKey");
 
   assert.equal(Boolean(storePdaWorkbenchSectionHtml), true);
   assert.match(storePdaWorkbenchSectionHtml, /store-pda-page/);
+  assert.match(storePdaWorkbenchSectionHtml, /扫描 SDP 实体包或 STORE_ITEM 商品码/);
+  assert.match(indexHtml, /我的 SDP 包任务/);
+  assert.match(loadSource, /\/store-delivery-packages\/assigned/);
+  assert.match(loadSource, /assigned_clerk/);
+  assert.match(assignedSource, /storeAssignedSdoPackageTasksState/);
+  assert.match(assignedSource, /assigned_clerk/);
+  assert.doesNotMatch(assignedSource, /getStoreManagerConsoleRows/);
+  assert.match(keySource, /getStoreReceivingPackageCode/);
+  assert.match(keySource, /SDO_PACKAGE::/);
+  assert.doesNotMatch(keySource, /sourceCode \? `\$\{scopeCode \|\| "STORE_PACKAGE"\}::\$\{sourceCode\}` : ""/);
+  assert.match(homeSource, /我的 SDP 包任务/);
   assert.match(summarySource, /store-pda-mobile-shell/);
   assert.match(summarySource, /store-pda-mobile-status/);
   assert.match(summarySource, /扫描 STORE_ITEM 商品码/);
+  assert.match(summarySource, /我的 SDP 包任务/);
   assert.match(summarySource, /store-pda-mobile-scan-zone/);
   assert.match(summarySource, /store-pda-current-item-card/);
   assert.match(summarySource, /data-pda-confirm-putaway/);
@@ -369,16 +385,29 @@ test("store PDA putaway page uses a mobile touch scan-first layout", () => {
   assert.match(stylesCss, /\.store-pda-bottom-actions\s*\{/);
 });
 
-test("store PDA scan guidance rejects non STORE_ITEM codes with next-step copy", () => {
+test("store PDA SDP scan validates assigned package ownership before entering detail", () => {
   const guidanceSource = extractFunctionSource(appJs, "getStorePdaScanGuidance");
+  const scanSource = extractFunctionSource(appJs, "handleStorePdaSdoPackageScan");
 
   assert.match(guidanceSource, /请扫描 STORE_ITEM 商品码。/);
-  assert.match(guidanceSource, /这是 SDO \/ SDP，请去门店收货页面处理。/);
-  assert.match(guidanceSource, /这是 SDB \/ LPK 来源包，不能直接上架销售。/);
+  assert.match(guidanceSource, /扫描 SDP 实体包后会校验是否分配给你。/);
+  assert.match(guidanceSource, /这是整张送货单，请由店长在门店收货页面处理。/);
+  assert.match(guidanceSource, /这是 SDB \/ LPK 来源包，不能直接上架。/);
   assert.match(guidanceSource, /这是 RAW_BALE，门店不能处理。/);
+  assert.match(scanSource, /resolveBarcodeForContext\(scanCode,\s*"clerk_putaway",\s*\["STORE_DELIVERY_PACKAGE"\]\)/);
+  assert.match(scanSource, /这个包没有分配给你，请找店长确认。/);
+  assert.match(scanSource, /这个包还未被店长确认收货。/);
+  assert.match(scanSource, /这个包已标记异常，不能上架。/);
+  assert.match(scanSource, /没有找到这个 SDP 实体包。/);
+  assert.match(scanSource, /const actionKey = getStorePackageActionKey/);
+  assert.match(scanSource, /storeClerkHomeState\.active_package_key = actionKey/);
+  assert.match(scanSource, /renderStoreClerkHomeSummary/);
   assert.match(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\["STORE_ITEM"\]\)/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"RAW_BALE"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\(payload\.token_no,\s*"store_pda",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
+  assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
+  assert.doesNotMatch(appJs, /const machineCode = `5\$\{/);
+  assert.match(appJs, /STORE_ITEM 生成将由后续后端发号接口完成；当前版本只确认包任务。/);
 });
 
 test("bucketStoreManagerDispatchBales keeps received and processing bales visible to the manager console", () => {
