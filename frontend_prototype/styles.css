@@ -412,6 +412,48 @@ h3 {
   font-size: 13px;
 }
 
+.store-generated-item-list {
+  display: grid;
+  gap: 10px;
+}
+
+.store-generated-item-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.store-generated-item-row small {
+  display: block;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.store-item-lineage-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 6px;
+}
+
+.store-item-lineage-summary > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(245, 247, 250, 0.9);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.store-item-lineage-summary b {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .category-library-sub-text em {
   font-style: normal;
   font-size: 13px;

@@ -4012,6 +4012,24 @@ class InMemoryState:
                 token_result["reject_reason"] = reject_reason
                 token_result["rejection_message"] = reject_reason
                 token_result["operational_next_step"] = "请重新扫描正确的 STORE_ITEM 商品码；若标签错误，请重新由后端发号并打印。"
+            for lineage_key in (
+                "sdo_package_display_code",
+                "sdo_package_machine_code",
+                "parent_sdo_display_code",
+                "parent_sdo_machine_code",
+                "source_type",
+                "source_code",
+                "source_machine_code",
+                "source_token_refs",
+                "cost_source_refs",
+                "source_bale_token",
+                "raw_bale_barcode",
+                "raw_bale_machine_code",
+                "cost_status",
+                "lineage_status",
+            ):
+                if lineage_key in token:
+                    token_result[lineage_key] = token.get(lineage_key)
             matches.append(token_result)
 
         self._rebuild_store_dispatch_bales()
@@ -13837,6 +13855,264 @@ class InMemoryState:
             "putaway_status": putaway_status,
         }
 
+    def _normalize_upper_list(self, value: Any) -> list[str]:
+        if isinstance(value, (list, tuple, set)):
+            raw_values = list(value)
+        elif value is None or value == "":
+            raw_values = []
+        else:
+            raw_values = [value]
+        normalized: list[str] = []
+        for raw in raw_values:
+            item = str(raw or "").strip().upper()
+            if item and item not in normalized:
+                normalized.append(item)
+        return normalized
+
+    def _find_sdo_package_source_row(self, package: dict[str, Any]) -> dict[str, Any]:
+        source_code = str(package.get("source_code") or "").strip().upper()
+        source_machine_code = str(package.get("source_machine_code") or "").strip().upper()
+        if not source_code and not source_machine_code:
+            return {}
+        collections = (
+            self.store_dispatch_bales.values(),
+            self.store_prep_bales.values(),
+        )
+        for collection in collections:
+            for row in collection:
+                if not isinstance(row, dict):
+                    continue
+                references = {
+                    str(row.get("bale_no") or "").strip().upper(),
+                    str(row.get("bale_barcode") or "").strip().upper(),
+                    str(row.get("dispatch_bale_no") or "").strip().upper(),
+                    str(row.get("source_code") or "").strip().upper(),
+                    str(row.get("machine_code") or "").strip().upper(),
+                    str(row.get("barcode_value") or "").strip().upper(),
+                    str(row.get("scan_token") or "").strip().upper(),
+                }
+                if (source_code and source_code in references) or (source_machine_code and source_machine_code in references):
+                    return dict(row)
+        return {}
+
+    def _first_nonempty_value(self, *values: Any) -> Any:
+        for value in values:
+            if value is None:
+                continue
+            if isinstance(value, str) and not value.strip():
+                continue
+            if isinstance(value, (list, dict)) and not value:
+                continue
+            return value
+        return None
+
+    def _known_unit_cost_value(self, *values: Any) -> Optional[float]:
+        for value in values:
+            if value is None or value == "":
+                continue
+            try:
+                parsed = round(float(value), 2)
+            except (TypeError, ValueError):
+                continue
+            if parsed > 0:
+                return parsed
+        return None
+
+    def build_store_item_lineage_from_sdo_package(self, package: dict[str, Any]) -> dict[str, Any]:
+        normalized_package = self._normalize_store_delivery_package(package)
+        source_row = self._find_sdo_package_source_row(normalized_package)
+        source_token_refs = self._normalize_upper_list(normalized_package.get("source_token_refs"))
+        source_token_refs += [
+            value
+            for value in self._normalize_upper_list(normalized_package.get("token_nos"))
+            if value not in source_token_refs
+        ]
+        source_token_refs += [
+            value
+            for value in self._normalize_upper_list(source_row.get("source_token_refs") or source_row.get("token_nos"))
+            if value not in source_token_refs
+        ]
+        source_token_rows = [
+            self.item_barcode_tokens[token_no]
+            for token_no in source_token_refs
+            if token_no in self.item_barcode_tokens
+        ]
+
+        cost_source_refs = self._normalize_upper_list(normalized_package.get("cost_source_refs"))
+        cost_source_refs += [
+            value
+            for value in self._normalize_upper_list(source_row.get("cost_source_refs"))
+            if value not in cost_source_refs
+        ]
+        for token_row in source_token_rows:
+            cost_source_refs += [
+                value
+                for value in self._normalize_upper_list(token_row.get("cost_source_refs"))
+                if value not in cost_source_refs
+            ]
+
+        source_cost_layer = self._first_nonempty_value(
+            normalized_package.get("source_cost_layer"),
+            source_row.get("source_cost_layer"),
+            next((token.get("source_cost_layer") for token in source_token_rows if token.get("source_cost_layer")), None),
+        )
+        if isinstance(source_cost_layer, dict):
+            source_cost_layer = dict(source_cost_layer)
+        else:
+            source_cost_layer = None
+
+        source_bale_token = str(
+            self._first_nonempty_value(
+                normalized_package.get("source_bale_token"),
+                source_row.get("source_bale_token"),
+                next((token.get("source_bale_token") for token in source_token_rows if token.get("source_bale_token")), None),
+                next(
+                    (
+                        (token.get("source_bale_tokens") or [None])[0]
+                        for token in source_token_rows
+                        if isinstance(token.get("source_bale_tokens"), list) and token.get("source_bale_tokens")
+                    ),
+                    None,
+                ),
+            )
+            or ""
+        ).strip()
+        raw_bale_barcode = str(
+            self._first_nonempty_value(
+                normalized_package.get("raw_bale_barcode"),
+                source_row.get("raw_bale_barcode"),
+                next((token.get("raw_bale_barcode") for token in source_token_rows if token.get("raw_bale_barcode")), None),
+                next(
+                    (
+                        (token.get("source_bale_barcodes") or [None])[0]
+                        for token in source_token_rows
+                        if isinstance(token.get("source_bale_barcodes"), list) and token.get("source_bale_barcodes")
+                    ),
+                    None,
+                ),
+            )
+            or ""
+        ).strip().upper()
+        raw_bale_machine_code = str(
+            self._first_nonempty_value(
+                normalized_package.get("raw_bale_machine_code"),
+                source_row.get("raw_bale_machine_code"),
+                next((token.get("raw_bale_machine_code") for token in source_token_rows if token.get("raw_bale_machine_code")), None),
+            )
+            or ""
+        ).strip().upper()
+        if raw_bale_barcode and not raw_bale_machine_code:
+            raw_bale = self._find_raw_bale_by_reference_no_defaults(raw_bale_barcode)
+            if raw_bale:
+                raw_bale_machine_code = self._raw_bale_machine_code(raw_bale)
+
+        unit_cost_kes = self._known_unit_cost_value(
+            normalized_package.get("unit_cost_kes"),
+            normalized_package.get("cost_price"),
+            (source_cost_layer or {}).get("unit_cost_kes") if isinstance(source_cost_layer, dict) else None,
+            (source_cost_layer or {}).get("cost_price") if isinstance(source_cost_layer, dict) else None,
+            source_row.get("unit_cost_kes"),
+            source_row.get("cost_price"),
+            next((token.get("unit_cost_kes") for token in source_token_rows if token.get("unit_cost_kes") not in {None, ""}), None),
+        )
+        source_batch_no = str(
+            self._first_nonempty_value(
+                normalized_package.get("source_batch_no"),
+                source_row.get("source_batch_no"),
+                next((token.get("source_batch_no") for token in source_token_rows if token.get("source_batch_no")), None),
+                next((token.get("customs_notice_no") for token in source_token_rows if token.get("customs_notice_no")), None),
+            )
+            or ""
+        ).strip().upper()
+        source_supplier = str(
+            self._first_nonempty_value(
+                normalized_package.get("source_supplier"),
+                source_row.get("source_supplier"),
+                source_row.get("supplier_name"),
+                next((token.get("source_supplier") for token in source_token_rows if token.get("source_supplier")), None),
+                next((token.get("supplier_name") for token in source_token_rows if token.get("supplier_name")), None),
+            )
+            or ""
+        ).strip()
+        if raw_bale_barcode and not source_supplier:
+            raw_bale = self._find_raw_bale_by_reference_no_defaults(raw_bale_barcode)
+            if raw_bale:
+                source_supplier = str(raw_bale.get("supplier_name") or "").strip()
+
+        category_main = str(
+            self._first_nonempty_value(
+                normalized_package.get("category_main"),
+                source_row.get("category_main"),
+                next((token.get("category_main") for token in source_token_rows if token.get("category_main")), None),
+            )
+            or ""
+        ).strip()
+        category_sub = str(
+            self._first_nonempty_value(
+                normalized_package.get("category_sub"),
+                source_row.get("category_sub"),
+                next((token.get("category_sub") for token in source_token_rows if token.get("category_sub")), None),
+            )
+            or ""
+        ).strip()
+        if not category_main or not category_sub:
+            main_from_summary, sub_from_summary = self._split_category_name_parts(
+                str(normalized_package.get("category_name") or normalized_package.get("content_summary") or source_row.get("category_name") or "")
+            )
+            category_main = category_main or main_from_summary
+            category_sub = category_sub or sub_from_summary
+        grade = str(
+            self._first_nonempty_value(
+                normalized_package.get("grade"),
+                source_row.get("grade"),
+                next((token.get("grade") for token in source_token_rows if token.get("grade")), None),
+            )
+            or ""
+        ).strip().upper()
+
+        cost_status = "known" if unit_cost_kes is not None else ("pending" if normalized_package.get("source_code") else "unknown")
+        lineage_status = "complete" if (
+            source_token_refs
+            or cost_source_refs
+            or source_bale_token
+            or raw_bale_barcode
+            or raw_bale_machine_code
+            or unit_cost_kes is not None
+        ) else "partial"
+        return {
+            "sdo_package_display_code": str(normalized_package.get("display_code") or "").strip().upper(),
+            "sdo_package_machine_code": str(normalized_package.get("machine_code") or "").strip().upper(),
+            "parent_sdo_display_code": str(normalized_package.get("parent_sdo_display_code") or "").strip().upper(),
+            "parent_sdo_machine_code": str(normalized_package.get("parent_sdo_machine_code") or "").strip().upper(),
+            "package_no": int(normalized_package.get("package_no") or 0),
+            "package_total": int(normalized_package.get("package_total") or 0),
+            "store_code": str(normalized_package.get("store_code") or "").strip().upper(),
+            "assigned_clerk": str(normalized_package.get("assigned_clerk") or "").strip(),
+            "source_type": str(normalized_package.get("source_type") or "").strip().upper(),
+            "source_code": str(normalized_package.get("source_code") or "").strip().upper(),
+            "source_machine_code": str(normalized_package.get("source_machine_code") or source_row.get("machine_code") or "").strip().upper(),
+            "source_token_refs": source_token_refs,
+            "token_nos": list(source_token_refs),
+            "cost_source_refs": cost_source_refs,
+            "source_cost_layer": source_cost_layer,
+            "content_summary": str(normalized_package.get("content_summary") or "").strip(),
+            "item_count": normalized_package.get("item_count"),
+            "sorting_task_no": str(self._first_nonempty_value(normalized_package.get("sorting_task_no"), source_row.get("sorting_task_no"), source_row.get("task_no")) or "").strip().upper(),
+            "source_bale_token": source_bale_token,
+            "source_bale_tokens": [source_bale_token] if source_bale_token else [],
+            "raw_bale_barcode": raw_bale_barcode,
+            "raw_bale_machine_code": raw_bale_machine_code,
+            "source_batch_no": source_batch_no,
+            "source_supplier": source_supplier,
+            "category_main": category_main,
+            "category_sub": category_sub,
+            "grade": grade,
+            "unit_cost_kes": unit_cost_kes,
+            "cost_price": unit_cost_kes,
+            "cost_status": cost_status,
+            "lineage_status": lineage_status,
+        }
+
     def generate_store_items_for_sdo_package(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
         package = self._find_store_delivery_package_by_code(package_code)
         package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))
@@ -13897,6 +14173,7 @@ class InMemoryState:
             or ""
         ).strip()
         generated_items: list[dict[str, Any]] = []
+        lineage = self.build_store_item_lineage_from_sdo_package(package)
         for offset in range(quantity):
             machine_code = self._allocate_store_item_barcode(timestamp)
             display_code = f"STOREITEM{machine_code[1:12]}"
@@ -13924,13 +14201,14 @@ class InMemoryState:
                 "source_bale_barcodes": [str(package.get("source_code") or "").strip().upper()] if str(package.get("source_code") or "").strip() else [],
                 "source_legacy_bale_barcodes": [],
                 "source_pool_tokens": [],
-                "source_bale_tokens": [],
-                "cost_source_refs": list(package.get("cost_source_refs") or []),
-                "source_token_refs": list(package.get("source_token_refs") or []),
+                "source_bale_tokens": list(lineage.get("source_bale_tokens") or []),
+                "cost_source_refs": list(lineage.get("cost_source_refs") or []),
+                "source_token_refs": list(lineage.get("source_token_refs") or []),
+                "token_nos": list(lineage.get("token_nos") or []),
                 "category_name": category_name,
-                "category_main": category_main,
-                "category_sub": category_sub,
-                "grade": grade,
+                "category_main": category_main or str(lineage.get("category_main") or "").strip(),
+                "category_sub": category_sub or str(lineage.get("category_sub") or "").strip(),
+                "grade": grade or str(lineage.get("grade") or "").strip(),
                 "sku_code": "",
                 "rack_code": rack_code,
                 "store_rack_code": rack_code,
@@ -13949,17 +14227,30 @@ class InMemoryState:
                 "generated_at": timestamp,
                 "created_at": timestamp,
                 "updated_at": timestamp,
-                "sdo_package_display_code": str(package.get("display_code") or "").strip().upper(),
-                "sdo_package_machine_code": str(package.get("machine_code") or "").strip().upper(),
-                "source_package": str(package.get("display_code") or "").strip().upper(),
-                "source_package_key": str(package.get("display_code") or "").strip().upper(),
-                "parent_sdo_display_code": str(package.get("parent_sdo_display_code") or "").strip().upper(),
-                "parent_sdo_machine_code": str(package.get("parent_sdo_machine_code") or "").strip().upper(),
-                "source_type": str(package.get("source_type") or "").strip().upper(),
-                "source_code": str(package.get("source_code") or "").strip().upper(),
-                "source_machine_code": str(package.get("source_machine_code") or "").strip().upper(),
-                "cost_status": "pending_cost_inheritance",
-                "unit_cost_kes": None,
+                "sdo_package_display_code": str(lineage.get("sdo_package_display_code") or "").strip().upper(),
+                "sdo_package_machine_code": str(lineage.get("sdo_package_machine_code") or "").strip().upper(),
+                "source_package": str(lineage.get("sdo_package_display_code") or "").strip().upper(),
+                "source_package_key": str(lineage.get("sdo_package_display_code") or "").strip().upper(),
+                "parent_sdo_display_code": str(lineage.get("parent_sdo_display_code") or "").strip().upper(),
+                "parent_sdo_machine_code": str(lineage.get("parent_sdo_machine_code") or "").strip().upper(),
+                "package_no": int(lineage.get("package_no") or 0),
+                "package_total": int(lineage.get("package_total") or 0),
+                "source_type": str(lineage.get("source_type") or "").strip().upper(),
+                "source_code": str(lineage.get("source_code") or "").strip().upper(),
+                "source_machine_code": str(lineage.get("source_machine_code") or "").strip().upper(),
+                "source_cost_layer": lineage.get("source_cost_layer"),
+                "content_summary": str(lineage.get("content_summary") or "").strip(),
+                "item_count": lineage.get("item_count"),
+                "sorting_task_no": str(lineage.get("sorting_task_no") or "").strip().upper(),
+                "source_bale_token": str(lineage.get("source_bale_token") or "").strip(),
+                "raw_bale_barcode": str(lineage.get("raw_bale_barcode") or "").strip().upper(),
+                "raw_bale_machine_code": str(lineage.get("raw_bale_machine_code") or "").strip().upper(),
+                "source_batch_no": str(lineage.get("source_batch_no") or "").strip().upper(),
+                "source_supplier": str(lineage.get("source_supplier") or "").strip(),
+                "cost_status": str(lineage.get("cost_status") or "pending").strip().lower(),
+                "lineage_status": str(lineage.get("lineage_status") or "partial").strip().lower(),
+                "unit_cost_kes": lineage.get("unit_cost_kes"),
+                "cost_price": lineage.get("cost_price"),
                 "cost_model_code": "",
                 "cost_locked_at": None,
             }
@@ -15387,6 +15678,7 @@ class InMemoryState:
 
         for item in payload["items"]:
             product = self.get_product_by_barcode(item["barcode"])
+            token_for_sale = self._find_item_token_by_barcode_value(item["barcode"])
             stock_key = f"{store['code']}||{product['barcode']}"
             lot_allocations = self._consume_lots_fifo(self.store_lots[stock_key], item["qty"])
             self._sync_store_stock_from_lots(store["code"], product["barcode"])
@@ -15451,6 +15743,11 @@ class InMemoryState:
                     "override_reason": item.get("override_reason", "").strip(),
                     "customer_id": item.get("customer_id", "").strip(),
                     "price_policy_breach": price_policy_breach,
+                    "sdo_package_display_code": str((token_for_sale or {}).get("sdo_package_display_code") or "").strip().upper(),
+                    "parent_sdo_display_code": str((token_for_sale or {}).get("parent_sdo_display_code") or "").strip().upper(),
+                    "source_type": str((token_for_sale or {}).get("source_type") or "").strip().upper(),
+                    "source_code": str((token_for_sale or {}).get("source_code") or "").strip().upper(),
+                    "cost_status": str((token_for_sale or {}).get("cost_status") or "").strip().lower(),
                     "returned_qty": 0,
                     "returned_amount_total": 0.0,
                     "lot_allocations": lot_allocations,

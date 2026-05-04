@@ -28379,6 +28379,8 @@ function getSelectedStorePackagePrice(row = {}, actionKey = getStorePackageActio
 function normalizeGeneratedStoreItemToken(token = {}, row = {}, actionKey = "") {
   const machineCode = String(token?.machine_code || token?.barcode_value || "").replace(/[^0-9]/g, "").trim();
   const sdoPackageCode = getStoreReceivingPackageCode(row);
+  const sourceTokenRefs = Array.isArray(token?.source_token_refs) ? token.source_token_refs : [];
+  const costSourceRefs = Array.isArray(token?.cost_source_refs) ? token.cost_source_refs : [];
   return {
     ...token,
     display_code: String(token?.display_code || token?.token_no || "").trim().toUpperCase(),
@@ -28393,6 +28395,18 @@ function normalizeGeneratedStoreItemToken(token = {}, row = {}, actionKey = "") 
     source_package: String(token?.source_package || sdoPackageCode || "").trim().toUpperCase(),
     sdo_package_display_code: String(token?.sdo_package_display_code || sdoPackageCode || "").trim().toUpperCase(),
     sdo_package_machine_code: String(token?.sdo_package_machine_code || getStoreReceivingPackageMachineCode(row) || "").trim().toUpperCase(),
+    parent_sdo_display_code: String(token?.parent_sdo_display_code || getStorePackageSdoCode(row) || "").trim().toUpperCase(),
+    parent_sdo_machine_code: String(token?.parent_sdo_machine_code || row?.parent_sdo_machine_code || "").trim().toUpperCase(),
+    source_type: String(token?.source_type || getStorePackageSourceType(row) || "").trim().toUpperCase(),
+    source_code: String(token?.source_code || getStorePackageSourceCode(row) || "").trim().toUpperCase(),
+    source_machine_code: String(token?.source_machine_code || row?.source_machine_code || "").trim().toUpperCase(),
+    source_token_refs: sourceTokenRefs.map((value) => String(value || "").trim().toUpperCase()).filter(Boolean),
+    cost_source_refs: costSourceRefs.map((value) => String(value || "").trim().toUpperCase()).filter(Boolean),
+    source_bale_token: String(token?.source_bale_token || "").trim(),
+    raw_bale_barcode: String(token?.raw_bale_barcode || "").trim().toUpperCase(),
+    raw_bale_machine_code: String(token?.raw_bale_machine_code || "").trim().toUpperCase(),
+    cost_status: String(token?.cost_status || "pending").trim().toLowerCase(),
+    lineage_status: String(token?.lineage_status || "partial").trim().toLowerCase(),
     store_rack_code: String(token?.store_rack_code || token?.rack_code || "").trim().toUpperCase(),
     rack_code: String(token?.rack_code || token?.store_rack_code || "").trim().toUpperCase(),
     selected_price: Number(token?.selected_price || token?.selling_price_kes || 0),
@@ -28475,6 +28489,40 @@ function markStorePackagePrintPreviewTokensPrinted(row = {}) {
   persistStoreSdoPackageItemTokenState();
 }
 
+function renderStoreItemLineageSummary(token = {}) {
+  const costStatus = String(token?.cost_status || "pending").trim().toLowerCase();
+  const lineageStatus = String(token?.lineage_status || "partial").trim().toLowerCase();
+  return `
+    <div class="store-item-lineage-summary" data-store-item-lineage-readonly>
+      <span><b>SDP</b>${escapeHtml(token?.sdo_package_display_code || token?.source_package || "-")}</span>
+      <span><b>SDO</b>${escapeHtml(token?.parent_sdo_display_code || "-")}</span>
+      <span><b>SRC</b>${escapeHtml([token?.source_type, token?.source_code].filter(Boolean).join(" ") || "-")}</span>
+      <span><b>cost_status</b>${renderStatusBadge(costStatus || "pending", costStatus === "known" ? "success" : "warning")}</span>
+      <span><b>lineage</b>${renderStatusBadge(lineageStatus, lineageStatus === "complete" ? "success" : "warning")}</span>
+    </div>
+  `;
+}
+
+function renderStorePackageGeneratedStoreItems(actionKey = "") {
+  const generatedTokens = getStorePackageTokens(actionKey);
+  if (!generatedTokens.length) {
+    return `<div class="empty-state compact">生成 STORE_ITEM 后，这里会只读显示 SDP / SDO / SRC / cost_status 来源链摘要。</div>`;
+  }
+  return `
+    <div class="store-generated-item-list">
+      ${generatedTokens.slice(0, 8).map((token) => `
+        <article class="store-generated-item-row">
+          <div>
+            <strong>${escapeHtml(token.display_code || token.token_no || "-")}</strong>
+            <small>${escapeHtml(token.machine_code || "-")}</small>
+          </div>
+          ${renderStoreItemLineageSummary(token)}
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderStorePackageListCard(row = {}) {
   const actionKey = getStorePackageActionKey(row);
   const itemCount = getStorePackageItemCount(row);
@@ -28527,6 +28575,7 @@ function renderStorePackagePrintPreview(actionKey = "") {
           <div class="store-print-label-meta">货架 ${escapeHtml(token.store_rack_code || "-")} · 来源 ${escapeHtml(token.source_package || "-")}</div>
           <strong>${escapeHtml(token.display_code || "-")}</strong>
           <div class="store-print-barcode">STORE_ITEM machine_code barcode ${escapeHtml(token.machine_code || "-")}</div>
+          ${renderStoreItemLineageSummary(token)}
         </article>
       `).join("")}
     </div>
@@ -28555,7 +28604,7 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
           <h3>SDP 包任务详情</h3>
         </div>
       </div>
-      ${renderStatusAlert("STORE_ITEM machine_code 必须由后端统一发号；本 PR 不做完整 token/cost inheritance。", "info")}
+      ${renderStatusAlert("STORE_ITEM machine_code 必须由后端统一发号；来源链由后端继承，PDA 只读显示 source/token/cost lineage。", "info")}
       <div class="report-summary-grid">
         <article class="store-metric"><strong>SDP</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageCode || "-")}</span></article>
         <article class="store-metric"><strong>6 开头机报码</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", sdoPackageMachineCode || "-")}</span></article>
@@ -28617,6 +28666,7 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
           </label>
         </div>
         <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}" ${remainingForGenerate <= 0 ? "disabled" : ""}>${remainingForGenerate <= 0 ? "已完成生成" : "生成 STORE_ITEM 商品码"}</button>
+        ${renderStorePackageGeneratedStoreItems(actionKey)}
       </section>
       <section class="store-package-flow-block">
         <h4>商品码打印区</h4>
