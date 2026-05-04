@@ -13562,6 +13562,52 @@ class InMemoryState:
         )
         return rows
 
+    def ensure_store_delivery_execution_order_packages(self, transfer_no: str, execution_order_no: str, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})
+        normalized_transfer_no = str(transfer_no or "").strip().upper()
+        normalized_execution_no = str(execution_order_no or "").strip().upper()
+        if not normalized_transfer_no or not normalized_execution_no:
+            raise HTTPException(status_code=400, detail="Transfer no and SDO execution order no are required")
+        order = next(
+            (
+                row
+                for row in self.store_delivery_execution_orders.values()
+                if str(row.get("source_transfer_no") or row.get("transfer_no") or "").strip().upper() == normalized_transfer_no
+                and str(row.get("execution_order_no") or row.get("official_delivery_barcode") or "").strip().upper() == normalized_execution_no
+            ),
+            None,
+        )
+        if not order:
+            raise HTTPException(status_code=404, detail="Store delivery execution order not found for this transfer")
+        normalized_order = self._normalize_store_delivery_execution_order(order)
+        existing_packages = self._find_store_delivery_packages_for_order(normalized_order["execution_order_no"])
+        if existing_packages:
+            normalized_order["packages"] = existing_packages
+            normalized_order["package_count"] = max(int(normalized_order.get("package_count") or 0), len(existing_packages))
+            if all(package.get("item_count") is not None for package in existing_packages):
+                normalized_order["total_item_count"] = sum(int(package.get("item_count") or 0) for package in existing_packages)
+            self.store_delivery_execution_orders[normalized_order["execution_order_no"]] = normalized_order
+            self._persist()
+            return normalized_order
+
+        source_rows = normalized_order.get("packages") if isinstance(normalized_order.get("packages"), list) else []
+        if not source_rows:
+            self._rebuild_store_dispatch_bales()
+            source_rows = [
+                row
+                for row in self.store_dispatch_bales.values()
+                if str(row.get("transfer_no") or "").strip().upper() == normalized_transfer_no
+            ]
+        if not source_rows:
+            raise HTTPException(status_code=409, detail="当前 SDO 没有可生成实体包码的来源包，请先完成仓库核对。")
+
+        packages = self._ensure_store_delivery_packages_for_order(normalized_order, source_rows, actor=actor["username"])
+        normalized_order = self.store_delivery_execution_orders.get(normalized_order["execution_order_no"], normalized_order)
+        normalized_order["packages"] = packages
+        self.store_delivery_execution_orders[normalized_order["execution_order_no"]] = normalized_order
+        self._persist()
+        return normalized_order
+
     def create_store_delivery_execution_order(self, transfer_no: str, payload: dict[str, Any]) -> dict[str, Any]:
         order = self.get_transfer_order(transfer_no)
         actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})

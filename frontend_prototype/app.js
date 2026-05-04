@@ -11290,6 +11290,47 @@ function buildSDOPrintJobs({
   });
 }
 
+function hasValidSdoPackagePrintRows(order = {}) {
+  const packages = Array.isArray(order?.packages) ? order.packages : [];
+  return packages.length > 0 && packages.every((row) => {
+    const displayCode = String(row?.display_code || row?.package_id || row?.sdo_package_code || "").trim().toUpperCase();
+    const machineCode = String(row?.machine_code || row?.barcode_value || row?.scan_token || "").replace(/[^0-9]/g, "").trim();
+    const barcodeValue = String(row?.barcode_value || row?.machine_code || "").replace(/[^0-9]/g, "").trim();
+    return /^SDP\d{9}$/.test(displayCode)
+      && /^6\d{9}$/.test(machineCode)
+      && barcodeValue === machineCode;
+  });
+}
+
+async function ensureSdoPackagePrintRowsForTransfer({
+  transferNo = "",
+  transfer = {},
+  order = null,
+} = {}) {
+  const normalizedTransferNo = String(transferNo || transfer?.transfer_no || order?.source_transfer_no || "").trim().toUpperCase();
+  const currentOrder = order || transfer?.store_delivery_execution_order || {};
+  if (hasValidSdoPackagePrintRows(currentOrder)) {
+    return currentOrder;
+  }
+  const executionOrderNo = String(
+    currentOrder?.execution_order_no
+    || currentOrder?.official_delivery_barcode
+    || transfer?.store_delivery_execution_order_no
+    || transfer?.official_delivery_barcode
+    || "",
+  ).trim().toUpperCase();
+  if (!normalizedTransferNo || !executionOrderNo) {
+    throw new Error("当前 SDO 缺少实体包码，请先生成 SDO_PACKAGE 后再打印。");
+  }
+  const ensuredOrder = await request(`/transfers/${encodeURIComponent(normalizedTransferNo)}/store-delivery-execution-orders/${encodeURIComponent(executionOrderNo)}/packages/ensure`, {
+    method: "POST",
+  });
+  if (!hasValidSdoPackagePrintRows(ensuredOrder)) {
+    throw new Error("当前 SDO 缺少实体包码，请先生成 SDO_PACKAGE 后再打印。");
+  }
+  return ensuredOrder;
+}
+
 function openLoosePickSheetPrintTemplateModal(task = {}, transfer = {}) {
   const templateCode = getPreferredWarehouseoutTemplateCode("store_loose_pick_60x40", "lpk_shortage_pick");
   const payload = {
@@ -31848,7 +31889,7 @@ async function submitTransferBundle(event) {
       foundPreparedBarcodes: executionRecord.foundPreparedBarcodes,
     })
     : result.store_dispatch_bales;
-  const storeDeliveryExecutionOrder = await request(`/transfers/${transferNo}/store-delivery-execution-orders`, {
+  let storeDeliveryExecutionOrder = await request(`/transfers/${transferNo}/store-delivery-execution-orders`, {
     method: "POST",
     body: JSON.stringify({
       notes: "仓库核对完成后生成正式门店送货执行单。",
@@ -31860,6 +31901,16 @@ async function submitTransferBundle(event) {
         item_count: parseKnownDispatchItemCount(row),
       })),
     }),
+  });
+  storeDeliveryExecutionOrder = await ensureSdoPackagePrintRowsForTransfer({
+    transferNo,
+    transfer: {
+      ...(transfer || {}),
+      store_delivery_execution_order: storeDeliveryExecutionOrder,
+      store_delivery_execution_order_no: storeDeliveryExecutionOrder.execution_order_no,
+      official_delivery_barcode: storeDeliveryExecutionOrder.official_delivery_barcode,
+    },
+    order: storeDeliveryExecutionOrder,
   });
   const displayResult = {
     ...result,

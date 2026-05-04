@@ -3846,6 +3846,26 @@ def create_store_delivery_execution_order(
     return StoreDeliveryExecutionOrderResponse(**state.create_store_delivery_execution_order(transfer_no, data))
 
 
+@router.post(
+    "/transfers/{transfer_no}/store-delivery-execution-orders/{execution_order_no}/packages/ensure",
+    response_model=StoreDeliveryExecutionOrderResponse,
+    tags=["transfers"],
+)
+def ensure_store_delivery_execution_order_packages(
+    transfer_no: str,
+    execution_order_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryExecutionOrderResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return StoreDeliveryExecutionOrderResponse(
+        **state.ensure_store_delivery_execution_order_packages(
+            transfer_no,
+            execution_order_no,
+            {"created_by": current_user["username"]},
+        )
+    )
+
+
 @router.get(
     "/receiving-sessions",
     response_model=list[ReceivingSessionResponse],

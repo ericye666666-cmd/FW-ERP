@@ -184,6 +184,63 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual([package["source_code"] for package in rows[0]["packages"]], ["SDB260503AAG", "LPK260504001"])
         self.assertFalse(any(str(package.get("display_code") or "").startswith("SDP") for package in rows[0]["packages"]))
 
+    def test_ensure_store_delivery_execution_order_packages_repairs_old_sdo_idempotently(self):
+        transfer_no = self._seed_transfer_for_store_delivery_package_test()
+        self.state.store_delivery_execution_orders["SDO260504001"] = {
+            "execution_order_no": "SDO260504001",
+            "official_delivery_barcode": "SDO260504001",
+            "source_transfer_no": transfer_no,
+            "from_warehouse_code": "WH1",
+            "to_store_code": "UTAWALA",
+            "package_count": 2,
+            "packages": [
+                {
+                    "source_type": "SDB",
+                    "source_code": "SDB260503AAG",
+                    "source_machine_code": "2260503006",
+                    "item_count": 100,
+                    "category_summary": "pants / jeans pant / P",
+                },
+                {
+                    "source_type": "LPK",
+                    "source_code": "LPK260504001",
+                    "source_machine_code": "3260504001",
+                    "item_count": 40,
+                    "category_summary": "pants / jeans pant / P",
+                },
+            ],
+            "status": "pending_print",
+            "created_by": "warehouse_clerk_1",
+            "created_at": "2026-05-04T00:00:00+03:00",
+        }
+
+        first = self.state.ensure_store_delivery_execution_order_packages(
+            transfer_no,
+            "SDO260504001",
+            {"created_by": "warehouse_clerk_1"},
+        )
+        second = self.state.ensure_store_delivery_execution_order_packages(
+            transfer_no,
+            "SDO260504001",
+            {"created_by": "warehouse_clerk_1"},
+        )
+
+        self.assertEqual(len(first["packages"]), 2)
+        self.assertEqual([package["package_no"] for package in first["packages"]], [1, 2])
+        self.assertEqual([package["package_total"] for package in first["packages"]], [2, 2])
+        self.assertTrue(all(package["display_code"].startswith("SDP") for package in first["packages"]))
+        self.assertTrue(all(re.fullmatch(r"6\d{9}", package["machine_code"]) for package in first["packages"]))
+        self.assertTrue(all(package["barcode_value"] == package["machine_code"] for package in first["packages"]))
+        self.assertTrue(all(package["parent_sdo_display_code"] == "SDO260504001" for package in first["packages"]))
+        self.assertTrue(all(package["parent_sdo_machine_code"] == first["machine_code"] for package in first["packages"]))
+        self.assertEqual([package["source_code"] for package in first["packages"]], ["SDB260503AAG", "LPK260504001"])
+        self.assertEqual([package["item_count"] for package in first["packages"]], [100, 40])
+        self.assertEqual(
+            [package["machine_code"] for package in second["packages"]],
+            [package["machine_code"] for package in first["packages"]],
+        )
+        self.assertEqual(len(self.state.store_delivery_packages), 2)
+
     def _create_ready_bales(self, customs_notice_no="RAW240421", package_count=2, unit_weight=40):
         shipment = self.state.create_inbound_shipment(
             {

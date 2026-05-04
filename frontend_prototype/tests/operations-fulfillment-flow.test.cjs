@@ -965,9 +965,14 @@ test("final transfer dispatch print uses SDO_PACKAGE 60x40 payload and package m
   assert.match(appJs, /function getTransferDispatchTemplateCode/);
   assert.match(appJs, /getTransferDispatchTemplateCode\(\)[\s\S]*?return "store_dispatch_60x40"/);
   assert.match(appJs, /const SDO_PRINT_TASK_TYPE = "store_delivery_execution"/);
+  assert.match(appJs, /function hasValidSdoPackagePrintRows/);
+  assert.match(appJs, /function ensureSdoPackagePrintRowsForTransfer/);
+  assert.match(appJs, /\/transfers\/\$\{encodeURIComponent\(normalizedTransferNo\)\}\/store-delivery-execution-orders\/\$\{encodeURIComponent\(executionOrderNo\)\}\/packages\/ensure/);
   assert.match(submitBundleSource, /const sdoPrintTransfer = \{[\s\S]*store_delivery_execution_order:\s*storeDeliveryExecutionOrder/);
+  assert.match(submitBundleSource, /storeDeliveryExecutionOrder = await ensureSdoPackagePrintRowsForTransfer/);
   assert.match(submitBundleSource, /transfer:\s*sdoPrintTransfer/);
   assert.match(sdoModalSource, /const jobs = buildSDOPrintJobs\(\{/);
+  assert.match(appJs, /当前 SDO 缺少实体包码，请先生成 SDO_PACKAGE 后再打印。/);
   assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 display_code/);
   assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 4 开头 machine_code/);
   assert.match(sdoJobSource, /transfer\?\.store_delivery_execution_order\?\.packages/);
