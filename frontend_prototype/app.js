@@ -16346,10 +16346,10 @@ function normalizeStoreReceivingPackageRow(row = {}, context = {}) {
   const source_code = String(merged.source_code || merged.bale_no || merged.dispatch_bale_no || "").trim().toUpperCase();
   const source_type = String(merged.source_type || (source_code.startsWith("LPK") ? "LPK" : source_code.startsWith("SDB") ? "SDB" : "MIXED")).trim().toUpperCase() || "MIXED";
   const itemCount = parseKnownDispatchItemCount(merged);
-  const exception_status = String(statusState.exception_status || merged.exception_status || "").trim().toLowerCase();
-  const received_status = String(statusState.received_status || merged.received_status || merged.receipt_status || "pending").trim().toLowerCase();
-  const assigned_clerk = String(assignmentState.assigned_clerk || merged.assigned_clerk || "").trim();
-  const assignment_status = String(assignmentState.assignment_status || merged.assignment_status || (assigned_clerk ? "assigned" : "unassigned")).trim().toLowerCase();
+  const exception_status = String(merged.exception_status || statusState.exception_status || "normal").trim().toLowerCase();
+  const received_status = String(merged.received_status || merged.receipt_status || statusState.received_status || "pending").trim().toLowerCase();
+  const assigned_clerk = String(merged.assigned_clerk || assignmentState.assigned_clerk || "").trim();
+  const assignment_status = String(merged.assignment_status || assignmentState.assignment_status || (assigned_clerk ? "assigned" : "unassigned")).trim().toLowerCase();
   return {
     ...merged,
     sdo_package_display_code,
@@ -16367,15 +16367,72 @@ function normalizeStoreReceivingPackageRow(row = {}, context = {}) {
     item_count: itemCount,
     content_summary: String(merged.content_summary || merged.category_summary || merged.category_name || "").trim(),
     received_status,
-    received_at: String(statusState.received_at || merged.received_at || "").trim(),
-    received_by: String(statusState.received_by || merged.received_by || "").trim(),
+    received_at: String(merged.received_at || statusState.received_at || "").trim(),
+    received_by: String(merged.received_by || statusState.received_by || "").trim(),
     assigned_clerk,
-    assigned_at: String(assignmentState.assigned_at || merged.assigned_at || "").trim(),
-    assigned_by: String(assignmentState.assigned_by || merged.assigned_by || "").trim(),
+    assigned_at: String(merged.assigned_at || assignmentState.assigned_at || "").trim(),
+    assigned_by: String(merged.assigned_by || assignmentState.assigned_by || "").trim(),
     assignment_status,
     exception_status,
-    exception_reason: String(statusState.exception_reason || merged.exception_reason || "").trim(),
+    exception_reason: String(merged.exception_reason || statusState.exception_reason || "").trim(),
   };
+}
+
+function cacheStoreReceivingPackageBackendState(packageRow = {}) {
+  const normalized = normalizeStoreReceivingPackageRow(packageRow, {});
+  if (!normalized) {
+    return null;
+  }
+  const packageCode = getStoreReceivingPackageCode(normalized);
+  if (!packageCode) {
+    return normalized;
+  }
+  storeReceiptPackageStatusState[packageCode] = {
+    received_status: normalized.received_status || "pending",
+    received_at: normalized.received_at || "",
+    received_by: normalized.received_by || "",
+    exception_status: normalized.exception_status || "normal",
+    exception_reason: normalized.exception_reason || "",
+  };
+  storeReceiptPackageAssignmentState[packageCode] = {
+    parent_sdo_display_code: normalized.parent_sdo_display_code || "",
+    assigned_clerk: normalized.assigned_clerk || "",
+    assigned_at: normalized.assigned_at || "",
+    assigned_by: normalized.assigned_by || "",
+    assignment_status: normalized.assignment_status || (normalized.assigned_clerk ? "assigned" : "unassigned"),
+  };
+  return normalized;
+}
+
+async function receiveStoreReceivingPackage(packageCode = "", row = {}) {
+  packageCode = String(packageCode || getStoreReceivingPackageCode(row) || "").trim().toUpperCase();
+  if (!packageCode) {
+    throw new Error("请先选择要确认收到的 SDP 实体包。");
+  }
+  const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/receive`, {
+    method: "POST",
+    body: JSON.stringify({
+      store_code: row?.store_code || getCurrentStoreCodeFallback(),
+      note: "store_manager_receive_sdo_package",
+    }),
+  });
+  return cacheStoreReceivingPackageBackendState(result) || result;
+}
+
+async function markStoreReceivingPackageException(packageCode = "", row = {}, exceptionReason = "store_manager_marked_exception") {
+  packageCode = String(packageCode || getStoreReceivingPackageCode(row) || "").trim().toUpperCase();
+  if (!packageCode) {
+    throw new Error("请先选择要标记异常的 SDP 实体包。");
+  }
+  const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/exception`, {
+    method: "POST",
+    body: JSON.stringify({
+      store_code: row?.store_code || getCurrentStoreCodeFallback(),
+      exception_reason: exceptionReason || "other",
+      note: "store_manager_exception_sdo_package",
+    }),
+  });
+  return cacheStoreReceivingPackageBackendState(result) || result;
 }
 
 function getStoreReceivingPackageRows(storeCode = "") {
@@ -16495,6 +16552,14 @@ function getStoreReceivingPackageStatus(row = {}) {
   return "pending";
 }
 
+function isStoreReceivingPackageAssignable(row = {}) {
+  const normalized = normalizeStoreReceivingPackageRow(row, {}) || row || {};
+  return String(normalized.received_status || "").trim().toLowerCase() === "received"
+    && String(normalized.exception_status || "").trim().toLowerCase() !== "exception"
+    && String(normalized.assignment_status || "").trim().toLowerCase() !== "assigned"
+    && !String(normalized.assigned_clerk || "").trim();
+}
+
 function buildStoreReceivingPackageRowFromResolver(resolved = {}, scannedCode = "") {
   const scanned = String(scannedCode || resolved?.barcode_value || "").trim().toUpperCase();
   return normalizeStoreReceivingPackageRow({
@@ -16510,6 +16575,17 @@ function buildStoreReceivingPackageRowFromResolver(resolved = {}, scannedCode = 
     package_total: resolved?.package_total || "",
     source_type: resolved?.source_type || "",
     source_code: resolved?.source_code || "",
+    item_count: resolved?.item_count,
+    status: resolved?.status || "",
+    received_status: resolved?.received_status || "",
+    received_at: resolved?.received_at || "",
+    received_by: resolved?.received_by || "",
+    exception_status: resolved?.exception_status || "",
+    exception_reason: resolved?.exception_reason || "",
+    assigned_clerk: resolved?.assigned_clerk || "",
+    assigned_at: resolved?.assigned_at || "",
+    assigned_by: resolved?.assigned_by || "",
+    assignment_status: resolved?.assignment_status || "",
   }, {});
 }
 
@@ -16572,7 +16648,7 @@ function renderStoreReceivingPackageCard(row = {}, { includeAssignmentCheckbox =
             <button type="button" class="ghost-button mini-button" data-store-receipt-package-detail="${escapeHtml(packageCode)}">查看详情</button>
             <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(row.parent_sdo_display_code || "")}" data-store-receipt-package="${escapeHtml(packageCode)}" ${row.received_status === "received" ? "disabled" : ""}>确认收到</button>
             <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(row.parent_sdo_display_code || "")}" data-store-receipt-package="${escapeHtml(packageCode)}" ${row.exception_status === "exception" ? "disabled" : ""}>标记异常</button>
-            <button type="button" class="ghost-button mini-button" data-store-receipt-package-assign="${escapeHtml(packageCode)}" ${row.received_status === "received" && row.exception_status !== "exception" ? "" : "disabled"}>分配</button>
+            <button type="button" class="ghost-button mini-button" data-store-receipt-package-assign="${escapeHtml(packageCode)}" ${isStoreReceivingPackageAssignable(row) ? "" : "disabled"}>分配</button>
           `}
       </div>
     </article>
@@ -16631,7 +16707,7 @@ function renderStoreReceivingPackageDetail(rowOrCode = "", context = {}) {
       <button type="button" class="ghost-button mini-button" data-store-receipt-rescan="1">重新扫描</button>
       <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="received" data-store-receipt-sdo="${escapeHtml(detail.parent_sdo_display_code || "")}" data-store-receipt-package="${escapeHtml(packageCode)}" ${detail.received_status === "received" ? "disabled" : ""}>确认收到</button>
       <button type="button" class="ghost-button mini-button" data-store-receipt-package-action="exception" data-store-receipt-sdo="${escapeHtml(detail.parent_sdo_display_code || "")}" data-store-receipt-package="${escapeHtml(packageCode)}" ${detail.exception_status === "exception" ? "disabled" : ""}>标记异常</button>
-      <button type="button" class="ghost-button mini-button" data-store-receipt-package-assign="${escapeHtml(packageCode)}" ${detail.received_status === "received" && detail.exception_status !== "exception" ? "" : "disabled"}>去分配店员</button>
+      <button type="button" class="ghost-button mini-button" data-store-receipt-package-assign="${escapeHtml(packageCode)}" ${isStoreReceivingPackageAssignable(packageRow) ? "" : "disabled"}>去分配店员</button>
     </div>
   `;
 }
@@ -16749,7 +16825,7 @@ function renderStoreDispatchAssignmentResultSummary(result) {
   `;
 }
 
-function assignStoreReceivingPackagesToClerk(packageRows = [], clerkName = "") {
+async function assignStoreReceivingPackagesToClerk(packageRows = [], clerkName = "") {
   const normalizedClerk = String(clerkName || "").trim();
   if (!normalizedClerk) {
     throw new Error("请先选择要分配给哪位店员。");
@@ -16760,8 +16836,7 @@ function assignStoreReceivingPackagesToClerk(packageRows = [], clerkName = "") {
   if (!rows.length) {
     throw new Error("请先选择已收货的 SDP 实体包。");
   }
-  const now = new Date().toISOString();
-  return rows.map((row) => {
+  return Promise.all(rows.map(async (row) => {
     const sdoPackageCode = getStoreReceivingPackageCode(row);
     const normalizedRow = normalizeStoreReceivingPackageRow(row, {}) || row;
     if (normalizedRow.received_status !== "received") {
@@ -16770,27 +16845,23 @@ function assignStoreReceivingPackagesToClerk(packageRows = [], clerkName = "") {
     if (normalizedRow.exception_status === "exception") {
       throw new Error(`SDP ${sdoPackageCode || "-"} 是异常包，先处理异常后才能分配。`);
     }
-    const previousAssignment = getStoreReceivingPackageAssignmentState(sdoPackageCode);
+    const previousAssignedClerk = String(normalizedRow.assigned_clerk || "").trim();
     if (
-      previousAssignment.assigned_clerk
-      && String(previousAssignment.assigned_clerk || "").trim().toLowerCase() !== normalizedClerk.toLowerCase()
+      previousAssignedClerk
+      && previousAssignedClerk.toLowerCase() !== normalizedClerk.toLowerCase()
     ) {
-      throw new Error(`SDP ${sdoPackageCode} 已分配给 ${previousAssignment.assigned_clerk}，一个 SDP 不能分配给多个店员。`);
+      throw new Error(`SDP ${sdoPackageCode} 已分配给 ${previousAssignedClerk}，一个 SDP 不能分配给多个店员。`);
     }
-    storeReceiptPackageAssignmentState[sdoPackageCode] = {
-      ...previousAssignment,
-      parent_sdo_display_code: normalizedRow.parent_sdo_display_code || "",
-      assigned_clerk: normalizedClerk,
-      assigned_at: previousAssignment.assigned_at || now,
-      assigned_by: previousAssignment.assigned_by || currentSession?.user?.username || "",
-      assignment_status: "assigned",
-    };
-    return normalizeStoreReceivingPackageRow(normalizedRow, {}) || {
-      ...normalizedRow,
-      assigned_clerk: normalizedClerk,
-      assignment_status: "assigned",
-    };
-  });
+    const result = await request(`/store-delivery-packages/${encodeURIComponent(sdoPackageCode)}/assign`, {
+      method: "POST",
+      body: JSON.stringify({
+        assigned_clerk: normalizedClerk,
+        store_code: normalizedRow.store_code || getCurrentStoreCodeFallback(),
+        note: "store_manager_assign_sdo_package",
+      }),
+    });
+    return cacheStoreReceivingPackageBackendState(result) || normalizeStoreReceivingPackageRow(result, {}) || result;
+  }));
 }
 
 function renderStoreDispatchAssignmentOverview(target) {
@@ -16800,7 +16871,7 @@ function renderStoreDispatchAssignmentOverview(target) {
   const acceptedGroups = sdoGroups
     .map((group) => ({
       ...group,
-      packages: group.packages.filter((row) => row.received_status === "received" && row.exception_status !== "exception"),
+      packages: group.packages.filter((row) => isStoreReceivingPackageAssignable(row)),
     }))
     .filter((group) => group.packages.length);
   if (!packageRows.length) {
@@ -27309,9 +27380,9 @@ function renderStoreManagerConsoleSummary(context = {}) {
     return;
   }
 
-  const pendingReceiptPackages = packageRows.filter((row) => String(row?.received_status || "").trim().toLowerCase() !== "received");
-  const receivedUnassignedPackages = packageRows.filter((row) => String(row?.received_status || "").trim().toLowerCase() === "received" && !String(row?.assigned_clerk || "").trim());
-  const assignedPackages = packageRows.filter((row) => String(row?.assigned_clerk || "").trim());
+  const pendingReceiptPackages = packageRows.filter((row) => String(row?.received_status || "").trim().toLowerCase() !== "received" && String(row?.exception_status || "").trim().toLowerCase() !== "exception");
+  const receivedUnassignedPackages = packageRows.filter((row) => String(row?.received_status || "").trim().toLowerCase() === "received" && String(row?.exception_status || "").trim().toLowerCase() !== "exception" && String(row?.assignment_status || "").trim().toLowerCase() !== "assigned" && !String(row?.assigned_clerk || "").trim());
+  const assignedPackages = packageRows.filter((row) => String(row?.assignment_status || "").trim().toLowerCase() === "assigned" || String(row?.assigned_clerk || "").trim());
   const exceptionPackages = packageRows.filter((row) => String(row?.exception_status || "").trim().toLowerCase() === "exception");
   const attentionRows = rows.filter((row) => row?.flow_type === "direct_hang" || String(row?.status || "").trim() === "printing_in_progress");
   const commandCenter = buildStoreReceivingCommandCenterViewModel(storeCode, context.selected_sdo_code);
@@ -27321,7 +27392,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
       .map((name) => `<option value="${escapeHtml(name)}" ${name === commandCenter.selected_clerk ? "selected" : ""}>${escapeHtml(name)}</option>`)
       .join("")
     : `<option value="" selected disabled>${escapeHtml(getNoActiveStaffLabel())}</option>`;
-  const commandCenterAssignmentDisabled = !commandCenter.selected?.packages?.some((row) => row.received_status === "received" && row.exception_status !== "exception") || !hasCommandCenterClerks;
+  const commandCenterAssignmentDisabled = !commandCenter.selected?.packages?.some((row) => isStoreReceivingPackageAssignable(row)) || !hasCommandCenterClerks;
 
   const renderArrivalTransferQueue = (groups = []) => {
     if (!groups.length) {
@@ -27416,7 +27487,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
           <button type="button" class="ghost-button mini-button" data-store-receipt-load-recent="1">读取最近送货单</button>
           ${commandCenter.step !== "list" ? '<button type="button" class="ghost-button mini-button" data-store-receipt-step="list">返回到货列表</button>' : ""}
         </div>
-        <div class="subtle small">本 PR 只完成店长端前端对象切换；SDP 收货、异常和分配状态当前是本机前端状态，不提供跨设备后端持久化。后续 PR 需要把 SDP received / assigned / exception 状态写入后端。</div>
+        <div class="subtle small">SDP 收货、异常和分配状态以后端状态为准；页面刷新会重新读取 SDO_PACKAGE 状态。</div>
         ${commandCenter.step === "list" ? `
           <div class="manager-console-list">${renderArrivalTransferQueue(commandCenter.sdo_groups)}</div>
         ` : commandCenter.selected ? `
@@ -27451,7 +27522,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
                 ${hasCommandCenterClerks ? "" : renderStatusBadge(getNoActiveStaffLabel(), "danger")}
               </div>
               <div class="candidate-list compact-list" style="margin-top:10px;">
-                ${commandCenter.selected.packages.filter((row) => row.received_status === "received" && row.exception_status !== "exception").map((row) => `
+                ${commandCenter.selected.packages.filter((row) => isStoreReceivingPackageAssignable(row)).map((row) => `
                   <article class="candidate-row ${getStatusCardClass(row.assigned_clerk ? "success" : "warning")}">
                     <div class="candidate-main">
                       <strong>${escapeHtml(row.sdo_package_display_code || getStoreReceivingPackageCode(row) || "-")}</strong>
@@ -30389,7 +30460,8 @@ async function submitStoreDispatchAssignment(event) {
     throw new Error("请先填写 SDO 主单号，或粘贴要绑定店员的 SDP 实体包码。");
   }
   const targets = await resolveStoreDispatchAssignmentTargets({ transferNo, baleNos });
-  const results = assignStoreReceivingPackagesToClerk(targets, payload.employee_name);
+  const results = await assignStoreReceivingPackagesToClerk(targets, payload.employee_name);
+  await loadTransferOrders();
   writeOutput("#storeDispatchAssignmentOutput", results);
   const firstResult = results[0] || {};
   populateStoreFlowFormsFromContext({
@@ -34462,19 +34534,14 @@ document.addEventListener("click", async (event) => {
       const action = String(button.dataset.storeReceiptPackageAction || "").trim().toLowerCase();
       const row = findStoreReceivingPackageByCode(packageCode);
       if (packageCode && ["received", "exception"].includes(action)) {
-        const previous = getStoreReceivingPackageStatusState(packageCode);
-        storeReceiptPackageStatusState[packageCode] = {
-          ...previous,
-          received_status: action === "received" ? "received" : previous.received_status || "pending",
-          received_at: action === "received" ? previous.received_at || new Date().toISOString() : previous.received_at || "",
-          received_by: action === "received" ? previous.received_by || currentSession?.user?.username || "" : previous.received_by || "",
-          exception_status: action === "exception" ? "exception" : "",
-          exception_reason: action === "exception" ? previous.exception_reason || "store_manager_marked_exception" : "",
-        };
+        const result = action === "received"
+          ? await receiveStoreReceivingPackage(packageCode, row || {})
+          : await markStoreReceivingPackageException(packageCode, row || {}, "store_manager_marked_exception");
+        await loadTransferOrders();
         storeCommandCenterState.selected_sdo_code = sdoCode || row?.parent_sdo_display_code || "";
         storeCommandCenterState.selected_package_code = packageCode;
         storeCommandCenterState.step = "package_detail";
-        const refreshedRow = findStoreReceivingPackageByCode(packageCode) || row;
+        const refreshedRow = findStoreReceivingPackageByCode(packageCode) || normalizeStoreReceivingPackageRow(result, {}) || row;
         renderStoreReceivingPackageDetail(refreshedRow || packageCode);
         renderStoreManagerConsoleSummary({
           store_code: refreshedRow?.store_code || getCurrentStoreCodeFallback(),
@@ -34487,28 +34554,21 @@ document.addEventListener("click", async (event) => {
     if (button.dataset.storeReceiptCompleteSdo) {
       const sdoCode = String(button.dataset.storeReceiptCompleteSdo || "").trim().toUpperCase();
       if (sdoCode) {
-        const now = new Date().toISOString();
-        getStoreReceivingPackageRows(getCurrentStoreCodeFallback())
+        const results = await Promise.all(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())
           .filter((row) => String(row?.parent_sdo_display_code || "").trim().toUpperCase() === sdoCode)
-          .forEach((row) => {
+          .map((row) => {
             const packageCode = getStoreReceivingPackageCode(row);
             if (!packageCode || row.exception_status === "exception") {
-              return;
+              return null;
             }
-            const previous = getStoreReceivingPackageStatusState(packageCode);
-            storeReceiptPackageStatusState[packageCode] = {
-              ...previous,
-              received_status: "received",
-              received_at: previous.received_at || now,
-              received_by: previous.received_by || currentSession?.user?.username || "",
-              exception_status: previous.exception_status || "",
-            };
-          });
+            return receiveStoreReceivingPackage(packageCode, row);
+          }));
+        await loadTransferOrders();
         storeCommandCenterState.step = "assignment";
         renderStoreReceiptTransferBaleList(sdoCode);
         renderStoreManagerConsoleSummary({
           store_code: getCurrentStoreCodeFallback(),
-          last_action_message: "本送货单已完成验收，下一步请进入店员分配。",
+          last_action_message: `本送货单已完成 ${results.filter(Boolean).length} 个 SDP 验收，下一步请进入店员分配。`,
         });
         showTransientInlineNotice("#storeDispatchBaleNotice", "本送货单已完成验收，下一步请进入店员分配。", "success", 2400);
       }
@@ -34554,6 +34614,9 @@ document.addEventListener("click", async (event) => {
       if (row.exception_status === "exception") {
         throw new Error("异常 SDP 不允许分配，先处理异常。");
       }
+      if (String(row.assignment_status || "").trim().toLowerCase() === "assigned" || String(row.assigned_clerk || "").trim()) {
+        throw new Error("已分配 SDP 不能重复分配给其他店员。");
+      }
       storeCommandCenterState.selected_sdo_code = row.parent_sdo_display_code || "";
       storeCommandCenterState.selected_package_code = packageCode;
       storeCommandCenterState.step = "assignment";
@@ -34574,7 +34637,7 @@ document.addEventListener("click", async (event) => {
       const sdoCode = String(button.dataset.storeAssignmentFillSelected || button.dataset.storeAssignmentFillAll || "").trim().toUpperCase();
       const rows = groupStoreReceivingPackagesBySdo(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)?.packages || [];
       const selected = button.dataset.storeAssignmentFillAll
-        ? rows.filter((row) => row.received_status === "received" && row.exception_status !== "exception").map((row) => getStoreReceivingPackageCode(row))
+        ? rows.filter((row) => isStoreReceivingPackageAssignable(row)).map((row) => getStoreReceivingPackageCode(row))
         : Array.from(document.querySelectorAll("input[data-store-assignment-pkg]:checked")).map((el) => String(el.getAttribute("data-store-assignment-pkg") || "").trim().toUpperCase()).filter(Boolean);
       const clerkSelect = Array.from(document.querySelectorAll("[data-store-command-center-clerk]"))
         .find((el) => String(el.getAttribute("data-store-command-center-clerk") || "").trim().toUpperCase() === sdoCode);
@@ -34586,12 +34649,14 @@ document.addEventListener("click", async (event) => {
         throw new Error("请先勾选至少一个包裹，或使用“一键分配整单给店员”。");
       }
       const selectedRows = selected.map((code) => findStoreReceivingPackageByCode(code, rows)).filter(Boolean);
-      const results = assignStoreReceivingPackagesToClerk(selectedRows, clerkName);
+      const results = await assignStoreReceivingPackagesToClerk(selectedRows, clerkName);
+      await loadTransferOrders();
       storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = clerkName;
       const refreshedRows = groupStoreReceivingPackagesBySdo(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)?.packages || [];
-      const assignableRows = refreshedRows.filter((row) => row.received_status === "received" && row.exception_status !== "exception");
-      const totalAssigned = assignableRows.filter((row) => String(row.assigned_clerk || "").trim()).length;
-      storeCommandCenterState.step = assignableRows.length && totalAssigned === assignableRows.length ? "completed" : "assignment";
+      const receivedNonExceptionRows = refreshedRows.filter((row) => row.received_status === "received" && row.exception_status !== "exception");
+      const remainingAssignableRows = receivedNonExceptionRows.filter((row) => isStoreReceivingPackageAssignable(row));
+      const totalAssigned = receivedNonExceptionRows.filter((row) => String(row.assigned_clerk || "").trim() || String(row.assignment_status || "").trim().toLowerCase() === "assigned").length;
+      storeCommandCenterState.step = receivedNonExceptionRows.length && remainingAssignableRows.length === 0 ? "completed" : "assignment";
       renderStoreManagerConsoleSummary({
         store_code: getCurrentStoreCodeFallback(),
         selected_sdo_code: sdoCode,

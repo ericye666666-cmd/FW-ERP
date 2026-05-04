@@ -189,8 +189,12 @@ from app.schemas.transfers import (
     PickingWaveCreate,
     PickingWaveResponse,
     RecommendationTransferCreateRequest,
+    StoreDeliveryPackageAssignRequest,
+    StoreDeliveryPackageExceptionRequest,
+    StoreDeliveryPackageReceiveRequest,
     StoreDeliveryExecutionOrderCreateRequest,
     StoreDeliveryExecutionOrderResponse,
+    StoreDeliveryExecutionPackageDetailResponse,
     TransferApprovalRequest,
     TransferOrderCreate,
     TransferOrderResponse,
@@ -3864,6 +3868,57 @@ def ensure_store_delivery_execution_order_packages(
             {"created_by": current_user["username"]},
         )
     )
+
+
+@router.post(
+    "/store-delivery-packages/{package_code}/receive",
+    response_model=StoreDeliveryExecutionPackageDetailResponse,
+    tags=["stores", "transfers"],
+)
+def receive_store_delivery_package(
+    package_code: str,
+    payload: StoreDeliveryPackageReceiveRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryExecutionPackageDetailResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["received_by"] = current_user["username"]
+    data["store_code"] = data.get("store_code") or current_user.get("store_code", "")
+    return StoreDeliveryExecutionPackageDetailResponse(**state.receive_store_delivery_package(package_code, data))
+
+
+@router.post(
+    "/store-delivery-packages/{package_code}/exception",
+    response_model=StoreDeliveryExecutionPackageDetailResponse,
+    tags=["stores", "transfers"],
+)
+def mark_store_delivery_package_exception(
+    package_code: str,
+    payload: StoreDeliveryPackageExceptionRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryExecutionPackageDetailResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["marked_by"] = current_user["username"]
+    data["store_code"] = data.get("store_code") or current_user.get("store_code", "")
+    return StoreDeliveryExecutionPackageDetailResponse(**state.mark_store_delivery_package_exception(package_code, data))
+
+
+@router.post(
+    "/store-delivery-packages/{package_code}/assign",
+    response_model=StoreDeliveryExecutionPackageDetailResponse,
+    tags=["stores", "transfers"],
+)
+def assign_store_delivery_package(
+    package_code: str,
+    payload: StoreDeliveryPackageAssignRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryExecutionPackageDetailResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["assigned_by"] = current_user["username"]
+    data["store_code"] = data.get("store_code") or current_user.get("store_code", "")
+    return StoreDeliveryExecutionPackageDetailResponse(**state.assign_store_delivery_package(package_code, data))
 
 
 @router.get(

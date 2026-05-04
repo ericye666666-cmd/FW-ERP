@@ -184,7 +184,13 @@ class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
     source_token_refs: List[str] = Field(default_factory=list)
     cost_source_refs: List[str] = Field(default_factory=list)
     status: str = "created"
+    received_status: str = "pending"
+    exception_status: str = "normal"
+    exception_reason: str = ""
     assigned_clerk: str = ""
+    assigned_at: Optional[str] = None
+    assigned_by: str = ""
+    assignment_status: str = "unassigned"
     received_at: Optional[str] = None
     received_by: str = ""
     printed_at: Optional[str] = None
@@ -192,6 +198,26 @@ class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
     created_at: str = ""
     updated_at: str = ""
     print_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class StoreDeliveryPackageReceiveRequest(BaseModel):
+    received_by: str = ""
+    store_code: str = ""
+    note: str = ""
+
+
+class StoreDeliveryPackageExceptionRequest(BaseModel):
+    exception_reason: str = Field(default="other")
+    marked_by: str = ""
+    store_code: str = ""
+    note: str = ""
+
+
+class StoreDeliveryPackageAssignRequest(BaseModel):
+    assigned_clerk: str = Field(min_length=1)
+    assigned_by: str = ""
+    store_code: str = ""
+    note: str = ""
 
 
 class StoreDeliveryExecutionOrderResponse(BaseModel):

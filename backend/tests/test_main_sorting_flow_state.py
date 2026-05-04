@@ -241,6 +241,179 @@ class MainSortingFlowStateTest(unittest.TestCase):
         )
         self.assertEqual(len(self.state.store_delivery_packages), 2)
 
+    def _create_store_delivery_package_state_order(self):
+        transfer_no = self._seed_transfer_for_store_delivery_package_test()
+        return self.state.create_store_delivery_execution_order(
+            transfer_no,
+            {
+                "created_by": "warehouse_clerk_1",
+                "notes": "package state persistence",
+                "packages": [
+                    {
+                        "source_type": "SDB",
+                        "source_code": "SDB260503AAG",
+                        "source_machine_code": "2260503006",
+                        "item_count": 100,
+                        "category_summary": "pants / jeans pant / P",
+                    },
+                    {
+                        "source_type": "LPK",
+                        "source_code": "LPK260504001",
+                        "source_machine_code": "3260504001",
+                        "item_count": 40,
+                        "category_summary": "pants / jeans pant / P",
+                    },
+                ],
+            },
+        )
+
+    def test_receive_store_delivery_package_persists_received_state_idempotently(self):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+
+        first = self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+                "note": "front counter scan",
+            },
+        )
+        second = self.state.receive_store_delivery_package(
+            package["machine_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+                "note": "repeat scan",
+            },
+        )
+
+        self.assertEqual(first["display_code"], package["display_code"])
+        self.assertEqual(first["received_status"], "received")
+        self.assertEqual(first["received_by"], "store_manager_1")
+        self.assertEqual(first["exception_status"], "normal")
+        self.assertIn(first["status"], {"received", "received_unassigned"})
+        self.assertEqual(second["received_status"], "received")
+        self.assertEqual(second["received_at"], first["received_at"])
+        self.assertEqual(len(self.state.store_delivery_packages), 2)
+
+    def test_store_delivery_package_exception_blocks_assignment(self):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+
+        result = self.state.mark_store_delivery_package_exception(
+            package["display_code"],
+            {
+                "exception_reason": "damaged",
+                "marked_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+
+        self.assertEqual(result["exception_status"], "exception")
+        self.assertEqual(result["exception_reason"], "damaged")
+        self.assertEqual(result["status"], "exception")
+        with self.assertRaises(HTTPException) as raised:
+            self.state.assign_store_delivery_package(
+                package["display_code"],
+                {
+                    "assigned_clerk": "Mary",
+                    "assigned_by": "store_manager_1",
+                    "store_code": "UTAWALA",
+                },
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+
+    def test_assign_store_delivery_package_requires_received_and_is_idempotent_for_same_clerk(self):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+
+        with self.assertRaises(HTTPException) as unreceived:
+            self.state.assign_store_delivery_package(
+                package["display_code"],
+                {
+                    "assigned_clerk": "Mary",
+                    "assigned_by": "store_manager_1",
+                    "store_code": "UTAWALA",
+                },
+            )
+        self.assertEqual(unreceived.exception.status_code, 409)
+
+        self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        first = self.state.assign_store_delivery_package(
+            package["display_code"],
+            {
+                "assigned_clerk": "Mary",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        second = self.state.assign_store_delivery_package(
+            package["machine_code"],
+            {
+                "assigned_clerk": "Mary",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+
+        self.assertEqual(first["assignment_status"], "assigned")
+        self.assertEqual(first["assigned_clerk"], "Mary")
+        self.assertEqual(first["assigned_by"], "store_manager_1")
+        self.assertEqual(first["status"], "assigned")
+        self.assertEqual(second["assigned_at"], first["assigned_at"])
+        with self.assertRaises(HTTPException) as reassigned:
+            self.state.assign_store_delivery_package(
+                package["display_code"],
+                {
+                    "assigned_clerk": "Jane",
+                    "assigned_by": "store_manager_1",
+                    "store_code": "UTAWALA",
+                },
+            )
+        self.assertEqual(reassigned.exception.status_code, 409)
+
+    def test_store_delivery_package_list_and_resolver_return_latest_state(self):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+
+        self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        self.state.assign_store_delivery_package(
+            package["display_code"],
+            {
+                "assigned_clerk": "Mary",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+
+        rows = self.state.list_store_delivery_execution_orders(transfer_no=order["source_transfer_no"])
+        listed_package = rows[0]["packages"][0]
+        resolved = self.state.resolve_barcode(package["machine_code"], context="store_receiving")
+
+        self.assertEqual(listed_package["received_status"], "received")
+        self.assertEqual(listed_package["assignment_status"], "assigned")
+        self.assertEqual(listed_package["assigned_clerk"], "Mary")
+        self.assertEqual(listed_package["exception_status"], "normal")
+        self.assertEqual(resolved["barcode_type"], "STORE_DELIVERY_PACKAGE")
+        self.assertEqual(resolved["received_status"], "received")
+        self.assertEqual(resolved["assignment_status"], "assigned")
+        self.assertEqual(resolved["assigned_clerk"], "Mary")
+        self.assertEqual(resolved["source_type"], "SDB")
+        self.assertEqual(resolved["source_code"], "SDB260503AAG")
+
     def _create_ready_bales(self, customs_notice_no="RAW240421", package_count=2, unit_weight=40):
         shipment = self.state.create_inbound_shipment(
             {
