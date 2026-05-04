@@ -28,3 +28,15 @@ class BarcodeResolveResponse(BaseModel):
     store_code: str = ""
     source_type: str = ""
     source_code: str = ""
+    item_count: int | None = None
+    status: str = ""
+    received_status: str = ""
+    received_at: str | None = None
+    received_by: str = ""
+    exception_status: str = ""
+    exception_reason: str = ""
+    assigned_clerk: str = ""
+    assigned_at: str | None = None
+    assigned_by: str = ""
+    assignment_status: str = ""
+    updated_at: str = ""

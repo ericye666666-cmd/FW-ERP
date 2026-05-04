@@ -1816,7 +1816,23 @@ class InMemoryState:
                 "source_token_refs": [str(value or "").strip().upper() for value in (token_refs or []) if str(value or "").strip()],
                 "cost_source_refs": [str(value or "").strip().upper() for value in (cost_refs or []) if str(value or "").strip()],
                 "status": str(normalized.get("status") or "created").strip().lower() or "created",
+                "received_status": str(
+                    normalized.get("received_status")
+                    or ("received" if normalized.get("received_at") else "")
+                    or ("received" if str(normalized.get("status") or "").strip().lower() in {"received", "received_unassigned", "assigned"} else "pending")
+                ).strip().lower() or "pending",
+                "exception_status": str(
+                    normalized.get("exception_status")
+                    or ("exception" if str(normalized.get("status") or "").strip().lower() == "exception" else "normal")
+                ).strip().lower() or "normal",
+                "exception_reason": str(normalized.get("exception_reason") or "").strip(),
                 "assigned_clerk": str(normalized.get("assigned_clerk") or normalized.get("assigned_employee") or "").strip(),
+                "assigned_at": normalized.get("assigned_at"),
+                "assigned_by": str(normalized.get("assigned_by") or "").strip(),
+                "assignment_status": str(
+                    normalized.get("assignment_status")
+                    or ("assigned" if str(normalized.get("assigned_clerk") or normalized.get("assigned_employee") or "").strip() else "unassigned")
+                ).strip().lower() or "unassigned",
                 "received_at": normalized.get("received_at"),
                 "received_by": str(normalized.get("received_by") or "").strip(),
                 "printed_at": normalized.get("printed_at"),
@@ -1844,6 +1860,69 @@ class InMemoryState:
             "template_scope": "warehouseout_bale",
         }
         return normalized
+
+    def _find_store_delivery_package_by_code(self, package_code: str) -> dict[str, Any]:
+        normalized_code = str(package_code or "").strip().upper()
+        normalized_digits = re.sub(r"\D", "", normalized_code)
+        if not normalized_code:
+            raise HTTPException(status_code=400, detail="SDO_PACKAGE code is required")
+
+        def matches(row: dict[str, Any]) -> bool:
+            keys = {
+                str(row.get("display_code") or "").strip().upper(),
+                str(row.get("package_id") or "").strip().upper(),
+                str(row.get("machine_code") or "").strip().upper(),
+                str(row.get("barcode_value") or "").strip().upper(),
+                str(row.get("human_readable") or "").strip().upper(),
+            }
+            if normalized_code in keys:
+                return True
+            if normalized_digits:
+                return normalized_digits in {re.sub(r"\D", "", value) for value in keys if value}
+            return False
+
+        for row in self.store_delivery_packages.values():
+            normalized = self._normalize_store_delivery_package(row)
+            if matches(normalized):
+                self.store_delivery_packages[normalized["display_code"]] = normalized
+                return normalized
+
+        for order in self.store_delivery_execution_orders.values():
+            for package in order.get("packages") if isinstance(order.get("packages"), list) else []:
+                if not isinstance(package, dict):
+                    continue
+                normalized = self._normalize_store_delivery_package(package)
+                if matches(normalized):
+                    self.store_delivery_packages[normalized["display_code"]] = normalized
+                    return normalized
+
+        raise HTTPException(status_code=404, detail=f"STORE_DELIVERY_PACKAGE {normalized_code} not found")
+
+    def _save_store_delivery_package(self, package: dict[str, Any]) -> dict[str, Any]:
+        normalized = self._normalize_store_delivery_package(package)
+        if not normalized.get("display_code"):
+            raise HTTPException(status_code=400, detail="SDO_PACKAGE display_code is required")
+        self.store_delivery_packages[normalized["display_code"]] = normalized
+        order_no = str(normalized.get("parent_sdo_order_no") or normalized.get("execution_order_no") or normalized.get("parent_sdo_display_code") or "").strip().upper()
+        if order_no:
+            order = self.store_delivery_execution_orders.get(order_no)
+            if order:
+                normalized_order = self._normalize_store_delivery_execution_order(order)
+                existing_packages = self._find_store_delivery_packages_for_order(order_no)
+                if existing_packages:
+                    normalized_order["packages"] = existing_packages
+                    normalized_order["package_count"] = max(int(normalized_order.get("package_count") or 0), len(existing_packages))
+                    if all(package_row.get("item_count") is not None for package_row in existing_packages):
+                        normalized_order["total_item_count"] = sum(int(package_row.get("item_count") or 0) for package_row in existing_packages)
+                self.store_delivery_execution_orders[order_no] = normalized_order
+        return normalized
+
+    def _validate_store_delivery_package_store(self, package: dict[str, Any], store_code: str = "") -> str:
+        package_store = str(package.get("store_code") or "").strip().upper()
+        requested_store = str(store_code or "").strip().upper()
+        if requested_store and package_store and requested_store != package_store:
+            raise HTTPException(status_code=403, detail=f"SDO_PACKAGE belongs to store {package_store}, not {requested_store}")
+        return package_store or requested_store
 
     def _find_store_delivery_packages_for_order(self, execution_order_no: str) -> list[dict[str, Any]]:
         normalized_order_no = str(execution_order_no or "").strip().upper()
@@ -4047,6 +4126,18 @@ class InMemoryState:
                     "store_code": normalized_package.get("store_code", ""),
                     "source_type": normalized_package.get("source_type", ""),
                     "source_code": normalized_package.get("source_code", ""),
+                    "item_count": normalized_package.get("item_count"),
+                    "status": normalized_package.get("status", ""),
+                    "received_status": normalized_package.get("received_status", ""),
+                    "received_at": normalized_package.get("received_at"),
+                    "received_by": normalized_package.get("received_by", ""),
+                    "exception_status": normalized_package.get("exception_status", ""),
+                    "exception_reason": normalized_package.get("exception_reason", ""),
+                    "assigned_clerk": normalized_package.get("assigned_clerk", ""),
+                    "assigned_at": normalized_package.get("assigned_at"),
+                    "assigned_by": normalized_package.get("assigned_by", ""),
+                    "assignment_status": normalized_package.get("assignment_status", ""),
+                    "updated_at": normalized_package.get("updated_at", ""),
                 }
             )
             matches.append(package_result)
@@ -13561,6 +13652,107 @@ class InMemoryState:
             reverse=True,
         )
         return rows
+
+    def receive_store_delivery_package(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        package = self._find_store_delivery_package_by_code(package_code)
+        package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))
+        actor = self._require_user_role(payload["received_by"], {"store_manager", "area_supervisor"}, store_code=package_store or None)
+        if str(package.get("exception_status") or "").strip().lower() == "exception":
+            raise HTTPException(status_code=409, detail="异常 SDP 不能直接确认收货，请先处理异常。")
+
+        if str(package.get("received_status") or "").strip().lower() == "received":
+            return package
+
+        timestamp = now_iso()
+        package.update(
+            {
+                "received_status": "received",
+                "received_at": package.get("received_at") or timestamp,
+                "received_by": package.get("received_by") or actor["username"],
+                "exception_status": str(package.get("exception_status") or "normal").strip().lower() or "normal",
+                "assignment_status": str(package.get("assignment_status") or "unassigned").strip().lower() or "unassigned",
+                "status": "assigned" if str(package.get("assignment_status") or "").strip().lower() == "assigned" else "received_unassigned",
+                "updated_at": timestamp,
+            }
+        )
+        saved = self._save_store_delivery_package(package)
+        self._log_event(
+            event_type="store_delivery_package.received",
+            entity_type="store_delivery_package",
+            entity_id=saved["display_code"],
+            actor=actor["username"],
+            summary=f"SDO package {saved['display_code']} received at {saved['store_code']}",
+            details={"store_code": saved.get("store_code", ""), "note": str(payload.get("note") or "").strip()},
+        )
+        self._persist()
+        return saved
+
+    def mark_store_delivery_package_exception(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        package = self._find_store_delivery_package_by_code(package_code)
+        package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))
+        actor = self._require_user_role(payload["marked_by"], {"store_manager", "area_supervisor"}, store_code=package_store or None)
+        timestamp = now_iso()
+        exception_reason = str(payload.get("exception_reason") or "other").strip().lower() or "other"
+        package.update(
+            {
+                "exception_status": "exception",
+                "exception_reason": exception_reason,
+                "status": "exception",
+                "updated_at": timestamp,
+            }
+        )
+        saved = self._save_store_delivery_package(package)
+        self._log_event(
+            event_type="store_delivery_package.exception",
+            entity_type="store_delivery_package",
+            entity_id=saved["display_code"],
+            actor=actor["username"],
+            summary=f"SDO package {saved['display_code']} marked exception",
+            details={"store_code": saved.get("store_code", ""), "reason": exception_reason, "note": str(payload.get("note") or "").strip()},
+        )
+        self._persist()
+        return saved
+
+    def assign_store_delivery_package(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        package = self._find_store_delivery_package_by_code(package_code)
+        package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))
+        actor = self._require_user_role(payload["assigned_by"], {"store_manager", "area_supervisor"}, store_code=package_store or None)
+        assigned_clerk = str(payload.get("assigned_clerk") or payload.get("employee_name") or "").strip()
+        if not assigned_clerk:
+            raise HTTPException(status_code=400, detail="Assigned clerk is required")
+        if str(package.get("received_status") or "").strip().lower() != "received":
+            raise HTTPException(status_code=409, detail="未收货 SDP 不允许分配。")
+        if str(package.get("exception_status") or "").strip().lower() == "exception":
+            raise HTTPException(status_code=409, detail="异常 SDP 不允许分配，先处理异常。")
+
+        previous_clerk = str(package.get("assigned_clerk") or "").strip()
+        if previous_clerk:
+            if previous_clerk.lower() == assigned_clerk.lower():
+                return package
+            raise HTTPException(status_code=409, detail=f"SDP {package['display_code']} 已分配给 {previous_clerk}，一个 SDP 不能分配给多个店员。")
+
+        timestamp = now_iso()
+        package.update(
+            {
+                "assigned_clerk": assigned_clerk,
+                "assigned_at": timestamp,
+                "assigned_by": actor["username"],
+                "assignment_status": "assigned",
+                "status": "assigned",
+                "updated_at": timestamp,
+            }
+        )
+        saved = self._save_store_delivery_package(package)
+        self._log_event(
+            event_type="store_delivery_package.assigned",
+            entity_type="store_delivery_package",
+            entity_id=saved["display_code"],
+            actor=actor["username"],
+            summary=f"SDO package {saved['display_code']} assigned to {assigned_clerk}",
+            details={"store_code": saved.get("store_code", ""), "assigned_clerk": assigned_clerk, "note": str(payload.get("note") or "").strip()},
+        )
+        self._persist()
+        return saved
 
     def ensure_store_delivery_execution_order_packages(self, transfer_no: str, execution_order_no: str, payload: dict[str, Any]) -> dict[str, Any]:
         actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})

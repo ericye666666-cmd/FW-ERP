@@ -192,25 +192,31 @@ test("store receiving surfaces use SDP package projection instead of source bale
   assert.match(appJs, /function renderStoreReceivingPackageDetail/);
   assert.match(appJs, /function getStoreReceiptSdoStatusText/);
   assert.match(appJs, /function renderStoreReceiptTransferPackageList/);
+  assert.match(appJs, /async function receiveStoreReceivingPackage/);
+  assert.match(appJs, /async function markStoreReceivingPackageException/);
+  assert.match(appJs, /async function assignStoreReceivingPackagesToClerk/);
   assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\], "store_receiving", \["STORE_DELIVERY_EXECUTION", "STORE_DELIVERY_PACKAGE"\]\)/);
   assert.match(appJs, /SDB \/ LPK 是仓库来源包，请扫描 SDO 或 SDP 实体包码。/);
   assert.match(appJs, /STORE_ITEM 只能用于 POS 销售。/);
   assert.match(appJs, /\^5\\d\{9\}\$[\s\S]*\^5\\d\{12\}\$/);
   assert.match(appJs, /SDB \/ LPK 只作为来源码显示，不作为门店正式收货对象/);
-  assert.match(indexHtml, /不提供跨设备后端持久化/);
-  assert.match(indexHtml, /后续 PR 需要把 SDP received \/ assigned \/ exception 状态写入后端/);
+  assert.match(indexHtml, /SDP 收货、异常和分配状态以后端状态为准/);
   assert.doesNotMatch(appJs, /当前版本先完成识别与信息展示；逐包收货回写将在后续版本补充/);
+  assert.doesNotMatch(appJs, /本机前端状态，不提供跨设备后端持久化/);
   assert.match(appJs, /#storeDispatchBaleAcceptForm \[name='bale_no'\][\s\S]*addEventListener\("input"/);
 });
 
 test("page 5 statistics are counted by SDP packages", () => {
   const summarySource = extractFunctionSource(appJs, "renderStoreManagerConsoleSummary");
+  const normalizeSource = extractFunctionSource(appJs, "normalizeStoreReceivingPackageRow");
 
   assert.match(summarySource, /const packageRows = getStoreReceivingPackageRows\(storeCode\)/);
   assert.match(summarySource, /pendingReceiptPackages/);
   assert.match(summarySource, /receivedUnassignedPackages/);
   assert.match(summarySource, /assignedPackages/);
   assert.match(summarySource, /exceptionPackages/);
+  assert.match(normalizeSource, /merged\.received_status[\s\S]*statusState\.received_status/);
+  assert.match(normalizeSource, /merged\.assignment_status[\s\S]*assignmentState\.assignment_status/);
   assert.match(summarySource, /待收货/);
   assert.match(summarySource, /已收货未分配/);
   assert.match(summarySource, /已分配/);
@@ -239,6 +245,21 @@ test("page 5 load recent refreshes SDO package data before rendering", () => {
   assert.match(appJs, /button\.dataset\.storeReceiptLoadRecent !== undefined[\s\S]*await loadTransferOrders\(\);[\s\S]*renderStoreManagerConsoleSummary/);
 });
 
+test("page 5 receiving actions call backend package endpoints", () => {
+  const receiveSource = extractFunctionSource(appJs, "receiveStoreReceivingPackage");
+  const exceptionSource = extractFunctionSource(appJs, "markStoreReceivingPackageException");
+  const clickSource = appJs.slice(appJs.indexOf("if (button.dataset.storeReceiptPackageAction)"));
+
+  assert.match(receiveSource, /\/store-delivery-packages\/\$\{encodeURIComponent\(packageCode\)\}\/receive/);
+  assert.match(receiveSource, /method: "POST"/);
+  assert.match(exceptionSource, /\/store-delivery-packages\/\$\{encodeURIComponent\(packageCode\)\}\/exception/);
+  assert.match(exceptionSource, /exception_reason/);
+  assert.match(clickSource, /await receiveStoreReceivingPackage/);
+  assert.match(clickSource, /await markStoreReceivingPackageException/);
+  assert.match(clickSource, /await loadTransferOrders\(\)/);
+  assert.doesNotMatch(clickSource, /storeReceiptPackageStatusState\[packageCode\] =/);
+});
+
 test("page 6 package detail exposes SDP identity and clear flow return buttons", () => {
   const detailSource = extractFunctionSource(appJs, "renderStoreReceivingPackageDetail");
 
@@ -262,16 +283,20 @@ test("page 6 package detail exposes SDP identity and clear flow return buttons",
 test("page 6.1 assignment stores one clerk per received SDP package", () => {
   const assignSource = extractFunctionSource(appJs, "assignStoreReceivingPackagesToClerk");
   const overviewSource = extractFunctionSource(appJs, "renderStoreDispatchAssignmentOverview");
+  const assignableSource = extractFunctionSource(appJs, "isStoreReceivingPackageAssignable");
 
   assert.match(assignSource, /const sdoPackageCode = getStoreReceivingPackageCode/);
-  assert.match(assignSource, /storeReceiptPackageAssignmentState\[sdoPackageCode\]/);
+  assert.match(assignSource, /\/store-delivery-packages\/\$\{encodeURIComponent\(sdoPackageCode\)\}\/assign/);
+  assert.match(assignSource, /method: "POST"/);
   assert.match(assignSource, /received_status !== "received"/);
   assert.match(assignSource, /exception_status === "exception"/);
   assert.match(assignSource, /assigned_clerk/);
-  assert.match(assignSource, /assignment_status: "assigned"/);
   assert.match(assignSource, /不能分配给多个店员/);
+  assert.doesNotMatch(assignSource, /storeReceiptPackageAssignmentState\[sdoPackageCode\] =/);
   assert.doesNotMatch(assignSource, /assignmentState\[baleNo\]/);
   assert.match(overviewSource, /getStoreReceivingPackageRows\(storeCode\)/);
+  assert.match(overviewSource, /isStoreReceivingPackageAssignable\(row\)/);
+  assert.match(assignableSource, /assignment_status[\s\S]*!== "assigned"/);
   assert.match(overviewSource, /data-store-assignment-pkg="\$\{escapeHtml\(getStoreReceivingPackageCode\(row\)\)\}"/);
 });
 
