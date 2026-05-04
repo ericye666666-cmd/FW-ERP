@@ -191,6 +191,28 @@ def test_pos_accepts_only_store_item_and_requires_identity_id(state):
     assert legacy_token_rejected["reject_reason"]
 
 
+def test_store_item_v2_resolver_validates_ean13_for_pos(state):
+    token = _seed_store_item_token(state)
+    token["barcode_value"] = "5261240000013"
+    token["final_item_barcode"] = {"barcode_value": "5261240000013"}
+
+    accepted = state.resolve_barcode("5261240000013", context="pos")
+
+    assert accepted["barcode_type"] == "STORE_ITEM"
+    assert accepted["object_id"] == token["token_no"]
+    assert accepted["pos_allowed"] is True
+    assert accepted["reject_reason"] == ""
+
+    token["barcode_value"] = "5261240000010"
+    token["final_item_barcode"] = {"barcode_value": "5261240000010"}
+    rejected = state.resolve_barcode("5261240000010", context="pos")
+
+    assert rejected["barcode_type"] == "STORE_ITEM"
+    assert rejected["object_id"] == token["token_no"]
+    assert rejected["pos_allowed"] is False
+    assert rejected["reject_reason"] == "STORE_ITEM EAN-13 校验位不正确，不能 POS 销售。"
+
+
 def test_warehouse_sorting_accepts_raw_bale_and_rejects_store_item(state):
     raw_bale, _, token, _ = _prepare_barcode_fixtures(state)
     store_item_barcode = token["barcode_value"]
@@ -446,7 +468,22 @@ def test_store_prep_bale_rejection_message_in_store_receiving_mentions_official_
 def test_machine_code_mapping_rules_for_lpk_and_sdo(state):
     assert state._physical_label_machine_code("TO-20260428-001", "LPK", source_reference="TO-20260428-001") == "3260428001"
     assert state._physical_label_machine_code("SDO260428001", "SDO") == "4260428001"
-    assert state._physical_label_machine_code("ST-20260428-001-0001", "STORE_ITEM") == "5260428001"
+
+
+def test_store_item_v2_ean13_generation_rules(state):
+    assert state._ean13_check_digit("526124000001") == "3"
+    assert state._store_item_barcode_v2_value("2026-05-04", 1) == "5261240000013"
+
+
+def test_store_item_v2_allocator_skips_existing_codes(state):
+    token = _seed_store_item_token(state)
+    token["barcode_value"] = "5261240000013"
+    token["final_item_barcode"] = {"barcode_value": "5261240000013"}
+
+    allocated = state._store_item_barcode_value("ST-20260504-001", 1, "2026-05-04T08:00:00+03:00")
+
+    assert allocated == "5261240000020"
+    assert state._is_valid_store_item_v2_barcode(allocated)
 
 
 def test_lpk_machine_code_uses_related_to_number_to_avoid_collision(state):
@@ -493,7 +530,8 @@ def test_store_item_print_payload_uses_type_5_machine_code(state):
     assert payload["machine_code"] == token["barcode_value"]
     assert payload["human_readable"] == token["barcode_value"]
     assert payload["display_code"] == token["token_no"]
-    assert payload["barcode_value"].startswith("5")
+    assert re.fullmatch(r"5\d{12}", payload["barcode_value"])
+    assert state._is_valid_store_item_v2_barcode(payload["barcode_value"])
     assert payload["token_no"] == token["token_no"]
 
 

@@ -94,12 +94,13 @@ test("warehouse ship selectors can count generated SDO packages without runtime 
   assert.match(source, /dispatch_bale_count/);
 });
 
-test("Austin clerk page can generate traceable STORE_ITEM tokens from assigned SDO packages", () => {
+test("Austin clerk page does not locally generate STORE_ITEM machine codes", () => {
   assert.match(appJs, /storeSdoPackageItemTokens/);
   assert.match(appJs, /function generateStoreItemTokensForSdoPackage/);
-  assert.match(appJs, /barcode_type:\s*"STORE_ITEM"/);
-  assert.match(appJs, /source_sdo:/);
-  assert.match(appJs, /source_package:/);
+  assert.match(appJs, /STORE_ITEM machine_code 必须由后端统一发号/);
+  assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
+  assert.doesNotMatch(appJs, /function buildStoreItemTokenSerial/);
+  assert.doesNotMatch(appJs, /const machineCode = `5\$\{/);
   assert.match(appJs, /data-store-package-generate-items/);
   assert.match(appJs, /data-store-package-print-items/);
 });
@@ -134,7 +135,7 @@ test("clerk 6.2 home is a PDA package list and moves package actions into shelvi
   assert.match(stepSource, /选择货架位/);
   assert.match(extractFunctionSource(appJs, "getStorePackageCostLabel"), /成本待确认/);
   assert.match(appJs, /A-01[\s\S]*A-02[\s\S]*B-01[\s\S]*B-02[\s\S]*C-01/);
-  assert.match(generateSource, /store_rack_code:\s*rackCode/);
+  assert.match(generateSource, /后端统一发号/);
 });
 
 test("clerk package cards open shelving even when SDO code is missing", () => {
@@ -175,16 +176,11 @@ test("clerk package shelving step supports price selection and batch print previ
   assert.match(stepSource, /标记本次已打印/);
   assert.match(appJs, /STORE_ITEM machine_code barcode/);
 
-  assert.match(generateSource, /selected_price:\s*selectedPrice/);
-  assert.match(generateSource, /item_count_source:\s*1/);
-  assert.match(generateSource, /cost_price:\s*costPrice/);
-  assert.match(generateSource, /cost_status:\s*costPrice == null \? "unknown" : "known"/);
-  assert.match(generateSource, /source_cost_layer:\s*sourceCostLayer/);
-  assert.match(generateSource, /default_price_1:\s*priceChoices\.default_price_1/);
-  assert.match(generateSource, /default_price_2:\s*priceChoices\.default_price_2/);
-  assert.match(generateSource, /print_status:\s*"pending_print"/);
-  assert.match(generateSource, /machineCode = `5/);
-  assert.match(generateSource, /barcode_value:\s*machineCode/);
+  assert.match(generateSource, /STORE_ITEM machine_code 必须由后端统一发号/);
+  assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
+  assert.doesNotMatch(generateSource, /barcode_value:\s*machineCode/);
+  assert.doesNotMatch(generateSource, /machine_code:\s*machineCode/);
+  assert.doesNotMatch(generateSource, /machineCode = `5/);
   assert.match(costSource, /total_cost_kes/);
   assert.match(costSource, /totalCost \/ itemCount/);
   assert.match(costSource, /return null/);

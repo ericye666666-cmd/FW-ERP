@@ -29,11 +29,13 @@ function extractFunctionSource(source, functionName) {
 
 test("POS scans only STORE_ITEM machine codes from clerk-generated tokens", () => {
   assert.match(appJs, /posStoreItemSaleRecords/);
-  assert.match(appJs, /sale_status:\s*"ready_for_sale"/);
   const lookupSource = extractFunctionSource(appJs, "resolvePosStoreItemTokenByMachineCode");
   const terminalLookupSource = extractFunctionSource(appJs, "submitCashierTerminalLookup");
   assert.match(lookupSource, /^function resolvePosStoreItemTokenByMachineCode/);
-  assert.match(lookupSource, /\!machineCode\.startsWith\("5"\)/);
+  assert.match(appJs, /function computeStoreItemEan13CheckDigit/);
+  assert.match(appJs, /function isValidStoreItemMachineCodeForPos/);
+  assert.match(lookupSource, /\!isValidStoreItemMachineCodeForPos\(machineCode\)/);
+  assert.match(appJs, /computeStoreItemEan13CheckDigit\(machineCode\.slice\(0,\s*12\)\) === machineCode\.slice\(12\)/);
   assert.match(lookupSource, /此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。/);
   assert.match(lookupSource, /sale_status[\s\S]*sold[\s\S]*该商品已售出，不能重复销售/);
   assert.match(lookupSource, /sale_status[\s\S]*ready_for_sale/);
@@ -73,11 +75,15 @@ test("POS cashier terminal renders cashier touch layout without changing barcode
 test("POS cashier terminal keeps non-STORE_ITEM codes out of sales", () => {
   const lookupSource = extractFunctionSource(appJs, "resolvePosStoreItemTokenByMachineCode");
   assert.match(lookupSource, /const machineCode = String\(value \|\| ""\)\.replace\(\s*\/\[\^0-9\]\/g,\s*""\)/, "lookup should normalize machine code from numeric barcode input");
-  assert.match(lookupSource, /\!machineCode\.startsWith\("5"\)/);
+  assert.match(lookupSource, /\!isValidStoreItemMachineCodeForPos\(machineCode\)/);
+  assert.match(appJs, /return \/\^5\\d\{9\}\$\/\.test\(machineCode\)/);
   assert.match(lookupSource, /throw new Error\("此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。"\)/);
   ["RAW_BALE", "STORE_PREP_BALE", "LOOSE_PICK_TASK", "STORE_DELIVERY_EXECUTION"].forEach((barcodeType) => {
     assert.doesNotMatch(lookupSource, new RegExp(`allowedBarcodeTypes[\\s\\S]*${barcodeType}`));
   });
+  assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
+  assert.doesNotMatch(appJs, /function buildStoreItemTokenSerial/);
+  assert.doesNotMatch(appJs, /const machineCode = `5\$\{/);
   assert.match(appJs, /store_item_machine_code:\s*token\.machine_code/);
   assert.match(appJs, /barcode:\s*token\.machine_code/);
   assert.doesNotMatch(appJs, /barcode:\s*token\.display_code/);

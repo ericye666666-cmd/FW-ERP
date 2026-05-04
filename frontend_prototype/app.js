@@ -23751,9 +23751,29 @@ function removeCashierTerminalPaymentLine(index) {
   renderCashierTerminal();
 }
 
+function computeStoreItemEan13CheckDigit(body = "") {
+  const digits = String(body || "").replace(/[^0-9]/g, "");
+  if (!/^\d{12}$/.test(digits)) {
+    return "";
+  }
+  let total = 0;
+  [...digits].forEach((digit, index) => {
+    total += Number(digit) * (index % 2 === 0 ? 1 : 3);
+  });
+  return String((10 - (total % 10)) % 10);
+}
+
+function isValidStoreItemMachineCodeForPos(value = "") {
+  const machineCode = String(value || "").replace(/[^0-9]/g, "").trim();
+  if (/^5\d{12}$/.test(machineCode)) {
+    return computeStoreItemEan13CheckDigit(machineCode.slice(0, 12)) === machineCode.slice(12);
+  }
+  return /^5\d{9}$/.test(machineCode);
+}
+
 function resolvePosStoreItemTokenByMachineCode(value = "") {
   const machineCode = String(value || "").replace(/[^0-9]/g, "").trim();
-  if (!machineCode.startsWith("5")) {
+  if (!isValidStoreItemMachineCodeForPos(machineCode)) {
     throw new Error("此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。");
   }
   const token = storeSdoPackageItemTokenState.find((row) => String(row?.machine_code || "").trim() === machineCode);
@@ -27442,76 +27462,13 @@ function getSelectedStorePackagePrice(row = {}, actionKey = getStorePackageActio
   throw new Error("请先选择售价");
 }
 
-function buildStoreItemTokenSerial() {
-  const today = new Date().toISOString().slice(2, 10).replace(/-/g, "");
-  const sameDayCount = storeSdoPackageItemTokenState.filter((token) => String(token?.display_code || "").includes(today)).length;
-  return {
-    today,
-    sequence: sameDayCount + 1,
-  };
-}
-
 function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
   const actionKey = getStorePackageActionKey(row);
   const existingTokens = getStorePackageTokens(actionKey);
   if (existingTokens.length) {
     return existingTokens;
   }
-  const rackCode = String(options.store_rack_code || "").trim().toUpperCase();
-  if (!rackCode) {
-    throw new Error("请先选择货架位");
-  }
-  const selectedPrice = Number(options.selected_price);
-  if (!(selectedPrice > 0)) {
-    throw new Error("请先选择售价");
-  }
-  const itemCount = getStorePackageItemCount(row);
-  if (!(itemCount > 0)) {
-    throw new Error("当前包件数待确认，不能生成 STORE_ITEM。");
-  }
-  const priceChoices = getStorePackagePriceChoices(row);
-  const costPrice = getStorePackageCostPrice(row);
-  const sourceCostLayer = String(row?.source_cost_layer || row?.cost_layer || "").trim();
-  const sourceSdo = getStorePackageSdoCode(row);
-  const sourcePackage = getStorePackageSourceCode(row);
-  const sourceType = getStorePackageSourceType(row);
-  const storeCode = String(row?.store_code || row?.to_store_code || row?.target_store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
-  const assignedEmployee = String(row?.assigned_employee || storeClerkHomeState.assigned_employee || getCurrentStoreWorkerFallback()).trim();
-  const categorySummary = getStorePackageCategoryLabel(row);
-  const newTokens = [];
-  for (let index = 0; index < itemCount; index += 1) {
-    const serial = buildStoreItemTokenSerial();
-    const serialText = String(serial.sequence + index).padStart(3, "0");
-    const displayCode = `STOREITEM${serial.today}${serialText}`;
-    const machineCode = `5${serial.today}${serialText}`;
-    newTokens.push({
-      display_code: displayCode,
-      machine_code: machineCode,
-      barcode_value: machineCode,
-      barcode_type: "STORE_ITEM",
-      source_package_key: actionKey,
-      source_sdo: sourceSdo,
-      source_package: sourcePackage,
-      source_type: sourceType,
-      store_code: storeCode,
-      assigned_employee: assignedEmployee,
-      category_summary: categorySummary,
-      item_count_source: 1,
-      cost_price: costPrice,
-      cost_status: costPrice == null ? "unknown" : "known",
-      source_cost_layer: sourceCostLayer,
-      default_price_1: priceChoices.default_price_1,
-      default_price_2: priceChoices.default_price_2,
-      selected_price: selectedPrice,
-      store_rack_code: rackCode,
-      print_status: "pending_print",
-      sale_status: "ready_for_sale",
-      created_at: new Date().toISOString(),
-    });
-  }
-  storeSdoPackageItemTokenState = [...storeSdoPackageItemTokenState, ...newTokens];
-  persistStoreSdoPackageItemTokenState();
-  return newTokens;
+  throw new Error("STORE_ITEM machine_code 必须由后端统一发号；当前前端/PDA 不允许本地生成 STORE_ITEM。");
 }
 
 function buildStorePackagePrintPreviewTokens(row = {}, quantity = null) {
