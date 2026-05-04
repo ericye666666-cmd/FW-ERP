@@ -196,6 +196,7 @@ class InMemoryState:
         self.store_prep_bales: dict[str, dict[str, Any]] = {}
         self.store_dispatch_bales: dict[str, dict[str, Any]] = {}
         self.store_delivery_execution_orders: dict[str, dict[str, Any]] = {}
+        self.store_delivery_packages: dict[str, dict[str, Any]] = {}
         self.sorting_stock: dict[str, dict[str, Any]] = {}
         self.goods_receipts: list[dict[str, Any]] = []
         self.print_jobs: list[dict[str, Any]] = []
@@ -228,6 +229,7 @@ class InMemoryState:
         self.offline_sync_batches: dict[str, dict[str, Any]] = {}
         self.offline_sale_registry: dict[str, dict[str, Any]] = {}
         self.label_templates: dict[str, dict[str, Any]] = {}
+        self._barcode_generation_lock = threading.RLock()
         self.users: dict[int, dict[str, Any]] = {}
         self.auth_sessions: dict[str, dict[str, Any]] = {}
         self.stores: dict[str, dict[str, Any]] = {
@@ -269,6 +271,9 @@ class InMemoryState:
         self._transfer_ids = count(len(self.transfer_orders) + 1)
         self._picking_wave_ids = count(len(self.picking_waves) + 1)
         self._store_delivery_execution_order_ids = count(len(self.store_delivery_execution_orders) + 1)
+        self._store_delivery_package_ids = count(
+            max((int(row.get("id") or 0) for row in self.store_delivery_packages.values()), default=0) + 1
+        )
         self._transfer_recommendation_ids = count(len(self.transfer_recommendations) + 1)
         self._receiving_session_ids = count(len(self.transfer_receiving_sessions) + 1)
         self._store_token_receiving_session_ids = count(len(self.store_token_receiving_sessions) + 1)
@@ -329,6 +334,7 @@ class InMemoryState:
             "store_prep_bales": self.store_prep_bales,
             "store_dispatch_bales": self.store_dispatch_bales,
             "store_delivery_execution_orders": self.store_delivery_execution_orders,
+            "store_delivery_packages": self.store_delivery_packages,
             "sorting_stock": self.sorting_stock,
             "goods_receipts": self.goods_receipts,
             "print_jobs": self.print_jobs,
@@ -392,6 +398,7 @@ class InMemoryState:
         self.store_prep_bales = payload.get("store_prep_bales", {})
         self.store_dispatch_bales = payload.get("store_dispatch_bales", {})
         self.store_delivery_execution_orders = payload.get("store_delivery_execution_orders", {})
+        self.store_delivery_packages = payload.get("store_delivery_packages", {})
         self.sorting_stock = payload.get("sorting_stock", {})
         self.goods_receipts = payload.get("goods_receipts", [])
         self.print_jobs = payload.get("print_jobs", [])
@@ -1642,6 +1649,9 @@ class InMemoryState:
             "LPK": "3",
             "SDO": "4",
             "STORE_ITEM": "5",
+            "SDP": "6",
+            "SDO_PACKAGE": "6",
+            "STORE_DELIVERY_PACKAGE": "6",
         }
         type_digit = type_digit_map.get(normalized_type, "")
         if not normalized_display or not type_digit:
@@ -1663,6 +1673,24 @@ class InMemoryState:
         if len(compact_digits) >= 9:
             return f"{type_digit}{compact_digits[-9:]}"
         return normalized_display
+
+    def _parse_optional_nonnegative_int(self, value: Any) -> Optional[int]:
+        if value is None or value == "":
+            return None
+        try:
+            parsed = int(float(value))
+        except (TypeError, ValueError):
+            return None
+        if parsed < 0:
+            return None
+        return parsed
+
+    def _extract_dispatch_item_count(self, row: dict[str, Any]) -> Optional[int]:
+        for key in ("item_count", "qty", "quantity", "piece_count", "pieces"):
+            parsed = self._parse_optional_nonnegative_int(row.get(key))
+            if parsed is not None:
+                return parsed
+        return None
 
     def _collect_existing_machine_codes(self) -> set[str]:
         machine_codes: set[str] = set()
@@ -1688,12 +1716,249 @@ class InMemoryState:
             self.store_prep_bales,
             self.store_dispatch_bales,
             self.store_delivery_execution_orders,
+            self.store_delivery_packages,
             self.item_barcode_tokens,
             self.print_jobs,
             self.print_station_jobs,
         ):
             walk(collection)
         return machine_codes
+
+    def _allocate_store_delivery_package_barcode(self) -> tuple[str, str]:
+        with self._barcode_generation_lock:
+            now = datetime.now(NAIROBI_TZ)
+            day_fragment = f"{now:%y}{now.timetuple().tm_yday:03d}"
+            machine_prefix = f"6{day_fragment}"
+            existing_codes = self._collect_existing_machine_codes()
+            existing_sequences = [
+                int(code[-4:])
+                for code in existing_codes
+                if re.fullmatch(rf"{re.escape(machine_prefix)}\d{{4}}", code)
+            ]
+            next_sequence = max(existing_sequences, default=0) + 1
+            if next_sequence > 9999:
+                raise HTTPException(status_code=409, detail="SDO_PACKAGE 当天 6 类型 barcode 流水已超过 9999，不能继续发号。")
+            machine_code = f"{machine_prefix}{next_sequence:04d}"
+            while machine_code in existing_codes:
+                next_sequence += 1
+                if next_sequence > 9999:
+                    raise HTTPException(status_code=409, detail="SDO_PACKAGE 当天 6 类型 barcode 流水已超过 9999，不能继续发号。")
+                machine_code = f"{machine_prefix}{next_sequence:04d}"
+            return f"SDP{machine_code[1:]}", machine_code
+
+    def _normalize_store_delivery_package(self, row: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(row or {})
+        display_code = str(
+            normalized.get("display_code")
+            or normalized.get("package_code")
+            or normalized.get("sdo_package_code")
+            or ""
+        ).strip().upper()
+        machine_code = str(
+            normalized.get("machine_code")
+            or normalized.get("barcode_value")
+            or normalized.get("scan_token")
+            or ""
+        ).replace(" ", "").strip().upper()
+        if machine_code and not re.fullmatch(r"6\d{9}", machine_code):
+            machine_code = ""
+        if machine_code and not display_code:
+            display_code = f"SDP{machine_code[1:]}"
+        barcode_value = machine_code
+        source_type = str(normalized.get("source_type") or "").strip().upper()
+        source_code = str(normalized.get("source_code") or normalized.get("bale_no") or "").strip().upper()
+        if not source_type:
+            if source_code.startswith("LPK"):
+                source_type = "LPK"
+            elif source_code.startswith("SDB"):
+                source_type = "SDB"
+            else:
+                source_type = "MIXED"
+        package_no = self._parse_optional_nonnegative_int(normalized.get("package_no")) or 0
+        package_total = self._parse_optional_nonnegative_int(normalized.get("package_total")) or 0
+        item_count = self._extract_dispatch_item_count(normalized)
+        content_summary = str(
+            normalized.get("content_summary")
+            or normalized.get("category_summary")
+            or normalized.get("category_name")
+            or ""
+        ).strip()
+        created_at = str(normalized.get("created_at") or now_iso())
+        updated_at = str(normalized.get("updated_at") or created_at)
+        package_id = str(normalized.get("package_id") or display_code or "").strip().upper()
+        token_refs = normalized.get("source_token_refs") if isinstance(normalized.get("source_token_refs"), list) else normalized.get("token_nos")
+        cost_refs = normalized.get("cost_source_refs") if isinstance(normalized.get("cost_source_refs"), list) else []
+        normalized.update(
+            {
+                "id": int(normalized.get("id") or 0),
+                "package_id": package_id,
+                "display_code": display_code,
+                "machine_code": machine_code,
+                "barcode_value": barcode_value,
+                "human_readable": machine_code,
+                "entity_type": "STORE_DELIVERY_PACKAGE",
+                "parent_entity_type": "STORE_DELIVERY_EXECUTION",
+                "parent_sdo_display_code": str(normalized.get("parent_sdo_display_code") or normalized.get("parent_sdo_order_no") or normalized.get("execution_order_no") or "").strip().upper(),
+                "parent_sdo_machine_code": str(normalized.get("parent_sdo_machine_code") or "").strip().upper(),
+                "parent_sdo_order_no": str(normalized.get("parent_sdo_order_no") or normalized.get("parent_sdo_display_code") or normalized.get("execution_order_no") or "").strip().upper(),
+                "execution_order_no": str(normalized.get("execution_order_no") or normalized.get("parent_sdo_order_no") or normalized.get("parent_sdo_display_code") or "").strip().upper(),
+                "transfer_no": str(normalized.get("transfer_no") or normalized.get("source_transfer_no") or "").strip().upper(),
+                "store_code": str(normalized.get("store_code") or normalized.get("to_store_code") or "").strip().upper(),
+                "package_no": package_no,
+                "package_total": package_total,
+                "source_type": source_type,
+                "source_code": source_code,
+                "source_machine_code": str(normalized.get("source_machine_code") or "").strip().upper(),
+                "item_count": item_count,
+                "content_summary": content_summary,
+                "category_summary": str(normalized.get("category_summary") or content_summary).strip(),
+                "category_name": str(normalized.get("category_name") or content_summary).strip(),
+                "source_token_refs": [str(value or "").strip().upper() for value in (token_refs or []) if str(value or "").strip()],
+                "cost_source_refs": [str(value or "").strip().upper() for value in (cost_refs or []) if str(value or "").strip()],
+                "status": str(normalized.get("status") or "created").strip().lower() or "created",
+                "assigned_clerk": str(normalized.get("assigned_clerk") or normalized.get("assigned_employee") or "").strip(),
+                "received_at": normalized.get("received_at"),
+                "received_by": str(normalized.get("received_by") or "").strip(),
+                "printed_at": normalized.get("printed_at"),
+                "printed_by": str(normalized.get("printed_by") or "").strip(),
+                "created_at": created_at,
+                "updated_at": updated_at,
+            }
+        )
+        normalized["print_payload"] = {
+            "title": "SDO / DELIVERY",
+            "display_code": normalized["display_code"],
+            "machine_code": normalized["machine_code"],
+            "barcode_value": normalized["barcode_value"],
+            "human_readable": normalized["machine_code"],
+            "parent_sdo_display_code": normalized["parent_sdo_display_code"],
+            "parent_sdo_machine_code": normalized["parent_sdo_machine_code"],
+            "store_code": normalized["store_code"],
+            "package_no": normalized["package_no"],
+            "package_total": normalized["package_total"],
+            "source_code": normalized["source_code"],
+            "item_count": normalized["item_count"],
+            "content_summary": normalized["content_summary"],
+            "entity_type": "STORE_DELIVERY_PACKAGE",
+            "template_code": "store_dispatch_60x40",
+            "template_scope": "warehouseout_bale",
+        }
+        return normalized
+
+    def _find_store_delivery_packages_for_order(self, execution_order_no: str) -> list[dict[str, Any]]:
+        normalized_order_no = str(execution_order_no or "").strip().upper()
+        if not normalized_order_no:
+            return []
+        packages = [
+            self._normalize_store_delivery_package(row)
+            for row in self.store_delivery_packages.values()
+            if str(row.get("parent_sdo_order_no") or row.get("execution_order_no") or "").strip().upper() == normalized_order_no
+        ]
+        return sorted(packages, key=lambda row: (int(row.get("package_no") or 0), str(row.get("display_code") or "")))
+
+    def _project_store_delivery_execution_order_with_existing_packages(self, row: dict[str, Any]) -> dict[str, Any]:
+        normalized = self._normalize_store_delivery_execution_order(row)
+        existing_packages = self._find_store_delivery_packages_for_order(normalized.get("execution_order_no", ""))
+        if not existing_packages:
+            return normalized
+        normalized["packages"] = existing_packages
+        normalized["package_count"] = max(int(normalized.get("package_count") or 0), len(existing_packages))
+        if all(package.get("item_count") is not None for package in existing_packages):
+            normalized["total_item_count"] = sum(int(package.get("item_count") or 0) for package in existing_packages)
+        return normalized
+
+    def _ensure_store_delivery_packages_for_order(
+        self,
+        order: dict[str, Any],
+        source_rows: Optional[list[dict[str, Any]]] = None,
+        *,
+        actor: str = "",
+    ) -> list[dict[str, Any]]:
+        with self._barcode_generation_lock:
+            normalized_order = self._normalize_store_delivery_execution_order(order)
+            execution_order_no = str(normalized_order.get("execution_order_no") or "").strip().upper()
+            if not execution_order_no:
+                return []
+            existing = self._find_store_delivery_packages_for_order(execution_order_no)
+            if existing:
+                normalized_order["packages"] = existing
+                normalized_order["package_count"] = max(int(normalized_order.get("package_count") or 0), len(existing))
+                self.store_delivery_execution_orders[execution_order_no] = normalized_order
+                return existing
+
+            raw_rows = source_rows if isinstance(source_rows, list) else normalized_order.get("packages")
+            package_source_rows = [row for row in (raw_rows or []) if isinstance(row, dict)]
+            if not package_source_rows:
+                normalized_order["packages"] = []
+                self.store_delivery_execution_orders[execution_order_no] = normalized_order
+                return []
+
+            package_total = len(package_source_rows)
+            created_at = str(normalized_order.get("created_at") or now_iso())
+            packages: list[dict[str, Any]] = []
+            for index, source_row in enumerate(package_source_rows, start=1):
+                existing_display = str(source_row.get("display_code") or source_row.get("package_code") or "").strip().upper()
+                existing_machine = str(source_row.get("machine_code") or source_row.get("barcode_value") or "").strip().upper()
+                if re.fullmatch(r"SDP\d{9}", existing_display) and re.fullmatch(r"6\d{9}", existing_machine):
+                    display_code = existing_display
+                    machine_code = existing_machine
+                else:
+                    display_code, machine_code = self._allocate_store_delivery_package_barcode()
+                source_code = str(source_row.get("source_code") or source_row.get("bale_no") or "").strip().upper()
+                source_type = str(source_row.get("source_type") or "").strip().upper()
+                if not source_type:
+                    source_type = "LPK" if source_code.startswith("LPK") else "SDB" if source_code.startswith("SDB") else "MIXED"
+                source_machine_code = str(source_row.get("source_machine_code") or "").strip().upper()
+                if not source_machine_code:
+                    candidate_source = self.store_dispatch_bales.get(source_code) or self.store_prep_bales.get(source_code)
+                    if candidate_source:
+                        source_machine_code = str(candidate_source.get("machine_code") or candidate_source.get("barcode_value") or "").strip().upper()
+                    elif source_type in {"SDB", "LPK"} and re.fullmatch(r"[23]\d{9}", str(source_row.get("machine_code") or "").strip().upper()):
+                        source_machine_code = str(source_row.get("machine_code") or "").strip().upper()
+                item_count = self._extract_dispatch_item_count(source_row)
+                content_summary = str(
+                    source_row.get("content_summary")
+                    or source_row.get("category_summary")
+                    or source_row.get("category_name")
+                    or ""
+                ).strip()
+                package = self._normalize_store_delivery_package(
+                    {
+                        **source_row,
+                        "id": int(source_row.get("id") or next(self._store_delivery_package_ids)),
+                        "package_id": display_code,
+                        "display_code": display_code,
+                        "machine_code": machine_code,
+                        "barcode_value": machine_code,
+                        "entity_type": "STORE_DELIVERY_PACKAGE",
+                        "parent_sdo_display_code": execution_order_no,
+                        "parent_sdo_machine_code": str(normalized_order.get("machine_code") or "").strip().upper(),
+                        "parent_sdo_order_no": execution_order_no,
+                        "execution_order_no": execution_order_no,
+                        "transfer_no": str(normalized_order.get("source_transfer_no") or "").strip().upper(),
+                        "store_code": str(normalized_order.get("to_store_code") or "").strip().upper(),
+                        "package_no": index,
+                        "package_total": package_total,
+                        "source_type": source_type,
+                        "source_code": source_code,
+                        "source_machine_code": source_machine_code,
+                        "item_count": item_count,
+                        "content_summary": content_summary,
+                        "status": "printed" if str(normalized_order.get("status") or "").strip().lower() == "printed" else "created",
+                        "printed_at": normalized_order.get("printed_at"),
+                        "printed_by": actor if normalized_order.get("printed_at") else "",
+                        "created_at": created_at,
+                        "updated_at": now_iso(),
+                    }
+                )
+                self.store_delivery_packages[package["display_code"]] = package
+                packages.append(package)
+            normalized_order["packages"] = packages
+            normalized_order["package_count"] = max(int(normalized_order.get("package_count") or 0), len(packages))
+            if packages and all(package.get("item_count") is not None for package in packages):
+                normalized_order["total_item_count"] = sum(int(package.get("item_count") or 0) for package in packages)
+            self.store_delivery_execution_orders[execution_order_no] = normalized_order
+            return packages
 
     def _normalize_store_delivery_execution_order(self, row: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(row or {})
@@ -1715,27 +1980,15 @@ class InMemoryState:
         for package in raw_packages:
             if not isinstance(package, dict):
                 continue
+            package_entity_type = str(package.get("entity_type") or "").strip().upper()
+            package_display = str(package.get("display_code") or package.get("package_code") or "").strip().upper()
+            package_machine = str(package.get("machine_code") or package.get("barcode_value") or "").strip().upper()
+            if package_entity_type == "STORE_DELIVERY_PACKAGE" or package_display.startswith("SDP") or package_machine.startswith("6"):
+                normalized_packages.append(self._normalize_store_delivery_package(package))
+                continue
             source_type = str(package.get("source_type") or "").strip().upper()
             source_code = str(package.get("source_code") or package.get("bale_no") or "").strip().upper()
-            raw_item_count = (
-                package.get("item_count")
-                if package.get("item_count") not in {None, ""}
-                else package.get("qty")
-                if package.get("qty") not in {None, ""}
-                else package.get("quantity")
-                if package.get("quantity") not in {None, ""}
-                else package.get("piece_count")
-                if package.get("piece_count") not in {None, ""}
-                else package.get("pieces")
-            )
-            item_count: Optional[int] = None
-            if raw_item_count is not None and raw_item_count != "":
-                try:
-                    parsed_count = int(float(raw_item_count))
-                    if parsed_count >= 0:
-                        item_count = parsed_count
-                except (TypeError, ValueError):
-                    item_count = None
+            item_count = self._extract_dispatch_item_count(package)
             normalized_packages.append(
                 {
                     "source_type": source_type,
@@ -3576,7 +3829,9 @@ class InMemoryState:
             "warehouse_dispatch_planning",
             "warehouse_execution",
             "warehouse_shortage_pick",
+            "warehouse_dispatch",
             "identity_ledger",
+            "clerk_putaway",
             "b2b_bale_sales",
         ]
         reject_reason = self._barcode_context_reject_reason(barcode_type, context, normalized_allowed_contexts)
@@ -3590,6 +3845,7 @@ class InMemoryState:
             "bale_sales_unit": "BALE_SALES_UNIT",
             "loose_pick_task": "LOOSE_PICK_TASK",
             "store_delivery_execution": "STORE_DELIVERY_EXECUTION",
+            "store_delivery_package": "STORE_DELIVERY_PACKAGE",
         }.get(str(object_type or "").strip().lower(), str(barcode_type or "UNKNOWN").strip().upper())
         return {
             "barcode_value": str(barcode_value or "").strip().upper(),
@@ -3735,6 +3991,65 @@ class InMemoryState:
                     context=normalized_context,
                 )
             )
+
+        delivery_package = self.store_delivery_packages.get(normalized_barcode)
+        if not delivery_package:
+            delivery_package = next(
+                (
+                    row
+                    for row in self.store_delivery_packages.values()
+                    if normalized_barcode
+                    in {
+                        str(row.get("display_code") or "").strip().upper(),
+                        str(row.get("package_id") or "").strip().upper(),
+                        str(row.get("machine_code") or "").strip().upper(),
+                        str(row.get("barcode_value") or "").strip().upper(),
+                        str(row.get("human_readable") or "").strip().upper(),
+                    }
+                ),
+                None,
+            )
+        if not delivery_package:
+            for order in self.store_delivery_execution_orders.values():
+                for package in order.get("packages") if isinstance(order.get("packages"), list) else []:
+                    if not isinstance(package, dict):
+                        continue
+                    if normalized_barcode in {
+                        str(package.get("display_code") or "").strip().upper(),
+                        str(package.get("package_id") or "").strip().upper(),
+                        str(package.get("machine_code") or "").strip().upper(),
+                        str(package.get("barcode_value") or "").strip().upper(),
+                    }:
+                        delivery_package = package
+                        break
+                if delivery_package:
+                    break
+        if delivery_package:
+            normalized_package = self._normalize_store_delivery_package(delivery_package)
+            if normalized_package.get("display_code"):
+                self.store_delivery_packages[normalized_package["display_code"]] = normalized_package
+            package_result = self._build_barcode_resolve_result(
+                barcode_value=normalized_barcode,
+                barcode_type="STORE_DELIVERY_PACKAGE",
+                object_type="store_delivery_package",
+                object_id=str(normalized_package.get("display_code") or normalized_barcode).strip().upper(),
+                template_scope="warehouseout_bale",
+                allowed_contexts=["warehouse_dispatch", "warehouse_execution", "store_receiving", "identity_ledger", "clerk_putaway"],
+                context=normalized_context,
+            )
+            package_result.update(
+                {
+                    "parent_entity_type": "STORE_DELIVERY_EXECUTION",
+                    "parent_sdo_machine_code": normalized_package.get("parent_sdo_machine_code", ""),
+                    "parent_sdo_display_code": normalized_package.get("parent_sdo_display_code", ""),
+                    "package_no": normalized_package.get("package_no", 0),
+                    "package_total": normalized_package.get("package_total", 0),
+                    "store_code": normalized_package.get("store_code", ""),
+                    "source_type": normalized_package.get("source_type", ""),
+                    "source_code": normalized_package.get("source_code", ""),
+                }
+            )
+            matches.append(package_result)
 
         prep_bale = self.store_prep_bales.get(normalized_barcode)
         if not prep_bale:
@@ -13228,10 +13543,9 @@ class InMemoryState:
         }
 
     def list_store_delivery_execution_orders(self, transfer_no: Optional[str] = None) -> list[dict[str, Any]]:
-        rows = [
-            self._normalize_store_delivery_execution_order(row)
-            for row in self.store_delivery_execution_orders.values()
-        ]
+        rows: list[dict[str, Any]] = []
+        for row in self.store_delivery_execution_orders.values():
+            rows.append(self._project_store_delivery_execution_order_with_existing_packages(row))
         if transfer_no:
             normalized_transfer_no = str(transfer_no or "").strip().upper()
             rows = [
@@ -13247,6 +13561,52 @@ class InMemoryState:
             reverse=True,
         )
         return rows
+
+    def ensure_store_delivery_execution_order_packages(self, transfer_no: str, execution_order_no: str, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})
+        normalized_transfer_no = str(transfer_no or "").strip().upper()
+        normalized_execution_no = str(execution_order_no or "").strip().upper()
+        if not normalized_transfer_no or not normalized_execution_no:
+            raise HTTPException(status_code=400, detail="Transfer no and SDO execution order no are required")
+        order = next(
+            (
+                row
+                for row in self.store_delivery_execution_orders.values()
+                if str(row.get("source_transfer_no") or row.get("transfer_no") or "").strip().upper() == normalized_transfer_no
+                and str(row.get("execution_order_no") or row.get("official_delivery_barcode") or "").strip().upper() == normalized_execution_no
+            ),
+            None,
+        )
+        if not order:
+            raise HTTPException(status_code=404, detail="Store delivery execution order not found for this transfer")
+        normalized_order = self._normalize_store_delivery_execution_order(order)
+        existing_packages = self._find_store_delivery_packages_for_order(normalized_order["execution_order_no"])
+        if existing_packages:
+            normalized_order["packages"] = existing_packages
+            normalized_order["package_count"] = max(int(normalized_order.get("package_count") or 0), len(existing_packages))
+            if all(package.get("item_count") is not None for package in existing_packages):
+                normalized_order["total_item_count"] = sum(int(package.get("item_count") or 0) for package in existing_packages)
+            self.store_delivery_execution_orders[normalized_order["execution_order_no"]] = normalized_order
+            self._persist()
+            return normalized_order
+
+        source_rows = normalized_order.get("packages") if isinstance(normalized_order.get("packages"), list) else []
+        if not source_rows:
+            self._rebuild_store_dispatch_bales()
+            source_rows = [
+                row
+                for row in self.store_dispatch_bales.values()
+                if str(row.get("transfer_no") or "").strip().upper() == normalized_transfer_no
+            ]
+        if not source_rows:
+            raise HTTPException(status_code=409, detail="当前 SDO 没有可生成实体包码的来源包，请先完成仓库核对。")
+
+        packages = self._ensure_store_delivery_packages_for_order(normalized_order, source_rows, actor=actor["username"])
+        normalized_order = self.store_delivery_execution_orders.get(normalized_order["execution_order_no"], normalized_order)
+        normalized_order["packages"] = packages
+        self.store_delivery_execution_orders[normalized_order["execution_order_no"]] = normalized_order
+        self._persist()
+        return normalized_order
 
     def create_store_delivery_execution_order(self, transfer_no: str, payload: dict[str, Any]) -> dict[str, Any]:
         order = self.get_transfer_order(transfer_no)
@@ -13265,7 +13625,7 @@ class InMemoryState:
             None,
         )
         if existing:
-            return self._normalize_store_delivery_execution_order(existing)
+            return self._project_store_delivery_execution_order_with_existing_packages(existing)
 
         self._rebuild_store_dispatch_bales()
         dispatch_rows = [
@@ -13327,9 +13687,20 @@ class InMemoryState:
                     "source_type": str(row.get("source_type") or "").strip().upper()
                     or ("LPK" if str(row.get("bale_no") or row.get("source_code") or "").strip().upper().startswith("LPK") else "SDB"),
                     "source_code": str(row.get("source_code") or row.get("bale_no") or "").strip().upper(),
+                    "source_machine_code": str(row.get("source_machine_code") or row.get("machine_code") or "").strip().upper(),
                     "item_count": parsed_item_count,
                     "category_summary": str(row.get("category_summary") or row.get("category_name") or "").strip(),
                     "category_name": str(row.get("category_name") or "").strip(),
+                    "source_token_refs": [
+                        str(value or "").strip().upper()
+                        for value in (row.get("source_token_refs") if isinstance(row.get("source_token_refs"), list) else row.get("token_nos") or [])
+                        if str(value or "").strip()
+                    ],
+                    "cost_source_refs": [
+                        str(value or "").strip().upper()
+                        for value in (row.get("cost_source_refs") if isinstance(row.get("cost_source_refs"), list) else [])
+                        if str(value or "").strip()
+                    ],
                 }
             )
         total_item_count: Optional[int] = None
@@ -13355,6 +13726,10 @@ class InMemoryState:
                 "notes": str(payload.get("notes") or payload.get("note") or "").strip(),
             }
         )
+        created["packages"] = self._ensure_store_delivery_packages_for_order(created, sdo_packages, actor=actor["username"])
+        created["package_count"] = max(int(created.get("package_count") or 0), len(created["packages"]))
+        if created["packages"] and all(package.get("item_count") is not None for package in created["packages"]):
+            created["total_item_count"] = sum(int(package.get("item_count") or 0) for package in created["packages"])
         self.store_delivery_execution_orders[execution_order_no] = created
         order["store_delivery_execution_order_no"] = execution_order_no
         order["official_delivery_barcode"] = execution_order_no
