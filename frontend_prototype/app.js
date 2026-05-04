@@ -11293,10 +11293,12 @@ function buildSDOPrintJobs({
 function hasValidSdoPackagePrintRows(order = {}) {
   const packages = Array.isArray(order?.packages) ? order.packages : [];
   return packages.length > 0 && packages.every((row) => {
+    const entityType = String(row?.entity_type || "").trim().toUpperCase();
     const displayCode = String(row?.display_code || row?.package_id || row?.sdo_package_code || "").trim().toUpperCase();
     const machineCode = String(row?.machine_code || row?.barcode_value || row?.scan_token || "").replace(/[^0-9]/g, "").trim();
     const barcodeValue = String(row?.barcode_value || row?.machine_code || "").replace(/[^0-9]/g, "").trim();
-    return /^SDP\d{9}$/.test(displayCode)
+    return entityType === "STORE_DELIVERY_PACKAGE"
+      && /^SDP\d{9}$/.test(displayCode)
       && /^6\d{9}$/.test(machineCode)
       && barcodeValue === machineCode;
   });
@@ -11370,13 +11372,13 @@ function openTransferDispatchPrintTemplateModal({
   const templateCode = getTransferDispatchTemplateCode();
   balePrinterConsoleNotice = {
     type: "success",
-    message: `已打开 SDO 门店送货执行单打印页。本轮 ${jobs.length} 张标签固定使用 SDO 模板。`,
+    message: `已打开 SDO 实体包标签打印页。本轮 ${jobs.length} 张标签固定使用 SDO_PACKAGE 模板。`,
   };
   openBalePrintModal({
     shipmentNo: String(transferNo || transfer?.transfer_no || "").trim().toUpperCase(),
     groupKey: `${String(transferNo || transfer?.transfer_no || "").trim().toUpperCase()}-DISPATCH`,
     jobs,
-    supplierName: "SDO / STORE DELIVERY ORDER",
+    supplierName: "SDO 实体包标签打印",
     categoryDisplay: `${String(transfer?.to_store_code || rows[0]?.store_code || "").trim().toUpperCase() || "STORE"} / ${sdoDisplayCode}`,
     templateScope: "warehouseout_bale",
     taskType: SDO_PRINT_TASK_TYPE,
@@ -17532,7 +17534,7 @@ function getCurrentBalePreviewHtml() {
 
 function normalizeLocalAgentMachineBarcode(value) {
   const cleaned = String(value || "").trim().replace(/\s+/g, "");
-  return /^[1-5]\d{9}$/.test(cleaned) ? cleaned : "";
+  return /^[1-6]\d{9}$/.test(cleaned) ? cleaned : "";
 }
 
 function getLocalAgentTemplateMachinePrefix(templateCode = "") {
@@ -17562,6 +17564,18 @@ function getLocalAgentDisplayMachinePrefix(displayCode = "") {
   if (normalized.startsWith("SDB")) return "2";
   if (normalized.startsWith("LPK")) return "3";
   if (normalized.startsWith("SDO")) return "4";
+  if (normalized.startsWith("SDP")) return "6";
+  return "";
+}
+
+function getLocalAgentEntityMachinePrefix(entityType = "") {
+  const normalized = String(entityType || "").trim().toUpperCase();
+  if (normalized === "RAW_BALE") return "1";
+  if (normalized === "STORE_PREP_BALE" || normalized === "DISPATCH_BALE") return "2";
+  if (normalized === "LOOSE_PICK_TASK") return "3";
+  if (normalized === "STORE_DELIVERY_EXECUTION") return "4";
+  if (normalized === "STORE_ITEM") return "5";
+  if (normalized === "STORE_DELIVERY_PACKAGE") return "6";
   return "";
 }
 
@@ -17571,21 +17585,48 @@ function doesLocalAgentLabelTypeMatch(labelPayload = {}, { templateCode = "" } =
     return false;
   }
   const machinePrefix = machineCode.slice(0, 1);
+  const entityPrefix = getLocalAgentEntityMachinePrefix(labelPayload.entity_type);
   const templatePrefix = getLocalAgentTemplateMachinePrefix(templateCode || labelPayload.template_code);
   const displayPrefix = getLocalAgentDisplayMachinePrefix(labelPayload.display_code);
-  return (!templatePrefix || templatePrefix === machinePrefix) && (!displayPrefix || displayPrefix === machinePrefix);
+  if (entityPrefix && entityPrefix !== machinePrefix) {
+    return false;
+  }
+  if (displayPrefix && displayPrefix !== machinePrefix) {
+    return false;
+  }
+  if (templatePrefix && templatePrefix !== machinePrefix) {
+    const normalizedTemplate = String(templateCode || labelPayload.template_code || "").trim().toLowerCase();
+    const isSdoPackageOnDispatchTemplate = ["store_dispatch_60x40", "transtoshop"].includes(normalizedTemplate)
+      && machinePrefix === "6"
+      && (entityPrefix === "6" || displayPrefix === "6" || !displayPrefix);
+    if (!isSdoPackageOnDispatchTemplate) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const RAW_BALE_MISSING_MACHINE_CODE_MESSAGE = "当前 bale 缺少正式 machine_code，请重新生成入库标签或联系管理员修复数据。";
+const SDO_PACKAGE_MISSING_MACHINE_CODE_MESSAGE = "当前 SDO 缺少 6 开头实体包码，请先生成 SDO_PACKAGE 后再打印。";
 
 function isRawBaleLocalAgentLabel(labelPayload = {}, { templateCode = "" } = {}) {
   return getLocalAgentTemplateMachinePrefix(templateCode || labelPayload.template_code) === "1"
     || getLocalAgentDisplayMachinePrefix(labelPayload.display_code) === "1";
 }
 
+function isSdoPackageLocalAgentLabel(labelPayload = {}) {
+  const rawMachinePrefix = String(labelPayload.barcode_value || labelPayload.machine_code || "").replace(/[^0-9]/g, "").slice(0, 1);
+  return getLocalAgentEntityMachinePrefix(labelPayload.entity_type) === "6"
+    || getLocalAgentDisplayMachinePrefix(labelPayload.display_code) === "6"
+    || rawMachinePrefix === "6";
+}
+
 function validateLocalAgentLabelPayload(labelPayload = {}, { templateCode = "" } = {}) {
   const machineCode = normalizeLocalAgentMachineBarcode(labelPayload.barcode_value || labelPayload.machine_code);
   if (!machineCode || !doesLocalAgentLabelTypeMatch(labelPayload, { templateCode })) {
+    if (isSdoPackageLocalAgentLabel(labelPayload)) {
+      return SDO_PACKAGE_MISSING_MACHINE_CODE_MESSAGE;
+    }
     if (isRawBaleLocalAgentLabel(labelPayload, { templateCode })) {
       return RAW_BALE_MISSING_MACHINE_CODE_MESSAGE;
     }
@@ -17616,14 +17657,26 @@ function buildLocalAgentLabelPayload(job, directPayload = {}) {
       || job?.barcode
       || "",
   ).trim().toUpperCase();
+  const entityType = String(directPayload.entity_type || payload.entity_type || job?.entity_type || "").trim().toUpperCase();
   return {
     ...directPayload,
+    entity_type: entityType,
     display_code: displayCode,
     machine_code: machineCode,
     barcode_value: machineCode,
     encoded_barcode: machineCode,
     template_code: directPayload.template_code || payload.template_code || "",
-    template_scope: directPayload.template_scope || getActiveBaleTemplateScope(),
+    template_scope: directPayload.template_scope || payload.template_scope || (typeof getActiveBaleTemplateScope === "function" ? getActiveBaleTemplateScope() : ""),
+    parent_sdo_display_code: String(directPayload.parent_sdo_display_code || payload.parent_sdo_display_code || "").trim().toUpperCase(),
+    parent_sdo_machine_code: String(directPayload.parent_sdo_machine_code || payload.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim(),
+    store_code: String(directPayload.store_code || payload.store_code || payload.store_name || "").trim().toUpperCase(),
+    package_no: directPayload.package_no ?? payload.package_no ?? payload.serial_no ?? "",
+    package_total: directPayload.package_total ?? payload.package_total ?? payload.total_packages ?? payload.package_count ?? "",
+    source_type: String(directPayload.source_type || payload.source_type || "").trim().toUpperCase(),
+    source_code: String(directPayload.source_code || payload.source_code || "").trim().toUpperCase(),
+    source_machine_code: String(directPayload.source_machine_code || payload.source_machine_code || "").replace(/[^0-9]/g, "").trim(),
+    item_count: directPayload.item_count ?? payload.item_count ?? payload.qty ?? "",
+    content_summary: String(directPayload.content_summary || payload.content_summary || payload.category_display || "").trim(),
   };
 }
 
@@ -17844,12 +17897,12 @@ function renderBalePrintModal() {
       : `${balePrintModalState.supplierName || "-"} · ${balePrintModalState.categoryDisplay || "-"} · 当前类别已经全部打印完成`;
   }
   if (title) {
-    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : (isSdoPrint ? "SDO / 门店送货执行单打印" : "Bale 条码打印窗"));
+    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : (isSdoPrint ? "SDO 实体包标签打印" : "Bale 条码打印窗"));
   }
   if (scopeNote) {
     scopeNote.textContent = isLpkPrint
       ? "LPK 只用于仓库补差拣货和打包。门店收货请扫描后续生成的 SDO 正式送货执行码。"
-      : (isSdbPrint ? "SDB 只用于仓库压缩后待送店 / 待售卖来源包；不是门店正式收货码。" : (isSdoPrint ? "SDO 是门店正式收货执行码；门店收货仍只扫 SDO，不扫 SDB / LPK。" : ""));
+      : (isSdbPrint ? "SDB 只用于仓库压缩后待送店 / 待售卖来源包；不是门店正式收货码。" : (isSdoPrint ? "SDO_PACKAGE 是门店送货实体包码；条码编码 6 开头实体包 machine_code，父级 SDO 只作关联信息。" : ""));
   }
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
@@ -17878,7 +17931,7 @@ function renderBalePrintModal() {
           ${isSdoPrint ? `
             <div class="field-stack compact-select" data-bale-modal-template-locked>
               <span>打印模板</span>
-              <span class="meta-pill">模板已锁定：SDO / STORE_DELIVERY_EXECUTION 60x40</span>
+              <span class="meta-pill">模板已锁定：SDO_PACKAGE / STORE_DELIVERY_PACKAGE 60x40</span>
             </div>
           ` : isStorePrepCompressionPrint ? `
             <div class="field-stack compact-select" data-bale-modal-template-locked>
@@ -17986,7 +18039,7 @@ function renderBalePrintModal() {
   if (primaryPrintButton instanceof HTMLButtonElement) {
     primaryPrintButton.disabled = !currentJob;
     primaryPrintButton.textContent = isSdoPrint
-      ? "打印 SDO 条码"
+      ? "打印 SDO 实体包标签"
       : (isLpkPrint
         ? "打印 LPK 条码"
         : (isSdbPrint
@@ -18125,11 +18178,22 @@ function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = 
     parcel_batch_no: String(printPayload.parcel_batch_no || "").trim(),
     unload_date: String(printPayload.unload_date || printPayload.received_at || "").trim(),
     template_scope: templateScope,
+    entity_type: String(printPayload.entity_type || job?.entity_type || "").trim().toUpperCase(),
     store_name: String(printPayload.store_name || "").trim(),
+    store_code: String(printPayload.store_code || printPayload.store_name || "").trim().toUpperCase(),
     transfer_order_no: String(printPayload.transfer_order_no || "").trim(),
     bale_piece_summary: String(printPayload.bale_piece_summary || "").trim(),
     total_quantity: String(printPayload.total_quantity || "").trim(),
     packing_list: String(printPayload.packing_list || "").trim(),
+    parent_sdo_display_code: String(printPayload.parent_sdo_display_code || "").trim().toUpperCase(),
+    parent_sdo_machine_code: String(printPayload.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim(),
+    package_no: printPayload.package_no ?? printPayload.serial_no ?? currentIndex + 1,
+    package_total: printPayload.package_total ?? printPayload.total_packages ?? totalJobs,
+    source_type: String(printPayload.source_type || "").trim().toUpperCase(),
+    source_code: String(printPayload.source_code || "").trim().toUpperCase(),
+    source_machine_code: String(printPayload.source_machine_code || "").replace(/[^0-9]/g, "").trim(),
+    item_count: printPayload.item_count ?? printPayload.qty ?? "",
+    content_summary: String(printPayload.content_summary || printPayload.category_display || "").trim(),
     dispatch_bale_no: String(printPayload.dispatch_bale_no || printPayload.scan_token || printPayload.barcode_value || job?.barcode || "").trim(),
     outbound_time: String(printPayload.outbound_time || "").trim(),
     status: String(printPayload.status || (activeTaskType === "sale" ? "wait for sale" : "WAITING FOR STORE DISPATCH")).trim(),
@@ -20976,7 +21040,7 @@ function getSelectedBaleTemplate(preferredValue = "", scope = "bale", taskType =
     if (normalizedTaskType === SDO_PRINT_TASK_TYPE) {
       return getLabelTemplateByCode(resolvedCode) || {
         template_code: "store_dispatch_60x40",
-        name: "SDO / STORE_DELIVERY_EXECUTION 60x40",
+        name: "SDO_PACKAGE / STORE_DELIVERY_PACKAGE 60x40",
         width_mm: 60,
         height_mm: 40,
         barcode_type: "Code128",

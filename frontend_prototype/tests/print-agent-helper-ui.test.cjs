@@ -21,6 +21,59 @@ const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/buil
   ? fs.readFileSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"), "utf8")
   : "";
 
+function extractFunctionSource(source, functionName) {
+  const start = source.indexOf(`function ${functionName}`);
+  assert.notEqual(start, -1, `missing function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `missing function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract ${functionName}`);
+}
+
+function extractConstSource(source, constName) {
+  const match = source.match(new RegExp(`const ${constName} = [^;]+;`));
+  assert.ok(match, `missing const ${constName}`);
+  return match[0];
+}
+
+function loadLocalAgentValidationHelpers() {
+  const optionalEntityPrefix = appJs.includes("function getLocalAgentEntityMachinePrefix")
+    ? extractFunctionSource(appJs, "getLocalAgentEntityMachinePrefix")
+    : "";
+  const optionalSdoPackageLabel = appJs.includes("function isSdoPackageLocalAgentLabel")
+    ? extractFunctionSource(appJs, "isSdoPackageLocalAgentLabel")
+    : "";
+  return Function(`
+    ${extractFunctionSource(appJs, "normalizeLocalAgentMachineBarcode")}
+    ${extractFunctionSource(appJs, "getLocalAgentTemplateMachinePrefix")}
+    ${extractFunctionSource(appJs, "getLocalAgentDisplayMachinePrefix")}
+    ${optionalEntityPrefix}
+    ${extractConstSource(appJs, "RAW_BALE_MISSING_MACHINE_CODE_MESSAGE")}
+    ${extractConstSource(appJs, "SDO_PACKAGE_MISSING_MACHINE_CODE_MESSAGE")}
+    ${extractFunctionSource(appJs, "doesLocalAgentLabelTypeMatch")}
+    ${extractFunctionSource(appJs, "isRawBaleLocalAgentLabel")}
+    ${optionalSdoPackageLabel}
+    ${extractFunctionSource(appJs, "validateLocalAgentLabelPayload")}
+    ${extractFunctionSource(appJs, "buildLocalAgentLabelPayload")}
+    return {
+      buildLocalAgentLabelPayload,
+      doesLocalAgentLabelTypeMatch,
+      validateLocalAgentLabelPayload,
+    };
+  `)();
+}
+
 test("print modal advanced options expose only field-safe print helper controls", () => {
   assert.match(indexHtml, /FW-ERP 打印助手/);
   assert.match(indexHtml, /打印助手：未启动/);
@@ -101,7 +154,7 @@ test("local agent primary label printing uses raw label endpoint instead of brow
 
 test("frontend validates local agent label machine code before calling print agent", () => {
   assert.match(appJs, /function validateLocalAgentLabelPayload/);
-  assert.match(appJs, /\^\[1-5\]\\d\{9\}\$/);
+  assert.match(appJs, /\^\[1-6\]\\d\{9\}\$/);
   assert.match(appJs, /当前 bale 缺少正式 machine_code，请重新生成入库标签或联系管理员修复数据。/);
   assert.match(appJs, /doesLocalAgentLabelTypeMatch/);
   assert.match(appJs, /template_code:\s*selectedTemplateCode/);
@@ -110,6 +163,51 @@ test("frontend validates local agent label machine code before calling print age
   assert.match(printFunction, /validateLocalAgentLabelPayload\(labelPayload,\s*\{/);
   assert.match(printFunction, /throw new Error\(validationError\)/);
   assert.doesNotMatch(printFunction, /fetch\(`\$\{agentUrl\}\/print\/label`[\s\S]*?validateLocalAgentLabelPayload/);
+});
+
+test("SDO_PACKAGE local agent guard accepts package labels and rejects parent or source barcodes", () => {
+  const { buildLocalAgentLabelPayload, validateLocalAgentLabelPayload } = loadLocalAgentValidationHelpers();
+  const sdoPackagePayload = {
+    entity_type: "STORE_DELIVERY_PACKAGE",
+    template_code: "store_dispatch_60x40",
+    template_scope: "warehouseout_bale",
+    display_code: "SDP261240003",
+    machine_code: "6261240003",
+    barcode_value: "6261240003",
+    human_readable: "6261240003",
+    parent_sdo_display_code: "SDO260429001",
+    parent_sdo_machine_code: "4260429001",
+    store_code: "UTAWALA",
+    package_no: 1,
+    package_total: 2,
+    source_type: "SDB",
+    source_code: "SDB-TO202604-001",
+    source_machine_code: "2260429001",
+    item_count: 120,
+    content_summary: "tops / lady tops",
+  };
+
+  assert.equal(validateLocalAgentLabelPayload(sdoPackagePayload, { templateCode: "store_dispatch_60x40" }), "");
+  const localPayload = buildLocalAgentLabelPayload({ print_payload: sdoPackagePayload }, {});
+  assert.equal(localPayload.entity_type, "STORE_DELIVERY_PACKAGE");
+  assert.equal(localPayload.display_code, "SDP261240003");
+  assert.equal(localPayload.machine_code, "6261240003");
+  assert.equal(localPayload.barcode_value, "6261240003");
+  assert.equal(localPayload.parent_sdo_machine_code, "4260429001");
+  assert.equal(localPayload.source_code, "SDB-TO202604-001");
+  assert.equal(localPayload.item_count, 120);
+
+  ["", "4261240003", "2261240003", "3261240003"].forEach((machineCode) => {
+    const error = validateLocalAgentLabelPayload(
+      {
+        ...sdoPackagePayload,
+        machine_code: machineCode,
+        barcode_value: machineCode,
+      },
+      { templateCode: "store_dispatch_60x40" },
+    );
+    assert.match(error, /当前 SDO 缺少 6 开头实体包码，请先生成 SDO_PACKAGE 后再打印。/);
+  });
 });
 
 test("print helper exposes a static Windows agent download link in advanced options", () => {
