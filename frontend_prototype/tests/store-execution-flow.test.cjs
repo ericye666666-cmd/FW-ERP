@@ -175,7 +175,7 @@ test("store clerk fields use dynamic user directory options instead of static cl
   assert.ok(pickerMatches.length >= 6);
 });
 
-test("store dispatch acceptance page removes directory filters and keeps only barcode-driven receipt entry", () => {
+test("store receiving surfaces use SDP package projection instead of source bale rows", () => {
   assert.equal(Boolean(storeDispatchSectionHtml), true);
   assert.doesNotMatch(storeDispatchSectionHtml, /name="shipment_no"/);
   assert.doesNotMatch(storeDispatchSectionHtml, /name="task_no"/);
@@ -183,32 +183,103 @@ test("store dispatch acceptance page removes directory filters and keeps only ba
   assert.doesNotMatch(storeDispatchSectionHtml, />读取门店配货 bale</);
   assert.match(storeDispatchSectionHtml, /name="transfer_no" placeholder="先选择调拨单/);
   assert.match(storeDispatchSectionHtml, /<textarea name="bale_no" class="bulk-scan-input"/);
-  assert.match(storeDispatchSectionHtml, /验收完成：批量确认本调拨单全部 bale/);
-  assert.match(appJs, /function resolveStoreReceiptBaleNo/);
-  assert.match(appJs, /function parseStoreReceiptScannedBaleNos/);
-  assert.match(appJs, /function splitStoreReceiptContinuousChunk/);
-  assert.match(appJs, /function getStoreReceiptTransferRows/);
+  assert.match(storeDispatchSectionHtml, /打开 SDO \/ SDP 收货/);
+  assert.match(storeDispatchSectionHtml, /SDB \/ LPK 只作来源码核对/);
+  assert.match(appJs, /function getStoreReceivingPackageCode/);
+  assert.match(appJs, /function getStoreReceivingPackageRows/);
+  assert.match(appJs, /function groupStoreReceivingPackagesBySdo/);
+  assert.match(appJs, /function findStoreReceivingPackageByCode/);
+  assert.match(appJs, /function renderStoreReceivingPackageDetail/);
   assert.match(appJs, /function getStoreReceiptSdoStatusText/);
-  assert.match(appJs, /function normalizeStoreReceiptBaleInputFromForm/);
-  assert.match(appJs, /function renderStoreReceiptTransferBaleList/);
+  assert.match(appJs, /function renderStoreReceiptTransferPackageList/);
   assert.match(appJs, /resolveBarcodeForContext\(scannedCodes\[0\], "store_receiving", \["STORE_DELIVERY_EXECUTION", "STORE_DELIVERY_PACKAGE"\]\)/);
-  assert.match(appJs, /门店收货只扫正式门店送货执行码/);
-  assert.match(appJs, /SDB 和 LPK 仍然只是仓库内部核对码/);
+  assert.match(appJs, /SDB \/ LPK 是仓库来源包，请扫描 SDO 或 SDP 实体包码。/);
+  assert.match(appJs, /STORE_ITEM 只能用于 POS 销售。/);
+  assert.match(appJs, /SDB \/ LPK 只作为来源码显示，不作为门店正式收货对象/);
+  assert.doesNotMatch(appJs, /当前版本先完成识别与信息展示；逐包收货回写将在后续版本补充/);
   assert.match(appJs, /#storeDispatchBaleAcceptForm \[name='bale_no'\][\s\S]*addEventListener\("input"/);
 });
 
-test("store manager can assign a transfer order batch or pasted dispatch bales in one submit", () => {
+test("page 5 statistics are counted by SDP packages", () => {
+  const summarySource = extractFunctionSource(appJs, "renderStoreManagerConsoleSummary");
+
+  assert.match(summarySource, /const packageRows = getStoreReceivingPackageRows\(storeCode\)/);
+  assert.match(summarySource, /pendingReceiptPackages/);
+  assert.match(summarySource, /receivedUnassignedPackages/);
+  assert.match(summarySource, /assignedPackages/);
+  assert.match(summarySource, /exceptionPackages/);
+  assert.match(summarySource, /待收货/);
+  assert.match(summarySource, /已收货未分配/);
+  assert.match(summarySource, /已分配/);
+  assert.doesNotMatch(summarySource, /inTransitSdoGroups\.length/);
+  assert.doesNotMatch(summarySource, /acceptedRows\.length/);
+});
+
+test("store receiving scan routing opens SDO package lists and SDP package detail", () => {
+  const submitSource = extractFunctionSource(appJs, "submitStoreDispatchBaleAccept");
+
+  assert.match(submitSource, /resolvedType === "STORE_DELIVERY_EXECUTION"/);
+  assert.match(submitSource, /storeCommandCenterState\.selected_sdo_code =/);
+  assert.match(submitSource, /storeCommandCenterState\.step = "sdo_packages"/);
+  assert.match(submitSource, /renderStoreReceiptTransferPackageList/);
+  assert.match(submitSource, /resolvedType === "STORE_DELIVERY_PACKAGE"/);
+  assert.match(submitSource, /storeCommandCenterState\.selected_package_code =/);
+  assert.match(submitSource, /storeCommandCenterState\.step = "package_detail"/);
+  assert.match(submitSource, /renderStoreReceivingPackageDetail/);
+  assert.doesNotMatch(submitSource, /请先选择调拨单，再验收这张调拨单下的门店配货 bale/);
+});
+
+test("page 6 package detail exposes SDP identity and clear flow return buttons", () => {
+  const detailSource = extractFunctionSource(appJs, "renderStoreReceivingPackageDetail");
+
+  assert.match(detailSource, /sdo_package_display_code/);
+  assert.match(detailSource, /sdo_package_machine_code/);
+  assert.match(detailSource, /parent_sdo_display_code/);
+  assert.match(detailSource, /source_code/);
+  assert.match(detailSource, /item_count/);
+  assert.match(detailSource, /content_summary/);
+  assert.match(detailSource, /received_status/);
+  assert.match(detailSource, /assigned_clerk/);
+  assert.match(detailSource, /exception_status/);
+  assert.match(detailSource, /返回到货列表/);
+  assert.match(detailSource, /返回当前 SDO 包列表/);
+  assert.match(detailSource, /重新扫描/);
+  assert.match(detailSource, /确认收到/);
+  assert.match(detailSource, /标记异常/);
+  assert.match(detailSource, /去分配店员/);
+});
+
+test("page 6.1 assignment stores one clerk per received SDP package", () => {
+  const assignSource = extractFunctionSource(appJs, "assignStoreReceivingPackagesToClerk");
+  const overviewSource = extractFunctionSource(appJs, "renderStoreDispatchAssignmentOverview");
+
+  assert.match(assignSource, /const sdoPackageCode = getStoreReceivingPackageCode/);
+  assert.match(assignSource, /storeReceiptPackageAssignmentState\[sdoPackageCode\]/);
+  assert.match(assignSource, /received_status !== "received"/);
+  assert.match(assignSource, /exception_status === "exception"/);
+  assert.match(assignSource, /assigned_clerk/);
+  assert.match(assignSource, /assignment_status: "assigned"/);
+  assert.match(assignSource, /不能分配给多个店员/);
+  assert.doesNotMatch(assignSource, /assignmentState\[baleNo\]/);
+  assert.match(overviewSource, /getStoreReceivingPackageRows\(storeCode\)/);
+  assert.match(overviewSource, /data-store-assignment-pkg="\$\{escapeHtml\(getStoreReceivingPackageCode\(row\)\)\}"/);
+});
+
+test("store manager can assign received SDP packages in one submit", () => {
   assert.equal(Boolean(storeDispatchAssignmentSectionHtml), true);
   assert.match(indexHtml, /data-action="load-store-dispatch-assignment"/);
   assert.match(storeDispatchAssignmentSectionHtml, /sorting-task-flow-step/);
   assert.match(storeDispatchAssignmentSectionHtml, /确认批量分配给店员/);
-  assert.match(storeDispatchAssignmentSectionHtml, /name="transfer_no"[\s\S]*总单/);
-  assert.match(storeDispatchAssignmentSectionHtml, /<textarea name="bale_no"[\s\S]*一行一个/);
+  assert.match(storeDispatchAssignmentSectionHtml, /name="transfer_no"[\s\S]*SDO 主单/);
+  assert.match(storeDispatchAssignmentSectionHtml, /<textarea name="bale_no"[\s\S]*已收货未分配 SDP/);
   assert.match(storeDispatchAssignmentSectionHtml, /一次可把本批多个包分给同一人/);
+  assert.match(storeDispatchAssignmentSectionHtml, /每个 SDP 只能对应一个店员/);
+  assert.doesNotMatch(storeDispatchAssignmentSectionHtml, /门店配货 bale/);
   assert.match(appJs, /function groupStoreDispatchRowsByTransfer/);
   assert.match(appJs, /function parseStoreDispatchAssignmentBaleNos/);
   assert.match(appJs, /async function resolveStoreDispatchAssignmentTargets/);
   assert.match(appJs, /function renderStoreDispatchAssignmentOverview/);
+  assert.match(appJs, /function assignStoreReceivingPackagesToClerk/);
   assert.match(appJs, /SDB \/ LPK 仅作来源码核对/);
   assert.match(appJs, /data-store-receipt-transfer-fill/);
   assert.match(appJs, /transfer_no/);
