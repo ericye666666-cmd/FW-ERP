@@ -14,6 +14,21 @@
   --fw-warning: #d97706;
   --fw-danger: #dc2626;
   --fw-info: #0284c7;
+  --status-info-bg: #eff6ff;
+  --status-info-border: #bfdbfe;
+  --status-info-text: #1d4ed8;
+  --status-success-bg: #f0fdf4;
+  --status-success-border: #bbf7d0;
+  --status-success-text: #15803d;
+  --status-warning-bg: #fffbeb;
+  --status-warning-border: #fde68a;
+  --status-warning-text: #92400e;
+  --status-danger-bg: #fef2f2;
+  --status-danger-border: #fecaca;
+  --status-danger-text: #991b1b;
+  --status-neutral-bg: #f8fafc;
+  --status-neutral-border: #e2e8f0;
+  --status-neutral-text: #475569;
   --fw-sidebar-bg: #0f172a;
   --fw-sidebar-active: #1e293b;
   --fw-sidebar-text: #e2e8f0;
@@ -3088,25 +3103,32 @@ th {
 .bale-status-pill {
   flex: 0 0 auto;
   white-space: nowrap;
-  padding: 7px 10px;
-  border-radius: 999px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--status-neutral-border);
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .bale-status-pill.is-done {
-  background: rgba(13, 92, 99, 0.1);
-  color: var(--accent);
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
 }
 
 .bale-status-pill.is-pending {
-  background: rgba(219, 170, 68, 0.16);
-  color: #7d5a11;
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
 }
 
 .warning-pill {
-  background: rgba(219, 170, 68, 0.16);
-  color: #7d5a11;
+  border: 1px solid var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
 }
 
 .bale-preview-card,
@@ -4650,16 +4672,16 @@ th {
 }
 
 .bale-print-modal-side .flow-summary-note.warning {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
   font-weight: 600;
 }
 
 .bale-modal-status-row .warning-pill {
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: #991b1b;
+  border: 1px solid var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
 }
 
 .bale-shipment-lock-form {
@@ -5160,16 +5182,44 @@ textarea:focus-visible,
 .alert-banner {
   padding: 10px 12px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #8f2d2d 0%, #641111 100%);
-  color: #fff7f7;
+  border: 1px solid var(--status-info-border);
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
 }
 
 .alert-banner.success-banner {
-  background: linear-gradient(135deg, #0d5c63 0%, #0b3f44 100%);
-  color: #f3fffe;
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.alert-banner.info-banner {
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.alert-banner.warning-banner {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.alert-banner.danger-banner,
+.alert-banner.error-banner,
+.status-error-banner {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+  color: var(--status-danger-text);
+}
+
+.alert-banner.neutral-banner {
+  border-color: var(--status-neutral-border);
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
 }
 
 .inline-feedback {
@@ -5529,6 +5579,124 @@ textarea:focus-visible,
 .chip {
   background: rgba(143, 45, 45, 0.1);
   color: var(--danger-ink);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--status-neutral-border);
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-badge--success {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.status-badge--warning {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.status-badge--danger {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+  color: var(--status-danger-text);
+}
+
+.status-badge--info {
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.status-badge--neutral {
+  border-color: var(--status-neutral-border);
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.status-block {
+  display: grid;
+  gap: 4px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--status-neutral-border);
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.status-block--success {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.status-block--warning {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.status-block--danger {
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-bg);
+  color: var(--status-danger-text);
+}
+
+.status-block--info {
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.status-block--neutral {
+  border-color: var(--status-neutral-border);
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.status-card--success,
+.status-card--warning,
+.status-card--danger,
+.status-card--info,
+.status-card--neutral {
+  border-left-width: 4px !important;
+}
+
+.status-card--success {
+  border-left-color: var(--status-success-text) !important;
+}
+
+.status-card--warning {
+  border-left-color: var(--status-warning-text) !important;
+}
+
+.status-card--danger {
+  border-left-color: var(--status-danger-text) !important;
+}
+
+.status-card--info {
+  border-left-color: var(--status-info-text) !important;
+}
+
+.status-card--neutral {
+  border-left-color: var(--status-neutral-text) !important;
 }
 
 .return-flow {

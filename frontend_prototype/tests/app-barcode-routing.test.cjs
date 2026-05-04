@@ -199,8 +199,8 @@ test("print modal uses neutral compact ERP visual styling", () => {
   assert.match(stylesCss, /\.bale-print-primary-button\s*\{[\s\S]*?min-height:\s*38px;[\s\S]*?font-size:\s*14px;/);
   assert.match(stylesCss, /\.bale-print-advanced\s*\{[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?border-radius:\s*8px;[\s\S]*?background:\s*#ffffff;[\s\S]*?padding:\s*10px 12px;/);
   assert.match(stylesCss, /\.bale-print-advanced summary\s*\{[\s\S]*?font-weight:\s*600;[\s\S]*?color:\s*#475569;[\s\S]*?min-height:\s*32px;/);
-  assert.match(stylesCss, /\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?border-color:\s*#fecaca;[\s\S]*?background:\s*#fef2f2;[\s\S]*?color:\s*#991b1b;/);
-  assert.match(stylesCss, /\.bale-modal-status-row \.warning-pill\s*\{[\s\S]*?border:\s*1px solid #fecaca;[\s\S]*?background:\s*#fef2f2;[\s\S]*?color:\s*#991b1b;/);
+  assert.match(stylesCss, /\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?border-color:\s*var\(--status-warning-border\);[\s\S]*?background:\s*var\(--status-warning-bg\);[\s\S]*?color:\s*var\(--status-warning-text\);/);
+  assert.match(stylesCss, /\.bale-modal-status-row \.warning-pill\s*\{[\s\S]*?border:\s*1px solid var\(--status-warning-border\);[\s\S]*?background:\s*var\(--status-warning-bg\);[\s\S]*?color:\s*var\(--status-warning-text\);/);
   assert.match(stylesCss, /\.bale-print-modal-side \.candidate-row\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
   assert.match(stylesCss, /\.bale-preview-card,\n\.printer-status-card\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
   assert.match(stylesCss, /\.bale-print-panel-head,\n\.bale-print-workbench-head\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
@@ -476,8 +476,8 @@ test("4.1 replenishment form uses neutral compact controls and copy", () => {
     "这里实时汇总本次门店需求件数",
     "系统优先使用现成待送店包",
   ].forEach((copy) => assert.doesNotMatch(panelHtml, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))));
+  assert.match(appJs, /下一步：\$\{renderStatusBadge\("请先添加补货明细", "warning"\)\}/);
   [
-    "下一步：请先添加补货明细",
     "确认后进入仓库执行；门店收货使用 SDO barcode。",
     "先生成补货申请，再生成仓库备货任务",
     "SDB 不是门店收货 barcode；门店收货使用后续 SDO barcode。",
