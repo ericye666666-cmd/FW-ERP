@@ -413,6 +413,8 @@ test("store PDA SDP scan validates assigned package ownership before entering de
 test("store PDA generates STORE_ITEM from assigned SDP through backend only", () => {
   const stepSource = extractFunctionSource(appJs, "renderStorePackageShelvingStep");
   const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
+  const normalizeSource = extractFunctionSource(appJs, "normalizeGeneratedStoreItemToken");
+  const lineageSource = extractFunctionSource(appJs, "renderStoreItemLineageSummary");
 
   assert.match(stepSource, /name="category_main"/);
   assert.match(stepSource, /name="category_sub"/);
@@ -430,6 +432,21 @@ test("store PDA generates STORE_ITEM from assigned SDP through backend only", ()
   assert.match(generateSource, /store_items/);
   assert.match(generateSource, /package_progress/);
   assert.match(appJs, /function normalizeGeneratedStoreItemToken/);
+  assert.match(appJs, /function renderStoreItemLineageSummary/);
+  assert.match(appJs, /function renderStorePackageGeneratedStoreItems/);
+  assert.match(stepSource, /renderStorePackageGeneratedStoreItems/);
+  assert.match(lineageSource, /SDP/);
+  assert.match(lineageSource, /SDO/);
+  assert.match(lineageSource, /SRC/);
+  assert.match(lineageSource, /cost_status/);
+  assert.match(lineageSource, /data-store-item-lineage-readonly/);
+  assert.match(normalizeSource, /sdo_package_display_code/);
+  assert.match(normalizeSource, /parent_sdo_display_code/);
+  assert.match(normalizeSource, /source_token_refs/);
+  assert.match(normalizeSource, /cost_source_refs/);
+  assert.match(normalizeSource, /lineage_status/);
+  assert.doesNotMatch(stepSource, /name="source_token_refs"/);
+  assert.doesNotMatch(stepSource, /name="cost_source_refs"/);
   assert.match(appJs, /await generateStoreItemTokensForSdoPackage/);
   assert.doesNotMatch(generateSource, /STORE_ITEM machine_code 必须由后端统一发号/);
   assert.doesNotMatch(generateSource, /machineCode = `5/);
