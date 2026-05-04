@@ -553,6 +553,69 @@ def test_list_store_delivery_execution_orders_does_not_create_sdo_packages_or_pe
     assert not any(str(package.get("display_code") or "").startswith("SDP") for package in rows[0]["packages"])
 
 
+def test_ensure_sdo_packages_repairs_old_sdo_without_reissuing_existing_packages(state):
+    _seed_transfer_with_dispatch_for_execution(state, transfer_no="TO-20260428-ENSURE")
+    state.store_dispatch_bales.clear()
+    state.store_dispatch_bales["SDB260503AAG"] = {
+        "bale_no": "SDB260503AAG",
+        "machine_code": "2260503006",
+        "transfer_no": "TO-20260428-ENSURE",
+        "source_type": "SDB",
+        "source_code": "SDB260503AAG",
+        "source_bales": ["SDB260503AAG"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 100,
+        "category_summary": "pants / jeans pant / P",
+        "token_nos": [],
+    }
+    state.store_dispatch_bales["LPK260504001"] = {
+        "bale_no": "LPK260504001",
+        "machine_code": "3260504001",
+        "transfer_no": "TO-20260428-ENSURE",
+        "source_type": "LPK",
+        "source_code": "LPK260504001",
+        "source_bales": ["LPK260504001"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 40,
+        "category_summary": "pants / jeans pant / P",
+        "token_nos": [],
+    }
+    state.store_delivery_execution_orders["SDO260504001"] = {
+        "execution_order_no": "SDO260504001",
+        "official_delivery_barcode": "SDO260504001",
+        "source_transfer_no": "TO-20260428-ENSURE",
+        "from_warehouse_code": "WH1",
+        "to_store_code": "UTAWALA",
+        "package_count": 2,
+        "packages": [],
+        "status": "pending_print",
+        "created_by": "warehouse_clerk_1",
+        "created_at": "2026-05-04T00:00:00+03:00",
+    }
+
+    first = state.ensure_store_delivery_execution_order_packages(
+        "TO-20260428-ENSURE",
+        "SDO260504001",
+        {"created_by": "warehouse_clerk_1"},
+    )
+    second = state.ensure_store_delivery_execution_order_packages(
+        "TO-20260428-ENSURE",
+        "SDO260504001",
+        {"created_by": "warehouse_clerk_1"},
+    )
+
+    assert len(first["packages"]) == 2
+    assert all(package["display_code"].startswith("SDP") for package in first["packages"])
+    assert all(re.fullmatch(r"6\d{9}", package["machine_code"]) for package in first["packages"])
+    assert all(package["barcode_value"] == package["machine_code"] for package in first["packages"])
+    assert [package["source_code"] for package in first["packages"]] == ["SDB260503AAG", "LPK260504001"]
+    assert [package["package_no"] for package in first["packages"]] == [1, 2]
+    assert [package["package_total"] for package in first["packages"]] == [2, 2]
+    assert [package["machine_code"] for package in second["packages"]] == [package["machine_code"] for package in first["packages"]]
+
+
 def test_create_store_delivery_execution_order_rejects_when_transfer_has_no_dispatch_rows(state):
     _seed_transfer_with_dispatch_for_execution(state, transfer_no="TO-20260428-EMPTY")
     state.store_dispatch_bales.clear()
