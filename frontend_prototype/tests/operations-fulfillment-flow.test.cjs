@@ -1219,13 +1219,13 @@ test("page 6.1 shipment draft uses current SDO package counts", () => {
 
 
 test("warehouse access profiles follow the current warehouse menu groups", () => {
-  assert.match(appJs, /warehouse:\s*\["inbound", "workorder", "replenishment", "baleSales", "general"\]/);
+  assert.match(appJs, /warehouse:\s*\["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"\]/);
   assert.match(
     appJs,
-    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["overview", "warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder", "replenishment", "baleSales", "general"\]/,
+    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["overview", "warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"\]/,
   );
   assert.match(
     appJs,
-    /warehouseWorkerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "workorder"\]/,
+    /warehouseWorkerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "departmentInbound", "workorder"\]/,
   );
 });

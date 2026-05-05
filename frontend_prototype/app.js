@@ -197,10 +197,26 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "门店功能区", en: "Store Operations" },
   { zh: "收银功能区", en: "Cashier Area" },
   { zh: "商品入仓", en: "Inbound" },
+  { zh: "服装入仓", en: "Garment Inbound" },
+  { zh: "百货入仓", en: "Department-Store Inbound" },
   { zh: "工单管理", en: "Work Orders" },
   { zh: "门店补货", en: "Store Replenishment" },
   { zh: "Bales销售", en: "Bale Sales" },
   { zh: "综合管理", en: "General Management" },
+  { zh: "仓库综合管理", en: "Warehouse General Management" },
+  { zh: "中方管理", en: "China Management" },
+  { zh: "服装整柜入库", en: "Garment Container Receiving" },
+  { zh: "服装整柜录入", en: "Garment Container Entry" },
+  { zh: "条码 / 打印确认", en: "Barcode / Print Confirmation" },
+  { zh: "服装库存总览", en: "Garment Inventory Overview" },
+  { zh: "自动补货", en: "Automatic Replenishment" },
+  { zh: "手动补货", en: "Manual Replenishment" },
+  { zh: "SDO 出库单制作", en: "SDO Dispatch Order Preparation" },
+  { zh: "门店配送", en: "Store Delivery" },
+  { zh: "货架位管理", en: "Rack Management" },
+  { zh: "分拣库位管理", en: "Sorting Rack Management" },
+  { zh: "打印模版管理", en: "Print Template Management" },
+  { zh: "船单三段成本补齐", en: "Three-Stage Shipment Cost Completion" },
   { zh: "业务执行", en: "Operations" },
   { zh: "风控管理", en: "Risk Management" },
   { zh: "店长端", en: "Store Manager" },
@@ -814,6 +830,7 @@ function setGlobalLanguage(language = "zh", options = {}) {
   if (workspaceHint) {
     workspaceHint.textContent = getWorkspaceHintText(activeWorkspace);
   }
+  syncWorkspacePanelHeadingsToNavTitles();
   renderWorkspacePageNav();
   applyGlobalI18n(document.body, currentLanguage);
 }
@@ -1659,8 +1676,8 @@ const WORKSPACE_META = {
   },
   warehouse: {
     titleEn: "Warehouse",
-    zh: "当前显示：仓库功能区。这里按商品入仓、工单管理、门店补货、Bales销售和综合管理五条线组织仓库页面。",
-    en: "Current View: Warehouse. Pages are grouped by Inbound, Work Orders, Store Replenishment, Bale Sales, and General Management.",
+    zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理和中方管理七条线组织仓库页面。",
+    en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management.",
   },
   operations: {
     titleEn: "Operations Center",
@@ -1682,10 +1699,17 @@ const WORKSPACE_META = {
 const WAREHOUSE_NAV_SECTIONS = [
   {
     id: "inbound",
-    title: "商品入仓",
-    titleEn: "Inbound",
+    title: "服装入仓",
+    titleEn: "Garment Inbound",
     iconSvg:
       '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.5 5.5h11M4.5 9.5h11M4.5 13.5h7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  },
+  {
+    id: "departmentInbound",
+    title: "百货入仓",
+    titleEn: "Department-Store Inbound",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 5.25h10v10H5z" stroke="currentColor" stroke-width="1.5"/><path d="M5 8.75h10M8.75 5.25v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   },
   {
     id: "workorder",
@@ -1710,10 +1734,17 @@ const WAREHOUSE_NAV_SECTIONS = [
   },
   {
     id: "general",
-    title: "综合管理",
-    titleEn: "General Management",
+    title: "仓库综合管理",
+    titleEn: "Warehouse General Management",
     iconSvg:
       '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="4.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="11.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="11.5" y="11.5" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>',
+  },
+  {
+    id: "china",
+    title: "中方管理",
+    titleEn: "China Management",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.75 6.25h10.5M4.75 10h10.5M4.75 13.75h7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13.25 12.25 15.5 14.5l-2.25 2.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   },
 ];
 
@@ -1818,8 +1849,8 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "inbound",
     order: 10,
     icon: "档",
-    navTitle: "0. 运输 / 关单主档",
-    navTitleEn: "0. Shipping / Customs Master",
+    navTitle: "服装整柜入库",
+    navTitleEn: "Garment Container Receiving",
   },
   {
     match: "0. 主档库",
@@ -1828,6 +1859,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     icon: "库",
     navTitle: "0. 主档库",
     navTitleEn: "0. Master Data Library",
+    hiddenInNav: true,
   },
   {
     match: "0. 包裹批次目录",
@@ -1842,72 +1874,73 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "inbound",
     order: 15,
     icon: "码",
-    navTitle: "0.1 条码 / 打印确认",
-    navTitleEn: "0.1 Barcode / Print Confirmation",
+    navTitle: "条码 / 打印确认",
+    navTitleEn: "Barcode / Print Confirmation",
   },
   {
     match: "1. 新建商品",
-    section: "inbound",
+    section: "departmentInbound",
     order: 70,
     icon: "品",
-    navTitle: "1. 新建商品",
-    navTitleEn: "1. Create Product",
+    navTitle: "新建商品",
+    navTitleEn: "Create Product",
   },
   {
     match: "2. 生成内部商品码",
-    section: "inbound",
+    section: "departmentInbound",
     order: 80,
     icon: "码",
-    navTitle: "2. 内部商品码",
-    navTitleEn: "2. Internal Item Codes",
+    navTitle: "内部商品码",
+    navTitleEn: "Internal Item Codes",
   },
   {
     match: "3. 仓库收货",
-    section: "inbound",
+    section: "departmentInbound",
     order: 90,
     icon: "收",
-    navTitle: "3. 仓库收货",
-    navTitleEn: "3. Warehouse Receiving",
+    navTitle: "仓库收货",
+    navTitleEn: "Warehouse Receiving",
   },
   {
     match: "0.1 原始 Bale 总库存",
     section: "workorder",
     order: 95,
     icon: "总",
-    navTitle: "0.1 原始 Bale 总库存",
-    navTitleEn: "0.1 Raw Bale Inventory",
+    navTitle: "服装库存总览",
+    navTitleEn: "Garment Inventory Overview",
   },
   {
     match: "0.1 创建分拣任务",
     section: "workorder",
     order: 100,
     icon: "拣",
-    navTitle: "0.1 创建分拣任务",
-    navTitleEn: "0.1 Create Sorting Task",
+    navTitle: "创建分拣任务",
+    navTitleEn: "Create Sorting Task",
   },
   {
     match: "0.1.1 分拣任务管理",
     section: "workorder",
     order: 105,
     icon: "管",
-    navTitle: "0.1.1 分拣任务管理",
-    navTitleEn: "0.1.1 Sorting Task Management",
+    navTitle: "分拣任务管理",
+    navTitleEn: "Sorting Task Management",
   },
   {
     match: "0.1.2 压缩工单管理",
     section: "workorder",
     order: 107,
     icon: "压",
-    navTitle: "0.1.2 压缩工单管理",
-    navTitleEn: "0.1.2 Compression Work Orders",
+    navTitle: "压缩工单管理",
+    navTitleEn: "Compression Work Orders",
   },
   {
     match: "0.2 分拣确认入库",
     section: "workorder",
     order: 110,
     icon: "架",
-    navTitle: "0.2 分拣确认入库",
-    navTitleEn: "0.2 Sorting Receipt Confirmation",
+    navTitle: "分拣确认入库",
+    navTitleEn: "Sorting Receipt Confirmation",
+    hiddenInNav: true,
   },
   {
     match: "0.3 分拣库存 / 中转区库存",
@@ -1924,6 +1957,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     icon: "送",
     navTitle: "门店送货执行单",
     navTitleEn: "Store Delivery Order",
+    hiddenInNav: true,
   },
   {
     match: "B2B 已售包裹",
@@ -1932,14 +1966,15 @@ const WAREHOUSE_PANEL_NAV_META = [
     icon: "售",
     navTitle: "B2B 已售包裹",
     navTitleEn: "B2B Sold Packages",
+    hiddenInNav: true,
   },
   {
     match: "0.4 待售包裹工单",
     section: "workorder",
     order: 125,
     icon: "售",
-    navTitle: "0.4 待售包裹工单",
-    navTitleEn: "0.4 Bale Sales Work Orders",
+    navTitle: "待售包裹工单",
+    navTitleEn: "Bale Sales Work Orders",
   },
   {
     match: "门店补货流程页",
@@ -1948,46 +1983,47 @@ const WAREHOUSE_PANEL_NAV_META = [
     icon: "流",
     navTitle: "门店补货流程页",
     navTitleEn: "Store Replenishment Flow",
+    hiddenInNav: true,
   },
   {
     match: "4. 门店补货建议",
     section: "replenishment",
     order: 126,
     icon: "补",
-    navTitle: "4. 门店补货建议",
-    navTitleEn: "4. Store Replenishment Suggestions",
+    navTitle: "自动补货",
+    navTitleEn: "Automatic Replenishment",
   },
   {
     match: "4.1 手动补货需求",
     section: "replenishment",
     order: 127,
     icon: "单",
-    navTitle: "4.1 手动补货需求",
-    navTitleEn: "4.1 Manual Replenishment Request",
+    navTitle: "手动补货",
+    navTitleEn: "Manual Replenishment",
   },
   {
     match: "5.1 LPK 补差拣货",
     section: "replenishment",
     order: 127.5,
     icon: "工",
-    navTitle: "5.1 LPK 补差拣货",
-    navTitleEn: "5.1 LPK Shortage Pick Task",
+    navTitle: "LPK 补差拣货",
+    navTitleEn: "LPK Shortage Pick Task",
   },
   {
     match: "6. 仓库执行单 / 出库打印",
     section: "replenishment",
     order: 128,
     icon: "配",
-    navTitle: "6. 仓库执行单 / 出库打印",
-    navTitleEn: "6. Warehouse Execution / Dispatch Print",
+    navTitle: "SDO 出库单制作",
+    navTitleEn: "SDO Dispatch Order Preparation",
   },
   {
     match: "6.1 配送批次 / 门店收货跟踪",
     section: "replenishment",
     order: 128.5,
     icon: "送",
-    navTitle: "6.1 配送批次 / 门店收货跟踪",
-    navTitleEn: "6.1 Delivery Batch / Store Receiving Tracking",
+    navTitle: "门店配送",
+    navTitleEn: "Store Delivery",
   },
   {
     match: "Bales销售｜待售包裹",
@@ -2010,40 +2046,48 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "general",
     order: 131,
     icon: "架",
-    navTitle: "4. 货架位管理",
-    navTitleEn: "4. Rack Management",
+    navTitle: "货架位管理",
+    navTitleEn: "Rack Management",
   },
   {
-    match: "4.1 打印纸模板管理",
+    match: "4.8 分拣库位管理",
+    section: "general",
+    order: 132,
+    icon: "架",
+    navTitle: "分拣库位管理",
+    navTitleEn: "Sorting Rack Management",
+  },
+  {
+    match: "4.1 打印模版管理",
     section: "general",
     order: 135,
     icon: "模",
-    navTitle: "4.1 打印纸模板管理",
-    navTitleEn: "4.1 Print Template Management",
+    navTitle: "打印模版管理",
+    navTitleEn: "Print Template Management",
   },
   {
     match: "4.2 中方来源 Bale 录入",
-    section: "general",
+    section: "china",
     order: 137,
     icon: "源",
-    navTitle: "4.2 中方来源 Bale 录入",
-    navTitleEn: "4.2 China Source Bale Entry",
+    navTitle: "服装整柜录入",
+    navTitleEn: "Garment Container Entry",
   },
   {
     match: "4.3 中方来源列表 / 补填成本",
-    section: "general",
+    section: "china",
     order: 138,
     icon: "费",
-    navTitle: "4.3 中方来源列表 / 补填成本",
-    navTitleEn: "4.3 China Source List / Cost Completion",
+    navTitle: "船单三段成本补齐",
+    navTitleEn: "Three-Stage Shipment Cost Completion",
   },
   {
     match: "4.4 商品身份证 ID 台账",
     section: "general",
     order: 139,
     icon: "账",
-    navTitle: "4.4 商品身份证 ID 台账",
-    navTitleEn: "4.4 Item Identity Ledger",
+    navTitle: "商品身份证 ID 台账",
+    navTitleEn: "Item Identity Ledger",
   },
   {
     match: "4.5 直挂拆包计件 / 成本确认",
@@ -2052,46 +2096,47 @@ const WAREHOUSE_PANEL_NAV_META = [
     icon: "拆",
     navTitle: "4.5 直挂拆包计件 / 成本确认",
     navTitleEn: "4.5 Direct-Hang Unpack / Cost Confirmation",
+    hiddenInNav: true,
   },
   {
     match: "4.7 默认成本价管理",
     section: "general",
     order: 139.9,
     icon: "价",
-    navTitle: "4.7 默认成本价管理",
-    navTitleEn: "4.7 Default Cost Management",
+    navTitle: "默认成本价管理",
+    navTitleEn: "Default Cost Management",
   },
   {
     match: "5. 耗材管理",
     section: "general",
     order: 140,
     icon: "耗",
-    navTitle: "5. 耗材管理",
-    navTitleEn: "5. Consumables",
+    navTitle: "耗材管理",
+    navTitleEn: "Consumables",
   },
   {
     match: "6. 固定资产",
     section: "general",
     order: 150,
     icon: "资",
-    navTitle: "6. 固定资产",
-    navTitleEn: "6. Fixed Assets",
+    navTitle: "固定资产",
+    navTitleEn: "Fixed Assets",
   },
   {
     match: "7. 综合看板",
     section: "general",
     order: 160,
     icon: "览",
-    navTitle: "7. 综合看板",
-    navTitleEn: "7. Warehouse Dashboard",
+    navTitle: "综合看板",
+    navTitleEn: "Warehouse Dashboard",
   },
   {
     match: "8. 需求提报",
     section: "general",
     order: 170,
     icon: "需",
-    navTitle: "8. 需求提报",
-    navTitleEn: "8. Requests",
+    navTitle: "需求提报",
+    navTitleEn: "Requests",
   },
 ];
 
@@ -2407,7 +2452,7 @@ const LEGACY_WORKSPACE_MAP = {
 
 const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  warehouse: ["inbound", "workorder", "replenishment", "baleSales", "general"],
+  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
   operations: ["insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"],
@@ -2439,14 +2484,14 @@ function getRoleAccessProfile(user = currentSession.user) {
   const chinaEntryRoles = new Set(["china_entry", "china_operator", "procurement", "buyer"]);
   if (chinaEntryRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "warehouse"], {
-      warehouse: ["inbound", "general"],
+      warehouse: ["inbound", "departmentInbound", "general", "china"],
     });
   }
 
   const chinaFinanceRoles = new Set(["china_finance", "finance", "accountant"]);
   if (chinaFinanceRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "warehouse", "operations", "admin"], {
-      warehouse: ["general"],
+      warehouse: ["general", "china"],
       operations: ["governance", "insight"],
       admin: ["governance"],
     });
@@ -2469,14 +2514,14 @@ function getRoleAccessProfile(user = currentSession.user) {
   const warehouseManagerRoles = new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "warehouse"], {
-      warehouse: ["inbound", "workorder", "replenishment", "baleSales", "general"],
+      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
     });
   }
 
   const warehouseWorkerRoles = new Set(["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"]);
   if (warehouseWorkerRoles.has(roleCode)) {
     return createRoleAccessProfile(["warehouse"], {
-      warehouse: ["inbound", "workorder"],
+      warehouse: ["inbound", "departmentInbound", "workorder"],
     });
   }
 
@@ -3009,8 +3054,8 @@ function getWorkspaceNavTitle(panel, language = currentLanguage) {
 
 function getWorkspacePanelTitle(panel, language = currentLanguage) {
   const meta = getWorkspacePanelNavMeta(panel);
-  const zh = panel?.dataset?.panelTitle || meta.navTitle || "当前页面";
-  const en = meta.pageTitleEn || meta.navTitleEn || meta.titleEn || translateI18nText(zh, "en");
+  const zh = meta.navTitle || panel?.dataset?.panelTitle || "当前页面";
+  const en = meta.navTitleEn || meta.pageTitleEn || meta.titleEn || translateI18nText(zh, "en");
   return getI18nText({ zh, en }, "", language);
 }
 
@@ -3112,6 +3157,16 @@ function initWorkspacePageRegistry() {
     panel.dataset.panelTitle = title;
     panel.dataset.panelIndex = String(index + 1);
     panel.dataset.panelKey = `${workspace}-${slugifyText(title)}-${index + 1}`;
+  });
+}
+
+function syncWorkspacePanelHeadingsToNavTitles() {
+  workspacePanelsList.forEach((panel) => {
+    const heading = panel.querySelector(".panel-head h2");
+    if (!(heading instanceof HTMLElement)) {
+      return;
+    }
+    heading.textContent = getWorkspaceNavTitle(panel);
   });
 }
 
@@ -37903,6 +37958,7 @@ populateChinaSourceCostRecordSelect();
 renderChinaSourceBalePreview();
 renderChinaSourceCostSummary();
 initWorkspacePageRegistry();
+syncWorkspacePanelHeadingsToNavTitles();
 if (!applyHashRoute()) {
   setActiveWorkspace(activeWorkspace);
 }
