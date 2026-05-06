@@ -45,6 +45,7 @@ const operationsFulfillmentFlow = globalThis.OperationsFulfillmentFlow || {};
 const labelTemplateFlow = globalThis.LabelTemplateFlow || {};
 const apparelDefaultCostFlow = globalThis.ApparelDefaultCostFlow || {};
 const apparelSortingRackFlow = globalThis.ApparelSortingRackFlow || {};
+const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "/store-delivery-shipments";
 
 const authPage = document.querySelector("#authPage");
 const appShell = document.querySelector("#appShell");
@@ -32929,6 +32930,19 @@ async function loadTransferOrders() {
   return transferOrderState;
 }
 
+async function loadStoreDeliveryShipmentRecords() {
+  transferOrderState = await hydrateTransferOrdersWithStoreDeliveryExecutionOrders(
+    await request(STORE_DELIVERY_SHIPMENTS_ENDPOINT),
+  );
+  populateTransferOrderSelectors();
+  renderTransferDispatchSummary(transferOrderState);
+  renderTransferDeliveryHistory(transferOrderState);
+  renderReplenishmentFlowSummary();
+  renderLoosePackingTaskWorkbench();
+  renderTransferExecutionWorkbench();
+  return transferOrderState;
+}
+
 async function submitStartReceivingSession(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -33164,30 +33178,29 @@ async function submitTransferShipment(event) {
   const routeStops = String(payload.route_stops || "").trim();
   const driverPhone = String(payload.driver_phone || "").trim();
   const existingNote = String(payload.note || "").trim();
-  if (departureTime || routeStops || driverPhone) {
+  if (departureTime || routeStops) {
     payload.note = [
       existingNote,
-      driverPhone ? `司机电话：${driverPhone}` : "",
       departureTime ? `预计出发：${departureTime}` : "",
       routeStops ? `路线：${routeStops}` : "",
     ]
       .filter(Boolean)
       .join("；");
   }
+  payload.driver_phone = driverPhone;
   delete payload.departure_time;
   delete payload.route_stops;
-  delete payload.driver_phone;
   delete payload.transfer_no;
-  const results = [];
-  for (const transferNo of transferNos) {
-    const result = await request(`/transfers/${encodeURIComponent(transferNo)}/ship`, {
-      method: "POST",
-      body: JSON.stringify({ ...payload }),
-    });
-    results.push(result);
-  }
-  writeOutput("#transferOutput", results.length === 1 ? results[0] : results);
-  await loadTransferOrders();
+  const result = await request(STORE_DELIVERY_SHIPMENTS_ENDPOINT, {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      transfer_nos: transferNos,
+    }),
+  });
+  const results = Array.isArray(result?.orders) ? result.orders : [];
+  writeOutput("#transferOutput", result);
+  await loadStoreDeliveryShipmentRecords();
   const latestTransferNo = transferNos[transferNos.length - 1] || "";
   const updated = transferOrderState.find((row) => String(row.transfer_no || "").trim().toUpperCase() === latestTransferNo.toUpperCase()) || results[results.length - 1];
   renderTransferTrackingResultSummary(updated);
@@ -34439,7 +34452,7 @@ document.querySelector("#recommendationCandidateList")?.addEventListener("click"
 
 document.querySelector("#loadTransferDispatchButton")?.addEventListener("click", async () => {
   try {
-    await loadTransferOrders();
+    await loadStoreDeliveryShipmentRecords();
     focusElement(document.querySelector("[data-transfer-delivery-panel='history']:not(.hidden-screen)") ? "#transferDeliveryHistoryList" : "#transferShipTargetHint");
   } catch (error) {
     const errorTarget = document.querySelector("[data-transfer-delivery-panel='history']:not(.hidden-screen)")

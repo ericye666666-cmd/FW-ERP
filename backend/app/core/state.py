@@ -14763,6 +14763,48 @@ class InMemoryState:
     def list_transfer_orders(self) -> list[dict[str, Any]]:
         return list(self.transfer_orders.values())
 
+    def list_store_delivery_shipments(self) -> list[dict[str, Any]]:
+        rows = list(self.transfer_orders.values())
+        return sorted(
+            rows,
+            key=lambda row: str(row.get("shipped_at") or row.get("created_at") or ""),
+            reverse=True,
+        )
+
+    def ship_store_delivery_transfers(self, payload: dict[str, Any]) -> dict[str, Any]:
+        transfer_nos = [
+            str(transfer_no or "").strip().upper()
+            for transfer_no in payload.get("transfer_nos", [])
+            if str(transfer_no or "").strip()
+        ]
+        if not transfer_nos:
+            raise HTTPException(status_code=400, detail="transfer_nos must not be empty")
+        if len(set(transfer_nos)) != len(transfer_nos):
+            raise HTTPException(status_code=400, detail="Duplicate SDO selections are not allowed")
+
+        note_parts = [
+            str(payload.get("note") or "").strip(),
+            f"司机电话：{str(payload.get('driver_phone') or '').strip()}" if str(payload.get("driver_phone") or "").strip() else "",
+        ]
+        note = "；".join(part for part in note_parts if part)
+        ship_payload = {
+            "shipped_by": payload["shipped_by"],
+            "driver_name": str(payload.get("driver_name") or "").strip(),
+            "vehicle_no": str(payload.get("vehicle_no") or "").strip(),
+            "note": note,
+        }
+        orders = [
+            self.ship_transfer_order(transfer_no, ship_payload)
+            for transfer_no in transfer_nos
+        ]
+        return {
+            "transfer_nos": transfer_nos,
+            "status": "shipped",
+            "delivery_status": "in_transit",
+            "message": "Store delivery shipment created",
+            "orders": orders,
+        }
+
     def get_transfer_order(self, transfer_no: str) -> dict[str, Any]:
         order = self.transfer_orders.get(transfer_no)
         if not order:

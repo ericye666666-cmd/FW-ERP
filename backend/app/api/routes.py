@@ -197,6 +197,8 @@ from app.schemas.transfers import (
     StoreDeliveryExecutionOrderCreateRequest,
     StoreDeliveryExecutionOrderResponse,
     StoreDeliveryExecutionPackageDetailResponse,
+    StoreDeliveryShipmentCreateRequest,
+    StoreDeliveryShipmentResponse,
     TransferApprovalRequest,
     TransferOrderCreate,
     TransferOrderResponse,
@@ -3785,6 +3787,32 @@ def list_transfer_orders(
 ) -> list[TransferOrderResponse]:
     _require_current_user(authorization=authorization)
     return [TransferOrderResponse(**order) for order in state.list_transfer_orders()]
+
+
+@router.get("/store-delivery-shipments", response_model=list[TransferOrderResponse], tags=["transfers"])
+def list_store_delivery_shipments(
+    authorization: Optional[str] = Header(default=None),
+) -> list[TransferOrderResponse]:
+    _require_current_user(authorization=authorization)
+    return [TransferOrderResponse(**order) for order in state.list_store_delivery_shipments()]
+
+
+@router.post("/store-delivery-shipments", response_model=StoreDeliveryShipmentResponse, tags=["transfers"])
+def create_store_delivery_shipment(
+    payload: StoreDeliveryShipmentCreateRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryShipmentResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["shipped_by"] = current_user["username"]
+    result = state.ship_store_delivery_transfers(data)
+    return StoreDeliveryShipmentResponse(
+        transfer_nos=result["transfer_nos"],
+        status=result.get("status", ""),
+        delivery_status=result.get("delivery_status", ""),
+        message=result.get("message", ""),
+        orders=[TransferOrderResponse(**order) for order in result.get("orders", [])],
+    )
 
 
 @router.get("/transfers/{transfer_no}", response_model=TransferOrderResponse, tags=["transfers"])

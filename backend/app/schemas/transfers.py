@@ -52,6 +52,11 @@ class TransferOrderResponse(BaseModel):
     submitted_at: Optional[str] = None
     approved_at: Optional[str] = None
     approved_by: Optional[str] = None
+    shipped_at: Optional[str] = None
+    shipped_by: Optional[str] = None
+    driver_name: str = ""
+    vehicle_no: str = ""
+    shipment_note: str = ""
     received_at: Optional[str] = None
     received_by: Optional[str] = None
     closed_at: Optional[str] = None
@@ -98,6 +103,22 @@ class TransferShipRequest(BaseModel):
     driver_name: str = Field(min_length=1)
     vehicle_no: str = Field(min_length=1)
     note: str = ""
+
+
+class StoreDeliveryShipmentCreateRequest(BaseModel):
+    transfer_nos: List[str] = Field(min_length=1)
+    driver_name: str = Field(min_length=1)
+    vehicle_no: str = Field(min_length=1)
+    driver_phone: str = ""
+    note: str = ""
+
+
+class StoreDeliveryShipmentResponse(BaseModel):
+    transfer_nos: List[str]
+    status: str = ""
+    delivery_status: str = ""
+    message: str = ""
+    orders: List[TransferOrderResponse]
 
 
 class DiscrepancyApprovalRequest(BaseModel):

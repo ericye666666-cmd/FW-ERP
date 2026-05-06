@@ -527,6 +527,64 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertIn("_is_store_clerk_user(current_user)", routes_source)
         self.assertIn("state.list_assigned_store_delivery_packages", routes_source)
 
+    def test_store_delivery_shipment_internal_api_batches_sdo_shipments(self):
+        def create_approved_transfer(category_sub):
+            order = self.state.create_transfer_order(
+                {
+                    "from_warehouse_code": "WH1",
+                    "to_store_code": "UTAWALA",
+                    "created_by": "warehouse_supervisor_1",
+                    "approval_required": True,
+                    "items": [
+                        {
+                            "category_main": "pants",
+                            "category_sub": category_sub,
+                            "requested_qty": 80,
+                        }
+                    ],
+                }
+            )
+            self.state.approve_transfer_order(
+                order["transfer_no"],
+                {
+                    "approved_by": "warehouse_supervisor_1",
+                    "approved": True,
+                    "note": "approve SDO for delivery",
+                },
+            )
+            return order
+
+        first = create_approved_transfer("cargo pant")
+        second = create_approved_transfer("jeans pant")
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "transfer_nos": [first["transfer_no"], second["transfer_no"]],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "note": "same vehicle delivery",
+            }
+        )
+
+        self.assertEqual(result["status"], "shipped")
+        self.assertEqual(result["delivery_status"], "in_transit")
+        self.assertEqual(result["transfer_nos"], [first["transfer_no"], second["transfer_no"]])
+        self.assertEqual([row["status"] for row in result["orders"]], ["shipped", "shipped"])
+        self.assertEqual({row["store_receipt_status"] for row in result["orders"]}, {"pending_receipt"})
+        self.assertEqual({row["driver_name"] for row in result["orders"]}, {"Driver A"})
+        listed = self.state.list_store_delivery_shipments()
+        self.assertTrue({first["transfer_no"], second["transfer_no"]}.issubset({row["transfer_no"] for row in listed}))
+
+    def test_store_delivery_shipment_internal_routes_are_declared(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/store-delivery-shipments"', routes_source)
+        self.assertIn("def list_store_delivery_shipments(", routes_source)
+        self.assertIn("def create_store_delivery_shipment(", routes_source)
+        self.assertIn("state.list_store_delivery_shipments", routes_source)
+        self.assertIn("state.ship_store_delivery_transfers", routes_source)
+
     def _create_ready_assigned_sdo_package_for_store_item_generation(self, *, assigned_clerk="Austin", item_count=3, package_overrides=None):
         order = self._create_store_delivery_package_state_order()
         package = order["packages"][0]
