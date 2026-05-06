@@ -1185,8 +1185,8 @@ test("门店配送 create tab supports editable SDO rows and transport fields", 
   assert.match(indexHtml, /data-transfer-sdo-row/);
   assert.match(indexHtml, /data-transfer-sdo-add/);
   assert.match(indexHtml, /data-transfer-sdo-remove/);
-  assert.match(indexHtml, /选择已生成 SDP 的 SDO/);
-  assert.match(indexHtml, /下拉显示 SDO \/ transfer \/ 门店 \/ 包数/);
+  assert.match(indexHtml, /选择门店送货单/);
+  assert.match(indexHtml, /选择后这里会显示本车次配送确认卡片/);
   assert.match(indexHtml, /司机 \/ 电话 \/ 车牌号/);
   assert.match(indexHtml, /name="driver_name"/);
   assert.match(indexHtml, /name="driver_phone"/);
@@ -1196,6 +1196,8 @@ test("门店配送 create tab supports editable SDO rows and transport fields", 
   assert.match(appJs, /function getSelectedTransferShipmentNos/);
   assert.match(appJs, /function addTransferShipmentSdoRow/);
   assert.match(appJs, /function removeTransferShipmentSdoRow/);
+  assert.match(indexHtml, /创建配送 \/ 同车发货/);
+  assert.match(indexHtml, /选择已经生成 SDO \/ SDP 的门店送货单，并登记司机与车辆信息。/);
   assert.match(appJs, /payload\.driver_phone/);
 });
 
@@ -1207,6 +1209,21 @@ test("门店配送 create selector only lists SDO rows with SDP packages and cle
   assert.match(populateSource, /mode === "ship"[\s\S]*getStoreDeliveryShipmentOptionRows\(rows\)/);
   assert.match(appJs, /`\$\{sdo\} \/ \$\{transferNo\} \/ \$\{storeCode\} \/ \$\{formatI18nCount\(packCount, "包", "packages"\)\} \/ \$\{statusLabel\}`/);
   assert.doesNotMatch(populateSource, /SDO 未生成/);
+});
+
+test("门店配送 create selection renders operational SDO cards and vehicle confirmation", () => {
+  const hintSource = extractFunctionSource(appJs, "renderTransferShipTargetHint");
+  assert.match(appJs, /function getStoreDeliveryShipmentCardData/);
+  assert.match(appJs, /function renderStoreDeliverySdoSelectionCard/);
+  assert.match(appJs, /function getTransferShipmentTransportFormData/);
+  assert.match(hintSource, /本车次配送/);
+  assert.match(hintSource, /运输任务确认/);
+  assert.match(hintSource, /renderStoreDeliverySdoSelectionCard\(transfer/);
+  assert.match(hintSource, /renderStatusBadge\(statusLabel,\s*statusLabel/);
+  assert.match(hintSource, /Driver A/);
+  assert.match(hintSource, /KDM-001A/);
+  assert.match(appJs, /SDP 已生成/);
+  assert.doesNotMatch(hintSource, /内部使用 transfer_no 提交/);
 });
 
 test("门店配送 history tab lists all shipment statuses with a search box", () => {
@@ -1222,7 +1239,10 @@ test("门店配送 history tab lists all shipment statuses with a search box", (
 
 test("门店配送 history cards are SDO-centered and exclude source package wording", () => {
   const historySource = extractFunctionSource(appJs, "renderTransferDeliveryHistory");
+  assert.match(appJs, /function renderStoreDeliveryHistoryCard/);
   assert.match(historySource, /const sdoCode = getStoreDeliverySdoDisplayCode\(row\)/);
+  assert.match(historySource, /renderStoreDeliveryHistoryCard\(\{/);
+  assert.match(historySource, /renderStatusBadge\(statusLabel,\s*statusLabel/);
   assert.match(historySource, /司机电话 \$\{escapeHtml\(row\.driver_phone \|\| "-"\)\}/);
   assert.match(historySource, /发货时间 \$\{escapeHtml\(formatDateTime\(row\.shipped_at\) \|\| "-"\)\}/);
   assert.match(historySource, /收货状态 \$\{escapeHtml\(getStoreDeliveryReceiptStatusLabel\(row\)\)\}/);
@@ -1233,15 +1253,70 @@ test("门店配送 history cards are SDO-centered and exclude source package wor
   assert.doesNotMatch(historySource, /配送批次/);
 });
 
+test("门店配送 result summary is same-vehicle delivery, not raw form output", () => {
+  const resultSource = extractFunctionSource(appJs, "renderTransferTrackingResultSummary");
+  assert.match(resultSource, /本车次配送/);
+  assert.match(resultSource, /运输任务确认/);
+  assert.match(resultSource, /\$\{orders\.length\} 张 SDO/);
+  assert.match(resultSource, /renderStoreDeliverySdoBreakdownRow/);
+  assert.match(resultSource, /renderStatusBadge\(batchLabel,\s*batchLabel/);
+  assert.match(resultSource, /driver_phone/);
+  assert.doesNotMatch(resultSource, /正式门店送货 barcode/);
+});
+
 test("门店配送 create and history tabs use internal shipment APIs", () => {
   const submitSource = extractFunctionSource(appJs, "submitTransferShipment");
   assert.match(appJs, /const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "\/store-delivery-shipments";/);
   assert.match(appJs, /async function loadStoreDeliveryShipmentRecords/);
   assert.match(appJs, /request\(STORE_DELIVERY_SHIPMENTS_ENDPOINT\)/);
   assert.match(submitSource, /request\(STORE_DELIVERY_SHIPMENTS_ENDPOINT,\s*\{[\s\S]*method:\s*"POST"/);
-  assert.match(submitSource, /transfer_nos:\s*transferNos/);
+  assert.match(appJs, /function getSelectedStoreDeliveryShipmentPayloads/);
+  assert.match(submitSource, /const shipments = getSelectedStoreDeliveryShipmentPayloads\(formElement\);/);
+  assert.match(submitSource, /shipments:\s*shipments/);
+  assert.doesNotMatch(submitSource, /transfer_nos:\s*transferNos/);
   assert.doesNotMatch(submitSource, /\/transfers\/\$\{encodeURIComponent\(transferNo\)\}\/ship/);
   assert.match(appJs, /#loadTransferDispatchButton[\s\S]*loadStoreDeliveryShipmentRecords/);
+  assert.match(appJs, /#transferDeliveryHistoryList[\s\S]*#transferTrackingResultSummary/);
+});
+
+test("门店配送 submit payload is SDO-level while transfer stays source association", () => {
+  const payloadSource = extractFunctionSource(appJs, "getSelectedStoreDeliveryShipmentPayloads");
+  assert.match(payloadSource, /sdo_display_code:\s*getStoreDeliverySdoDisplayCode\(transfer\)/);
+  assert.match(payloadSource, /sdo_machine_code:/);
+  assert.match(payloadSource, /transfer_no:\s*transferNo/);
+  assert.doesNotMatch(payloadSource, /source_code/);
+  assert.doesNotMatch(payloadSource, /bale_no/);
+  assert.doesNotMatch(payloadSource, /SDB/);
+  assert.doesNotMatch(payloadSource, /LPK/);
+});
+
+test("门店配送 result and history show SDP package list under each SDO", () => {
+  const resultSource = extractFunctionSource(appJs, "renderTransferTrackingResultSummary");
+  const historyCardSource = extractFunctionSource(appJs, "renderStoreDeliveryHistoryCard");
+  assert.match(appJs, /function getStoreDeliveryShipmentSdpPackages/);
+  assert.match(appJs, /function renderStoreDeliverySdpPackageList/);
+  assert.match(resultSource, /renderStoreDeliverySdpPackageList\(row/);
+  assert.match(historyCardSource, /renderStoreDeliverySdpPackageList\(summary\.row/);
+  assert.match(appJs, /SDP 包/);
+  assert.match(appJs, /packageRow\.machine_code/);
+  assert.match(appJs, /packageRow\.barcode_value/);
+  assert.match(appJs, /packageRow\.source_code/);
+});
+
+test("门店配送 page uses unified status accent system and hides technical wording", () => {
+  const deliveryPageHtml = (indexHtml.match(/<section class="panel" data-workspace-panel="warehouse">[\s\S]*?<h2>门店配送<\/h2>[\s\S]*?<pre id="labelPrintOutput" class="output hidden-output"><\/pre>/) || [""])[0];
+  const deliverySource = [
+    extractFunctionSource(appJs, "renderTransferShipTargetHint"),
+    extractFunctionSource(appJs, "renderTransferDeliveryHistory"),
+    extractFunctionSource(appJs, "renderTransferTrackingResultSummary"),
+  ].join("\n");
+  assert.match(deliverySource, /renderStatusBadge/);
+  assert.match(deliverySource, /getStatusCardClass/);
+  assert.match(stylesCss, /\.store-delivery-sdo-card/);
+  assert.match(stylesCss, /\.store-delivery-task-card/);
+  assert.match(stylesCss, /\.store-delivery-timeline/);
+  assert.doesNotMatch(deliveryPageHtml, /shipment aggregate|transfer aggregate|batch aggregate|route binding/i);
+  assert.doesNotMatch(deliverySource, /shipment aggregate|transfer aggregate|batch aggregate|route binding/i);
 });
 
 test("门店配送 statuses keep shipment wording compact", () => {

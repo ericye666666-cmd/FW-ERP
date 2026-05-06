@@ -3811,6 +3811,7 @@ def create_store_delivery_shipment(
         status=result.get("status", ""),
         delivery_status=result.get("delivery_status", ""),
         message=result.get("message", ""),
+        shipments=result.get("shipments", []),
         orders=[TransferOrderResponse(**order) for order in result.get("orders", [])],
     )
 

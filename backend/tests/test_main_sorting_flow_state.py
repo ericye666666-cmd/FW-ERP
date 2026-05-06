@@ -601,6 +601,97 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(listed_row["driver_phone"], "0712345678")
         self.assertEqual(listed_row["delivery_status"], "in_transit")
 
+    def test_store_delivery_shipment_accepts_sdo_level_items_and_returns_sdp_packages(self):
+        first = self._create_store_delivery_package_state_order()
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "shipments": [
+                    {
+                        "transfer_no": first["source_transfer_no"],
+                        "sdo_display_code": first["execution_order_no"],
+                        "sdo_machine_code": first["machine_code"],
+                    }
+                ],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "driver_phone": "0712345678",
+                "note": "same vehicle delivery",
+            }
+        )
+
+        self.assertEqual(result["transfer_nos"], [first["source_transfer_no"]])
+        self.assertEqual(len(result["shipments"]), 1)
+        shipment = result["shipments"][0]
+        self.assertEqual(shipment["transfer_no"], first["source_transfer_no"])
+        self.assertEqual(shipment["sdo_display_code"], first["execution_order_no"])
+        self.assertEqual(shipment["sdo_machine_code"], first["machine_code"])
+        self.assertEqual(shipment["store_code"], "UTAWALA")
+        self.assertEqual(shipment["package_count"], 2)
+        self.assertEqual(shipment["driver_phone"], "0712345678")
+        self.assertEqual(shipment["delivery_status"], "in_transit")
+        self.assertEqual(len(shipment["packages"]), 2)
+        for package in shipment["packages"]:
+            self.assertEqual(package["entity_type"], "STORE_DELIVERY_PACKAGE")
+            self.assertTrue(package["display_code"].startswith("SDP"))
+            self.assertRegex(package["machine_code"], r"^6\d{9}$")
+            self.assertEqual(package["barcode_value"], package["machine_code"])
+            self.assertGreater(package["package_no"], 0)
+            self.assertEqual(package["package_total"], 2)
+            self.assertIn(package["source_code"], {"SDB260503AAG", "LPK260504001"})
+            self.assertIn(package["item_count"], {100, 40})
+
+    def test_store_delivery_shipment_rejects_sdo_level_payload_without_sdo_identity(self):
+        first = self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [{"transfer_no": first["source_transfer_no"]}],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("请选择 SDO 出库单，不能只提交补货单号", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_sdo_transfer_mismatch(self):
+        first = self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [
+                        {
+                            "transfer_no": "TO-OTHER-TRANSFER",
+                            "sdo_display_code": first["execution_order_no"],
+                        }
+                    ],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("SDO 与 transfer_no 不匹配，请重新选择", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_source_package_identity_as_shipment_object(self):
+        self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [{"sdo_display_code": "SDB260503AAG"}],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("SDB / LPK 只是来源包，不能作为门店配送对象", raised.exception.detail)
+
     def test_store_delivery_shipment_rejects_transfer_without_sdo_or_sdp(self):
         plain = self._create_approved_plain_transfer_without_sdo()
 
@@ -634,6 +725,23 @@ class MainSortingFlowStateTest(unittest.TestCase):
             )
         self.assertEqual(no_sdp_error.exception.status_code, 409)
         self.assertIn("尚未生成 SDO / SDP", no_sdp_error.exception.detail)
+
+        with self.assertRaises(HTTPException) as sdo_no_sdp_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [
+                        {
+                            "transfer_no": sdo_order["source_transfer_no"],
+                            "sdo_display_code": sdo_order["execution_order_no"],
+                        }
+                    ],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(sdo_no_sdp_error.exception.status_code, 409)
+        self.assertIn("该 SDO 尚未生成 SDP 实体包，不能发车", sdo_no_sdp_error.exception.detail)
 
     def test_store_delivery_shipment_rejects_unready_sdo_status(self):
         sdo_order = self._create_store_delivery_package_state_order()
