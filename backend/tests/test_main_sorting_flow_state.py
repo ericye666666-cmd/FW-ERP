@@ -527,6 +527,662 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertIn("_is_store_clerk_user(current_user)", routes_source)
         self.assertIn("state.list_assigned_store_delivery_packages", routes_source)
 
+    def _create_approved_plain_transfer_without_sdo(self, category_sub="cargo pant"):
+        order = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "created_by": "warehouse_supervisor_1",
+                "approval_required": True,
+                "items": [
+                    {
+                        "category_main": "pants",
+                        "category_sub": category_sub,
+                        "requested_qty": 80,
+                    }
+                ],
+            }
+        )
+        return self.state.approve_transfer_order(
+            order["transfer_no"],
+            {
+                "approved_by": "warehouse_supervisor_1",
+                "approved": True,
+                "note": "approve ordinary transfer",
+            },
+        )
+
+    def test_store_delivery_shipment_history_filters_out_plain_transfers(self):
+        plain = self._create_approved_plain_transfer_without_sdo()
+        sdo_order = self._create_store_delivery_package_state_order()
+
+        rows = self.state.list_store_delivery_shipments()
+
+        self.assertNotIn(plain["transfer_no"], {row["transfer_no"] for row in rows})
+        self.assertIn(sdo_order["source_transfer_no"], {row["transfer_no"] for row in rows})
+        self.assertTrue(all(row.get("store_delivery_execution_order_no") or row.get("shipped_at") for row in rows))
+        listed_sdo = next(row for row in rows if row["transfer_no"] == sdo_order["source_transfer_no"])
+        self.assertEqual(listed_sdo["store_delivery_execution_order_no"], sdo_order["execution_order_no"])
+        self.assertEqual(
+            listed_sdo["store_delivery_execution_order"]["packages"][0]["entity_type"],
+            "STORE_DELIVERY_PACKAGE",
+        )
+
+    def test_store_delivery_shipment_internal_api_batches_only_sdo_shipments(self):
+        first = self._create_store_delivery_package_state_order()
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "transfer_nos": [first["source_transfer_no"]],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "driver_phone": "0712345678",
+                "note": "same vehicle delivery",
+            }
+        )
+
+        self.assertEqual(result["status"], "shipped")
+        self.assertEqual(result["delivery_status"], "in_transit")
+        self.assertEqual(result["transfer_nos"], [first["source_transfer_no"]])
+        self.assertEqual([row["status"] for row in result["orders"]], ["shipped"])
+        self.assertEqual({row["store_receipt_status"] for row in result["orders"]}, {"pending_receipt"})
+        self.assertEqual({row["driver_name"] for row in result["orders"]}, {"Driver A"})
+        self.assertEqual({row["vehicle_no"] for row in result["orders"]}, {"KDM-001A"})
+        self.assertEqual({row["driver_phone"] for row in result["orders"]}, {"0712345678"})
+        self.assertNotIn("0712345678", result["orders"][0].get("shipment_note", ""))
+        self.assertEqual(
+            result["orders"][0]["store_delivery_execution_order"]["packages"][0]["entity_type"],
+            "STORE_DELIVERY_PACKAGE",
+        )
+        listed = self.state.list_store_delivery_shipments()
+        self.assertIn(first["source_transfer_no"], {row["transfer_no"] for row in listed})
+        listed_row = next(row for row in listed if row["transfer_no"] == first["source_transfer_no"])
+        self.assertEqual(listed_row["driver_phone"], "0712345678")
+        self.assertEqual(listed_row["delivery_status"], "in_transit")
+
+    def test_store_delivery_shipment_accepts_sdo_level_items_and_returns_sdp_packages(self):
+        first = self._create_store_delivery_package_state_order()
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "shipments": [
+                    {
+                        "transfer_no": first["source_transfer_no"],
+                        "sdo_display_code": first["execution_order_no"],
+                        "sdo_machine_code": first["machine_code"],
+                    }
+                ],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "driver_phone": "0712345678",
+                "note": "same vehicle delivery",
+            }
+        )
+
+        self.assertEqual(result["transfer_nos"], [first["source_transfer_no"]])
+        self.assertEqual(len(result["shipments"]), 1)
+        shipment = result["shipments"][0]
+        self.assertEqual(shipment["transfer_no"], first["source_transfer_no"])
+        self.assertEqual(shipment["sdo_display_code"], first["execution_order_no"])
+        self.assertEqual(shipment["sdo_machine_code"], first["machine_code"])
+        self.assertEqual(shipment["store_code"], "UTAWALA")
+        self.assertEqual(shipment["package_count"], 2)
+        self.assertEqual(shipment["driver_phone"], "0712345678")
+        self.assertEqual(shipment["delivery_status"], "in_transit")
+        self.assertEqual(len(shipment["packages"]), 2)
+        for package in shipment["packages"]:
+            self.assertEqual(package["entity_type"], "STORE_DELIVERY_PACKAGE")
+            self.assertTrue(package["display_code"].startswith("SDP"))
+            self.assertRegex(package["machine_code"], r"^6\d{9}$")
+            self.assertEqual(package["barcode_value"], package["machine_code"])
+            self.assertGreater(package["package_no"], 0)
+            self.assertEqual(package["package_total"], 2)
+            self.assertIn(package["source_code"], {"SDB260503AAG", "LPK260504001"})
+            self.assertIn(package["item_count"], {100, 40})
+
+    def test_store_delivery_shipment_rejects_sdo_level_payload_without_sdo_identity(self):
+        first = self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [{"transfer_no": first["source_transfer_no"]}],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("请选择 SDO 出库单，不能只提交补货单号", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_sdo_transfer_mismatch(self):
+        first = self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [
+                        {
+                            "transfer_no": "TO-OTHER-TRANSFER",
+                            "sdo_display_code": first["execution_order_no"],
+                        }
+                    ],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("SDO 与 transfer_no 不匹配，请重新选择", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_source_package_identity_as_shipment_object(self):
+        self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [{"sdo_display_code": "SDB260503AAG"}],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("SDB / LPK 只是来源包，不能作为门店配送对象", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_transfer_without_sdo_or_sdp(self):
+        plain = self._create_approved_plain_transfer_without_sdo()
+
+        with self.assertRaises(HTTPException) as no_sdo_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "transfer_nos": [plain["transfer_no"]],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(no_sdo_error.exception.status_code, 409)
+        self.assertIn("尚未生成 SDO / SDP", no_sdo_error.exception.detail)
+
+        sdo_order = self._create_store_delivery_package_state_order()
+        execution_no = sdo_order["execution_order_no"]
+        self.state.store_delivery_execution_orders[execution_no]["packages"] = []
+        for package in list(self.state.store_delivery_packages.values()):
+            if str(package.get("parent_sdo_display_code") or "") == execution_no:
+                self.state.store_delivery_packages.pop(package["display_code"], None)
+
+        with self.assertRaises(HTTPException) as no_sdp_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "transfer_nos": [sdo_order["source_transfer_no"]],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(no_sdp_error.exception.status_code, 409)
+        self.assertIn("尚未生成 SDO / SDP", no_sdp_error.exception.detail)
+
+        with self.assertRaises(HTTPException) as sdo_no_sdp_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [
+                        {
+                            "transfer_no": sdo_order["source_transfer_no"],
+                            "sdo_display_code": sdo_order["execution_order_no"],
+                        }
+                    ],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(sdo_no_sdp_error.exception.status_code, 409)
+        self.assertIn("该 SDO 尚未生成 SDP 实体包，不能发车", sdo_no_sdp_error.exception.detail)
+
+    def test_store_delivery_shipment_rejects_unready_sdo_status(self):
+        sdo_order = self._create_store_delivery_package_state_order()
+        transfer = self.state.transfer_orders[sdo_order["source_transfer_no"]]
+        transfer["status"] = "closed"
+
+        with self.assertRaises(HTTPException) as status_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "transfer_nos": [sdo_order["source_transfer_no"]],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(status_error.exception.status_code, 409)
+        self.assertIn("当前状态不能进入门店配送", status_error.exception.detail)
+
+    def test_store_delivery_shipment_internal_routes_are_declared(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/store-delivery-shipments"', routes_source)
+        self.assertIn("def list_store_delivery_shipments(", routes_source)
+        self.assertIn("def create_store_delivery_shipment(", routes_source)
+        self.assertIn("state.list_store_delivery_shipments", routes_source)
+        self.assertIn("state.ship_store_delivery_transfers", routes_source)
+
+    def _create_ready_assigned_sdo_package_for_store_item_generation(self, *, assigned_clerk="Austin", item_count=3, package_overrides=None):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+        package["item_count"] = item_count
+        if package_overrides:
+            package.update(package_overrides)
+        self.state._save_store_delivery_package(package)
+        self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        assigned = self.state.assign_store_delivery_package(
+            package["display_code"],
+            {
+                "assigned_clerk": assigned_clerk,
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        return order, assigned
+
+    def test_backend_generates_store_items_from_ready_assigned_sdo_package(self):
+        order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=3)
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 2,
+            },
+        )
+
+        self.assertEqual(result["package_progress"]["generated_store_item_count"], 2)
+        self.assertEqual(result["package_progress"]["remaining_store_item_count"], 1)
+        self.assertEqual(result["package_progress"]["putaway_status"], "in_progress")
+        listed_package = self.state.list_store_delivery_execution_orders(transfer_no=order["source_transfer_no"])[0]["packages"][0]
+        self.assertEqual(listed_package["generated_store_item_count"], 2)
+        self.assertEqual(listed_package["remaining_store_item_count"], 1)
+        self.assertEqual(listed_package["putaway_status"], "in_progress")
+        self.assertEqual(len(result["store_items"]), 2)
+        for index, token in enumerate(result["store_items"], start=1):
+            self.assertRegex(token["machine_code"], r"^5\d{12}$")
+            self.assertTrue(self.state._is_valid_store_item_v2_barcode(token["machine_code"]))
+            self.assertEqual(token["barcode_value"], token["machine_code"])
+            self.assertEqual(token["entity_type"], "STORE_ITEM")
+            self.assertEqual(token["store_code"], "UTAWALA")
+            self.assertEqual(token["assigned_clerk"], "Austin")
+            self.assertEqual(token["assigned_employee"], "Austin")
+            self.assertEqual(token["generated_by"], "Austin")
+            self.assertEqual(token["rack_code"], "A-01")
+            self.assertEqual(token["store_rack_code"], "A-01")
+            self.assertEqual(token["selected_price"], 150)
+            self.assertEqual(token["selling_price_kes"], 150)
+            self.assertEqual(token["category_main"], "pants")
+            self.assertEqual(token["category_sub"], "jeans pant")
+            self.assertEqual(token["grade"], "P")
+            self.assertEqual(token["sdo_package_display_code"], package["display_code"])
+            self.assertEqual(token["sdo_package_machine_code"], package["machine_code"])
+            self.assertEqual(token["parent_sdo_display_code"], order["execution_order_no"])
+            self.assertEqual(token["parent_sdo_machine_code"], order["machine_code"])
+            self.assertEqual(token["source_type"], "SDB")
+            self.assertEqual(token["source_code"], "SDB260503AAG")
+            self.assertEqual(token["qty_index"], index)
+            self.assertEqual(token["qty_total"], 3)
+
+        resolved = self.state.resolve_barcode(result["store_items"][0]["machine_code"], context="pos")
+        self.assertEqual(resolved["barcode_type"], "STORE_ITEM")
+        self.assertEqual(resolved["object_id"], result["store_items"][0]["token_no"])
+        self.assertEqual(resolved["identity_id"], result["store_items"][0]["identity_no"])
+        self.assertEqual(self.state.resolve_barcode(package["machine_code"], context="pos")["barcode_type"], "STORE_DELIVERY_PACKAGE")
+        self.assertTrue(self.state.resolve_barcode(package["machine_code"], context="pos")["reject_reason"])
+
+    def test_store_item_generation_inherits_sdo_package_token_and_cost_lineage(self):
+        order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
+            item_count=2,
+            package_overrides={
+                "source_token_refs": ["TOK-SORT-001", "TOK-SORT-002"],
+                "token_nos": ["TOK-SORT-001", "TOK-SORT-002"],
+                "cost_source_refs": ["COST-LAYER-001"],
+                "source_cost_layer": {"layer_id": "COST-LAYER-001", "unit_cost_kes": 72},
+                "content_summary": "pants / jeans pant / P",
+            },
+        )
+        self.state.store_dispatch_bales["SDB260503AAG"].update(
+            {
+                "sorting_task_no": "SORT260503001",
+                "source_bale_token": "SRC-BALE-001",
+                "raw_bale_barcode": "RB260501001",
+                "raw_bale_machine_code": "1260501001",
+                "source_batch_no": "BATCH-001",
+                "source_supplier": "Youxun Demo",
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "unit_cost_kes": 72,
+                "cost_status": "known",
+            }
+        )
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 1,
+            },
+        )
+
+        token = result["store_items"][0]
+        self.assertEqual(token["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(token["sdo_package_machine_code"], package["machine_code"])
+        self.assertEqual(token["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(token["parent_sdo_machine_code"], order["machine_code"])
+        self.assertEqual(token["source_type"], "SDB")
+        self.assertEqual(token["source_code"], "SDB260503AAG")
+        self.assertEqual(token["source_machine_code"], "2260503006")
+        self.assertEqual(token["source_token_refs"], ["TOK-SORT-001", "TOK-SORT-002"])
+        self.assertEqual(token["token_nos"], ["TOK-SORT-001", "TOK-SORT-002"])
+        self.assertEqual(token["cost_source_refs"], ["COST-LAYER-001"])
+        self.assertEqual(token["source_cost_layer"]["layer_id"], "COST-LAYER-001")
+        self.assertEqual(token["sorting_task_no"], "SORT260503001")
+        self.assertEqual(token["source_bale_token"], "SRC-BALE-001")
+        self.assertEqual(token["raw_bale_barcode"], "RB260501001")
+        self.assertEqual(token["raw_bale_machine_code"], "1260501001")
+        self.assertEqual(token["source_batch_no"], "BATCH-001")
+        self.assertEqual(token["source_supplier"], "Youxun Demo")
+        self.assertEqual(token["unit_cost_kes"], 72)
+        self.assertEqual(token["cost_status"], "known")
+        self.assertEqual(token["lineage_status"], "complete")
+
+        resolved = self.state.resolve_barcode(token["machine_code"], context="pos")
+        self.assertEqual(resolved["barcode_type"], "STORE_ITEM")
+        self.assertEqual(resolved["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(resolved["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(resolved["source_type"], "SDB")
+        self.assertEqual(resolved["source_code"], "SDB260503AAG")
+        self.assertEqual(resolved["cost_status"], "known")
+        self.assertEqual(resolved["lineage_status"], "complete")
+
+        self.state._ensure_item_token_product_exists(token["token_no"], actor="Austin", rack_code="A-01")
+        self.state._add_store_lot(
+            "UTAWALA",
+            token["machine_code"],
+            1,
+            token["unit_cost_kes"],
+            "store_item",
+            token["token_no"],
+            store_rack_code="A-01",
+        )
+        shift = self.state.open_cashier_shift(
+            {
+                "opened_by": "store_manager_1",
+                "store_code": "UTAWALA",
+                "opening_float_cash": 0,
+                "note": "lineage sale smoke",
+            }
+        )
+        sale = self.state.create_sale_transaction(
+            {
+                "order_no": "SALE-SDP-LINEAGE-001",
+                "store_code": "UTAWALA",
+                "cashier_name": "store_manager_1",
+                "shift_no": shift["shift_no"],
+                "sold_at": "2026-05-04T10:00:00+03:00",
+                "items": [{"barcode": token["machine_code"], "qty": 1, "selling_price": 150}],
+                "payments": [{"method": "cash", "amount": 150}],
+            }
+        )
+        sale_item = sale["items"][0]
+        self.assertEqual(sale_item["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(sale_item["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(sale_item["source_type"], "SDB")
+        self.assertEqual(sale_item["source_code"], "SDB260503AAG")
+        self.assertEqual(sale_item["cost_status"], "known")
+
+    def test_store_item_generation_keeps_partial_lineage_without_faking_cost(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
+            item_count=1,
+            package_overrides={
+                "source_token_refs": [],
+                "token_nos": [],
+                "cost_source_refs": [],
+                "source_cost_layer": None,
+            },
+        )
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["machine_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 1,
+            },
+        )
+
+        token = result["store_items"][0]
+        self.assertEqual(token["source_code"], "SDB260503AAG")
+        self.assertEqual(token["lineage_status"], "partial")
+        self.assertIn(token["cost_status"], {"pending", "unknown"})
+        self.assertIsNone(token["unit_cost_kes"])
+        self.assertIsNone(token.get("cost_price"))
+        self.assertEqual(token["source_token_refs"], [])
+        self.assertEqual(token["cost_source_refs"], [])
+
+    def test_store_item_generation_rejects_unready_or_wrong_clerk_sdo_package(self):
+        order = self._create_store_delivery_package_state_order()
+        base_package = order["packages"][0]
+
+        def package_variant(display_code, machine_code, **overrides):
+            row = {
+                **base_package,
+                "id": overrides.pop("id", 950),
+                "display_code": display_code,
+                "package_id": display_code,
+                "machine_code": machine_code,
+                "barcode_value": machine_code,
+                "item_count": 2,
+                "received_status": "received",
+                "exception_status": "normal",
+                "exception_reason": "",
+                "assigned_clerk": "Austin",
+                "assignment_status": "assigned",
+                "status": "assigned",
+                **overrides,
+            }
+            return self.state._save_store_delivery_package(row)
+
+        unreceived = package_variant(
+            "SDP260504971",
+            "6260504971",
+            id=971,
+            received_status="pending",
+        )
+
+        with self.assertRaises(HTTPException) as unreceived_error:
+            self.state.generate_store_items_for_sdo_package(
+                unreceived["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(unreceived_error.exception.status_code, 409)
+
+        exception_package = package_variant(
+            "SDP260504972",
+            "6260504972",
+            id=972,
+            exception_status="exception",
+            exception_reason="damaged",
+            status="exception",
+        )
+        with self.assertRaises(HTTPException) as exception_error:
+            self.state.generate_store_items_for_sdo_package(
+                exception_package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(exception_error.exception.status_code, 409)
+
+        unassigned_package = package_variant(
+            "SDP260504973",
+            "6260504973",
+            id=973,
+            assigned_clerk="",
+            assignment_status="unassigned",
+            status="received_unassigned",
+        )
+        with self.assertRaises(HTTPException) as unassigned_error:
+            self.state.generate_store_items_for_sdo_package(
+                unassigned_package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(unassigned_error.exception.status_code, 409)
+
+        mary_package = package_variant(
+            "SDP260504974",
+            "6260504974",
+            id=974,
+            assigned_clerk="Mary",
+        )
+        with self.assertRaises(HTTPException) as wrong_clerk_error:
+            self.state.generate_store_items_for_sdo_package(
+                mary_package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(wrong_clerk_error.exception.status_code, 403)
+
+    def test_store_item_generation_quantity_cannot_exceed_sdo_package_item_count(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=3)
+
+        with self.assertRaises(HTTPException) as too_many:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 4,
+                },
+            )
+        self.assertEqual(too_many.exception.status_code, 409)
+
+        first = self.state.generate_store_items_for_sdo_package(
+            package["machine_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "quantity": 2,
+            },
+        )
+        self.assertEqual(first["package_progress"]["generated_store_item_count"], 2)
+
+        with self.assertRaises(HTTPException) as duplicate_too_many:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 2,
+                },
+            )
+        self.assertEqual(duplicate_too_many.exception.status_code, 409)
+
+        final = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "quantity": 1,
+            },
+        )
+        self.assertEqual(final["package_progress"]["generated_store_item_count"], 3)
+        self.assertEqual(final["package_progress"]["remaining_store_item_count"], 0)
+        self.assertEqual(final["package_progress"]["putaway_status"], "completed")
+
+        with self.assertRaises(HTTPException) as completed:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "A-01",
+                    "selected_price": 150,
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(completed.exception.status_code, 409)
+
+    def test_store_item_generation_endpoint_is_declared_for_pda(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/store-delivery-packages/{package_code}/store-items/generate"', routes_source)
+        self.assertIn("def generate_store_items_for_sdo_package(", routes_source)
+        self.assertIn("state.generate_store_items_for_sdo_package", routes_source)
+
     def _create_ready_bales(self, customs_notice_no="RAW240421", package_count=2, unit_weight=40):
         shipment = self.state.create_inbound_shipment(
             {
