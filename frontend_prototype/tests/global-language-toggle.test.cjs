@@ -118,11 +118,13 @@ test("workspace navigation uses stable bilingual labels instead of raw Chinese m
   assert.match(appJs, /function getWorkspaceSectionTitle/);
   assert.match(appJs, /function getWorkspaceNavTitle/);
   assert.match(appJs, /function getWorkspacePanelTitle/);
-  assert.match(appJs, /titleEn:\s*"Inbound"/);
+  assert.match(appJs, /titleEn:\s*"Garment Inbound"/);
+  assert.match(appJs, /titleEn:\s*"Department-Store Inbound"/);
   assert.match(appJs, /titleEn:\s*"Work Orders"/);
   assert.match(appJs, /titleEn:\s*"Store Replenishment"/);
   assert.match(appJs, /titleEn:\s*"Bale Sales"/);
-  assert.match(appJs, /titleEn:\s*"General Management"/);
+  assert.match(appJs, /titleEn:\s*"Warehouse General Management"/);
+  assert.match(appJs, /titleEn:\s*"China Management"/);
   assert.match(appJs, /titleEn:\s*"Store Manager"/);
   assert.match(appJs, /titleEn:\s*"Store Clerk"/);
   assert.match(appJs, /titleEn:\s*"Cashier Area"/);
