@@ -1209,6 +1209,17 @@ test("门店配送 history tab lists all shipment statuses with a search box", (
   assert.match(appJs, /includes\(transferDeliveryHistorySearchQuery\)/);
 });
 
+test("门店配送 create and history tabs use internal shipment APIs", () => {
+  const submitSource = extractFunctionSource(appJs, "submitTransferShipment");
+  assert.match(appJs, /const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "\/store-delivery-shipments";/);
+  assert.match(appJs, /async function loadStoreDeliveryShipmentRecords/);
+  assert.match(appJs, /request\(STORE_DELIVERY_SHIPMENTS_ENDPOINT\)/);
+  assert.match(submitSource, /request\(STORE_DELIVERY_SHIPMENTS_ENDPOINT,\s*\{[\s\S]*method:\s*"POST"/);
+  assert.match(submitSource, /transfer_nos:\s*transferNos/);
+  assert.doesNotMatch(submitSource, /\/transfers\/\$\{encodeURIComponent\(transferNo\)\}\/ship/);
+  assert.match(appJs, /#loadTransferDispatchButton[\s\S]*loadStoreDeliveryShipmentRecords/);
+});
+
 test("门店配送 statuses keep shipment wording compact", () => {
   assert.match(appJs, /return chooseI18nLabel\("待发车", "Pending Dispatch"\);/);
   assert.match(appJs, /return chooseI18nLabel\("运输中", "In Transit"\);/);
