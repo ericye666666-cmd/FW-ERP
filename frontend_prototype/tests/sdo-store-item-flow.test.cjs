@@ -102,7 +102,7 @@ test("Austin clerk page does not locally generate STORE_ITEM machine codes", () 
   assert.doesNotMatch(appJs, /function buildStoreItemTokenSerial/);
   assert.doesNotMatch(appJs, /const machineCode = `5\$\{/);
   assert.match(appJs, /data-store-package-generate-items/);
-  assert.match(appJs, /data-store-package-print-items/);
+  assert.match(appJs, /data-store-package-print-generated/);
 });
 
 test("STORE_ITEM source_type is normalized to SDB or LPK for assigned SDO packages", () => {
@@ -152,14 +152,16 @@ test("clerk package cards open shelving even when SDO code is missing", () => {
   assert.match(cardSource, /data-store-package-process="\$\{escapeHtml\(actionKey\)\}"/);
 });
 
-test("clerk package shelving step supports price selection and batch print preview", () => {
+test("clerk package shelving step creates STORE_ITEM print jobs without marking printed", () => {
   const stepSource = extractFunctionSource(appJs, "renderStorePackageShelvingStep");
   const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
   const priceChoiceSource = extractFunctionSource(appJs, "getStorePackagePriceChoices");
   const defaultPriceSource = extractFunctionSource(appJs, "getDefaultStoreSalePriceChoices");
   const costSource = extractFunctionSource(appJs, "getStorePackageCostPrice");
-  const previewSource = extractFunctionSource(appJs, "buildStorePackagePrintPreviewTokens");
-  const markPrintedSource = extractFunctionSource(appJs, "markStorePackagePrintPreviewTokensPrinted");
+  const printSource = extractFunctionSource(appJs, "createStorePackageGeneratedStoreItemPrintJobs");
+  const labelSource = extractFunctionSource(appJs, "getStoreItemLabelTemplateCode");
+  const generatedListSource = extractFunctionSource(appJs, "renderStorePackageGeneratedStoreItems");
+  const feedbackSource = extractFunctionSource(appJs, "renderStorePackagePrintJobFeedback");
 
   assert.match(stepSource, /上架设置/);
   assert.match(stepSource, /store_rack_code/);
@@ -172,12 +174,13 @@ test("clerk package shelving step supports price selection and batch print previ
   assert.match(priceChoiceSource, /getDefaultStoreSalePriceChoices/);
   assert.match(stepSource, /STORE_ITEM 生成区/);
   assert.match(stepSource, /生成 STORE_ITEM 商品码/);
-  assert.match(stepSource, /商品码打印区/);
-  assert.match(stepSource, /本次打印数量/);
-  assert.match(stepSource, /预览本次商品码/);
-  assert.match(stepSource, /打印本次数量/);
-  assert.match(stepSource, /标记本次已打印/);
-  assert.match(appJs, /STORE_ITEM machine_code barcode/);
+  assert.match(generatedListSource, /打印本次标签/);
+  assert.match(generatedListSource, /data-store-package-label-size/);
+  assert.match(generatedListSource, /value="60x40" selected/);
+  assert.match(generatedListSource, /value="40x30"/);
+  assert.match(generatedListSource, /data-store-package-print-generated/);
+  assert.match(generatedListSource, /machine_code/);
+  assert.match(generatedListSource, /barcode_value/);
 
   assert.match(appJs, /STORE_ITEM machine_code 必须由后端统一发号/);
   assert.match(generateSource, /store-items\/generate/);
@@ -195,20 +198,34 @@ test("clerk package shelving step supports price selection and batch print previ
   assert.match(defaultPriceSource, /Math\.round\(costPrice \* 2\.2\)/);
   assert.match(defaultPriceSource, /default_price_1:\s*150/);
   assert.match(defaultPriceSource, /default_price_2:\s*200/);
-  assert.match(previewSource, /pending\.slice\(0, requested\)/);
-  assert.match(previewSource, /Math\.min\(.*pending\.length/);
-  assert.match(previewSource, /token\.machine_code/);
-  assert.match(markPrintedSource, /previewMachineCodes\.has/);
-  assert.match(markPrintedSource, /print_status:\s*"printed"/);
-  assert.match(markPrintedSource, /printed_at:/);
+  assert.match(labelSource, /60x40/);
+  assert.match(labelSource, /apparel_60x40/);
+  assert.match(labelSource, /40x30/);
+  assert.match(labelSource, /apparel_40x30/);
+  assert.match(printSource, /\/print-jobs\/item-tokens/);
+  assert.match(printSource, /token_nos/);
+  assert.match(printSource, /copies:\s*1/);
+  assert.match(printSource, /printer_name:\s*"Deli DL-720C"/);
+  assert.match(printSource, /template_code/);
+  assert.match(feedbackSource, /queued/);
+  assert.match(generatedListSource, /本次生成数量/);
+  assert.match(generatedListSource, /待打印/);
+  assert.match(generatedListSource, /barcode_value/);
+  assert.match(generatedListSource, /来源 SDP/);
+  assert.match(generatedListSource, /所属 SDO/);
+  assert.match(generatedListSource, /rack_code/);
+  assert.match(feedbackSource, /创建打印任务后仍需等待打印完成/);
 
   assert.match(appJs, /function getSelectedStorePackagePrice/);
-  assert.match(appJs, /function buildStorePackagePrintPreviewTokens/);
-  assert.match(appJs, /function markStorePackagePrintPreviewTokensPrinted/);
-  assert.match(appJs, /data-store-package-preview-print/);
-  assert.match(appJs, /data-store-package-confirm-printed/);
+  assert.match(appJs, /function createStorePackageGeneratedStoreItemPrintJobs/);
+  assert.match(appJs, /function renderStorePackagePrintJobFeedback/);
   assert.match(appJs, /请先选择货架位/);
   assert.match(appJs, /请先选择售价/);
   assert.match(appJs, /请先生成 STORE_ITEM 商品码/);
-  assert.match(appJs, /本包商品码已全部打印/);
+  assert.match(appJs, /打印任务创建失败/);
+  assert.doesNotMatch(appJs, /data-store-package-confirm-printed/);
+  assert.doesNotMatch(printSource, /\/print-jobs\/\$\{[^}]+}\/complete/);
+  assert.doesNotMatch(printSource, /printed_in_store/);
+  assert.doesNotMatch(printSource, /print_status:\s*"printed"/);
+  assert.doesNotMatch(generatedListSource, /已可销售/);
 });

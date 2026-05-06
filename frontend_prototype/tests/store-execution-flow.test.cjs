@@ -415,6 +415,7 @@ test("store PDA generates STORE_ITEM from assigned SDP through backend only", ()
   const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
   const normalizeSource = extractFunctionSource(appJs, "normalizeGeneratedStoreItemToken");
   const lineageSource = extractFunctionSource(appJs, "renderStoreItemLineageSummary");
+  const generatedListSource = extractFunctionSource(appJs, "renderStorePackageGeneratedStoreItems");
 
   assert.match(stepSource, /name="category_main"/);
   assert.match(stepSource, /name="category_sub"/);
@@ -434,7 +435,11 @@ test("store PDA generates STORE_ITEM from assigned SDP through backend only", ()
   assert.match(appJs, /function normalizeGeneratedStoreItemToken/);
   assert.match(appJs, /function renderStoreItemLineageSummary/);
   assert.match(appJs, /function renderStorePackageGeneratedStoreItems/);
+  assert.match(appJs, /function createStorePackageGeneratedStoreItemPrintJobs/);
   assert.match(stepSource, /renderStorePackageGeneratedStoreItems/);
+  assert.match(generatedListSource, /打印本次标签/);
+  assert.match(appJs, /apparel_60x40/);
+  assert.match(appJs, /apparel_40x30/);
   assert.match(lineageSource, /SDP/);
   assert.match(lineageSource, /SDO/);
   assert.match(lineageSource, /SRC/);
@@ -448,6 +453,9 @@ test("store PDA generates STORE_ITEM from assigned SDP through backend only", ()
   assert.doesNotMatch(stepSource, /name="source_token_refs"/);
   assert.doesNotMatch(stepSource, /name="cost_source_refs"/);
   assert.match(appJs, /await generateStoreItemTokensForSdoPackage/);
+  assert.match(appJs, /await createStorePackageGeneratedStoreItemPrintJobs/);
+  assert.match(appJs, /打印任务创建失败/);
+  assert.doesNotMatch(appJs, /已可销售/);
   assert.doesNotMatch(generateSource, /STORE_ITEM machine_code 必须由后端统一发号/);
   assert.doesNotMatch(generateSource, /machineCode = `5/);
   assert.doesNotMatch(generateSource, /localStorage\.length|Date\.now\(\)|new Date\(\)\.getTime/);

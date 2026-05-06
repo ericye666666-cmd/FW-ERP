@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core import state as state_module
 from app.core.config import settings
 from app.core.state import InMemoryState
+from app.schemas.barcodes import BarcodeResolveResponse
 from app.schemas.sorting import BaleBarcodeResponse, RawBaleStockResponse
 
 
@@ -959,6 +960,104 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(sale_item["source_type"], "SDB")
         self.assertEqual(sale_item["source_code"], "SDB260503AAG")
         self.assertEqual(sale_item["cost_status"], "known")
+
+    def test_store_item_resolver_projects_store_package_source_and_cost_fields(self):
+        order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
+            item_count=2,
+            package_overrides={
+                "source_token_refs": ["TOK-SORT-001"],
+                "cost_source_refs": ["COST-LAYER-001"],
+                "source_cost_layer": {"layer_id": "COST-LAYER-001", "unit_cost_kes": 72},
+            },
+        )
+        self.state.store_dispatch_bales["SDB260503AAG"].update(
+            {
+                "source_bale_token": "SRC-BALE-001",
+                "raw_bale_barcode": "RB260501001",
+                "raw_bale_machine_code": "1260501001",
+                "source_batch_no": "BATCH-001",
+                "source_supplier": "Youxun Demo",
+                "unit_cost_kes": 72,
+                "cost_status": "known",
+            }
+        )
+        result = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "A-01",
+                "selected_price": 150,
+                "category_main": "pants",
+                "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 1,
+            },
+        )
+        token = result["store_items"][0]
+
+        pending = self.state.resolve_barcode(token["machine_code"], context="pos")
+        self.assertEqual(pending["barcode_type"], "STORE_ITEM")
+        self.assertFalse(pending["pos_allowed"])
+        self.assertTrue(pending["reject_reason"])
+        self.assertEqual(pending["store_code"], "UTAWALA")
+        self.assertEqual(pending["assigned_clerk"], "Austin")
+        self.assertEqual(pending["assigned_employee"], "Austin")
+        self.assertEqual(pending["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(pending["sdo_package_machine_code"], package["machine_code"])
+        self.assertEqual(pending["parent_sdo_display_code"], order["execution_order_no"])
+        self.assertEqual(pending["parent_sdo_machine_code"], order["machine_code"])
+        self.assertEqual(pending["package_no"], package["package_no"])
+        self.assertEqual(pending["package_total"], package["package_total"])
+        self.assertEqual(pending["item_count"], 2)
+        self.assertEqual(pending["source_type"], "SDB")
+        self.assertEqual(pending["source_code"], "SDB260503AAG")
+        self.assertEqual(pending["source_machine_code"], "2260503006")
+        self.assertEqual(pending["source_bale_token"], "SRC-BALE-001")
+        self.assertEqual(pending["raw_bale_barcode"], "RB260501001")
+        self.assertEqual(pending["raw_bale_machine_code"], "1260501001")
+        self.assertEqual(pending["source_batch_no"], "BATCH-001")
+        self.assertEqual(pending["source_supplier"], "Youxun Demo")
+        self.assertEqual(pending["category_main"], "pants")
+        self.assertEqual(pending["category_sub"], "jeans pant")
+        self.assertEqual(pending["grade"], "P")
+        self.assertEqual(pending["selected_price"], 150)
+        self.assertEqual(pending["selling_price_kes"], 150)
+        self.assertEqual(pending["unit_cost_kes"], 72)
+        self.assertEqual(pending["cost_price"], 72)
+        self.assertEqual(pending["cost_status"], "known")
+        self.assertEqual(pending["lineage_status"], "complete")
+        self.assertEqual(pending["print_status"], "pending_print")
+        self.assertEqual(pending["sale_status"], "pending_putaway")
+        self.assertEqual(pending["status"], "pending_print")
+
+        response = BarcodeResolveResponse(**pending)
+        response_payload = response.model_dump() if hasattr(response, "model_dump") else response.dict()
+        self.assertEqual(response_payload["store_code"], "UTAWALA")
+        self.assertEqual(response_payload["assigned_employee"], "Austin")
+        self.assertEqual(response_payload["sdo_package_display_code"], package["display_code"])
+        self.assertEqual(response_payload["sdo_package_machine_code"], package["machine_code"])
+        self.assertEqual(response_payload["source_machine_code"], "2260503006")
+        self.assertEqual(response_payload["cost_status"], "known")
+        self.assertEqual(response_payload["print_status"], "pending_print")
+
+        self.state.item_barcode_tokens[token["token_no"]].update(
+            {
+                "status": "printed_in_store",
+                "print_status": "printed_in_store",
+                "sale_status": "ready_for_sale",
+            }
+        )
+        allowed = self.state.resolve_barcode(token["machine_code"], context="pos")
+        self.assertEqual(allowed["barcode_type"], "STORE_ITEM")
+        self.assertTrue(allowed["pos_allowed"])
+        self.assertFalse(allowed["reject_reason"])
+        self.assertEqual(allowed["status"], "printed_in_store")
+
+        sdp_result = self.state.resolve_barcode(package["machine_code"], context="pos")
+        self.assertEqual(sdp_result["barcode_type"], "STORE_DELIVERY_PACKAGE")
+        self.assertTrue(sdp_result["reject_reason"])
 
     def test_store_item_generation_keeps_partial_lineage_without_faking_cost(self):
         _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
