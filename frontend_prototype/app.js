@@ -20017,10 +20017,11 @@ function renderTransferTrackingResultSummary(result) {
   const routeLabel = String(result.route_stops || "").trim() || "WH1 → 待补充站点";
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">配送批次 ${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")} 已更新：${escapeHtml(batchLabel)}。</div>
+    <div class="alert-banner">本车次配送 ${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")} 已更新：${escapeHtml(batchLabel)}。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>配送批次号</strong><span>${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")}</span></article>
+      <article class="store-metric"><strong>本车次编号</strong><span>${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")}</span></article>
       <article class="store-metric"><strong>司机</strong><span>${escapeHtml(result.driver_name || "待填写")}</span></article>
+      <article class="store-metric"><strong>司机电话</strong><span>${escapeHtml(result.driver_phone || "待填写")}</span></article>
       <article class="store-metric"><strong>车辆</strong><span>${escapeHtml(result.vehicle_no || "待填写")}</span></article>
       <article class="store-metric"><strong>预计出发时间</strong><span>${escapeHtml(result.departure_time || "待填写")}</span></article>
       <article class="store-metric"><strong>路线</strong><span>${escapeHtml(routeLabel)}</span></article>
@@ -20170,6 +20171,66 @@ function getSelectedTransferShipmentNos(form = document.querySelector("#transfer
   return Array.from(new Set(getTransferShipmentSelectValues(form)));
 }
 
+function getStoreDeliverySdoDisplayCode(row = {}) {
+  return String(
+    row?.store_delivery_execution_order_no
+      || row?.store_delivery_execution_order?.execution_order_no
+      || row?.official_delivery_barcode
+      || "",
+  ).trim().toUpperCase();
+}
+
+function hasStoreDeliveryShipmentSdoPackages(row = {}) {
+  if (!getStoreDeliverySdoDisplayCode(row)) {
+    return false;
+  }
+  const packages = row?.store_delivery_execution_order?.packages;
+  if (Array.isArray(packages) && packages.some((pkg) => {
+    const displayCode = String(pkg?.display_code || pkg?.package_code || "").trim().toUpperCase();
+    const machineCode = String(pkg?.machine_code || pkg?.barcode_value || "").trim().toUpperCase();
+    return String(pkg?.entity_type || "").trim().toUpperCase() === "STORE_DELIVERY_PACKAGE"
+      || displayCode.startsWith("SDP")
+      || machineCode.startsWith("6");
+  })) {
+    return true;
+  }
+  return false;
+}
+
+function getStoreDeliveryShipmentOptionRows(rows = []) {
+  return (Array.isArray(rows) ? rows : []).filter((row) => hasStoreDeliveryShipmentSdoPackages(row));
+}
+
+function getStoreDeliveryShipmentOptionLabel(row = {}) {
+  const sdo = getStoreDeliverySdoDisplayCode(row) || "-";
+  const transferNo = String(row?.transfer_no || "-").trim().toUpperCase() || "-";
+  const storeCode = String(row?.to_store_code || row?.store_code || "-").trim().toUpperCase() || "-";
+  const packCount = getTransferShipmentPackageCount(row);
+  const statusLabel = getShipmentBatchProgressLabel(row);
+  return `${sdo} / ${transferNo} / ${storeCode} / ${formatI18nCount(packCount, "包", "packages")} / ${statusLabel}`;
+}
+
+function getStoreDeliveryReceiptStatusLabel(row = {}) {
+  const receiptStatus = String(row?.store_receipt_status || "").trim().toLowerCase();
+  if (receiptStatus === "received" || receiptStatus === "completed") {
+    return chooseI18nLabel("已收货", "Received");
+  }
+  if (receiptStatus === "receiving_in_progress" || receiptStatus === "partially_received") {
+    return chooseI18nLabel("部分收货", "Partially Received");
+  }
+  if (receiptStatus === "exception" || receiptStatus === "rejected") {
+    return chooseI18nLabel("异常", "Exception");
+  }
+  if (receiptStatus === "pending_receipt") {
+    return chooseI18nLabel("待门店收货", "Pending Store Receipt");
+  }
+  return receiptStatus ? translateStatusLabel(receiptStatus) : chooseI18nLabel("待门店收货", "Pending Store Receipt");
+}
+
+function formatDateTime(value = "") {
+  return formatLocalDateTime(value);
+}
+
 function ensureTransferShipmentSdoRow() {
   const list = document.querySelector("[data-transfer-sdo-list]");
   if (!(list instanceof HTMLElement)) {
@@ -20192,7 +20253,7 @@ function addTransferShipmentSdoRow(value = "") {
   row.dataset.transferSdoRow = "true";
   row.innerHTML = `
     <select name="transfer_no">
-      <option value="">选择仓库送货执行单 / SDO</option>
+      <option value="">选择 SDO / transfer / 门店 / 包数</option>
     </select>
     <button type="button" class="ghost-button mini-button" data-transfer-sdo-remove>删除</button>
   `;
@@ -20274,9 +20335,10 @@ function renderTransferDeliveryHistory(rows = transferOrderState) {
       row.to_store_code,
       row.to_store_name,
       row.driver_name,
+      row.driver_phone,
       row.vehicle_no,
-      row.delivery_batch?.delivery_batch_no,
-      row.delivery_batch?.shipment_session_no,
+      row.shipped_at,
+      getStoreDeliveryReceiptStatusLabel(row),
       getShipmentBatchProgressLabel(row),
     ].map((value) => String(value || "").trim().toUpperCase()).join(" ");
     return haystack.includes(transferDeliveryHistorySearchQuery);
@@ -20308,20 +20370,21 @@ function renderTransferDeliveryHistory(rows = transferOrderState) {
     </div>
     <div class="candidate-list transfer-draft-list">
       ${filteredList.map((row) => {
-        const deliveryBatch = row.delivery_batch || {};
         const packageCount = getTransferShipmentPackageCount(row);
         const statusLabel = getShipmentBatchProgressLabel(row);
+        const sdoCode = getStoreDeliverySdoDisplayCode(row);
         return `
           <article class="candidate-row transfer-draft-row">
             <div>
-              <strong>${escapeHtml(row.store_delivery_execution_order_no || row.transfer_no || "-")}</strong>
-              <div class="subtle small">${escapeHtml(`${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${statusLabel}`)}</div>
+              <strong>${escapeHtml(sdoCode || "-")}</strong>
+              <div class="subtle small">${escapeHtml(`${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${formatI18nCount(packageCount, "包", "packages")}`)}</div>
               <div class="meta-row">
-                <span class="meta-pill">配送批次 ${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")}</span>
                 <span class="meta-pill">司机 ${escapeHtml(row.driver_name || "-")}</span>
                 <span class="meta-pill">车辆 ${escapeHtml(row.vehicle_no || "-")}</span>
-                <span class="meta-pill">包数 ${escapeHtml(packageCount || 0)}</span>
-                <span class="meta-pill">状态 ${escapeHtml(statusLabel)}</span>
+                <span class="meta-pill">司机电话 ${escapeHtml(row.driver_phone || "-")}</span>
+                <span class="meta-pill">发货时间 ${escapeHtml(formatDateTime(row.shipped_at) || "-")}</span>
+                <span class="meta-pill">当前配送状态 ${escapeHtml(statusLabel)}</span>
+                <span class="meta-pill">收货状态 ${escapeHtml(getStoreDeliveryReceiptStatusLabel(row))}</span>
               </div>
             </div>
             <div class="candidate-side-actions">
@@ -20508,7 +20571,8 @@ function populateTransferOrderSelectors() {
     if (!selects.length) return;
     selects.forEach((select) => {
       const previousValue = String(select.value || "").trim().toUpperCase();
-      const options = rows.map((row) => {
+      const sourceRows = mode === "ship" ? getStoreDeliveryShipmentOptionRows(rows) : rows;
+      const options = sourceRows.map((row) => {
         const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(row));
         const summary = plan.summary || {};
         const total = Number(summary.totalRequestedQty || row.requested_qty || 0);
@@ -20516,12 +20580,7 @@ function populateTransferOrderSelectors() {
         const sdbCount = Number(summary.selectedPreparedBaleCount || row.delivery_batch?.bale_count || 0);
         const requiredDate = String(row.required_arrival_date || row.required_arrival_on || "-").trim() || "-";
         if (mode === "ship") {
-          const hasSdo = Boolean(row.store_delivery_execution_order_no);
-          const sdo = row.store_delivery_execution_order_no || chooseI18nLabel("SDO 未生成", "SDO Not Generated");
-          const transferNo = row.transfer_no || "-";
-          const packCount = hasSdo ? getTransferShipmentPackageCount(row) : Math.max(sdbCount + (shortage > 0 ? 1 : 0), 0);
-          const statusLabel = hasSdo ? getShipmentBatchProgressLabel(row) : translateStatusLabel("pending_print", "store_dispatch_bale");
-          return `${sdo} / ${row.to_store_code || "-"} / ${transferNo} / ${formatI18nCount(packCount, "包", "packages")} / ${statusLabel}`;
+          return getStoreDeliveryShipmentOptionLabel(row);
         }
         if (mode === "exec") {
           return currentLanguage === "en"
@@ -20631,10 +20690,10 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   target.className = "report-summary";
   target.innerHTML = `
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>配送批次数量</strong><span>${batchGroups.length || 0}</span></article>
-      <article class="store-metric"><strong>待发车批次</strong><span>${waitingCount || 0}</span></article>
-      <article class="store-metric"><strong>运输中批次</strong><span>${inTransitCount || 0}</span></article>
-      <article class="store-metric"><strong>已完成批次</strong><span>${completedCount || 0}</span></article>
+      <article class="store-metric"><strong>本车次配送数量</strong><span>${batchGroups.length || 0}</span></article>
+      <article class="store-metric"><strong>待发车车次</strong><span>${waitingCount || 0}</span></article>
+      <article class="store-metric"><strong>运输中车次</strong><span>${inTransitCount || 0}</span></article>
+      <article class="store-metric"><strong>已完成车次</strong><span>${completedCount || 0}</span></article>
       <article class="store-metric"><strong>涉及门店数</strong><span>${uniqueStores.size || 0}</span></article>
       <article class="store-metric"><strong>总包数</strong><span>${summary.total_dispatch_bales || 0}</span></article>
       <article class="store-metric"><strong>待收货包数</strong><span>${pendingBales || 0}</span></article>
@@ -20648,7 +20707,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
               .map((group) => `
                 <article class="candidate-row transfer-draft-row">
                   <div>
-                    <strong>配送批次：${escapeHtml(group.shipmentBatchNo || "-")}</strong>
+                    <strong>本车次配送：${escapeHtml(group.shipmentBatchNo || "-")}</strong>
                     <div class="subtle small">司机：${escapeHtml(group.driver || "-")}</div>
                     <div class="subtle small">车辆：${escapeHtml(group.vehicle || "-")}</div>
                     <div class="subtle small">路线：${escapeHtml(group.route || "-")}</div>
@@ -20692,7 +20751,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
                   <span class="meta-pill">${escapeHtml(`${groupingLabel} / 每包最多 ${row.dispatch_max_items_per_bale || "-"} 件`)}</span>
                   <span class="meta-pill">状态 ${escapeHtml(statusLabel)}</span>
                   <span class="meta-pill">审核 ${escapeHtml(approvalLabel)}</span>
-                  <span class="meta-pill">delivery batch ${escapeHtml(deliveryBatch.delivery_batch_no || "待生成")}</span>
+                  <span class="meta-pill">本车次 ${escapeHtml(deliveryBatch.delivery_batch_no || "待生成")}</span>
                   <span class="meta-pill">shipment ${escapeHtml(deliveryBatch.shipment_session_no || "待发运")}</span>
                   <span class="meta-pill">正式收货码：仓库执行单生成（Phase 2）</span>
                 </div>

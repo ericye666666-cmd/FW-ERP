@@ -14763,8 +14763,97 @@ class InMemoryState:
     def list_transfer_orders(self) -> list[dict[str, Any]]:
         return list(self.transfer_orders.values())
 
+    def _find_store_delivery_execution_order_for_transfer(self, order: dict[str, Any]) -> Optional[dict[str, Any]]:
+        transfer_no = str(order.get("transfer_no") or "").strip().upper()
+        sdo_refs = {
+            str(order.get("store_delivery_execution_order_no") or "").strip().upper(),
+            str(order.get("official_delivery_barcode") or "").strip().upper(),
+        }
+        sdo_refs = {value for value in sdo_refs if value}
+        for row in self.store_delivery_execution_orders.values():
+            normalized = self._project_store_delivery_execution_order_with_existing_packages(row)
+            execution_no = str(normalized.get("execution_order_no") or normalized.get("official_delivery_barcode") or "").strip().upper()
+            source_transfer_no = str(normalized.get("source_transfer_no") or normalized.get("transfer_no") or "").strip().upper()
+            if transfer_no and source_transfer_no == transfer_no:
+                return normalized
+            if sdo_refs and execution_no in sdo_refs:
+                return normalized
+        return None
+
+    def _is_store_delivery_shipment_record(self, order: dict[str, Any]) -> bool:
+        sdo_no = str(order.get("store_delivery_execution_order_no") or order.get("official_delivery_barcode") or "").strip().upper()
+        if sdo_no or self._find_store_delivery_execution_order_for_transfer(order):
+            return True
+        status = str(order.get("status") or "").strip().lower()
+        delivery_status = str(order.get("delivery_status") or "").strip()
+        return bool(
+            order.get("shipped_at")
+            or delivery_status
+            or order.get("delivery_batch_no")
+            or order.get("shipment_session_no")
+            or order.get("delivery_batch")
+            or order.get("shipment_session")
+            or status in {"shipped", "in_transit", "partially_received", "completed"}
+        )
+
+    def _validate_store_delivery_transfer_for_shipment(self, transfer_no: str) -> dict[str, Any]:
+        order = self.get_transfer_order(transfer_no)
+        execution_order = self._find_store_delivery_execution_order_for_transfer(order)
+        sdo_no = str(
+            order.get("store_delivery_execution_order_no")
+            or order.get("official_delivery_barcode")
+            or (execution_order or {}).get("execution_order_no")
+            or (execution_order or {}).get("official_delivery_barcode")
+            or ""
+        ).strip().upper()
+        if not execution_order or not sdo_no:
+            raise HTTPException(status_code=409, detail="该补货单尚未生成 SDO / SDP，不能进入门店配送。")
+
+        packages = execution_order.get("packages") if isinstance(execution_order.get("packages"), list) else []
+        sdp_packages = [
+            package
+            for package in packages
+            if str(package.get("entity_type") or "").strip().upper() == "STORE_DELIVERY_PACKAGE"
+            or str(package.get("display_code") or package.get("package_code") or "").strip().upper().startswith("SDP")
+            or str(package.get("machine_code") or package.get("barcode_value") or "").strip().upper().startswith("6")
+        ]
+        if not sdp_packages:
+            raise HTTPException(status_code=409, detail="该补货单尚未生成 SDO / SDP，不能进入门店配送。")
+
+        allowed_statuses = {"ready_to_ship", "pending_dispatch", "approved", "packed"}
+        status = str(order.get("status") or "").strip().lower()
+        if status not in allowed_statuses:
+            raise HTTPException(status_code=409, detail=f"该 SDO 当前状态不能进入门店配送：{status or 'unknown'}。")
+        return order
+
+    def _project_transfer_order_with_store_delivery_execution_order(self, order: dict[str, Any]) -> dict[str, Any]:
+        projected = dict(order)
+        execution_order = self._find_store_delivery_execution_order_for_transfer(order)
+        if not execution_order:
+            return projected
+        execution_order_no = str(
+            execution_order.get("execution_order_no")
+            or execution_order.get("official_delivery_barcode")
+            or projected.get("store_delivery_execution_order_no")
+            or projected.get("official_delivery_barcode")
+            or ""
+        ).strip().upper()
+        projected["store_delivery_execution_order"] = execution_order
+        projected["store_delivery_execution_order_no"] = str(projected.get("store_delivery_execution_order_no") or execution_order_no).strip().upper()
+        projected["official_delivery_barcode"] = str(projected.get("official_delivery_barcode") or execution_order_no).strip().upper()
+        projected["store_delivery_execution_status"] = str(
+            projected.get("store_delivery_execution_status")
+            or execution_order.get("status")
+            or ""
+        ).strip()
+        return projected
+
     def list_store_delivery_shipments(self) -> list[dict[str, Any]]:
-        rows = list(self.transfer_orders.values())
+        rows = [
+            self._project_transfer_order_with_store_delivery_execution_order(order)
+            for order in self.transfer_orders.values()
+            if self._is_store_delivery_shipment_record(order)
+        ]
         return sorted(
             rows,
             key=lambda row: str(row.get("shipped_at") or row.get("created_at") or ""),
@@ -14782,19 +14871,20 @@ class InMemoryState:
         if len(set(transfer_nos)) != len(transfer_nos):
             raise HTTPException(status_code=400, detail="Duplicate SDO selections are not allowed")
 
-        note_parts = [
-            str(payload.get("note") or "").strip(),
-            f"司机电话：{str(payload.get('driver_phone') or '').strip()}" if str(payload.get("driver_phone") or "").strip() else "",
-        ]
-        note = "；".join(part for part in note_parts if part)
+        for transfer_no in transfer_nos:
+            self._validate_store_delivery_transfer_for_shipment(transfer_no)
+
         ship_payload = {
             "shipped_by": payload["shipped_by"],
             "driver_name": str(payload.get("driver_name") or "").strip(),
             "vehicle_no": str(payload.get("vehicle_no") or "").strip(),
-            "note": note,
+            "driver_phone": str(payload.get("driver_phone") or "").strip(),
+            "note": str(payload.get("note") or "").strip(),
         }
         orders = [
-            self.ship_transfer_order(transfer_no, ship_payload)
+            self._project_transfer_order_with_store_delivery_execution_order(
+                self.ship_transfer_order(transfer_no, ship_payload)
+            )
             for transfer_no in transfer_nos
         ]
         return {
@@ -15542,6 +15632,8 @@ class InMemoryState:
         order["shipped_by"] = actor["username"]
         order["driver_name"] = str(payload.get("driver_name") or "").strip()
         order["vehicle_no"] = str(payload.get("vehicle_no") or "").strip().upper()
+        order["driver_phone"] = str(payload.get("driver_phone") or "").strip()
+        order["delivery_status"] = "in_transit"
         order["shipment_note"] = str(payload.get("note") or "").strip()
         for bale in related_bales:
             bale["dispatched_at"] = shipped_at
@@ -15560,6 +15652,7 @@ class InMemoryState:
                 "shipment_session_no": order["shipment_session_no"],
                 "driver_name": order["driver_name"],
                 "vehicle_no": order["vehicle_no"],
+                "driver_phone": order["driver_phone"],
             },
         )
         self._persist()

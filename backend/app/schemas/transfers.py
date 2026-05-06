@@ -55,7 +55,9 @@ class TransferOrderResponse(BaseModel):
     shipped_at: Optional[str] = None
     shipped_by: Optional[str] = None
     driver_name: str = ""
+    driver_phone: str = ""
     vehicle_no: str = ""
+    delivery_status: str = ""
     shipment_note: str = ""
     received_at: Optional[str] = None
     received_by: Optional[str] = None
@@ -66,6 +68,7 @@ class TransferOrderResponse(BaseModel):
     shipment_session_no: str = ""
     store_receipt_status: str = ""
     store_delivery_execution_order_no: str = ""
+    store_delivery_execution_order: dict[str, Any] = Field(default_factory=dict)
     official_delivery_barcode: str = ""
     store_delivery_execution_status: str = ""
     store_delivery_execution_created_at: Optional[str] = None
