@@ -114,9 +114,9 @@ test("role access profiles keep each account inside its operational workspace", 
   );
 
   assert.match(profileSource, /const warehouseManagerRoles = new Set\(\["warehouse_manager", "warehouse_supervisor"\]\)/);
-  assert.match(profileSource, /warehouse:\s*\["inbound", "workorder", "replenishment", "baleSales", "general"\]/);
+  assert.match(profileSource, /warehouse:\s*\["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"\]/);
   assert.match(profileSource, /const warehouseWorkerRoles = new Set\(\["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"\]\)/);
-  assert.match(profileSource, /return createRoleAccessProfile\(\["warehouse"\], \{\s*warehouse:\s*\["inbound", "workorder"\]/);
+  assert.match(profileSource, /return createRoleAccessProfile\(\["warehouse"\], \{\s*warehouse:\s*\["inbound", "departmentInbound", "workorder"\]/);
   assert.match(profileSource, /const cashierRoles = new Set\(\["cashier", "store_cashier"\]\)/);
   assert.match(profileSource, /return createRoleAccessProfile\(\["store"\], \{\s*store:\s*\["cashier"\]/);
   assert.match(profileSource, /const clerkRoles = new Set\(\["store_clerk", "clerk", "store_staff", "sales_clerk"\]\)/);

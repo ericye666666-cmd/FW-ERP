@@ -1044,9 +1044,9 @@ test("warehouse dispatch tracking removes temporary store receipt writeback step
   assert.doesNotMatch(appJs, /填入签收回写/);
 });
 
-test("transfer shipment confirmation shows a success alert after shipping", () => {
+test("transfer shipment confirmation shows in-transit status after shipping", () => {
   assert.match(appJs, /async function submitTransferShipment/);
-  assert.match(appJs, /submitTransferShipment[\s\S]*?alert\("发货成功"\)/);
+  assert.match(appJs, /submitTransferShipment[\s\S]*?alert\("确认发货成功，状态已更新为运输中"\)/);
 });
 
 test("transfer shipment form shows the target store before dispatching", () => {
@@ -1153,25 +1153,49 @@ test("phase 2B page 6 state labels and gating copy are visible in workbench summ
   assert.doesNotMatch(indexHtml, /SDB\/LPK can be scanned by store/i);
 });
 
-test("phase 2C page 6.1 copy clarifies shipment batch scope and barcode boundary", () => {
-  assert.match(indexHtml, /6\.1 配送批次 \/ 门店收货跟踪/);
-  assert.match(indexHtml, /配送批次 = 一辆车 \+ 一个或多个门店 \+ 一张或多张 SDO。/);
-  assert.match(indexHtml, /选择仓库送货执行单 \/ SDO/);
-  assert.match(indexHtml, /配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。/);
-  assert.match(indexHtml, /该配送批次会展示已生成的正式门店送货执行单 \/ barcode。/);
+test("门店配送 page exposes create and history tabs without the old intro copy", () => {
+  assert.match(appJs, /navTitle: "门店配送"/);
+  assert.match(indexHtml, /data-transfer-delivery-tab="create"[\s\S]*创建配送/);
+  assert.match(indexHtml, /data-transfer-delivery-tab="history"[\s\S]*历史配送记录/);
+  assert.match(indexHtml, /data-transfer-delivery-panel="create"/);
+  assert.match(indexHtml, /data-transfer-delivery-panel="history"/);
+  assert.doesNotMatch(indexHtml, /配送批次 = 一辆车 \+ 一个或多个门店 \+ 一张或多张 SDO。/);
+  assert.doesNotMatch(indexHtml, /当前版本先按已生成 SDO 展示配送批次视图/);
   assert.doesNotMatch(indexHtml, /SDB can be scanned by store/i);
   assert.doesNotMatch(indexHtml, /LPK can be scanned by store/i);
 });
 
-test("phase 2C page 6.1 shows required shipment-batch fields and statuses", () => {
-  assert.match(indexHtml, /配送批次号/);
-  assert.match(indexHtml, /司机/);
-  assert.match(indexHtml, /车辆/);
-  assert.match(indexHtml, /预计出发时间/);
-  assert.match(indexHtml, /路线 \/ 站点/);
-  assert.match(indexHtml, /关联仓库执行单/);
-  assert.match(indexHtml, /目标门店/);
-  assert.match(indexHtml, /每个门店收货状态/);
+test("门店配送 create tab supports editable SDO rows and transport fields", () => {
+  assert.match(indexHtml, /id="transferShipForm"/);
+  assert.match(indexHtml, /data-transfer-sdo-list/);
+  assert.match(indexHtml, /data-transfer-sdo-row/);
+  assert.match(indexHtml, /data-transfer-sdo-add/);
+  assert.match(indexHtml, /data-transfer-sdo-remove/);
+  assert.match(indexHtml, /选择 SDO 单/);
+  assert.match(indexHtml, /司机 \/ 电话 \/ 车牌号/);
+  assert.match(indexHtml, /name="driver_name"/);
+  assert.match(indexHtml, /name="driver_phone"/);
+  assert.match(indexHtml, /name="vehicle_no"/);
+  assert.match(indexHtml, /placeholder="备注"/);
+  assert.match(indexHtml, />确认发货<\/button>/);
+  assert.match(appJs, /function getSelectedTransferShipmentNos/);
+  assert.match(appJs, /function addTransferShipmentSdoRow/);
+  assert.match(appJs, /function removeTransferShipmentSdoRow/);
+  assert.match(appJs, /payload\.driver_phone/);
+});
+
+test("门店配送 history tab lists all shipment statuses with a search box", () => {
+  assert.match(indexHtml, /id="transferDeliveryHistorySearch"/);
+  assert.match(indexHtml, /placeholder="搜索配送记录 \/ SDO \/ 门店 \/ 司机 \/ 车牌 \/ 状态"/);
+  assert.match(indexHtml, /id="transferDeliveryHistoryList"/);
+  assert.match(appJs, /function renderTransferDeliveryHistory/);
+  assert.match(appJs, /transferDeliveryHistorySearchQuery/);
+  assert.match(appJs, /renderTransferDeliveryHistory\(transferOrderState\)/);
+  assert.match(appJs, /getShipmentBatchProgressLabel\(row\)/);
+  assert.match(appJs, /includes\(transferDeliveryHistorySearchQuery\)/);
+});
+
+test("门店配送 statuses keep shipment wording compact", () => {
   assert.match(appJs, /return chooseI18nLabel\("待发车", "Pending Dispatch"\);/);
   assert.match(appJs, /return chooseI18nLabel\("运输中", "In Transit"\);/);
   assert.match(appJs, /return chooseI18nLabel\("部分门店已收货", "Partially Received"\);/);
@@ -1190,7 +1214,7 @@ test("phase 2C page 6.1 summary cards and per-store grouping copy are present", 
   assert.match(appJs, /<strong>异常数<\/strong>/);
   assert.match(appJs, /<strong>配送批次：\$\{escapeHtml\(group\.shipmentBatchNo \|\| "-"\)\}<\/strong>/);
   assert.match(appJs, /<strong>门店站点：\$\{escapeHtml\(String\(row\.to_store_code \|\| "-"\)\.toUpperCase\(\) \|\| "-"\)\}<\/strong>/);
-  assert.match(appJs, /当前还没有多个仓库执行单可加入同一配送批次。Phase 2C 先建立配送批次视图；正式多单绑定将在后续执行单模型完善后接入。/);
+  assert.match(appJs, /当前没有配送记录。确认发货后，这里会出现运输中的配送单。/);
 });
 
 test("page 6.1 shipment draft uses current SDO package counts", () => {
@@ -1213,7 +1237,7 @@ test("page 6.1 shipment draft uses current SDO package counts", () => {
   assert.match(appJs, /涉及门店数/);
   assert.match(appJs, /总包数/);
   assert.match(appJs, /总件数/);
-  assert.match(indexHtml, /路线 \/ 站点/);
+  assert.match(indexHtml, /司机 \/ 电话 \/ 车牌号/);
   assert.match(appJs, /#transferShipForm/);
 });
 

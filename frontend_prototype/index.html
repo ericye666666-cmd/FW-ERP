@@ -2182,47 +2182,54 @@
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
           <h2>6.1 配送批次 / 门店收货跟踪</h2>
-          <button id="loadTransferDispatchButton" type="button">读取最近调拨单</button>
+          <button id="loadTransferDispatchButton" type="button">刷新配送数据</button>
         </div>
-        <div class="candidate-summary">
-          <div class="transfer-flow-strip">
-            <span class="store-flag">1 选 SDO</span>
-            <span class="store-flag">2 建配送批次</span>
-            <span class="store-flag">3 看门店站点</span>
+        <div class="store-delivery-tabs" role="tablist" aria-label="门店配送">
+          <button type="button" class="store-delivery-tab active" data-transfer-delivery-tab="create">创建配送</button>
+          <button type="button" class="store-delivery-tab" data-transfer-delivery-tab="history">历史配送记录</button>
+        </div>
+        <div id="transferDeliveryCreatePanel" data-transfer-delivery-panel="create">
+          <form id="transferShipForm" class="store-delivery-create-form">
+            <section class="store-delivery-section">
+              <div class="section-title">选择 SDO 单</div>
+              <div id="transferShipSdoRows" class="store-delivery-sdo-list" data-transfer-sdo-list>
+                <div class="store-delivery-sdo-row" data-transfer-sdo-row>
+                  <select name="transfer_no">
+                    <option value="">选择仓库送货执行单 / SDO</option>
+                  </select>
+                  <button type="button" class="ghost-button mini-button" data-transfer-sdo-remove>删除</button>
+                </div>
+              </div>
+              <div class="button-row">
+                <button type="button" class="ghost-button mini-button" data-transfer-sdo-add>新增 SDO</button>
+              </div>
+              <div id="transferShipTargetHint" class="flow-summary-note">选择 SDO 后，这里会显示目标门店与配送上下文。</div>
+            </section>
+            <section class="store-delivery-section">
+              <div class="section-title">司机 / 电话 / 车牌号</div>
+              <div class="form-grid compact">
+                <input name="driver_name" placeholder="司机姓名" value="Driver A" />
+                <input name="driver_phone" placeholder="司机电话" />
+                <input name="vehicle_no" placeholder="车牌号" value="KDM-001A" />
+                <textarea name="note" rows="3" placeholder="备注"></textarea>
+              </div>
+            </section>
+            <button type="submit" class="flow-primary-action">确认发货</button>
+          </form>
+          <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
+            这里会显示发货结果，确认后状态为运输中。
           </div>
-          <div class="subtle small">配送批次 = 一辆车 + 一个或多个门店 + 一张或多张 SDO。</div>
-          <div class="subtle small">配送批次用于运输跟踪；正式门店收货 barcode 仍应来自仓库送货执行单。SDB 和 LPK 不是门店收货 barcode。</div>
-          <div class="subtle small">该配送批次会展示已生成的正式门店送货执行单 / barcode。</div>
-          <div class="subtle small">当前版本先按已生成 SDO 展示配送批次视图；后续会支持把多个 SDO 绑定到同一车次。</div>
+          <div id="transferShipWaveSummary" class="candidate-summary empty-state">选择仓库备货任务后，这里展示任务内可配送 SDO 与未生成 SDO 的申请。</div>
         </div>
-        <div class="candidate-summary">
-          <div class="subtle small">配送批次号</div>
-          <div class="subtle small">司机</div>
-          <div class="subtle small">车辆</div>
-          <div class="subtle small">预计出发时间</div>
-          <div class="subtle small">路线 / 站点</div>
-          <div class="subtle small">关联仓库执行单</div>
-          <div class="subtle small">目标门店</div>
-          <div class="subtle small">每个门店收货状态</div>
-        </div>
-        <form id="transferShipForm" class="form-grid compact">
-          <select name="transfer_no">
-            <option value="">选择仓库送货执行单 / SDO</option>
-          </select>
-          <div id="transferShipTargetHint" class="flow-summary-note">选择执行单后，这里会显示目标门店与配送上下文，发运前先核对。</div>
-          <input name="driver_name" placeholder="司机，例如 Driver A" value="Driver A" />
-          <input name="vehicle_no" placeholder="车辆，例如 KDM-001A" value="KDM-001A" />
-          <input name="departure_time" placeholder="预计出发时间，例如 2026-04-28 10:30" />
-          <input name="route_stops" placeholder="路线 / 站点，例如 WH1 → Utawala → Kawangware" />
-          <textarea name="note" rows="3" placeholder="发运备注，例如 本批次包含多个仓库执行单。"></textarea>
-          <button type="submit">确认发运</button>
-        </form>
-        <div id="transferTrackingResultSummary" class="candidate-summary empty-state">
-          这里会显示发运记录，并展示已关联的正式门店送货执行单 barcode（如已生成）。
-        </div>
-        <div id="transferShipWaveSummary" class="candidate-summary empty-state">选择仓库备货任务后，这里展示任务内可配送 SDO 与未生成 SDO 的申请。</div>
-        <div id="transferDispatchSummary" class="candidate-summary empty-state">
-          先创建并审核调拨单，这里再读取最近调拨单，就能看哪些单待仓库配货、待打印和待配送。
+        <div id="transferDeliveryHistoryPanel" class="hidden-screen" data-transfer-delivery-panel="history">
+          <label class="workspace-page-search store-delivery-history-search" for="transferDeliveryHistorySearch">
+            <span class="workspace-page-search-icon" aria-hidden="true"></span>
+            <input id="transferDeliveryHistorySearch" type="search" placeholder="搜索配送记录 / SDO / 门店 / 司机 / 车牌 / 状态" />
+          </label>
+          <div id="transferDeliveryHistoryList" class="candidate-summary empty-state">刷新配送数据后，这里会显示所有状态下的配送记录。</div>
+          <div id="transferDispatchSummary" class="candidate-summary empty-state hidden-screen">
+            当前没有配送记录。确认发货后，这里会出现运输中的配送单。
+          </div>
         </div>
         <pre id="labelPrintOutput" class="output hidden-output"></pre>
       </section>
