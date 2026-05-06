@@ -29022,6 +29022,20 @@ function getStorePackageLastGeneratedTokens(actionKey = "") {
   return tokens.filter((token) => tokenNos.has(String(token?.token_no || "").trim().toUpperCase()));
 }
 
+function isPendingPrintStoreItemToken(token = {}) {
+  const printStatus = String(token?.print_status || "").trim().toLowerCase();
+  const status = String(token?.status || "").trim().toLowerCase();
+  return printStatus === "pending_print" || status === "pending_print";
+}
+
+function getStorePackagePrintableTokens(actionKey = "") {
+  const lastGenerated = getStorePackageLastGeneratedTokens(actionKey);
+  if (lastGenerated.length) {
+    return lastGenerated.filter(isPendingPrintStoreItemToken);
+  }
+  return getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
+}
+
 function getStoreItemLabelTemplateCode(labelSize = "60x40") {
   const normalized = String(labelSize || "60x40").trim();
   if (normalized === "40x30") {
@@ -29046,12 +29060,10 @@ function summarizeStorePackagePrintJobs(result = [], labelSize = "60x40") {
 }
 
 async function createStorePackageGeneratedStoreItemPrintJobs(actionKey = "", labelSize = "60x40") {
-  const tokens = getStorePackageLastGeneratedTokens(actionKey)
-    .filter((token) => String(token?.print_status || "pending_print").trim() === "pending_print")
-    .filter((token) => String(token?.status || "pending_print").trim() !== "print_queued");
+  const tokens = getStorePackagePrintableTokens(actionKey);
   const tokenNos = tokens.map((token) => String(token?.token_no || "").trim()).filter(Boolean);
   if (!tokenNos.length) {
-    throw new Error("请先生成 STORE_ITEM 商品码");
+    throw new Error("当前没有待打印 STORE_ITEM。");
   }
   try {
     const result = await request("/print-jobs/item-tokens", {
@@ -29064,13 +29076,6 @@ async function createStorePackageGeneratedStoreItemPrintJobs(actionKey = "", lab
       }),
     });
     const summary = summarizeStorePackagePrintJobs(result, labelSize);
-    const queuedTokenNos = new Set(tokenNos.map((value) => String(value || "").trim().toUpperCase()));
-    storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => (
-      queuedTokenNos.has(String(token?.token_no || "").trim().toUpperCase())
-        ? { ...token, status: "print_queued" }
-        : token
-    ));
-    persistStoreSdoPackageItemTokenState();
     storePackagePrintJobState[actionKey] = summary;
     return summary;
   } catch (error) {
@@ -29115,13 +29120,15 @@ function renderStorePackagePrintJobFeedback(actionKey = "") {
 }
 
 function renderStorePackageGeneratedStoreItems(actionKey = "") {
-  const generatedTokens = getStorePackageLastGeneratedTokens(actionKey);
+  const lastGeneratedTokens = getStorePackageLastGeneratedTokens(actionKey);
+  const isCurrentBatch = lastGeneratedTokens.length > 0;
+  const generatedTokens = isCurrentBatch ? lastGeneratedTokens : getStorePackagePrintableTokens(actionKey);
   if (!generatedTokens.length) {
-    return `<div class="empty-state compact">生成 STORE_ITEM 后，这里会只读显示 SDP / SDO / SRC / cost_status 来源链摘要。</div>`;
+    return `<div class="empty-state compact">当前没有待打印 STORE_ITEM。</div>`;
   }
   return `
     <div class="store-package-print-summary">
-      <strong>本次生成数量</strong>
+      <strong>${isCurrentBatch ? "本次生成数量" : "待打印标签"}</strong>
       <span>${generatedTokens.length}</span>
     </div>
     <div class="store-generated-item-list">
@@ -29137,7 +29144,7 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
       `).join("")}
     </div>
     <div class="store-package-print-panel">
-      <h4>打印本次标签</h4>
+      <h4>${isCurrentBatch ? "打印本次标签" : "待打印标签"}</h4>
       <label>
         <span>标签尺寸</span>
         <select data-store-package-label-size="${escapeHtml(actionKey)}">
