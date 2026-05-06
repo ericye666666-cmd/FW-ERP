@@ -527,6 +527,248 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertIn("_is_store_clerk_user(current_user)", routes_source)
         self.assertIn("state.list_assigned_store_delivery_packages", routes_source)
 
+    def _create_approved_plain_transfer_without_sdo(self, category_sub="cargo pant"):
+        order = self.state.create_transfer_order(
+            {
+                "from_warehouse_code": "WH1",
+                "to_store_code": "UTAWALA",
+                "created_by": "warehouse_supervisor_1",
+                "approval_required": True,
+                "items": [
+                    {
+                        "category_main": "pants",
+                        "category_sub": category_sub,
+                        "requested_qty": 80,
+                    }
+                ],
+            }
+        )
+        return self.state.approve_transfer_order(
+            order["transfer_no"],
+            {
+                "approved_by": "warehouse_supervisor_1",
+                "approved": True,
+                "note": "approve ordinary transfer",
+            },
+        )
+
+    def test_store_delivery_shipment_history_filters_out_plain_transfers(self):
+        plain = self._create_approved_plain_transfer_without_sdo()
+        sdo_order = self._create_store_delivery_package_state_order()
+
+        rows = self.state.list_store_delivery_shipments()
+
+        self.assertNotIn(plain["transfer_no"], {row["transfer_no"] for row in rows})
+        self.assertIn(sdo_order["source_transfer_no"], {row["transfer_no"] for row in rows})
+        self.assertTrue(all(row.get("store_delivery_execution_order_no") or row.get("shipped_at") for row in rows))
+        listed_sdo = next(row for row in rows if row["transfer_no"] == sdo_order["source_transfer_no"])
+        self.assertEqual(listed_sdo["store_delivery_execution_order_no"], sdo_order["execution_order_no"])
+        self.assertEqual(
+            listed_sdo["store_delivery_execution_order"]["packages"][0]["entity_type"],
+            "STORE_DELIVERY_PACKAGE",
+        )
+
+    def test_store_delivery_shipment_internal_api_batches_only_sdo_shipments(self):
+        first = self._create_store_delivery_package_state_order()
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "transfer_nos": [first["source_transfer_no"]],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "driver_phone": "0712345678",
+                "note": "same vehicle delivery",
+            }
+        )
+
+        self.assertEqual(result["status"], "shipped")
+        self.assertEqual(result["delivery_status"], "in_transit")
+        self.assertEqual(result["transfer_nos"], [first["source_transfer_no"]])
+        self.assertEqual([row["status"] for row in result["orders"]], ["shipped"])
+        self.assertEqual({row["store_receipt_status"] for row in result["orders"]}, {"pending_receipt"})
+        self.assertEqual({row["driver_name"] for row in result["orders"]}, {"Driver A"})
+        self.assertEqual({row["vehicle_no"] for row in result["orders"]}, {"KDM-001A"})
+        self.assertEqual({row["driver_phone"] for row in result["orders"]}, {"0712345678"})
+        self.assertNotIn("0712345678", result["orders"][0].get("shipment_note", ""))
+        self.assertEqual(
+            result["orders"][0]["store_delivery_execution_order"]["packages"][0]["entity_type"],
+            "STORE_DELIVERY_PACKAGE",
+        )
+        listed = self.state.list_store_delivery_shipments()
+        self.assertIn(first["source_transfer_no"], {row["transfer_no"] for row in listed})
+        listed_row = next(row for row in listed if row["transfer_no"] == first["source_transfer_no"])
+        self.assertEqual(listed_row["driver_phone"], "0712345678")
+        self.assertEqual(listed_row["delivery_status"], "in_transit")
+
+    def test_store_delivery_shipment_accepts_sdo_level_items_and_returns_sdp_packages(self):
+        first = self._create_store_delivery_package_state_order()
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "shipments": [
+                    {
+                        "transfer_no": first["source_transfer_no"],
+                        "sdo_display_code": first["execution_order_no"],
+                        "sdo_machine_code": first["machine_code"],
+                    }
+                ],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "driver_phone": "0712345678",
+                "note": "same vehicle delivery",
+            }
+        )
+
+        self.assertEqual(result["transfer_nos"], [first["source_transfer_no"]])
+        self.assertEqual(len(result["shipments"]), 1)
+        shipment = result["shipments"][0]
+        self.assertEqual(shipment["transfer_no"], first["source_transfer_no"])
+        self.assertEqual(shipment["sdo_display_code"], first["execution_order_no"])
+        self.assertEqual(shipment["sdo_machine_code"], first["machine_code"])
+        self.assertEqual(shipment["store_code"], "UTAWALA")
+        self.assertEqual(shipment["package_count"], 2)
+        self.assertEqual(shipment["driver_phone"], "0712345678")
+        self.assertEqual(shipment["delivery_status"], "in_transit")
+        self.assertEqual(len(shipment["packages"]), 2)
+        for package in shipment["packages"]:
+            self.assertEqual(package["entity_type"], "STORE_DELIVERY_PACKAGE")
+            self.assertTrue(package["display_code"].startswith("SDP"))
+            self.assertRegex(package["machine_code"], r"^6\d{9}$")
+            self.assertEqual(package["barcode_value"], package["machine_code"])
+            self.assertGreater(package["package_no"], 0)
+            self.assertEqual(package["package_total"], 2)
+            self.assertIn(package["source_code"], {"SDB260503AAG", "LPK260504001"})
+            self.assertIn(package["item_count"], {100, 40})
+
+    def test_store_delivery_shipment_rejects_sdo_level_payload_without_sdo_identity(self):
+        first = self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [{"transfer_no": first["source_transfer_no"]}],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("请选择 SDO 出库单，不能只提交补货单号", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_sdo_transfer_mismatch(self):
+        first = self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [
+                        {
+                            "transfer_no": "TO-OTHER-TRANSFER",
+                            "sdo_display_code": first["execution_order_no"],
+                        }
+                    ],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("SDO 与 transfer_no 不匹配，请重新选择", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_source_package_identity_as_shipment_object(self):
+        self._create_store_delivery_package_state_order()
+
+        with self.assertRaises(HTTPException) as raised:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [{"sdo_display_code": "SDB260503AAG"}],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("SDB / LPK 只是来源包，不能作为门店配送对象", raised.exception.detail)
+
+    def test_store_delivery_shipment_rejects_transfer_without_sdo_or_sdp(self):
+        plain = self._create_approved_plain_transfer_without_sdo()
+
+        with self.assertRaises(HTTPException) as no_sdo_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "transfer_nos": [plain["transfer_no"]],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(no_sdo_error.exception.status_code, 409)
+        self.assertIn("尚未生成 SDO / SDP", no_sdo_error.exception.detail)
+
+        sdo_order = self._create_store_delivery_package_state_order()
+        execution_no = sdo_order["execution_order_no"]
+        self.state.store_delivery_execution_orders[execution_no]["packages"] = []
+        for package in list(self.state.store_delivery_packages.values()):
+            if str(package.get("parent_sdo_display_code") or "") == execution_no:
+                self.state.store_delivery_packages.pop(package["display_code"], None)
+
+        with self.assertRaises(HTTPException) as no_sdp_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "transfer_nos": [sdo_order["source_transfer_no"]],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(no_sdp_error.exception.status_code, 409)
+        self.assertIn("尚未生成 SDO / SDP", no_sdp_error.exception.detail)
+
+        with self.assertRaises(HTTPException) as sdo_no_sdp_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "shipments": [
+                        {
+                            "transfer_no": sdo_order["source_transfer_no"],
+                            "sdo_display_code": sdo_order["execution_order_no"],
+                        }
+                    ],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(sdo_no_sdp_error.exception.status_code, 409)
+        self.assertIn("该 SDO 尚未生成 SDP 实体包，不能发车", sdo_no_sdp_error.exception.detail)
+
+    def test_store_delivery_shipment_rejects_unready_sdo_status(self):
+        sdo_order = self._create_store_delivery_package_state_order()
+        transfer = self.state.transfer_orders[sdo_order["source_transfer_no"]]
+        transfer["status"] = "closed"
+
+        with self.assertRaises(HTTPException) as status_error:
+            self.state.ship_store_delivery_transfers(
+                {
+                    "transfer_nos": [sdo_order["source_transfer_no"]],
+                    "shipped_by": "warehouse_supervisor_1",
+                    "driver_name": "Driver A",
+                    "vehicle_no": "KDM-001A",
+                }
+            )
+        self.assertEqual(status_error.exception.status_code, 409)
+        self.assertIn("当前状态不能进入门店配送", status_error.exception.detail)
+
+    def test_store_delivery_shipment_internal_routes_are_declared(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/store-delivery-shipments"', routes_source)
+        self.assertIn("def list_store_delivery_shipments(", routes_source)
+        self.assertIn("def create_store_delivery_shipment(", routes_source)
+        self.assertIn("state.list_store_delivery_shipments", routes_source)
+        self.assertIn("state.ship_store_delivery_transfers", routes_source)
+
     def _create_ready_assigned_sdo_package_for_store_item_generation(self, *, assigned_clerk="Austin", item_count=3, package_overrides=None):
         order = self._create_store_delivery_package_state_order()
         package = order["packages"][0]

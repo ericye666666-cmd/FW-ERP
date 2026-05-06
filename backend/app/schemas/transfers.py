@@ -52,6 +52,13 @@ class TransferOrderResponse(BaseModel):
     submitted_at: Optional[str] = None
     approved_at: Optional[str] = None
     approved_by: Optional[str] = None
+    shipped_at: Optional[str] = None
+    shipped_by: Optional[str] = None
+    driver_name: str = ""
+    driver_phone: str = ""
+    vehicle_no: str = ""
+    delivery_status: str = ""
+    shipment_note: str = ""
     received_at: Optional[str] = None
     received_by: Optional[str] = None
     closed_at: Optional[str] = None
@@ -61,6 +68,10 @@ class TransferOrderResponse(BaseModel):
     shipment_session_no: str = ""
     store_receipt_status: str = ""
     store_delivery_execution_order_no: str = ""
+    store_delivery_execution_order: dict[str, Any] = Field(default_factory=dict)
+    sdo_display_code: str = ""
+    sdo_machine_code: str = ""
+    packages: List[dict[str, Any]] = Field(default_factory=list)
     official_delivery_barcode: str = ""
     store_delivery_execution_status: str = ""
     store_delivery_execution_created_at: Optional[str] = None
@@ -98,6 +109,30 @@ class TransferShipRequest(BaseModel):
     driver_name: str = Field(min_length=1)
     vehicle_no: str = Field(min_length=1)
     note: str = ""
+
+
+class StoreDeliveryShipmentItemRequest(BaseModel):
+    transfer_no: str = ""
+    sdo_display_code: str = ""
+    sdo_machine_code: str = ""
+
+
+class StoreDeliveryShipmentCreateRequest(BaseModel):
+    shipments: List[StoreDeliveryShipmentItemRequest] = Field(default_factory=list)
+    transfer_nos: List[str] = Field(default_factory=list)
+    driver_name: str = Field(min_length=1)
+    vehicle_no: str = Field(min_length=1)
+    driver_phone: str = ""
+    note: str = ""
+
+
+class StoreDeliveryShipmentResponse(BaseModel):
+    transfer_nos: List[str]
+    status: str = ""
+    delivery_status: str = ""
+    message: str = ""
+    shipments: List[dict[str, Any]] = Field(default_factory=list)
+    orders: List[TransferOrderResponse]
 
 
 class DiscrepancyApprovalRequest(BaseModel):
