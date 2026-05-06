@@ -2189,9 +2189,15 @@
           <button type="button" class="store-delivery-tab" data-transfer-delivery-tab="history">历史配送记录</button>
         </div>
         <div id="transferDeliveryCreatePanel" data-transfer-delivery-panel="create">
+          <div class="store-delivery-page-intro">
+            <div>
+              <h3>创建配送 / 同车发货</h3>
+              <p>选择已经生成 SDO / SDP 的门店送货单，并登记司机与车辆信息。</p>
+            </div>
+          </div>
           <form id="transferShipForm" class="store-delivery-create-form">
             <section class="store-delivery-section">
-              <div class="section-title">选择已生成 SDP 的 SDO</div>
+              <div class="section-title">选择门店送货单</div>
               <div id="transferShipSdoRows" class="store-delivery-sdo-list" data-transfer-sdo-list>
                 <div class="store-delivery-sdo-row" data-transfer-sdo-row>
                   <select name="transfer_no">
@@ -2203,7 +2209,7 @@
               <div class="button-row">
                 <button type="button" class="ghost-button mini-button" data-transfer-sdo-add>新增 SDO</button>
               </div>
-              <div id="transferShipTargetHint" class="flow-summary-note">下拉显示 SDO / transfer / 门店 / 包数，内部使用 transfer_no 提交。</div>
+              <div id="transferShipTargetHint" class="candidate-summary empty-state">选择后这里会显示本车次配送确认卡片。</div>
             </section>
             <section class="store-delivery-section">
               <div class="section-title">司机 / 电话 / 车牌号</div>

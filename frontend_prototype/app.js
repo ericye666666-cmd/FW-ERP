@@ -20005,33 +20005,45 @@ function renderTransferTrackingResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示发货结果，确认后状态为运输中。";
+    target.textContent = "确认发货后，这里会显示本车次配送的 SDO、包数、司机和车辆信息。";
     return;
   }
-  const normalized = normalizeTransferForOperationsSummary(result);
-  const deliveryBatch = normalized.delivery_batch || {};
-  const batchLabel = getShipmentBatchProgressLabel(normalized);
-  const storeLabel = String(normalized.to_store_code || normalized.to_store_name || "-").trim() || "-";
-  const linkedExecutionOrder = normalized.transfer_no || "-";
-  const officialBarcode = String(normalized.official_delivery_barcode || normalized.store_delivery_execution_order_no || "").trim() || "-";
-  const routeLabel = String(result.route_stops || "").trim() || "WH1 → 待补充站点";
-  target.className = "report-summary";
+  const resultRows = Array.isArray(result?.shipments) && result.shipments.length
+    ? result.shipments
+    : (Array.isArray(result?.orders) && result.orders.length ? result.orders : [result]);
+  const orders = resultRows
+    .map((row) => normalizeTransferForOperationsSummary(row));
+  const batchLabel = orders.some((row) => getShipmentBatchProgressLabel(row) === chooseI18nLabel("异常 / 退回", "Exception / Return"))
+    ? chooseI18nLabel("异常 / 退回", "Exception / Return")
+    : orders.every((row) => getShipmentBatchProgressLabel(row) === chooseI18nLabel("全部收货完成", "Receiving Complete"))
+      ? chooseI18nLabel("全部收货完成", "Receiving Complete")
+      : chooseI18nLabel("运输中", "In Transit");
+  const packageTotal = orders.reduce((sum, row) => sum + getTransferShipmentPackageCount(row), 0);
+  const storeCodes = Array.from(new Set(orders.map((row) => String(row.to_store_code || row.store_code || "").trim().toUpperCase()).filter(Boolean)));
+  const driverName = String(result.driver_name || orders[0]?.driver_name || "Driver A").trim() || "Driver A";
+  const driverPhone = String(result.driver_phone || orders[0]?.driver_phone || "").trim();
+  const vehicleNo = String(result.vehicle_no || orders[0]?.vehicle_no || "KDM-001A").trim().toUpperCase() || "KDM-001A";
+  target.className = `store-delivery-task-card ${getStatusCardClass(batchLabel)}`;
   target.innerHTML = `
-    <div class="alert-banner">本车次配送 ${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")} 已更新：${escapeHtml(batchLabel)}。</div>
-    <div class="report-summary-grid">
-      <article class="store-metric"><strong>本车次编号</strong><span>${escapeHtml(deliveryBatch.delivery_batch_no || deliveryBatch.shipment_session_no || "待生成")}</span></article>
-      <article class="store-metric"><strong>司机</strong><span>${escapeHtml(result.driver_name || "待填写")}</span></article>
-      <article class="store-metric"><strong>司机电话</strong><span>${escapeHtml(result.driver_phone || "待填写")}</span></article>
-      <article class="store-metric"><strong>车辆</strong><span>${escapeHtml(result.vehicle_no || "待填写")}</span></article>
-      <article class="store-metric"><strong>预计出发时间</strong><span>${escapeHtml(result.departure_time || "待填写")}</span></article>
-      <article class="store-metric"><strong>路线</strong><span>${escapeHtml(routeLabel)}</span></article>
-      <article class="store-metric"><strong>关联仓库执行单</strong><span>${escapeHtml(linkedExecutionOrder)}</span></article>
-      <article class="store-metric"><strong>正式门店送货执行单</strong><span>${escapeHtml(normalized.store_delivery_execution_order_no || "-")}</span></article>
-      <article class="store-metric"><strong>正式门店送货 barcode</strong><span>${escapeHtml(officialBarcode)}</span></article>
-      <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(storeLabel)}</span></article>
-      <article class="store-metric"><strong>每个门店收货状态</strong><span>${escapeHtml(batchLabel)}</span></article>
+    <div class="store-delivery-card-main">
+      <div>
+        <strong>运输任务确认</strong>
+        <div class="subtle small">本车次配送已创建，状态为 ${renderStatusBadge(batchLabel, batchLabel)}。</div>
+      </div>
+      ${renderStatusBadge(batchLabel, batchLabel)}
     </div>
-    <div class="subtle small">配送状态来自当前 SDO 发货记录。</div>
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>本车次配送</strong><span>${orders.length} 张 SDO</span></article>
+      <article class="store-metric"><strong>包数</strong><span>${escapeHtml(formatI18nCount(packageTotal, "包", "packages"))}</span></article>
+      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCodes.join(" / ") || "-")}</span></article>
+      <article class="store-metric"><strong>司机</strong><span>${escapeHtml(driverName)}</span></article>
+      <article class="store-metric"><strong>司机电话</strong><span>${escapeHtml(driverPhone || "待填写")}</span></article>
+      <article class="store-metric"><strong>车辆</strong><span>${escapeHtml(vehicleNo)}</span></article>
+    </div>
+    <div class="summary-breakdown-list">
+      ${orders.map((row) => renderStoreDeliverySdoBreakdownRow(row)).join("")}
+    </div>
+    ${orders.map((row) => renderStoreDeliverySdpPackageList(row)).join("")}
   `;
 }
 
@@ -20044,8 +20056,8 @@ function renderTransferShipTargetHint(transferNo = "") {
     ? [String(transferNo || "").trim().toUpperCase()].filter(Boolean)
     : getSelectedTransferShipmentNos();
   if (!selectedNos.length) {
-    target.className = "flow-summary-note";
-    target.textContent = "请选择 SDO，发货前先核对目标门店与包数。";
+    target.className = "candidate-summary empty-state";
+    target.textContent = "请选择已经生成 SDO / SDP 的门店送货单。";
     return;
   }
   if (selectedNos.some((item) => isWaveSelectionValue(item))) {
@@ -20060,30 +20072,56 @@ function renderTransferShipTargetHint(transferNo = "") {
   const missing = rows.find((row) => !row.transfer);
   if (missing) {
     target.className = "flow-summary-note";
-    target.textContent = `正在读取 SDO ${missing.transferNo} 的目标门店...`;
+    target.textContent = `正在读取 SDO ${missing.transferNo} 的目标门店和包数...`;
     return;
   }
-  target.className = "flow-summary-note success";
+  const transfers = rows.map((row) => normalizeTransferForOperationsSummary(row.transfer));
+  const summaries = transfers.map((transfer) => getStoreDeliveryShipmentCardData(transfer));
+  const blocked = summaries.find((summary) => !summary.hasSdp);
+  if (blocked) {
+    target.className = `store-delivery-task-card ${getStatusCardClass("warning")}`;
+    target.innerHTML = renderStatusAlert("该补货单尚未生成 SDO / SDP，不能发车。", "warning");
+    return;
+  }
+  const packageTotal = summaries.reduce((sum, summary) => sum + Number(summary.packageCount || 0), 0);
+  const storeCodes = Array.from(new Set(summaries.map((summary) => summary.storeCode).filter(Boolean)));
+  const transport = getTransferShipmentTransportFormData();
+  const statusLabel = summaries.some((summary) => summary.statusLabel === chooseI18nLabel("异常 / 退回", "Exception / Return"))
+    ? chooseI18nLabel("异常 / 退回", "Exception / Return")
+    : summaries.every((summary) => summary.statusLabel === chooseI18nLabel("全部收货完成", "Receiving Complete"))
+      ? chooseI18nLabel("全部收货完成", "Receiving Complete")
+      : chooseI18nLabel("待发车", "Pending Dispatch");
+  target.className = `store-delivery-task-card ${getStatusCardClass(statusLabel)}`;
   target.innerHTML = `
-    <div>已选 ${rows.length} 张 SDO。发货后状态显示为运输中。</div>
+    <div class="store-delivery-card-main">
+      <div>
+        <strong>运输任务确认</strong>
+        <div class="subtle small">本车次配送：${summaries.length} 张 SDO · ${escapeHtml(formatI18nCount(packageTotal, "包", "packages"))} · ${escapeHtml(storeCodes.join(" / ") || "-")}</div>
+      </div>
+      ${renderStatusBadge(statusLabel, statusLabel)}
+    </div>
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>本车次配送</strong><span>${summaries.length} 张 SDO</span></article>
+      <article class="store-metric"><strong>包数</strong><span>${escapeHtml(formatI18nCount(packageTotal, "包", "packages"))}</span></article>
+      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCodes.join(" / ") || "-")}</span></article>
+      <article class="store-metric"><strong>司机</strong><span>${escapeHtml(transport.driver_name || "Driver A")}</span></article>
+      <article class="store-metric"><strong>司机电话</strong><span>${escapeHtml(transport.driver_phone || "待填写")}</span></article>
+      <article class="store-metric"><strong>车辆</strong><span>${escapeHtml(transport.vehicle_no || "KDM-001A")}</span></article>
+    </div>
+    <div class="store-delivery-sdo-list">
+      ${transfers.map((transfer) => renderStoreDeliverySdoSelectionCard(transfer)).join("")}
+    </div>
     <div class="summary-breakdown-list">
-      ${rows.map(({ transferNo: rowTransferNo, transfer }) => {
-        const storeCode = String(transfer.to_store_code || "").trim().toUpperCase();
-        const storeName = getTransferStoreDisplayName(transfer);
-        const deliveryBatch = String(transfer.delivery_batch_no || transfer.delivery_batch?.delivery_batch_no || "").trim().toUpperCase();
-        const baleCount = getTransferShipmentPackageCount(transfer);
-        return `
-          <div class="summary-breakdown-row">
-            <span>${escapeHtml(rowTransferNo)} / 目标门店：${escapeHtml(storeCode || "-")}${storeName && storeName !== storeCode ? ` / ${escapeHtml(storeName)}` : ""}</span>
-            <strong>${escapeHtml(getShipmentBatchProgressLabel(transfer))} · ${escapeHtml(baleCount)} 包${deliveryBatch ? ` · ${escapeHtml(deliveryBatch)}` : ""}</strong>
-          </div>
-        `;
-      }).join("")}
+      ${transfers.map((transfer) => renderStoreDeliverySdoBreakdownRow(transfer)).join("")}
     </div>
   `;
 }
 
 function getTransferShipmentPackageCount(transfer = {}) {
+  const directPackages = getStoreDeliveryShipmentSdpPackages(transfer);
+  if (directPackages.length) {
+    return directPackages.length;
+  }
   const sdoPackages = transfer?.store_delivery_execution_order?.packages;
   if (Array.isArray(sdoPackages) && sdoPackages.length) {
     return sdoPackages.length;
@@ -20171,21 +20209,57 @@ function getSelectedTransferShipmentNos(form = document.querySelector("#transfer
   return Array.from(new Set(getTransferShipmentSelectValues(form)));
 }
 
+function getStoreDeliverySdoMachineCode(row = {}) {
+  return String(
+    row?.sdo_machine_code
+      || row?.store_delivery_execution_order?.machine_code
+      || row?.machine_code
+      || row?.store_delivery_execution_order?.print_payload?.barcode_value
+      || "",
+  ).trim().toUpperCase();
+}
+
 function getStoreDeliverySdoDisplayCode(row = {}) {
   return String(
-    row?.store_delivery_execution_order_no
+    row?.sdo_display_code
+      || row?.store_delivery_execution_order_no
       || row?.store_delivery_execution_order?.execution_order_no
       || row?.official_delivery_barcode
       || "",
   ).trim().toUpperCase();
 }
 
+function getSelectedStoreDeliveryShipmentPayloads(form = document.querySelector("#transferShipForm")) {
+  return getSelectedTransferShipmentNos(form).map((transferNo) => {
+    const transfer = findTransferOrderStateRow(transferNo) || {};
+    return {
+      transfer_no: transferNo,
+      sdo_display_code: getStoreDeliverySdoDisplayCode(transfer),
+      sdo_machine_code: getStoreDeliverySdoMachineCode(transfer),
+    };
+  });
+}
+
+function getStoreDeliveryShipmentSdpPackages(row = {}) {
+  const directPackages = Array.isArray(row?.packages) ? row.packages : [];
+  const nestedPackages = Array.isArray(row?.store_delivery_execution_order?.packages)
+    ? row.store_delivery_execution_order.packages
+    : [];
+  return (directPackages.length ? directPackages : nestedPackages).filter((packageRow) => {
+    const displayCode = String(packageRow?.display_code || packageRow?.package_code || "").trim().toUpperCase();
+    const machineCode = String(packageRow?.machine_code || packageRow?.barcode_value || "").trim().toUpperCase();
+    return String(packageRow?.entity_type || "").trim().toUpperCase() === "STORE_DELIVERY_PACKAGE"
+      || displayCode.startsWith("SDP")
+      || machineCode.startsWith("6");
+  });
+}
+
 function hasStoreDeliveryShipmentSdoPackages(row = {}) {
   if (!getStoreDeliverySdoDisplayCode(row)) {
     return false;
   }
-  const packages = row?.store_delivery_execution_order?.packages;
-  if (Array.isArray(packages) && packages.some((pkg) => {
+  const packages = getStoreDeliveryShipmentSdpPackages(row);
+  if (packages.some((pkg) => {
     const displayCode = String(pkg?.display_code || pkg?.package_code || "").trim().toUpperCase();
     const machineCode = String(pkg?.machine_code || pkg?.barcode_value || "").trim().toUpperCase();
     return String(pkg?.entity_type || "").trim().toUpperCase() === "STORE_DELIVERY_PACKAGE"
@@ -20229,6 +20303,161 @@ function getStoreDeliveryReceiptStatusLabel(row = {}) {
 
 function formatDateTime(value = "") {
   return formatLocalDateTime(value);
+}
+
+function getStoreDeliveryShipmentItemCount(row = {}) {
+  const executionOrder = row?.store_delivery_execution_order || {};
+  const explicit = executionOrder.total_item_count ?? row.total_item_count ?? row.item_count;
+  if (explicit !== null && explicit !== undefined && explicit !== "") {
+    return Number(explicit) || 0;
+  }
+  const packages = getStoreDeliveryShipmentSdpPackages(row);
+  const packageCounts = packages
+    .map((pkg) => pkg?.item_count)
+    .filter((value) => value !== null && value !== undefined && value !== "");
+  if (packageCounts.length && packageCounts.length === packages.length) {
+    return packageCounts.reduce((sum, value) => sum + Number(value || 0), 0);
+  }
+  return getTransferRequestedQtyForDisplay(row);
+}
+
+function getStoreDeliveryShipmentCreatedAt(row = {}) {
+  return row?.store_delivery_execution_order?.created_at
+    || row?.store_delivery_execution_created_at
+    || row?.created_at
+    || "";
+}
+
+function getStoreDeliveryShipmentCardData(row = {}) {
+  const normalized = normalizeTransferForOperationsSummary(row);
+  const sdo = getStoreDeliverySdoDisplayCode(normalized) || "-";
+  const transferNo = String(normalized.transfer_no || "-").trim().toUpperCase() || "-";
+  const storeCode = String(normalized.to_store_code || normalized.store_code || "-").trim().toUpperCase() || "-";
+  const packageCount = getTransferShipmentPackageCount(normalized);
+  const statusLabel = getShipmentBatchProgressLabel(normalized);
+  const hasSdp = hasStoreDeliveryShipmentSdoPackages(normalized);
+  const itemCount = getStoreDeliveryShipmentItemCount(normalized);
+  return {
+    row: normalized,
+    sdo,
+    transferNo,
+    storeCode,
+    packageCount,
+    itemCount,
+    statusLabel,
+    hasSdp,
+    sdpLabel: hasSdp ? "SDP 已生成" : "SDP 未生成",
+    createdAt: getStoreDeliveryShipmentCreatedAt(normalized),
+  };
+}
+
+function getTransferShipmentTransportFormData(form = document.querySelector("#transferShipForm")) {
+  const formElement = form instanceof HTMLFormElement ? form : document.querySelector("#transferShipForm");
+  const readField = (name, fallback = "") => {
+    const input = formElement?.querySelector(`[name='${name}']`);
+    return String(input?.value || fallback || "").trim();
+  };
+  return {
+    driver_name: readField("driver_name", "Driver A") || "Driver A",
+    driver_phone: readField("driver_phone", ""),
+    vehicle_no: readField("vehicle_no", "KDM-001A").toUpperCase() || "KDM-001A",
+  };
+}
+
+function renderStoreDeliverySdoSelectionCard(row = {}) {
+  const summary = getStoreDeliveryShipmentCardData(row);
+  return `
+    <article class="store-delivery-sdo-card ${getStatusCardClass(summary.statusLabel)}">
+      <div class="store-delivery-card-main">
+        <div>
+          <strong>${escapeHtml(summary.sdo)}</strong>
+          <div class="subtle small">${escapeHtml(summary.storeCode)} · ${escapeHtml(formatI18nCount(summary.packageCount, "包", "packages"))} · ${renderStatusBadge(summary.statusLabel, summary.statusLabel)}</div>
+        </div>
+        <span class="store-delivery-package-count">${escapeHtml(formatI18nCount(summary.packageCount, "包", "packages"))}</span>
+      </div>
+      <div class="store-delivery-card-meta">
+        <span>${escapeHtml(summary.transferNo)}</span>
+        <span>${renderStatusBadge(summary.sdpLabel, summary.hasSdp ? "success" : "warning")}</span>
+        <span>${escapeHtml(formatI18nCount(summary.itemCount, "件", "items"))}</span>
+        <span>${escapeHtml(formatDateTime(summary.createdAt) || "创建时间待记录")}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderStoreDeliverySdoBreakdownRow(row = {}) {
+  const summary = getStoreDeliveryShipmentCardData(row);
+  return `
+    <div class="summary-breakdown-row store-delivery-breakdown-row">
+      <span>${escapeHtml(summary.sdo)} → ${escapeHtml(summary.storeCode)} → ${escapeHtml(formatI18nCount(summary.packageCount, "包", "packages"))}</span>
+      <strong>${renderStatusBadge(summary.statusLabel, summary.statusLabel)}</strong>
+    </div>
+  `;
+}
+
+function renderStoreDeliverySdpPackageList(row = {}) {
+  const packages = getStoreDeliveryShipmentSdpPackages(row);
+  if (!packages.length) {
+    return `<div class="subtle small">SDP 包列表待生成。</div>`;
+  }
+  return `
+    <div class="store-delivery-sdp-list">
+      <div class="subtle small">SDP 包</div>
+      ${packages.map((packageRow) => {
+        const packageDisplayCode = String(packageRow.display_code || packageRow.package_code || "-").trim().toUpperCase() || "-";
+        const packageMachineCode = String(packageRow.machine_code || packageRow.barcode_value || "-").trim().toUpperCase() || "-";
+        const packageNo = Number(packageRow.package_no || 0);
+        const packageTotal = Number(packageRow.package_total || packages.length || 0);
+        const sourceCode = String(packageRow.source_code || "-").trim().toUpperCase() || "-";
+        const itemCount = packageRow.item_count === null || packageRow.item_count === undefined || packageRow.item_count === ""
+          ? "-"
+          : formatI18nCount(Number(packageRow.item_count || 0), "件", "items");
+        return `
+          <div class="store-delivery-sdp-row">
+            <strong>${escapeHtml(packageDisplayCode)}</strong>
+            <span>${escapeHtml(packageMachineCode)}</span>
+            <span>${escapeHtml(`Pkg ${packageNo || "-"} / ${packageTotal || "-"}`)}</span>
+            <span>${escapeHtml(`SRC ${sourceCode}`)}</span>
+            <span>${escapeHtml(itemCount)}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderStoreDeliveryHistoryCard(row = {}) {
+  const summary = getStoreDeliveryShipmentCardData(row);
+  const statusLabel = getShipmentBatchProgressLabel(summary.row);
+  const receiptLabel = getStoreDeliveryReceiptStatusLabel(summary.row);
+  const updatedAt = summary.row.updated_at || summary.row.received_at || summary.row.shipped_at || summary.row.created_at || "";
+  const statusBadge = row.__status_badge || renderStatusBadge(statusLabel, statusLabel);
+  return `
+    <article class="store-delivery-task-card ${getStatusCardClass(statusLabel)}">
+      <div class="store-delivery-card-main">
+        <div>
+          <strong>${escapeHtml(row.__sdo_code || summary.sdo)}</strong>
+          <div class="subtle small">${escapeHtml(`${summary.transferNo} / ${summary.storeCode} / ${formatI18nCount(summary.packageCount, "包", "packages")}`)}</div>
+        </div>
+        ${statusBadge}
+      </div>
+      <div class="store-delivery-driver-grid">
+        <span><b>司机</b>${escapeHtml(summary.row.driver_name || "-")}</span>
+        <span><b>司机电话</b>${escapeHtml(summary.row.driver_phone || "-")}</span>
+        <span><b>车辆</b>${escapeHtml(summary.row.vehicle_no || "-")}</span>
+      </div>
+      <div class="store-delivery-timeline">
+        <span><b>发车时间</b>${escapeHtml(formatDateTime(summary.row.shipped_at) || "-")}</span>
+        <span><b>收货时间</b>${escapeHtml(formatDateTime(summary.row.received_at) || "-")}</span>
+        <span><b>最近更新</b>${escapeHtml(formatDateTime(updatedAt) || "-")}</span>
+        <span><b>收货状态</b>${renderStatusBadge(receiptLabel, receiptLabel)}</span>
+      </div>
+      ${renderStoreDeliverySdpPackageList(summary.row)}
+      <div class="candidate-side-actions">
+        <button type="button" class="ghost-button mini-button" data-transfer-ship-fill="${escapeHtml(summary.transferNo)}">带入创建配送</button>
+      </div>
+    </article>
+  `;
 }
 
 function ensureTransferShipmentSdoRow() {
@@ -20362,36 +20591,31 @@ function renderTransferDeliveryHistory(rows = transferOrderState) {
   target.className = "report-summary";
   target.innerHTML = `
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>配送记录</strong><span>${filteredList.length}</span></article>
-      <article class="store-metric"><strong>待发车</strong><span>${statusCounts[pendingDispatchLabel] || 0}</span></article>
-      <article class="store-metric"><strong>运输中</strong><span>${statusCounts[inTransitLabel] || 0}</span></article>
-      <article class="store-metric"><strong>已完成</strong><span>${statusCounts[receivingCompleteLabel] || 0}</span></article>
-      <article class="store-metric"><strong>异常</strong><span>${statusCounts[exceptionLabel] || 0}</span></article>
+      <article class="store-metric"><strong>配送记录</strong><span>${renderStatusBadge(filteredList.length, "neutral")}</span></article>
+      <article class="store-metric"><strong>待发车</strong><span>${renderStatusBadge(statusCounts[pendingDispatchLabel] || 0, "warning")}</span></article>
+      <article class="store-metric"><strong>运输中</strong><span>${renderStatusBadge(statusCounts[inTransitLabel] || 0, "info")}</span></article>
+      <article class="store-metric"><strong>已完成</strong><span>${renderStatusBadge(statusCounts[receivingCompleteLabel] || 0, "success")}</span></article>
+      <article class="store-metric"><strong>异常</strong><span>${renderStatusBadge(statusCounts[exceptionLabel] || 0, "danger")}</span></article>
     </div>
-    <div class="candidate-list transfer-draft-list">
+    <div class="store-delivery-history-list">
       ${filteredList.map((row) => {
         const packageCount = getTransferShipmentPackageCount(row);
         const statusLabel = getShipmentBatchProgressLabel(row);
         const sdoCode = getStoreDeliverySdoDisplayCode(row);
-        return `
-          <article class="candidate-row transfer-draft-row">
-            <div>
-              <strong>${escapeHtml(sdoCode || "-")}</strong>
-              <div class="subtle small">${escapeHtml(`${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${formatI18nCount(packageCount, "包", "packages")}`)}</div>
-              <div class="meta-row">
-                <span class="meta-pill">司机 ${escapeHtml(row.driver_name || "-")}</span>
-                <span class="meta-pill">车辆 ${escapeHtml(row.vehicle_no || "-")}</span>
-                <span class="meta-pill">司机电话 ${escapeHtml(row.driver_phone || "-")}</span>
-                <span class="meta-pill">发货时间 ${escapeHtml(formatDateTime(row.shipped_at) || "-")}</span>
-                <span class="meta-pill">当前配送状态 ${escapeHtml(statusLabel)}</span>
-                <span class="meta-pill">收货状态 ${escapeHtml(getStoreDeliveryReceiptStatusLabel(row))}</span>
-              </div>
-            </div>
-            <div class="candidate-side-actions">
-              <button type="button" class="ghost-button mini-button" data-transfer-ship-fill="${escapeHtml(row.transfer_no || "")}">带入创建配送</button>
-            </div>
-          </article>
-        `;
+        const statusBadge = renderStatusBadge(statusLabel, statusLabel);
+        const driverPhoneLabel = `司机电话 ${escapeHtml(row.driver_phone || "-")}`;
+        const shippedAtLabel = `发货时间 ${escapeHtml(formatDateTime(row.shipped_at) || "-")}`;
+        const receiptStatusLabel = `收货状态 ${escapeHtml(getStoreDeliveryReceiptStatusLabel(row))}`;
+        const transferStorePackageLine = `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${formatI18nCount(packageCount, "包", "packages")}`;
+        return renderStoreDeliveryHistoryCard({
+          ...row,
+          __sdo_code: sdoCode,
+          __status_badge: statusBadge,
+          __driver_phone_label: driverPhoneLabel,
+          __shipped_at_label: shippedAtLabel,
+          __receipt_status_label: receiptStatusLabel,
+          __transfer_store_package_line: transferStorePackageLine,
+        });
       }).join("")}
     </div>
   `;
@@ -20591,7 +20815,7 @@ function populateTransferOrderSelectors() {
           ? `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / total ${total} items / shortage ${shortage} items`
           : `${row.transfer_no || "-"} / ${row.to_store_code || "-"} / ${requiredDate} / 总量 ${total} 件 / 缺口 ${shortage} 件`;
       });
-      const requestOptions = rows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("");
+      const requestOptions = sourceRows.map((row, index) => `<option value="${escapeHtml(row.transfer_no || "")}">${escapeHtml(options[index])}</option>`).join("");
       const waveOptions = waves
         .map((wave) => {
           const label = currentLanguage === "en"
@@ -20601,7 +20825,7 @@ function populateTransferOrderSelectors() {
         })
         .join("");
       select.innerHTML = `<option value="">${escapeHtml(empty)}</option>${requestOptions}${waveOptions}`;
-      if (previousValue && (rows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue) || (isWaveSelectionValue(previousValue) && waves.some((wave) => `WAVE:${String(wave?.wave_no || "").trim().toUpperCase()}` === previousValue)))) {
+      if (previousValue && (sourceRows.some((row) => String(row.transfer_no || "").trim().toUpperCase() === previousValue) || (isWaveSelectionValue(previousValue) && waves.some((wave) => `WAVE:${String(wave?.wave_no || "").trim().toUpperCase()}` === previousValue)))) {
         select.value = previousValue;
       }
       renderWaveExecutionEntrySummary(select.value, mode);
@@ -20652,6 +20876,10 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  target.className = "candidate-summary empty-state hidden-screen";
+  target.textContent = "";
+  renderTransferShipTargetHint();
+  return;
   const baseList = Array.isArray(rows) ? rows : [];
   const list = baseList.map((row) => normalizeTransferForOperationsSummary(row));
   if (!list.length) {
@@ -33231,6 +33459,10 @@ async function submitTransferShipment(event) {
     renderWaveExecutionEntrySummary(waveNo, "ship");
     throw new Error("已选择仓库备货任务。请选择任务内的一张补货申请继续执行；LPK / SDO 仍按单张补货申请生成。");
   }
+  const shipments = getSelectedStoreDeliveryShipmentPayloads(formElement);
+  if (!shipments.length || shipments.some((shipment) => !shipment.sdo_display_code && !shipment.sdo_machine_code)) {
+    throw new Error("请选择 SDO 出库单，不能只提交补货单号。");
+  }
   const form = new FormData(formElement);
   const payload = Object.fromEntries(form.entries());
   const departureTime = String(payload.departure_time || "").trim();
@@ -33254,15 +33486,25 @@ async function submitTransferShipment(event) {
     method: "POST",
     body: JSON.stringify({
       ...payload,
-      transfer_nos: transferNos,
+      shipments: shipments,
     }),
   });
-  const results = Array.isArray(result?.orders) ? result.orders : [];
+  const results = Array.isArray(result?.shipments) && result.shipments.length
+    ? result.shipments
+    : (Array.isArray(result?.orders) ? result.orders : []);
   writeOutput("#transferOutput", result);
   await loadStoreDeliveryShipmentRecords();
-  const latestTransferNo = transferNos[transferNos.length - 1] || "";
-  const updated = transferOrderState.find((row) => String(row.transfer_no || "").trim().toUpperCase() === latestTransferNo.toUpperCase()) || results[results.length - 1];
-  renderTransferTrackingResultSummary(updated);
+  const hydratedResults = results.map((row) => (
+    transferOrderState.find((stateRow) => String(stateRow.transfer_no || "").trim().toUpperCase() === String(row.transfer_no || "").trim().toUpperCase()) || row
+  ));
+  renderTransferTrackingResultSummary({
+    ...result,
+    driver_name: payload.driver_name,
+    driver_phone: payload.driver_phone,
+    vehicle_no: payload.vehicle_no,
+    shipments: results,
+    orders: hydratedResults.length ? hydratedResults : results,
+  });
   renderTransferDeliveryHistory(transferOrderState);
   loadTransferShipTargetHint(transferNos[0]);
   alert("确认发货成功，状态已更新为运输中");
@@ -34515,7 +34757,7 @@ document.querySelector("#loadTransferDispatchButton")?.addEventListener("click",
     focusElement(document.querySelector("[data-transfer-delivery-panel='history']:not(.hidden-screen)") ? "#transferDeliveryHistoryList" : "#transferShipTargetHint");
   } catch (error) {
     const errorTarget = document.querySelector("[data-transfer-delivery-panel='history']:not(.hidden-screen)")
-      ? "#transferDispatchSummary"
+      ? "#transferDeliveryHistoryList"
       : "#transferTrackingResultSummary";
     renderErrorSummary(errorTarget, formatErrorMessage(error));
   }
@@ -34630,6 +34872,14 @@ document.querySelector("#transferShipForm")?.addEventListener("change", (event) 
   }
   queueTransferShipTargetHintLoad(target.value || "");
   renderWaveExecutionEntrySummary(target.value || "", "ship");
+});
+
+document.querySelector("#transferShipForm")?.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || !["driver_name", "driver_phone", "vehicle_no"].includes(target.name)) {
+    return;
+  }
+  renderTransferShipTargetHint();
 });
 
 const initialTransferShipNo = String(document.querySelector("#transferShipForm [name='transfer_no']")?.value || "").trim();

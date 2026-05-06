@@ -14796,6 +14796,113 @@ class InMemoryState:
             or status in {"shipped", "in_transit", "partially_received", "completed"}
         )
 
+    def _reject_source_package_as_store_delivery_shipment_object(self, *codes: str) -> None:
+        for code in codes:
+            normalized = str(code or "").strip().upper()
+            if not normalized:
+                continue
+            if normalized.startswith(("SDB", "LPK")) or re.fullmatch(r"[23]\d{9}", normalized):
+                raise HTTPException(status_code=409, detail="SDB / LPK 只是来源包，不能作为门店配送对象。")
+
+    def _find_store_delivery_execution_order_by_identity(
+        self,
+        *,
+        sdo_display_code: str = "",
+        sdo_machine_code: str = "",
+    ) -> dict[str, Any]:
+        display_code = str(sdo_display_code or "").strip().upper()
+        machine_code = str(sdo_machine_code or "").replace(" ", "").strip().upper()
+        self._reject_source_package_as_store_delivery_shipment_object(display_code, machine_code)
+        if not display_code and not machine_code:
+            raise HTTPException(status_code=400, detail="请选择 SDO 出库单，不能只提交补货单号。")
+        if display_code.startswith("SDP") or re.fullmatch(r"6\d{9}", machine_code or display_code):
+            raise HTTPException(status_code=400, detail="请选择 SDO 出库单，不能用 SDP 包码替代 SDO。")
+
+        requested = {value for value in {display_code, machine_code} if value}
+        for row in self.store_delivery_execution_orders.values():
+            normalized = self._project_store_delivery_execution_order_with_existing_packages(row)
+            candidates = {
+                str(normalized.get("execution_order_no") or "").strip().upper(),
+                str(normalized.get("official_delivery_barcode") or "").strip().upper(),
+                str(normalized.get("machine_code") or "").strip().upper(),
+                str((normalized.get("print_payload") or {}).get("barcode_value") or "").strip().upper(),
+                str((normalized.get("print_payload") or {}).get("scan_token") or "").strip().upper(),
+            }
+            if requested.intersection({value for value in candidates if value}):
+                return normalized
+        raise HTTPException(status_code=404, detail=f"未找到 SDO 出库单：{display_code or machine_code}")
+
+    def _validate_store_delivery_sdo_packages_for_shipment(self, execution_order: dict[str, Any]) -> list[dict[str, Any]]:
+        packages = execution_order.get("packages") if isinstance(execution_order.get("packages"), list) else []
+        sdp_packages: list[dict[str, Any]] = []
+        for package in packages:
+            if not isinstance(package, dict):
+                continue
+            normalized = self._normalize_store_delivery_package(package)
+            display_code = str(normalized.get("display_code") or "").strip().upper()
+            machine_code = str(normalized.get("machine_code") or normalized.get("barcode_value") or "").strip().upper()
+            self._reject_source_package_as_store_delivery_shipment_object(display_code, machine_code)
+            if (
+                str(normalized.get("entity_type") or "").strip().upper() != "STORE_DELIVERY_PACKAGE"
+                or not display_code.startswith("SDP")
+                or not re.fullmatch(r"6\d{9}", machine_code)
+                or str(normalized.get("barcode_value") or "").strip().upper() != machine_code
+                or int(normalized.get("package_no") or 0) <= 0
+                or int(normalized.get("package_total") or 0) <= 0
+            ):
+                continue
+            sdp_packages.append(normalized)
+        if not sdp_packages:
+            raise HTTPException(status_code=409, detail="该 SDO 尚未生成 SDP 实体包，不能发车。")
+        return sdp_packages
+
+    def _build_store_delivery_shipment_projection(
+        self,
+        order: dict[str, Any],
+        execution_order: dict[str, Any],
+    ) -> dict[str, Any]:
+        projected_order = self._project_transfer_order_with_store_delivery_execution_order(order)
+        normalized_execution = self._project_store_delivery_execution_order_with_existing_packages(execution_order)
+        packages = self._validate_store_delivery_sdo_packages_for_shipment(normalized_execution)
+        transfer_no = str(
+            normalized_execution.get("source_transfer_no")
+            or projected_order.get("transfer_no")
+            or ""
+        ).strip().upper()
+        store_code = str(
+            normalized_execution.get("to_store_code")
+            or projected_order.get("to_store_code")
+            or ""
+        ).strip().upper()
+        total_item_count = normalized_execution.get("total_item_count")
+        if total_item_count is None and packages and all(package.get("item_count") is not None for package in packages):
+            total_item_count = sum(int(package.get("item_count") or 0) for package in packages)
+        return {
+            "transfer_no": transfer_no,
+            "source_transfer_no": transfer_no,
+            "sdo_display_code": str(normalized_execution.get("execution_order_no") or "").strip().upper(),
+            "sdo_machine_code": str(normalized_execution.get("machine_code") or "").strip().upper(),
+            "store_delivery_execution_order_no": str(normalized_execution.get("execution_order_no") or "").strip().upper(),
+            "official_delivery_barcode": str(normalized_execution.get("official_delivery_barcode") or "").strip().upper(),
+            "store_code": store_code,
+            "to_store_code": store_code,
+            "package_count": len(packages),
+            "total_item_count": total_item_count,
+            "item_count": total_item_count,
+            "status": str(projected_order.get("status") or "").strip().lower(),
+            "delivery_status": str(projected_order.get("delivery_status") or "").strip().lower(),
+            "store_receipt_status": str(projected_order.get("store_receipt_status") or "").strip().lower(),
+            "driver_name": str(projected_order.get("driver_name") or "").strip(),
+            "driver_phone": str(projected_order.get("driver_phone") or "").strip(),
+            "vehicle_no": str(projected_order.get("vehicle_no") or "").strip().upper(),
+            "shipped_at": projected_order.get("shipped_at"),
+            "received_at": projected_order.get("received_at"),
+            "created_at": normalized_execution.get("created_at") or projected_order.get("created_at"),
+            "updated_at": projected_order.get("updated_at") or projected_order.get("shipped_at") or normalized_execution.get("created_at"),
+            "packages": packages,
+            "store_delivery_execution_order": normalized_execution,
+        }
+
     def _validate_store_delivery_transfer_for_shipment(self, transfer_no: str) -> dict[str, Any]:
         order = self.get_transfer_order(transfer_no)
         execution_order = self._find_store_delivery_execution_order_for_transfer(order)
@@ -14809,16 +14916,12 @@ class InMemoryState:
         if not execution_order or not sdo_no:
             raise HTTPException(status_code=409, detail="该补货单尚未生成 SDO / SDP，不能进入门店配送。")
 
-        packages = execution_order.get("packages") if isinstance(execution_order.get("packages"), list) else []
-        sdp_packages = [
-            package
-            for package in packages
-            if str(package.get("entity_type") or "").strip().upper() == "STORE_DELIVERY_PACKAGE"
-            or str(package.get("display_code") or package.get("package_code") or "").strip().upper().startswith("SDP")
-            or str(package.get("machine_code") or package.get("barcode_value") or "").strip().upper().startswith("6")
-        ]
-        if not sdp_packages:
-            raise HTTPException(status_code=409, detail="该补货单尚未生成 SDO / SDP，不能进入门店配送。")
+        try:
+            self._validate_store_delivery_sdo_packages_for_shipment(execution_order)
+        except HTTPException as error:
+            if error.status_code == 409:
+                raise HTTPException(status_code=409, detail="该补货单尚未生成 SDO / SDP，不能进入门店配送。")
+            raise
 
         allowed_statuses = {"ready_to_ship", "pending_dispatch", "approved", "packed"}
         status = str(order.get("status") or "").strip().lower()
@@ -14846,6 +14949,13 @@ class InMemoryState:
             or execution_order.get("status")
             or ""
         ).strip()
+        try:
+            packages = self._validate_store_delivery_sdo_packages_for_shipment(execution_order)
+        except HTTPException:
+            packages = []
+        projected["sdo_display_code"] = execution_order_no
+        projected["sdo_machine_code"] = str(execution_order.get("machine_code") or "").strip().upper()
+        projected["packages"] = packages
         return projected
 
     def list_store_delivery_shipments(self) -> list[dict[str, Any]]:
@@ -14861,18 +14971,56 @@ class InMemoryState:
         )
 
     def ship_store_delivery_transfers(self, payload: dict[str, Any]) -> dict[str, Any]:
-        transfer_nos = [
-            str(transfer_no or "").strip().upper()
-            for transfer_no in payload.get("transfer_nos", [])
-            if str(transfer_no or "").strip()
+        shipment_inputs = payload.get("shipments") if isinstance(payload.get("shipments"), list) else []
+        shipment_targets: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+
+        if shipment_inputs:
+            for item in shipment_inputs:
+                if not isinstance(item, dict):
+                    continue
+                requested_transfer_no = str(item.get("transfer_no") or "").strip().upper()
+                execution_order = self._find_store_delivery_execution_order_by_identity(
+                    sdo_display_code=str(item.get("sdo_display_code") or "").strip().upper(),
+                    sdo_machine_code=str(item.get("sdo_machine_code") or "").strip().upper(),
+                )
+                source_transfer_no = str(execution_order.get("source_transfer_no") or "").strip().upper()
+                if requested_transfer_no and requested_transfer_no != source_transfer_no:
+                    raise HTTPException(status_code=409, detail="SDO 与 transfer_no 不匹配，请重新选择。")
+                if not source_transfer_no:
+                    raise HTTPException(status_code=409, detail="请选择 SDO 出库单，不能只提交补货单号。")
+                order = self.get_transfer_order(source_transfer_no)
+                self._validate_store_delivery_sdo_packages_for_shipment(execution_order)
+                shipment_targets.append((source_transfer_no, order, execution_order))
+        else:
+            transfer_nos = [
+                str(transfer_no or "").strip().upper()
+                for transfer_no in payload.get("transfer_nos", [])
+                if str(transfer_no or "").strip()
+            ]
+            if not transfer_nos:
+                raise HTTPException(status_code=400, detail="请选择 SDO 出库单，不能只提交补货单号。")
+            for transfer_no in transfer_nos:
+                order = self._validate_store_delivery_transfer_for_shipment(transfer_no)
+                execution_order = self._find_store_delivery_execution_order_for_transfer(order)
+                if not execution_order:
+                    raise HTTPException(status_code=409, detail="该补货单尚未生成 SDO / SDP，不能进入门店配送。")
+                shipment_targets.append((transfer_no, order, execution_order))
+
+        transfer_nos = [transfer_no for transfer_no, _order, _execution_order in shipment_targets]
+        sdo_codes = [
+            str(execution_order.get("execution_order_no") or execution_order.get("official_delivery_barcode") or "").strip().upper()
+            for _transfer_no, _order, execution_order in shipment_targets
         ]
         if not transfer_nos:
-            raise HTTPException(status_code=400, detail="transfer_nos must not be empty")
-        if len(set(transfer_nos)) != len(transfer_nos):
+            raise HTTPException(status_code=400, detail="请选择 SDO 出库单，不能只提交补货单号。")
+        if len(set(sdo_codes)) != len(sdo_codes):
             raise HTTPException(status_code=400, detail="Duplicate SDO selections are not allowed")
 
-        for transfer_no in transfer_nos:
-            self._validate_store_delivery_transfer_for_shipment(transfer_no)
+        allowed_statuses = {"ready_to_ship", "pending_dispatch", "approved", "packed"}
+        for _transfer_no, order, _execution_order in shipment_targets:
+            status = str(order.get("status") or "").strip().lower()
+            if status not in allowed_statuses:
+                raise HTTPException(status_code=409, detail=f"该 SDO 当前状态不能进入门店配送：{status or 'unknown'}。")
 
         ship_payload = {
             "shipped_by": payload["shipped_by"],
@@ -14881,17 +15029,29 @@ class InMemoryState:
             "driver_phone": str(payload.get("driver_phone") or "").strip(),
             "note": str(payload.get("note") or "").strip(),
         }
-        orders = [
-            self._project_transfer_order_with_store_delivery_execution_order(
+        orders: list[dict[str, Any]] = []
+        shipment_projections: list[dict[str, Any]] = []
+        execution_by_transfer = {
+            transfer_no: execution_order
+            for transfer_no, _order, execution_order in shipment_targets
+        }
+        for transfer_no in transfer_nos:
+            shipped_order = self._project_transfer_order_with_store_delivery_execution_order(
                 self.ship_transfer_order(transfer_no, ship_payload)
             )
-            for transfer_no in transfer_nos
-        ]
+            orders.append(shipped_order)
+            shipment_projections.append(
+                self._build_store_delivery_shipment_projection(
+                    shipped_order,
+                    execution_by_transfer[transfer_no],
+                )
+            )
         return {
             "transfer_nos": transfer_nos,
             "status": "shipped",
             "delivery_status": "in_transit",
             "message": "Store delivery shipment created",
+            "shipments": shipment_projections,
             "orders": orders,
         }
 
