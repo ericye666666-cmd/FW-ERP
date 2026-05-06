@@ -2181,7 +2181,7 @@
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>6.1 配送批次 / 门店收货跟踪</h2>
+          <h2>门店配送</h2>
           <button id="loadTransferDispatchButton" type="button">刷新配送数据</button>
         </div>
         <div class="store-delivery-tabs" role="tablist" aria-label="门店配送">
@@ -2191,11 +2191,11 @@
         <div id="transferDeliveryCreatePanel" data-transfer-delivery-panel="create">
           <form id="transferShipForm" class="store-delivery-create-form">
             <section class="store-delivery-section">
-              <div class="section-title">选择 SDO 单</div>
+              <div class="section-title">选择已生成 SDP 的 SDO</div>
               <div id="transferShipSdoRows" class="store-delivery-sdo-list" data-transfer-sdo-list>
                 <div class="store-delivery-sdo-row" data-transfer-sdo-row>
                   <select name="transfer_no">
-                    <option value="">选择仓库送货执行单 / SDO</option>
+                    <option value="">选择 SDO / transfer / 门店 / 包数</option>
                   </select>
                   <button type="button" class="ghost-button mini-button" data-transfer-sdo-remove>删除</button>
                 </div>
@@ -2203,7 +2203,7 @@
               <div class="button-row">
                 <button type="button" class="ghost-button mini-button" data-transfer-sdo-add>新增 SDO</button>
               </div>
-              <div id="transferShipTargetHint" class="flow-summary-note">选择 SDO 后，这里会显示目标门店与配送上下文。</div>
+              <div id="transferShipTargetHint" class="flow-summary-note">下拉显示 SDO / transfer / 门店 / 包数，内部使用 transfer_no 提交。</div>
             </section>
             <section class="store-delivery-section">
               <div class="section-title">司机 / 电话 / 车牌号</div>
