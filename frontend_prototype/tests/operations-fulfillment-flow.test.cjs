@@ -31,6 +31,7 @@ const {
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 const recommendationSectionHtml = (indexHtml.match(/<form id="recommendationForm"[\s\S]*?<pre id="recommendationOutput" class="output hidden-output"><\/pre>/) || [""])[0];
 const warehouseNavSectionJs = (appJs.match(/const WAREHOUSE_NAV_SECTIONS = \[[\s\S]*?\n\];/) || [""])[0];
 const warehousePanelMetaJs = (appJs.match(/const WAREHOUSE_PANEL_NAV_META = \[[\s\S]*?\n\];/) || [""])[0];
@@ -1163,6 +1164,19 @@ test("门店配送 page exposes create and history tabs without the old intro co
   assert.doesNotMatch(indexHtml, /当前版本先按已生成 SDO 展示配送批次视图/);
   assert.doesNotMatch(indexHtml, /SDB can be scanned by store/i);
   assert.doesNotMatch(indexHtml, /LPK can be scanned by store/i);
+});
+
+test("门店配送 tab buttons use compact blue horizontal button styling", () => {
+  const tabStyles = stylesCss.match(/\.store-delivery-tab\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  const tabsStyles = stylesCss.match(/\.store-delivery-tabs\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(tabsStyles, /display:\s*flex/);
+  assert.match(tabsStyles, /align-items:\s*center/);
+  assert.match(tabStyles, /width:\s*auto/);
+  assert.match(tabStyles, /flex:\s*0 0 auto/);
+  assert.match(tabStyles, /display:\s*inline-flex/);
+  assert.match(tabStyles, /background:\s*var\(--fw-primary\)/);
+  assert.match(tabStyles, /color:\s*#fff/);
+  assert.doesNotMatch(tabStyles, /background:\s*var\(--fw-surface\)/);
 });
 
 test("门店配送 create tab supports editable SDO rows and transport fields", () => {
