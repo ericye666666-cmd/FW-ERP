@@ -7815,6 +7815,12 @@ textarea:focus-visible,
   font-size: 13px;
 }
 
+.mobile-preview-sdp-mini small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .store-mobile-preview-device {
   display: flex;
   justify-content: center;
@@ -7988,6 +7994,14 @@ textarea:focus-visible,
 .mobile-print-summary b {
   color: #475569;
   font-size: 11px;
+}
+
+.mobile-sdp-head small,
+.mobile-sdp-grid small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .mobile-pricing-badge {

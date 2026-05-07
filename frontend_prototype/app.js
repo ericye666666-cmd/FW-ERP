@@ -29363,7 +29363,6 @@ function renderStoreClerkHomeSummary(context = {}) {
 
 function createStoreMobilePricingPreviewState(overrides = {}) {
   const baseState = {
-    selectedRole: "店员",
     activePage: "pricing",
     activeGroupId: "A",
     labelSize: "60×40",
@@ -29376,20 +29375,24 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
       rack_code: "A-01",
     },
     selectedSdp: {
-      sdp_code: "6002381948213",
-      sdo_code: "SDO2612700004",
-      store_name: "DLR-上海南京东路店",
+      display_code: "SDP261250002",
+      sdp_code: "SDP261250002",
+      machine_code: "6261250002",
+      sdo_code: "SDO260504008",
+      sdo_machine_code: "4260504008",
+      store_name: "Direct Loop Utawala",
       package_no: "2/3",
-      source_type: "SDB / LPK",
-      source_code: "SDB261270045 / LPK261270002",
+      source_type: "SDB",
+      source_code: "SDB-TO202605-002",
+      source_machine_code: "2202605002",
       category: "牛仔裤",
       total_count: 210,
-      grouped_count: 190,
-      ungrouped_count: 20,
+      grouped_count: 210,
+      ungrouped_count: 0,
       generated_count: 80,
       printed_count: 0,
       assigned_clerk: "Austin",
-      received_by: "店长 Mina",
+      received_by: "门店收货",
     },
     priceGroups: [
       {
@@ -29406,7 +29409,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         group_id: "B",
         tier: "B 档",
         price_kes: 100,
-        quantity: 100,
+        quantity: 80,
         category: "牛仔裤",
         grade: "B",
         rack_code: "A-02",
@@ -29426,7 +29429,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         group_id: "CUSTOM-200",
         tier: "自定义",
         price_kes: 200,
-        quantity: 15,
+        quantity: 20,
         category: "牛仔裤",
         grade: "A",
         rack_code: "A-03",
@@ -29453,7 +29456,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         job_id: "MOCK-PJ-B-001",
         group_id: "B",
         label_size: "60×40",
-        copies: 100,
+        copies: 80,
         status: "打印中",
       },
       {
@@ -29461,7 +29464,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         group_id: "S",
         label_size: "40×30",
         copies: 30,
-        status: "已打印",
+        status: "queued",
       },
     ],
   };
@@ -29498,20 +29501,27 @@ function renderStoreMobilePricingBadge(label = "") {
 
 function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   const sdp = state.selectedSdp || {};
+  const sdpDisplayCode = String(sdp.display_code || sdp.sdp_code || "-").trim();
+  const sdpMachineCode = String(sdp.machine_code || "").trim();
+  const sdoDisplayCode = String(sdp.sdo_code || "-").trim();
+  const sdoMachineCode = String(sdp.sdo_machine_code || "").trim();
+  const sourceDisplayCode = [sdp.source_type, sdp.source_code].filter(Boolean).join(" · ") || "-";
+  const sourceMachineCode = String(sdp.source_machine_code || "").trim();
   return `
     <section class="mobile-sdp-card">
       <div class="mobile-sdp-head">
         <div>
           <span>当前 SDP</span>
-          <strong>${escapeHtml(sdp.sdp_code || "-")}</strong>
+          <strong>${escapeHtml(sdpDisplayCode)}</strong>
+          ${sdpMachineCode ? `<small>${escapeHtml(`machine_code: ${sdpMachineCode}`)}</small>` : ""}
         </div>
         ${renderStoreMobilePricingBadge("已分配")}
       </div>
       <div class="mobile-sdp-grid">
-        <span><b>所属 SDO</b>${escapeHtml(sdp.sdo_code || "-")}</span>
+        <span><b>所属 SDO</b>${escapeHtml(sdoDisplayCode)}${sdoMachineCode ? `<small>${escapeHtml(`machine_code: ${sdoMachineCode}`)}</small>` : ""}</span>
         <span><b>门店</b>${escapeHtml(sdp.store_name || "-")}</span>
         <span><b>包号</b>${escapeHtml(sdp.package_no || "-")}</span>
-        <span><b>来源</b>${escapeHtml(`${sdp.source_type || "-"} · ${sdp.source_code || "-"}`)}</span>
+        <span><b>来源</b>${escapeHtml(sourceDisplayCode)}${sourceMachineCode ? `<small>${escapeHtml(`machine_code: ${sourceMachineCode}`)}</small>` : ""}</span>
         <span><b>品类</b>${escapeHtml(sdp.category || "-")}</span>
         <span><b>总件数</b>${escapeHtml(sdp.total_count || 0)}</span>
         <span><b>已分组</b>${escapeHtml(sdp.grouped_count || 0)}</span>
@@ -29667,7 +29677,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <span><b>预计 job 数</b>1</span>
       </div>
       <div class="mobile-choice-block">
-        <span>label size</span>
+        <span>标签尺寸</span>
         <div class="mobile-segment-row">
           <button type="button" class="${activeSize === "60×40" ? "is-active" : ""}" data-mobile-pricing-label-size="60×40">60×40</button>
           <button type="button" class="${activeSize === "40×30" ? "is-active" : ""}" data-mobile-pricing-label-size="40×30">40×30</button>
@@ -29828,15 +29838,9 @@ function renderStoreMobilePricingPreview() {
       <aside class="store-mobile-preview-controls">
         <div>
           <span class="eyebrow">预览模式</span>
-          <h3>Android PDA 模拟器</h3>
-          <p class="subtle small">只读模拟状态，不写后端，不调用打印完成。</p>
-        </div>
-        <div class="mobile-preview-control-block">
-          <strong>角色选择</strong>
-          <div class="mobile-segment-row">
-            <button type="button" class="${state.selectedRole === "店长" ? "is-active" : ""}" data-mobile-pricing-role="店长">店长</button>
-            <button type="button" class="${state.selectedRole === "店员" ? "is-active" : ""}" data-mobile-pricing-role="店员">店员</button>
-          </div>
+          <h3>店员 PDA Preview</h3>
+          <p class="subtle small">现场分堆标价 UI</p>
+          <p class="subtle small">只读预览，不写后端。</p>
         </div>
         <div class="mobile-preview-control-block">
           <strong>页面列表</strong>
@@ -29849,7 +29853,8 @@ function renderStoreMobilePricingPreview() {
         <div class="mobile-preview-control-block">
           <strong>当前 mock SDP</strong>
           <div class="mobile-preview-sdp-mini">
-            <b>${escapeHtml(state.selectedSdp?.sdp_code || "-")}</b>
+            <b>${escapeHtml(state.selectedSdp?.display_code || state.selectedSdp?.sdp_code || "-")}</b>
+            <small>${escapeHtml(state.selectedSdp?.machine_code ? `machine_code: ${state.selectedSdp.machine_code}` : "")}</small>
             <span>${escapeHtml(state.selectedSdp?.store_name || "-")}</span>
             <span>${escapeHtml(`${state.selectedSdp?.category || "-"} · ${state.selectedSdp?.total_count || 0} 件`)}</span>
           </div>
@@ -29868,7 +29873,6 @@ function handleStoreMobilePricingPreviewAction(button) {
   }
   const state = storeMobilePricingPreviewState;
   const page = button.dataset.mobilePricingPage;
-  const role = button.dataset.mobilePricingRole;
   const selectGroup = button.dataset.mobilePricingSelectGroup;
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const printGroup = button.dataset.mobilePricingPrintGroup;
@@ -29879,9 +29883,6 @@ function handleStoreMobilePricingPreviewAction(button) {
   const qtyStep = button.dataset.mobilePricingQtyStep;
   if (page) {
     state.activePage = page;
-  }
-  if (role) {
-    state.selectedRole = role;
   }
   if (selectGroup) {
     state.activeGroupId = selectGroup;
@@ -36012,7 +36013,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-role], [data-mobile-pricing-select-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-select-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
