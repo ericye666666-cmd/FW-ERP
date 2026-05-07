@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
@@ -38,6 +39,10 @@ function functionSource(source, functionName) {
   throw new Error(`could not extract ${functionName}`);
 }
 
+function executableFunction(source, functionName) {
+  return vm.runInNewContext(`(${functionSource(source, functionName)})`);
+}
+
 test("store manager PDA preview is the visible manager entry with four bottom tabs", () => {
   assert.match(indexHtml, /<h2>店长 PDA 工作台<\/h2>/);
   assert.match(indexHtml, /id="storeManagerPdaPreview"/);
@@ -61,6 +66,10 @@ test("store manager receiving preview presents SDO as the official receiving tar
   assert.match(receivingSource, /SDO 门店收退货/);
   assert.match(receivingSource, /STORE_DELIVERY_EXECUTION/);
   assert.match(receivingSource, /正式收货入口/);
+  assert.match(receivingSource, /storeManagerPdaSdoForm/);
+  assert.match(receivingSource, /storeManagerPdaSdoInput/);
+  assert.match(receivingSource, /data-scan-input="true"/);
+  assert.match(receivingSource, /placeholder="扫描 SDO 主单码"/);
   assert.match(receivingSource, /SDB \/ LPK 只显示为来源参考/);
   assert.match(receivingSource, /POS 仍只接受 STORE_ITEM/);
   assert.match(receivingSource, /不作为门店收货码/);
@@ -68,6 +77,47 @@ test("store manager receiving preview presents SDO as the official receiving tar
   assert.doesNotMatch(receivingSource, /扫描 SDP/);
   assert.doesNotMatch(receivingSource, /SDP.*正式收货入口/);
   assert.doesNotMatch(receivingSource, /确认收到/);
+});
+
+test("store manager PDA SDO submit routes through existing store receiving flow without widening barcode types", () => {
+  const submitSource = functionSource(appJs, "submitStoreManagerPdaSdoScan");
+  const clickSource = appJs.slice(appJs.indexOf('document.querySelector("#storeManagerPdaPreview")'), appJs.indexOf("workspacePageSearch?.addEventListener"));
+
+  assert.match(submitSource, /#storeDispatchBaleAcceptForm \[name='bale_no'\]/);
+  assert.match(submitSource, /submitStoreDispatchBaleAccept/);
+  assert.match(submitSource, /getPanelKeyByTitle\("store", "5\. 门店收货主控台"\)/);
+  assert.match(submitSource, /setActivePanel\(panelKey\)/);
+  assert.match(submitSource, /showTransientInlineNotice\("#storeDispatchBaleNotice"/);
+  assert.match(submitSource, /validateStoreManagerPdaSdoScanCode/);
+  assert.match(submitSource, /STORE_DELIVERY_EXECUTION \/ SDO/);
+  assert.doesNotMatch(submitSource, /STORE_DELIVERY_PACKAGE/);
+  assert.match(clickSource, /storeManagerPdaSdoForm/);
+  assert.match(clickSource, /submitStoreManagerPdaSdoScan/);
+});
+
+test("store manager PDA SDO validation accepts only official SDO formats", () => {
+  const validate = executableFunction(appJs, "validateStoreManagerPdaSdoScanCode");
+
+  const displayCodeResult = validate("SDO260504008");
+  assert.equal(displayCodeResult.ok, true);
+  assert.equal(displayCodeResult.code, "SDO260504008");
+  const machineCodeResult = validate("4260504008");
+  assert.equal(machineCodeResult.ok, true);
+  assert.equal(machineCodeResult.code, "4260504008");
+
+  [
+    ["SDOABC", /请扫描 STORE_DELIVERY_EXECUTION \/ SDO 主单码/],
+    ["SDO-TEST", /请扫描 STORE_DELIVERY_EXECUTION \/ SDO 主单码/],
+    ["SDO123", /请扫描 STORE_DELIVERY_EXECUTION \/ SDO 主单码/],
+    ["SDP261250002", /SDP 是 SDO 内包明细/],
+    ["SDB-TO202605-002", /SDB \/ LPK 是仓库来源包/],
+    ["LPK260500001", /SDB \/ LPK 是仓库来源包/],
+    ["5260504008", /STORE_ITEM 只能用于 POS 销售/],
+  ].forEach(([code, messagePattern]) => {
+    const result = validate(code);
+    assert.equal(result.ok, false, `${code} should be rejected`);
+    assert.match(result.error, messagePattern, `${code} should explain the correct boundary`);
+  });
 });
 
 test("store manager package detail cards show SDO source package and category context", () => {
