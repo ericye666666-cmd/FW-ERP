@@ -29029,9 +29029,9 @@ function isPendingPrintStoreItemToken(token = {}) {
 }
 
 function getStorePackagePrintableTokens(actionKey = "") {
-  const lastGenerated = getStorePackageLastGeneratedTokens(actionKey);
-  if (lastGenerated.length) {
-    return lastGenerated.filter(isPendingPrintStoreItemToken);
+  const lastGeneratedPending = getStorePackageLastGeneratedTokens(actionKey).filter(isPendingPrintStoreItemToken);
+  if (lastGeneratedPending.length) {
+    return lastGeneratedPending;
   }
   return getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
 }
@@ -29120,19 +29120,23 @@ function renderStorePackagePrintJobFeedback(actionKey = "") {
 }
 
 function renderStorePackageGeneratedStoreItems(actionKey = "") {
-  const lastGeneratedTokens = getStorePackageLastGeneratedTokens(actionKey);
-  const isCurrentBatch = lastGeneratedTokens.length > 0;
-  const generatedTokens = isCurrentBatch ? lastGeneratedTokens : getStorePackagePrintableTokens(actionKey);
-  if (!generatedTokens.length) {
+  const lastGeneratedPending = getStorePackageLastGeneratedTokens(actionKey).filter(isPendingPrintStoreItemToken);
+  const isCurrentBatch = lastGeneratedPending.length > 0;
+  const printableTokens = isCurrentBatch
+    ? lastGeneratedPending
+    : getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
+  if (!printableTokens.length) {
     return `<div class="empty-state compact">当前没有待打印 STORE_ITEM。</div>`;
   }
+  const printTitle = isCurrentBatch ? "打印本次标签" : "待打印标签";
+  const printButtonText = isCurrentBatch ? "打印本次标签" : "打印待打印标签";
   return `
     <div class="store-package-print-summary">
       <strong>${isCurrentBatch ? "本次生成数量" : "待打印标签"}</strong>
-      <span>${generatedTokens.length}</span>
+      <span>${printableTokens.length}</span>
     </div>
     <div class="store-generated-item-list">
-      ${generatedTokens.slice(0, 8).map((token) => `
+      ${printableTokens.slice(0, 8).map((token) => `
         <article class="store-generated-item-row">
           <div>
             <strong>${escapeHtml(token.display_code || token.token_no || "-")}</strong>
@@ -29144,7 +29148,7 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
       `).join("")}
     </div>
     <div class="store-package-print-panel">
-      <h4>${isCurrentBatch ? "打印本次标签" : "待打印标签"}</h4>
+      <h4>${printTitle}</h4>
       <label>
         <span>标签尺寸</span>
         <select data-store-package-label-size="${escapeHtml(actionKey)}">
@@ -29152,7 +29156,7 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
           <option value="40x30">40×30</option>
         </select>
       </label>
-      <button type="button" class="primary-button" data-store-package-print-generated="${escapeHtml(actionKey)}">打印本次标签</button>
+      <button type="button" class="primary-button" data-store-package-print-generated="${escapeHtml(actionKey)}">${printButtonText}</button>
       ${renderStorePackagePrintJobFeedback(actionKey)}
     </div>
   `;

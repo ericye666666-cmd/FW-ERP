@@ -205,7 +205,9 @@ test("clerk package shelving step creates STORE_ITEM print jobs without marking 
   assert.match(labelSource, /40x30/);
   assert.match(labelSource, /apparel_40x30/);
   assert.match(printableSource, /getStorePackageLastGeneratedTokens/);
-  assert.match(printableSource, /lastGenerated\.length/);
+  assert.match(printableSource, /lastGeneratedPending/);
+  assert.match(printableSource, /if \(lastGeneratedPending\.length\)/);
+  assert.doesNotMatch(printableSource, /if \(lastGenerated\.length\)/);
   assert.match(printableSource, /getStorePackageTokens/);
   assert.match(printableSource, /isPendingPrintStoreItemToken/);
   assert.match(pendingPrintSource, /print_status/);
@@ -219,8 +221,13 @@ test("clerk package shelving step creates STORE_ITEM print jobs without marking 
   assert.match(printSource, /template_code/);
   assert.match(printSource, /当前没有待打印 STORE_ITEM/);
   assert.match(feedbackSource, /queued/);
+  assert.match(generatedListSource, /lastGeneratedPending/);
+  assert.match(generatedListSource, /isCurrentBatch = lastGeneratedPending\.length > 0/);
+  assert.match(generatedListSource, /const printTitle/);
+  assert.match(generatedListSource, /const printButtonText/);
   assert.match(generatedListSource, /本次生成数量/);
   assert.match(generatedListSource, /待打印标签/);
+  assert.match(generatedListSource, /打印待打印标签/);
   assert.match(generatedListSource, /当前没有待打印 STORE_ITEM/);
   assert.match(generatedListSource, /待打印/);
   assert.match(generatedListSource, /barcode_value/);
@@ -228,6 +235,8 @@ test("clerk package shelving step creates STORE_ITEM print jobs without marking 
   assert.match(generatedListSource, /所属 SDO/);
   assert.match(generatedListSource, /rack_code/);
   assert.match(feedbackSource, /创建打印任务后仍需等待打印完成/);
+  assert.match(generatedListSource, /<h4>\$\{printTitle\}<\/h4>/);
+  assert.match(generatedListSource, />\$\{printButtonText\}<\/button>/);
 
   assert.match(appJs, /function getSelectedStorePackagePrice/);
   assert.match(appJs, /function createStorePackageGeneratedStoreItemPrintJobs/);
