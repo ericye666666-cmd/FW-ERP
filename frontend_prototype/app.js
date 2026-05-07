@@ -2245,27 +2245,37 @@ const OPERATIONS_PANEL_NAV_META = [
 
 const STORE_PANEL_NAV_META = [
   {
+    match: "店长 PDA 工作台",
+    section: "manager",
+    order: 1,
+    icon: "PDA",
+    navTitle: "店长 PDA 工作台",
+    navTitleEn: "Store Manager PDA Workbench",
+  },
+  {
     match: "5. 门店收货主控台",
     section: "manager",
     order: 5,
     icon: "控",
-    navTitle: "门店收货主控台",
+    navTitle: "开发调试：门店收货主控台",
     navTitleEn: "5. Store Receiving Command Center",
+    hiddenInNav: true,
   },
   {
     match: "6.2 我的当前 bale",
     section: "clerk",
     order: 25,
     icon: "我",
-    navTitle: "6.2 我的当前 bale",
+    navTitle: "开发调试：我的当前 SDP",
     navTitleEn: "6.2 My Current Bales",
+    hiddenInNav: true,
   },
   {
     match: "PDA 现场分堆标价 UI Preview",
     section: "clerk",
     order: 28,
     icon: "价",
-    navTitle: "PDA 现场分堆标价 UI Preview",
+    navTitle: "店员 PDA 工作台",
     navTitleEn: "PDA Batch Pricing UI Preview",
   },
   {
@@ -2275,6 +2285,24 @@ const STORE_PANEL_NAV_META = [
     icon: "验",
     navTitle: "6. 送货单验收详情 / Store Receiving Detail",
     navTitleEn: "6. Store Receiving Detail",
+    hiddenInNav: true,
+  },
+  {
+    match: "内部兼容：门店验收 SDO / SDP",
+    section: "manager",
+    order: 11,
+    icon: "调",
+    navTitle: "开发调试：门店验收",
+    navTitleEn: "Dev Debug: Store Receiving",
+    hiddenInNav: true,
+  },
+  {
+    match: "内部兼容：门店分配店员",
+    section: "manager",
+    order: 12,
+    icon: "调",
+    navTitle: "开发调试：店员分配",
+    navTitleEn: "Dev Debug: Clerk Assignment",
     hiddenInNav: true,
   },
   {
@@ -2291,16 +2319,27 @@ const STORE_PANEL_NAV_META = [
     section: "clerk",
     order: 30,
     icon: "编",
-    navTitle: "7. 店员 PDA 上架工作台",
+    navTitle: "开发调试：店员 PDA 上架",
     navTitleEn: "7. Store Clerk PDA Shelving",
+    hiddenInNav: true,
+  },
+  {
+    match: "7.1 打印任务 / 重打",
+    section: "clerk",
+    order: 40,
+    icon: "调",
+    navTitle: "开发调试：打印任务",
+    navTitleEn: "Dev Debug: Print Tasks",
+    hiddenInNav: true,
   },
   {
     match: "7.2 直挂店员工作台",
     section: "clerk",
     order: 45,
     icon: "直",
-    navTitle: "7.2 直挂店员工作台",
+    navTitle: "开发调试：直挂店员工作台",
     navTitleEn: "7.2 Direct-Hang Clerk Workbench",
+    hiddenInNav: true,
   },
   {
     match: "9. 收银销售",
@@ -2355,24 +2394,36 @@ const STORE_PANEL_NAV_META = [
     section: "general",
     order: 120,
     icon: "位",
-    navTitle: "8. 门店货架位",
+    navTitle: "开发调试：门店货架位",
     navTitleEn: "8. Store Rack Management",
+    hiddenInNav: true,
+  },
+  {
+    match: "8. 上架会话 / 异常核对",
+    section: "clerk",
+    order: 121,
+    icon: "调",
+    navTitle: "开发调试：上架会话",
+    navTitleEn: "Dev Debug: Putaway Sessions",
+    hiddenInNav: true,
   },
   {
     match: "10. 周期退仓",
     section: "manager",
     order: 130,
     icon: "仓",
-    navTitle: "10. 周期退仓",
+    navTitle: "开发调试：周期退仓",
     navTitleEn: "10. Cycle Return to Warehouse",
+    hiddenInNav: true,
   },
   {
     match: "实时数据查看",
     section: "manager",
     order: 140,
     icon: "览",
-    navTitle: "实时数据查看",
+    navTitle: "开发调试：实时数据查看",
     navTitleEn: "Live Store Data",
+    hiddenInNav: true,
   },
 ];
 
@@ -2454,6 +2505,144 @@ const storeCommandCenterState = {
   step: "list",
   selected_clerk_by_sdo: {},
 };
+
+const STORE_MANAGER_PDA_TABS = [
+  { id: "overview", label: "经营总览", title: "经营总览" },
+  { id: "receiving", label: "收退货", title: "SDO 收退货" },
+  { id: "logs", label: "经营日志", title: "经营日志" },
+  { id: "other", label: "其他", title: "其他" },
+];
+
+const STORE_MANAGER_PDA_MOCK = {
+  storeCode: "UTAWALA",
+  managerName: "店长 Sarah",
+  summaryCards: [
+    { label: "今日销售额", value: "KES 48,260", tone: "success" },
+    { label: "今日收货件数", value: "126 件", tone: "info" },
+    { label: "待处理 SDO", value: "2", tone: "warning" },
+    { label: "异常包裹", value: "1", tone: "danger" },
+    { label: "待打印标签", value: "80 张", tone: "warning" },
+    { label: "未上架商品", value: "34 件", tone: "warning" },
+    { label: "今日客流", value: "143 人", tone: "neutral" },
+    { label: "今日退款", value: "2 单", tone: "neutral" },
+    { label: "今日异常", value: "3 条", tone: "danger" },
+  ],
+  employeeProgress: [
+    { name: "Austin", current: "处理中 2 包", done: "今日完成 5 包", tone: "info" },
+    { name: "Nancy", current: "处理中 1 包", done: "今日完成 3 包", tone: "warning" },
+    { name: "Kevin", current: "空闲", done: "今日完成 4 包", tone: "success" },
+  ],
+  reminders: [
+    { label: "2 个 SDO 内包待分配", action: "去分配", tone: "warning" },
+    { label: "80 张标签待打印", action: "看打印队列", tone: "info" },
+    { label: "1 个异常包裹待处理", action: "处理异常", tone: "danger" },
+  ],
+  receivingStats: [
+    { label: "待到货 SDO", value: "4", tone: "neutral" },
+    { label: "待收货 SDO", value: "2", tone: "warning" },
+    { label: "已收货 SDO", value: "9", tone: "success" },
+    { label: "内包异常", value: "1", tone: "danger" },
+    { label: "退仓预览", value: "1", tone: "info" },
+  ],
+  sdpCards: [
+    {
+      displayCode: "SDP261250002",
+      machineCode: "6261250002",
+      sdoCode: "SDO260504008",
+      sourceCode: "SDB-TO202605-002",
+      packageNo: "2/3",
+      category: "牛仔裤",
+      itemCount: "210 件",
+      status: "待收货",
+      store: "UTAWALA",
+      currentClerk: "Austin",
+      nextAction: "查看 SDO 收货",
+      tone: "warning",
+    },
+    {
+      displayCode: "SDP261250003",
+      machineCode: "6261250003",
+      sdoCode: "SDO260504008",
+      sourceCode: "SDB-TO202605-002",
+      packageNo: "3/3",
+      category: "女装上衣",
+      itemCount: "180 件",
+      status: "已收货",
+      store: "UTAWALA",
+      currentClerk: "Nancy",
+      nextAction: "查看进度",
+      tone: "success",
+    },
+    {
+      displayCode: "SDP261250004",
+      machineCode: "6261250004",
+      sdoCode: "SDO260504009",
+      sourceCode: "SDB-TO202605-003",
+      packageNo: "1/2",
+      category: "鞋包",
+      itemCount: "件数待确认",
+      status: "异常",
+      store: "UTAWALA",
+      currentClerk: "未分配",
+      nextAction: "处理异常",
+      tone: "danger",
+    },
+    {
+      displayCode: "SDP261250005",
+      machineCode: "6261250005",
+      sdoCode: "SDO260504010",
+      sourceCode: "SDB-TO202605-004",
+      packageNo: "1/1",
+      category: "童装",
+      itemCount: "96 件",
+      status: "待分配",
+      store: "UTAWALA",
+      currentClerk: "未分配",
+      nextAction: "分配内包店员",
+      tone: "info",
+    },
+    {
+      displayCode: "SDP261250006",
+      machineCode: "6261250006",
+      sdoCode: "SDO260504011",
+      sourceCode: "SDB-TO202605-005",
+      packageNo: "1/2",
+      category: "运动裤",
+      itemCount: "72 件",
+      status: "退仓中",
+      store: "UTAWALA",
+      currentClerk: "Kevin",
+      nextAction: "查看进度",
+      tone: "neutral",
+    },
+  ],
+  operationEntries: [
+    { title: "客户反馈", status: "今日新增 3 条", action: "查看", tone: "info" },
+    { title: "总部任务", status: "2 个未确认", action: "进入", tone: "warning" },
+    { title: "每日日报", status: "今日未提交", action: "填写", tone: "danger" },
+    { title: "门店照片", status: "待上传 4 张", action: "上传", tone: "info" },
+    { title: "异常上报", status: "1 个待处理", action: "查看", tone: "danger" },
+  ],
+  logs: [
+    { time: "09:18", title: "Austin 已完成 SDP261250001", detail: "已上架 42 件，待打印 0 张", tone: "success" },
+    { time: "10:06", title: "Nancy 接收 SDP261250003", detail: "正在补售价和货架位", tone: "info" },
+    { time: "10:22", title: "SDP261250004 标记异常", detail: "件数与包卡不一致，等待店长复核", tone: "danger" },
+    { time: "11:05", title: "退仓单已创建", detail: "RET261250006，待仓库签收", tone: "warning" },
+  ],
+  settingsCards: [
+    { label: "货架位管理", value: "A01-A12 正常", tone: "neutral" },
+    { label: "打印机设置", value: "Deli DL-720C 在线", tone: "success" },
+    { label: "标签纸设置", value: "默认 60×40", tone: "info" },
+    { label: "账号登录", value: "Sarah / 店长", tone: "neutral" },
+    { label: "语言", value: "中文", tone: "neutral" },
+    { label: "网络状态", value: "在线", tone: "success" },
+    { label: "版本信息", value: "v0.1 preview", tone: "neutral" },
+  ],
+};
+
+let activeStoreManagerPdaTab = "overview";
+let activeStoreManagerPdaReturnCode = "";
+let storeManagerPdaReturnSubmitted = false;
 
 const LEGACY_WORKSPACE_MAP = {
   sorting: "warehouse",
@@ -2745,9 +2934,9 @@ function getUserRoleLanding(user = currentSession.user) {
     return null;
   }
   return roleCode === "store_manager"
-    ? { workspace: "store", panelTitle: "5. 门店执行控制台", label: "店长端 / 门店收货主控台" }
+    ? { workspace: "store", panelTitle: "店长 PDA 工作台", label: "店长端 / 店长 PDA 工作台" }
     : roleCode === "store_clerk"
-      ? { workspace: "store", panelTitle: "6.2 我的当前 bale", label: "店员端 / 我的当前 bale" }
+      ? { workspace: "store", panelTitle: "PDA 现场分堆标价 UI Preview", label: "店员端 / 店员 PDA 工作台" }
       : CASHIER_ROLE_CODES.has(roleCode)
         ? { workspace: "store", panelTitle: "9. 收银销售", label: "收银功能区 / 收银销售" }
         : null;
@@ -3011,6 +3200,10 @@ async function autoLoadRoleHome(user = currentSession.user) {
   if (!landing) {
     return;
   }
+  if (landing.panelTitle === "店长 PDA 工作台") {
+    renderStoreManagerPdaPreview();
+    return;
+  }
   if (landing.panelTitle === "5. 门店执行控制台") {
     const form = document.querySelector("#storeManagerConsoleForm");
     if (!(form instanceof HTMLFormElement)) {
@@ -3044,6 +3237,258 @@ function getWorkspaceNavSections(workspace) {
 
 function getWorkspaceHintText(workspace = activeWorkspace, language = currentLanguage) {
   return getI18nText(WORKSPACE_META[workspace] || WORKSPACE_META.overview, "", language);
+}
+
+function getStoreManagerPdaTab(tabId = activeStoreManagerPdaTab) {
+  return STORE_MANAGER_PDA_TABS.find((tab) => tab.id === tabId) || STORE_MANAGER_PDA_TABS[0];
+}
+
+function getStoreManagerPdaSdpByCode(displayCode) {
+  return STORE_MANAGER_PDA_MOCK.sdpCards.find((row) => row.displayCode === displayCode) || null;
+}
+
+function renderStoreManagerPdaSummaryCard(card = {}) {
+  return `
+    <article class="store-manager-pda-metric ${getStatusCardClass(card.tone || "neutral")}">
+      <span>${escapeHtml(card.label || "-")}</span>
+      <strong>${escapeHtml(card.value || "-")}</strong>
+    </article>
+  `;
+}
+
+function renderStoreManagerPdaOverview() {
+  const data = STORE_MANAGER_PDA_MOCK;
+  return `
+    <section class="store-manager-pda-metrics">
+      ${data.summaryCards.map((card) => renderStoreManagerPdaSummaryCard(card)).join("")}
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>员工处理进度</strong>
+        <span>实时现场状态</span>
+      </div>
+      <div class="store-manager-pda-list">
+        ${data.employeeProgress.map((row) => `
+          <article class="store-manager-pda-row ${getStatusCardClass(row.tone)}">
+            <div>
+              <strong>${escapeHtml(row.name)}</strong>
+              <span>${escapeHtml(row.current)}</span>
+            </div>
+            <b>${escapeHtml(row.done)}</b>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>提醒</strong>
+        <span>需要店长处理</span>
+      </div>
+      <div class="store-manager-pda-reminders">
+        ${data.reminders.map((row) => `
+          <button type="button" class="store-manager-pda-reminder ${getStatusCardClass(row.tone)}">
+            <span>${escapeHtml(row.label)}</span>
+            <strong>${escapeHtml(row.action)}</strong>
+          </button>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderStoreManagerPdaReceiving() {
+  const data = STORE_MANAGER_PDA_MOCK;
+  const returnPreviewCard = getStoreManagerPdaSdpByCode(activeStoreManagerPdaReturnCode);
+  return `
+    <section class="store-manager-pda-rule-note">
+      <strong>SDO 门店收退货</strong>
+      <span>正式收货入口：STORE_DELIVERY_EXECUTION / SDO。SDP 只作为 SDO 内包明细，不作为门店收货码。</span>
+      <span>SDB / LPK 只显示为来源参考；POS 仍只接受 STORE_ITEM。</span>
+    </section>
+
+    <section class="store-manager-pda-status-grid">
+      ${data.receivingStats.map((row) => `
+        <article class="store-manager-pda-status ${getStatusCardClass(row.tone)}">
+          <span>${escapeHtml(row.label)}</span>
+          <strong>${escapeHtml(row.value)}</strong>
+        </article>
+      `).join("")}
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>SDO 内包明细 / internal package detail</strong>
+        <span>不是正式收货入口码</span>
+      </div>
+      <div class="store-manager-pda-sdp-list">
+        ${data.sdpCards.map((row) => `
+          <article class="store-manager-pda-sdp-card ${getStatusCardClass(row.tone)}">
+            <div class="store-manager-pda-sdp-top">
+              <div>
+                <strong>${escapeHtml(row.displayCode)}</strong>
+                <small>SDO 内包明细 · machine_code ${escapeHtml(row.machineCode)}</small>
+              </div>
+              ${renderStatusBadge(row.status, row.tone)}
+            </div>
+            <div class="store-manager-pda-sdp-facts">
+              <span><b>门店</b>${escapeHtml(row.store)}</span>
+              <span><b>所属 SDO</b>${escapeHtml(row.sdoCode)}</span>
+              <span><b>来源</b>${escapeHtml(row.sourceCode)}</span>
+              <span><b>包号</b>${escapeHtml(row.packageNo)}</span>
+              <span><b>品类</b>${escapeHtml(row.category)}</span>
+              <span><b>件数</b>${escapeHtml(row.itemCount)}</span>
+              <span><b>当前店员</b>${escapeHtml(row.currentClerk)}</span>
+            </div>
+            <div class="store-manager-pda-sdp-actions">
+              <button type="button" class="store-manager-pda-primary-action">${escapeHtml(row.nextAction)}</button>
+              <button
+                type="button"
+                class="store-manager-pda-secondary-action"
+                data-store-manager-pda-return-code="${escapeHtml(row.displayCode)}"
+              >
+                发起退仓
+              </button>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    ${renderStoreManagerPdaReturnPreview(returnPreviewCard)}
+  `;
+}
+
+function renderStoreManagerPdaLogs() {
+  return `
+    <section class="store-manager-pda-operation-grid">
+      ${STORE_MANAGER_PDA_MOCK.operationEntries.map((row) => `
+        <button type="button" class="store-manager-pda-operation ${getStatusCardClass(row.tone)}">
+          <span>${escapeHtml(row.status)}</span>
+          <strong>${escapeHtml(row.title)}</strong>
+          <b>${escapeHtml(row.action)}</b>
+        </button>
+      `).join("")}
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>今天门店动作</strong>
+        <span>现场记录</span>
+      </div>
+      <div class="store-manager-pda-timeline">
+        ${STORE_MANAGER_PDA_MOCK.logs.map((row) => `
+          <article class="store-manager-pda-log ${getStatusCardClass(row.tone)}">
+            <time>${escapeHtml(row.time)}</time>
+            <div>
+              <strong>${escapeHtml(row.title)}</strong>
+              <span>${escapeHtml(row.detail)}</span>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderStoreManagerPdaOther() {
+  return `
+    <section class="store-manager-pda-setting-list">
+      ${STORE_MANAGER_PDA_MOCK.settingsCards.map((row) => `
+        <button type="button" class="store-manager-pda-setting ${getStatusCardClass(row.tone)}">
+          <strong>${escapeHtml(row.label)}</strong>
+          <span>${escapeHtml(row.value)}</span>
+        </button>
+      `).join("")}
+    </section>
+    <details class="store-manager-pda-debug">
+      <summary>开发调试</summary>
+      <p>旧网页收货、分配、打印和上架核对页面仍保留在代码里，但不作为店长或店员默认入口展示。</p>
+    </details>
+  `;
+}
+
+function renderStoreManagerPdaReturnPreview(row = null) {
+  if (!row) {
+    return "";
+  }
+  const submitted = storeManagerPdaReturnSubmitted && activeStoreManagerPdaReturnCode === row.displayCode;
+  return `
+    <section class="store-manager-pda-return-sheet ${getStatusCardClass(row.tone)}">
+      <div class="store-manager-pda-card-head">
+        <strong>退仓确认</strong>
+        <span>仅预览</span>
+      </div>
+      <div class="store-manager-pda-return-summary">
+        <span><b>内包明细 code</b>${escapeHtml(row.displayCode)}</span>
+        <span><b>件数</b>${escapeHtml(row.itemCount)}</span>
+        <span><b>当前店员</b>${escapeHtml(row.currentClerk)}</span>
+      </div>
+      <div class="store-manager-pda-return-reasons" role="group" aria-label="退仓原因">
+        ${["品类不适合", "质量差", "重复配送", "异常退回", "其他"].map((reason, index) => `
+          <label>
+            <input type="radio" name="store-manager-pda-return-reason" ${index === 0 ? "checked" : ""} />
+            <span>${escapeHtml(reason)}</span>
+          </label>
+        `).join("")}
+      </div>
+      ${submitted ? '<p class="store-manager-pda-return-note">预览已提交：等待总部/仓库确认。</p>' : ""}
+      <div class="store-manager-pda-sdp-actions">
+        <button
+          type="button"
+          class="store-manager-pda-primary-action"
+          data-store-manager-pda-return-submit="${escapeHtml(row.displayCode)}"
+        >
+          提交退仓申请
+        </button>
+        <button type="button" class="store-manager-pda-secondary-action" data-store-manager-pda-return-close="true">返回</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderStoreManagerPdaPreview(tabId = activeStoreManagerPdaTab) {
+  const target = document.querySelector("#storeManagerPdaPreview");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const activeTab = getStoreManagerPdaTab(tabId);
+  activeStoreManagerPdaTab = activeTab.id;
+  const bodyHtml = activeTab.id === "receiving"
+    ? renderStoreManagerPdaReceiving()
+    : activeTab.id === "logs"
+      ? renderStoreManagerPdaLogs()
+      : activeTab.id === "other"
+        ? renderStoreManagerPdaOther()
+        : renderStoreManagerPdaOverview();
+  target.innerHTML = `
+    <div class="store-manager-pda-shell">
+      <div class="store-manager-pda-device-bar">
+        <span>${escapeHtml(STORE_MANAGER_PDA_MOCK.storeCode)}</span>
+        <strong>${escapeHtml(STORE_MANAGER_PDA_MOCK.managerName)}</strong>
+        <span>在线</span>
+      </div>
+      <div class="store-manager-pda-screen">
+        <header class="store-manager-pda-title">
+          <div>
+            <span>店长端</span>
+            <h3>${escapeHtml(activeTab.title)}</h3>
+          </div>
+          <small>今日 · 预览数据</small>
+        </header>
+        <div class="store-manager-pda-body">
+          ${bodyHtml}
+        </div>
+      </div>
+      <nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA tabs">
+        ${STORE_MANAGER_PDA_TABS.map((tab) => `
+          <button type="button" class="${tab.id === activeTab.id ? "is-active" : ""}" data-store-manager-pda-tab="${escapeHtml(tab.id)}">
+            ${escapeHtml(tab.label)}
+          </button>
+        `).join("")}
+      </nav>
+    </div>
+  `;
 }
 
 function getWorkspaceSectionTitle(section = {}, language = currentLanguage) {
@@ -35341,6 +35786,42 @@ async function handlePanelJumpEvent(event) {
 workspacePageNav?.addEventListener("click", handlePanelJumpEvent);
 appShell?.addEventListener("click", handlePanelJumpEvent);
 
+document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", (event) => {
+  if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+  const returnButton = event.target.closest("[data-store-manager-pda-return-code]");
+  if (returnButton instanceof HTMLElement) {
+    activeStoreManagerPdaReturnCode = returnButton.dataset.storeManagerPdaReturnCode || "";
+    storeManagerPdaReturnSubmitted = false;
+    renderStoreManagerPdaPreview("receiving");
+    return;
+  }
+  const returnSubmitButton = event.target.closest("[data-store-manager-pda-return-submit]");
+  if (returnSubmitButton instanceof HTMLElement) {
+    activeStoreManagerPdaReturnCode = returnSubmitButton.dataset.storeManagerPdaReturnSubmit || activeStoreManagerPdaReturnCode;
+    storeManagerPdaReturnSubmitted = true;
+    renderStoreManagerPdaPreview("receiving");
+    return;
+  }
+  const returnCloseButton = event.target.closest("[data-store-manager-pda-return-close]");
+  if (returnCloseButton instanceof HTMLElement) {
+    activeStoreManagerPdaReturnCode = "";
+    storeManagerPdaReturnSubmitted = false;
+    renderStoreManagerPdaPreview("receiving");
+    return;
+  }
+  const tabButton = event.target.closest("[data-store-manager-pda-tab]");
+  if (!(tabButton instanceof HTMLElement)) {
+    return;
+  }
+  if (tabButton.dataset.storeManagerPdaTab !== "receiving") {
+    activeStoreManagerPdaReturnCode = "";
+    storeManagerPdaReturnSubmitted = false;
+  }
+  renderStoreManagerPdaPreview(tabButton.dataset.storeManagerPdaTab || "overview");
+});
+
 workspacePageSearch?.addEventListener("input", (event) => {
   workspacePageFilterQuery = event.target.value || "";
   renderWorkspacePageNav();
@@ -39289,6 +39770,7 @@ populateChinaSourceShipmentSelects();
 populateChinaSourceCostRecordSelect();
 renderChinaSourceBalePreview();
 renderChinaSourceCostSummary();
+renderStoreManagerPdaPreview();
 initWorkspacePageRegistry();
 syncWorkspacePanelHeadingsToNavTitles();
 if (!applyHashRoute()) {

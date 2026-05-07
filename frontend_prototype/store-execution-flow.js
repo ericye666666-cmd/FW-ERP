@@ -102,15 +102,15 @@
     if (managerRoles.has(normalizedRole)) {
       return {
         workspace: "store",
-        panelTitle: "5. 门店到货工作台 / Store Receiving Dashboard",
-        label: "店长端 / 门店到货工作台",
+        panelTitle: "店长 PDA 工作台",
+        label: "店长端 / 店长 PDA 工作台",
       };
     }
     if (clerkRoles.has(normalizedRole)) {
       return {
         workspace: "store",
-        panelTitle: "6.2 我的当前 bale",
-        label: "店员端 / 我的当前 bale",
+        panelTitle: "PDA 现场分堆标价 UI Preview",
+        label: "店员端 / 店员 PDA 工作台",
       };
     }
     if (cashierRoles.has(normalizedRole)) {
