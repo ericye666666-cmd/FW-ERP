@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
@@ -36,6 +37,10 @@ function functionSource(source, functionName) {
     }
   }
   throw new Error(`could not extract ${functionName}`);
+}
+
+function executableFunction(source, functionName) {
+  return vm.runInNewContext(`(${functionSource(source, functionName)})`);
 }
 
 test("store manager PDA preview is the visible manager entry with four bottom tabs", () => {
@@ -83,14 +88,36 @@ test("store manager PDA SDO submit routes through existing store receiving flow 
   assert.match(submitSource, /getPanelKeyByTitle\("store", "5\. 门店收货主控台"\)/);
   assert.match(submitSource, /setActivePanel\(panelKey\)/);
   assert.match(submitSource, /showTransientInlineNotice\("#storeDispatchBaleNotice"/);
-  assert.match(submitSource, /请扫描 SDO 主单码/);
-  assert.match(submitSource, /SDP 是 SDO 内包明细/);
-  assert.match(submitSource, /SDB \/ LPK 是仓库来源包/);
-  assert.match(submitSource, /STORE_ITEM 只能用于 POS 销售/);
+  assert.match(submitSource, /validateStoreManagerPdaSdoScanCode/);
   assert.match(submitSource, /STORE_DELIVERY_EXECUTION \/ SDO/);
   assert.doesNotMatch(submitSource, /STORE_DELIVERY_PACKAGE/);
   assert.match(clickSource, /storeManagerPdaSdoForm/);
   assert.match(clickSource, /submitStoreManagerPdaSdoScan/);
+});
+
+test("store manager PDA SDO validation accepts only official SDO formats", () => {
+  const validate = executableFunction(appJs, "validateStoreManagerPdaSdoScanCode");
+
+  const displayCodeResult = validate("SDO260504008");
+  assert.equal(displayCodeResult.ok, true);
+  assert.equal(displayCodeResult.code, "SDO260504008");
+  const machineCodeResult = validate("4260504008");
+  assert.equal(machineCodeResult.ok, true);
+  assert.equal(machineCodeResult.code, "4260504008");
+
+  [
+    ["SDOABC", /请扫描 STORE_DELIVERY_EXECUTION \/ SDO 主单码/],
+    ["SDO-TEST", /请扫描 STORE_DELIVERY_EXECUTION \/ SDO 主单码/],
+    ["SDO123", /请扫描 STORE_DELIVERY_EXECUTION \/ SDO 主单码/],
+    ["SDP261250002", /SDP 是 SDO 内包明细/],
+    ["SDB-TO202605-002", /SDB \/ LPK 是仓库来源包/],
+    ["LPK260500001", /SDB \/ LPK 是仓库来源包/],
+    ["5260504008", /STORE_ITEM 只能用于 POS 销售/],
+  ].forEach(([code, messagePattern]) => {
+    const result = validate(code);
+    assert.equal(result.ok, false, `${code} should be rejected`);
+    assert.match(result.error, messagePattern, `${code} should explain the correct boundary`);
+  });
 });
 
 test("store manager package detail cards show SDO source package and category context", () => {

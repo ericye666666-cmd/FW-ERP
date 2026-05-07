@@ -3504,27 +3504,36 @@ function renderStoreManagerPdaPreview(tabId = activeStoreManagerPdaTab) {
   `;
 }
 
+function validateStoreManagerPdaSdoScanCode(value = "") {
+  const rawCode = String(value || "").trim().toUpperCase();
+  const digits = rawCode.replace(/[^0-9]/g, "");
+  if (!rawCode) {
+    return { ok: false, error: "请扫描 SDO 主单码。" };
+  }
+  if (/^SDP/.test(rawCode) || /^6\d{9}$/.test(digits)) {
+    return { ok: false, error: "SDP 是 SDO 内包明细，请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。" };
+  }
+  if (/^(SDB|LPK)/.test(rawCode) || /^[23]\d{9}$/.test(digits)) {
+    return { ok: false, error: "SDB / LPK 是仓库来源包，不是门店正式收货码。请扫描 STORE_DELIVERY_EXECUTION / SDO。" };
+  }
+  if (/^5\d{9}$/.test(digits) || /^5\d{12}$/.test(digits)) {
+    return { ok: false, error: "STORE_ITEM 只能用于 POS 销售。请扫描 STORE_DELIVERY_EXECUTION / SDO。" };
+  }
+  if (/^SDO\d{9}$/.test(rawCode) || /^4\d{9}$/.test(digits)) {
+    return { ok: true, code: /^4\d{9}$/.test(digits) ? digits : rawCode };
+  }
+  return { ok: false, error: "请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。" };
+}
+
 function submitStoreManagerPdaSdoScan(event) {
   event.preventDefault();
   return (async () => {
     const form = new FormData(event.currentTarget);
-    const rawCode = String(form.get("sdo_code") || "").trim().toUpperCase();
-    const digits = rawCode.replace(/[^0-9]/g, "");
-    if (!rawCode) {
-      throw new Error("请扫描 SDO 主单码。");
+    const validation = validateStoreManagerPdaSdoScanCode(form.get("sdo_code"));
+    if (!validation.ok) {
+      throw new Error(validation.error || "请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。");
     }
-    if (/^SDP/.test(rawCode) || /^6\d{9}$/.test(digits)) {
-      throw new Error("SDP 是 SDO 内包明细，请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。");
-    }
-    if (/^(SDB|LPK)/.test(rawCode) || /^[23]\d{9}$/.test(digits)) {
-      throw new Error("SDB / LPK 是仓库来源包，不是门店正式收货码。请扫描 STORE_DELIVERY_EXECUTION / SDO。");
-    }
-    if (/^5\d{9}$/.test(digits) || /^5\d{12}$/.test(digits)) {
-      throw new Error("STORE_ITEM 只能用于 POS 销售。请扫描 STORE_DELIVERY_EXECUTION / SDO。");
-    }
-    if (!rawCode.startsWith("SDO") && !/^4\d{9}$/.test(digits)) {
-      throw new Error("请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。");
-    }
+    const rawCode = validation.code;
     const receivingForm = document.querySelector("#storeDispatchBaleAcceptForm");
     if (!(receivingForm instanceof HTMLFormElement)) {
       throw new Error("没有找到门店收货主控台。");
