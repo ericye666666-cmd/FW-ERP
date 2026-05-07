@@ -8423,6 +8423,460 @@ textarea:focus-visible,
   color: #2563eb;
 }
 
+.store-manager-pda-page {
+  background: #f6f8f5;
+}
+
+.store-manager-pda-preview {
+  display: grid;
+  justify-items: center;
+}
+
+.store-manager-pda-shell {
+  width: min(390px, 100%);
+  height: clamp(560px, calc(100svh - 112px), 760px);
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  border: 10px solid #171717;
+  border-radius: 28px;
+  background: #171717;
+  box-shadow: 0 22px 48px rgba(23, 23, 23, 0.18);
+  overflow: hidden;
+}
+
+.store-manager-pda-device-bar {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 14px 6px;
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.store-manager-pda-device-bar strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.store-manager-pda-screen {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: #f6f8f5;
+  overflow: hidden;
+}
+
+.store-manager-pda-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid #dde5da;
+  background: #ffffff;
+}
+
+.store-manager-pda-title div {
+  display: grid;
+  gap: 4px;
+}
+
+.store-manager-pda-title span,
+.store-manager-pda-title small,
+.store-manager-pda-card-head span,
+.store-manager-pda-metric span,
+.store-manager-pda-status span,
+.store-manager-pda-action span {
+  color: #657164;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.store-manager-pda-title h3 {
+  margin: 0;
+  color: #172017;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.store-manager-pda-body {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 12px 12px 18px;
+  overflow: auto;
+}
+
+.store-manager-pda-metrics,
+.store-manager-pda-status-grid,
+.store-manager-pda-action-grid,
+.store-manager-pda-operation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.store-manager-pda-metric,
+.store-manager-pda-status,
+.store-manager-pda-action,
+.store-manager-pda-operation,
+.store-manager-pda-setting,
+.store-manager-pda-rule-note,
+.store-manager-pda-return-sheet,
+.store-manager-pda-card,
+.store-manager-pda-sdp-card,
+.store-manager-pda-debug {
+  border: 1px solid #dde5da;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.store-manager-pda-metric,
+.store-manager-pda-status {
+  min-height: 76px;
+  display: grid;
+  align-content: space-between;
+  gap: 8px;
+  padding: 11px;
+}
+
+.store-manager-pda-metric strong,
+.store-manager-pda-status strong {
+  color: #172017;
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.store-manager-pda-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.store-manager-pda-rule-note {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.store-manager-pda-rule-note strong {
+  color: #172017;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.store-manager-pda-rule-note span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.store-manager-pda-card-head,
+.store-manager-pda-sdp-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.store-manager-pda-card-head strong,
+.store-manager-pda-sdp-top strong,
+.store-manager-pda-row strong,
+.store-manager-pda-log strong,
+.store-manager-pda-action strong,
+.store-manager-pda-operation strong,
+.store-manager-pda-setting strong {
+  color: #172017;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.store-manager-pda-list,
+.store-manager-pda-sdp-list,
+.store-manager-pda-timeline,
+.store-manager-pda-reminders {
+  display: grid;
+  gap: 8px;
+}
+
+.store-manager-pda-row,
+.store-manager-pda-log {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #dde5da;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.store-manager-pda-row div,
+.store-manager-pda-log div {
+  display: grid;
+  gap: 3px;
+}
+
+.store-manager-pda-row span,
+.store-manager-pda-row b,
+.store-manager-pda-log span,
+.store-manager-pda-log time,
+.store-manager-pda-sdp-top small {
+  color: #657164;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.store-manager-pda-reminder,
+.store-manager-pda-action,
+.store-manager-pda-setting {
+  min-height: 58px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.store-manager-pda-reminder strong {
+  color: #14532d;
+  font-size: 14px;
+}
+
+.store-manager-pda-sdp-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.store-manager-pda-sdp-top div {
+  display: grid;
+  gap: 3px;
+}
+
+.store-manager-pda-sdp-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.store-manager-pda-sdp-facts span {
+  min-height: 48px;
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #e5ebe2;
+  border-radius: 8px;
+  background: #fbfcfa;
+  color: #172017;
+  font-size: 13px;
+}
+
+.store-manager-pda-sdp-facts b {
+  color: #657164;
+  font-size: 11px;
+}
+
+.store-manager-pda-sdp-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.store-manager-pda-primary-action {
+  min-height: 52px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.store-manager-pda-secondary-action {
+  min-height: 48px;
+  border: 1px solid #cfd8ca;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172017;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.store-manager-pda-log {
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: start;
+}
+
+.store-manager-pda-log time {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #eef3ec;
+  color: #172017;
+  font-weight: 800;
+}
+
+.store-manager-pda-action-grid {
+  grid-template-columns: 1fr;
+}
+
+.store-manager-pda-action {
+  min-height: 66px;
+}
+
+.store-manager-pda-operation-grid,
+.store-manager-pda-setting-list {
+  display: grid;
+  gap: 8px;
+}
+
+.store-manager-pda-operation {
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 12px;
+  text-align: left;
+}
+
+.store-manager-pda-operation span {
+  grid-column: 1 / -1;
+  color: #657164;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.store-manager-pda-operation b {
+  color: #14532d;
+  font-size: 14px;
+}
+
+.store-manager-pda-setting-list {
+  grid-template-columns: 1fr;
+}
+
+.store-manager-pda-setting {
+  min-height: 64px;
+}
+
+.store-manager-pda-return-sheet {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #fffdf7;
+}
+
+.store-manager-pda-return-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.store-manager-pda-return-summary span {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #eee4c9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172017;
+  font-size: 13px;
+}
+
+.store-manager-pda-return-summary b {
+  color: #657164;
+  font-size: 11px;
+}
+
+.store-manager-pda-return-reasons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.store-manager-pda-return-reasons label {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #eee4c9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172017;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.store-manager-pda-return-note {
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #166534;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-pda-debug {
+  padding: 10px 12px;
+}
+
+.store-manager-pda-debug summary {
+  min-height: 34px;
+  color: #475569;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-pda-debug p {
+  margin: 8px 0 2px;
+  color: #657164;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.store-manager-pda-bottom-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  background: #ffffff;
+  border-top: 1px solid #dde5da;
+}
+
+.store-manager-pda-bottom-tabs button {
+  min-height: 50px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #657164;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-pda-bottom-tabs button.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 .transfer-draft-list {
   margin-top: 10px;
 }

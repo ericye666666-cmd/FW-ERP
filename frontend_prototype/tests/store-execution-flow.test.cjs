@@ -52,13 +52,23 @@ const storeManagerConsoleSectionHtml = (indexHtml.match(/<section class="panel s
 const storePdaWorkbenchSectionHtml = (indexHtml.match(/<section class="panel store-support-panel(?: [^"]*)?" data-workspace-panel="store">[\s\S]*?<h2>7\. 店员 PDA 上架工作台<\/h2>[\s\S]*?<pre id="storeTokenEditOutput" class="output hidden-output"><\/pre>\s*<\/section>/) || [""])[0];
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 
-test("getStoreRoleLanding sends store clerks to my current bale instead of the manager console", () => {
+test("getStoreRoleLanding sends store managers to the PDA preview", () => {
+  const result = getStoreRoleLanding("store_manager", true);
+
+  assert.deepEqual(result, {
+    workspace: "store",
+    panelTitle: "店长 PDA 工作台",
+    label: "店长端 / 店长 PDA 工作台",
+  });
+});
+
+test("getStoreRoleLanding sends store clerks to the PDA workbench preview", () => {
   const result = getStoreRoleLanding("store_clerk", true);
 
   assert.deepEqual(result, {
     workspace: "store",
-    panelTitle: "6.2 我的当前 bale",
-    label: "店员端 / 我的当前 bale",
+    panelTitle: "PDA 现场分堆标价 UI Preview",
+    label: "店员端 / 店员 PDA 工作台",
   });
 });
 

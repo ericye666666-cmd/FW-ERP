@@ -26,8 +26,8 @@
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="4.2 中方来源 Bale 录入">2. China source / inbound</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1 创建分拣任务">3. Sorting tasks</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1.2 压缩工单管理">4. Sorted stock / compression</button>
-          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="5. 门店收货主控台">5. Store dispatch / receiving</button>
-          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="7. 店员 PDA 上架工作台">6. Store item price / rack / printing</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="店长 PDA 工作台">5. Store manager PDA preview</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="PDA 现场分堆标价 UI Preview">6. Store clerk PDA preview</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="9. 收银销售">7. POS</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="10. 周期退仓">8. Returns / return-to-warehouse</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="Bales销售｜真实出库">9. B2B bale sales</button>
@@ -3036,7 +3036,14 @@
         <pre id="preparedBaleRegistrationOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-manager store-manager-pda-page" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>店长 PDA 工作台</h2>
+        </div>
+        <div id="storeManagerPdaPreview" class="store-manager-pda-preview" aria-live="polite"></div>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-manager store-dev-debug-panel hidden-screen" data-workspace-panel="store">
         <div class="panel-head">
           <h2>5. 门店收货主控台</h2>
         </div>
