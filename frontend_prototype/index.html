@@ -3087,7 +3087,7 @@
         </div>
         <form id="storeDispatchBaleAcceptForm" class="form-grid compact">
           <input name="transfer_no" placeholder="先选择调拨单，例如 TO-20260425-010" />
-          <textarea name="bale_no" class="bulk-scan-input" rows="7" placeholder="扫描 SDO 主单码或 SDP 实体包码；SDB / LPK 只作来源码核对。"></textarea>
+          <textarea name="bale_no" class="bulk-scan-input" rows="7" data-scan-input="true" placeholder="扫描 SDO 主单码或 SDP 实体包码；SDB / LPK 只作来源码核对。"></textarea>
           <input name="note" placeholder="验收备注，如包装完好 / 少一包待查" value="门店 SDP 包验收" />
           <button type="submit">打开 SDO / SDP 收货</button>
         </form>
@@ -3155,7 +3155,7 @@
         </div>
         <form id="storeTokenEditDirectoryForm" class="form-grid compact store-pda-entry-form">
           <input name="store_code" placeholder="门店代码" value="UTAWALA" />
-          <input name="bale_no" placeholder="扫描 SDP 实体包或 STORE_ITEM 商品码" />
+          <input name="bale_no" data-scan-input="true" placeholder="扫描 SDP 实体包或 STORE_ITEM 商品码" />
           <input name="assigned_employee" list="storeClerkOptions" placeholder="按店员筛选" />
           <button type="submit">读取我的 SDP 包任务</button>
         </form>
@@ -3398,6 +3398,7 @@
                         type="text"
                         inputmode="text"
                         autocomplete="off"
+                        data-scan-input="true"
                         placeholder="扫描 STORE_ITEM 商品码"
                       />
                       <button type="submit" class="primary-inline" data-terminal-submit="add" data-terminal-copy="addToBasket">加入商品篮</button>

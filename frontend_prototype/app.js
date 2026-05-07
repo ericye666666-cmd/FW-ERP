@@ -13772,6 +13772,7 @@ function renderBaleScannerTestPanel(shipmentNo = "", rows = []) {
           id="baleScannerTestInput"
           name="barcode"
           value="${escapeHtml(state.draftValue || "")}"
+          data-scan-input="true"
           placeholder="点这里后直接扫 bale 短码或完整 bale 号"
           autocomplete="off"
           autocapitalize="off"
@@ -17895,7 +17896,7 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
       </div>
       <label class="store-pda-scan-input-wrap">
         <span>商品码</span>
-        <input id="storePdaScanInput" data-pda-scan-input inputmode="numeric" autocomplete="off" value="${escapeHtml(scannedCode)}" placeholder="扫描 STORE_ITEM 商品码" />
+        <input id="storePdaScanInput" data-pda-scan-input data-scan-input="true" inputmode="numeric" autocomplete="off" value="${escapeHtml(scannedCode)}" placeholder="扫描 STORE_ITEM 商品码" />
       </label>
       <button type="button" class="store-pda-scan-button" data-pda-scan-focus>扫描商品码</button>
       <div class="store-pda-scan-message ${scanMessageClass}" id="storePdaScanMessage" aria-live="polite">${escapeHtml(scanMessage)}</div>
