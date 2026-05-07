@@ -29388,7 +29388,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
       category: "牛仔裤",
       total_count: 210,
       grouped_count: 210,
-      ungrouped_count: 0,
+      pending_generate_count: 130,
+      pending_print_count: 80,
       generated_count: 80,
       printed_count: 0,
       assigned_clerk: "Austin",
@@ -29457,7 +29458,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         group_id: "B",
         label_size: "60×40",
         copies: 80,
-        status: "打印中",
+        status: "printing",
       },
       {
         job_id: "MOCK-PJ-S-001",
@@ -29466,7 +29467,15 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         copies: 30,
         status: "queued",
       },
+      {
+        job_id: "MOCK-PJ-CUSTOM-200-001",
+        group_id: "CUSTOM-200",
+        label_size: "60×40",
+        copies: 20,
+        status: "queued",
+      },
     ],
+    createdPrintJobs: [],
   };
   return {
     ...baseState,
@@ -29476,6 +29485,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     priceGroups: Array.isArray(overrides.priceGroups) ? overrides.priceGroups : baseState.priceGroups,
     generatedRanges: { ...baseState.generatedRanges, ...(overrides.generatedRanges || {}) },
     printJobs: Array.isArray(overrides.printJobs) ? overrides.printJobs : baseState.printJobs,
+    createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
   };
 }
 
@@ -29495,8 +29505,21 @@ function getStoreMobilePricingTone(label = "") {
 
 function renderStoreMobilePricingBadge(label = "") {
   const text = String(label || "").trim();
-  const display = text === "queued" ? "queued" : text;
-  return `<span class="mobile-pricing-badge ${getStoreMobilePricingTone(text)}">${escapeHtml(display)}</span>`;
+  return `<span class="mobile-pricing-badge ${getStoreMobilePricingTone(text)}">${escapeHtml(text)}</span>`;
+}
+
+function getStoreMobileStatusText(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  const labels = {
+    queued: "排队中",
+    printing: "打印中",
+    printed: "已打印",
+  };
+  return labels[normalized] || String(status || "").trim();
+}
+
+function renderStoreMobileStatusBadge(status = "") {
+  return renderStoreMobilePricingBadge(getStoreMobileStatusText(status));
 }
 
 function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
@@ -29507,27 +29530,33 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   const sdoMachineCode = String(sdp.sdo_machine_code || "").trim();
   const sourceDisplayCode = [sdp.source_type, sdp.source_code].filter(Boolean).join(" · ") || "-";
   const sourceMachineCode = String(sdp.source_machine_code || "").trim();
+  const stats = [
+    ["总数", sdp.total_count || 0],
+    ["已分组", sdp.grouped_count || 0],
+    ["待生成", sdp.pending_generate_count || 0],
+    ["待打印", sdp.pending_print_count || 0],
+    ["已打印", sdp.printed_count || 0],
+  ];
   return `
-    <section class="mobile-sdp-card">
+    <section class="mobile-sdp-card compact">
       <div class="mobile-sdp-head">
         <div>
           <span>当前 SDP</span>
           <strong>${escapeHtml(sdpDisplayCode)}</strong>
-          ${sdpMachineCode ? `<small>${escapeHtml(`machine_code: ${sdpMachineCode}`)}</small>` : ""}
+          ${sdpMachineCode ? `<small class="mobile-code-secondary">${escapeHtml(`machine_code: ${sdpMachineCode}`)}</small>` : ""}
         </div>
         ${renderStoreMobilePricingBadge("已分配")}
       </div>
-      <div class="mobile-sdp-grid">
-        <span><b>所属 SDO</b>${escapeHtml(sdoDisplayCode)}${sdoMachineCode ? `<small>${escapeHtml(`machine_code: ${sdoMachineCode}`)}</small>` : ""}</span>
+      <div class="mobile-sdp-meta-line">
+        <span><b>SDO</b>${escapeHtml(sdoDisplayCode)}${sdoMachineCode ? `<small class="mobile-code-secondary">${escapeHtml(sdoMachineCode)}</small>` : ""}</span>
         <span><b>门店</b>${escapeHtml(sdp.store_name || "-")}</span>
         <span><b>包号</b>${escapeHtml(sdp.package_no || "-")}</span>
-        <span><b>来源</b>${escapeHtml(sourceDisplayCode)}${sourceMachineCode ? `<small>${escapeHtml(`machine_code: ${sourceMachineCode}`)}</small>` : ""}</span>
-        <span><b>品类</b>${escapeHtml(sdp.category || "-")}</span>
-        <span><b>总件数</b>${escapeHtml(sdp.total_count || 0)}</span>
-        <span><b>已分组</b>${escapeHtml(sdp.grouped_count || 0)}</span>
-        <span><b>未分组</b>${escapeHtml(sdp.ungrouped_count || 0)}</span>
-        <span><b>已生成</b>${escapeHtml(sdp.generated_count || 0)}</span>
-        <span><b>已打印</b>${escapeHtml(sdp.printed_count || 0)}</span>
+        <span><b>来源</b>${escapeHtml(sourceDisplayCode)}${sourceMachineCode ? `<small class="mobile-code-secondary">${escapeHtml(sourceMachineCode)}</small>` : ""}</span>
+      </div>
+      <div class="mobile-sdp-stat-strip">
+        ${stats.map(([label, value]) => `
+          <span><b>${escapeHtml(label)}</b><strong>${escapeHtml(value)}</strong></span>
+        `).join("")}
       </div>
     </section>
   `;
@@ -29661,31 +29690,50 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
 
 function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const group = getStoreMobilePricingActiveGroup(state);
-  const job = (state.printJobs || []).find((item) => String(item.group_id || "") === String(group.group_id || ""));
+  const job = (state.createdPrintJobs || []).find((item) => String(item.group_id || "") === String(group.group_id || ""));
   const activeSize = String(job?.label_size || state.labelSize || "60×40");
+  const summaryHtml = `
+    <div class="mobile-print-summary">
+      <span><b>档位</b>${escapeHtml(group.tier || "-")}</span>
+      <span><b>售价</b>KSh ${escapeHtml(group.price_kes || 0)}</span>
+      <span><b>数量</b>${escapeHtml(group.quantity || 0)}</span>
+      <span><b>打印张数</b>${escapeHtml(group.quantity || 0)}</span>
+      <span><b>预计 job 数</b>1</span>
+    </div>
+  `;
+  const labelSizeHtml = `
+    <div class="mobile-choice-block">
+      <span>标签尺寸</span>
+      <div class="mobile-segment-row">
+        <button type="button" class="${activeSize === "60×40" ? "is-active" : ""}" data-mobile-pricing-label-size="60×40">60×40</button>
+        <button type="button" class="${activeSize === "40×30" ? "is-active" : ""}" data-mobile-pricing-label-size="40×30">40×30</button>
+      </div>
+    </div>
+  `;
+  if (!job) {
+    return `
+      <section class="mobile-print-panel">
+        <div class="mobile-section-head">
+          <strong>本组打印任务</strong>
+          ${renderStoreMobilePricingBadge("未创建")}
+        </div>
+        ${summaryHtml}
+        ${labelSizeHtml}
+        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">创建打印任务</button>
+      </section>
+    `;
+  }
   return `
     <section class="mobile-print-panel">
       <div class="mobile-section-head">
         <strong>本组打印任务</strong>
-        ${renderStoreMobilePricingBadge(job?.status || "待打印")}
+        ${renderStoreMobileStatusBadge(job.status || "queued")}
       </div>
-      <div class="mobile-print-summary">
-        <span><b>档位</b>${escapeHtml(group.tier || "-")}</span>
-        <span><b>售价</b>KSh ${escapeHtml(group.price_kes || 0)}</span>
-        <span><b>数量</b>${escapeHtml(group.quantity || 0)}</span>
-        <span><b>打印张数</b>${escapeHtml(group.quantity || 0)}</span>
-        <span><b>预计 job 数</b>1</span>
-      </div>
-      <div class="mobile-choice-block">
-        <span>标签尺寸</span>
-        <div class="mobile-segment-row">
-          <button type="button" class="${activeSize === "60×40" ? "is-active" : ""}" data-mobile-pricing-label-size="60×40">60×40</button>
-          <button type="button" class="${activeSize === "40×30" ? "is-active" : ""}" data-mobile-pricing-label-size="40×30">40×30</button>
-        </div>
-      </div>
+      ${summaryHtml}
+      ${labelSizeHtml}
       <div class="mobile-print-job-card">
-        <span>打印任务创建成功</span>
-        <strong>状态：queued</strong>
+        <span>本组任务</span>
+        <strong>${escapeHtml(getStoreMobileStatusText(job.status || "queued"))}</strong>
         <small>${escapeHtml(job?.job_id || "MOCK-PJ-NEW-001")} · ${escapeHtml(activeSize)} · ${escapeHtml(group.quantity || 0)} 张 · ${escapeHtml(group.tier || "-")}</small>
       </div>
       <span class="subtle small">打印本组标签</span>
@@ -29712,7 +29760,7 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
                 <strong>${escapeHtml(group.tier || "-")}</strong>
                 <span>KSh ${escapeHtml(group.price_kes || 0)} · ${escapeHtml(job.copies || group.quantity || 0)} 张 · ${escapeHtml(job.label_size || "60×40")}</span>
               </div>
-              ${renderStoreMobilePricingBadge(job.status || "queued")}
+              ${renderStoreMobileStatusBadge(job.status || "queued")}
             </article>
           `;
         }).join("")}
@@ -29766,10 +29814,6 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
     <section class="mobile-pricing-workbench">
       <h3>现场分堆标价</h3>
       ${renderStoreMobileSdpCard(state)}
-      <div class="mobile-section-head">
-        <strong>价格组总览</strong>
-        ${renderStoreMobilePricingBadge("已分组")}
-      </div>
       ${renderPriceGroupCards(state)}
       <div class="mobile-bottom-button-stack">
         <button type="button" class="primary-button" data-mobile-pricing-page="editor">新增价格组</button>
@@ -29906,12 +29950,15 @@ function handleStoreMobilePricingPreviewAction(button) {
     const group = state.priceGroups.find((item) => String(item.group_id || "") === String(printGroup));
     if (group) {
       state.activeGroupId = group.group_id;
-      const existing = state.printJobs.find((job) => String(job.group_id || "") === String(group.group_id || ""));
+      if (!Array.isArray(state.createdPrintJobs)) {
+        state.createdPrintJobs = [];
+      }
+      const existing = state.createdPrintJobs.find((job) => String(job.group_id || "") === String(group.group_id || ""));
       if (existing) {
         existing.label_size = state.labelSize || existing.label_size || "60×40";
         existing.status = "queued";
       } else {
-        state.printJobs.push({
+        state.createdPrintJobs.push({
           job_id: `MOCK-PJ-${group.group_id}-001`,
           group_id: group.group_id,
           label_size: state.labelSize || "60×40",
