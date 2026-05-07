@@ -61,6 +61,10 @@ test("store manager receiving preview presents SDO as the official receiving tar
   assert.match(receivingSource, /SDO 门店收退货/);
   assert.match(receivingSource, /STORE_DELIVERY_EXECUTION/);
   assert.match(receivingSource, /正式收货入口/);
+  assert.match(receivingSource, /storeManagerPdaSdoForm/);
+  assert.match(receivingSource, /storeManagerPdaSdoInput/);
+  assert.match(receivingSource, /data-scan-input="true"/);
+  assert.match(receivingSource, /placeholder="扫描 SDO 主单码"/);
   assert.match(receivingSource, /SDB \/ LPK 只显示为来源参考/);
   assert.match(receivingSource, /POS 仍只接受 STORE_ITEM/);
   assert.match(receivingSource, /不作为门店收货码/);
@@ -68,6 +72,25 @@ test("store manager receiving preview presents SDO as the official receiving tar
   assert.doesNotMatch(receivingSource, /扫描 SDP/);
   assert.doesNotMatch(receivingSource, /SDP.*正式收货入口/);
   assert.doesNotMatch(receivingSource, /确认收到/);
+});
+
+test("store manager PDA SDO submit routes through existing store receiving flow without widening barcode types", () => {
+  const submitSource = functionSource(appJs, "submitStoreManagerPdaSdoScan");
+  const clickSource = appJs.slice(appJs.indexOf('document.querySelector("#storeManagerPdaPreview")'), appJs.indexOf("workspacePageSearch?.addEventListener"));
+
+  assert.match(submitSource, /#storeDispatchBaleAcceptForm \[name='bale_no'\]/);
+  assert.match(submitSource, /submitStoreDispatchBaleAccept/);
+  assert.match(submitSource, /getPanelKeyByTitle\("store", "5\. 门店收货主控台"\)/);
+  assert.match(submitSource, /setActivePanel\(panelKey\)/);
+  assert.match(submitSource, /showTransientInlineNotice\("#storeDispatchBaleNotice"/);
+  assert.match(submitSource, /请扫描 SDO 主单码/);
+  assert.match(submitSource, /SDP 是 SDO 内包明细/);
+  assert.match(submitSource, /SDB \/ LPK 是仓库来源包/);
+  assert.match(submitSource, /STORE_ITEM 只能用于 POS 销售/);
+  assert.match(submitSource, /STORE_DELIVERY_EXECUTION \/ SDO/);
+  assert.doesNotMatch(submitSource, /STORE_DELIVERY_PACKAGE/);
+  assert.match(clickSource, /storeManagerPdaSdoForm/);
+  assert.match(clickSource, /submitStoreManagerPdaSdoScan/);
 });
 
 test("store manager package detail cards show SDO source package and category context", () => {

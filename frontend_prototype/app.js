@@ -3308,6 +3308,19 @@ function renderStoreManagerPdaReceiving() {
       <span>SDB / LPK 只显示为来源参考；POS 仍只接受 STORE_ITEM。</span>
     </section>
 
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>扫描 SDO 主单码</strong>
+        <span>STORE_DELIVERY_EXECUTION / SDO</span>
+      </div>
+      <form id="storeManagerPdaSdoForm" class="form-grid compact">
+        <input id="storeManagerPdaSdoInput" name="sdo_code" data-scan-input="true" autocomplete="off" autocapitalize="off" placeholder="扫描 SDO 主单码" />
+        <button type="submit" class="store-manager-pda-primary-action">打开 SDO 收货</button>
+      </form>
+      <div id="storeManagerPdaSdoNotice" class="inline-notice-slot" aria-live="polite"></div>
+      <div class="subtle small">只接受 STORE_DELIVERY_EXECUTION / SDO。SDP 仍只显示为内包明细，SDB / LPK 仍只作为 source_code。</div>
+    </section>
+
     <section class="store-manager-pda-status-grid">
       ${data.receivingStats.map((row) => `
         <article class="store-manager-pda-status ${getStatusCardClass(row.tone)}">
@@ -3489,6 +3502,43 @@ function renderStoreManagerPdaPreview(tabId = activeStoreManagerPdaTab) {
       </nav>
     </div>
   `;
+}
+
+function submitStoreManagerPdaSdoScan(event) {
+  event.preventDefault();
+  return (async () => {
+    const form = new FormData(event.currentTarget);
+    const rawCode = String(form.get("sdo_code") || "").trim().toUpperCase();
+    const digits = rawCode.replace(/[^0-9]/g, "");
+    if (!rawCode) {
+      throw new Error("请扫描 SDO 主单码。");
+    }
+    if (/^SDP/.test(rawCode) || /^6\d{9}$/.test(digits)) {
+      throw new Error("SDP 是 SDO 内包明细，请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。");
+    }
+    if (/^(SDB|LPK)/.test(rawCode) || /^[23]\d{9}$/.test(digits)) {
+      throw new Error("SDB / LPK 是仓库来源包，不是门店正式收货码。请扫描 STORE_DELIVERY_EXECUTION / SDO。");
+    }
+    if (/^5\d{9}$/.test(digits) || /^5\d{12}$/.test(digits)) {
+      throw new Error("STORE_ITEM 只能用于 POS 销售。请扫描 STORE_DELIVERY_EXECUTION / SDO。");
+    }
+    if (!rawCode.startsWith("SDO") && !/^4\d{9}$/.test(digits)) {
+      throw new Error("请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。");
+    }
+    const receivingForm = document.querySelector("#storeDispatchBaleAcceptForm");
+    if (!(receivingForm instanceof HTMLFormElement)) {
+      throw new Error("没有找到门店收货主控台。");
+    }
+    setInputValue("#storeDispatchBaleAcceptForm [name='transfer_no']", "");
+    setInputValue("#storeDispatchBaleAcceptForm [name='bale_no']", rawCode);
+    const panelKey = getPanelKeyByTitle("store", "5. 门店收货主控台");
+    if (panelKey) {
+      setActivePanel(panelKey);
+    }
+    await submitStoreDispatchBaleAccept({ preventDefault() {}, currentTarget: receivingForm });
+    showTransientInlineNotice("#storeDispatchBaleNotice", `已从店长 PDA 打开 SDO ${rawCode} 收货。`, "success", 2200);
+    focusElement("#storeDispatchBaleAcceptForm [name='bale_no']");
+  })();
 }
 
 function getWorkspaceSectionTitle(section = {}, language = currentLanguage) {
@@ -35821,6 +35871,18 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", (ev
     storeManagerPdaReturnSubmitted = false;
   }
   renderStoreManagerPdaPreview(tabButton.dataset.storeManagerPdaTab || "overview");
+});
+
+document.querySelector("#storeManagerPdaPreview")?.addEventListener("submit", async (event) => {
+  if (!(event.target instanceof HTMLFormElement) || !event.target.matches("#storeManagerPdaSdoForm")) {
+    return;
+  }
+  try {
+    await submitStoreManagerPdaSdoScan(event);
+  } catch (error) {
+    event.preventDefault();
+    showTransientInlineNotice("#storeManagerPdaSdoNotice", formatErrorMessage(error), "danger", 2400);
+  }
 });
 
 workspacePageSearch?.addEventListener("input", (event) => {
