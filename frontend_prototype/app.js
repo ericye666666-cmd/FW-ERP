@@ -1239,7 +1239,8 @@ let storeReceiptPackageStatusState = {};
 let storeReceiptPackageAssignmentState = {};
 let storeAssignedSdoPackageTasksState = [];
 let storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), []);
-let storePackagePrintPreviewState = {};
+let storePackageLastGeneratedTokenState = {};
+let storePackagePrintJobState = {};
 let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
 let storeDefaultSalePrices = safeParse(localStorage.getItem(STORAGE_KEYS.storeDefaultSalePrices), {});
 let warehouseDispatchHistoryState = [];
@@ -28953,6 +28954,7 @@ function normalizeGeneratedStoreItemToken(token = {}, row = {}, actionKey = "") 
     store_rack_code: String(token?.store_rack_code || token?.rack_code || "").trim().toUpperCase(),
     rack_code: String(token?.rack_code || token?.store_rack_code || "").trim().toUpperCase(),
     selected_price: Number(token?.selected_price || token?.selling_price_kes || 0),
+    selling_price_kes: Number(token?.selling_price_kes || token?.selected_price || 0),
   };
 }
 
@@ -28976,8 +28978,12 @@ function mergeGeneratedStoreItemsIntoPackageState(row = {}, generatedTokens = []
       cacheStoreReceivingPackageBackendState(normalizedPackage);
     }
   }
+  if (normalizedTokens.length) {
+    storePackageLastGeneratedTokenState[actionKey] = normalizedTokens.map((token) => token.token_no);
+    storePackagePrintJobState[actionKey] = null;
+  }
   persistStoreSdoPackageItemTokenState();
-  return getStorePackageTokens(actionKey);
+  return normalizedTokens;
 }
 
 async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
@@ -29005,31 +29011,82 @@ async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
   return mergeGeneratedStoreItemsIntoPackageState(row, Array.isArray(result?.store_items) ? result.store_items : [], packageRow);
 }
 
-function buildStorePackagePrintPreviewTokens(row = {}, quantity = null) {
-  const actionKey = typeof row === "string" ? row : getStorePackageActionKey(row);
-  const pending = getStorePackageTokens(actionKey).filter((token) => String(token?.print_status || "").trim() === "pending_print");
-  if (!pending.length) {
-    throw new Error("本包商品码已全部打印");
+function getStorePackageLastGeneratedTokens(actionKey = "") {
+  const tokenNos = new Set((storePackageLastGeneratedTokenState[actionKey] || [])
+    .map((value) => String(value || "").trim().toUpperCase())
+    .filter(Boolean));
+  const tokens = getStorePackageTokens(actionKey);
+  if (!tokenNos.size) {
+    return [];
   }
-  const requested = quantity == null ? Math.min(pending.length, 20) : Math.min(Math.max(1, Number(quantity || 1)), pending.length);
-  const previewTokens = pending.slice(0, requested);
-  storePackagePrintPreviewState[actionKey] = previewTokens.map((token) => token.machine_code);
-  return previewTokens;
+  return tokens.filter((token) => tokenNos.has(String(token?.token_no || "").trim().toUpperCase()));
 }
 
-function markStorePackagePrintPreviewTokensPrinted(row = {}) {
-  const actionKey = typeof row === "string" ? row : getStorePackageActionKey(row);
-  const previewMachineCodes = new Set(storePackagePrintPreviewState[actionKey] || []);
-  if (!previewMachineCodes.size) {
-    throw new Error("请先预览本次商品码");
+function isPendingPrintStoreItemToken(token = {}) {
+  const printStatus = String(token?.print_status || "").trim().toLowerCase();
+  const status = String(token?.status || "").trim().toLowerCase();
+  return printStatus === "pending_print" || status === "pending_print";
+}
+
+function getStorePackagePrintableTokens(actionKey = "") {
+  const lastGeneratedPending = getStorePackageLastGeneratedTokens(actionKey).filter(isPendingPrintStoreItemToken);
+  if (lastGeneratedPending.length) {
+    return lastGeneratedPending;
   }
-  storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => (
-    previewMachineCodes.has(String(token?.machine_code || "").trim())
-      ? { ...token, print_status: "printed", printed_at: new Date().toISOString() }
-      : token
-  ));
-  storePackagePrintPreviewState[actionKey] = [];
-  persistStoreSdoPackageItemTokenState();
+  return getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
+}
+
+function getStoreItemLabelTemplateCode(labelSize = "60x40") {
+  const normalized = String(labelSize || "60x40").trim();
+  if (normalized === "40x30") {
+    return "apparel_40x30";
+  }
+  return "apparel_60x40";
+}
+
+function summarizeStorePackagePrintJobs(result = [], labelSize = "60x40") {
+  const jobs = Array.isArray(result) ? result : result ? [result] : [];
+  const firstJob = jobs[0] || {};
+  const lastJob = jobs[jobs.length - 1] || firstJob || {};
+  return {
+    status: "queued",
+    label_size: labelSize,
+    template_code: getStoreItemLabelTemplateCode(labelSize),
+    job_count: jobs.length,
+    first_job_id: firstJob.id || firstJob.job_id || "",
+    last_job_id: lastJob.id || lastJob.job_id || "",
+    jobs,
+  };
+}
+
+async function createStorePackageGeneratedStoreItemPrintJobs(actionKey = "", labelSize = "60x40") {
+  const tokens = getStorePackagePrintableTokens(actionKey);
+  const tokenNos = tokens.map((token) => String(token?.token_no || "").trim()).filter(Boolean);
+  if (!tokenNos.length) {
+    throw new Error("当前没有待打印 STORE_ITEM。");
+  }
+  try {
+    const result = await request("/print-jobs/item-tokens", {
+      method: "POST",
+      body: JSON.stringify({
+        token_nos: tokenNos,
+        copies: 1,
+        printer_name: "Deli DL-720C",
+        template_code: getStoreItemLabelTemplateCode(labelSize),
+      }),
+    });
+    const summary = summarizeStorePackagePrintJobs(result, labelSize);
+    storePackagePrintJobState[actionKey] = summary;
+    return summary;
+  } catch (error) {
+    storePackagePrintJobState[actionKey] = {
+      status: "error",
+      label_size: labelSize,
+      template_code: getStoreItemLabelTemplateCode(labelSize),
+      error: error?.message || "打印任务创建失败",
+    };
+    throw new Error(`打印任务创建失败：${error?.message || "请稍后重试"}`);
+  }
 }
 
 function renderStoreItemLineageSummary(token = {}) {
@@ -29046,22 +29103,61 @@ function renderStoreItemLineageSummary(token = {}) {
   `;
 }
 
-function renderStorePackageGeneratedStoreItems(actionKey = "") {
-  const generatedTokens = getStorePackageTokens(actionKey);
-  if (!generatedTokens.length) {
-    return `<div class="empty-state compact">生成 STORE_ITEM 后，这里会只读显示 SDP / SDO / SRC / cost_status 来源链摘要。</div>`;
+function renderStorePackagePrintJobFeedback(actionKey = "") {
+  const feedback = storePackagePrintJobState[actionKey];
+  if (!feedback) {
+    return `<div class="subtle small">创建打印任务后仍需等待打印完成，打印完成后才可销售。</div>`;
   }
+  if (feedback.status === "error") {
+    return renderStatusAlert(feedback.error || "打印任务创建失败", "danger");
+  }
+  const labelSize = feedback.label_size || "60x40";
+  const jobCount = Number(feedback.job_count || (Array.isArray(feedback.jobs) ? feedback.jobs.length : 0));
+  const jobText = jobCount > 1
+    ? `已创建打印任务 ${jobCount} 个 · first ${feedback.first_job_id || "-"} · last ${feedback.last_job_id || "-"} · status = queued`
+    : `已创建打印任务 · job id ${feedback.first_job_id || "-"} · label size ${labelSize} · status = queued`;
+  return renderStatusAlert(jobText, "info");
+}
+
+function renderStorePackageGeneratedStoreItems(actionKey = "") {
+  const lastGeneratedPending = getStorePackageLastGeneratedTokens(actionKey).filter(isPendingPrintStoreItemToken);
+  const isCurrentBatch = lastGeneratedPending.length > 0;
+  const printableTokens = isCurrentBatch
+    ? lastGeneratedPending
+    : getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
+  if (!printableTokens.length) {
+    return `<div class="empty-state compact">当前没有待打印 STORE_ITEM。</div>`;
+  }
+  const printTitle = isCurrentBatch ? "打印本次标签" : "待打印标签";
+  const printButtonText = isCurrentBatch ? "打印本次标签" : "打印待打印标签";
   return `
+    <div class="store-package-print-summary">
+      <strong>${isCurrentBatch ? "本次生成数量" : "待打印标签"}</strong>
+      <span>${printableTokens.length}</span>
+    </div>
     <div class="store-generated-item-list">
-      ${generatedTokens.slice(0, 8).map((token) => `
+      ${printableTokens.slice(0, 8).map((token) => `
         <article class="store-generated-item-row">
           <div>
             <strong>${escapeHtml(token.display_code || token.token_no || "-")}</strong>
-            <small>${escapeHtml(token.machine_code || "-")}</small>
+            <small>${escapeHtml(`machine_code ${token.machine_code || "-"} · barcode_value ${token.barcode_value || token.machine_code || "-"}`)}</small>
+            <small>${escapeHtml(`待打印 · 来源 SDP ${token.sdo_package_display_code || token.source_package || "-"} · 所属 SDO ${token.parent_sdo_display_code || "-"} · 价格 KES ${formatCurrency(token.selected_price || token.selling_price_kes || 0)} · rack_code ${token.rack_code || token.store_rack_code || "-"}`)}</small>
           </div>
           ${renderStoreItemLineageSummary(token)}
         </article>
       `).join("")}
+    </div>
+    <div class="store-package-print-panel">
+      <h4>${printTitle}</h4>
+      <label>
+        <span>标签尺寸</span>
+        <select data-store-package-label-size="${escapeHtml(actionKey)}">
+          <option value="60x40" selected>60×40</option>
+          <option value="40x30">40×30</option>
+        </select>
+      </label>
+      <button type="button" class="primary-button" data-store-package-print-generated="${escapeHtml(actionKey)}">${printButtonText}</button>
+      ${renderStorePackagePrintJobFeedback(actionKey)}
     </div>
   `;
 }
@@ -29103,28 +29199,6 @@ function renderStorePackageListCard(row = {}) {
   `;
 }
 
-function renderStorePackagePrintPreview(actionKey = "") {
-  const previewMachineCodes = new Set(storePackagePrintPreviewState[actionKey] || []);
-  const previewTokens = getStorePackageTokens(actionKey).filter((token) => previewMachineCodes.has(String(token?.machine_code || "").trim()));
-  if (!previewTokens.length) {
-    return `<div class="empty-state">点击“预览本次商品码”后，这里会显示本次要打印的 STORE_ITEM。</div>`;
-  }
-  return `
-    <div class="store-print-preview-list">
-      ${previewTokens.slice(0, 20).map((token) => `
-        <article class="store-print-label-preview">
-          <div class="store-print-label-price">KES ${escapeHtml(formatCurrency(token.selected_price || 0))}</div>
-          <div class="store-print-label-category">${escapeHtml(token.category_summary || "-")}</div>
-          <div class="store-print-label-meta">货架 ${escapeHtml(token.store_rack_code || "-")} · 来源 ${escapeHtml(token.source_package || "-")}</div>
-          <strong>${escapeHtml(token.display_code || "-")}</strong>
-          <div class="store-print-barcode">STORE_ITEM machine_code barcode ${escapeHtml(token.machine_code || "-")}</div>
-          ${renderStoreItemLineageSummary(token)}
-        </article>
-      `).join("")}
-    </div>
-  `;
-}
-
 function renderStorePackageShelvingStep(row = {}, context = {}) {
   const actionKey = getStorePackageActionKey(row);
   const itemCount = getStorePackageItemCount(row);
@@ -29133,7 +29207,6 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
   const priceChoices = getStorePackagePriceChoices(row);
   const rackOptions = getStoreRackOptionsForPackage(row?.store_code);
   const selectedRack = String(context.selected_rack || "").trim().toUpperCase();
-  const defaultPrintQty = Math.min(unprinted || itemCount || 0, 20);
   const remainingForGenerate = Math.max((itemCount || 0) - counts.generated, 0);
   const defaultGenerateQty = Math.max(remainingForGenerate || itemCount || 1, 1);
   const sdoPackageCode = getStoreReceivingPackageCode(row);
@@ -29210,19 +29283,6 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
         </div>
         <button type="button" class="primary-button" data-store-package-generate-items="${escapeHtml(actionKey)}" ${remainingForGenerate <= 0 ? "disabled" : ""}>${remainingForGenerate <= 0 ? "已完成生成" : "生成 STORE_ITEM 商品码"}</button>
         ${renderStorePackageGeneratedStoreItems(actionKey)}
-      </section>
-      <section class="store-package-flow-block">
-        <h4>商品码打印区</h4>
-        <label>
-          <span>本次打印数量</span>
-          <input type="number" min="1" max="${escapeHtml(unprinted || 1)}" value="${escapeHtml(defaultPrintQty || 1)}" data-store-package-print-qty="${escapeHtml(actionKey)}" />
-        </label>
-        <div class="button-row">
-          <button type="button" class="ghost-button" data-store-package-preview-print="${escapeHtml(actionKey)}">预览本次商品码</button>
-          <button type="button" class="ghost-button" data-store-package-print-items="${escapeHtml(actionKey)}">打印本次数量</button>
-          <button type="button" class="primary-button" data-store-package-confirm-printed="${escapeHtml(actionKey)}">标记本次已打印</button>
-        </div>
-        ${renderStorePackagePrintPreview(actionKey)}
       </section>
     </section>
   `;
@@ -35363,7 +35423,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-package-process], [data-store-package-back], [data-store-package-generate-items], [data-store-package-preview-print], [data-store-package-print-items], [data-store-package-confirm-printed], [data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
+    ? event.target.closest("[data-store-package-process], [data-store-package-back], [data-store-package-generate-items], [data-store-package-print-generated], [data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -35397,12 +35457,10 @@ document.addEventListener("click", async (event) => {
       });
       return;
     }
-    if (button.dataset.storePackageGenerateItems || button.dataset.storePackagePreviewPrint || button.dataset.storePackagePrintItems || button.dataset.storePackageConfirmPrinted) {
+    if (button.dataset.storePackageGenerateItems || button.dataset.storePackagePrintGenerated) {
       const actionKey = String(
         button.dataset.storePackageGenerateItems
-        || button.dataset.storePackagePreviewPrint
-        || button.dataset.storePackagePrintItems
-        || button.dataset.storePackageConfirmPrinted
+        || button.dataset.storePackagePrintGenerated
         || "",
       ).trim();
       const row = findStorePackageByActionKey(actionKey);
@@ -35439,34 +35497,30 @@ document.addEventListener("click", async (event) => {
         });
         return;
       }
-      if (button.dataset.storePackagePreviewPrint || button.dataset.storePackagePrintItems) {
+      if (button.dataset.storePackagePrintGenerated) {
         if (!getStorePackageTokens(actionKey).length) {
           throw new Error("请先生成 STORE_ITEM 商品码");
         }
-        const rackSelect = document.querySelector(`[data-store-package-rack="${CSS.escape(actionKey)}"]`);
-        if (!String(rackSelect?.value || "").trim()) {
-          throw new Error("请先选择货架位");
+        const labelSizeSelect = document.querySelector(`[data-store-package-label-size="${CSS.escape(actionKey)}"]`);
+        const labelSize = String(labelSizeSelect?.value || "60x40").trim() || "60x40";
+        let printSummary = null;
+        try {
+          printSummary = await createStorePackageGeneratedStoreItemPrintJobs(actionKey, labelSize);
+        } catch (error) {
+          renderStoreClerkHomeSummary({
+            store_code: storeClerkHomeState.store_code,
+            assigned_employee: storeClerkHomeState.assigned_employee,
+            active_package_key: actionKey,
+            last_action_message: error?.message || "打印任务创建失败",
+          });
+          throw error;
         }
-        getSelectedStorePackagePrice(row, actionKey);
-        const qtyInput = document.querySelector(`[data-store-package-print-qty="${CSS.escape(actionKey)}"]`);
-        const previewTokens = buildStorePackagePrintPreviewTokens(actionKey, Number(qtyInput?.value || 0));
-        writeOutput("#storeClerkHomeOutput", previewTokens);
+        writeOutput("#storeClerkHomeOutput", printSummary);
         renderStoreClerkHomeSummary({
           store_code: storeClerkHomeState.store_code,
           assigned_employee: storeClerkHomeState.assigned_employee,
           active_package_key: actionKey,
-          last_action_message: `本次预览 ${previewTokens.length} 个 STORE_ITEM 商品码。`,
-        });
-        return;
-      }
-      if (button.dataset.storePackageConfirmPrinted) {
-        markStorePackagePrintPreviewTokensPrinted(actionKey);
-        writeOutput("#storeClerkHomeOutput", getStorePackageTokens(actionKey));
-        renderStoreClerkHomeSummary({
-          store_code: storeClerkHomeState.store_code,
-          assigned_employee: storeClerkHomeState.assigned_employee,
-          active_package_key: actionKey,
-          last_action_message: "本次预览的商品码已标记为已打印。",
+          last_action_message: `已创建 ${printSummary.job_count || 0} 个 STORE_ITEM 打印任务，状态 queued。`,
         });
         return;
       }

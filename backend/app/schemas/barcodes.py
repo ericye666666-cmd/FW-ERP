@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -28,15 +30,38 @@ class BarcodeResolveResponse(BaseModel):
     store_code: str = ""
     source_type: str = ""
     source_code: str = ""
-    item_count: int | None = None
+    item_count: Optional[int] = None
     status: str = ""
     received_status: str = ""
-    received_at: str | None = None
+    received_at: Optional[str] = None
     received_by: str = ""
     exception_status: str = ""
     exception_reason: str = ""
     assigned_clerk: str = ""
-    assigned_at: str | None = None
+    assigned_employee: str = ""
+    assigned_at: Optional[str] = None
     assigned_by: str = ""
     assignment_status: str = ""
     updated_at: str = ""
+    sdo_package_display_code: str = ""
+    sdo_package_machine_code: str = ""
+    source_machine_code: str = ""
+    source_token_refs: list[str] = Field(default_factory=list)
+    cost_source_refs: list[str] = Field(default_factory=list)
+    source_bale_token: str = ""
+    raw_bale_barcode: str = ""
+    raw_bale_machine_code: str = ""
+    source_batch_no: str = ""
+    source_supplier: str = ""
+    category_main: str = ""
+    category_sub: str = ""
+    grade: str = ""
+    selected_price: Optional[float] = None
+    selling_price_kes: Optional[float] = None
+    unit_cost_kes: Optional[float] = None
+    cost_price: Optional[float] = None
+    cost_status: str = ""
+    lineage_status: str = ""
+    print_status: str = ""
+    sale_status: str = ""
+    source_cost_layer: Optional[dict[str, Any]] = None
