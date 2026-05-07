@@ -140,14 +140,21 @@ test("label size selector supports 60x40 and 40x30 without mixing groups", () =>
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const queueSource = extractFunctionSource(appJs, "renderPriceGroupPrintQueue");
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+  const cardSource = extractFunctionSource(appJs, "renderPriceGroupCards");
 
   assert.match(printPanelSource, /data-mobile-pricing-label-size="60×40"/);
   assert.match(printPanelSource, /data-mobile-pricing-label-size="40×30"/);
-  assert.match(printPanelSource, /打印本组标签/);
+  assert.match(printPanelSource, /本组打印任务/);
   assert.match(printPanelSource, /getStoreMobileStatusText\(job\.status \|\| "queued"\)/);
+  assert.match(printPanelSource, /group\.tier/);
+  assert.match(printPanelSource, /group\.quantity/);
+  assert.match(cardSource, /group\.tier/);
+  assert.match(cardSource, /group\.quantity/);
   assert.match(queueSource, /group\.tier/);
   assert.match(queueSource, /group\.price_kes/);
   assert.match(queueSource, /job\.label_size/);
+  assert.match(queueSource, /job\.copies \|\| group\.quantity/);
+  assert.match(stateSource, /group_id:\s*"CUSTOM-200"[\s\S]*?price_kes:\s*200[\s\S]*?quantity:\s*20[\s\S]*?rack_code:\s*"A-03"/);
   assert.match(stateSource, /group_id:\s*"CUSTOM-200"[\s\S]*?copies:\s*20[\s\S]*?status:\s*"queued"/);
   assert.match(queueSource, /renderStoreMobileStatusBadge/);
   assert.doesNotMatch(queueSource, /混合总任务|全部价格组|all groups/i);
@@ -163,6 +170,9 @@ test("print task panel starts uncreated and only mock action creates queued job 
   assert.doesNotMatch(printPanelSource, /state\.printJobs/);
   assert.match(printPanelSource, /if \(!job\)/);
   assert.match(printPanelSource, /创建打印任务/);
+  assert.equal((printPanelSource.match(/创建打印任务/g) || []).length, 1);
+  assert.match(printPanelSource, /返回打印队列/);
+  assert.match(printPanelSource, /data-mobile-pricing-page="print_queue"/);
   assert.doesNotMatch(printPanelSource, /打印任务创建成功/);
   assert.match(actionSource, /createdPrintJobs/);
   assert.match(actionSource, /status:\s*"queued"/);

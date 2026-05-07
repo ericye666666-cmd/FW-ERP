@@ -29736,8 +29736,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <strong>${escapeHtml(getStoreMobileStatusText(job.status || "queued"))}</strong>
         <small>${escapeHtml(job?.job_id || "MOCK-PJ-NEW-001")} · ${escapeHtml(activeSize)} · ${escapeHtml(group.quantity || 0)} 张 · ${escapeHtml(group.tier || "-")}</small>
       </div>
-      <span class="subtle small">打印本组标签</span>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">创建打印任务</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="print_queue">返回打印队列</button>
     </section>
   `;
 }
