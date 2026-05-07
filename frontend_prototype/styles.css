@@ -7878,41 +7878,57 @@ textarea:focus-visible,
 }
 
 .mobile-pricing-topbar {
-  min-height: 74px;
   display: grid;
-  grid-template-columns: 64px 1fr 64px;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 0;
+  min-height: 56px;
+  padding: 5px 12px 8px;
   background: #2563eb;
   color: #ffffff;
 }
 
-.mobile-pricing-topbar strong {
+.mobile-pricing-statusbar,
+.mobile-pricing-titlebar {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+}
+
+.mobile-pricing-statusbar {
+  min-height: 18px;
+}
+
+.mobile-pricing-titlebar {
+  min-height: 30px;
+  grid-template-columns: 1fr 32px;
+}
+
+.mobile-pricing-titlebar strong {
   text-align: center;
-  font-size: 21px;
+  font-size: 18px;
   line-height: 1.1;
 }
 
-.mobile-pricing-topbar span {
-  font-size: 13px;
+.mobile-pricing-statusbar span,
+.mobile-pricing-titlebar span {
+  font-size: 11px;
   font-weight: 800;
 }
 
-.mobile-pricing-topbar span:last-child {
+.mobile-pricing-statusbar span:last-child,
+.mobile-pricing-titlebar span:last-child {
   text-align: right;
 }
 
 .mobile-pricing-screen {
   min-height: 0;
   overflow: auto;
-  padding: 14px;
+  padding: 10px;
 }
 
 .mobile-pricing-screen h3 {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   color: #0f172a;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.15;
 }
 
@@ -7923,19 +7939,19 @@ textarea:focus-visible,
 .mobile-print-panel,
 .mobile-print-queue {
   display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 13px;
+  gap: 9px;
+  margin-bottom: 9px;
+  padding: 10px;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .mobile-sdp-card.compact {
-  gap: 8px;
-  margin-bottom: 6px;
-  padding: 10px;
+  gap: 6px;
+  margin-bottom: 5px;
+  padding: 8px 9px;
 }
 
 .mobile-sdp-head,
@@ -7993,7 +8009,7 @@ textarea:focus-visible,
 
 .mobile-sdp-stat-strip {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 5px;
+  gap: 4px;
 }
 
 .mobile-sdp-grid span,
@@ -8012,7 +8028,7 @@ textarea:focus-visible,
 .mobile-sdp-card.compact .mobile-sdp-meta-line span,
 .mobile-sdp-card.compact .mobile-sdp-stat-strip span {
   min-height: 0;
-  padding: 6px;
+  padding: 5px 4px;
 }
 
 .mobile-sdp-grid b,
@@ -8026,8 +8042,15 @@ textarea:focus-visible,
 
 .mobile-sdp-stat-strip strong {
   color: #0f172a;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.05;
+}
+
+.mobile-sdp-primary-line {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.15;
 }
 
 .mobile-sdp-head small,
@@ -8046,11 +8069,11 @@ textarea:focus-visible,
 
 .mobile-pricing-badge {
   display: inline-flex;
-  min-height: 30px;
+  min-height: 26px;
   align-items: center;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -8086,7 +8109,7 @@ textarea:focus-visible,
 .mobile-bottom-button-stack,
 .mobile-print-queue-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .mobile-pricing-workbench {
@@ -8095,7 +8118,79 @@ textarea:focus-visible,
 
 .mobile-price-group-card.is-active {
   border-color: #93c5fd;
-  background: #eff6ff;
+  background: #f8fbff;
+}
+
+.mobile-field-group-card {
+  gap: 7px;
+  padding: 10px;
+  border-radius: 9px;
+}
+
+.mobile-field-group-top,
+.mobile-field-group-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 0.78fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.mobile-field-group-left,
+.mobile-field-group-right {
+  display: grid;
+  gap: 2px;
+}
+
+.mobile-field-group-left strong {
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1.05;
+}
+
+.mobile-field-group-right {
+  justify-items: end;
+}
+
+.mobile-field-group-right strong {
+  color: #0f172a;
+  font-size: 22px;
+  line-height: 1.05;
+}
+
+.mobile-group-qty {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.mobile-field-group-meta,
+.mobile-field-next-action {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mobile-field-next-action {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.mobile-field-group-actions .primary-button,
+.mobile-field-group-actions .ghost-button {
+  min-height: 44px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.mobile-field-group-actions button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
 }
 
 .mobile-price-group-facts {
@@ -8211,12 +8306,73 @@ textarea:focus-visible,
   font-size: 18px;
 }
 
+.mobile-print-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mobile-print-summary span strong {
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.1;
+}
+
+.mobile-print-queue-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mobile-print-queue-summary span {
+  display: grid;
+  gap: 3px;
+  min-height: 52px;
+  padding: 8px;
+  border-radius: 9px;
+  background: #eff6ff;
+}
+
+.mobile-print-queue-summary b {
+  color: #475569;
+  font-size: 11px;
+}
+
+.mobile-print-queue-summary strong {
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.1;
+}
+
 .mobile-print-queue-row {
-  min-height: 66px;
-  padding: 10px;
+  min-height: 58px;
+  padding: 9px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
+}
+
+.mobile-next-group-hint {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+}
+
+.mobile-next-group-hint span {
+  color: #047857;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.mobile-next-group-hint strong {
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.mobile-next-group-hint.is-complete {
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 .mobile-progress-row {

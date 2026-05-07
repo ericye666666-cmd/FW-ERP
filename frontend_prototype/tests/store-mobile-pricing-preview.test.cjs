@@ -44,8 +44,15 @@ test("price groups render separately with independent generate and print actions
   assert.match(stateSource, /group_id:\s*"B"/);
   assert.match(stateSource, /group_id:\s*"S"/);
   assert.match(stateSource, /group_id:\s*"CUSTOM-200"/);
+  assert.match(cardSource, /mobile-field-group-card/);
+  assert.match(cardSource, /mobile-group-qty/);
+  assert.match(cardSource, /生成本组/);
+  assert.match(cardSource, /打印本组/);
+  assert.match(cardSource, /查看队列/);
+  assert.match(cardSource, /已完成/);
   assert.match(cardSource, /data-mobile-pricing-generate-group="\$\{escapeHtml\(group\.group_id\)\}"/);
   assert.match(cardSource, /data-mobile-pricing-print-group="\$\{escapeHtml\(group\.group_id\)\}"/);
+  assert.doesNotMatch(cardSource, /generated\.start|generated\.end|STOREITEM|编辑/);
   assert.doesNotMatch(cardSource, /generate-all|print-all|一键生成全部|全部混合打印|混合总任务/);
 });
 
@@ -72,21 +79,25 @@ test("mock data uses Utawala SDP display codes with matching price group quantit
   assert.doesNotMatch(stateSource, /DLR-上海南京东路店|6002381948213|SDB \/ LPK|SDB261270045|LPK261270002/);
   assert.match(sdpCardSource, /sdp\.display_code/);
   assert.match(sdpCardSource, /sdp\.machine_code/);
-  assert.match(sdpCardSource, /sdp\.sdo_machine_code/);
-  assert.match(sdpCardSource, /sdp\.source_machine_code/);
+  assert.match(sdpCardSource, /sdp\.sdo_code/);
+  assert.match(sdpCardSource, /sdp\.source_code/);
 });
 
 test("SDP header is compact and uses the requested top statistics", () => {
   const sdpCardSource = extractFunctionSource(appJs, "renderStoreMobileSdpCard");
 
   assert.match(sdpCardSource, /mobile-code-secondary/);
+  assert.match(sdpCardSource, /mobile-sdp-primary-line/);
   assert.match(sdpCardSource, /mobile-sdp-stat-strip/);
+  assert.match(sdpCardSource, /sdp\.category/);
+  assert.match(sdpCardSource, /sdp\.total_count/);
   assert.match(sdpCardSource, /总数/);
   assert.match(sdpCardSource, /已分组/);
   assert.match(sdpCardSource, /待生成/);
   assert.match(sdpCardSource, /待打印/);
   assert.match(sdpCardSource, /已打印/);
   assert.doesNotMatch(sdpCardSource, /未分组/);
+  assert.doesNotMatch(sdpCardSource, /store_name|包号|门店/);
   assert.match(stylesCss, /\.mobile-sdp-card\.compact/);
   assert.match(stylesCss, /\.mobile-code-secondary/);
 });
@@ -145,6 +156,9 @@ test("label size selector supports 60x40 and 40x30 without mixing groups", () =>
   assert.match(printPanelSource, /data-mobile-pricing-label-size="60×40"/);
   assert.match(printPanelSource, /data-mobile-pricing-label-size="40×30"/);
   assert.match(printPanelSource, /本组打印任务/);
+  assert.match(printPanelSource, /当前打印机/);
+  assert.match(printPanelSource, /Deli DL-720C/);
+  assert.match(printPanelSource, /创建 \$\{escapeHtml\(group\.quantity \|\| 0\)\} 张标签/);
   assert.match(printPanelSource, /getStoreMobileStatusText\(job\.status \|\| "queued"\)/);
   assert.match(printPanelSource, /group\.tier/);
   assert.match(printPanelSource, /group\.quantity/);
@@ -169,13 +183,42 @@ test("print task panel starts uncreated and only mock action creates queued job 
   assert.match(printPanelSource, /state\.createdPrintJobs/);
   assert.doesNotMatch(printPanelSource, /state\.printJobs/);
   assert.match(printPanelSource, /if \(!job\)/);
-  assert.match(printPanelSource, /创建打印任务/);
-  assert.equal((printPanelSource.match(/创建打印任务/g) || []).length, 1);
+  assert.match(printPanelSource, /创建 \$\{escapeHtml\(group\.quantity \|\| 0\)\} 张标签/);
+  assert.doesNotMatch(printPanelSource, /创建打印任务/);
   assert.match(printPanelSource, /返回打印队列/);
   assert.match(printPanelSource, /data-mobile-pricing-page="print_queue"/);
   assert.doesNotMatch(printPanelSource, /打印任务创建成功/);
   assert.match(actionSource, /createdPrintJobs/);
   assert.match(actionSource, /status:\s*"queued"/);
+});
+
+test("print queue has field summary and keeps every price group separate", () => {
+  const queueSource = extractFunctionSource(appJs, "renderPriceGroupPrintQueue");
+  const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+
+  assert.match(stateSource, /printer_name:\s*"Deli DL-720C"/);
+  assert.match(stateSource, /pending_label_count:\s*130/);
+  assert.match(stateSource, /printed_today_count:\s*80/);
+  assert.match(stateSource, /current_task_group_id:\s*"B"/);
+  assert.match(queueSource, /当前打印机/);
+  assert.match(queueSource, /待打印总张数/);
+  assert.match(queueSource, /今日已打印/);
+  assert.match(queueSource, /当前任务/);
+  assert.match(queueSource, /mobile-print-queue-summary/);
+  assert.match(queueSource, /mobile-print-queue-row/);
+  assert.match(queueSource, /getStoreMobileStatusText\(job\.status \|\| "queued"\)/);
+});
+
+test("generation and print task pages guide the next price group", () => {
+  const helperSource = extractFunctionSource(appJs, "renderNextPriceGroupHint");
+  const generationSource = extractFunctionSource(appJs, "renderPriceGroupGenerationResult");
+  const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
+
+  assert.match(helperSource, /下一组/);
+  assert.match(helperSource, /全部价格组已处理/);
+  assert.match(helperSource, /price_kes/);
+  assert.match(generationSource, /renderNextPriceGroupHint/);
+  assert.match(printPanelSource, /renderNextPriceGroupHint/);
 });
 
 test("preview statuses are localized for clerk UI", () => {
@@ -189,6 +232,7 @@ test("preview statuses are localized for clerk UI", () => {
 
 test("pricing workbench moves price groups close to the top", () => {
   const screenSource = extractFunctionSource(appJs, "renderStoreMobileDeviceScreen");
+  const frameSource = extractFunctionSource(appJs, "renderStoreMobileDeviceFrame");
   const sdpIndex = screenSource.indexOf("renderStoreMobileSdpCard");
   const groupsIndex = screenSource.indexOf("renderPriceGroupCards");
   const addIndex = screenSource.indexOf("新增价格组");
@@ -197,7 +241,11 @@ test("pricing workbench moves price groups close to the top", () => {
   assert.ok(groupsIndex > sdpIndex, "price groups follow SDP card");
   assert.ok(addIndex > groupsIndex, "actions stay below price groups");
   assert.doesNotMatch(screenSource.slice(sdpIndex, groupsIndex), /mobile-section-head[\s\S]*?价格组总览/);
+  assert.match(frameSource, /mobile-pricing-statusbar/);
+  assert.match(frameSource, /mobile-pricing-titlebar/);
   assert.match(stylesCss, /\.mobile-pricing-workbench\s*\{[\s\S]*?gap:\s*8px/);
+  assert.match(stylesCss, /\.mobile-pricing-statusbar/);
+  assert.match(stylesCss, /\.mobile-pricing-titlebar/);
 });
 
 test("preview actions are mock-only and do not call backend mutations or print complete", () => {

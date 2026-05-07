@@ -29366,6 +29366,10 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     activePage: "pricing",
     activeGroupId: "A",
     labelSize: "60×40",
+    printer_name: "Deli DL-720C",
+    pending_label_count: 130,
+    printed_today_count: 80,
+    current_task_group_id: "B",
     editorDraft: {
       tier: "A",
       price_kes: 150,
@@ -29494,6 +29498,45 @@ function getStoreMobilePricingActiveGroup(state = storeMobilePricingPreviewState
   return groups.find((group) => String(group.group_id || "") === String(state.activeGroupId || "")) || groups[0] || {};
 }
 
+function getStoreMobileCreatedPrintJobForGroup(state = storeMobilePricingPreviewState, groupId = "") {
+  const jobs = Array.isArray(state.createdPrintJobs) ? state.createdPrintJobs : [];
+  return jobs.find((job) => String(job.group_id || "") === String(groupId || "")) || null;
+}
+
+function getStoreMobilePriceGroupStatus(state = storeMobilePricingPreviewState, group = {}) {
+  const createdJob = getStoreMobileCreatedPrintJobForGroup(state, group.group_id);
+  if (createdJob?.status) {
+    return getStoreMobileStatusText(createdJob.status);
+  }
+  if (String(group.status || "") === "已打印") {
+    return "已打印";
+  }
+  if (state.generatedRanges?.[group.group_id]) {
+    return "待打印";
+  }
+  return String(group.status || "待生成");
+}
+
+function renderNextPriceGroupHint(state = storeMobilePricingPreviewState, currentGroup = {}) {
+  const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
+  const currentIndex = groups.findIndex((group) => String(group.group_id || "") === String(currentGroup.group_id || ""));
+  const nextGroup = currentIndex > -1 ? groups[currentIndex + 1] : null;
+  if (!nextGroup) {
+    return `
+      <div class="mobile-next-group-hint is-complete">
+        <span>下一组</span>
+        <strong>全部价格组已处理</strong>
+      </div>
+    `;
+  }
+  return `
+    <div class="mobile-next-group-hint">
+      <span>下一组</span>
+      <strong>${escapeHtml(nextGroup.tier || "-")} / KSh${escapeHtml(nextGroup.price_kes || 0)} / ${escapeHtml(nextGroup.quantity || 0)}件</strong>
+    </div>
+  `;
+}
+
 function getStoreMobilePricingTone(label = "") {
   const text = String(label || "").trim();
   if (/异常/.test(text)) return "danger";
@@ -29527,9 +29570,7 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   const sdpDisplayCode = String(sdp.display_code || sdp.sdp_code || "-").trim();
   const sdpMachineCode = String(sdp.machine_code || "").trim();
   const sdoDisplayCode = String(sdp.sdo_code || "-").trim();
-  const sdoMachineCode = String(sdp.sdo_machine_code || "").trim();
-  const sourceDisplayCode = [sdp.source_type, sdp.source_code].filter(Boolean).join(" · ") || "-";
-  const sourceMachineCode = String(sdp.source_machine_code || "").trim();
+  const sourceDisplayCode = String(sdp.source_code || "-").trim();
   const stats = [
     ["总数", sdp.total_count || 0],
     ["已分组", sdp.grouped_count || 0],
@@ -29541,17 +29582,11 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
     <section class="mobile-sdp-card compact">
       <div class="mobile-sdp-head">
         <div>
-          <span>当前 SDP</span>
           <strong>${escapeHtml(sdpDisplayCode)}</strong>
-          ${sdpMachineCode ? `<small class="mobile-code-secondary">${escapeHtml(`machine_code: ${sdpMachineCode}`)}</small>` : ""}
+          <span class="mobile-sdp-primary-line">${escapeHtml(`${sdp.category || "-"} / ${sdp.total_count || 0} 件`)}</span>
+          <small class="mobile-code-secondary">${escapeHtml(`${sdoDisplayCode} · machine_code ${sdpMachineCode || "-"} · 来源 ${sourceDisplayCode}`)}</small>
         </div>
-        ${renderStoreMobilePricingBadge("已分配")}
-      </div>
-      <div class="mobile-sdp-meta-line">
-        <span><b>SDO</b>${escapeHtml(sdoDisplayCode)}${sdoMachineCode ? `<small class="mobile-code-secondary">${escapeHtml(sdoMachineCode)}</small>` : ""}</span>
-        <span><b>门店</b>${escapeHtml(sdp.store_name || "-")}</span>
-        <span><b>包号</b>${escapeHtml(sdp.package_no || "-")}</span>
-        <span><b>来源</b>${escapeHtml(sourceDisplayCode)}${sourceMachineCode ? `<small class="mobile-code-secondary">${escapeHtml(sourceMachineCode)}</small>` : ""}</span>
+        ${renderStoreMobilePricingBadge("现场作业")}
       </div>
       <div class="mobile-sdp-stat-strip">
         ${stats.map(([label, value]) => `
@@ -29567,35 +29602,42 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
   return `
     <div class="mobile-price-group-list">
       ${groups.map((group) => {
-        const generated = state.generatedRanges?.[group.group_id] || null;
-        const hasGenerated = Boolean(generated);
-        const groupStatus = hasGenerated ? "待打印" : String(group.status || "待生成");
+        const hasGenerated = Boolean(state.generatedRanges?.[group.group_id]);
+        const createdJob = getStoreMobileCreatedPrintJobForGroup(state, group.group_id);
+        const statusText = getStoreMobilePriceGroupStatus(state, group);
+        const isPrinted = statusText === "已打印";
+        const printButtonText = isPrinted ? "已完成" : createdJob ? "查看队列" : "打印本组";
+        const printButtonTarget = createdJob ? "data-mobile-pricing-page=\"print_queue\"" : `data-mobile-pricing-print-group="${escapeHtml(group.group_id)}"`;
         return `
-          <article class="mobile-price-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""}">
-            <div class="mobile-price-group-main">
-              <div class="mobile-price-group-title">
+          <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""}">
+            <div class="mobile-field-group-top">
+              <div class="mobile-field-group-left">
                 <strong>${escapeHtml(group.tier || "-")}</strong>
-                <span>KSh ${escapeHtml(group.price_kes || 0)}</span>
+                <b class="mobile-group-qty">${escapeHtml(group.quantity || 0)}件</b>
               </div>
-              <div class="mobile-price-group-facts">
-                <span>数量：${escapeHtml(group.quantity || 0)}</span>
-                <span>品类：${escapeHtml(group.category || "-")}</span>
-                <span>货架：${escapeHtml(group.rack_code || "-")}</span>
-              </div>
-              <div class="mobile-price-group-range">
-                ${
-                  generated
-                    ? `${escapeHtml(generated.start)} - ${escapeHtml(generated.end)}`
-                    : "本组还未生成 STORE_ITEM"
-                }
+              <div class="mobile-field-group-right">
+                <strong>KSh ${escapeHtml(group.price_kes || 0)}</strong>
+                ${renderStoreMobilePricingBadge(statusText)}
               </div>
             </div>
-            <div class="mobile-price-group-actions">
-              ${renderStoreMobilePricingBadge(groupStatus)}
-              <button type="button" class="ghost-button mini-button" data-mobile-pricing-select-group="${escapeHtml(group.group_id)}">编辑</button>
-              <button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本组 STORE_ITEM</button>
-              <button type="button" class="ghost-button mini-button" data-mobile-pricing-print-group="${escapeHtml(group.group_id)}" ${hasGenerated ? "" : "disabled"}>打印本组标签</button>
+            <div class="mobile-field-group-meta">
+              ${escapeHtml(group.category || "-")} · ${escapeHtml(group.rack_code || "-")}
             </div>
+            <div class="mobile-field-group-actions">
+              <button type="button" class="${!hasGenerated && !isPrinted ? "primary-button" : "ghost-button"} mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}" ${hasGenerated || isPrinted ? "disabled" : ""}>生成本组</button>
+              <button type="button" class="${hasGenerated && !createdJob && !isPrinted ? "primary-button" : "ghost-button"} mini-button" ${printButtonTarget} ${(!hasGenerated && !createdJob) || isPrinted ? "disabled" : ""}>${escapeHtml(printButtonText)}</button>
+            </div>
+            <div class="mobile-field-next-action">
+              <span>${
+                isPrinted
+                  ? "已完成"
+                  : createdJob
+                    ? "下一步：查看队列"
+                    : hasGenerated
+                      ? "下一步：打印本组"
+                      : "下一步：生成本组"
+              }</span>
+              </div>
           </article>
         `;
       }).join("")}
@@ -29683,7 +29725,8 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <span><b>货架</b>${escapeHtml(group.rack_code || "-")}</span>
         <span><b>状态</b>待打印</span>
       </div>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组</button>
+      ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
 }
@@ -29692,13 +29735,14 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const group = getStoreMobilePricingActiveGroup(state);
   const job = (state.createdPrintJobs || []).find((item) => String(item.group_id || "") === String(group.group_id || ""));
   const activeSize = String(job?.label_size || state.labelSize || "60×40");
+  const printerName = String(state.printer_name || "Deli DL-720C");
   const summaryHtml = `
     <div class="mobile-print-summary">
-      <span><b>档位</b>${escapeHtml(group.tier || "-")}</span>
-      <span><b>售价</b>KSh ${escapeHtml(group.price_kes || 0)}</span>
-      <span><b>数量</b>${escapeHtml(group.quantity || 0)}</span>
-      <span><b>打印张数</b>${escapeHtml(group.quantity || 0)}</span>
-      <span><b>预计 job 数</b>1</span>
+      <span><b>档位</b><strong>${escapeHtml(group.tier || "-")}</strong></span>
+      <span><b>售价</b><strong>KSh ${escapeHtml(group.price_kes || 0)}</strong></span>
+      <span><b>张数</b><strong>${escapeHtml(group.quantity || 0)} 张</strong></span>
+      <span><b>货架</b><strong>${escapeHtml(group.rack_code || "-")}</strong></span>
+      <span><b>当前打印机</b><strong>${escapeHtml(printerName)}</strong></span>
     </div>
   `;
   const labelSizeHtml = `
@@ -29719,7 +29763,8 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         </div>
         ${summaryHtml}
         ${labelSizeHtml}
-        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">创建打印任务</button>
+        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">创建 ${escapeHtml(group.quantity || 0)} 张标签</button>
+        ${renderNextPriceGroupHint(state, group)}
       </section>
     `;
   }
@@ -29737,6 +29782,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <small>${escapeHtml(job?.job_id || "MOCK-PJ-NEW-001")} · ${escapeHtml(activeSize)} · ${escapeHtml(group.quantity || 0)} 张 · ${escapeHtml(group.tier || "-")}</small>
       </div>
       <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="print_queue">返回打印队列</button>
+      ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
 }
@@ -29744,11 +29790,20 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
 function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
   const jobs = Array.isArray(state.printJobs) ? state.printJobs : [];
+  const printerName = String(state.printer_name || "Deli DL-720C");
+  const currentGroup = groups.find((group) => String(group.group_id || "") === String(state.current_task_group_id || "")) || groups[0] || {};
+  const currentJob = jobs.find((job) => String(job.group_id || "") === String(currentGroup.group_id || "")) || {};
   return `
     <section class="mobile-print-queue">
       <div class="mobile-section-head">
         <strong>打印队列预览</strong>
         ${renderStoreMobilePricingBadge("按价格组分开")}
+      </div>
+      <div class="mobile-print-queue-summary">
+        <span><b>当前打印机</b><strong>${escapeHtml(printerName)}</strong></span>
+        <span><b>待打印总张数</b><strong>${escapeHtml(state.pending_label_count || 0)}</strong></span>
+        <span><b>今日已打印</b><strong>${escapeHtml(state.printed_today_count || 0)}</strong></span>
+        <span><b>当前任务</b><strong>${escapeHtml(`${currentGroup.tier || "-"} / KSh${currentGroup.price_kes || 0} / ${currentJob.copies || currentGroup.quantity || 0}张`)}</strong></span>
       </div>
       <div class="mobile-print-queue-list">
         ${jobs.map((job) => {
@@ -29759,7 +29814,7 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
                 <strong>${escapeHtml(group.tier || "-")}</strong>
                 <span>KSh ${escapeHtml(group.price_kes || 0)} · ${escapeHtml(job.copies || group.quantity || 0)} 张 · ${escapeHtml(job.label_size || "60×40")}</span>
               </div>
-              ${renderStoreMobileStatusBadge(job.status || "queued")}
+              ${renderStoreMobileStatusBadge(getStoreMobileStatusText(job.status || "queued"))}
             </article>
           `;
         }).join("")}
@@ -29840,9 +29895,14 @@ function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
       <div class="android-pda-speaker"></div>
       <div class="android-pda-screen">
         <header class="mobile-pricing-topbar">
-          <span>10:32</span>
-          <strong>${escapeHtml(pages.find((page) => page.key === activePage)?.label || "现场分堆标价")}</strong>
-          <span>100%</span>
+          <div class="mobile-pricing-statusbar">
+            <span>10:32</span>
+            <span>Wi-Fi · 100%</span>
+          </div>
+          <div class="mobile-pricing-titlebar">
+            <strong>${escapeHtml(pages.find((page) => page.key === activePage)?.label || "现场分堆标价")}</strong>
+            <span>⌗</span>
+          </div>
         </header>
         <main class="mobile-pricing-screen">
           ${renderStoreMobileDeviceScreen(state)}
