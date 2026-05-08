@@ -193,6 +193,10 @@ body {
   margin-top: 4px;
 }
 
+.auth-card :is(input, button) {
+  scroll-margin: 96px 0 160px;
+}
+
 .app-shell {
   display: grid;
   gap: 0;
@@ -9003,11 +9007,21 @@ textarea:focus-visible,
 
 @media (max-width: 880px) {
   .auth-page {
-    padding: 20px;
+    min-height: 100dvh;
+    padding: 12px;
+    justify-content: flex-start;
+  }
+
+  .test-home-entry {
+    display: none !important;
   }
 
   .auth-shell {
     grid-template-columns: 1fr;
+  }
+
+  .auth-brand {
+    display: none;
   }
 
   .auth-brand,

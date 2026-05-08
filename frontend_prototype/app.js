@@ -1,5 +1,6 @@
 const STORAGE_KEYS = {
   apiBase: "retail_ops_api_base",
+  loginUsername: "retail_ops_login_username",
   token: "retail_ops_access_token",
   user: "retail_ops_current_user",
   devTracker: "retail_ops_dev_tracker",
@@ -46,10 +47,14 @@ const labelTemplateFlow = globalThis.LabelTemplateFlow || {};
 const apparelDefaultCostFlow = globalThis.ApparelDefaultCostFlow || {};
 const apparelSortingRackFlow = globalThis.ApparelSortingRackFlow || {};
 const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "/store-delivery-shipments";
+const PDA_STAGING_HOST = "fw-erp-34-35-52-250.nip.io";
+const PDA_STAGING_API_BASE = "https://fw-erp-34-35-52-250.nip.io/api/v1";
+const LOCAL_DEV_API_BASE = "http://127.0.0.1:8000/api/v1";
 
 const authPage = document.querySelector("#authPage");
 const appShell = document.querySelector("#appShell");
 const apiBaseInput = document.querySelector("#apiBase");
+const loginUsernameInput = document.querySelector("#loginForm [name='username']");
 const workspacePanels = document.querySelector("#workspacePanels");
 const sessionSummary = document.querySelector("#sessionSummary");
 const appSessionMeta = document.querySelector("#appSessionMeta");
@@ -2768,10 +2773,17 @@ function getAccessibleSectionsForWorkspace(workspace, user = currentSession.user
 }
 
 function defaultApiBase() {
-  if (window.location.protocol.startsWith("http")) {
-    return `${window.location.origin}/api/v1`;
+  const host = window.location.hostname || "";
+  if (host === PDA_STAGING_HOST) {
+    return PDA_STAGING_API_BASE;
   }
-  return "http://127.0.0.1:8000/api/v1";
+  if (!host || host === "127.0.0.1" || host === "localhost") {
+    return LOCAL_DEV_API_BASE;
+  }
+  if (window.location.protocol.startsWith("http")) {
+    return `${window.location.origin.replace(/\/$/, "")}/api/v1`;
+  }
+  return LOCAL_DEV_API_BASE;
 }
 
 function safeParse(value, fallback) {
@@ -2889,17 +2901,53 @@ function deleteDevTask(taskId = "") {
 }
 
 function getApiBase() {
-  const sameOriginBase = defaultApiBase();
-  if (window.location.protocol.startsWith("http")) {
-    localStorage.setItem(STORAGE_KEYS.apiBase, sameOriginBase);
-    return sameOriginBase;
-  }
-  const saved = localStorage.getItem(STORAGE_KEYS.apiBase) || "";
-  return saved || apiBaseInput.value.trim() || sameOriginBase;
+  const saved = (localStorage.getItem(STORAGE_KEYS.apiBase) || "").trim();
+  const current = apiBaseInput.value.trim();
+  return current || saved || defaultApiBase();
 }
 
 function saveApiBase() {
-  localStorage.setItem(STORAGE_KEYS.apiBase, apiBaseInput.value.trim());
+  const apiBase = apiBaseInput.value.trim() || defaultApiBase();
+  apiBaseInput.value = apiBase;
+  localStorage.setItem(STORAGE_KEYS.apiBase, apiBase);
+}
+
+function persistLoginUsername() {
+  if (!(loginUsernameInput instanceof HTMLInputElement)) {
+    return;
+  }
+  const username = loginUsernameInput.value.trim();
+  if (username) {
+    localStorage.setItem(STORAGE_KEYS.loginUsername, username);
+    return;
+  }
+  localStorage.removeItem(STORAGE_KEYS.loginUsername);
+}
+
+function restoreLoginUsername() {
+  if (!(loginUsernameInput instanceof HTMLInputElement)) {
+    return;
+  }
+  const saved = (localStorage.getItem(STORAGE_KEYS.loginUsername) || "").trim();
+  if (saved) {
+    loginUsernameInput.value = saved;
+  }
+}
+
+function scrollLoginInputIntoView(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  window.setTimeout(() => {
+    target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  }, 80);
+}
+
+function bindPdaLoginFocusHandling() {
+  document.querySelectorAll("#loginForm input, #apiBase").forEach((input) => {
+    input.addEventListener("focus", scrollLoginInputIntoView);
+  });
 }
 
 function getWorkspaceSearchPlaceholder(workspace) {
@@ -3998,8 +4046,14 @@ function setActivePanel(panelKey, options = {}) {
   }
 }
 
-apiBaseInput.value = getApiBase() || defaultApiBase();
+apiBaseInput.value = (localStorage.getItem(STORAGE_KEYS.apiBase) || "").trim() || defaultApiBase();
 document.querySelector("#saveBaseButton").addEventListener("click", saveApiBase);
+restoreLoginUsername();
+if (loginUsernameInput instanceof HTMLInputElement) {
+  loginUsernameInput.addEventListener("input", persistLoginUsername);
+  loginUsernameInput.addEventListener("change", persistLoginUsername);
+}
+bindPdaLoginFocusHandling();
 
 const FIELD_LABELS = {
   username: "用户名",
@@ -31395,6 +31449,7 @@ async function loadRackView(kind) {
 
 async function submitLogin(event) {
   event.preventDefault();
+  persistLoginUsername();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
   let result;
