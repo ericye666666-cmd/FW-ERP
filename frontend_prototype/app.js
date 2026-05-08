@@ -48,12 +48,14 @@ const apparelDefaultCostFlow = globalThis.ApparelDefaultCostFlow || {};
 const apparelSortingRackFlow = globalThis.ApparelSortingRackFlow || {};
 const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "/store-delivery-shipments";
 const PDA_STAGING_HOST = "fw-erp-34-35-52-250.nip.io";
+const PDA_STAGING_ORIGIN = `https://${PDA_STAGING_HOST}`;
 const PDA_STAGING_API_BASE = "https://fw-erp-34-35-52-250.nip.io/api/v1";
 const LOCAL_DEV_API_BASE = "http://127.0.0.1:8000/api/v1";
 
 const authPage = document.querySelector("#authPage");
 const appShell = document.querySelector("#appShell");
 const apiBaseInput = document.querySelector("#apiBase");
+const apiModeIndicator = document.querySelector("#apiModeIndicator");
 const loginUsernameInput = document.querySelector("#loginForm [name='username']");
 const workspacePanels = document.querySelector("#workspacePanels");
 const sessionSummary = document.querySelector("#sessionSummary");
@@ -2772,12 +2774,29 @@ function getAccessibleSectionsForWorkspace(workspace, user = currentSession.user
   return [...(profile.sections?.[workspace] || [])];
 }
 
-function defaultApiBase() {
+function isStagingAppOrigin() {
+  return String(window.location.origin || "").startsWith(PDA_STAGING_ORIGIN);
+}
+
+function isLocalDevHost() {
   const host = window.location.hostname || "";
-  if (host === PDA_STAGING_HOST) {
+  return !host || host === "127.0.0.1" || host === "localhost";
+}
+
+function isLoopbackApiBase(value = "") {
+  const apiBase = String(value || "").trim().toLowerCase();
+  return !apiBase
+    || apiBase.startsWith("http://127.0.0.1")
+    || apiBase.startsWith("http://localhost")
+    || apiBase.startsWith("https://127.0.0.1")
+    || apiBase.startsWith("https://localhost");
+}
+
+function defaultApiBase() {
+  if (isStagingAppOrigin()) {
     return PDA_STAGING_API_BASE;
   }
-  if (!host || host === "127.0.0.1" || host === "localhost") {
+  if (isLocalDevHost()) {
     return LOCAL_DEV_API_BASE;
   }
   if (window.location.protocol.startsWith("http")) {
@@ -2900,16 +2919,41 @@ function deleteDevTask(taskId = "") {
   return row;
 }
 
+function resolveApiBaseForCurrentOrigin(current = "", saved = "") {
+  if (isStagingAppOrigin()) {
+    return PDA_STAGING_API_BASE;
+  }
+  const currentBase = String(current || "").trim();
+  const savedBase = String(saved || "").trim();
+  return savedBase || currentBase || defaultApiBase();
+}
+
+function getInitialApiBase() {
+  const saved = (localStorage.getItem(STORAGE_KEYS.apiBase) || "").trim();
+  const current = apiBaseInput.value.trim();
+  return resolveApiBaseForCurrentOrigin(current, saved);
+}
+
 function getApiBase() {
   const saved = (localStorage.getItem(STORAGE_KEYS.apiBase) || "").trim();
   const current = apiBaseInput.value.trim();
-  return current || saved || defaultApiBase();
+  return resolveApiBaseForCurrentOrigin(current, saved);
 }
 
 function saveApiBase() {
-  const apiBase = apiBaseInput.value.trim() || defaultApiBase();
+  const apiBase = resolveApiBaseForCurrentOrigin(apiBaseInput.value.trim(), "");
   apiBaseInput.value = apiBase;
   localStorage.setItem(STORAGE_KEYS.apiBase, apiBase);
+  renderApiModeIndicator();
+}
+
+function renderApiModeIndicator() {
+  if (!(apiModeIndicator instanceof HTMLElement)) {
+    return;
+  }
+  const staging = isStagingAppOrigin() && getApiBase() === PDA_STAGING_API_BASE;
+  apiModeIndicator.hidden = !staging;
+  apiModeIndicator.textContent = staging ? "API mode: staging" : "";
 }
 
 function persistLoginUsername() {
@@ -4046,8 +4090,12 @@ function setActivePanel(panelKey, options = {}) {
   }
 }
 
-apiBaseInput.value = (localStorage.getItem(STORAGE_KEYS.apiBase) || "").trim() || defaultApiBase();
+apiBaseInput.value = getInitialApiBase();
+if (isStagingAppOrigin() && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
+  localStorage.setItem(STORAGE_KEYS.apiBase, PDA_STAGING_API_BASE);
+}
 document.querySelector("#saveBaseButton").addEventListener("click", saveApiBase);
+renderApiModeIndicator();
 restoreLoginUsername();
 if (loginUsernameInput instanceof HTMLInputElement) {
   loginUsernameInput.addEventListener("input", persistLoginUsername);
