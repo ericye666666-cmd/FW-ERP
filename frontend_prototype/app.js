@@ -93,13 +93,7 @@ const workspacePanelsList = [...document.querySelectorAll("[data-workspace-panel
 const testHomeLinks = [...document.querySelectorAll("[data-test-home-workspace]")];
 const TEST_HOME_TARGET_STORAGE_KEY = "retail_ops_test_home_target";
 
-localStorage.removeItem(STORAGE_KEYS.token);
-localStorage.removeItem(STORAGE_KEYS.user);
-
-let currentSession = {
-  token: "",
-  user: null,
-};
+let currentSession = getStoredSession();
 let priceAlertState = [];
 let returnCandidatesState = [];
 let selectedReturnBarcodes = new Set();
@@ -2816,6 +2810,30 @@ function safeParse(value, fallback) {
   }
 }
 
+function getStoredSession() {
+  return {
+    token: (localStorage.getItem(STORAGE_KEYS.token) || "").trim(),
+    user: safeParse(localStorage.getItem(STORAGE_KEYS.user), null),
+  };
+}
+
+function persistSession(session = currentSession) {
+  currentSession = {
+    token: String(session?.token || "").trim(),
+    user: session?.user || null,
+  };
+  if (currentSession.token) {
+    localStorage.setItem(STORAGE_KEYS.token, currentSession.token);
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.token);
+  }
+  if (currentSession.user) {
+    localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(currentSession.user));
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.user);
+  }
+}
+
 function createDevTaskId() {
   return `dev-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
@@ -3012,6 +3030,11 @@ function getWorkspaceSearchPlaceholder(workspace) {
 
 function getNormalizedRoleCode(user = currentSession.user) {
   return String(user?.role_code || "").trim().toLowerCase();
+}
+
+function requiresRoleLanding(user = currentSession.user) {
+  const roleCode = getNormalizedRoleCode(user);
+  return roleCode === "store_manager" || roleCode === "store_clerk" || CASHIER_ROLE_CODES.has(roleCode);
 }
 
 function getUserRoleLanding(user = currentSession.user) {
@@ -24756,13 +24779,34 @@ function parseJsonField(text, fallback) {
   return JSON.parse(trimmed);
 }
 
+function renderLoginRoutingFailure(user = currentSession.user) {
+  const landing = getUserRoleLanding(user);
+  const roleCode = getNormalizedRoleCode(user) || "-";
+  const target = landing?.label || landing?.panelTitle || `role ${roleCode}`;
+  const message = `登录成功，但无法进入默认工作台：${target}。请联系管理员检查角色路由。`;
+  authPage?.classList.remove("hidden-screen");
+  appShell?.classList.add("hidden-screen");
+  renderAuthResultSummary("error", message);
+  if (authOutput) {
+    authOutput.textContent = message;
+  }
+  window.scrollTo({ top: 0, behavior: "auto" });
+  return message;
+}
+
 function setSession(session) {
+  const token = String(session?.access_token || session?.token || "").trim();
   currentSession = {
-    token: session.access_token,
-    user: session.user,
+    token,
+    user: session?.user || null,
   };
+  persistSession(currentSession);
   renderSessionState();
-  applyUserDefaultLanding(session.user, { force: true });
+  const routed = applyUserDefaultLanding(currentSession.user, { force: true });
+  if (!routed && requiresRoleLanding(currentSession.user)) {
+    renderLoginRoutingFailure(currentSession.user);
+  }
+  return routed;
 }
 
 function clearLoginPasswordField() {
@@ -24838,9 +24882,13 @@ function renderSessionState() {
   setActiveWorkspace(activeWorkspace);
   renderAuthResultSummary("login", { user: currentSession.user });
   hydrateStoreDefaults();
-  refreshUserDirectoryForPickers({ force: true }).catch(() => {
+  if (requiresRoleLanding(currentSession.user)) {
     refreshAssignableUserPickers({ rerenderPanels: false });
-  });
+  } else {
+    refreshUserDirectoryForPickers({ force: true }).catch(() => {
+      refreshAssignableUserPickers({ rerenderPanels: false });
+    });
+  }
   applyUserDefaultLanding(currentSession.user);
   autoLoadRoleHome(currentSession.user);
   syncCashierTerminalMode();
@@ -31039,6 +31087,13 @@ async function refreshIntegrationSummaries() {
   });
 }
 
+async function loadPostLoginDataForRole(user = currentSession.user) {
+  if (requiresRoleLanding(user)) {
+    return;
+  }
+  await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
+}
+
 async function loadConfig() {
   const [stores, suppliers, barcode, labels, inboundShipments, baleRows, rawBales, chinaSources, apparelWeights, apparelDefaultCosts, apparelSortingRacks] = await Promise.all([
     request("/stores"),
@@ -31509,9 +31564,12 @@ async function submitLogin(event) {
   } finally {
     ensureLoginPasswordCleared();
   }
-  setSession(result);
+  const routed = setSession(result);
+  if (!routed && requiresRoleLanding(currentSession.user)) {
+    return;
+  }
   renderAuthResultSummary("login", result);
-  await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
+  await loadPostLoginDataForRole(currentSession.user);
 }
 
 async function submitLogout() {
@@ -31545,8 +31603,9 @@ async function refreshSession() {
   try {
     const user = await request("/auth/me");
     currentSession.user = user;
+    persistSession(currentSession);
     renderSessionState();
-    await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
+    await loadPostLoginDataForRole(currentSession.user);
   } catch (error) {
     authOutput.textContent = error.message;
     renderAuthResultSummary("error", error.message);

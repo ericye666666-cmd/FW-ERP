@@ -91,9 +91,9 @@ test("login page exposes a subtle staging API mode indicator", () => {
   assert.match(appJs, /renderApiModeIndicator\(\);/);
 });
 
-test("login page cache-busts app and style assets for the PDA hardfix", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-login-hardfix-203" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-login-hardfix-203"><\/script>/);
+test("login page cache-busts app and style assets for the PDA session fix", () => {
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-login-session-204" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-login-session-204"><\/script>/);
 });
 
 test("login username is persisted and failed login does not force admin_1", () => {
@@ -105,6 +105,52 @@ test("login username is persisted and failed login does not force admin_1", () =
   assert.match(appJs, /loginUsernameInput\.addEventListener\("input", persistLoginUsername\)/);
   assert.match(submitLogin, /persistLoginUsername\(\);/);
   assert.doesNotMatch(bindForm, /admin_1/);
+});
+
+test("successful PDA login persists token and user before role routing", () => {
+  const setSession = extractFunctionSource("setSession");
+  const persistSession = extractFunctionSource("persistSession");
+  const beforeSessionInit = appJs.slice(0, appJs.indexOf("let currentSession = getStoredSession();"));
+
+  assert.match(appJs, /let currentSession = getStoredSession\(\);/);
+  assert.doesNotMatch(beforeSessionInit, /localStorage\.removeItem\(STORAGE_KEYS\.token\);\s*localStorage\.removeItem\(STORAGE_KEYS\.user\);/);
+  assert.match(persistSession, /localStorage\.setItem\(STORAGE_KEYS\.token,\s*currentSession\.token\)/);
+  assert.match(persistSession, /localStorage\.setItem\(STORAGE_KEYS\.user,\s*JSON\.stringify\(currentSession\.user\)\)/);
+  assert.match(setSession, /persistSession\(currentSession\)/);
+});
+
+test("successful store clerk PDA login routes to clerk workbench", () => {
+  const landing = extractFunctionSource("getUserRoleLanding");
+  const setSession = extractFunctionSource("setSession");
+  const submitLogin = extractFunctionSource("submitLogin");
+
+  assert.match(landing, /roleCode === "store_clerk"/);
+  assert.match(landing, /PDA 现场分堆标价 UI Preview/);
+  assert.match(setSession, /applyUserDefaultLanding\(currentSession\.user,\s*\{ force: true \}\)/);
+  assert.match(setSession, /renderLoginRoutingFailure\(currentSession\.user\)/);
+  assert.doesNotMatch(submitLogin, /Promise\.all\(\[loadDashboard\(\), loadConfig\(\), refreshIntegrationSummaries\(\)\]\)/);
+});
+
+test("successful store manager PDA login routes to manager workbench", () => {
+  const landing = extractFunctionSource("getUserRoleLanding");
+  const setSession = extractFunctionSource("setSession");
+
+  assert.match(landing, /roleCode === "store_manager"/);
+  assert.match(landing, /店长 PDA 工作台/);
+  assert.match(setSession, /applyUserDefaultLanding\(currentSession\.user,\s*\{ force: true \}\)/);
+});
+
+test("failed PDA login keeps staging API base and typed username", () => {
+  const submitLogin = extractFunctionSource("submitLogin");
+  const bindForm = extractFunctionSource("bindForm");
+  const clearSession = extractFunctionSource("clearSession");
+
+  assert.match(submitLogin, /persistLoginUsername\(\);/);
+  assert.doesNotMatch(bindForm, /admin_1/);
+  assert.doesNotMatch(clearSession, /admin_1/);
+  assert.doesNotMatch(bindForm, /apiBaseInput\.value\s*=/);
+  assert.doesNotMatch(clearSession, /apiBaseInput\.value\s*=/);
+  assert.match(bindForm, /renderErrorSummary\(summarySelector, message\)/);
 });
 
 test("mobile PDA auth layout hides Test Home before the login card", () => {
