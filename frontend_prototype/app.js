@@ -35958,6 +35958,13 @@ async function submitTransferBundle(event) {
       foundPreparedBarcodes: executionRecord.foundPreparedBarcodes,
     })
     : result.store_dispatch_bales;
+  const invalidSdbCategoryRow = (Array.isArray(displayStoreDispatchBales) ? displayStoreDispatchBales : []).find((row) => {
+    const sourceType = String(row?.source_type || "").trim().toUpperCase();
+    return sourceType === "SDB" && String(row?.category_warning || "").trim();
+  });
+  if (invalidSdbCategoryRow) {
+    throw new Error(invalidSdbCategoryRow.category_warning || "SDB must be single-category; selected SDB category is missing.");
+  }
   let storeDeliveryExecutionOrder = await request(`/transfers/${transferNo}/store-delivery-execution-orders`, {
     method: "POST",
     body: JSON.stringify({
