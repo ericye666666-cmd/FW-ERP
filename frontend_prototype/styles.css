@@ -753,6 +753,65 @@ body.cashier-terminal-mode .cashier-compat-shell {
   display: none;
 }
 
+body.pda-runtime-mode {
+  min-height: 100svh;
+  background: #f8fafc;
+}
+
+body.pda-runtime-mode .app-shell {
+  width: 100%;
+  min-height: 100svh;
+  padding: 0;
+  margin: 0;
+}
+
+body.pda-runtime-mode .workspace-top-panel {
+  display: none !important;
+}
+
+body.pda-runtime-mode .workspace-side-panel {
+  display: none !important;
+}
+
+body.pda-runtime-mode .workspace-tabs {
+  display: none !important;
+}
+
+body.pda-runtime-mode .workspace-page-bar {
+  display: none !important;
+}
+
+body.pda-runtime-mode .workspace-page-nav {
+  display: none !important;
+}
+
+body.pda-runtime-mode .workspace-shell {
+  display: block;
+  width: 100%;
+  min-height: 100svh;
+}
+
+body.pda-runtime-mode #workspacePanels {
+  display: block;
+  width: 100%;
+  min-height: 100svh;
+  padding: 0;
+}
+
+body.pda-runtime-mode #workspacePanels > .panel:not(.workspace-hidden):not(.panel-hidden) {
+  min-height: 100svh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+body.pda-runtime-mode #workspacePanels > .panel:not(.workspace-hidden):not(.panel-hidden) > .panel-head {
+  display: none !important;
+}
+
 .cashier-terminal-status {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -7734,6 +7793,41 @@ textarea:focus-visible,
   box-shadow: none;
 }
 
+body.pda-runtime-mode .store-mobile-runtime-shell {
+  min-height: 100svh;
+  border: 0;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+body.pda-runtime-mode .store-mobile-runtime-screen {
+  width: 100%;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #f8fafc;
+}
+
+body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  min-height: 52px;
+}
+
+body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-screen {
+  min-height: 0;
+  max-height: none;
+  padding: 12px;
+  overflow: auto;
+}
+
+body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
+}
+
 .store-mobile-preview-layout {
   display: grid;
   grid-template-columns: minmax(260px, 340px) minmax(360px, 1fr);
@@ -8447,6 +8541,36 @@ textarea:focus-visible,
   background: #171717;
   box-shadow: 0 22px 48px rgba(23, 23, 23, 0.18);
   overflow: hidden;
+}
+
+body.pda-runtime-mode .store-manager-pda-preview {
+  width: 100%;
+  min-height: 100svh;
+  display: block;
+}
+
+body.pda-runtime-mode .store-manager-pda-shell {
+  width: 100%;
+  height: 100svh;
+  border: 0;
+  border-radius: 0;
+  background: #f6f8f5;
+  box-shadow: none;
+}
+
+body.pda-runtime-mode .store-manager-pda-device-bar {
+  display: none !important;
+}
+
+body.pda-runtime-mode .store-manager-pda-screen {
+  min-height: 0;
+  overflow: auto;
+}
+
+body.pda-runtime-mode .store-manager-pda-bottom-tabs {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
 }
 
 .store-manager-pda-device-bar {

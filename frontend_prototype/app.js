@@ -3047,6 +3047,55 @@ function getNormalizedRoleCode(user = currentSession.user) {
   return String(user?.role_code || "").trim().toLowerCase();
 }
 
+function isDirectLoopPdaUserAgent() {
+  return String(navigator.userAgent || "").includes("DirectLoopPDA/1.0");
+}
+
+function isSmallPdaViewport() {
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(max-width: 880px)").matches;
+  }
+  return Number(window.innerWidth || 0) > 0 && Number(window.innerWidth || 0) <= 880;
+}
+
+function isPdaRuntimeRole(user = currentSession.user) {
+  const roleCode = getNormalizedRoleCode(user);
+  return roleCode === "store_clerk" || roleCode === "store_manager" || CASHIER_ROLE_CODES.has(roleCode);
+}
+
+function isPdaRuntimeMode(user = currentSession.user) {
+  return isDirectLoopPdaUserAgent() || (isSmallPdaViewport() && isPdaRuntimeRole(user));
+}
+
+function syncPdaRuntimeMode(user = currentSession.user) {
+  const enabled = Boolean(currentSession?.token && isPdaRuntimeMode(user));
+  document.body.classList.toggle("pda-runtime-mode", enabled);
+  appShell?.classList.toggle("pda-runtime-mode", enabled);
+  if (enabled) {
+    const roleCode = getNormalizedRoleCode(user);
+    document.body.dataset.pdaRuntimeRole = roleCode;
+    appShell?.setAttribute("data-pda-runtime-role", roleCode);
+  } else {
+    delete document.body.dataset.pdaRuntimeRole;
+    appShell?.removeAttribute("data-pda-runtime-role");
+  }
+  return enabled;
+}
+
+function renderActivePdaRuntimeSurface(panel = null) {
+  if (!isPdaRuntimeMode(currentSession.user)) {
+    return;
+  }
+  const title = String(panel?.dataset?.panelTitle || "");
+  if (title.startsWith("PDA 现场分堆标价 UI Preview")) {
+    renderStoreMobilePricingPreview();
+  } else if (title.startsWith("店长 PDA 工作台")) {
+    renderStoreManagerPdaPreview();
+  } else if (title.startsWith("9. 收银销售")) {
+    syncCashierTerminalMode();
+  }
+}
+
 function requiresRoleLanding(user = currentSession.user) {
   const roleCode = getNormalizedRoleCode(user);
   return roleCode === "store_manager" || roleCode === "store_clerk" || CASHIER_ROLE_CODES.has(roleCode);
@@ -3605,7 +3654,7 @@ function renderStoreManagerPdaPreview(tabId = activeStoreManagerPdaTab) {
         ? renderStoreManagerPdaOther()
         : renderStoreManagerPdaOverview();
   target.innerHTML = `
-    <div class="store-manager-pda-shell">
+    <div class="store-manager-pda-shell" data-pda-runtime-surface="store-manager">
       <div class="store-manager-pda-device-bar">
         <span>${escapeHtml(STORE_MANAGER_PDA_MOCK.storeCode)}</span>
         <strong>${escapeHtml(STORE_MANAGER_PDA_MOCK.managerName)}</strong>
@@ -4094,6 +4143,9 @@ function setActivePanel(panelKey, options = {}) {
     if (window.location.hash !== nextHash) {
       window.location.hash = nextHash;
     }
+  }
+  if (syncPdaRuntimeMode(currentSession.user)) {
+    renderActivePdaRuntimeSurface(targetPanel);
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (currentSession?.token && panelKey === getPanelKeyByTitle("warehouse", "0.1 创建分拣任务")) {
@@ -24852,6 +24904,7 @@ function clearSession(message = "Not signed in.") {
   localStorage.removeItem(STORAGE_KEYS.user);
   document.body.classList.remove("cashier-terminal-mode");
   appShell?.classList.remove("cashier-terminal-mode");
+  syncPdaRuntimeMode(null);
   if (sessionSummary) {
     sessionSummary.textContent = "未登录";
   }
@@ -24890,6 +24943,7 @@ function renderSessionState() {
   logoutButton.disabled = false;
   authPage?.classList.add("hidden-screen");
   appShell?.classList.remove("hidden-screen");
+  syncPdaRuntimeMode(currentSession.user);
   writeOutput("#authOutput", {
     signed_in_as: currentSession.user.username,
     role: currentSession.user.role_code,
@@ -30549,8 +30603,8 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
   `;
 }
 
-function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
-  const pages = [
+function getStoreMobilePageOptions() {
+  return [
     { key: "tasks", label: "我的 SDP 任务" },
     { key: "detail", label: "SDP 详情" },
     { key: "pricing", label: "现场分堆标价" },
@@ -30559,8 +30613,46 @@ function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
     { key: "print_task", label: "本组打印任务" },
     { key: "print_queue", label: "打印队列预览" },
   ];
+}
+
+function getStoreMobileActivePageLabel(state = storeMobilePricingPreviewState) {
+  const activePage = String(state.activePage || "pricing");
+  return getStoreMobilePageOptions().find((page) => page.key === activePage)?.label || "现场分堆标价";
+}
+
+function renderStoreMobileBottomTabs(state = storeMobilePricingPreviewState) {
   const bottomTabs = ["任务", "扫描", "标价", "打印", "我的"];
   const activePage = String(state.activePage || "pricing");
+  return `
+    ${bottomTabs.map((tab) => `
+      <button type="button" class="${(tab === "标价" && ["pricing", "groups", "editor", "generation"].includes(activePage)) || (tab === "打印" && ["print_task", "print_queue"].includes(activePage)) || (tab === "任务" && ["tasks", "detail"].includes(activePage)) ? "is-active" : ""}" data-mobile-pricing-page="${tab === "任务" ? "tasks" : tab === "打印" ? "print_queue" : tab === "标价" ? "pricing" : activePage}">
+        <span>${escapeHtml(tab === "任务" ? "▣" : tab === "扫描" ? "⌗" : tab === "标价" ? "¥" : tab === "打印" ? "▤" : "○")}</span>
+        ${escapeHtml(tab)}
+      </button>
+    `).join("")}
+  `;
+}
+
+function renderStoreMobileRuntimeScreen(state = storeMobilePricingPreviewState) {
+  return `
+    <section class="store-mobile-runtime-screen" data-pda-runtime-surface="store-clerk">
+      <header class="mobile-pricing-topbar">
+        <div class="mobile-pricing-titlebar">
+          <strong>${escapeHtml(getStoreMobileActivePageLabel(state))}</strong>
+          <span>⌗</span>
+        </div>
+      </header>
+      <main class="mobile-pricing-screen">
+        ${renderStoreMobileDeviceScreen(state)}
+      </main>
+      <nav class="mobile-pricing-tabbar" aria-label="店员 PDA tabs">
+        ${renderStoreMobileBottomTabs(state)}
+      </nav>
+    </section>
+  `;
+}
+
+function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
   return `
     <div class="android-pda-frame" aria-label="Android PDA preview">
       <div class="android-pda-speaker"></div>
@@ -30571,7 +30663,7 @@ function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
             <span>Wi-Fi · 100%</span>
           </div>
           <div class="mobile-pricing-titlebar">
-            <strong>${escapeHtml(pages.find((page) => page.key === activePage)?.label || "现场分堆标价")}</strong>
+            <strong>${escapeHtml(getStoreMobileActivePageLabel(state))}</strong>
             <span>⌗</span>
           </div>
         </header>
@@ -30579,12 +30671,7 @@ function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
           ${renderStoreMobileDeviceScreen(state)}
         </main>
         <nav class="mobile-pricing-tabbar">
-          ${bottomTabs.map((tab) => `
-            <button type="button" class="${(tab === "标价" && ["pricing", "groups", "editor", "generation"].includes(activePage)) || (tab === "打印" && ["print_task", "print_queue"].includes(activePage)) || (tab === "任务" && ["tasks", "detail"].includes(activePage)) ? "is-active" : ""}" data-mobile-pricing-page="${tab === "任务" ? "tasks" : tab === "打印" ? "print_queue" : tab === "标价" ? "pricing" : activePage}">
-              <span>${escapeHtml(tab === "任务" ? "▣" : tab === "扫描" ? "⌗" : tab === "标价" ? "¥" : tab === "打印" ? "▤" : "○")}</span>
-              ${escapeHtml(tab)}
-            </button>
-          `).join("")}
+          ${renderStoreMobileBottomTabs(state)}
         </nav>
       </div>
     </div>
@@ -30597,15 +30684,12 @@ function renderStoreMobilePricingPreview() {
     return;
   }
   const state = storeMobilePricingPreviewState;
-  const pageOptions = [
-    ["tasks", "我的 SDP 任务"],
-    ["detail", "SDP 详情"],
-    ["pricing", "现场分堆标价"],
-    ["groups", "价格组列表"],
-    ["generation", "本组 STORE_ITEM 生成结果"],
-    ["print_task", "本组打印任务"],
-    ["print_queue", "打印队列预览"],
-  ];
+  if (isPdaRuntimeMode()) {
+    target.className = "store-mobile-runtime-shell";
+    target.innerHTML = renderStoreMobileRuntimeScreen(state);
+    return;
+  }
+  const pageOptions = getStoreMobilePageOptions().map((page) => [page.key, page.label]);
   target.className = "report-summary store-mobile-preview-shell";
   target.innerHTML = `
     <div class="store-mobile-preview-layout">

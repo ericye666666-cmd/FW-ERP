@@ -92,8 +92,8 @@ test("login page exposes a subtle staging API mode indicator", () => {
 });
 
 test("login page cache-busts app and style assets for the PDA submit fix", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-login-submit-205" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-login-submit-205"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-mode-206" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-mode-206"><\/script>/);
 });
 
 test("login form cannot fall back to native GET with credentials in the URL", () => {
@@ -128,7 +128,7 @@ test("login button click fallback invokes JS login without native form GET", () 
 test("legacy WebView guard prevents GET fallback when app.js cannot parse", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
   const legacyGuardPosition = indexHtml.indexOf("function legacyPdaLoginGuard");
-  const appScriptPosition = indexHtml.indexOf('<script src="./app.js?v=pda-login-submit-205"></script>');
+  const appScriptPosition = indexHtml.indexOf('<script src="./app.js?v=pda-runtime-mode-206"></script>');
 
   assert.notEqual(legacyGuardPosition, -1, "legacy guard should exist");
   assert.ok(legacyGuardPosition < appScriptPosition, "legacy guard should bind before app.js loads");

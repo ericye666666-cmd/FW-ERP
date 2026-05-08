@@ -115,20 +115,23 @@ test("preview is store clerk only and removes manager role switching", () => {
 });
 
 test("PDA pricing preview includes the requested clerk workflow pages and Chinese-only statuses", () => {
+  const pageOptionsSource = extractFunctionSource(appJs, "getStoreMobilePageOptions");
+  const bottomTabsSource = extractFunctionSource(appJs, "renderStoreMobileBottomTabs");
   const frameSource = extractFunctionSource(appJs, "renderStoreMobileDeviceFrame");
 
-  assert.match(frameSource, /我的 SDP 任务/);
-  assert.match(frameSource, /SDP 详情/);
-  assert.match(frameSource, /现场分堆标价/);
-  assert.match(frameSource, /价格组列表/);
-  assert.match(frameSource, /本组 STORE_ITEM 生成结果/);
-  assert.match(frameSource, /本组打印任务/);
-  assert.match(frameSource, /打印队列预览/);
-  assert.match(frameSource, /任务/);
-  assert.match(frameSource, /扫描/);
-  assert.match(frameSource, /标价/);
-  assert.match(frameSource, /打印/);
-  assert.match(frameSource, /我的/);
+  assert.match(pageOptionsSource, /我的 SDP 任务/);
+  assert.match(pageOptionsSource, /SDP 详情/);
+  assert.match(pageOptionsSource, /现场分堆标价/);
+  assert.match(pageOptionsSource, /价格组列表/);
+  assert.match(pageOptionsSource, /本组 STORE_ITEM 生成结果/);
+  assert.match(pageOptionsSource, /本组打印任务/);
+  assert.match(pageOptionsSource, /打印队列预览/);
+  assert.match(bottomTabsSource, /任务/);
+  assert.match(bottomTabsSource, /扫描/);
+  assert.match(bottomTabsSource, /标价/);
+  assert.match(bottomTabsSource, /打印/);
+  assert.match(bottomTabsSource, /我的/);
+  assert.match(frameSource, /renderStoreMobileDeviceScreen\(state\)/);
   assert.doesNotMatch(frameSource, /pending_print|pending_putaway|resolver projection|source_token_refs|lineage payload|transfer projection/);
 });
 
