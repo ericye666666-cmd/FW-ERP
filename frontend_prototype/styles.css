@@ -9076,6 +9076,13 @@ body.cashier-terminal-mode .workspace-side-panel {
   display: none;
 }
 
+body.cashier-terminal-mode .workspace-page-bar,
+body.cashier-terminal-mode #workspacePrevButton,
+body.cashier-terminal-mode #workspaceNextButton,
+body.cashier-terminal-mode #workspacePageSearch {
+  display: none !important;
+}
+
 body.cashier-terminal-mode .workspace-shell {
   display: block;
 }

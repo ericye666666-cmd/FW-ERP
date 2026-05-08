@@ -128,9 +128,25 @@ test("POS sale completion records source chain and marks only scanned STORE_ITEM
 
 test("cashier terminal shell only activates on the POS sales panel", () => {
   const terminalModeSource = extractFunctionSource(appJs, "syncCashierTerminalMode");
-  assert.match(terminalModeSource, /isCashierTerminalRole\(\)/);
-  assert.match(terminalModeSource, /isCashierTerminalPanelActive\(\)/);
+  assert.match(terminalModeSource, /isCashierTerminalFullScreenActive\(\)/);
   assert.doesNotMatch(terminalModeSource, /const enabled = Boolean\(currentSession\.user\) && isCashierTerminalRole\(\);/);
+});
+
+test("POS full-screen entry pushes a cashier history state and browser Back exits to the previous store panel", () => {
+  const enterSource = extractFunctionSource(appJs, "enterCashierTerminalFullScreen");
+  const exitSource = extractFunctionSource(appJs, "exitCashierTerminalFullScreen");
+  const popStateSource = extractFunctionSource(appJs, "handleCashierTerminalPopState");
+  const setActivePanelSource = extractFunctionSource(appJs, "setActivePanel");
+
+  assert.match(indexHtml, /data-terminal-action="exit-pos"[\s\S]*退出收银台/);
+  assert.match(enterSource, /previousPanelKey/);
+  assert.match(enterSource, /view:\s*"pos-cashier"/);
+  assert.match(enterSource, /window\.history\.pushState\(/);
+  assert.match(setActivePanelSource, /enterCashierTerminalFullScreen\(\{\s*previousPanelKey:/);
+  assert.match(popStateSource, /exitCashierTerminalFullScreen\(\{\s*syncHistory:\s*false/);
+  assert.match(appJs, /window\.addEventListener\("popstate",\s*handleCashierTerminalPopState\)/);
+  assert.match(exitSource, /setActivePanel\(fallbackPanelKey/);
+  assert.doesNotMatch(exitSource, /submitLogout|clearSession|authPage|hidden-screen/);
 });
 
 test("cashier terminal hidden drawer does not cover the POS screen", () => {

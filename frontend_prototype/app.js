@@ -104,6 +104,7 @@ let saleRefundState = [];
 let paymentAnomalyState = [];
 let userDirectoryState = [];
 const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier"]);
+const POS_CASHIER_HISTORY_VIEW = "pos-cashier";
 const USER_ROLE_LABELS = {
   store_clerk: "店员",
   store_manager: "店长",
@@ -1117,6 +1118,7 @@ let sortingStockCategoryMainFilter = "";
 let sortingStockSearchText = "";
 let cashierTerminalClockTimer = null;
 let cashierTerminalPrimedStoreCode = "";
+let cashierTerminalReturnPanelKey = "";
 let cashierTerminalState = createCashierTerminalState();
 let sortingStockMinLooseQtyFilter = "";
 let activeSortingCompressionGroupKey = "";
@@ -3916,6 +3918,7 @@ function setActivePanel(panelKey, options = {}) {
   if (!panelKey) {
     return;
   }
+  const previousPanelKey = activePanelKey;
   const targetPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === panelKey);
   if (!targetPanel) {
     return;
@@ -3959,11 +3962,16 @@ function setActivePanel(panelKey, options = {}) {
     panel.classList.toggle("panel-hidden", !(sameWorkspace && accessible && panel.dataset.panelKey === activePanelKey));
   });
   renderWorkspacePageNav();
-  if (syncHash) {
+  const enteringCashierTerminal = panelKey === getCashierTerminalSalesPanelKey();
+  if (syncHash && enteringCashierTerminal) {
+    enterCashierTerminalFullScreen({ previousPanelKey: previousPanelKey });
+  } else if (syncHash) {
     const nextHash = `#${encodeURIComponent(activePanelKey)}`;
     if (window.location.hash !== nextHash) {
       window.location.hash = nextHash;
     }
+  } else if (enteringCashierTerminal) {
+    enterCashierTerminalFullScreen({ previousPanelKey: previousPanelKey, pushHistory: false });
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
   if (currentSession?.token && panelKey === getPanelKeyByTitle("warehouse", "0.1 创建分拣任务")) {
@@ -3993,7 +4001,7 @@ function setActivePanel(panelKey, options = {}) {
     loadTransferPlanningContext({ force: true }).catch(() => {});
   }
   syncCashierTerminalMode();
-  if (isCashierTerminalRole() && panelKey === getCashierTerminalSalesPanelKey()) {
+  if (isCashierTerminalFullScreenActive()) {
     focusCashierTerminalScanInput({ select: false });
   }
 }
@@ -24684,6 +24692,7 @@ function ensureLoginPasswordCleared() {
 function clearSession(message = "Not signed in.") {
   currentSession = { token: "", user: null };
   cashierTerminalPrimedStoreCode = "";
+  cashierTerminalReturnPanelKey = "";
   cashierTerminalState = createCashierTerminalState();
   clearSortingTaskLockedShipment();
   localStorage.removeItem(STORAGE_KEYS.token);
@@ -24849,6 +24858,99 @@ function isCashierTerminalPanelActive() {
   return Boolean(getCashierTerminalSalesPanelKey()) && activePanelKey === getCashierTerminalSalesPanelKey();
 }
 
+function isCashierTerminalFullScreenActive() {
+  return Boolean(currentSession.user) && isCashierTerminalPanelActive();
+}
+
+function isValidCashierTerminalReturnPanel(panelKey) {
+  const key = String(panelKey || "").trim();
+  if (!key || key === getCashierTerminalSalesPanelKey()) {
+    return false;
+  }
+  const panel = workspacePanelsList.find((item) => item.dataset.panelKey === key);
+  return Boolean(panel && panel.dataset.workspacePanel === "store" && isPanelAccessible(panel));
+}
+
+function getCashierTerminalReturnPanelKey(previousPanelKey = "") {
+  const preferredKey = String(previousPanelKey || "").trim();
+  if (isValidCashierTerminalReturnPanel(preferredKey)) {
+    return preferredKey;
+  }
+  if (isValidCashierTerminalReturnPanel(cashierTerminalReturnPanelKey)) {
+    return cashierTerminalReturnPanelKey;
+  }
+  const storePanels = getOrderedPanelsForWorkspace("store").filter((panel) =>
+    isValidCashierTerminalReturnPanel(panel.dataset.panelKey),
+  );
+  const cashierFallback = storePanels.find((panel) => getWorkspacePanelNavMeta(panel).section === "cashier");
+  return cashierFallback?.dataset.panelKey || storePanels[0]?.dataset.panelKey || "";
+}
+
+function getCashierTerminalPanelHash(panelKey) {
+  return `#${encodeURIComponent(panelKey || "")}`;
+}
+
+function enterCashierTerminalFullScreen({ previousPanelKey = "", pushHistory = true } = {}) {
+  if (!currentSession.user || !isCashierTerminalPanelActive()) {
+    return;
+  }
+  const salesPanelKey = getCashierTerminalSalesPanelKey();
+  const returnPanelKey = getCashierTerminalReturnPanelKey(previousPanelKey);
+  if (returnPanelKey) {
+    cashierTerminalReturnPanelKey = returnPanelKey;
+  }
+  if (!pushHistory || !window.history?.pushState) {
+    return;
+  }
+  const currentState = window.history.state || {};
+  if (currentState.view === POS_CASHIER_HISTORY_VIEW && currentState.panelKey === salesPanelKey) {
+    return;
+  }
+  window.history.pushState(
+    {
+      view: "pos-cashier",
+      panelKey: salesPanelKey,
+      returnPanelKey: cashierTerminalReturnPanelKey || "",
+    },
+    "",
+    getCashierTerminalPanelHash(salesPanelKey),
+  );
+}
+
+function exitCashierTerminalFullScreen({ syncHistory = true, fallbackPanelKey = "" } = {}) {
+  fallbackPanelKey = getCashierTerminalReturnPanelKey(fallbackPanelKey || cashierTerminalReturnPanelKey);
+  cashierTerminalState.activeDrawer = "";
+  if (!fallbackPanelKey) {
+    syncCashierTerminalMode();
+    return;
+  }
+  setActivePanel(fallbackPanelKey, { syncHash: false });
+  cashierTerminalReturnPanelKey = fallbackPanelKey;
+  if (!syncHistory) {
+    return;
+  }
+  const nextHash = getCashierTerminalPanelHash(fallbackPanelKey);
+  if (window.history?.replaceState) {
+    window.history.replaceState({ view: "store-menu", panelKey: fallbackPanelKey }, "", nextHash);
+  } else if (window.location.hash !== nextHash) {
+    window.location.hash = nextHash;
+  }
+}
+
+function handleCashierTerminalPopState(event) {
+  if (!isCashierTerminalPanelActive()) {
+    return;
+  }
+  if (event.state?.view === POS_CASHIER_HISTORY_VIEW) {
+    return;
+  }
+  const hashPanelKey = getHashPanelKey();
+  const fallbackPanelKey = isValidCashierTerminalReturnPanel(hashPanelKey)
+    ? hashPanelKey
+    : cashierTerminalReturnPanelKey;
+  exitCashierTerminalFullScreen({ syncHistory: false, fallbackPanelKey });
+}
+
 function getCashierTerminalStoreCode() {
   return getCurrentStoreCodeFallback();
 }
@@ -24894,7 +24996,7 @@ function formatCashierTerminalShiftStatus(status) {
 }
 
 function syncCashierTerminalMode() {
-  const enabled = Boolean(currentSession.user) && isCashierTerminalRole() && isCashierTerminalPanelActive();
+  const enabled = isCashierTerminalFullScreenActive();
   document.body.classList.toggle("cashier-terminal-mode", enabled);
   appShell?.classList.toggle("cashier-terminal-mode", enabled);
   if (!enabled) {
@@ -24905,7 +25007,7 @@ function syncCashierTerminalMode() {
 }
 
 function focusCashierTerminalScanInput({ select = true } = {}) {
-  if (!isCashierTerminalRole() || !isCashierTerminalPanelActive() || !(cashierTerminalBarcodeInput instanceof HTMLInputElement)) {
+  if (!isCashierTerminalFullScreenActive() || !(cashierTerminalBarcodeInput instanceof HTMLInputElement)) {
     return;
   }
   window.setTimeout(() => {
@@ -26234,6 +26336,9 @@ function handleCashierTerminalNetworkChange() {
 
 async function handleCashierTerminalAction(action, target) {
   switch (action) {
+    case "exit-pos":
+      exitCashierTerminalFullScreen();
+      return;
     case "logout":
       await submitLogout();
       return;
@@ -26326,7 +26431,7 @@ async function handleCashierTerminalAction(action, target) {
 }
 
 function handleCashierTerminalHotkeys(event) {
-  if (!isCashierTerminalRole() || !isCashierTerminalPanelActive() || event.altKey || event.ctrlKey || event.metaKey) {
+  if (!isCashierTerminalFullScreenActive() || event.altKey || event.ctrlKey || event.metaKey) {
     return;
   }
   if (event.key === "F2") {
@@ -35918,6 +36023,8 @@ workspaceNextButton?.addEventListener("click", () => {
 window.addEventListener("hashchange", () => {
   applyHashRoute();
 });
+
+window.addEventListener("popstate", handleCashierTerminalPopState);
 
 function handleJsonBuilderInputEvent(event) {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-builder-input]") : null;
