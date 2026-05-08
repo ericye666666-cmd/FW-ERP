@@ -57,6 +57,7 @@ const appShell = document.querySelector("#appShell");
 const apiBaseInput = document.querySelector("#apiBase");
 const apiModeIndicator = document.querySelector("#apiModeIndicator");
 const loginUsernameInput = document.querySelector("#loginForm [name='username']");
+const loginSubmitButton = document.querySelector("#loginSubmitButton");
 const workspacePanels = document.querySelector("#workspacePanels");
 const sessionSummary = document.querySelector("#sessionSummary");
 const appSessionMeta = document.querySelector("#appSessionMeta");
@@ -2974,6 +2975,20 @@ function renderApiModeIndicator() {
   apiModeIndicator.textContent = staging ? "API mode: staging" : "";
 }
 
+function removeUnsafeLoginQueryParams() {
+  if (!window.location.search || !window.history || typeof window.history.replaceState !== "function") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  const hasUnsafeLoginParams = url.searchParams.has("username") || url.searchParams.has("password");
+  if (!hasUnsafeLoginParams) {
+    return;
+  }
+  url.searchParams.delete("username");
+  url.searchParams.delete("password");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function persistLoginUsername() {
   if (!(loginUsernameInput instanceof HTMLInputElement)) {
     return;
@@ -4113,6 +4128,7 @@ function setActivePanel(panelKey, options = {}) {
   }
 }
 
+removeUnsafeLoginQueryParams();
 apiBaseInput.value = getInitialApiBase();
 if (isStagingAppOrigin() && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
   localStorage.setItem(STORAGE_KEYS.apiBase, PDA_STAGING_API_BASE);
@@ -31552,9 +31568,18 @@ async function loadRackView(kind) {
 
 async function submitLogin(event) {
   event.preventDefault();
+  event.stopPropagation();
+  const form = event.currentTarget;
+  return submitLoginFromForm(form);
+}
+
+async function submitLoginFromForm(form) {
+  if (!(form instanceof HTMLFormElement)) {
+    throw new Error("Login form is not available.");
+  }
   persistLoginUsername();
-  const form = new FormData(event.currentTarget);
-  const payload = Object.fromEntries(form.entries());
+  const formData = new FormData(form);
+  const payload = Object.fromEntries(formData.entries());
   let result;
   try {
     result = await request("/auth/login", {
@@ -31570,6 +31595,32 @@ async function submitLogin(event) {
   }
   renderAuthResultSummary("login", result);
   await loadPostLoginDataForRole(currentSession.user);
+}
+
+function renderLoginSubmitError(error) {
+  const message = formatErrorMessage(error);
+  writeOutput("#authOutput", "");
+  renderErrorSummary("#authResultSummary", message);
+  ensureLoginPasswordCleared();
+}
+
+function bindLoginSubmitFallback() {
+  if (!(loginSubmitButton instanceof HTMLButtonElement)) {
+    return;
+  }
+  loginSubmitButton.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const form = loginSubmitButton.form;
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+    try {
+      await submitLoginFromForm(form);
+    } catch (error) {
+      renderLoginSubmitError(error);
+    }
+  });
 }
 
 async function submitLogout() {
@@ -35400,6 +35451,7 @@ loadSystemPrinters()
   .catch(() => {});
 
 bindForm("#loginForm", submitLogin, "#authOutput");
+bindLoginSubmitFallback();
 bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
 bindForm("#storeRetailSeedForm", submitStoreRetailSeed, "#storeRetailSeedOutput");
