@@ -63,29 +63,46 @@ test("PDA bottom nav is fixed or sticky at the physical screen bottom for manage
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.store-mobile-runtime-screen\s+\.mobile-pricing-screen[\s\S]*padding-bottom:\s*calc/);
 });
 
-test("manager task list shows the SDO260504008 demo receiving task", () => {
+test("manager runtime state is backend-backed, store scoped, and no longer seeds demo SDO data", () => {
   const stateSource = functionSource(appJs, "createStoreManagerPdaTaskState");
+  const backendLoad = functionSource(appJs, "loadStoreManagerPdaBackendState");
   const taskList = functionSource(appJs, "renderStoreManagerPdaTaskList");
-  const runtimeBody = functionSource(appJs, "renderStoreManagerPdaRuntimeBody");
+  const renderPreview = functionSource(appJs, "renderStoreManagerPdaPreview");
 
-  assert.match(appJs, /retail_ops_pda_demo_store_task_state/);
-  assert.match(stateSource, /activeTab:\s*"receiving"/);
-  assert.match(stateSource, /display_code:\s*"SDO260504008"/);
-  assert.match(stateSource, /machine_code:\s*"4260504008"/);
-  assert.match(stateSource, /store_code:\s*"UTAWALA"/);
-  assert.match(stateSource, /source_code:\s*"SDB-TO202605-002"/);
-  assert.match(stateSource, /display_code:\s*"SDP261250002"/);
-  assert.match(stateSource, /machine_code:\s*"6261250002"/);
-  assert.match(stateSource, /category:\s*"牛仔裤"/);
-  assert.match(stateSource, /item_count:\s*210/);
-  assert.match(stateSource, /display_code:\s*"SDP261250003"/);
-  assert.match(stateSource, /category:\s*"女装上衣"/);
-  assert.match(stateSource, /item_count:\s*180/);
-  assert.match(taskList, /SDO260504008/);
-  assert.match(taskList, /开始收货/);
-  assert.match(taskList, /data-store-manager-pda-start-task/);
-  assert.match(runtimeBody, /activeTab === "receiving"/);
-  assert.match(runtimeBody, /renderStoreManagerPdaTaskFlow/);
+  assert.doesNotMatch(appJs, /retail_ops_pda_demo_store_task_state/);
+  assert.match(stateSource, /sdoTasks:\s*\[\]/);
+  assert.match(stateSource, /sdoTask:\s*null/);
+  assert.doesNotMatch(stateSource, /SDO260504008/);
+  assert.doesNotMatch(stateSource, /SDP261250002/);
+  assert.match(backendLoad, /await loadTransferOrders\(\)/);
+  assert.match(backendLoad, /await refreshUserDirectoryForPickers/);
+  assert.match(backendLoad, /getStoreManagerPdaSdoTasksForStore\(getCurrentStoreCodeFallback\(\)\)/);
+  assert.match(backendLoad, /getAssignableStoreClerks\(storeCode\)/);
+  assert.match(taskList, /暂无待收货 SDO，请先在仓库端完成 SDO 发货。/);
+  assert.match(renderPreview, /loadStoreManagerPdaBackendState/);
+});
+
+test("manager SDO task adapter maps real transfer SDO package data and keeps SDB/LPK as source references", () => {
+  const adapter = functionSource(appJs, "getStoreManagerPdaSdoTasksForStore");
+  const normalizeTask = functionSource(appJs, "normalizeStoreManagerPdaSdoTask");
+  const normalizePackage = functionSource(appJs, "normalizeStoreManagerPdaPackage");
+
+  assert.match(adapter, /getStoreReceivingPackageRows\(storeCode\)/);
+  assert.match(adapter, /groupStoreReceivingPackagesBySdo/);
+  assert.match(adapter, /store_code/);
+  assert.match(normalizeTask, /display_code/);
+  assert.match(normalizeTask, /machine_code/);
+  assert.match(normalizeTask, /source_code/);
+  assert.match(normalizeTask, /package_count/);
+  assert.match(normalizeTask, /total_item_count/);
+  assert.match(normalizeTask, /packages/);
+  assert.match(normalizePackage, /sdo_package_display_code/);
+  assert.match(normalizePackage, /sdo_package_machine_code/);
+  assert.match(normalizePackage, /source_code/);
+  assert.match(normalizePackage, /received_status/);
+  assert.match(normalizePackage, /exception_status/);
+  assert.match(normalizePackage, /assigned_clerk/);
+  assert.match(normalizePackage, /assignment_status/);
 });
 
 test("starting manager task opens SDO scan verification with scanner input", () => {
@@ -100,9 +117,9 @@ test("starting manager task opens SDO scan verification with scanner input", () 
   assert.match(actionHandler, /activePage = "scan"/);
 });
 
-test("manager SDO verification accepts only the assigned SDO display or machine code", () => {
+test("manager SDO verification accepts only SDO display or 4-prefix machine code for the current store", () => {
   const validate = executableFunction(appJs, "validateStoreManagerPdaSdoScanCode");
-  const taskVerifier = functionSource(appJs, "verifyStoreManagerPdaSdoBarcode");
+  const verifier = functionSource(appJs, "verifyStoreManagerPdaSdoBarcode");
 
   assert.equal(validate("SDO260504008").ok, true);
   assert.equal(validate("4260504008").ok, true);
@@ -112,72 +129,82 @@ test("manager SDO verification accepts only the assigned SDO display or machine 
     ["SDB-TO202605-002", /SDB \/ LPK 是仓库来源包/],
     ["LPK260500001", /SDB \/ LPK 是仓库来源包/],
     ["STORE_ITEM-DEMO-A-001", /STORE_ITEM 只能用于 POS 销售/],
-    ["SDO999999999", /不是当前 SDO 收货任务/],
   ].forEach(([code, pattern]) => {
     const result = validate(code);
     assert.equal(result.ok, false, `${code} should be rejected`);
     assert.match(result.error, pattern);
   });
-  assert.match(taskVerifier, /SDO260504008/);
-  assert.match(taskVerifier, /4260504008/);
-  assert.match(taskVerifier, /不是当前 SDO 收货任务/);
+  assert.match(verifier, /state\.sdoTasks/);
+  assert.match(verifier, /task\.store_code/);
+  assert.match(verifier, /不属于当前门店/);
+  assert.match(verifier, /当前门店没有这张 SDO 收货任务/);
+  assert.doesNotMatch(verifier, /SDO260504008/);
+  assert.doesNotMatch(verifier, /4260504008/);
 });
 
-test("successful SDO scan opens detail with both SDP packages", () => {
+test("successful SDO scan opens backend package detail rows", () => {
   const submitScan = functionSource(appJs, "handleStoreManagerPdaSdoScanSubmit");
   const detail = functionSource(appJs, "renderStoreManagerPdaSdoDetail");
+  const packageCard = functionSource(appJs, "renderStoreManagerPdaPackageCard");
 
   assert.match(submitScan, /state\.verified = true/);
   assert.match(submitScan, /state\.scanSuccess = "核对成功"/);
   assert.match(submitScan, /state\.activePage = "detail"/);
-  assert.match(detail, /SDO260504008/);
+  assert.match(submitScan, /state\.sdoTask = validation\.task/);
   assert.match(detail, /Package count|包裹数/);
   assert.match(detail, /Total item count|总件数/);
   assert.match(detail, /renderStoreManagerPdaPackageCard/);
-  assert.match(appJs, /display_code:\s*"SDP261250002"/);
-  assert.match(appJs, /display_code:\s*"SDP261250003"/);
+  assert.match(packageCard, /source_code/);
+  assert.match(packageCard, /SDB \/ LPK 只作为来源参考/);
+  assert.doesNotMatch(detail, /演示任务：真实跨设备推送将在后端持久化阶段接入/);
 });
 
-test("package receiving, exception, assignment, and completion state transitions are implemented", () => {
+test("package receive, exception, assignment, and completion use backend package helpers", () => {
   const receivePackage = functionSource(appJs, "receiveStoreManagerPdaPackage");
   const markException = functionSource(appJs, "markStoreManagerPdaPackageException");
   const assignPackage = functionSource(appJs, "assignStoreManagerPdaPackageToClerk");
-  const updateCompletion = functionSource(appJs, "updateStoreManagerPdaTaskCompletion");
   const packageCard = functionSource(appJs, "renderStoreManagerPdaPackageCard");
   const completion = functionSource(appJs, "renderStoreManagerPdaCompletionSummary");
 
-  assert.match(receivePackage, /status = "已收货 \/ 待分配"/);
-  assert.match(markException, /status = "异常"/);
-  assert.match(assignPackage, /if \(pkg\.status === "异常"\)/);
-  assert.match(assignPackage, /return state/);
-  assert.match(assignPackage, /assigned_clerk = clerkName/);
-  assert.match(assignPackage, /status = "已分配"/);
+  assert.match(receivePackage, /await receiveStoreReceivingPackage/);
+  assert.match(markException, /await markStoreReceivingPackageException/);
+  assert.match(assignPackage, /await assignStoreReceivingPackagesToClerk/);
+  assert.match(receivePackage, /await loadTransferOrders\(\)/);
+  assert.match(assignPackage, /await loadStoreAssignedSdoPackageTasks/);
+  assert.match(assignPackage, /已分配给/);
   assert.match(packageCard, /分配店员/);
-  assert.match(packageCard, /Austin/);
-  assert.match(packageCard, /Nancy/);
-  assert.match(packageCard, /Kevin/);
-  assert.match(packageCard, /已推送给 Austin/);
-  assert.match(updateCompletion, /status = "已完成"/);
-  assert.match(updateCompletion, /activePage = "complete"/);
-  assert.match(completion, /Packages 2\/2 processed|包裹 2\/2 已处理/);
-  assert.match(completion, /Assigned 2|已分配 2/);
-  assert.match(completion, /Exceptions 0|异常 0/);
+  assert.match(packageCard, /availableClerks/);
+  assert.doesNotMatch(packageCard, /const clerkOptions = \["Austin", "Nancy", "Kevin"\]/);
+  assert.match(completion, /Packages|包裹/);
+  assert.match(completion, /Assigned|已分配/);
+  assert.match(completion, /Exceptions|异常/);
   assert.match(completion, /返回任务列表/);
 });
 
-test("manager other tab is scoped to PDA account settings", () => {
+test("manager available clerk list is data-driven from active UTAWALA store_clerk users", () => {
+  const backendLoad = functionSource(appJs, "loadStoreManagerPdaBackendState");
+  const packageCard = functionSource(appJs, "renderStoreManagerPdaPackageCard");
+
+  assert.match(backendLoad, /getAssignableStoreClerks\(storeCode\)/);
+  assert.match(backendLoad, /buildAssignableUserOptionRows/);
+  assert.match(packageCard, /state\.availableClerks/);
+  assert.match(packageCard, /data-store-manager-pda-clerk/);
+  assert.match(packageCard, /当前没有可分配店员/);
+  assert.doesNotMatch(packageCard, /已推送给 Austin/);
+});
+
+test("manager other tab is scoped to PDA account settings without demo reset", () => {
   const myTab = functionSource(appJs, "renderStoreManagerPdaMyTab");
 
   assert.match(myTab, /当前账号/);
-  assert.match(myTab, /store_manager_1/);
+  assert.match(myTab, /currentSession\.user/);
   assert.match(myTab, /门店/);
-  assert.match(myTab, /UTAWALA/);
+  assert.match(myTab, /getCurrentStoreCodeFallback/);
   assert.match(myTab, /角色/);
   assert.match(myTab, /店长/);
   assert.match(myTab, /PDA mode \/ version/);
   assert.match(myTab, /退出登录/);
-  assert.match(myTab, /重置演示任务状态/);
-  assert.match(myTab, /其他/);
+  assert.doesNotMatch(myTab, /重置演示任务状态/);
   assert.doesNotMatch(myTab, /warehouse|POS|经营总览|收退货|经营日志/i);
 });
 
@@ -192,17 +219,19 @@ test("PDA runtime does not render the desktop preview shell", () => {
   assert.match(renderPreview, /STORE_MANAGER_PDA_TABS/);
 });
 
-test("clerk PDA from #208 still keeps only tasks and my tabs", () => {
+test("clerk PDA from #208 still keeps two tabs and visibly notes that real assigned SDP linkage is not wired", () => {
   const bottomTabs = functionSource(appJs, "renderStoreMobileBottomTabs");
+  const taskList = functionSource(appJs, "renderStoreMobileTaskList");
   const actionHandler = functionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(bottomTabs, /const bottomTabs = \["任务", "我的"\]/);
   assert.doesNotMatch(bottomTabs, /扫描|标价|打印/);
+  assert.match(taskList, /当前店员端为演示流程；真实 assigned SDP 接入在后续 PR。/);
   assert.match(actionHandler, /mobilePricingStartTask/);
   assert.match(actionHandler, /advanceStoreMobileGroupWorkflow/);
 });
 
 test("manager PDA cache-busts app and style assets", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=manager-pda-task-flow-209" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=manager-pda-task-flow-209"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=manager-pda-backend-210" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=manager-pda-backend-210"><\/script>/);
 });
