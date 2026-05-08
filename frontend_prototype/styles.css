@@ -812,6 +812,24 @@ body.pda-runtime-mode #workspacePanels > .panel:not(.workspace-hidden):not(.pane
   display: none !important;
 }
 
+body.pda-runtime-mode .pda-runtime-error-shell {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 18px;
+}
+
+body.pda-runtime-mode .pda-runtime-error {
+  width: min(100%, 360px);
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #991b1b;
+  padding: 18px;
+  text-align: center;
+  box-shadow: 0 12px 28px rgba(153, 27, 27, 0.12);
+}
+
 .cashier-terminal-status {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));

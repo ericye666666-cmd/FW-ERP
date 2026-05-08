@@ -91,9 +91,9 @@ test("login page exposes a subtle staging API mode indicator", () => {
   assert.match(appJs, /renderApiModeIndicator\(\);/);
 });
 
-test("login page cache-busts app and style assets for the PDA submit fix", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-mode-206" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-mode-206"><\/script>/);
+test("login page cache-busts app and style assets for the PDA runtime content fix", () => {
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-content-207" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-content-207"><\/script>/);
 });
 
 test("login form cannot fall back to native GET with credentials in the URL", () => {
@@ -104,6 +104,19 @@ test("login form cannot fall back to native GET with credentials in the URL", ()
   assert.match(loginFormHtml, /novalidate/);
   assert.match(loginFormHtml, /id="loginSubmitButton"/);
   assert.doesNotMatch(loginFormHtml, /method="get"/i);
+});
+
+test("staging PDA username field does not hardcode admin_1", () => {
+  const loginFormHtml = indexHtml.match(/<form id="loginForm"[\s\S]*?<\/form>/)?.[0] || "";
+  const getDefaultLoginUsername = extractFunctionSource("getDefaultLoginUsername");
+  const restoreLoginUsername = extractFunctionSource("restoreLoginUsername");
+
+  assert.match(loginFormHtml, /name="username"/);
+  assert.doesNotMatch(loginFormHtml, /name="username"[^>]*value="admin_1"/);
+  assert.match(getDefaultLoginUsername, /localStorage\.getItem\(STORAGE_KEYS\.loginUsername\)/);
+  assert.match(getDefaultLoginUsername, /isStagingAppOrigin\(\) \|\| isDirectLoopPdaUserAgent\(\)/);
+  assert.match(getDefaultLoginUsername, /return "";/);
+  assert.match(restoreLoginUsername, /loginUsernameInput\.value = getDefaultLoginUsername\(\)/);
 });
 
 test("submitLogin blocks native form submission before making the auth request", () => {
@@ -128,7 +141,7 @@ test("login button click fallback invokes JS login without native form GET", () 
 test("legacy WebView guard prevents GET fallback when app.js cannot parse", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
   const legacyGuardPosition = indexHtml.indexOf("function legacyPdaLoginGuard");
-  const appScriptPosition = indexHtml.indexOf('<script src="./app.js?v=pda-runtime-mode-206"></script>');
+  const appScriptPosition = indexHtml.indexOf('<script src="./app.js?v=pda-runtime-content-207"></script>');
 
   assert.notEqual(legacyGuardPosition, -1, "legacy guard should exist");
   assert.ok(legacyGuardPosition < appScriptPosition, "legacy guard should bind before app.js loads");
@@ -145,6 +158,16 @@ test("legacy WebView guard prevents GET fallback when app.js cannot parse", () =
   assert.match(legacyGuard, /retail_ops_api_base/);
   assert.match(legacyGuard, /PDA 现场分堆标价 UI Preview/);
   assert.doesNotMatch(legacyGuard, /searchParams\.get\("password"\)/);
+});
+
+test("legacy WebView guard restores and persists last login username without password", () => {
+  const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+
+  assert.match(legacyGuard, /restoreLegacyLoginUsername/);
+  assert.match(legacyGuard, /localStorage\.getItem\("retail_ops_login_username"\)/);
+  assert.match(legacyGuard, /loginForm\.elements\.username\.value = savedUsername/);
+  assert.match(legacyGuard, /localStorage\.setItem\("retail_ops_login_username", username\)/);
+  assert.doesNotMatch(legacyGuard, /localStorage\.setItem\("retail_ops_login_password"/);
 });
 
 test("username and password query params are stripped without reading password", () => {
@@ -220,6 +243,15 @@ test("failed PDA login keeps staging API base and typed username", () => {
   assert.doesNotMatch(bindForm, /apiBaseInput\.value\s*=/);
   assert.doesNotMatch(clearSession, /apiBaseInput\.value\s*=/);
   assert.match(bindForm, /renderErrorSummary\(summarySelector, message\)/);
+});
+
+test("PDA logout does not reset username to admin_1", () => {
+  const clearSession = extractFunctionSource("clearSession");
+  const submitLogout = extractFunctionSource("submitLogout");
+
+  assert.doesNotMatch(clearSession, /loginUsernameInput\.value/);
+  assert.doesNotMatch(clearSession, /admin_1/);
+  assert.doesNotMatch(submitLogout, /admin_1/);
 });
 
 test("mobile PDA auth layout hides Test Home before the login card", () => {
