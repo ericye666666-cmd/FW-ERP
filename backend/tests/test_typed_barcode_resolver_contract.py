@@ -513,6 +513,107 @@ def test_sdo_package_resolves_for_store_receiving_and_is_rejected_by_pos(state):
     assert lpk_result["reject_reason"]
 
 
+def test_sdo_package_generation_uses_selected_allocation_quantities_for_sdb_and_lpk(state):
+    transfer_no = "TO-20260508-ALLOC"
+    _seed_transfer_with_dispatch_for_execution(state, transfer_no=transfer_no)
+    state.store_dispatch_bales.clear()
+    state.store_dispatch_bales["SDB-T0202605-001"] = {
+        "bale_no": "SDB-T0202605-001",
+        "machine_code": "2260508001",
+        "transfer_no": transfer_no,
+        "source_type": "SDB",
+        "source_code": "SDB-T0202605-001",
+        "source_bales": ["SDB-T0202605-001"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 300,
+        "category_summary": "pants / cargo pants",
+        "token_nos": [],
+    }
+    state.store_dispatch_bales["SDB-T0202605-002"] = {
+        "bale_no": "SDB-T0202605-002",
+        "machine_code": "2260508002",
+        "transfer_no": transfer_no,
+        "source_type": "SDB",
+        "source_code": "SDB-T0202605-002",
+        "source_bales": ["SDB-T0202605-002"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 210,
+        "category_summary": "jacket / jacket",
+        "token_nos": [],
+    }
+    state.store_dispatch_bales["LPK-T020260508026-PICK"] = {
+        "bale_no": "LPK-T020260508026-PICK",
+        "machine_code": "3260508026",
+        "transfer_no": transfer_no,
+        "source_type": "LPK",
+        "source_code": "LPK-T020260508026-PICK",
+        "source_bales": ["LPK-T020260508026-PICK"],
+        "status": "ready_dispatch",
+        "store_code": "UTAWALA",
+        "item_count": 20,
+        "category_summary": "pants / cargo pants",
+        "token_nos": [],
+    }
+
+    created = state.create_store_delivery_execution_order(
+        transfer_no,
+        {
+            "created_by": "warehouse_clerk_1",
+            "notes": "warehouse verified selected allocation",
+            "packages": [
+                {
+                    "source_type": "SDB",
+                    "source_code": "SDB-T0202605-001",
+                    "source_machine_code": "2260508001",
+                    "item_count": 300,
+                    "allocated_item_count": 100,
+                    "category_summary": "pants / cargo pants",
+                    "category_name": "pants / cargo pants",
+                },
+                {
+                    "source_type": "SDB",
+                    "source_code": "SDB-T0202605-002",
+                    "source_machine_code": "2260508002",
+                    "item_count": 210,
+                    "allocated_item_count": 100,
+                    "category_summary": "jacket / jacket",
+                    "category_name": "jacket / jacket",
+                },
+                {
+                    "source_type": "LPK",
+                    "source_code": "LPK-T020260508026-PICK",
+                    "source_machine_code": "3260508026",
+                    "item_count": 20,
+                    "allocated_item_count": 20,
+                    "category_summary": "pants / cargo pants",
+                    "category_name": "pants / cargo pants",
+                },
+            ],
+        },
+    )
+
+    packages = created["packages"]
+    assert len(packages) == 3
+    assert [package["item_count"] for package in packages] == [100, 100, 20]
+    assert [package["source_code"] for package in packages] == [
+        "SDB-T0202605-001",
+        "SDB-T0202605-002",
+        "LPK-T020260508026-PICK",
+    ]
+    assert [package["source_type"] for package in packages] == ["SDB", "SDB", "LPK"]
+    assert [package["content_summary"] for package in packages] == [
+        "pants / cargo pants",
+        "jacket / jacket",
+        "pants / cargo pants",
+    ]
+    assert [package["parent_sdo_display_code"] for package in packages] == [created["execution_order_no"]] * 3
+    assert [package["store_code"] for package in packages] == ["UTAWALA", "UTAWALA", "UTAWALA"]
+    assert [(package["package_no"], package["package_total"]) for package in packages] == [(1, 3), (2, 3), (3, 3)]
+    assert created["total_item_count"] == 220
+
+
 def test_list_store_delivery_execution_orders_does_not_create_sdo_packages_or_persist(state):
     state.store_delivery_execution_orders["SDO260504001"] = {
         "execution_order_no": "SDO260504001",

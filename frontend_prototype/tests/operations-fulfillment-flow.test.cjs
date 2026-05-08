@@ -653,7 +653,7 @@ test("transfer dispatch result display collapses category loose bales into one p
   assert.equal(rows[0].category_summary, "多类目补差 · 2 个类目");
   assert.equal(rows[0].item_count, 10);
   assert.deepEqual(rows[0].source_bales, ["LPK260423003"]);
-  assert.equal(rows[0].source_type, "loose_pick_sheet");
+  assert.equal(rows[0].source_type, "LPK");
 });
 
 test("transfer dispatch display uses backend dispatch bale numbers and keeps source bales separate", () => {
@@ -704,6 +704,63 @@ test("transfer dispatch display uses backend dispatch bale numbers and keeps sou
   assert.deepEqual(rows[1].source_bales, ["WB260423000049"]);
   assert.equal(rows[1].package_index, 2);
   assert.equal(rows[1].package_count, 2);
+});
+
+test("transfer dispatch display keeps selected SDO allocation quantity instead of full source package quantity", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "pants", category_sub: "cargo pants", requested_qty: 120 },
+      { category_main: "jacket", category_sub: "jacket", requested_qty: 100 },
+    ],
+    preparedBales: [
+      {
+        bale_no: "SDB-SOURCE-001",
+        bale_barcode: "WB260508000001",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "cargo pants",
+        qty: 100,
+      },
+      {
+        bale_no: "SDB-SOURCE-002",
+        bale_barcode: "WB260508000002",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "jacket",
+        category_sub: "jacket",
+        qty: 100,
+      },
+    ],
+    looseRows: [
+      { category_name: "pants / cargo pants", rack_code: "A-PT-CARGO-01", qty_on_hand: 20 },
+    ],
+  });
+  const looseTasks = buildLoosePackingTasks({ transferNo: "TO-20260508-ALLOC", plan, packageLimitQty: 200 });
+  const rows = buildTransferDispatchResultDisplayRows({
+    result: {
+      transfer_no: "TO-20260508-ALLOC",
+      to_store_code: "UTAWALA",
+      store_dispatch_bales: [
+        { bale_no: "SDB-T0202605-001", category_summary: "pants / cargo pants", item_count: 300, store_code: "UTAWALA" },
+        { bale_no: "SDB-T0202605-002", category_summary: "jacket / jacket", item_count: 210, store_code: "UTAWALA" },
+        { bale_no: "LPK-T020260508026-PICK", category_summary: "pants / cargo pants", item_count: 20, store_code: "UTAWALA" },
+      ],
+    },
+    plan,
+    looseTasks,
+  });
+
+  const byBaleNo = new Map(rows.map((row) => [row.bale_no, row]));
+  assert.equal(byBaleNo.get("SDB-T0202605-001")?.item_count, 100);
+  assert.equal(byBaleNo.get("SDB-T0202605-002")?.item_count, 100);
+  assert.equal(byBaleNo.get("LPK-T020260508026-PICK")?.item_count, 20);
+  assert.equal(byBaleNo.get("SDB-T0202605-001")?.allocated_item_count, 100);
+  assert.equal(byBaleNo.get("SDB-T0202605-002")?.allocated_item_count, 100);
+  assert.equal(byBaleNo.get("LPK-T020260508026-PICK")?.allocated_item_count, 20);
+  assert.equal(byBaleNo.get("SDB-T0202605-001")?.source_type, "SDB");
+  assert.equal(byBaleNo.get("SDB-T0202605-002")?.source_type, "SDB");
+  assert.equal(byBaleNo.get("LPK-T020260508026-PICK")?.source_type, "LPK");
 });
 
 test("transfer planning rows fall back to cached category demand when backend order has empty lines", () => {
@@ -972,6 +1029,7 @@ test("final transfer dispatch print uses SDO_PACKAGE 60x40 payload and package m
   assert.match(submitBundleSource, /const sdoPrintTransfer = \{[\s\S]*store_delivery_execution_order:\s*storeDeliveryExecutionOrder/);
   assert.match(submitBundleSource, /storeDeliveryExecutionOrder = await ensureSdoPackagePrintRowsForTransfer/);
   assert.match(submitBundleSource, /transfer:\s*sdoPrintTransfer/);
+  assert.match(submitBundleSource, /allocated_item_count:\s*parseKnownDispatchItemCount\(row\)/);
   assert.match(sdoModalSource, /const jobs = buildSDOPrintJobs\(\{/);
   assert.match(appJs, /当前 SDO 缺少实体包码，请先生成 SDO_PACKAGE 后再打印。/);
   assert.match(sdoJobSource, /throw new Error\("正式 SDO barcode 缺少 display_code/);

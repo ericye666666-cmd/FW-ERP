@@ -791,13 +791,19 @@ def _build_tspl_label_lines(payload: dict) -> list[tuple[int, int, str, int, int
             _first_label_value(payload, "source_code", "source_package_summary", "source_reference", default="-"),
             max_len=22,
         )
+        category = _tspl_ascii_value(
+            _first_label_value(payload, "content_summary", "category_summary", "category_display", "category", default="-"),
+            max_len=22,
+        ).upper()
         item_count = _tspl_ascii_value(_first_label_value(payload, "item_count", "qty", "quantity", default="-"), max_len=8)
         return [
-            (20, 8, "SDO DELIVERY", 2, 2, 14),
-            (20, 44, f"{store}  PKG {package_position}", 1, 1, 28),
-            (20, 76, display_code or "-", 2, 2, 14),
-            (20, 118, f"SRC {source_code}", 1, 1, 26),
-            (20, 146, f"QTY {item_count}", 1, 1, 14),
+            (20, 8, "SDP PACKAGE", 2, 2, 12),
+            (330, 12, store, 1, 2, 10),
+            (20, 46, f"PKG {package_position}", 1, 2, 10),
+            (250, 42, f"QTY {item_count}", 2, 2, 8),
+            (20, 88, display_code or "-", 2, 2, 14),
+            (20, 132, f"CAT {category}", 1, 1, 22),
+            (20, 160, f"SRC {source_code}", 1, 1, 22),
         ]
     if family == "store_item":
         return [

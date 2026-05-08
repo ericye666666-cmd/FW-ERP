@@ -12763,7 +12763,8 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     || derivedMachineCode;
   const categorySummary = String(row.category_summary || row.category_name || "送店 bale").trim();
   const storeCode = String(row.store_code || transfer?.to_store_code || "").trim().toUpperCase();
-  const sourceLabel = String(row.source_label || (row.source_type === "loose_pick_sheet" ? "补差拣货单" : "现成待送店包裹")).trim();
+  const normalizedSourceType = String(row.source_type || "").trim().toUpperCase();
+  const sourceLabel = String(row.source_label || (normalizedSourceType === "LPK" || row.source_type === "loose_pick_sheet" ? "补差拣货单" : "现成待送店包裹")).trim();
   const itemCount = Number(row.item_count || row.qty || 0) || 0;
   const sourceCode = String(row.source_code || finalBaleNo || sourceBales[0] || "").trim().toUpperCase();
   return {
@@ -35967,6 +35968,7 @@ async function submitTransferBundle(event) {
         category_summary: String(row?.category_summary || row?.category_name || "").trim(),
         category_name: String(row?.category_name || row?.category_summary || "").trim(),
         item_count: parseKnownDispatchItemCount(row),
+        allocated_item_count: parseKnownDispatchItemCount(row),
       })),
     }),
   });
