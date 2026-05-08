@@ -65,6 +65,16 @@ test("transfer selectors use persisted required arrival date fields", () => {
   assert.match(appJs, /row\.required_arrival_date\s*\|\|\s*row\.required_arrival_on/);
 });
 
+test("submitTransferBundle blocks SDB rows with missing single-category warning before SDO_PACKAGE generation", () => {
+  const source = extractFunctionSource(appJs, "submitTransferBundle");
+  assert.match(source, /category_warning/);
+  assert.match(source, /SDB must be single-category; selected SDB category is missing/);
+  assert.ok(
+    source.indexOf("category_warning") < source.indexOf("/store-delivery-execution-orders"),
+    "SDB category warning guard must run before SDO package creation request",
+  );
+});
+
 test("buildTransferDemandLines groups by grade dimension", () => {
   const result = buildTransferDemandLines([
     { category_main: "tops", category_sub: "lady tops", grade: "P", requested_qty: 2 },
@@ -761,6 +771,175 @@ test("transfer dispatch display keeps selected SDO allocation quantity instead o
   assert.equal(byBaleNo.get("SDB-T0202605-001")?.source_type, "SDB");
   assert.equal(byBaleNo.get("SDB-T0202605-002")?.source_type, "SDB");
   assert.equal(byBaleNo.get("LPK-T020260508026-PICK")?.source_type, "LPK");
+});
+
+test("prepared SDB display row keeps selected jacket category instead of stale mixed result category", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "jacket", category_sub: "jacket", requested_qty: 100 },
+    ],
+    preparedBales: [
+      {
+        bale_no: "SDB-SOURCE-JACKET",
+        bale_barcode: "WB260508000210",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "jacket",
+        category_sub: "jacket",
+        qty: 100,
+      },
+    ],
+    looseRows: [],
+  });
+  const rows = buildTransferDispatchResultDisplayRows({
+    result: {
+      transfer_no: "TO-20260508-JACKET",
+      to_store_code: "UTAWALA",
+      store_dispatch_bales: [
+        {
+          bale_no: "SDB-TO202605-002",
+          category_name: "mixed categories",
+          category_summary: "tops / lady tops、tops / men shirt",
+          item_count: 210,
+          store_code: "UTAWALA",
+        },
+      ],
+    },
+    plan,
+    looseTasks: [],
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].bale_no, "SDB-TO202605-002");
+  assert.equal(rows[0].item_count, 100);
+  assert.equal(rows[0].allocated_item_count, 100);
+  assert.equal(rows[0].source_full_item_count, 210);
+  assert.equal(rows[0].source_type, "SDB");
+  assert.equal(rows[0].category_summary, "jacket / jacket");
+  assert.equal(rows[0].category_name, "jacket / jacket");
+  assert.notEqual(rows[0].category_summary, "tops / lady tops、tops / men shirt");
+  assert.notEqual(rows[0].category_name, "mixed categories");
+});
+
+test("prepared SDB display row keeps selected cargo pants category instead of historical mixed result category", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "pants", category_sub: "cargo pants", requested_qty: 100 },
+    ],
+    preparedBales: [
+      {
+        bale_no: "SDB-SOURCE-CARGO",
+        bale_barcode: "WB260508000100",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "pants",
+        category_sub: "cargo pants",
+        qty: 100,
+      },
+    ],
+    looseRows: [],
+  });
+  const rows = buildTransferDispatchResultDisplayRows({
+    result: {
+      transfer_no: "TO-20260508-CARGO",
+      to_store_code: "UTAWALA",
+      store_dispatch_bales: [
+        {
+          bale_no: "SDB-TO202605-001",
+          category_name: "mixed categories",
+          category_summary: "dress / long dress、tops / lady tops",
+          item_count: 300,
+          store_code: "UTAWALA",
+        },
+      ],
+    },
+    plan,
+    looseTasks: [],
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].bale_no, "SDB-TO202605-001");
+  assert.equal(rows[0].item_count, 100);
+  assert.equal(rows[0].allocated_item_count, 100);
+  assert.equal(rows[0].source_full_item_count, 300);
+  assert.equal(rows[0].source_type, "SDB");
+  assert.equal(rows[0].category_summary, "pants / cargo pants");
+  assert.equal(rows[0].category_name, "pants / cargo pants");
+  assert.notEqual(rows[0].category_summary, "dress / long dress、tops / lady tops");
+  assert.notEqual(rows[0].category_name, "mixed categories");
+});
+
+test("prepared SDB display row does not silently use mixed result category when selected category is missing", () => {
+  const plan = {
+    preparedPickRows: [
+      {
+        bale_no: "SDB-SOURCE-MISSING",
+        bale_barcode: "WB260508000999",
+        task_type: "store_dispatch",
+        status: "waiting_store_dispatch",
+        category_main: "",
+        category_sub: "",
+        qty: 100,
+      },
+    ],
+    loosePickRows: [],
+  };
+  const rows = buildTransferDispatchResultDisplayRows({
+    result: {
+      transfer_no: "TO-20260508-MISSING",
+      to_store_code: "UTAWALA",
+      store_dispatch_bales: [
+        {
+          bale_no: "SDB-TO202605-099",
+          category_name: "mixed categories",
+          category_summary: "dress / long dress、tops / lady tops",
+          item_count: 300,
+          store_code: "UTAWALA",
+        },
+      ],
+    },
+    plan,
+    looseTasks: [],
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].category_summary, "UNKNOWN SDB CATEGORY");
+  assert.equal(rows[0].category_name, "UNKNOWN SDB CATEGORY");
+  assert.match(rows[0].category_warning, /SDB must be single-category/);
+  assert.notEqual(rows[0].category_summary, "dress / long dress、tops / lady tops");
+  assert.notEqual(rows[0].category_name, "mixed categories");
+});
+
+test("LPK display rows remain allowed to show mixed shortage category summary", () => {
+  const plan = buildTransferPreparationPlan({
+    demandLines: [
+      { category_main: "dress", category_sub: "long dress", requested_qty: 5 },
+      { category_main: "tops", category_sub: "lady tops", requested_qty: 5 },
+    ],
+    preparedBales: [],
+    looseRows: [
+      { category_name: "dress / long dress", rack_code: "A-DR-LD-P-01", qty_on_hand: 20 },
+      { category_name: "tops / lady tops", rack_code: "A-TS-LT-P-01", qty_on_hand: 20 },
+    ],
+  });
+  const looseTasks = buildLoosePackingTasks({ transferNo: "TO-20260508-LPK", plan, packageLimitQty: 200 });
+  const rows = buildTransferDispatchResultDisplayRows({
+    result: {
+      transfer_no: "TO-20260508-LPK",
+      to_store_code: "UTAWALA",
+      store_dispatch_bales: [
+        { bale_no: "LPK-T020260508026-PICK", source_type: "LPK", category_summary: "dress / long dress、tops / lady tops", item_count: 10, store_code: "UTAWALA" },
+      ],
+    },
+    plan,
+    looseTasks,
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].source_type, "LPK");
+  assert.equal(rows[0].category_summary, "多类目补差 · 2 个类目");
+  assert.equal(rows[0].category_name, "多类目补差");
+  assert.equal(rows[0].item_count, 10);
 });
 
 test("transfer planning rows fall back to cached category demand when backend order has empty lines", () => {

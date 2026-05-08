@@ -58,6 +58,34 @@
     return String(value || "").trim();
   }
 
+  function isMixedSdbCategoryLabel(value) {
+    const label = normalizeText(value);
+    if (!label) {
+      return false;
+    }
+    return label.toLowerCase() === "mixed categories" || label.includes("、");
+  }
+
+  function resolvePreparedSdbDisplayCategory(row = {}, resultRow = {}) {
+    const selectedLabel = [row?.categoryMain, row?.categorySub].map(normalizeText).filter(Boolean).join(" / ");
+    if (selectedLabel) {
+      return { label: selectedLabel, warning: "" };
+    }
+
+    const fallbackLabel = [
+      resultRow?.category_summary,
+      resultRow?.category_name,
+    ].map(normalizeText).find((label) => label && !isMixedSdbCategoryLabel(label));
+    if (fallbackLabel) {
+      return { label: fallbackLabel, warning: "" };
+    }
+
+    return {
+      label: "UNKNOWN SDB CATEGORY",
+      warning: "SDB must be single-category; selected SDB category is missing.",
+    };
+  }
+
   function resolveCategoryPair(row) {
     const directMain = normalizeText(row && (row.category_main || row.categoryMain));
     const directSub = normalizeText(row && (row.category_sub || row.categorySub));
@@ -1156,17 +1184,15 @@
     const displayRows = preparedRows.map((row, index) => {
       const resultRow = pickResultRow(row, index);
       const sourceBaleNo = normalizeText(row?.baleBarcode || row?.baleNo).toUpperCase();
+      const sdbCategory = resolvePreparedSdbDisplayCategory(row, resultRow);
       return {
         bale_no: normalizeText(resultRow?.bale_no || row?.dispatch_bale_no || row?.final_bale_no || `SDB-${index + 1}`).toUpperCase(),
         task_no: normalizeText(row?.taskNo).toUpperCase(),
         shipment_no: normalizeText(row?.shipmentNo || result?.transfer_no).toUpperCase(),
         token_group_no: 0,
-        category_name: normalizeText(resultRow?.category_name || resultRow?.category_summary)
-          || [row?.categoryMain, row?.categorySub].map(normalizeText).filter(Boolean).join(" / ")
-          || "现成待送店包裹",
-        category_summary: normalizeText(resultRow?.category_summary || resultRow?.category_name)
-          || [row?.categoryMain, row?.categorySub].map(normalizeText).filter(Boolean).join(" / ")
-          || "现成待送店包裹",
+        category_name: sdbCategory.label,
+        category_summary: sdbCategory.label,
+        category_warning: sdbCategory.warning,
         grade: normalizeText(resultRow?.grade || row?.grade) || "mixed",
         item_count: Number(row?.qty || 0),
         allocated_item_count: Number(row?.qty || 0),
