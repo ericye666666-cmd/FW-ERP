@@ -8124,7 +8124,7 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
 }
 
 .mobile-sdp-stat-strip {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -8237,6 +8237,11 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   background: #f8fbff;
 }
 
+.mobile-price-group-card.is-complete {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
 .mobile-field-group-card {
   gap: 7px;
   padding: 10px;
@@ -8302,6 +8307,23 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   border-radius: 9px;
   font-size: 14px;
   font-weight: 900;
+}
+
+.mobile-group-complete-mark {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #bbf7d0;
+  border-radius: 9px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.mobile-group-complete-mark.is-wide {
+  min-height: 52px;
+  width: 100%;
 }
 
 .mobile-field-group-actions button:disabled {
@@ -8508,10 +8530,111 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   font-weight: 900;
 }
 
+.mobile-task-card,
+.mobile-scan-step,
+.mobile-task-completion,
+.mobile-my-tab {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-task-card.is-complete {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.mobile-task-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.mobile-task-card-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.mobile-task-card-head span,
+.mobile-task-card-head small,
+.mobile-task-facts b,
+.mobile-my-list b,
+.mobile-completion-grid b,
+.mobile-scan-input span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mobile-task-card-head strong {
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.mobile-task-facts,
+.mobile-my-list,
+.mobile-completion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-task-facts span,
+.mobile-my-list span,
+.mobile-completion-grid span {
+  display: grid;
+  gap: 3px;
+  min-height: 50px;
+  padding: 8px;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.mobile-my-list strong,
+.mobile-completion-grid span,
+.mobile-task-facts span {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.mobile-task-complete-note,
+.mobile-scan-success {
+  padding: 10px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-weight: 900;
+}
+
+.mobile-scan-input {
+  display: grid;
+  gap: 8px;
+}
+
+.mobile-scan-input input {
+  min-height: 62px;
+  width: 100%;
+  border: 2px solid #93c5fd;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
 .mobile-pricing-tabbar {
   min-height: 72px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
   padding: 8px 6px;
   border-top: 1px solid #e2e8f0;
