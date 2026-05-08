@@ -3473,6 +3473,7 @@ function getStoreManagerPdaSdpByCode(displayCode) {
 
 function createStoreManagerPdaTaskState(overrides = {}) {
   const defaultState = {
+    activeTab: "receiving",
     activePage: "tasks",
     verified: false,
     scanDraft: "",
@@ -4038,7 +4039,7 @@ function renderStoreManagerPdaCompletionSummary(state = ensureStoreManagerPdaTas
 function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
   return `
     <section class="store-manager-pda-card store-manager-pda-my-tab">
-      <h3>我的</h3>
+      <h3>其他</h3>
       <div class="store-manager-pda-sdp-facts">
         <span><b>当前账号</b>store_manager_1</span>
         <span><b>门店</b>UTAWALA</span>
@@ -4051,7 +4052,7 @@ function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
   `;
 }
 
-function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState()) {
+function renderStoreManagerPdaTaskFlow(state = ensureStoreManagerPdaTaskState()) {
   const page = String(state.activePage || "tasks");
   if (page === "scan") {
     return renderStoreManagerPdaSdoScanStep(state);
@@ -4062,27 +4063,40 @@ function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState
   if (page === "complete") {
     return renderStoreManagerPdaCompletionSummary(state);
   }
-  if (page === "my") {
-    return renderStoreManagerPdaMyTab(state);
-  }
   return renderStoreManagerPdaTaskList(state);
 }
 
+function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState()) {
+  const activeTab = String(state.activeTab || "receiving");
+  if (activeTab === "receiving") {
+    return renderStoreManagerPdaTaskFlow(state);
+  }
+  if (activeTab === "logs") {
+    return renderStoreManagerPdaLogs();
+  }
+  if (activeTab === "other") {
+    return renderStoreManagerPdaMyTab(state);
+  }
+  return renderStoreManagerPdaOverview();
+}
+
 function getStoreManagerPdaRuntimeTitle(state = ensureStoreManagerPdaTaskState()) {
+  const activeTab = String(state.activeTab || "receiving");
+  if (activeTab === "overview") return "经营总览";
+  if (activeTab === "logs") return "经营日志";
+  if (activeTab === "other") return "其他";
   const page = String(state.activePage || "tasks");
   if (page === "scan") return "扫描 SDO 主单码";
   if (page === "detail") return "SDO 收货 / 分配";
   if (page === "complete") return "任务完成";
-  if (page === "my") return "我的";
-  return "店长 PDA 工作台";
+  return "收退货";
 }
 
 function renderStoreManagerPdaBottomTabs(state = ensureStoreManagerPdaTaskState()) {
-  const bottomTabs = ["任务", "我的"];
-  const activePage = String(state.activePage || "tasks");
-  return bottomTabs.map((tab) => `
-    <button type="button" class="${(tab === "我的" && activePage === "my") || (tab === "任务" && activePage !== "my") ? "is-active" : ""}" data-store-manager-pda-page="${tab === "任务" ? "tasks" : "my"}">
-      ${escapeHtml(tab)}
+  const activeTab = String(state.activeTab || "receiving");
+  return STORE_MANAGER_PDA_TABS.map((tab) => `
+    <button type="button" class="${tab.id === activeTab ? "is-active" : ""}" data-store-manager-pda-tab="${escapeHtml(tab.id)}">
+      ${escapeHtml(tab.label)}
     </button>
   `).join("");
 }
@@ -4109,13 +4123,16 @@ function renderStoreManagerPdaRuntimeScreen(state = ensureStoreManagerPdaTaskSta
   `;
 }
 
-function renderStoreManagerPdaPreview(tabId = activeStoreManagerPdaTab) {
+function renderStoreManagerPdaPreview(tabId = "") {
   const target = document.querySelector("#storeManagerPdaPreview");
   if (!(target instanceof HTMLElement)) {
     return;
   }
   if (isPdaRuntimeMode()) {
     const state = ensureStoreManagerPdaTaskState();
+    if (STORE_MANAGER_PDA_TABS.some((tab) => tab.id === tabId)) {
+      state.activeTab = tabId;
+    }
     target.className = "store-manager-pda-preview store-manager-pda-runtime-preview";
     target.innerHTML = renderStoreManagerPdaRuntimeScreen(state);
     return;
@@ -4226,24 +4243,33 @@ function handleStoreManagerPdaSdoScanSubmit(event) {
 
 function handleStoreManagerPdaTaskAction(button) {
   const state = ensureStoreManagerPdaTaskState();
+  if (button.dataset.storeManagerPdaTab) {
+    state.activeTab = button.dataset.storeManagerPdaTab;
+    state.notice = "";
+  }
   if (button.dataset.storeManagerPdaPage) {
+    state.activeTab = "receiving";
     state.activePage = button.dataset.storeManagerPdaPage;
     state.notice = "";
   }
   if (button.dataset.storeManagerPdaStartTask) {
+    state.activeTab = "receiving";
     state.activePage = "scan";
     state.scanError = "";
     state.scanSuccess = "";
   }
   if (button.dataset.storeManagerPdaReceivePackage) {
+    state.activeTab = "receiving";
     receiveStoreManagerPdaPackage(state, button.dataset.storeManagerPdaReceivePackage);
     state.activePage = "detail";
   }
   if (button.dataset.storeManagerPdaExceptionPackage) {
+    state.activeTab = "receiving";
     markStoreManagerPdaPackageException(state, button.dataset.storeManagerPdaExceptionPackage);
     state.activePage = "detail";
   }
   if (button.dataset.storeManagerPdaAssignPackage) {
+    state.activeTab = "receiving";
     assignStoreManagerPdaPackageToClerk(
       state,
       button.dataset.storeManagerPdaAssignPackage,
@@ -4251,7 +4277,8 @@ function handleStoreManagerPdaTaskAction(button) {
     );
   }
   if (button.dataset.storeManagerPdaResetTask) {
-    resetStoreManagerPdaTaskState();
+    const resetState = resetStoreManagerPdaTaskState();
+    resetState.activeTab = "receiving";
   } else {
     updateStoreManagerPdaTaskCompletion(state);
     persistStoreManagerPdaTaskState(state);
@@ -36934,6 +36961,7 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", (ev
     return;
   }
   const runtimeButton = event.target.closest([
+    "[data-store-manager-pda-tab]",
     "[data-store-manager-pda-page]",
     "[data-store-manager-pda-start-task]",
     "[data-store-manager-pda-receive-package]",

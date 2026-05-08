@@ -32,23 +32,22 @@ function executableFunction(source, functionName) {
   return vm.runInNewContext(`(${functionSource(source, functionName)})`);
 }
 
-test("store manager PDA runtime bottom nav only shows tasks and my", () => {
+test("store manager PDA runtime bottom nav keeps the original four manager tabs", () => {
   const renderPreview = functionSource(appJs, "renderStoreManagerPdaPreview");
   const bottomTabs = functionSource(appJs, "renderStoreManagerPdaBottomTabs");
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
 
   assert.match(renderPreview, /isPdaRuntimeMode\(\)/);
   assert.match(renderPreview, /renderStoreManagerPdaRuntimeScreen/);
-  assert.match(bottomTabs, /const bottomTabs = \["任务", "我的"\]/);
-  assert.match(bottomTabs, /data-store-manager-pda-page/);
-  assert.match(bottomTabs, /tab === "任务" \? "tasks" : "my"/);
-  assert.doesNotMatch(bottomTabs, /经营总览|收退货|经营日志|其他/);
-  assert.match(legacyGuard, /data-legacy-manager-action="tasks">任务/);
-  assert.match(legacyGuard, /data-legacy-manager-action="my">我的/);
-  assert.doesNotMatch(legacyGuard, /<button type="button">总览<\/button>/);
-  assert.doesNotMatch(legacyGuard, /<button type="button">收货<\/button>/);
-  assert.doesNotMatch(legacyGuard, /<button type="button">日志<\/button>/);
-  assert.doesNotMatch(legacyGuard, /<button type="button">其他<\/button>/);
+  assert.match(bottomTabs, /STORE_MANAGER_PDA_TABS\.map/);
+  ["经营总览", "收退货", "经营日志", "其他"].forEach((label) => {
+    assert.match(appJs, new RegExp(`label: "${label}"`), `missing manager tab ${label}`);
+    assert.match(legacyGuard, new RegExp(`>${label}<`), `legacy guard missing manager tab ${label}`);
+  });
+  assert.match(bottomTabs, /data-store-manager-pda-tab/);
+  assert.doesNotMatch(bottomTabs, /const bottomTabs = \["任务", "我的"\]/);
+  assert.doesNotMatch(legacyGuard, /data-legacy-manager-action="tasks">任务/);
+  assert.doesNotMatch(legacyGuard, /data-legacy-manager-action="my">我的/);
 });
 
 test("PDA bottom nav is fixed or sticky at the physical screen bottom for manager and clerk", () => {
@@ -67,8 +66,10 @@ test("PDA bottom nav is fixed or sticky at the physical screen bottom for manage
 test("manager task list shows the SDO260504008 demo receiving task", () => {
   const stateSource = functionSource(appJs, "createStoreManagerPdaTaskState");
   const taskList = functionSource(appJs, "renderStoreManagerPdaTaskList");
+  const runtimeBody = functionSource(appJs, "renderStoreManagerPdaRuntimeBody");
 
   assert.match(appJs, /retail_ops_pda_demo_store_task_state/);
+  assert.match(stateSource, /activeTab:\s*"receiving"/);
   assert.match(stateSource, /display_code:\s*"SDO260504008"/);
   assert.match(stateSource, /machine_code:\s*"4260504008"/);
   assert.match(stateSource, /store_code:\s*"UTAWALA"/);
@@ -83,6 +84,8 @@ test("manager task list shows the SDO260504008 demo receiving task", () => {
   assert.match(taskList, /SDO260504008/);
   assert.match(taskList, /开始收货/);
   assert.match(taskList, /data-store-manager-pda-start-task/);
+  assert.match(runtimeBody, /activeTab === "receiving"/);
+  assert.match(runtimeBody, /renderStoreManagerPdaTaskFlow/);
 });
 
 test("starting manager task opens SDO scan verification with scanner input", () => {
@@ -162,7 +165,7 @@ test("package receiving, exception, assignment, and completion state transitions
   assert.match(completion, /返回任务列表/);
 });
 
-test("manager my tab is scoped to PDA account settings", () => {
+test("manager other tab is scoped to PDA account settings", () => {
   const myTab = functionSource(appJs, "renderStoreManagerPdaMyTab");
 
   assert.match(myTab, /当前账号/);
@@ -174,7 +177,8 @@ test("manager my tab is scoped to PDA account settings", () => {
   assert.match(myTab, /PDA mode \/ version/);
   assert.match(myTab, /退出登录/);
   assert.match(myTab, /重置演示任务状态/);
-  assert.doesNotMatch(myTab, /warehouse|POS|经营总览|收退货|经营日志|其他/i);
+  assert.match(myTab, /其他/);
+  assert.doesNotMatch(myTab, /warehouse|POS|经营总览|收退货|经营日志/i);
 });
 
 test("PDA runtime does not render the desktop preview shell", () => {
@@ -184,7 +188,6 @@ test("PDA runtime does not render the desktop preview shell", () => {
   assert.match(runtimeScreen, /data-pda-runtime-surface="store-manager"/);
   assert.match(runtimeScreen, /renderStoreManagerPdaBottomTabs/);
   assert.doesNotMatch(runtimeScreen, /store-manager-pda-device-bar/);
-  assert.doesNotMatch(runtimeScreen, /经营总览|收退货|经营日志|其他/);
   assert.doesNotMatch(runtimeScreen, /预览数据|Android PDA preview|PDA 现场分堆标价 UI Preview/);
   assert.match(renderPreview, /STORE_MANAGER_PDA_TABS/);
 });

@@ -3714,6 +3714,7 @@
         var stagingApiBase = "https://fw-erp-34-35-52-250.nip.io/api/v1";
         var legacyStoreManagerTarget = null;
         var legacyStoreManagerState = {
+          tab: "receiving",
           page: "tasks",
           verified: false,
           scanError: "",
@@ -3917,11 +3918,19 @@
             return renderLegacyRuntimeFailure(target);
           }
           legacyStoreManagerTarget = target;
+          var tab = legacyStoreManagerState.tab || "receiving";
           var page = legacyStoreManagerState.page || "tasks";
           var body = "";
-          if (page === "my") {
+          if (tab === "overview") {
             body = ''
-              + '<section class="store-manager-pda-card store-manager-pda-my-tab"><h3>我的</h3>'
+              + '<section class="store-manager-pda-metrics"><article class="store-manager-pda-metric status-card-success"><span>今日销售额</span><strong>KES 48,260</strong></article><article class="store-manager-pda-metric status-card-warning"><span>待处理 SDO</span><strong>1</strong></article></section>'
+              + '<section class="store-manager-pda-card"><div class="store-manager-pda-card-head"><strong>员工处理进度</strong><span>现场状态</span></div><div class="store-manager-pda-list"><article class="store-manager-pda-row status-card-info"><div><strong>Austin</strong><span>等待 SDP 分配</span></div><b>空闲</b></article><article class="store-manager-pda-row status-card-warning"><div><strong>Nancy</strong><span>待收货支持</span></div><b>待命</b></article></div></section>';
+          } else if (tab === "logs") {
+            body = ''
+              + '<section class="store-manager-pda-card"><div class="store-manager-pda-card-head"><strong>今天门店动作</strong><span>经营日志</span></div><div class="store-manager-pda-timeline"><article class="store-manager-pda-log status-card-info"><time>10:20</time><div><strong>SDO260504008 待收货</strong><span>等待店长扫描主单码</span></div></article><article class="store-manager-pda-log status-card-success"><time>10:40</time><div><strong>SDP261250002</strong><span>可分配给 Austin</span></div></article></div></section>';
+          } else if (tab === "other") {
+            body = ''
+              + '<section class="store-manager-pda-card store-manager-pda-my-tab"><h3>其他</h3>'
               + '<div class="store-manager-pda-sdp-facts"><span><b>当前账号</b>store_manager_1</span><span><b>门店</b>UTAWALA</span><span><b>角色</b>店长</span><span><b>PDA mode / version</b>Direct Loop PDA · manager task flow 209</span></div>'
               + '<button type="button" class="store-manager-pda-secondary-action" data-legacy-manager-action="reset">重置演示任务状态</button>'
               + '<button type="button" class="store-manager-pda-primary-action" data-action="logout">退出登录</button></section>';
@@ -3969,7 +3978,7 @@
             + '<header class="store-manager-pda-title"><div><span>店长端</span><h3>店长 PDA 工作台</h3></div><small>今日</small></header>'
             + '<div class="store-manager-pda-body">' + body + '</div>'
             + '</div>'
-            + '<nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA tabs"><button type="button" class="' + (page !== "my" ? "is-active" : "") + '" data-legacy-manager-action="tasks">任务</button><button type="button" class="' + (page === "my" ? "is-active" : "") + '" data-legacy-manager-action="my">我的</button></nav>'
+            + '<nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA tabs"><button type="button" class="' + (tab === "overview" ? "is-active" : "") + '" data-legacy-manager-action="tab" data-legacy-manager-tab="overview">经营总览</button><button type="button" class="' + (tab === "receiving" ? "is-active" : "") + '" data-legacy-manager-action="tab" data-legacy-manager-tab="receiving">收退货</button><button type="button" class="' + (tab === "logs" ? "is-active" : "") + '" data-legacy-manager-action="tab" data-legacy-manager-tab="logs">经营日志</button><button type="button" class="' + (tab === "other" ? "is-active" : "") + '" data-legacy-manager-action="tab" data-legacy-manager-tab="other">其他</button></nav>'
             + '</div>';
           return true;
         }
@@ -4210,6 +4219,7 @@
             }
           }
           if (complete) {
+            legacyStoreManagerState.tab = "receiving";
             legacyStoreManagerState.page = "complete";
           }
         }
@@ -4220,15 +4230,23 @@
             return;
           }
           var action = button.getAttribute("data-legacy-manager-action") || "";
+          var tab = button.getAttribute("data-legacy-manager-tab") || "";
           var packageCode = button.getAttribute("data-legacy-package-code") || "";
           var clerk = button.getAttribute("data-legacy-clerk") || "Austin";
           var pkg = getLegacyManagerPackage(packageCode);
           if (event && event.preventDefault) event.preventDefault();
           if (event && event.stopPropagation) event.stopPropagation();
-          if (action === "tasks") legacyStoreManagerState.page = "tasks";
-          if (action === "my") legacyStoreManagerState.page = "my";
-          if (action === "start") legacyStoreManagerState.page = "scan";
+          if (action === "tab") legacyStoreManagerState.tab = tab || "receiving";
+          if (action === "tasks") {
+            legacyStoreManagerState.tab = "receiving";
+            legacyStoreManagerState.page = "tasks";
+          }
+          if (action === "start") {
+            legacyStoreManagerState.tab = "receiving";
+            legacyStoreManagerState.page = "scan";
+          }
           if (action === "reset") {
+            legacyStoreManagerState.tab = "receiving";
             legacyStoreManagerState.page = "tasks";
             legacyStoreManagerState.scanError = "";
             legacyStoreManagerState.scanSuccess = "";
@@ -4238,16 +4256,19 @@
             ];
           }
           if (action === "receive" && pkg && pkg.status === "待收货") {
+            legacyStoreManagerState.tab = "receiving";
             pkg.status = "已收货 / 待分配";
             legacyStoreManagerState.page = "detail";
           }
           if (action === "exception" && pkg) {
+            legacyStoreManagerState.tab = "receiving";
             pkg.status = "异常";
             pkg.clerk = "";
             legacyStoreManagerState.page = "detail";
             maybeCompleteLegacyManagerTask();
           }
           if (action === "assign" && pkg && pkg.status !== "异常" && pkg.status !== "待收货") {
+            legacyStoreManagerState.tab = "receiving";
             pkg.status = "已分配";
             pkg.clerk = clerk;
             legacyStoreManagerState.page = "detail";
@@ -4269,6 +4290,7 @@
             legacyStoreManagerState.scanSuccess = "核对成功";
             legacyStoreManagerState.scanError = "";
             legacyStoreManagerState.verified = true;
+            legacyStoreManagerState.tab = "receiving";
             legacyStoreManagerState.page = "detail";
           } else if (/^SDP/.test(value) || /^6\d{9}$/.test(value)) {
             legacyStoreManagerState.scanError = "SDP 是 SDO 内包明细，请扫描 SDO 主单码。";
