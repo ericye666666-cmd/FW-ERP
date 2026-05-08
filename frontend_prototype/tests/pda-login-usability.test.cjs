@@ -41,6 +41,11 @@ test("staging PDA host defaults API base to the FW-ERP staging API", () => {
   assert.match(defaultApiBase, /return PDA_STAGING_API_BASE;/);
 });
 
+test("static login API field defaults to the staging API for PDA-safe fallback", () => {
+  assert.match(indexHtml, /<input id="apiBase" value="https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1" \/>/);
+  assert.doesNotMatch(indexHtml, /<input id="apiBase" value="http:\/\/127\.0\.0\.1:8000\/api\/v1" \/>/);
+});
+
 test("localhost and 127.0.0.1 keep the local development API default", () => {
   const defaultApiBase = extractFunctionSource("defaultApiBase");
   const isLocalDevHost = extractFunctionSource("isLocalDevHost");
@@ -84,6 +89,11 @@ test("login page exposes a subtle staging API mode indicator", () => {
   assert.match(renderApiModeIndicator, /API mode: staging/);
   assert.match(renderApiModeIndicator, /isStagingAppOrigin\(\)/);
   assert.match(appJs, /renderApiModeIndicator\(\);/);
+});
+
+test("login page cache-busts app and style assets for the PDA hardfix", () => {
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-login-hardfix-203" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-login-hardfix-203"><\/script>/);
 });
 
 test("login username is persisted and failed login does not force admin_1", () => {
