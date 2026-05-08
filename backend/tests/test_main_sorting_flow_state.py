@@ -146,6 +146,107 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual([package["display_code"] for package in second["packages"]], [package["display_code"] for package in packages])
         self.assertEqual([package["machine_code"] for package in second["packages"]], machine_codes)
 
+    def test_sdo_package_generation_uses_selected_allocation_quantities_for_sdb_and_lpk(self):
+        transfer_no = "TO-20260508-ALLOC"
+        self._seed_transfer_for_store_delivery_package_test()
+        base_transfer = self.state.transfer_orders.pop("TO-20260504-SDP")
+        base_transfer["transfer_no"] = transfer_no
+        self.state.transfer_orders[transfer_no] = base_transfer
+        self.state.store_dispatch_bales.clear()
+        self.state.store_dispatch_bales["SDB-T0202605-001"] = {
+            "bale_no": "SDB-T0202605-001",
+            "machine_code": "2260508001",
+            "transfer_no": transfer_no,
+            "source_bales": ["SDB-T0202605-001"],
+            "source_type": "SDB",
+            "source_code": "SDB-T0202605-001",
+            "status": "ready_dispatch",
+            "store_code": "UTAWALA",
+            "item_count": 300,
+            "category_summary": "pants / cargo pants",
+            "token_nos": [],
+        }
+        self.state.store_dispatch_bales["SDB-T0202605-002"] = {
+            "bale_no": "SDB-T0202605-002",
+            "machine_code": "2260508002",
+            "transfer_no": transfer_no,
+            "source_bales": ["SDB-T0202605-002"],
+            "source_type": "SDB",
+            "source_code": "SDB-T0202605-002",
+            "status": "ready_dispatch",
+            "store_code": "UTAWALA",
+            "item_count": 210,
+            "category_summary": "jacket / jacket",
+            "token_nos": [],
+        }
+        self.state.store_dispatch_bales["LPK-T020260508026-PICK"] = {
+            "bale_no": "LPK-T020260508026-PICK",
+            "machine_code": "3260508026",
+            "transfer_no": transfer_no,
+            "source_bales": ["LPK-T020260508026-PICK"],
+            "source_type": "LPK",
+            "source_code": "LPK-T020260508026-PICK",
+            "status": "ready_dispatch",
+            "store_code": "UTAWALA",
+            "item_count": 20,
+            "category_summary": "pants / cargo pants",
+            "token_nos": [],
+        }
+
+        created = self.state.create_store_delivery_execution_order(
+            transfer_no,
+            {
+                "created_by": "warehouse_clerk_1",
+                "notes": "warehouse verified selected allocation",
+                "packages": [
+                    {
+                        "source_type": "SDB",
+                        "source_code": "SDB-T0202605-001",
+                        "source_machine_code": "2260508001",
+                        "item_count": 300,
+                        "allocated_item_count": 100,
+                        "category_summary": "pants / cargo pants",
+                        "category_name": "pants / cargo pants",
+                    },
+                    {
+                        "source_type": "SDB",
+                        "source_code": "SDB-T0202605-002",
+                        "source_machine_code": "2260508002",
+                        "item_count": 210,
+                        "allocated_item_count": 100,
+                        "category_summary": "jacket / jacket",
+                        "category_name": "jacket / jacket",
+                    },
+                    {
+                        "source_type": "LPK",
+                        "source_code": "LPK-T020260508026-PICK",
+                        "source_machine_code": "3260508026",
+                        "item_count": 20,
+                        "allocated_item_count": 20,
+                        "category_summary": "pants / cargo pants",
+                        "category_name": "pants / cargo pants",
+                    },
+                ],
+            },
+        )
+
+        packages = created["packages"]
+        self.assertEqual(len(packages), 3)
+        self.assertEqual([package["item_count"] for package in packages], [100, 100, 20])
+        self.assertEqual(
+            [package["source_code"] for package in packages],
+            ["SDB-T0202605-001", "SDB-T0202605-002", "LPK-T020260508026-PICK"],
+        )
+        self.assertEqual([package["source_type"] for package in packages], ["SDB", "SDB", "LPK"])
+        self.assertEqual(
+            [package["content_summary"] for package in packages],
+            ["pants / cargo pants", "jacket / jacket", "pants / cargo pants"],
+        )
+        self.assertEqual([package["parent_sdo_display_code"] for package in packages], [created["execution_order_no"]] * 3)
+        self.assertEqual([package["store_code"] for package in packages], ["UTAWALA", "UTAWALA", "UTAWALA"])
+        self.assertEqual([(package["package_no"], package["package_total"]) for package in packages], [(1, 3), (2, 3), (3, 3)])
+        self.assertEqual(created["total_item_count"], 220)
+
     def test_list_store_delivery_execution_orders_does_not_generate_or_persist_sdo_packages(self):
         self.state.store_delivery_execution_orders["SDO260504001"] = {
             "execution_order_no": "SDO260504001",
