@@ -81,12 +81,21 @@ test("store clerk PDA runtime renders direct screen content without preview wrap
 
 test("store manager PDA runtime hides desktop shell and shows manager bottom-tab interface directly", () => {
   const renderStoreManagerPdaPreview = extractFunctionSource(appJs, "renderStoreManagerPdaPreview");
+  const renderStoreManagerPdaRuntimeScreen = extractFunctionSource(appJs, "renderStoreManagerPdaRuntimeScreen");
+  const renderStoreManagerPdaBottomTabs = extractFunctionSource(appJs, "renderStoreManagerPdaBottomTabs");
 
+  assert.match(renderStoreManagerPdaPreview, /if \(isPdaRuntimeMode\(\)\)/);
+  assert.match(renderStoreManagerPdaPreview, /renderStoreManagerPdaRuntimeScreen/);
+  assert.match(renderStoreManagerPdaRuntimeScreen, /data-pda-runtime-surface="store-manager"/);
+  assert.match(renderStoreManagerPdaRuntimeScreen, /renderStoreManagerPdaBottomTabs/);
+  assert.match(renderStoreManagerPdaBottomTabs, /const bottomTabs = \["任务", "我的"\]/);
   assert.match(renderStoreManagerPdaPreview, /data-pda-runtime-surface="store-manager"/);
   assert.match(renderStoreManagerPdaPreview, /store-manager-pda-bottom-tabs/);
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.store-manager-pda-shell[\s\S]*border:\s*0/);
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.store-manager-pda-device-bar[\s\S]*display:\s*none\s*!important/);
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.store-manager-pda-bottom-tabs[\s\S]*position:\s*sticky/);
+  assert.doesNotMatch(renderStoreManagerPdaRuntimeScreen, /store-manager-pda-device-bar/);
+  assert.doesNotMatch(renderStoreManagerPdaRuntimeScreen, /经营总览|收退货|经营日志|其他/);
 });
 
 test("PDA runtime surfaces render a visible failure instead of a blank page", () => {
@@ -113,6 +122,12 @@ test("legacy WebView guard renders clerk and manager PDA runtime content", () =>
   assert.match(legacyGuard, /data-pda-runtime-surface="store-manager"/);
   assert.match(legacyGuard, /店长 PDA 工作台/);
   assert.match(legacyGuard, /store-manager-pda-bottom-tabs/);
+  assert.match(legacyGuard, /data-legacy-manager-action="tasks">任务/);
+  assert.match(legacyGuard, /data-legacy-manager-action="my">我的/);
+  assert.doesNotMatch(legacyGuard, /<button type="button">总览<\/button>/);
+  assert.doesNotMatch(legacyGuard, /<button type="button">收货<\/button>/);
+  assert.doesNotMatch(legacyGuard, /<button type="button">日志<\/button>/);
+  assert.doesNotMatch(legacyGuard, /<button type="button">其他<\/button>/);
   assert.match(legacyGuard, /PDA 页面加载失败，请联系管理员。/);
   assert.doesNotMatch(legacyGuard, /这里是 Android PDA 模拟器预览/);
 });
@@ -129,6 +144,6 @@ test("desktop preview shell remains available outside PDA runtime", () => {
 });
 
 test("PDA runtime PR cache-busts app and style assets", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-task-flow-208" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-task-flow-208"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=manager-pda-task-flow-209" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=manager-pda-task-flow-209"><\/script>/);
 });
