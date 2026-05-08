@@ -58,6 +58,7 @@ test("PDA runtime mode hides desktop workspace shell navigation", () => {
 test("store clerk PDA runtime renders direct screen content without preview wrapper or phone frame", () => {
   const renderStoreMobilePricingPreview = extractFunctionSource(appJs, "renderStoreMobilePricingPreview");
   const renderStoreMobileRuntimeScreen = extractFunctionSource(appJs, "renderStoreMobileRuntimeScreen");
+  const renderStoreMobileDeviceScreen = extractFunctionSource(appJs, "renderStoreMobileDeviceScreen");
 
   assert.match(renderStoreMobilePricingPreview, /if \(isPdaRuntimeMode\(\)\)/);
   assert.match(renderStoreMobilePricingPreview, /store-mobile-runtime-shell/);
@@ -65,7 +66,11 @@ test("store clerk PDA runtime renders direct screen content without preview wrap
   assert.match(renderStoreMobileRuntimeScreen, /data-pda-runtime-surface="store-clerk"/);
   assert.match(renderStoreMobileRuntimeScreen, /renderStoreMobileDeviceScreen\(state\)/);
   assert.match(renderStoreMobileRuntimeScreen, /mobile-pricing-tabbar/);
+  assert.match(renderStoreMobileDeviceScreen, /现场分堆标价/);
+  assert.match(appJs, /display_code: "SDP261250002"/);
+  assert.match(appJs, /price_kes: 150/);
   assert.doesNotMatch(renderStoreMobileRuntimeScreen, /PDA 现场分堆标价 UI Preview/);
+  assert.doesNotMatch(renderStoreMobileRuntimeScreen, /这里是 Android PDA 模拟器预览/);
   assert.doesNotMatch(renderStoreMobileRuntimeScreen, /店员 PDA Preview/);
   assert.doesNotMatch(renderStoreMobileRuntimeScreen, /只读预览/);
   assert.doesNotMatch(renderStoreMobileRuntimeScreen, /当前 mock SDP/);
@@ -84,6 +89,34 @@ test("store manager PDA runtime hides desktop shell and shows manager bottom-tab
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.store-manager-pda-bottom-tabs[\s\S]*position:\s*sticky/);
 });
 
+test("PDA runtime surfaces render a visible failure instead of a blank page", () => {
+  const renderPdaRuntimeFailure = extractFunctionSource(appJs, "renderPdaRuntimeFailure");
+  const ensurePdaRuntimeContent = extractFunctionSource(appJs, "ensurePdaRuntimeContent");
+  const renderActivePdaRuntimeSurface = extractFunctionSource(appJs, "renderActivePdaRuntimeSurface");
+
+  assert.match(renderPdaRuntimeFailure, /PDA 页面加载失败，请联系管理员。/);
+  assert.match(ensurePdaRuntimeContent, /textContent\.trim\(\)/);
+  assert.match(ensurePdaRuntimeContent, /这里是 Android PDA 模拟器预览/);
+  assert.match(ensurePdaRuntimeContent, /renderPdaRuntimeFailure/);
+  assert.match(renderActivePdaRuntimeSurface, /ensurePdaRuntimeContent/);
+});
+
+test("legacy WebView guard renders clerk and manager PDA runtime content", () => {
+  const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+
+  assert.match(legacyGuard, /renderLegacyStoreClerkRuntime/);
+  assert.match(legacyGuard, /data-pda-runtime-surface="store-clerk"/);
+  assert.match(legacyGuard, /现场分堆标价/);
+  assert.match(legacyGuard, /SDP261250002/);
+  assert.match(legacyGuard, /价格组/);
+  assert.match(legacyGuard, /renderLegacyStoreManagerRuntime/);
+  assert.match(legacyGuard, /data-pda-runtime-surface="store-manager"/);
+  assert.match(legacyGuard, /店长 PDA 工作台/);
+  assert.match(legacyGuard, /store-manager-pda-bottom-tabs/);
+  assert.match(legacyGuard, /PDA 页面加载失败，请联系管理员。/);
+  assert.doesNotMatch(legacyGuard, /这里是 Android PDA 模拟器预览/);
+});
+
 test("desktop preview shell remains available outside PDA runtime", () => {
   const renderStoreMobilePricingPreview = extractFunctionSource(appJs, "renderStoreMobilePricingPreview");
   const renderStoreMobileDeviceFrame = extractFunctionSource(appJs, "renderStoreMobileDeviceFrame");
@@ -96,6 +129,6 @@ test("desktop preview shell remains available outside PDA runtime", () => {
 });
 
 test("PDA runtime PR cache-busts app and style assets", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-mode-206" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-mode-206"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-content-207" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-content-207"><\/script>/);
 });

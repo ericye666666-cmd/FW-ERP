@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>店铺进销存工作台</title>
-    <link rel="stylesheet" href="./styles.css?v=pda-runtime-mode-206" />
+    <link rel="stylesheet" href="./styles.css?v=pda-runtime-content-207" />
   </head>
   <body>
     <section id="authPage" class="auth-page">
@@ -74,7 +74,7 @@
             <div id="apiModeIndicator" class="subtle small api-mode-indicator" hidden></div>
           </div>
           <form id="loginForm" class="form-grid compact auth-form" method="post" action="javascript:void(0)" autocomplete="off" novalidate>
-            <input name="username" placeholder="用户名" value="admin_1" />
+            <input name="username" placeholder="用户名" />
             <input name="password" type="password" placeholder="密码" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
             <button id="loginSubmitButton" type="submit">登录并进入终端 / 工作区</button>
           </form>
@@ -3761,6 +3761,103 @@
           }
         }
 
+        function isLegacyStagingOrPda() {
+          var directLoopPda = window.navigator && String(window.navigator.userAgent || "").indexOf("DirectLoopPDA/1.0") !== -1;
+          return window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0 || directLoopPda;
+        }
+
+        function restoreLegacyLoginUsername() {
+          if (!loginForm || !loginForm.elements.username) {
+            return;
+          }
+          var savedUsername = "";
+          try {
+            savedUsername = String(window.localStorage.getItem("retail_ops_login_username") || "").trim();
+          } catch (error) {
+            savedUsername = "";
+          }
+          if (savedUsername) {
+            loginForm.elements.username.value = savedUsername;
+            return;
+          }
+          if (isLegacyStagingOrPda()) {
+            loginForm.elements.username.value = "";
+          }
+        }
+
+        function renderLegacyRuntimeFailure(target) {
+          var container = target || document.getElementById("workspacePanels") || document.body;
+          if (!container) {
+            return false;
+          }
+          container.className = (container.className ? container.className + " " : "") + "pda-runtime-error-shell";
+          container.innerHTML = '<section class="pda-runtime-error" role="alert"><strong>PDA 页面加载失败，请联系管理员。</strong></section>';
+          return false;
+        }
+
+        function renderLegacyStoreClerkRuntime(target) {
+          if (!target) {
+            return renderLegacyRuntimeFailure(target);
+          }
+          target.className = "store-mobile-runtime-shell";
+          target.innerHTML = ''
+            + '<section class="store-mobile-runtime-screen" data-pda-runtime-surface="store-clerk">'
+            + '<header class="mobile-pricing-topbar"><div class="mobile-pricing-titlebar"><strong>现场分堆标价</strong><span>⌗</span></div></header>'
+            + '<main class="mobile-pricing-screen">'
+            + '<section class="mobile-pricing-hero"><span>当前 SDP</span><strong>SDP261250002</strong><small>UTAWALA · 女装 · 36 件</small></section>'
+            + '<section class="mobile-pricing-section"><div class="mobile-pricing-section-head"><strong>价格组</strong><span>3 组待处理</span></div>'
+            + '<article class="mobile-price-group-card is-active"><div><strong>女士上衣 A</strong><span>12 件 · KSh 150</span></div><button type="button">开始标价</button></article>'
+            + '<article class="mobile-price-group-card"><div><strong>连衣裙 B</strong><span>8 件 · KSh 250</span></div><button type="button">查看</button></article>'
+            + '<article class="mobile-price-group-card"><div><strong>裤装 C</strong><span>16 件 · KSh 180</span></div><button type="button">查看</button></article>'
+            + '</section>'
+            + '<section class="store-pda-bottom-actions"><button type="button">保存价格</button><button type="button" class="danger-light">异常上报</button></section>'
+            + '</main>'
+            + '<nav class="mobile-pricing-tabbar" aria-label="店员 PDA tabs"><button type="button">任务</button><button type="button">扫描</button><button type="button" class="is-active">标价</button><button type="button">打印</button><button type="button">我的</button></nav>'
+            + '</section>';
+          return true;
+        }
+
+        function renderLegacyStoreManagerRuntime(target) {
+          if (!target) {
+            return renderLegacyRuntimeFailure(target);
+          }
+          target.className = "store-manager-pda-preview";
+          target.innerHTML = ''
+            + '<div class="store-manager-pda-shell" data-pda-runtime-surface="store-manager">'
+            + '<div class="store-manager-pda-screen">'
+            + '<header class="store-manager-pda-title"><div><span>店长端</span><h3>店长 PDA 工作台</h3></div><small>今日</small></header>'
+            + '<div class="store-manager-pda-body">'
+            + '<section class="store-manager-pda-metrics"><article class="store-manager-pda-metric status-card-success"><span>待收货</span><strong>3</strong></article><article class="store-manager-pda-metric status-card-warning"><span>待分配</span><strong>7</strong></article></section>'
+            + '<section class="store-manager-pda-action-grid"><button type="button" class="store-manager-pda-action"><strong>SDO 收货</strong><span>扫描主单</span></button><button type="button" class="store-manager-pda-action"><strong>分配店员</strong><span>按 SDP 派工</span></button></section>'
+            + '<section class="store-manager-pda-card"><div class="store-manager-pda-card-head"><strong>今天门店动作</strong><span>现场记录</span></div><div class="store-manager-pda-timeline"><article class="store-manager-pda-log status-card-success"><time>10:20</time><div><strong>SDP261250002</strong><span>Austin 已进入分堆标价</span></div></article></div></section>'
+            + '</div>'
+            + '</div>'
+            + '<nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA tabs"><button type="button" class="is-active">总览</button><button type="button">收货</button><button type="button">日志</button><button type="button">其他</button></nav>'
+            + '</div>';
+          return true;
+        }
+
+        function renderLegacyPdaRuntimeContent(roleCode, targetPanel) {
+          var target = null;
+          if (roleCode === "store_clerk") {
+            target = document.getElementById("storeMobilePricingPreviewSummary") || (targetPanel ? targetPanel.querySelector(".candidate-summary") : null);
+            renderLegacyStoreClerkRuntime(target);
+          } else if (roleCode === "store_manager") {
+            target = document.getElementById("storeManagerPdaPreview") || targetPanel;
+            renderLegacyStoreManagerRuntime(target);
+          } else {
+            return true;
+          }
+          if (!target) {
+            return renderLegacyRuntimeFailure(targetPanel);
+          }
+          var text = String(target.textContent || "").trim();
+          if (!text || !target.querySelector("[data-pda-runtime-surface]")) {
+            return renderLegacyRuntimeFailure(target);
+          }
+          return true;
+        }
+
         function getLegacyApiBase() {
           var apiBaseInput = document.getElementById("apiBase");
           if (window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0) {
@@ -3848,6 +3945,10 @@
             panels[panelIndex].classList.toggle("panel-hidden", panels[panelIndex] !== targetPanel);
           }
 
+          if (runtimeRole || directLoopPda) {
+            renderLegacyPdaRuntimeContent(roleCode, targetPanel);
+          }
+
           window.scrollTo(0, 0);
         }
 
@@ -3893,6 +3994,7 @@
         }
 
         removeUnsafeLoginQueryParams();
+        restoreLegacyLoginUsername();
         if (supportsModernSyntax() || !loginForm) {
           return;
         }
@@ -3902,6 +4004,6 @@
         }
       })();
     </script>
-    <script src="./app.js?v=pda-runtime-mode-206"></script>
+    <script src="./app.js?v=pda-runtime-content-207"></script>
   </body>
 </html>

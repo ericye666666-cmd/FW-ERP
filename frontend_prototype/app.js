@@ -3005,10 +3005,18 @@ function restoreLoginUsername() {
   if (!(loginUsernameInput instanceof HTMLInputElement)) {
     return;
   }
+  loginUsernameInput.value = getDefaultLoginUsername();
+}
+
+function getDefaultLoginUsername() {
   const saved = (localStorage.getItem(STORAGE_KEYS.loginUsername) || "").trim();
   if (saved) {
-    loginUsernameInput.value = saved;
+    return saved;
   }
+  if (isStagingAppOrigin() || isDirectLoopPdaUserAgent()) {
+    return "";
+  }
+  return "admin_1";
 }
 
 function scrollLoginInputIntoView(event) {
@@ -3082,15 +3090,49 @@ function syncPdaRuntimeMode(user = currentSession.user) {
   return enabled;
 }
 
+function renderPdaRuntimeFailure(target = null) {
+  const container = target instanceof HTMLElement
+    ? target
+    : document.querySelector("#workspacePanels > .panel:not(.workspace-hidden):not(.panel-hidden)")
+      || document.querySelector("#storeMobilePricingPreviewSummary")
+      || document.querySelector("#storeManagerPdaPreview");
+  if (!(container instanceof HTMLElement)) {
+    return false;
+  }
+  container.classList.add("pda-runtime-error-shell");
+  container.innerHTML = `
+    <section class="pda-runtime-error" role="alert">
+      <strong>PDA 页面加载失败，请联系管理员。</strong>
+    </section>
+  `;
+  return false;
+}
+
+function ensurePdaRuntimeContent(target) {
+  if (!(target instanceof HTMLElement)) {
+    return renderPdaRuntimeFailure(target);
+  }
+  const text = target.textContent.trim();
+  const hasRuntimeSurface = Boolean(target.querySelector("[data-pda-runtime-surface]"));
+  const hasPreviewExplanation = text.includes("这里是 Android PDA 模拟器预览");
+  if (!text || !hasRuntimeSurface || hasPreviewExplanation) {
+    return renderPdaRuntimeFailure(target);
+  }
+  return true;
+}
+
 function renderActivePdaRuntimeSurface(panel = null) {
   if (!isPdaRuntimeMode(currentSession.user)) {
     return;
   }
   const title = String(panel?.dataset?.panelTitle || "");
-  if (title.startsWith("PDA 现场分堆标价 UI Preview")) {
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (title.startsWith("PDA 现场分堆标价 UI Preview") || roleCode === "store_clerk") {
     renderStoreMobilePricingPreview();
-  } else if (title.startsWith("店长 PDA 工作台")) {
+    ensurePdaRuntimeContent(document.querySelector("#storeMobilePricingPreviewSummary"));
+  } else if (title.startsWith("店长 PDA 工作台") || roleCode === "store_manager") {
     renderStoreManagerPdaPreview();
+    ensurePdaRuntimeContent(document.querySelector("#storeManagerPdaPreview"));
   } else if (title.startsWith("9. 收银销售")) {
     syncCashierTerminalMode();
   }
