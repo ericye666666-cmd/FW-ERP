@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>店铺进销存工作台</title>
-    <link rel="stylesheet" href="./styles.css?v=pda-runtime-content-207" />
+    <link rel="stylesheet" href="./styles.css?v=pda-task-flow-208" />
   </head>
   <body>
     <section id="authPage" class="auth-page">
@@ -3795,24 +3795,108 @@
           return false;
         }
 
+        var legacyStoreClerkTarget = null;
+        var legacyStoreClerkState = null;
+
+        function createLegacyStoreClerkState() {
+          return {
+            page: "tasks",
+            activeGroupId: "A",
+            scanError: "",
+            scanSuccess: "",
+            groups: [
+              { id: "A", label: "A档", qty: 80, price: 150, status: "待生成" },
+              { id: "B", label: "B档", qty: 80, price: 100, status: "待生成" },
+              { id: "S", label: "S档", qty: 30, price: 300, status: "待生成" },
+              { id: "CUSTOM-200", label: "自定义", qty: 20, price: 200, status: "待生成" },
+            ],
+          };
+        }
+
+        function getLegacyClerkStatus() {
+          if (!legacyStoreClerkState) return "待核对";
+          var groups = legacyStoreClerkState.groups || [];
+          var completed = 0;
+          for (var index = 0; index < groups.length; index += 1) {
+            if (groups[index].status === "已完成") completed += 1;
+          }
+          if (completed === groups.length) return "已完成";
+          return legacyStoreClerkState.scanSuccess ? "进行中" : "待核对";
+        }
+
+        function getLegacyNextGroup() {
+          var groups = legacyStoreClerkState && legacyStoreClerkState.groups ? legacyStoreClerkState.groups : [];
+          for (var index = 0; index < groups.length; index += 1) {
+            if (groups[index].status !== "已完成") return groups[index];
+          }
+          return null;
+        }
+
+        function renderLegacyClerkBadge(label) {
+          return '<span class="mobile-pricing-badge warning">' + escapeHtml(label) + "</span>";
+        }
+
+        function renderLegacyClerkTaskList() {
+          var status = getLegacyClerkStatus();
+          var completeCopy = status === "已完成" ? '<div class="mobile-task-complete-note">已完成：总数 210，价格组 4/4 已完成。</div>' : "";
+          var primary = status === "已完成" ? "" : '<button type="button" class="primary-button mobile-wide-action" data-legacy-clerk-action="start">开始任务</button>';
+          return ''
+            + '<section class="mobile-task-list"><h3>我的 SDP 任务</h3>'
+            + '<article class="mobile-task-card"><div class="mobile-task-card-head"><div><span>演示任务 / Demo only</span><strong>SDP261250002</strong><small>牛仔裤 / 210 件 · UTAWALA · 来源 SDO260504008</small></div>' + renderLegacyClerkBadge(status) + '</div>'
+            + '<div class="mobile-task-facts"><span><b>来源包</b>SDB-TO202605-002</span><span><b>店员</b>Austin</span><span><b>价格组</b>4</span><span><b>状态</b>' + escapeHtml(status) + '</span></div>'
+            + completeCopy + primary + '</article></section>';
+        }
+
+        function renderLegacyClerkScanStep() {
+          return ''
+            + '<form class="mobile-scan-step" data-legacy-clerk-scan-form="true">'
+            + '<div class="mobile-section-head"><strong>扫描实体包</strong>' + renderLegacyClerkBadge(legacyStoreClerkState.scanSuccess || "待核对") + '</div>'
+            + '<p class="subtle small">请扫描 SDP 实体包条码</p>'
+            + '<label class="mobile-scan-input"><span>SDP261250002 / 6261250002</span><input name="sdp_scan" data-scan-input="true" autocomplete="off" /></label>'
+            + (legacyStoreClerkState.scanError ? '<div class="alert-banner">' + escapeHtml(legacyStoreClerkState.scanError) + '</div>' : "")
+            + '<button type="submit" class="primary-button mobile-wide-action">手动确认 / 核对</button></form>';
+        }
+
+        function renderLegacyClerkGroups() {
+          var groups = legacyStoreClerkState.groups || [];
+          var html = '<section class="mobile-pricing-workbench"><h3>现场分堆标价</h3><section class="mobile-sdp-card compact"><div class="mobile-sdp-head"><div><strong>SDP261250002</strong><span class="mobile-sdp-primary-line">牛仔裤 / 210 件</span><small class="mobile-code-secondary">UTAWALA · 来源 SDO260504008 · SDB-TO202605-002</small></div>' + renderLegacyClerkBadge(getLegacyClerkStatus()) + '</div></section><div class="mobile-price-group-list">';
+          for (var index = 0; index < groups.length; index += 1) {
+            var group = groups[index];
+            var action = "";
+            if (group.status === "待生成") action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="generate" data-legacy-group-id="' + escapeHtml(group.id) + '">生成本组 STORE_ITEM</button>';
+            if (group.status === "待打印") action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="print" data-legacy-group-id="' + escapeHtml(group.id) + '">打印本组标签</button>';
+            if (group.status === "待贴标确认") action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="confirm" data-legacy-group-id="' + escapeHtml(group.id) + '">已贴完本组</button>';
+            if (group.status === "已完成") action = '<span class="mobile-group-complete-mark">已完成</span>';
+            html += '<article class="mobile-price-group-card mobile-field-group-card' + (legacyStoreClerkState.activeGroupId === group.id ? " is-active" : "") + '"><div class="mobile-field-group-top"><div class="mobile-field-group-left"><strong>' + escapeHtml(group.label) + '</strong><b class="mobile-group-qty">' + escapeHtml(group.qty) + '件</b></div><div class="mobile-field-group-right"><strong>KSh ' + escapeHtml(group.price) + '</strong>' + renderLegacyClerkBadge(group.status) + '</div></div><div class="mobile-field-group-actions">' + action + '</div></article>';
+          }
+          return html + '</div></section>';
+        }
+
+        function renderLegacyClerkMyTab() {
+          return '<section class="mobile-my-tab"><h3>我的</h3><div class="mobile-my-list"><span><b>当前账号</b><strong>Austin</strong></span><span><b>门店</b><strong>UTAWALA</strong></span><span><b>角色</b><strong>店员</strong></span><span><b>PDA mode / version</b><strong>Direct Loop PDA · task flow 208</strong></span></div><button type="button" class="ghost-button mobile-wide-action" data-legacy-clerk-action="reset">重置演示任务状态</button><button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button></section>';
+        }
+
+        function renderLegacyStoreClerkScreen() {
+          if (!legacyStoreClerkState) legacyStoreClerkState = createLegacyStoreClerkState();
+          if (legacyStoreClerkState.page === "verify") return renderLegacyClerkScanStep();
+          if (legacyStoreClerkState.page === "my") return renderLegacyClerkMyTab();
+          if (legacyStoreClerkState.page === "pricing") return renderLegacyClerkGroups();
+          if (legacyStoreClerkState.page === "complete") return renderLegacyClerkTaskList();
+          return renderLegacyClerkTaskList();
+        }
+
         function renderLegacyStoreClerkRuntime(target) {
           if (!target) {
             return renderLegacyRuntimeFailure(target);
           }
+          legacyStoreClerkTarget = target;
+          if (!legacyStoreClerkState) legacyStoreClerkState = createLegacyStoreClerkState();
           target.className = "store-mobile-runtime-shell";
           target.innerHTML = ''
             + '<section class="store-mobile-runtime-screen" data-pda-runtime-surface="store-clerk">'
-            + '<header class="mobile-pricing-topbar"><div class="mobile-pricing-titlebar"><strong>现场分堆标价</strong><span>⌗</span></div></header>'
-            + '<main class="mobile-pricing-screen">'
-            + '<section class="mobile-pricing-hero"><span>当前 SDP</span><strong>SDP261250002</strong><small>UTAWALA · 女装 · 36 件</small></section>'
-            + '<section class="mobile-pricing-section"><div class="mobile-pricing-section-head"><strong>价格组</strong><span>3 组待处理</span></div>'
-            + '<article class="mobile-price-group-card is-active"><div><strong>女士上衣 A</strong><span>12 件 · KSh 150</span></div><button type="button">开始标价</button></article>'
-            + '<article class="mobile-price-group-card"><div><strong>连衣裙 B</strong><span>8 件 · KSh 250</span></div><button type="button">查看</button></article>'
-            + '<article class="mobile-price-group-card"><div><strong>裤装 C</strong><span>16 件 · KSh 180</span></div><button type="button">查看</button></article>'
-            + '</section>'
-            + '<section class="store-pda-bottom-actions"><button type="button">保存价格</button><button type="button" class="danger-light">异常上报</button></section>'
-            + '</main>'
-            + '<nav class="mobile-pricing-tabbar" aria-label="店员 PDA tabs"><button type="button">任务</button><button type="button">扫描</button><button type="button" class="is-active">标价</button><button type="button">打印</button><button type="button">我的</button></nav>'
+            + '<header class="mobile-pricing-topbar"><div class="mobile-pricing-titlebar"><strong>店员 PDA 工作台</strong><span>⌗</span></div></header>'
+            + '<main class="mobile-pricing-screen">' + renderLegacyStoreClerkScreen() + '</main>'
+            + '<nav class="mobile-pricing-tabbar" aria-label="店员 PDA tabs"><button type="button" class="' + (legacyStoreClerkState.page !== "my" ? "is-active" : "") + '" data-legacy-clerk-action="tasks">任务</button><button type="button" class="' + (legacyStoreClerkState.page === "my" ? "is-active" : "") + '" data-legacy-clerk-action="my">我的</button></nav>'
             + '</section>';
           return true;
         }
@@ -3993,6 +4077,68 @@
           return false;
         }
 
+        function handleLegacyClerkRuntimeClick(event) {
+          var button = event.target && event.target.closest ? event.target.closest("[data-legacy-clerk-action]") : null;
+          if (!button || !legacyStoreClerkTarget || !legacyStoreClerkState) {
+            return;
+          }
+          var action = button.getAttribute("data-legacy-clerk-action") || "";
+          var groupId = button.getAttribute("data-legacy-group-id") || "";
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          if (action === "tasks") legacyStoreClerkState.page = "tasks";
+          if (action === "my") legacyStoreClerkState.page = "my";
+          if (action === "start") legacyStoreClerkState.page = "verify";
+          if (action === "reset") legacyStoreClerkState = createLegacyStoreClerkState();
+          for (var index = 0; index < legacyStoreClerkState.groups.length; index += 1) {
+            var group = legacyStoreClerkState.groups[index];
+            if (group.id !== groupId) continue;
+            legacyStoreClerkState.activeGroupId = group.id;
+            if (action === "generate" && group.status === "待生成") {
+              group.status = "待打印";
+              legacyStoreClerkState.page = "pricing";
+            } else if (action === "print" && group.status === "待打印") {
+              group.status = "待贴标确认";
+              legacyStoreClerkState.page = "pricing";
+            } else if (action === "confirm" && group.status === "待贴标确认") {
+              group.status = "已完成";
+              var nextGroup = getLegacyNextGroup();
+              if (nextGroup) {
+                legacyStoreClerkState.activeGroupId = nextGroup.id;
+                legacyStoreClerkState.page = "pricing";
+              } else {
+                legacyStoreClerkState.page = "complete";
+              }
+            }
+          }
+          renderLegacyStoreClerkRuntime(legacyStoreClerkTarget);
+        }
+
+        function handleLegacyClerkScanSubmit(event) {
+          var form = event.target && event.target.closest ? event.target.closest("[data-legacy-clerk-scan-form]") : null;
+          if (!form || !legacyStoreClerkTarget || !legacyStoreClerkState) {
+            return;
+          }
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          var input = form.elements.sdp_scan;
+          var value = input && input.value ? String(input.value).trim().toUpperCase() : "";
+          if (value === "SDP261250002" || value === "6261250002") {
+            legacyStoreClerkState.scanSuccess = "核对成功";
+            legacyStoreClerkState.scanError = "";
+            legacyStoreClerkState.page = "pricing";
+          } else if (value === "SDO260504008" || value === "4260504008" || /^SDO/.test(value) || /^4\d{9}$/.test(value)) {
+            legacyStoreClerkState.scanError = "请扫描 SDP 实体包，不要扫 SDO 主单。";
+          } else if (/^(SDB|LPK)/.test(value)) {
+            legacyStoreClerkState.scanError = "请扫描 SDP 实体包，不要扫 SDB / LPK 来源包。";
+          } else if (/^(STORE_ITEM|STOREITEM|STI)/.test(value)) {
+            legacyStoreClerkState.scanError = "请先扫描 SDP 包，不要扫 STORE_ITEM 商品码。";
+          } else {
+            legacyStoreClerkState.scanError = "不是当前 SDP 任务条码。";
+          }
+          renderLegacyStoreClerkRuntime(legacyStoreClerkTarget);
+        }
+
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax() || !loginForm) {
@@ -4002,8 +4148,10 @@
         if (loginSubmitButton) {
           loginSubmitButton.addEventListener("click", handleLegacyLogin);
         }
+        document.addEventListener("click", handleLegacyClerkRuntimeClick);
+        document.addEventListener("submit", handleLegacyClerkScanSubmit);
       })();
     </script>
-    <script src="./app.js?v=pda-runtime-content-207"></script>
+    <script src="./app.js?v=pda-task-flow-208"></script>
   </body>
 </html>

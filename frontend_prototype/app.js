@@ -30130,13 +30130,18 @@ function renderStoreClerkHomeSummary(context = {}) {
 
 function createStoreMobilePricingPreviewState(overrides = {}) {
   const baseState = {
-    activePage: "pricing",
+    activePage: "tasks",
     activeGroupId: "A",
+    taskStatus: "待核对",
+    verified: false,
+    scanDraft: "",
+    scanError: "",
+    scanSuccess: "",
     labelSize: "60×40",
     printer_name: "Deli DL-720C",
-    pending_label_count: 130,
-    printed_today_count: 80,
-    current_task_group_id: "B",
+    pending_label_count: 210,
+    printed_today_count: 0,
+    current_task_group_id: "A",
     editorDraft: {
       tier: "A",
       price_kes: 150,
@@ -30151,17 +30156,17 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
       machine_code: "6261250002",
       sdo_code: "SDO260504008",
       sdo_machine_code: "4260504008",
-      store_name: "Direct Loop Utawala",
-      package_no: "2/3",
+      store_name: "UTAWALA",
+      package_no: "1/1",
       source_type: "SDB",
       source_code: "SDB-TO202605-002",
       source_machine_code: "2202605002",
       category: "牛仔裤",
       total_count: 210,
       grouped_count: 210,
-      pending_generate_count: 130,
-      pending_print_count: 80,
-      generated_count: 80,
+      pending_generate_count: 210,
+      pending_print_count: 0,
+      generated_count: 0,
       printed_count: 0,
       assigned_clerk: "Austin",
       received_by: "门店收货",
@@ -30175,7 +30180,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         category: "牛仔裤",
         grade: "A",
         rack_code: "A-01",
-        status: "待打印",
+        status: "待生成",
       },
       {
         group_id: "B",
@@ -30208,44 +30213,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         status: "待生成",
       },
     ],
-    generatedRanges: {
-      A: {
-        start: "STOREITEM26127000001",
-        end: "STOREITEM26127000080",
-        generated_count: 80,
-        pending_print_count: 80,
-      },
-    },
-    printJobs: [
-      {
-        job_id: "MOCK-PJ-A-001",
-        group_id: "A",
-        label_size: "60×40",
-        copies: 80,
-        status: "queued",
-      },
-      {
-        job_id: "MOCK-PJ-B-001",
-        group_id: "B",
-        label_size: "60×40",
-        copies: 80,
-        status: "printing",
-      },
-      {
-        job_id: "MOCK-PJ-S-001",
-        group_id: "S",
-        label_size: "40×30",
-        copies: 30,
-        status: "queued",
-      },
-      {
-        job_id: "MOCK-PJ-CUSTOM-200-001",
-        group_id: "CUSTOM-200",
-        label_size: "60×40",
-        copies: 20,
-        status: "queued",
-      },
-    ],
+    generatedRanges: {},
+    printJobs: [],
     createdPrintJobs: [],
   };
   return {
@@ -30260,6 +30229,104 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
   };
 }
 
+function getStoreMobileTaskGroups(state = storeMobilePricingPreviewState) {
+  return Array.isArray(state.priceGroups) ? state.priceGroups : [];
+}
+
+function getStoreMobileTaskTotals(state = storeMobilePricingPreviewState) {
+  const groups = getStoreMobileTaskGroups(state);
+  const total = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const generated = groups
+    .filter((group) => String(group.status || "") !== "待生成")
+    .reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const stickered = groups
+    .filter((group) => String(group.status || "") === "已完成")
+    .reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const completeGroups = groups.filter((group) => String(group.status || "") === "已完成").length;
+  return {
+    total,
+    generated,
+    stickered,
+    printed: stickered,
+    completeGroups,
+    groupCount: groups.length,
+    pendingGenerate: Math.max(0, total - generated),
+    pendingSticker: Math.max(0, generated - stickered),
+  };
+}
+
+function isStoreMobileTaskComplete(state = storeMobilePricingPreviewState) {
+  const groups = getStoreMobileTaskGroups(state);
+  return groups.length > 0 && groups.every((group) => String(group.status || "") === "已完成");
+}
+
+function getStoreMobileTaskStatus(state = storeMobilePricingPreviewState) {
+  if (isStoreMobileTaskComplete(state)) {
+    return "已完成";
+  }
+  if (state.verified || getStoreMobileTaskGroups(state).some((group) => String(group.status || "") !== "待生成")) {
+    return "进行中";
+  }
+  return String(state.taskStatus || "待核对");
+}
+
+function getNextIncompleteStoreMobileGroup(state = storeMobilePricingPreviewState) {
+  const groups = getStoreMobileTaskGroups(state);
+  const activeIndex = groups.findIndex((group) => String(group.group_id || "") === String(state.activeGroupId || ""));
+  const orderedGroups = activeIndex > -1
+    ? groups.slice(activeIndex + 1).concat(groups.slice(0, activeIndex + 1))
+    : groups;
+  return orderedGroups.find((group) => String(group.status || "") !== "已完成") || null;
+}
+
+function syncStoreMobileTaskCounters(state = storeMobilePricingPreviewState) {
+  const totals = getStoreMobileTaskTotals(state);
+  if (state.selectedSdp) {
+    state.selectedSdp.pending_generate_count = totals.pendingGenerate;
+    state.selectedSdp.pending_print_count = totals.pendingSticker;
+    state.selectedSdp.generated_count = totals.generated;
+    state.selectedSdp.printed_count = totals.stickered;
+  }
+  state.pending_label_count = totals.pendingSticker;
+  state.printed_today_count = totals.stickered;
+  state.taskStatus = getStoreMobileTaskStatus(state);
+  return state;
+}
+
+function getStoreMobileGeneratedRangeForGroup(group = {}) {
+  const cleanGroupId = String(group.group_id || "A").replace(/[^0-9A-Z]/g, "").padEnd(4, "0");
+  const quantity = Number(group.quantity || 0);
+  return {
+    start: `STOREITEM-DEMO-${cleanGroupId}-001`,
+    end: `STOREITEM-DEMO-${cleanGroupId}-${String(quantity).padStart(3, "0")}`,
+    generated_count: quantity,
+    pending_print_count: quantity,
+    demo_only: true,
+  };
+}
+
+function verifyStoreMobileSdpBarcode(value = "", state = storeMobilePricingPreviewState) {
+  const rawValue = String(value || "").trim().toUpperCase();
+  const sdp = state.selectedSdp || {};
+  const validCodes = [
+    String(sdp.display_code || "SDP261250002").trim().toUpperCase(),
+    String(sdp.machine_code || "6261250002").trim().toUpperCase(),
+  ];
+  if (validCodes.includes(rawValue)) {
+    return { ok: true, message: "核对成功" };
+  }
+  if (rawValue === "SDO260504008" || rawValue === "4260504008" || /^SDO/.test(rawValue) || /^4\d{9}$/.test(rawValue)) {
+    return { ok: false, message: "请扫描 SDP 实体包，不要扫 SDO 主单。" };
+  }
+  if (/^(SDB|LPK)/.test(rawValue)) {
+    return { ok: false, message: "请扫描 SDP 实体包，不要扫 SDB / LPK 来源包。" };
+  }
+  if (/^(STORE_ITEM|STOREITEM|STI)/.test(rawValue)) {
+    return { ok: false, message: "请先扫描 SDP 包，不要扫 STORE_ITEM 商品码。" };
+  }
+  return { ok: false, message: "wrong SDP: 不是当前 SDP 任务条码。" };
+}
+
 function getStoreMobilePricingActiveGroup(state = storeMobilePricingPreviewState) {
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
   return groups.find((group) => String(group.group_id || "") === String(state.activeGroupId || "")) || groups[0] || {};
@@ -30271,16 +30338,6 @@ function getStoreMobileCreatedPrintJobForGroup(state = storeMobilePricingPreview
 }
 
 function getStoreMobilePriceGroupStatus(state = storeMobilePricingPreviewState, group = {}) {
-  const createdJob = getStoreMobileCreatedPrintJobForGroup(state, group.group_id);
-  if (createdJob?.status) {
-    return getStoreMobileStatusText(createdJob.status);
-  }
-  if (String(group.status || "") === "已打印") {
-    return "已打印";
-  }
-  if (state.generatedRanges?.[group.group_id]) {
-    return "待打印";
-  }
   return String(group.status || "待生成");
 }
 
@@ -30307,8 +30364,8 @@ function renderNextPriceGroupHint(state = storeMobilePricingPreviewState, curren
 function getStoreMobilePricingTone(label = "") {
   const text = String(label || "").trim();
   if (/异常/.test(text)) return "danger";
-  if (/已打印|可销售|已生成|已分组/.test(text)) return "success";
-  if (/打印中|待打印|待生成|待分组|待处理/.test(text)) return "warning";
+  if (/已打印|已完成|可销售|已生成|已分组/.test(text)) return "success";
+  if (/打印中|待打印|待贴标确认|待生成|待核对|进行中|待分组|待处理/.test(text)) return "warning";
   if (/queued/.test(text)) return "info";
   return "neutral";
 }
@@ -30334,16 +30391,16 @@ function renderStoreMobileStatusBadge(status = "") {
 
 function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   const sdp = state.selectedSdp || {};
+  const totals = getStoreMobileTaskTotals(state);
   const sdpDisplayCode = String(sdp.display_code || sdp.sdp_code || "-").trim();
   const sdpMachineCode = String(sdp.machine_code || "").trim();
   const sdoDisplayCode = String(sdp.sdo_code || "-").trim();
   const sourceDisplayCode = String(sdp.source_code || "-").trim();
   const stats = [
-    ["总数", sdp.total_count || 0],
-    ["已分组", sdp.grouped_count || 0],
-    ["待生成", sdp.pending_generate_count || 0],
-    ["待打印", sdp.pending_print_count || 0],
-    ["已打印", sdp.printed_count || 0],
+    ["总数", sdp.total_count || totals.total || 0],
+    ["已生成", totals.generated],
+    ["已贴标", totals.stickered],
+    ["价格组", `${totals.completeGroups}/${totals.groupCount}`],
   ];
   return `
     <section class="mobile-sdp-card compact">
@@ -30351,9 +30408,9 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
         <div>
           <strong>${escapeHtml(sdpDisplayCode)}</strong>
           <span class="mobile-sdp-primary-line">${escapeHtml(`${sdp.category || "-"} / ${sdp.total_count || 0} 件`)}</span>
-          <small class="mobile-code-secondary">${escapeHtml(`${sdoDisplayCode} · machine_code ${sdpMachineCode || "-"} · 来源 ${sourceDisplayCode}`)}</small>
+          <small class="mobile-code-secondary">${escapeHtml(`${sdp.store_name || "-"} · 来源 ${sdoDisplayCode} · ${sourceDisplayCode} · machine_code ${sdpMachineCode || "-"}`)}</small>
         </div>
-        ${renderStoreMobilePricingBadge("现场作业")}
+        ${renderStoreMobilePricingBadge(getStoreMobileTaskStatus(state))}
       </div>
       <div class="mobile-sdp-stat-strip">
         ${stats.map(([label, value]) => `
@@ -30369,14 +30426,25 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
   return `
     <div class="mobile-price-group-list">
       ${groups.map((group) => {
-        const hasGenerated = Boolean(state.generatedRanges?.[group.group_id]);
-        const createdJob = getStoreMobileCreatedPrintJobForGroup(state, group.group_id);
         const statusText = getStoreMobilePriceGroupStatus(state, group);
-        const isPrinted = statusText === "已打印";
-        const printButtonText = isPrinted ? "已完成" : createdJob ? "查看队列" : "打印本组";
-        const printButtonTarget = createdJob ? "data-mobile-pricing-page=\"print_queue\"" : `data-mobile-pricing-print-group="${escapeHtml(group.group_id)}"`;
+        const isComplete = statusText === "已完成";
+        const isCurrent = String(state.activeGroupId || "") === String(group.group_id || "");
+        const primaryAction = statusText === "待生成"
+          ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本组 STORE_ITEM</button>`
+          : statusText === "待打印"
+            ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-print-group="${escapeHtml(group.group_id)}">打印本组标签</button>`
+            : statusText === "待贴标确认"
+              ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id)}">已贴完本组</button>`
+              : '<span class="mobile-group-complete-mark">已完成</span>';
+        const nextAction = statusText === "待生成"
+          ? "下一步：生成本组 STORE_ITEM"
+          : statusText === "待打印"
+            ? "下一步：打印本组标签"
+            : statusText === "待贴标确认"
+              ? "下一步：贴完后确认"
+              : "已完成";
         return `
-          <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""}">
+          <article class="mobile-price-group-card mobile-field-group-card ${isCurrent ? "is-active" : ""} ${isComplete ? "is-complete" : ""}">
             <div class="mobile-field-group-top">
               <div class="mobile-field-group-left">
                 <strong>${escapeHtml(group.tier || "-")}</strong>
@@ -30389,22 +30457,14 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
             </div>
             <div class="mobile-field-group-meta">
               ${escapeHtml(group.category || "-")} · ${escapeHtml(group.rack_code || "-")}
+              ${isCurrent && !isComplete ? " · 当前组" : ""}
             </div>
             <div class="mobile-field-group-actions">
-              <button type="button" class="${!hasGenerated && !isPrinted ? "primary-button" : "ghost-button"} mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}" ${hasGenerated || isPrinted ? "disabled" : ""}>生成本组</button>
-              <button type="button" class="${hasGenerated && !createdJob && !isPrinted ? "primary-button" : "ghost-button"} mini-button" ${printButtonTarget} ${(!hasGenerated && !createdJob) || isPrinted ? "disabled" : ""}>${escapeHtml(printButtonText)}</button>
+              ${primaryAction}
             </div>
             <div class="mobile-field-next-action">
-              <span>${
-                isPrinted
-                  ? "已完成"
-                  : createdJob
-                    ? "下一步：查看队列"
-                    : hasGenerated
-                      ? "下一步：打印本组"
-                      : "下一步：生成本组"
-              }</span>
-              </div>
+              <span>${escapeHtml(nextAction)}</span>
+            </div>
           </article>
         `;
       }).join("")}
@@ -30471,8 +30531,8 @@ function renderPriceGroupEditor(state = storeMobilePricingPreviewState) {
 function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState) {
   const group = getStoreMobilePricingActiveGroup(state);
   const generated = state.generatedRanges?.[group.group_id] || {
-    start: "STOREITEM26127000001",
-    end: "STOREITEM26127000080",
+    start: "STOREITEM-DEMO-A-001",
+    end: "STOREITEM-DEMO-A-080",
     generated_count: group.quantity || 0,
     pending_print_count: group.quantity || 0,
   };
@@ -30490,9 +30550,9 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <span><b>已生成</b>${escapeHtml(generated.generated_count || group.quantity || 0)} / ${escapeHtml(group.quantity || 0)}</span>
         <span><b>待打印</b>${escapeHtml(generated.pending_print_count || group.quantity || 0)}</span>
         <span><b>货架</b>${escapeHtml(group.rack_code || "-")}</span>
-        <span><b>状态</b>待打印</span>
+        <span><b>状态</b>待打印 · demo result only</span>
       </div>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>
       ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
@@ -30503,6 +30563,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const job = (state.createdPrintJobs || []).find((item) => String(item.group_id || "") === String(group.group_id || ""));
   const activeSize = String(job?.label_size || state.labelSize || "60×40");
   const printerName = String(state.printer_name || "Deli DL-720C");
+  const statusText = getStoreMobilePriceGroupStatus(state, group);
   const summaryHtml = `
     <div class="mobile-print-summary">
       <span><b>档位</b><strong>${escapeHtml(group.tier || "-")}</strong></span>
@@ -30526,29 +30587,34 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       <section class="mobile-print-panel">
         <div class="mobile-section-head">
           <strong>本组打印任务</strong>
-          ${renderStoreMobilePricingBadge("未创建")}
+          ${renderStoreMobilePricingBadge(statusText)}
         </div>
         ${summaryHtml}
         ${labelSizeHtml}
-        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">创建 ${escapeHtml(group.quantity || 0)} 张标签</button>
+        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>
         ${renderNextPriceGroupHint(state, group)}
       </section>
     `;
   }
+  const primaryAction = statusText === "待贴标确认"
+    ? `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id || "")}">已贴完本组</button>`
+    : statusText === "已完成"
+      ? '<div class="mobile-group-complete-mark is-wide">本组已完成</div>'
+      : `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>`;
   return `
     <section class="mobile-print-panel">
       <div class="mobile-section-head">
         <strong>本组打印任务</strong>
-        ${renderStoreMobileStatusBadge(job.status || "queued")}
+        ${renderStoreMobilePricingBadge(statusText)}
       </div>
       ${summaryHtml}
       ${labelSizeHtml}
       <div class="mobile-print-job-card">
-        <span>本组任务</span>
+        <span>本组任务 · demo only</span>
         <strong>${escapeHtml(getStoreMobileStatusText(job.status || "queued"))}</strong>
         <small>${escapeHtml(job?.job_id || "MOCK-PJ-NEW-001")} · ${escapeHtml(activeSize)} · ${escapeHtml(group.quantity || 0)} 张 · ${escapeHtml(group.tier || "-")}</small>
       </div>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="print_queue">返回打印队列</button>
+      ${primaryAction}
       ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
@@ -30556,7 +30622,10 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
 
 function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
-  const jobs = Array.isArray(state.printJobs) ? state.printJobs : [];
+  const jobs = [
+    ...(Array.isArray(state.printJobs) ? state.printJobs : []),
+    ...(Array.isArray(state.createdPrintJobs) ? state.createdPrintJobs : []),
+  ];
   const printerName = String(state.printer_name || "Deli DL-720C");
   const currentGroup = groups.find((group) => String(group.group_id || "") === String(state.current_task_group_id || "")) || groups[0] || {};
   const currentJob = jobs.find((job) => String(job.group_id || "") === String(currentGroup.group_id || "")) || {};
@@ -30590,16 +30659,113 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
   `;
 }
 
+function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
+  const sdp = state.selectedSdp || {};
+  const taskStatus = getStoreMobileTaskStatus(state) || "待核对";
+  const totals = getStoreMobileTaskTotals(state);
+  const displayCode = String(sdp.display_code || "SDP261250002");
+  const defaultCategoryLine = "牛仔裤 / 210 件";
+  const categoryLine = sdp.category || sdp.total_count ? `${sdp.category || "牛仔裤"} / ${sdp.total_count || 210} 件` : defaultCategoryLine;
+  const storeName = String(sdp.store_name || "UTAWALA");
+  const sdoCode = String(sdp.sdo_code || "SDO260504008");
+  const completed = taskStatus === "已完成";
+  return `
+    <section class="mobile-task-list">
+      <h3>我的 SDP 任务</h3>
+      <article class="mobile-task-card ${completed ? "is-complete" : ""}">
+        <div class="mobile-task-card-head">
+          <div>
+            <span>演示任务 / Demo only</span>
+            <strong>${escapeHtml(displayCode)}</strong>
+            <small>${escapeHtml(`${categoryLine} · ${storeName} · 来源 ${sdoCode}`)}</small>
+          </div>
+          ${renderStoreMobilePricingBadge(taskStatus)}
+        </div>
+        <div class="mobile-task-facts">
+          <span><b>来源包</b>${escapeHtml(sdp.source_code || "SDB-TO202605-002")}</span>
+          <span><b>店员</b>${escapeHtml(sdp.assigned_clerk || "Austin")}</span>
+          <span><b>价格组</b>${escapeHtml(`${totals.completeGroups}/${totals.groupCount}`)}</span>
+          <span><b>已贴标</b>${escapeHtml(totals.stickered)}</span>
+        </div>
+        ${
+          completed
+            ? '<div class="mobile-task-complete-note">已完成：总数 210，价格组 4/4 已完成。</div>'
+            : '<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-start-task="true">开始任务</button>'
+        }
+      </article>
+    </section>
+  `;
+}
+
+function renderStoreMobileScanStep(state = storeMobilePricingPreviewState) {
+  const sdp = state.selectedSdp || {};
+  return `
+    <form class="mobile-scan-step" data-mobile-pricing-scan-form="true">
+      <div class="mobile-section-head">
+        <strong>扫描实体包</strong>
+        ${renderStoreMobilePricingBadge(state.scanSuccess || "待核对")}
+      </div>
+      <p class="subtle small">请扫描 SDP 实体包条码</p>
+      <label class="mobile-scan-input">
+        <span>${escapeHtml(sdp.display_code || "SDP261250002")} / ${escapeHtml(sdp.machine_code || "6261250002")}</span>
+        <input id="storeMobileSdpScanInput" name="sdp_scan" data-scan-input="true" data-store-mobile-sdp-scan-input="true" autocomplete="off" value="${escapeHtml(state.scanDraft || "")}" />
+      </label>
+      ${state.scanError ? `<div class="alert-banner">${escapeHtml(state.scanError)}</div>` : ""}
+      ${state.scanSuccess ? `<div class="mobile-scan-success">${escapeHtml(state.scanSuccess)}</div>` : ""}
+      <button type="submit" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-scan="true">手动确认 / 核对</button>
+    </form>
+  `;
+}
+
+function renderStoreMobileCompletionSummary(state = storeMobilePricingPreviewState) {
+  const totals = getStoreMobileTaskTotals(state);
+  return `
+    <section class="mobile-task-completion">
+      <div class="mobile-section-head">
+        <strong>整包 SDP 任务完成</strong>
+        ${renderStoreMobilePricingBadge("已完成")}
+      </div>
+      <div class="mobile-completion-grid">
+        <span><b>总数</b>${escapeHtml(totals.total || 210)}</span>
+        <span><b>已生成</b>${escapeHtml(totals.generated)}</span>
+        <span><b>已打印/贴标</b>${escapeHtml(totals.stickered)}</span>
+        <span><b>价格组 4/4 已完成</b>${escapeHtml(`${totals.completeGroups}/${totals.groupCount}`)}</span>
+      </div>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="tasks">返回任务列表</button>
+    </section>
+  `;
+}
+
+function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
+  const sdp = state.selectedSdp || {};
+  return `
+    <section class="mobile-my-tab">
+      <h3>我的</h3>
+      <div class="mobile-my-list">
+        <span><b>当前账号</b><strong>${escapeHtml(sdp.assigned_clerk || "Austin")}</strong></span>
+        <span><b>门店</b><strong>${escapeHtml(sdp.store_name || "UTAWALA")}</strong></span>
+        <span><b>角色</b><strong>店员</strong></span>
+        <span><b>PDA mode / version</b><strong>Direct Loop PDA · task flow 208</strong></span>
+      </div>
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-reset-task="true">重置演示任务状态</button>
+      <button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button>
+    </section>
+  `;
+}
+
 function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
   const page = String(state.activePage || "pricing");
   if (page === "tasks") {
-    return `
-      <section class="mobile-task-list">
-        <h3>我的 SDP 任务</h3>
-        ${renderStoreMobileSdpCard(state)}
-        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="detail">查看 SDP 详情</button>
-      </section>
-    `;
+    return renderStoreMobileTaskList(state);
+  }
+  if (page === "verify") {
+    return renderStoreMobileScanStep(state);
+  }
+  if (page === "complete") {
+    return renderStoreMobileCompletionSummary(state);
+  }
+  if (page === "my") {
+    return renderStoreMobileMyTab(state);
   }
   if (page === "detail") {
     return `
@@ -30637,8 +30803,7 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
       ${renderStoreMobileSdpCard(state)}
       ${renderPriceGroupCards(state)}
       <div class="mobile-bottom-button-stack">
-        <button type="button" class="primary-button" data-mobile-pricing-page="editor">新增价格组</button>
-        <button type="button" class="ghost-button" data-mobile-pricing-page="groups">保存分组</button>
+        <button type="button" class="ghost-button" data-mobile-pricing-page="groups">查看价格组列表</button>
         <button type="button" class="ghost-button" data-mobile-pricing-page="tasks">返回任务</button>
       </div>
     </section>
@@ -30663,12 +30828,12 @@ function getStoreMobileActivePageLabel(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileBottomTabs(state = storeMobilePricingPreviewState) {
-  const bottomTabs = ["任务", "扫描", "标价", "打印", "我的"];
+  const bottomTabs = ["任务", "我的"];
   const activePage = String(state.activePage || "pricing");
   return `
     ${bottomTabs.map((tab) => `
-      <button type="button" class="${(tab === "标价" && ["pricing", "groups", "editor", "generation"].includes(activePage)) || (tab === "打印" && ["print_task", "print_queue"].includes(activePage)) || (tab === "任务" && ["tasks", "detail"].includes(activePage)) ? "is-active" : ""}" data-mobile-pricing-page="${tab === "任务" ? "tasks" : tab === "打印" ? "print_queue" : tab === "标价" ? "pricing" : activePage}">
-        <span>${escapeHtml(tab === "任务" ? "▣" : tab === "扫描" ? "⌗" : tab === "标价" ? "¥" : tab === "打印" ? "▤" : "○")}</span>
+      <button type="button" class="${(tab === "我的" && activePage === "my") || (tab === "任务" && activePage !== "my") ? "is-active" : ""}" data-mobile-pricing-page="${tab === "任务" ? "tasks" : "my"}">
+        <span>${escapeHtml(tab === "任务" ? "▣" : "○")}</span>
         ${escapeHtml(tab)}
       </button>
     `).join("")}
@@ -30725,6 +30890,7 @@ function renderStoreMobilePricingPreview() {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  syncStoreMobileTaskCounters(storeMobilePricingPreviewState);
   const state = storeMobilePricingPreviewState;
   if (isPdaRuntimeMode()) {
     target.className = "store-mobile-runtime-shell";
@@ -30767,12 +30933,90 @@ function renderStoreMobilePricingPreview() {
   `;
 }
 
+function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState, groupId = "", action = "") {
+  const groups = getStoreMobileTaskGroups(state);
+  const group = groups.find((item) => String(item.group_id || "") === String(groupId || ""));
+  if (!group) {
+    return state;
+  }
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.taskStatus = "进行中";
+  if (action === "generate" && String(group.status || "") === "待生成") {
+    group.status = "待打印";
+    state.generatedRanges[group.group_id] = getStoreMobileGeneratedRangeForGroup(group);
+    state.activePage = "generation";
+  } else if (action === "print" && String(group.status || "") === "待打印") {
+    group.status = "待贴标确认";
+    if (!Array.isArray(state.createdPrintJobs)) {
+      state.createdPrintJobs = [];
+    }
+    const existing = state.createdPrintJobs.find((job) => String(job.group_id || "") === String(group.group_id || ""));
+    if (existing) {
+      existing.label_size = state.labelSize || existing.label_size || "60×40";
+      existing.status = "queued";
+    } else {
+      state.createdPrintJobs.push({
+        job_id: `MOCK-PJ-${group.group_id}-001`,
+        group_id: group.group_id,
+        label_size: state.labelSize || "60×40",
+        copies: group.quantity || 0,
+        status: "queued",
+        demo_only: true,
+      });
+    }
+    state.activePage = "print_task";
+  } else if (action === "confirm" && String(group.status || "") === "待贴标确认") {
+    group.status = "已完成";
+    const nextGroup = getNextIncompleteStoreMobileGroup(state);
+    if (isStoreMobileTaskComplete(state)) {
+      state.taskStatus = "已完成";
+      state.activePage = "complete";
+    } else if (nextGroup) {
+      state.activeGroupId = nextGroup.group_id;
+      state.current_task_group_id = nextGroup.group_id;
+      state.activePage = "pricing";
+    }
+  }
+  return syncStoreMobileTaskCounters(state);
+}
+
+function handleStoreMobileScanSubmit(inputValue = "") {
+  const state = storeMobilePricingPreviewState;
+  const scanInput = document.querySelector("[data-store-mobile-sdp-scan-input]");
+  const scannedValue = String(inputValue || (scanInput instanceof HTMLInputElement ? scanInput.value : "") || "").trim();
+  state.scanDraft = scannedValue;
+  const result = verifyStoreMobileSdpBarcode(scannedValue, state);
+  if (result.ok) {
+    state.verified = true;
+    state.scanError = "";
+    state.scanSuccess = "核对成功";
+    state.taskStatus = "进行中";
+    const nextGroup = getNextIncompleteStoreMobileGroup(state);
+    if (nextGroup) {
+      state.activeGroupId = nextGroup.group_id;
+      state.current_task_group_id = nextGroup.group_id;
+    }
+    state.activePage = "pricing";
+  } else {
+    state.scanSuccess = "";
+    state.scanError = result.message;
+    state.activePage = "verify";
+  }
+  storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+  renderStoreMobilePricingPreview();
+}
+
 function handleStoreMobilePricingPreviewAction(button) {
   if (!(button instanceof HTMLElement)) {
     return;
   }
   const state = storeMobilePricingPreviewState;
   const page = button.dataset.mobilePricingPage;
+  const startTask = button.dataset.mobilePricingStartTask;
+  const confirmScan = button.dataset.mobilePricingConfirmScan;
+  const confirmStickers = button.dataset.mobilePricingConfirmStickers;
+  const resetTask = button.dataset.mobilePricingResetTask;
   const selectGroup = button.dataset.mobilePricingSelectGroup;
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const printGroup = button.dataset.mobilePricingPrintGroup;
@@ -30781,6 +31025,20 @@ function handleStoreMobilePricingPreviewAction(button) {
   const gradeChoice = button.dataset.mobilePricingGradeChoice;
   const categoryChoice = button.dataset.mobilePricingCategoryChoice;
   const qtyStep = button.dataset.mobilePricingQtyStep;
+  if (resetTask) {
+    storeMobilePricingPreviewState = createStoreMobilePricingPreviewState();
+    renderStoreMobilePricingPreview();
+    return;
+  }
+  if (confirmScan) {
+    handleStoreMobileScanSubmit();
+    return;
+  }
+  if (startTask) {
+    state.activePage = "verify";
+    state.scanError = "";
+    state.scanSuccess = "";
+  }
   if (page) {
     state.activePage = page;
   }
@@ -30789,41 +31047,13 @@ function handleStoreMobilePricingPreviewAction(button) {
     state.activePage = "editor";
   }
   if (generateGroup) {
-    const group = state.priceGroups.find((item) => String(item.group_id || "") === String(generateGroup));
-    if (group) {
-      state.activeGroupId = group.group_id;
-      group.status = "待打印";
-      state.generatedRanges[group.group_id] = {
-        start: `STOREITEM2612700${String(group.group_id).replace(/[^0-9A-Z]/g, "").padEnd(4, "0")}001`,
-        end: `STOREITEM2612700${String(group.group_id).replace(/[^0-9A-Z]/g, "").padEnd(4, "0")}${String(group.quantity || 0).padStart(3, "0")}`,
-        generated_count: group.quantity,
-        pending_print_count: group.quantity,
-      };
-      state.activePage = "generation";
-    }
+    advanceStoreMobileGroupWorkflow(state, generateGroup, "generate");
   }
   if (printGroup) {
-    const group = state.priceGroups.find((item) => String(item.group_id || "") === String(printGroup));
-    if (group) {
-      state.activeGroupId = group.group_id;
-      if (!Array.isArray(state.createdPrintJobs)) {
-        state.createdPrintJobs = [];
-      }
-      const existing = state.createdPrintJobs.find((job) => String(job.group_id || "") === String(group.group_id || ""));
-      if (existing) {
-        existing.label_size = state.labelSize || existing.label_size || "60×40";
-        existing.status = "queued";
-      } else {
-        state.createdPrintJobs.push({
-          job_id: `MOCK-PJ-${group.group_id}-001`,
-          group_id: group.group_id,
-          label_size: state.labelSize || "60×40",
-          copies: group.quantity || 0,
-          status: "queued",
-        });
-      }
-      state.activePage = "print_task";
-    }
+    advanceStoreMobileGroupWorkflow(state, printGroup, "print");
+  }
+  if (confirmStickers) {
+    advanceStoreMobileGroupWorkflow(state, confirmStickers, "confirm");
   }
   if (labelSize) {
     state.labelSize = labelSize;
@@ -30841,7 +31071,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   if (qtyStep) {
     state.editorDraft.quantity = Math.max(1, Number(state.editorDraft.quantity || 0) + Number(qtyStep || 0));
   }
-  storeMobilePricingPreviewState = state;
+  storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
   renderStoreMobilePricingPreview();
 }
 
@@ -37012,12 +37242,23 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-select-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
+  event.preventDefault();
   handleStoreMobilePricingPreviewAction(button);
+});
+
+document.addEventListener("submit", (event) => {
+  const form = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-scan-form]") : null;
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  handleStoreMobileScanSubmit();
 });
 
 document.addEventListener("click", async (event) => {

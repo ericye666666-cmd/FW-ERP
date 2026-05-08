@@ -129,6 +129,6 @@ test("desktop preview shell remains available outside PDA runtime", () => {
 });
 
 test("PDA runtime PR cache-busts app and style assets", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-content-207" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-content-207"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-task-flow-208" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-task-flow-208"><\/script>/);
 });
