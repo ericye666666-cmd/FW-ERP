@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>店铺进销存工作台</title>
-    <link rel="stylesheet" href="./styles.css?v=pda-login-submit-205" />
+    <link rel="stylesheet" href="./styles.css?v=pda-runtime-mode-206" />
   </head>
   <body>
     <section id="authPage" class="auth-page">
@@ -3815,8 +3815,19 @@
           var appSessionMeta = document.getElementById("appSessionMeta");
           var workspace = targetPanel.getAttribute("data-workspace-panel") || "overview";
 
+          var runtimeRole = roleCode === "store_clerk" || roleCode === "store_manager" || roleCode === "cashier" || roleCode === "store_cashier";
+          var directLoopPda = window.navigator && String(window.navigator.userAgent || "").indexOf("DirectLoopPDA/1.0") !== -1;
+          if (runtimeRole || directLoopPda) {
+            document.body.classList.add("pda-runtime-mode");
+          }
           if (authPage) authPage.classList.add("hidden-screen");
-          if (appShell) appShell.classList.remove("hidden-screen");
+          if (appShell) {
+            appShell.classList.remove("hidden-screen");
+            if (runtimeRole || directLoopPda) {
+              appShell.classList.add("pda-runtime-mode");
+              appShell.setAttribute("data-pda-runtime-role", roleCode);
+            }
+          }
           if (workspacePanels) workspacePanels.classList.remove("locked");
           if (sessionSummary) {
             sessionSummary.textContent = String(user && (user.full_name || user.username) ? (user.full_name || user.username) : "已登录");
@@ -3891,6 +3902,6 @@
         }
       })();
     </script>
-    <script src="./app.js?v=pda-login-submit-205"></script>
+    <script src="./app.js?v=pda-runtime-mode-206"></script>
   </body>
 </html>
