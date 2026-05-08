@@ -4377,21 +4377,18 @@ function verifyStoreManagerPdaSdoBarcode(value = "", state = createStoreManagerP
   }
   const normalizedCode = String(validation.code || "").trim().toUpperCase();
   const digits = normalizedCode.replace(/[^0-9]/g, "");
-  const tasks = [
-    ...(Array.isArray(state.sdoTasks) ? state.sdoTasks : []),
-    state.sdoTask,
-  ].filter(Boolean);
-  const task = tasks.find((row) => {
-    const displayCode = String(row?.display_code || "").trim().toUpperCase();
-    const machineCode = String(row?.machine_code || "").replace(/[^0-9]/g, "").trim();
-    return displayCode === normalizedCode || (digits && machineCode === digits);
-  });
+  const task = state?.sdoTask || null;
   if (!task) {
-    return { ok: false, error: "当前门店没有这张 SDO 收货任务。" };
+    return { ok: false, error: "请先从收退货任务列表选择一张 SDO。" };
   }
   const currentStoreCode = getCurrentStoreCodeFallback();
   if (task.store_code && currentStoreCode && String(task.store_code || "").trim().toUpperCase() !== currentStoreCode) {
     return { ok: false, error: "这张 SDO 不属于当前门店。" };
+  }
+  const selectedDisplayCode = String(task.display_code || "").trim().toUpperCase();
+  const selectedMachineCode = String(task.machine_code || "").replace(/[^0-9]/g, "").trim();
+  if (selectedDisplayCode !== normalizedCode && (!digits || selectedMachineCode !== digits)) {
+    return { ok: false, error: "不是当前选中的 SDO，请返回任务列表选择正确 SDO 后再扫描。" };
   }
   return { ...validation, task };
 }

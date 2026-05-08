@@ -32,6 +32,16 @@ function executableFunction(source, functionName) {
   return vm.runInNewContext(`(${functionSource(source, functionName)})`);
 }
 
+function executableStoreManagerSdoVerifier() {
+  return vm.runInNewContext(`
+    ${functionSource(appJs, "validateStoreManagerPdaSdoScanCode")}
+    ${functionSource(appJs, "verifyStoreManagerPdaSdoBarcode")}
+    verifyStoreManagerPdaSdoBarcode;
+  `, {
+    getCurrentStoreCodeFallback: () => "UTAWALA",
+  });
+}
+
 test("store manager PDA runtime bottom nav keeps the original four manager tabs", () => {
   const renderPreview = functionSource(appJs, "renderStoreManagerPdaPreview");
   const bottomTabs = functionSource(appJs, "renderStoreManagerPdaBottomTabs");
@@ -134,12 +144,111 @@ test("manager SDO verification accepts only SDO display or 4-prefix machine code
     assert.equal(result.ok, false, `${code} should be rejected`);
     assert.match(result.error, pattern);
   });
-  assert.match(verifier, /state\.sdoTasks/);
+  assert.match(verifier, /state\?\.sdoTask/);
   assert.match(verifier, /task\.store_code/);
   assert.match(verifier, /不属于当前门店/);
-  assert.match(verifier, /当前门店没有这张 SDO 收货任务/);
+  assert.match(verifier, /当前选中的 SDO/);
   assert.doesNotMatch(verifier, /SDO260504008/);
   assert.doesNotMatch(verifier, /4260504008/);
+});
+
+test("manager SDO verification accepts only the selected current SDO task", () => {
+  const verify = executableStoreManagerSdoVerifier();
+  const currentTask = {
+    display_code: "SDO260504001",
+    machine_code: "4260504001",
+    store_code: "UTAWALA",
+  };
+  const siblingTask = {
+    display_code: "SDO260504002",
+    machine_code: "4260504002",
+    store_code: "UTAWALA",
+  };
+  const state = {
+    sdoTask: currentTask,
+    sdoTasks: [currentTask, siblingTask],
+  };
+
+  assert.equal(verify("SDO260504001", state).ok, true);
+  assert.equal(verify("4260504001", state).ok, true);
+
+  const siblingDisplay = verify("SDO260504002", state);
+  const siblingMachine = verify("4260504002", state);
+  assert.equal(siblingDisplay.ok, false);
+  assert.equal(siblingMachine.ok, false);
+  assert.match(siblingDisplay.error, /当前选中的 SDO/);
+  assert.match(siblingMachine.error, /当前选中的 SDO/);
+});
+
+test("manager SDO verification rejects selected SDO if it belongs to another store", () => {
+  const verify = executableStoreManagerSdoVerifier();
+  const otherStoreTask = {
+    display_code: "SDO260504099",
+    machine_code: "4260504099",
+    store_code: "KAWANGWARE",
+  };
+  const result = verify("SDO260504099", {
+    sdoTask: otherStoreTask,
+    sdoTasks: [otherStoreTask],
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /不属于当前门店/);
+});
+
+test("manager SDO task adapter scopes SDO cards to the manager store", () => {
+  const getTasks = vm.runInNewContext(`
+    ${functionSource(appJs, "getStoreManagerPdaPackageStatus")}
+    ${functionSource(appJs, "normalizeStoreManagerPdaPackage")}
+    ${functionSource(appJs, "normalizeStoreManagerPdaSdoTask")}
+    ${functionSource(appJs, "getStoreManagerPdaSdoTasksForStore")}
+    getStoreManagerPdaSdoTasksForStore;
+  `, {
+    getCurrentStoreCodeFallback: () => "UTAWALA",
+    getStoreReceivingPackageCode: (row) => row.sdo_package_display_code || row.display_code || "",
+    normalizeStoreReceivingPackageRow: (row) => row,
+    getStoreReceivingPackageRows: () => [],
+    groupStoreReceivingPackagesBySdo: () => [
+      {
+        sdo_display_code: "SDO260504001",
+        sdo_machine_code: "4260504001",
+        store_code: "UTAWALA",
+        item_count: 210,
+        packages: [
+          {
+            sdo_package_display_code: "SDP261250002",
+            sdo_package_machine_code: "6261250002",
+            store_code: "UTAWALA",
+            source_code: "SDB-TO202605-002",
+            received_status: "pending",
+            exception_status: "normal",
+            assignment_status: "unassigned",
+          },
+        ],
+      },
+      {
+        sdo_display_code: "SDO260504099",
+        sdo_machine_code: "4260504099",
+        store_code: "KAWANGWARE",
+        item_count: 50,
+        packages: [
+          {
+            sdo_package_display_code: "SDP261250099",
+            sdo_package_machine_code: "6261250099",
+            store_code: "KAWANGWARE",
+            source_code: "LPK260504001",
+            received_status: "pending",
+            exception_status: "normal",
+            assignment_status: "unassigned",
+          },
+        ],
+      },
+    ],
+  });
+
+  const tasks = getTasks("UTAWALA");
+  assert.deepEqual(tasks.map((task) => task.display_code), ["SDO260504001"]);
+  assert.equal(tasks[0].packages[0].source_code, "SDB-TO202605-002");
 });
 
 test("successful SDO scan opens backend package detail rows", () => {

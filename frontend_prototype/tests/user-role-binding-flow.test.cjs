@@ -61,6 +61,19 @@ test("store clerk assignment only shows active store_clerk users from the same s
   assert.equal(rows.some((row) => row.username === "warehouse_clerk_1"), false);
 });
 
+test("Utawala clerk picker includes every active store_clerk, not only Austin", () => {
+  const rows = getAssignableStoreClerks([
+    { username: "store_clerk_1", full_name: "Store Clerk One", role_code: "store_clerk", store_code: "UTAWALA", status: "active", is_active: true },
+    { username: "Austin", full_name: "Austin", role_code: "store_clerk", store_code: "UTAWALA", status: "active", is_active: true },
+    { username: "Swahili", full_name: "Swahili", role_code: "store_clerk", store_code: "UTAWALA", status: "active", is_active: true },
+    { username: "cashier_1", full_name: "Cashier One", role_code: "cashier", store_code: "UTAWALA", status: "active", is_active: true },
+    { username: "inactive_utawala", full_name: "Inactive", role_code: "store_clerk", store_code: "UTAWALA", status: "inactive", is_active: false },
+    { username: "other_store", full_name: "Other Store", role_code: "store_clerk", store_code: "KAWANGWARE", status: "active", is_active: true },
+  ], "UTAWALA");
+
+  assert.deepEqual(rows.map((row) => row.username), ["store_clerk_1", "Austin", "Swahili"]);
+});
+
 test("warehouse staff picker only shows active warehouse workers from the same warehouse", () => {
   const rows = getAssignableWarehouseStaff(users, "WH1");
 
