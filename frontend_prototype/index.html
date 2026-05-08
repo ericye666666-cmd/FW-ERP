@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>店铺进销存工作台</title>
-    <link rel="stylesheet" href="./styles.css?v=pda-login-session-204" />
+    <link rel="stylesheet" href="./styles.css?v=pda-login-submit-205" />
   </head>
   <body>
     <section id="authPage" class="auth-page">
@@ -73,10 +73,10 @@
             <button id="saveBaseButton" type="button">保存地址</button>
             <div id="apiModeIndicator" class="subtle small api-mode-indicator" hidden></div>
           </div>
-          <form id="loginForm" class="form-grid compact auth-form" autocomplete="off">
+          <form id="loginForm" class="form-grid compact auth-form" method="post" action="javascript:void(0)" autocomplete="off" novalidate>
             <input name="username" placeholder="用户名" value="admin_1" />
             <input name="password" type="password" placeholder="密码" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
-            <button type="submit">登录并进入终端 / 工作区</button>
+            <button id="loginSubmitButton" type="submit">登录并进入终端 / 工作区</button>
           </form>
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
@@ -3707,6 +3707,190 @@
     <script src="./operations-fulfillment-flow.js?v=store-batch-receipt-20260426"></script>
     <script src="./apparel-default-cost-flow.js"></script>
     <script src="./apparel-sorting-rack-flow.js"></script>
-    <script src="./app.js?v=pda-login-session-204"></script>
+    <script>
+      (function legacyPdaLoginGuard() {
+        var loginForm = document.getElementById("loginForm");
+        var loginSubmitButton = document.getElementById("loginSubmitButton");
+        var stagingApiBase = "https://fw-erp-34-35-52-250.nip.io/api/v1";
+
+        function removeUnsafeLoginQueryParams() {
+          if (!window.location.search || !window.history || typeof window.history.replaceState !== "function") {
+            return;
+          }
+          var url = new URL(window.location.href);
+          var changed = false;
+          if (url.searchParams.has("username")) {
+            url.searchParams.delete("username");
+            changed = true;
+          }
+          if (url.searchParams.has("password")) {
+            url.searchParams.delete("password");
+            changed = true;
+          }
+          if (changed) {
+            window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+          }
+        }
+
+        function supportsModernSyntax() {
+          try {
+            new Function("var row = { user: { name: 'ok' } }; return row?.user?.name;");
+            return true;
+          } catch (error) {
+            return false;
+          }
+        }
+
+        function escapeHtml(value) {
+          return String(value || "").replace(/[&<>"']/g, function replaceChar(char) {
+            return {
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            }[char];
+          });
+        }
+
+        function renderLegacyLoginError(message) {
+          var target = document.getElementById("authResultSummary");
+          if (target) {
+            target.className = "candidate-summary";
+            target.innerHTML = '<div class="alert-banner">' + escapeHtml(message) + "</div>";
+          }
+        }
+
+        function getLegacyApiBase() {
+          var apiBaseInput = document.getElementById("apiBase");
+          if (window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0) {
+            return stagingApiBase;
+          }
+          return apiBaseInput && apiBaseInput.value ? apiBaseInput.value.trim() : stagingApiBase;
+        }
+
+        function getFormValue(name) {
+          return loginForm && loginForm.elements[name] ? String(loginForm.elements[name].value || "").trim() : "";
+        }
+
+        function clearLegacyPassword() {
+          if (loginForm && loginForm.elements.password) {
+            loginForm.elements.password.value = "";
+          }
+        }
+
+        function findPanelByTitle(prefix) {
+          var panels = document.querySelectorAll("[data-workspace-panel]");
+          for (var index = 0; index < panels.length; index += 1) {
+            var heading = panels[index].querySelector(".panel-head h2");
+            var text = heading ? String(heading.textContent || "").trim() : "";
+            if (text.indexOf(prefix) === 0) {
+              return panels[index];
+            }
+          }
+          return null;
+        }
+
+        function enterLegacyWorkspace(user) {
+          var roleCode = String(user && user.role_code ? user.role_code : "").trim().toLowerCase();
+          var targetTitle = "";
+          if (roleCode === "store_clerk") {
+            targetTitle = "PDA 现场分堆标价 UI Preview";
+          } else if (roleCode === "store_manager") {
+            targetTitle = "店长 PDA 工作台";
+          } else if (roleCode === "cashier" || roleCode === "store_cashier") {
+            targetTitle = "9. 收银销售";
+          }
+
+          var targetPanel = targetTitle ? findPanelByTitle(targetTitle) : findPanelByTitle("先这样测试");
+          if (!targetPanel) {
+            renderLegacyLoginError("登录成功，但旧版 WebView 无法进入默认工作台。请联系管理员升级 WebView。");
+            return;
+          }
+
+          var authPage = document.getElementById("authPage");
+          var appShell = document.getElementById("appShell");
+          var workspacePanels = document.getElementById("workspacePanels");
+          var sessionSummary = document.getElementById("sessionSummary");
+          var appSessionMeta = document.getElementById("appSessionMeta");
+          var workspace = targetPanel.getAttribute("data-workspace-panel") || "overview";
+
+          if (authPage) authPage.classList.add("hidden-screen");
+          if (appShell) appShell.classList.remove("hidden-screen");
+          if (workspacePanels) workspacePanels.classList.remove("locked");
+          if (sessionSummary) {
+            sessionSummary.textContent = String(user && (user.full_name || user.username) ? (user.full_name || user.username) : "已登录");
+          }
+          if (appSessionMeta) {
+            appSessionMeta.textContent = "角色: " + roleCode + (user && user.store_code ? " / " + user.store_code : "");
+          }
+
+          var tabs = document.querySelectorAll("[data-workspace-target]");
+          for (var tabIndex = 0; tabIndex < tabs.length; tabIndex += 1) {
+            tabs[tabIndex].classList.toggle("active", tabs[tabIndex].getAttribute("data-workspace-target") === workspace);
+          }
+
+          var panels = document.querySelectorAll("[data-workspace-panel]");
+          for (var panelIndex = 0; panelIndex < panels.length; panelIndex += 1) {
+            var sameWorkspace = panels[panelIndex].getAttribute("data-workspace-panel") === workspace;
+            panels[panelIndex].classList.toggle("workspace-hidden", !sameWorkspace);
+            panels[panelIndex].classList.toggle("panel-hidden", panels[panelIndex] !== targetPanel);
+          }
+
+          window.scrollTo(0, 0);
+        }
+
+        function handleLegacyLogin(event) {
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          var username = getFormValue("username");
+          var password = getFormValue("password");
+          if (!username || !password) {
+            renderLegacyLoginError("请输入用户名和密码。");
+            return false;
+          }
+          try {
+            window.localStorage.setItem("retail_ops_login_username", username);
+          } catch (error) {
+            // Ignore storage failures here; the main goal is preventing native GET fallback.
+          }
+          fetch(getLegacyApiBase() + "/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username, password: password }),
+          })
+            .then(function parseResponse(response) {
+              return response.json().then(function parseBody(body) {
+                if (!response.ok) {
+                  throw new Error(body && body.detail ? body.detail : "登录失败。");
+                }
+                return body;
+              });
+            })
+            .then(function handleLoginResult(result) {
+              clearLegacyPassword();
+              window.localStorage.setItem("retail_ops_access_token", result.access_token || "");
+              window.localStorage.setItem("retail_ops_current_user", JSON.stringify(result.user || null));
+              window.localStorage.setItem("retail_ops_api_base", getLegacyApiBase());
+              enterLegacyWorkspace(result.user || {});
+            })
+            .catch(function handleLoginError(error) {
+              clearLegacyPassword();
+              renderLegacyLoginError(error && error.message ? error.message : "登录失败。");
+            });
+          return false;
+        }
+
+        removeUnsafeLoginQueryParams();
+        if (supportsModernSyntax() || !loginForm) {
+          return;
+        }
+        loginForm.addEventListener("submit", handleLegacyLogin);
+        if (loginSubmitButton) {
+          loginSubmitButton.addEventListener("click", handleLegacyLogin);
+        }
+      })();
+    </script>
+    <script src="./app.js?v=pda-login-submit-205"></script>
   </body>
 </html>
