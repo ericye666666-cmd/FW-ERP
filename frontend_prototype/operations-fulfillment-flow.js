@@ -1168,10 +1168,12 @@
           || [row?.categoryMain, row?.categorySub].map(normalizeText).filter(Boolean).join(" / ")
           || "现成待送店包裹",
         grade: normalizeText(resultRow?.grade || row?.grade) || "mixed",
-        item_count: Number(resultRow?.item_count || row?.qty || 0),
+        item_count: Number(row?.qty || 0),
+        allocated_item_count: Number(row?.qty || 0),
+        source_full_item_count: Number(resultRow?.item_count || 0),
         status: normalizeText(resultRow?.status) || "ready_dispatch",
         store_code: normalizeText(resultRow?.store_code).toUpperCase() || fallbackStoreCode,
-        source_type: "prepared_store_dispatch_bale",
+        source_type: "SDB",
         source_label: "现成待送店包裹",
         source_bales: [sourceBaleNo].filter(Boolean),
         rack_codes: Array.isArray(row?.rackCodes) ? row.rackCodes.map((item) => normalizeText(item).toUpperCase()).filter(Boolean) : [],
@@ -1186,6 +1188,12 @@
       const lineCount = Array.isArray(row?.lines) && row.lines.length ? row.lines.length : 1;
       const collapsedBackendBales = resultRows
         .filter((resultRow) => {
+          const resultBaleNo = normalizeText(resultRow?.bale_no || resultRow?.source_code).toUpperCase();
+          const resultSourceType = normalizeText(resultRow?.source_type).toUpperCase();
+          const isLooseResult = resultBaleNo.startsWith("LPK") || resultSourceType === "LPK" || resultSourceType === "LOOSE_PICK_SHEET";
+          if (!isLooseResult) {
+            return false;
+          }
           const summary = normalizeText(resultRow?.category_summary || resultRow?.category_name).toLowerCase();
           return Array.isArray(row?.lines) && row.lines.some((line) => {
             const label = [line?.categoryMain, line?.categorySub].map(normalizeText).filter(Boolean).join(" / ").toLowerCase();
@@ -1216,9 +1224,11 @@
         category_summary: `多类目补差 · ${lineCount} 个类目`,
         grade: `PKG<${normalizeLoosePackageLimitQty(row?.packageLimitQty)}`,
         item_count: Number(row?.qty || 0),
+        allocated_item_count: Number(row?.qty || 0),
+        source_full_item_count: Number(resultRow?.item_count || 0),
         status: "ready_dispatch",
         store_code: normalizeText(resultRow?.store_code).toUpperCase() || fallbackStoreCode,
-        source_type: "loose_pick_sheet",
+        source_type: "LPK",
         source_label: "补差拣货单",
         source_bales: [sourceBarcode].filter(Boolean),
         collapsed_bale_nos: collapsedBackendBales,

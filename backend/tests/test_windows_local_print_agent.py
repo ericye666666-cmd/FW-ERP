@@ -593,7 +593,7 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
             "source_code": "LPK-TO20260504023",
             "source_machine_code": "3261240006",
             "item_count": 120,
-            "content_summary": "tops / lady tops",
+            "content_summary": "cargo pants",
         }
 
         normalized, error = agent._normalize_print_label_request(
@@ -615,6 +615,7 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertIn("PKG 1/2", tspl)
         self.assertIn("SDP261240006", tspl)
         self.assertIn("SRC LPK-TO20260504023", tspl)
+        self.assertIn("CAT CARGO PANTS", tspl)
         self.assertIn("QTY 120", tspl)
         self.assertNotIn("tops / lady tops", tspl)
         self.assertNotIn("Display", tspl)

@@ -1686,7 +1686,19 @@ class InMemoryState:
         return parsed
 
     def _extract_dispatch_item_count(self, row: dict[str, Any]) -> Optional[int]:
-        for key in ("item_count", "qty", "quantity", "piece_count", "pieces"):
+        for key in (
+            "allocated_item_count",
+            "allocated_qty",
+            "allocation_qty",
+            "selected_item_count",
+            "selected_qty",
+            "sdo_item_count",
+            "item_count",
+            "qty",
+            "quantity",
+            "piece_count",
+            "pieces",
+        ):
             parsed = self._parse_optional_nonnegative_int(row.get(key))
             if parsed is not None:
                 return parsed
@@ -14405,25 +14417,7 @@ class InMemoryState:
         sdo_packages: list[dict[str, Any]] = []
         known_package_item_counts: list[int] = []
         for row in package_source_rows:
-            raw_item_count = (
-                row.get("item_count")
-                if row.get("item_count") not in {None, ""}
-                else row.get("qty")
-                if row.get("qty") not in {None, ""}
-                else row.get("quantity")
-                if row.get("quantity") not in {None, ""}
-                else row.get("piece_count")
-                if row.get("piece_count") not in {None, ""}
-                else row.get("pieces")
-            )
-            parsed_item_count: Optional[int] = None
-            if raw_item_count is not None and raw_item_count != "":
-                try:
-                    candidate = int(float(raw_item_count))
-                    if candidate >= 0:
-                        parsed_item_count = candidate
-                except (TypeError, ValueError):
-                    parsed_item_count = None
+            parsed_item_count = self._extract_dispatch_item_count(row)
             if parsed_item_count is not None:
                 known_package_item_counts.append(parsed_item_count)
             sdo_packages.append(
