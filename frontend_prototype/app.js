@@ -3477,6 +3477,8 @@ function createStoreManagerPdaTaskState(overrides = {}) {
     scanDraft: "",
     scanError: "",
     scanSuccess: "",
+    sdoSearchQuery: "",
+    sdoSearchError: "",
     notice: "",
     loading: false,
     loaded: false,
@@ -3536,6 +3538,62 @@ function getStoreManagerPdaPackageStatus(pkg = {}) {
   return "待收货";
 }
 
+function normalizeStoreManagerPdaReceivingEligibilityStatus(row = {}) {
+  const candidates = [
+    row?.store_receipt_status,
+    row?.receiving_status,
+    row?.receipt_status,
+    row?.dispatch_status,
+    row?.shipment_status,
+    row?.delivery_status,
+    row?.lifecycle_status,
+    row?.status,
+    row?.store_delivery_execution_order?.status,
+  ];
+  return candidates
+    .map((value) => String(value || "").trim().toLowerCase())
+    .find(Boolean) || "";
+}
+
+function isStoreManagerPdaSdoReceivingEligible(row = {}) {
+  const eligibleStatuses = new Set([
+    "shipped",
+    "dispatched",
+    "pending_receipt",
+    "pending_store_receiving",
+    "in_transit",
+    "receiving_in_progress",
+    "partially_received",
+    "received",
+    "completed",
+    "closed",
+  ]);
+  const preDispatchStatuses = new Set([
+    "draft",
+    "created",
+    "pending",
+    "ready",
+    "approved",
+    "packed",
+    "ready_dispatch",
+    "ready_to_dispatch",
+    "pending_dispatch",
+    "generated",
+    "printed",
+  ]);
+  const statuses = [
+    normalizeStoreManagerPdaReceivingEligibilityStatus(row),
+    ...(Array.isArray(row?.packages) ? row.packages.map((pkg) => normalizeStoreManagerPdaReceivingEligibilityStatus(pkg)) : []),
+  ].filter(Boolean);
+  if (statuses.some((status) => eligibleStatuses.has(status))) {
+    return true;
+  }
+  if (statuses.some((status) => preDispatchStatuses.has(status))) {
+    return false;
+  }
+  return false;
+}
+
 function normalizeStoreManagerPdaPackage(row = {}) {
   const normalized = normalizeStoreReceivingPackageRow(row, {}) || row || {};
   const displayCode = String(
@@ -3558,6 +3616,7 @@ function normalizeStoreManagerPdaPackage(row = {}) {
     item_count: Number.isFinite(itemCount) ? itemCount : null,
     source_code: String(normalized.source_code || normalized.bale_no || "").trim().toUpperCase(),
     source_type: String(normalized.source_type || "").trim().toUpperCase(),
+    dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(normalized),
     received_status: String(normalized.received_status || "pending").trim().toLowerCase(),
     exception_status: String(normalized.exception_status || "normal").trim().toLowerCase(),
     assigned_clerk: String(normalized.assigned_clerk || "").trim(),
@@ -3603,6 +3662,7 @@ function normalizeStoreManagerPdaSdoTask(row = {}) {
     display_code: displayCode || String(packages[0]?.parent_sdo_display_code || "").trim().toUpperCase(),
     machine_code: machineCode,
     store_code: storeCode,
+    dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(row) || packages[0]?.dispatch_status || "",
     source_code: uniqueSourceCodes.join(" / "),
     package_count: Number(row.package_count || packages.length || 0),
     total_item_count: Number(row.total_item_count || totalItemCount || 0),
@@ -3617,10 +3677,12 @@ function getStoreManagerPdaSdoTasksForStore(storeCode = getCurrentStoreCodeFallb
   const normalizedStore = String(storeCode || "").trim().toUpperCase();
   const packageRows = getStoreReceivingPackageRows(storeCode);
   return groupStoreReceivingPackagesBySdo(packageRows)
+    .filter((group) => isStoreManagerPdaSdoReceivingEligible(group))
     .map((group) => normalizeStoreManagerPdaSdoTask({
       display_code: group.sdo_display_code,
       machine_code: group.sdo_machine_code,
       store_code: group.store_code,
+      dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(group),
       source_code: [...new Set((group.packages || []).map((pkg) => pkg.source_code).filter(Boolean))].join(" / "),
       package_count: group.packages?.length || 0,
       total_item_count: group.item_count || 0,
@@ -3689,7 +3751,8 @@ function getStoreManagerPdaTaskTotals(state = ensureStoreManagerPdaTaskState()) 
   const assignedCount = packages.filter((pkg) => pkg.status === "已分配").length;
   const exceptionCount = packages.filter((pkg) => pkg.status === "异常").length;
   const processedCount = packages.filter((pkg) => pkg.status === "已分配" || pkg.status === "异常").length;
-  return { totalPackages, totalItems, receivedCount, assignedCount, exceptionCount, processedCount };
+  const pendingCount = packages.filter((pkg) => pkg.status === "待收货" || pkg.status === "已收货 / 待分配").length;
+  return { totalPackages, totalItems, receivedCount, assignedCount, exceptionCount, processedCount, pendingCount };
 }
 
 function getStoreManagerPdaStatusTone(status = "") {
@@ -3996,10 +4059,37 @@ function renderStoreManagerPdaReturnPreview(row = null) {
 }
 
 function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState()) {
-  const tasks = Array.isArray(state.sdoTasks) ? state.sdoTasks : [];
+  const allTasks = Array.isArray(state.sdoTasks) ? state.sdoTasks : [];
+  const query = String(state.sdoSearchQuery || "").trim().toUpperCase();
+  const tasks = query
+    ? allTasks.filter((task) => {
+      const searchable = [
+        task?.display_code,
+        task?.machine_code,
+        task?.store_code,
+        task?.source_code,
+      ].join(" ").toUpperCase();
+      return searchable.includes(query) || searchable.replace(/[^0-9]/g, "").includes(query.replace(/[^0-9]/g, ""));
+    })
+    : allTasks;
+  const searchCard = `
+    <section class="store-manager-pda-card store-manager-pda-sdo-search">
+      <div class="store-manager-pda-card-head">
+        <strong>待收货 SDO</strong>
+        <span>${escapeHtml(getCurrentStoreCodeFallback())}</span>
+      </div>
+      <form class="form-grid compact" data-store-manager-pda-sdo-search-form="true">
+        <input name="sdo_search" data-scan-input="true" autocomplete="off" autocapitalize="off" value="${escapeHtml(state.sdoSearchQuery || "")}" placeholder="搜索 / 扫描 SDO 快速定位" />
+        <button type="submit" class="store-manager-pda-secondary-action">定位</button>
+      </form>
+      ${state.sdoSearchError ? `<div class="alert-banner">${escapeHtml(state.sdoSearchError)}</div>` : ""}
+      <div class="subtle small">可选快速定位：只接受 SDO / 4-prefix machine_code。SDP、SDB、LPK、STORE_ITEM 不作为这里的入口。</div>
+    </section>
+  `;
   if (state.loading) {
     return `
       <section class="store-manager-pda-task-list">
+        ${searchCard}
         <article class="store-manager-pda-card">
           <div class="store-manager-pda-card-head">
             <strong>正在加载 ${escapeHtml(getCurrentStoreCodeFallback())} SDO...</strong>
@@ -4012,6 +4102,7 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
   if (state.loadError) {
     return `
       <section class="store-manager-pda-task-list">
+        ${searchCard}
         <article class="store-manager-pda-card">
           <div class="alert-banner">${escapeHtml(state.loadError)}</div>
           <button type="button" class="store-manager-pda-primary-action" data-store-manager-pda-reload="true">重新加载</button>
@@ -4022,9 +4113,10 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
   if (!tasks.length) {
     return `
       <section class="store-manager-pda-task-list">
+        ${searchCard}
         <article class="store-manager-pda-card">
           <div class="store-manager-pda-card-head">
-            <strong>暂无待收货 SDO，请先在仓库端完成 SDO 发货。</strong>
+            <strong>${query ? "没有找到匹配的待收货 SDO。" : "暂无待收货 SDO，请先在仓库端完成门店配送发货。"}</strong>
             ${renderStatusBadge(getCurrentStoreCodeFallback(), "warning")}
           </div>
           <div class="subtle small">这里只显示当前门店的 STORE_DELIVERY_EXECUTION / SDO。SDB / LPK 仍只是仓库来源参考。</div>
@@ -4035,11 +4127,15 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
   }
   return `
     <section class="store-manager-pda-task-list">
+      ${searchCard}
       ${tasks.map((task) => {
         const status = String(task.status || "待收货");
         const completed = status === "已完成";
         const packages = Array.isArray(task.packages) ? task.packages : [];
         const assignedCount = packages.filter((pkg) => pkg.status === "已分配").length;
+        const receivedCount = packages.filter((pkg) => pkg.status !== "待收货").length;
+        const exceptionCount = packages.filter((pkg) => pkg.status === "异常").length;
+        const pendingCount = packages.filter((pkg) => pkg.status === "待收货" || pkg.status === "已收货 / 待分配").length;
         return `
         <article class="store-manager-pda-card store-manager-pda-task-card ${completed ? "is-complete" : ""}">
           <div class="store-manager-pda-card-head">
@@ -4054,7 +4150,11 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
             <span><b>来源</b>${escapeHtml(task.source_code || "-")}</span>
             <span><b>包裹数</b>${escapeHtml(task.package_count || packages.length || 0)}</span>
             <span><b>总件数</b>${escapeHtml(task.total_item_count || 0)}</span>
+            <span><b>发货状态</b>${escapeHtml(task.dispatch_status || "pending_receipt")}</span>
+            <span><b>已验收</b>${escapeHtml(receivedCount)}</span>
             <span><b>已分配</b>${escapeHtml(assignedCount)}</span>
+            <span><b>异常</b>${escapeHtml(exceptionCount)}</span>
+            <span><b>未处理</b>${escapeHtml(pendingCount)}</span>
           </div>
           <div class="store-manager-pda-sdp-list">
             ${packages.map((pkg) => `
@@ -4070,34 +4170,12 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
           ${
             completed
               ? `<div class="store-manager-pda-complete-note">已完成：${escapeHtml(packages.length)} 个 SDP 包裹已处理。</div>`
-              : `<button type="button" class="store-manager-pda-primary-action" data-store-manager-pda-start-task="${escapeHtml(task.display_code || "")}">开始收货</button>`
+              : `<button type="button" class="store-manager-pda-primary-action" data-store-manager-pda-open-task="${escapeHtml(task.display_code || "")}">查看 / 开始验收</button>`
           }
         </article>
       `;
       }).join("")}
     </section>
-  `;
-}
-
-function renderStoreManagerPdaSdoScanStep(state = ensureStoreManagerPdaTaskState()) {
-  const task = state.sdoTask || {};
-  return `
-    <form class="store-manager-pda-card store-manager-pda-scan-step" data-store-manager-pda-sdo-scan-form="true">
-      <div class="store-manager-pda-card-head">
-        <div>
-          <strong>扫描 SDO 主单码</strong>
-          <span>请扫描仓库送货单 SDO</span>
-        </div>
-        ${renderStatusBadge(state.scanSuccess || "待核对", state.scanSuccess ? "success" : "warning")}
-      </div>
-      <label class="mobile-scan-input">
-        <span>${escapeHtml(task.display_code || "等待选择 SDO")} / ${escapeHtml(task.machine_code || "4-prefix machine_code")}</span>
-        <input name="sdo_scan" data-scan-input="true" autocomplete="off" autocapitalize="off" value="${escapeHtml(state.scanDraft || "")}" placeholder="扫描 SDO 主单码" />
-      </label>
-      ${state.scanError ? `<div class="alert-banner">${escapeHtml(state.scanError)}</div>` : ""}
-      ${state.scanSuccess ? `<div class="mobile-scan-success">${escapeHtml(state.scanSuccess)}</div>` : ""}
-      <button type="submit" class="store-manager-pda-primary-action">手动确认 / 核对</button>
-    </form>
   `;
 }
 
@@ -4145,6 +4223,7 @@ function renderStoreManagerPdaPackageCard(pkg = {}, state = ensureStoreManagerPd
       <div class="store-manager-pda-sdp-facts">
         <span><b>品类</b>${escapeHtml(pkg.category || "-")}</span>
         <span><b>件数</b>${escapeHtml(pkg.item_count ?? "-")} 件</span>
+        <span><b>来源类型</b>${escapeHtml(pkg.source_type || "-")}</span>
         <span><b>来源</b>${escapeHtml(pkg.source_code || "-")}</span>
         <span><b>来源规则</b>SDB / LPK 只作为来源参考</span>
         <span><b>分配店员</b>${escapeHtml(pkg.assigned_clerk || "未分配")}</span>
@@ -4182,6 +4261,8 @@ function renderStoreManagerPdaSdoDetail(state = ensureStoreManagerPdaTaskState()
         <span><b>总件数 / Total item count</b>${escapeHtml(totals.totalItems || 0)}</span>
         <span><b>已收货</b>${escapeHtml(totals.receivedCount)}</span>
         <span><b>已分配</b>${escapeHtml(totals.assignedCount)}</span>
+        <span><b>异常</b>${escapeHtml(totals.exceptionCount)}</span>
+        <span><b>未处理</b>${escapeHtml(totals.pendingCount)}</span>
       </div>
     </section>
     ${state.notice ? `<div class="store-manager-pda-push-note">${escapeHtml(state.notice)}</div>` : ""}
@@ -4210,6 +4291,7 @@ function renderStoreManagerPdaCompletionSummary(state = ensureStoreManagerPdaTas
         <span><b>Packages / 包裹</b>${escapeHtml(`${totals.processedCount}/${totals.totalPackages} processed`)}</span>
         <span><b>Assigned / 已分配</b>${escapeHtml(totals.assignedCount)}</span>
         <span><b>Exceptions / 异常</b>${escapeHtml(totals.exceptionCount)}</span>
+        <span><b>未处理</b>${escapeHtml(totals.pendingCount)}</span>
         <span><b>总件数</b>${escapeHtml(totals.totalItems || 0)}</span>
       </div>
       <button type="button" class="store-manager-pda-primary-action" data-store-manager-pda-page="tasks">返回任务列表</button>
@@ -4238,9 +4320,6 @@ function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
 
 function renderStoreManagerPdaTaskFlow(state = ensureStoreManagerPdaTaskState()) {
   const page = String(state.activePage || "tasks");
-  if (page === "scan") {
-    return renderStoreManagerPdaSdoScanStep(state);
-  }
   if (page === "detail") {
     return renderStoreManagerPdaSdoDetail(state);
   }
@@ -4270,7 +4349,6 @@ function getStoreManagerPdaRuntimeTitle(state = ensureStoreManagerPdaTaskState()
   if (activeTab === "logs") return "经营日志";
   if (activeTab === "other") return "其他";
   const page = String(state.activePage || "tasks");
-  if (page === "scan") return "扫描 SDO 主单码";
   if (page === "detail") return "SDO 收货 / 分配";
   if (page === "complete") return "任务完成";
   return "收退货";
@@ -4370,25 +4448,30 @@ function renderStoreManagerPdaPreview(tabId = "") {
   `;
 }
 
+function findStoreManagerPdaTaskBySdoCode(state = createStoreManagerPdaTaskState(), value = "") {
+  const normalizedCode = String(value || "").trim().toUpperCase();
+  const digits = normalizedCode.replace(/[^0-9]/g, "");
+  const tasks = Array.isArray(state?.sdoTasks) ? state.sdoTasks : [];
+  return tasks.find((task) => {
+    const displayCode = String(task?.display_code || "").trim().toUpperCase();
+    const machineCode = String(task?.machine_code || "").replace(/[^0-9]/g, "").trim();
+    return displayCode === normalizedCode || (digits && machineCode === digits);
+  }) || null;
+}
+
 function verifyStoreManagerPdaSdoBarcode(value = "", state = createStoreManagerPdaTaskState()) {
   const validation = validateStoreManagerPdaSdoScanCode(value);
   if (!validation.ok) {
     return validation;
   }
   const normalizedCode = String(validation.code || "").trim().toUpperCase();
-  const digits = normalizedCode.replace(/[^0-9]/g, "");
-  const task = state?.sdoTask || null;
+  const task = findStoreManagerPdaTaskBySdoCode(state, normalizedCode);
   if (!task) {
-    return { ok: false, error: "请先从收退货任务列表选择一张 SDO。" };
+    return { ok: false, error: "没有找到当前门店这张待收货 SDO。" };
   }
   const currentStoreCode = getCurrentStoreCodeFallback();
   if (task.store_code && currentStoreCode && String(task.store_code || "").trim().toUpperCase() !== currentStoreCode) {
     return { ok: false, error: "这张 SDO 不属于当前门店。" };
-  }
-  const selectedDisplayCode = String(task.display_code || "").trim().toUpperCase();
-  const selectedMachineCode = String(task.machine_code || "").replace(/[^0-9]/g, "").trim();
-  if (selectedDisplayCode !== normalizedCode && (!digits || selectedMachineCode !== digits)) {
-    return { ok: false, error: "不是当前选中的 SDO，请返回任务列表选择正确 SDO 后再扫描。" };
   }
   return { ...validation, task };
 }
@@ -4414,29 +4497,33 @@ function validateStoreManagerPdaSdoScanCode(value = "") {
   return { ok: false, error: "请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。" };
 }
 
-function handleStoreManagerPdaSdoScanSubmit(event) {
+function handleStoreManagerPdaSdoQuickSearchSubmit(event) {
   event.preventDefault();
   event.stopPropagation();
   const state = ensureStoreManagerPdaTaskState();
   const form = event.currentTarget || event.target;
   const formData = new FormData(form);
-  const validation = verifyStoreManagerPdaSdoBarcode(formData.get("sdo_scan"), state);
-  state.scanDraft = String(formData.get("sdo_scan") || "").trim();
-  if (!validation.ok) {
-    state.scanError = validation.error || "请扫描当前 SDO 主单码。";
-    state.scanSuccess = "";
+  const value = String(formData.get("sdo_search") || "").trim();
+  state.sdoSearchQuery = value;
+  state.sdoSearchError = "";
+  if (!value) {
     persistStoreManagerPdaTaskState(state);
     renderStoreManagerPdaPreview();
     return false;
   }
-  state.verified = true;
-  state.scanError = "";
-  state.scanSuccess = "核对成功";
-  state.activePage = "detail";
-  state.sdoTask = validation.task;
-  if (state.sdoTask) {
-    state.sdoTask.status = "进行中";
+  const validation = verifyStoreManagerPdaSdoBarcode(value, state);
+  if (!validation.ok) {
+    state.sdoSearchError = validation.error || "没有找到当前门店这张待收货 SDO。";
+    persistStoreManagerPdaTaskState(state);
+    renderStoreManagerPdaPreview();
+    return false;
   }
+  state.activeTab = "receiving";
+  state.activePage = "detail";
+  state.verified = true;
+  state.sdoTask = validation.task;
+  state.sdoSearchQuery = validation.task?.display_code || value;
+  state.notice = `${validation.task?.display_code || value} 已定位。`;
   persistStoreManagerPdaTaskState(state);
   renderStoreManagerPdaPreview();
   return false;
@@ -4453,12 +4540,15 @@ async function handleStoreManagerPdaTaskAction(button) {
     state.activePage = button.dataset.storeManagerPdaPage;
     state.notice = "";
   }
-  if (button.dataset.storeManagerPdaStartTask) {
+  if (button.dataset.storeManagerPdaOpenTask || button.dataset.storeManagerPdaStartTask) {
     state.activeTab = "receiving";
-    state.activePage = "scan";
-    selectStoreManagerPdaTask(state, button.dataset.storeManagerPdaStartTask);
+    state.activePage = "detail";
+    selectStoreManagerPdaTask(state, button.dataset.storeManagerPdaOpenTask || button.dataset.storeManagerPdaStartTask);
+    state.verified = true;
+    state.notice = "";
     state.scanError = "";
     state.scanSuccess = "";
+    state.sdoSearchError = "";
   }
   if (button.dataset.storeManagerPdaReload) {
     state.loaded = false;
@@ -18013,6 +18103,9 @@ function getStoreReceivingPackageRows(storeCode = "") {
     rowsByCode.set(packageCode, { ...(rowsByCode.get(packageCode) || {}), ...normalized });
   };
   (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
+    if (!isStoreManagerPdaSdoReceivingEligible(transfer)) {
+      return;
+    }
     const order = transfer?.store_delivery_execution_order || {};
     const parentSdoDisplayCode = String(
       transfer?.store_delivery_execution_order_no
@@ -18027,13 +18120,19 @@ function getStoreReceivingPackageRows(storeCode = "") {
       transfer_no: transfer?.transfer_no || order?.source_transfer_no || "",
       store_code: transfer?.to_store_code || transfer?.store_code || order?.to_store_code || "",
       package_total: order?.package_count || "",
+      dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(transfer),
     };
     (Array.isArray(order?.packages) ? order.packages : []).forEach((packageRow) => addRow(packageRow, context));
   });
   [
     ...(Array.isArray(storeDispatchBaleState) ? storeDispatchBaleState : []),
     ...(Array.isArray(filteredStoreDispatchBaleState) ? filteredStoreDispatchBaleState : []),
-  ].forEach((row) => addRow(row, {}));
+  ].forEach((row) => {
+    if (!isStoreManagerPdaSdoReceivingEligible(row)) {
+      return;
+    }
+    addRow(row, {});
+  });
   return [...rowsByCode.values()].sort((left, right) => {
     const leftSdo = String(left?.parent_sdo_display_code || "").localeCompare(String(right?.parent_sdo_display_code || ""), "en");
     if (leftSdo !== 0) return leftSdo;
@@ -18053,6 +18152,7 @@ function groupStoreReceivingPackagesBySdo(rows = []) {
         sdo_machine_code: String(row?.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim(),
         transfer_no: String(row?.transfer_no || "").trim().toUpperCase(),
         store_code: String(row?.store_code || "").trim().toUpperCase(),
+        dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(row),
         packages: [],
         rows: [],
         item_count: 0,
@@ -18061,6 +18161,9 @@ function groupStoreReceivingPackagesBySdo(rows = []) {
       });
     }
     const group = groups.get(sdoDisplayCode);
+    if (!group.dispatch_status) {
+      group.dispatch_status = normalizeStoreManagerPdaReceivingEligibilityStatus(row);
+    }
     group.packages.push(row);
     group.rows.push(row);
     const knownItemCount = parseKnownDispatchItemCount(row);
@@ -37176,6 +37279,7 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", asy
   const runtimeButton = event.target.closest([
     "[data-store-manager-pda-tab]",
     "[data-store-manager-pda-page]",
+    "[data-store-manager-pda-open-task]",
     "[data-store-manager-pda-start-task]",
     "[data-store-manager-pda-receive-package]",
     "[data-store-manager-pda-exception-package]",
@@ -37228,8 +37332,8 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", asy
 });
 
 document.querySelector("#storeManagerPdaPreview")?.addEventListener("submit", async (event) => {
-  if (event.target instanceof HTMLFormElement && event.target.matches("[data-store-manager-pda-sdo-scan-form]")) {
-    handleStoreManagerPdaSdoScanSubmit(event);
+  if (event.target instanceof HTMLFormElement && event.target.matches("[data-store-manager-pda-sdo-search-form]")) {
+    handleStoreManagerPdaSdoQuickSearchSubmit(event);
     return;
   }
   if (!(event.target instanceof HTMLFormElement) || !event.target.matches("#storeManagerPdaSdoForm")) {

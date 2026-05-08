@@ -35,6 +35,7 @@ function executableFunction(source, functionName) {
 function executableStoreManagerSdoVerifier() {
   return vm.runInNewContext(`
     ${functionSource(appJs, "validateStoreManagerPdaSdoScanCode")}
+    ${functionSource(appJs, "findStoreManagerPdaTaskBySdoCode")}
     ${functionSource(appJs, "verifyStoreManagerPdaSdoBarcode")}
     verifyStoreManagerPdaSdoBarcode;
   `, {
@@ -88,21 +89,28 @@ test("manager runtime state is backend-backed, store scoped, and no longer seeds
   assert.match(backendLoad, /await refreshUserDirectoryForPickers/);
   assert.match(backendLoad, /getStoreManagerPdaSdoTasksForStore\(getCurrentStoreCodeFallback\(\)\)/);
   assert.match(backendLoad, /getAssignableStoreClerks\(storeCode\)/);
-  assert.match(taskList, /暂无待收货 SDO，请先在仓库端完成 SDO 发货。/);
+  assert.match(taskList, /暂无待收货 SDO，请先在仓库端完成门店配送发货。/);
   assert.match(renderPreview, /loadStoreManagerPdaBackendState/);
 });
 
-test("manager SDO task adapter maps real transfer SDO package data and keeps SDB/LPK as source references", () => {
+test("manager SDO task adapter maps only dispatched receiving-eligible SDO data and keeps SDB/LPK as source references", () => {
   const adapter = functionSource(appJs, "getStoreManagerPdaSdoTasksForStore");
   const normalizeTask = functionSource(appJs, "normalizeStoreManagerPdaSdoTask");
   const normalizePackage = functionSource(appJs, "normalizeStoreManagerPdaPackage");
+  const eligibility = functionSource(appJs, "isStoreManagerPdaSdoReceivingEligible");
+  const statusHelper = functionSource(appJs, "normalizeStoreManagerPdaReceivingEligibilityStatus");
 
   assert.match(adapter, /getStoreReceivingPackageRows\(storeCode\)/);
   assert.match(adapter, /groupStoreReceivingPackagesBySdo/);
+  assert.match(adapter, /isStoreManagerPdaSdoReceivingEligible/);
   assert.match(adapter, /store_code/);
+  assert.match(eligibility, /shipped|dispatched|pending_receipt|pending_store_receiving|in_transit/);
+  assert.match(eligibility, /created|draft|ready_dispatch/);
+  assert.match(statusHelper, /store_receipt_status/);
   assert.match(normalizeTask, /display_code/);
   assert.match(normalizeTask, /machine_code/);
   assert.match(normalizeTask, /source_code/);
+  assert.match(normalizeTask, /dispatch_status/);
   assert.match(normalizeTask, /package_count/);
   assert.match(normalizeTask, /total_item_count/);
   assert.match(normalizeTask, /packages/);
@@ -115,21 +123,28 @@ test("manager SDO task adapter maps real transfer SDO package data and keeps SDB
   assert.match(normalizePackage, /assignment_status/);
 });
 
-test("starting manager task opens SDO scan verification with scanner input", () => {
-  const scanStep = functionSource(appJs, "renderStoreManagerPdaSdoScanStep");
+test("manager SDO list is the primary receiving path and SDO card click opens detail directly", () => {
+  const taskList = functionSource(appJs, "renderStoreManagerPdaTaskList");
   const actionHandler = functionSource(appJs, "handleStoreManagerPdaTaskAction");
+  const taskFlow = functionSource(appJs, "renderStoreManagerPdaTaskFlow");
 
-  assert.match(scanStep, /扫描 SDO 主单码/);
-  assert.match(scanStep, /请扫描仓库送货单 SDO/);
-  assert.match(scanStep, /data-scan-input="true"/);
-  assert.match(scanStep, /手动确认 \/ 核对/);
-  assert.match(actionHandler, /storeManagerPdaStartTask/);
-  assert.match(actionHandler, /activePage = "scan"/);
+  assert.match(taskList, /待收货 SDO/);
+  assert.match(taskList, /搜索 \/ 扫描 SDO 快速定位/);
+  assert.match(taskList, /data-scan-input="true"/);
+  assert.match(taskList, /查看 \/ 开始验收/);
+  assert.match(taskList, /data-store-manager-pda-open-task/);
+  assert.doesNotMatch(taskList, /扫描 SDO 主单码/);
+  assert.doesNotMatch(taskList, /开始收货/);
+  assert.match(actionHandler, /storeManagerPdaOpenTask/);
+  assert.match(actionHandler, /activePage = "detail"/);
+  assert.doesNotMatch(actionHandler, /activePage = "scan"/);
+  assert.doesNotMatch(taskFlow, /renderStoreManagerPdaSdoScanStep/);
 });
 
-test("manager SDO verification accepts only SDO display or 4-prefix machine code for the current store", () => {
+test("optional manager SDO quick search accepts only SDO display or 4-prefix machine code", () => {
   const validate = executableFunction(appJs, "validateStoreManagerPdaSdoScanCode");
   const verifier = functionSource(appJs, "verifyStoreManagerPdaSdoBarcode");
+  const quickSearch = functionSource(appJs, "handleStoreManagerPdaSdoQuickSearchSubmit");
 
   assert.equal(validate("SDO260504008").ok, true);
   assert.equal(validate("4260504008").ok, true);
@@ -144,15 +159,17 @@ test("manager SDO verification accepts only SDO display or 4-prefix machine code
     assert.equal(result.ok, false, `${code} should be rejected`);
     assert.match(result.error, pattern);
   });
-  assert.match(verifier, /state\?\.sdoTask/);
+  assert.match(quickSearch, /verifyStoreManagerPdaSdoBarcode/);
+  assert.match(quickSearch, /state\.activePage = "detail"/);
+  assert.match(verifier, /findStoreManagerPdaTaskBySdoCode/);
   assert.match(verifier, /task\.store_code/);
   assert.match(verifier, /不属于当前门店/);
-  assert.match(verifier, /当前选中的 SDO/);
+  assert.match(verifier, /没有找到当前门店这张待收货 SDO/);
   assert.doesNotMatch(verifier, /SDO260504008/);
   assert.doesNotMatch(verifier, /4260504008/);
 });
 
-test("manager SDO verification accepts only the selected current SDO task", () => {
+test("optional manager SDO quick search locates any visible current-store SDO task", () => {
   const verify = executableStoreManagerSdoVerifier();
   const currentTask = {
     display_code: "SDO260504001",
@@ -171,13 +188,8 @@ test("manager SDO verification accepts only the selected current SDO task", () =
 
   assert.equal(verify("SDO260504001", state).ok, true);
   assert.equal(verify("4260504001", state).ok, true);
-
-  const siblingDisplay = verify("SDO260504002", state);
-  const siblingMachine = verify("4260504002", state);
-  assert.equal(siblingDisplay.ok, false);
-  assert.equal(siblingMachine.ok, false);
-  assert.match(siblingDisplay.error, /当前选中的 SDO/);
-  assert.match(siblingMachine.error, /当前选中的 SDO/);
+  assert.equal(verify("SDO260504002", state).ok, true);
+  assert.equal(verify("4260504002", state).ok, true);
 });
 
 test("manager SDO verification rejects selected SDO if it belongs to another store", () => {
@@ -200,6 +212,8 @@ test("manager SDO task adapter scopes SDO cards to the manager store", () => {
   const getTasks = vm.runInNewContext(`
     ${functionSource(appJs, "getStoreManagerPdaPackageStatus")}
     ${functionSource(appJs, "normalizeStoreManagerPdaPackage")}
+    ${functionSource(appJs, "normalizeStoreManagerPdaReceivingEligibilityStatus")}
+    ${functionSource(appJs, "isStoreManagerPdaSdoReceivingEligible")}
     ${functionSource(appJs, "normalizeStoreManagerPdaSdoTask")}
     ${functionSource(appJs, "getStoreManagerPdaSdoTasksForStore")}
     getStoreManagerPdaSdoTasksForStore;
@@ -213,6 +227,7 @@ test("manager SDO task adapter scopes SDO cards to the manager store", () => {
         sdo_display_code: "SDO260504001",
         sdo_machine_code: "4260504001",
         store_code: "UTAWALA",
+        dispatch_status: "shipped",
         item_count: 210,
         packages: [
           {
@@ -220,6 +235,7 @@ test("manager SDO task adapter scopes SDO cards to the manager store", () => {
             sdo_package_machine_code: "6261250002",
             store_code: "UTAWALA",
             source_code: "SDB-TO202605-002",
+            dispatch_status: "shipped",
             received_status: "pending",
             exception_status: "normal",
             assignment_status: "unassigned",
@@ -230,6 +246,7 @@ test("manager SDO task adapter scopes SDO cards to the manager store", () => {
         sdo_display_code: "SDO260504099",
         sdo_machine_code: "4260504099",
         store_code: "KAWANGWARE",
+        dispatch_status: "shipped",
         item_count: 50,
         packages: [
           {
@@ -237,6 +254,7 @@ test("manager SDO task adapter scopes SDO cards to the manager store", () => {
             sdo_package_machine_code: "6261250099",
             store_code: "KAWANGWARE",
             source_code: "LPK260504001",
+            dispatch_status: "shipped",
             received_status: "pending",
             exception_status: "normal",
             assignment_status: "unassigned",
@@ -251,19 +269,60 @@ test("manager SDO task adapter scopes SDO cards to the manager store", () => {
   assert.equal(tasks[0].packages[0].source_code, "SDB-TO202605-002");
 });
 
-test("successful SDO scan opens backend package detail rows", () => {
-  const submitScan = functionSource(appJs, "handleStoreManagerPdaSdoScanSubmit");
+test("store manager PDA does not list SDO before warehouse dispatch", () => {
+  const getTasks = vm.runInNewContext(`
+    ${functionSource(appJs, "getStoreManagerPdaPackageStatus")}
+    ${functionSource(appJs, "normalizeStoreManagerPdaPackage")}
+    ${functionSource(appJs, "normalizeStoreManagerPdaReceivingEligibilityStatus")}
+    ${functionSource(appJs, "isStoreManagerPdaSdoReceivingEligible")}
+    ${functionSource(appJs, "normalizeStoreManagerPdaSdoTask")}
+    ${functionSource(appJs, "getStoreManagerPdaSdoTasksForStore")}
+    getStoreManagerPdaSdoTasksForStore;
+  `, {
+    getCurrentStoreCodeFallback: () => "UTAWALA",
+    getStoreReceivingPackageCode: (row) => row.sdo_package_display_code || row.display_code || "",
+    normalizeStoreReceivingPackageRow: (row) => row,
+    getStoreReceivingPackageRows: () => [],
+    groupStoreReceivingPackagesBySdo: () => [
+      {
+        sdo_display_code: "SDO260504010",
+        sdo_machine_code: "4260504010",
+        store_code: "UTAWALA",
+        dispatch_status: "created",
+        item_count: 100,
+        packages: [
+          {
+            sdo_package_display_code: "SDP261250010",
+            sdo_package_machine_code: "6261250010",
+            store_code: "UTAWALA",
+            source_code: "SDB-TO202605-010",
+            dispatch_status: "created",
+            received_status: "pending",
+            exception_status: "normal",
+            assignment_status: "unassigned",
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(getTasks("UTAWALA"), []);
+});
+
+test("SDO card click opens backend package detail rows without mandatory scan", () => {
+  const actionHandler = functionSource(appJs, "handleStoreManagerPdaTaskAction");
   const detail = functionSource(appJs, "renderStoreManagerPdaSdoDetail");
   const packageCard = functionSource(appJs, "renderStoreManagerPdaPackageCard");
 
-  assert.match(submitScan, /state\.verified = true/);
-  assert.match(submitScan, /state\.scanSuccess = "核对成功"/);
-  assert.match(submitScan, /state\.activePage = "detail"/);
-  assert.match(submitScan, /state\.sdoTask = validation\.task/);
+  assert.match(actionHandler, /data.*storeManagerPdaOpenTask|storeManagerPdaOpenTask/);
+  assert.match(actionHandler, /selectStoreManagerPdaTask/);
+  assert.match(actionHandler, /state\.activePage = "detail"/);
   assert.match(detail, /Package count|包裹数/);
   assert.match(detail, /Total item count|总件数/);
+  assert.match(detail, /未处理/);
   assert.match(detail, /renderStoreManagerPdaPackageCard/);
   assert.match(packageCard, /source_code/);
+  assert.match(packageCard, /source_type/);
   assert.match(packageCard, /SDB \/ LPK 只作为来源参考/);
   assert.doesNotMatch(detail, /演示任务：真实跨设备推送将在后端持久化阶段接入/);
 });
@@ -287,6 +346,7 @@ test("package receive, exception, assignment, and completion use backend package
   assert.match(completion, /Packages|包裹/);
   assert.match(completion, /Assigned|已分配/);
   assert.match(completion, /Exceptions|异常/);
+  assert.match(completion, /未处理/);
   assert.match(completion, /返回任务列表/);
 });
 
@@ -342,6 +402,6 @@ test("clerk PDA from #208 still keeps two tabs and visibly notes that real assig
 
 test("manager PDA cache-busts app and style assets", () => {
   assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=manager-pda-backend-210" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=sdo-package-allocation-211"><\/script>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=store-manager-receiving-list-213"><\/script>/);
   assert.match(indexHtml, /<script src="\.\/operations-fulfillment-flow\.js\?v=sdo-package-allocation-211"><\/script>/);
 });
