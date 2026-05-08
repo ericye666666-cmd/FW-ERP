@@ -88,11 +88,15 @@ test("cashier terminal side drawer stays hidden until explicitly opened", () => 
   assert.match(stylesCss, /display:\s*none\s*!important/);
 });
 
-test("test environment does not restore login from storage and always clears password", () => {
-  assert.doesNotMatch(appJs, /token:\s*localStorage\.getItem\(STORAGE_KEYS\.token\)/);
-  assert.doesNotMatch(appJs, /user:\s*safeParse\(localStorage\.getItem\(STORAGE_KEYS\.user\)/);
-  assert.doesNotMatch(appJs, /localStorage\.setItem\(STORAGE_KEYS\.token/);
-  assert.doesNotMatch(appJs, /localStorage\.setItem\(STORAGE_KEYS\.user/);
+test("test environment restores signed-in session from storage and always clears password", () => {
+  const beforeSessionInit = appJs.slice(0, appJs.indexOf("let currentSession = getStoredSession();"));
+
+  assert.match(appJs, /function getStoredSession/);
+  assert.match(appJs, /token:\s*\(localStorage\.getItem\(STORAGE_KEYS\.token\)\s*\|\|\s*""\)\.trim\(\)/);
+  assert.match(appJs, /user:\s*safeParse\(localStorage\.getItem\(STORAGE_KEYS\.user\), null\)/);
+  assert.match(appJs, /localStorage\.setItem\(STORAGE_KEYS\.token/);
+  assert.match(appJs, /localStorage\.setItem\(STORAGE_KEYS\.user/);
+  assert.doesNotMatch(beforeSessionInit, /localStorage\.removeItem\(STORAGE_KEYS\.token\);\s*localStorage\.removeItem\(STORAGE_KEYS\.user\);/);
   assert.doesNotMatch(indexHtml, /<input name="password" type="password" placeholder="密码" value=/);
   assert.doesNotMatch(indexHtml, /name="password"[^>]+autocomplete="current-password"/);
   assert.match(indexHtml, /<form id="loginForm"[^>]+autocomplete="off"/);
