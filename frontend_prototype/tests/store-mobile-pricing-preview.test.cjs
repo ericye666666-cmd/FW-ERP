@@ -42,7 +42,7 @@ test("admin store page exposes an Android PDA batch pricing preview frame", () =
   assert.match(stylesCss, /\.android-pda-frame\s*\{/);
 });
 
-test("price groups render separately with independent generate and print actions", () => {
+test("price groups render separately with independent STORE_ITEM generation and preview actions", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const cardSource = extractFunctionSource(appJs, "renderPriceGroupCards");
 
@@ -52,13 +52,14 @@ test("price groups render separately with independent generate and print actions
   assert.match(stateSource, /group_id:\s*"CUSTOM-200"/);
   assert.match(cardSource, /mobile-field-group-card/);
   assert.match(cardSource, /mobile-group-qty/);
-  assert.match(cardSource, /生成本组 STORE_ITEM/);
-  assert.match(cardSource, /打印本组标签/);
-  assert.match(cardSource, /已贴完本组/);
-  assert.match(cardSource, /已完成/);
+  assert.match(cardSource, /生成本批商品码/);
+  assert.match(cardSource, /查看标签预览/);
+  assert.match(cardSource, /已生成 \/ 待打印/);
   assert.match(cardSource, /data-mobile-pricing-generate-group/);
-  assert.match(cardSource, /data-mobile-pricing-print-group/);
-  assert.match(cardSource, /data-mobile-pricing-confirm-stickers/);
+  assert.match(cardSource, /data-mobile-pricing-preview-labels/);
+  assert.doesNotMatch(cardSource, /data-mobile-pricing-print-group/);
+  assert.doesNotMatch(cardSource, /data-mobile-pricing-confirm-stickers/);
+  assert.doesNotMatch(cardSource, /打印本组标签|打印本批标签|已贴完本组|已贴完本批/);
   assert.doesNotMatch(cardSource, /generated\.start|generated\.end|STOREITEM|编辑/);
   assert.doesNotMatch(cardSource, /generate-all|print-all|一键生成全部|全部混合打印|混合总任务/);
 });
@@ -130,9 +131,9 @@ test("PDA pricing preview keeps #195 page components but runtime bottom nav only
   assert.match(pageOptionsSource, /SDP 详情/);
   assert.match(pageOptionsSource, /现场分堆标价/);
   assert.match(pageOptionsSource, /价格组列表/);
-  assert.match(pageOptionsSource, /本组 STORE_ITEM 生成结果/);
-  assert.match(pageOptionsSource, /本组打印任务/);
-  assert.match(pageOptionsSource, /打印队列预览/);
+  assert.match(pageOptionsSource, /本批 STORE_ITEM 生成结果/);
+  assert.match(pageOptionsSource, /本批标签预览/);
+  assert.match(pageOptionsSource, /print payload 预览/);
   assert.match(bottomTabsSource, /const bottomTabs = \["任务", "我的"\]/);
   assert.doesNotMatch(bottomTabsSource, /扫描/);
   assert.doesNotMatch(bottomTabsSource, /标价/);
@@ -240,8 +241,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-printer-diagnostics-scroll-232/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-diagnostics-scroll-232/);
+  assert.match(indexHtml, /app\.js\?v=store-item-label-preview-PR2/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-label-preview-PR2/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -400,9 +401,11 @@ test("legacy WebView clerk runtime also uses task-driven two-tab flow", () => {
   assert.match(legacyGuard, /data-scan-input="true"/);
   assert.match(legacyGuard, /SDP261250002/);
   assert.match(legacyGuard, /6261250002/);
-  assert.match(legacyGuard, /生成本组 STORE_ITEM/);
-  assert.match(legacyGuard, /打印本组标签/);
-  assert.match(legacyGuard, /已贴完本组/);
+  assert.match(legacyGuard, /生成本批商品码/);
+  assert.match(legacyGuard, /查看标签预览/);
+  assert.match(legacyGuard, /data-legacy-label-template-size="60x40"/);
+  assert.match(legacyGuard, /data-legacy-label-template-size="40x30"/);
+  assert.doesNotMatch(legacyGuard, /打印本组标签|已贴完本组|data-legacy-clerk-action="confirm"|data-legacy-clerk-action="print"/);
 });
 
 test("task tab renders backend assigned SDP cards before demo fallback", () => {
@@ -514,22 +517,180 @@ test("backend selected SDP batch quantity validation blocks over-allocation", ()
   assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 0 }).ok, false);
 });
 
-test("real backend SDP batch generation uses STORE_ITEM API and never completes print without bridge response", () => {
+test("real backend SDP batch generation uses pricing batch STORE_ITEM API and stays preview-only", () => {
   const generateSource = extractFunctionSource(appJs, "generateStoreMobileBatchStoreItems");
-  const printSource = extractFunctionSource(appJs, "queueStoreMobileBatchPrintJobs");
+  const previewActionSource = extractFunctionSource(appJs, "prepareStoreMobileBatchLabelPreview");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(generateSource, /store-delivery-packages/);
-  assert.match(generateSource, /store-items\/generate/);
+  assert.match(generateSource, /store-items\/generate-from-pricing-batch/);
   assert.match(generateSource, /pricing_batch_id/);
   assert.match(generateSource, /source_line_key/);
-  assert.match(generateSource, /selected_price/);
+  assert.match(generateSource, /sale_price_kes/);
+  assert.match(generateSource, /pricing_type/);
+  assert.match(generateSource, /category_short/);
+  assert.match(generateSource, /assigned_clerk/);
   assert.match(generateSource, /source_sdp_display_code/);
-  assert.match(printSource, /print-jobs\/item-tokens/);
-  assert.match(printSource, /Android print bridge|待打印/);
-  assert.doesNotMatch(printSource, /\/print-jobs\/\$\{[^}]+\}\/complete/);
+  assert.match(previewActionSource, /buildStoreItemLabelPreviewPayload/);
+  assert.match(previewActionSource, /preview_only/);
+  assert.doesNotMatch(previewActionSource, /print-jobs\/item-tokens|DirectLoopPdaPrinter|printTestLabel|sticker_confirmed|marked.*printed/i);
+  assert.doesNotMatch(generateSource, /print-jobs\/item-tokens|DirectLoopPdaPrinter|printTestLabel/);
   assert.match(actionSource, /generateStoreMobileBatchStoreItems/);
-  assert.match(actionSource, /queueStoreMobileBatchPrintJobs/);
+  assert.match(actionSource, /prepareStoreMobileBatchLabelPreview/);
+});
+
+test("generated STORE_ITEM list shows only clerk-facing item fields", () => {
+  const listSource = extractFunctionSource(appJs, "renderStoreMobileGeneratedStoreItemList");
+  const renderList = getExecutableFunction(
+    "renderStoreMobileGeneratedStoreItemList",
+    `
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+    ${extractFunctionSource(appJs, "normalizeStoreItemForLabelPreview")}
+    `,
+  );
+  const html = renderList({
+    generated_store_items: [{
+      machine_code: "526129000123",
+      barcode_value: "526129000123",
+      sale_price_kes: 450,
+      category_short: "Cargo",
+      grade: "P",
+      print_status: "pending_print",
+      sticker_status: "pending",
+      display_code: "STOREITEM26129000123",
+      source_sdp_display_code: "SDP261290019",
+      parent_sdo_display_code: "SDO260504008",
+      transfer_no: "TO202605-001",
+      pricing_batch_id: "PB-1",
+      store_code: "UTAWALA",
+    }],
+  });
+
+  assert.match(listSource, /machine_code/);
+  assert.match(listSource, /price_kes/);
+  assert.match(listSource, /category_short/);
+  assert.match(listSource, /print_status/);
+  assert.match(listSource, /sticker_status/);
+  assert.match(html, /526129000123/);
+  assert.match(html, /KES 450/);
+  assert.match(html, /Cargo/);
+  assert.match(html, /pending_print/);
+  assert.match(html, /pending/);
+  assert.doesNotMatch(html, /SDO260504008|SDP261290019|SDB|LPK|TO202605-001|PB-1|UTAWALA|STOREITEM26129000123/);
+});
+
+test("STORE_ITEM label preview payload uses machine_code and excludes source chain fields", () => {
+  const buildPayload = getExecutableFunction(
+    "buildStoreItemLabelPreviewPayload",
+    `
+    ${extractFunctionSource(appJs, "getStoreItemLabelSizeConfig")}
+    ${extractFunctionSource(appJs, "normalizeStoreItemForLabelPreview")}
+    `,
+  );
+  const payload = buildPayload("60x40", [{
+    machine_code: "526129000123",
+    barcode_value: "SHOULD-NOT-WIN",
+    sale_price_kes: 450,
+    category_short: "Cargo",
+    grade: "P",
+    display_code: "STOREITEM26129000123",
+    source_sdp_display_code: "SDP261290019",
+    parent_sdo_display_code: "SDO260504008",
+    source_code: "SDB-TO202605-002",
+    transfer_no: "TO202605-001",
+    pricing_batch_id: "PB-1",
+    store_code: "UTAWALA",
+  }]);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
+    printer_profile: "CHITENG_S1_OFFICIAL",
+    label_template_size: "60x40",
+    label_width_mm: 60,
+    label_height_mm: 40,
+    print_mode: "preview_only",
+    labels: [{
+      machine_code: "526129000123",
+      barcode_value: "526129000123",
+      price_kes: 450,
+      category_short: "Cargo",
+      grade: "P",
+    }],
+  });
+  assert.doesNotMatch(JSON.stringify(payload), /SDO|SDP|SDB|LPK|transfer_no|pricing_batch_id|source_sdp|store_code|display_code|STOREITEM|UTAWALA/);
+});
+
+test("STORE_ITEM label preview renders one Code128 barcode under text for both sizes", () => {
+  const renderPreview = getExecutableFunction(
+    "renderStoreItemLabelPreview",
+    `
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+    ${extractFunctionSource(appJs, "getStoreItemLabelSizeConfig")}
+    ${extractFunctionSource(appJs, "normalizeStoreItemForLabelPreview")}
+    ${extractFunctionSource(appJs, "buildStoreItemLabelPreviewPayload")}
+    ${extractFunctionSource(appJs, "renderCode128BarcodePreview")}
+    `,
+  );
+  const items = [{
+    machine_code: "526129000123",
+    sale_price_kes: 450,
+    category_short: "Cargo Pant",
+    grade: "P",
+    source_sdp_display_code: "SDP261290019",
+    parent_sdo_display_code: "SDO260504008",
+    transfer_no: "TO202605-001",
+    pricing_batch_id: "PB-1",
+    store_code: "UTAWALA",
+    display_code: "STOREITEM26129000123",
+  }];
+  const html60 = renderPreview(items, "60x40");
+  const html40 = renderPreview(items, "40x30");
+
+  for (const html of [html60, html40]) {
+    assert.equal((html.match(/data-code128-barcode=/g) || []).length, 1);
+    assert.match(html, /Code128/);
+    assert.doesNotMatch(html, /QR|qrcode|SDO260504008|SDP261290019|SDB|LPK|TO202605-001|PB-1|UTAWALA|STOREITEM26129000123|source_sdp|pricing_batch_id|transfer_no|store_code|display_code/);
+    assert.ok(html.indexOf("Cargo Pant") < html.indexOf("KES 450"), "category/grade must render above price");
+    assert.ok(html.indexOf("KES 450") < html.indexOf("data-code128-barcode"), "price must render above barcode");
+    assert.ok(html.indexOf("data-code128-barcode") < html.lastIndexOf("526129000123"), "machine_code text must render below barcode");
+  }
+  assert.match(html60, /data-label-template-size="60x40"/);
+  assert.match(html40, /data-label-template-size="40x30"/);
+  assert.match(stylesCss, /\.store-item-label-header[\s\S]*?order:\s*1/);
+  assert.match(stylesCss, /\.store-item-label-price[\s\S]*?order:\s*2/);
+  assert.match(stylesCss, /\.store-item-code128-barcode[\s\S]*?order:\s*3/);
+  assert.match(stylesCss, /\.store-item-label-machine-code[\s\S]*?order:\s*4/);
+});
+
+test("legacy PDA bundle contains the same STORE_ITEM list and label preview logic", () => {
+  const legacyPreviewSource = extractFunctionSource(appLegacyJs, "prepareStoreMobileBatchLabelPreview");
+  const legacyQueueSource = extractFunctionSource(appLegacyJs, "queueStoreMobileBatchPrintJobs");
+  const legacyActionSource = extractFunctionSource(appLegacyJs, "handleStoreMobilePricingPreviewAction");
+  const legacyPreviewBranch = legacyActionSource.slice(legacyActionSource.indexOf("if (previewLabels)"), legacyActionSource.indexOf("if (labelSize)"));
+
+  assert.match(appLegacyJs, /function renderStoreMobileGeneratedStoreItemList/);
+  assert.match(appLegacyJs, /function buildStoreItemLabelPreviewPayload/);
+  assert.match(appLegacyJs, /function renderStoreItemLabelPreview/);
+  assert.match(appLegacyJs, /data-code128-barcode/);
+  assert.match(appLegacyJs, /label_template_size/);
+  assert.match(appLegacyJs, /preview_only/);
+  assert.match(appLegacyJs, /生成本批商品码/);
+  assert.match(appLegacyJs, /查看标签预览/);
+  assert.doesNotMatch(legacyPreviewBranch, /data-mobile-pricing-confirm-stickers|DirectLoopPdaPrinter|printTestLabel|print-jobs\/item-tokens/);
+  assert.doesNotMatch(legacyPreviewSource, /DirectLoopPdaPrinter|printTestLabel|print-jobs\/item-tokens/);
+  assert.doesNotMatch(legacyQueueSource, /DirectLoopPdaPrinter|printTestLabel|print-jobs\/item-tokens/);
 });
 
 test("warehouse sale price management and Clerk PDA read the shared backend sale price API", () => {
@@ -592,55 +753,60 @@ test("price group editor uses PDA-friendly quick controls", () => {
   assert.match(editorSource, /A-01/);
 });
 
-test("label size selector supports 60x40 and 40x30 without mixing groups", () => {
+test("STORE_ITEM label preview supports 60x40 and 40x30 without printing", () => {
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const queueSource = extractFunctionSource(appJs, "renderPriceGroupPrintQueue");
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const cardSource = extractFunctionSource(appJs, "renderPriceGroupCards");
+  const sizeSource = extractFunctionSource(appJs, "getStoreItemLabelSizeConfig");
+  const payloadSource = extractFunctionSource(appJs, "buildStoreItemLabelPreviewPayload");
 
-  assert.match(printPanelSource, /data-mobile-pricing-label-size="60×40"/);
-  assert.match(printPanelSource, /data-mobile-pricing-label-size="40×30"/);
-  assert.match(printPanelSource, /本组打印任务/);
-  assert.match(printPanelSource, /当前打印机/);
-  assert.match(printPanelSource, /Deli DL-720C/);
-  assert.match(printPanelSource, /打印本组标签/);
-  assert.match(printPanelSource, /已贴完本组/);
-  assert.match(printPanelSource, /getStoreMobileStatusText\(job\.status \|\| "queued"\)/);
+  assert.match(printPanelSource, /data-mobile-pricing-label-size="60x40"/);
+  assert.match(printPanelSource, /data-mobile-pricing-label-size="40x30"/);
+  assert.match(printPanelSource, /本批标签预览/);
+  assert.match(printPanelSource, /renderStoreItemLabelPreview/);
+  assert.match(printPanelSource, /buildStoreItemLabelPreviewPayload/);
+  assert.match(sizeSource, /label_template_size:\s*"60x40"[\s\S]*label_width_mm:\s*60[\s\S]*label_height_mm:\s*40/);
+  assert.match(sizeSource, /label_template_size:\s*"40x30"[\s\S]*label_width_mm:\s*40[\s\S]*label_height_mm:\s*30/);
+  assert.match(payloadSource, /print_mode:\s*"preview_only"/);
+  assert.match(payloadSource, /printer_profile:\s*"CHITENG_S1_OFFICIAL"/);
+  assert.doesNotMatch(printPanelSource, /打印本组标签|已贴完本组|Android print bridge|data-mobile-pricing-confirm-stickers/);
   assert.match(printPanelSource, /group\.tier/);
   assert.match(printPanelSource, /group\.quantity/);
   assert.match(cardSource, /group\.tier/);
   assert.match(cardSource, /group\.quantity/);
   assert.match(queueSource, /group\.tier/);
   assert.match(queueSource, /group\.price_kes/);
-  assert.match(queueSource, /job\.label_size/);
-  assert.match(queueSource, /job\.copies \|\| group\.quantity/);
+  assert.match(queueSource, /label_template_size/);
+  assert.match(queueSource, /preview_only/);
   assert.match(stateSource, /group_id:\s*"CUSTOM-200"[\s\S]*?price_kes:\s*200[\s\S]*?quantity:\s*20[\s\S]*?rack_code:\s*"A-03"/);
-  assert.match(stateSource, /printJobs:\s*\[\]/);
-  assert.match(queueSource, /renderStoreMobileStatusBadge/);
+  assert.match(stateSource, /label_template_size:\s*"60x40"/);
+  assert.match(stateSource, /label_width_mm:\s*60/);
+  assert.match(stateSource, /label_height_mm:\s*40/);
   assert.doesNotMatch(queueSource, /混合总任务|全部价格组|all groups/i);
 });
 
-test("print task panel starts uncreated and only mock action creates queued job detail", () => {
+test("label preview panel is preview-only and never creates print jobs or sticker confirmation", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
 
   assert.match(stateSource, /createdPrintJobs:\s*\[\]/);
-  assert.match(printPanelSource, /state\.createdPrintJobs/);
+  assert.doesNotMatch(printPanelSource, /state\.createdPrintJobs/);
   assert.doesNotMatch(printPanelSource, /state\.printJobs/);
-  assert.match(printPanelSource, /if \(!job\)/);
-  assert.match(printPanelSource, /打印本组标签/);
-  assert.match(printPanelSource, /已贴完本组/);
+  assert.match(printPanelSource, /renderStoreItemLabelPreview/);
+  assert.match(printPanelSource, /JSON preview payload/);
+  assert.doesNotMatch(printPanelSource, /if \(!job\)/);
+  assert.doesNotMatch(printPanelSource, /打印本组标签|已贴完本组|data-mobile-pricing-confirm-stickers/);
   assert.doesNotMatch(printPanelSource, /创建打印任务/);
   assert.doesNotMatch(printPanelSource, /返回打印队列/);
   assert.doesNotMatch(printPanelSource, /打印任务创建成功/);
-  assert.match(actionSource, /advanceStoreMobileGroupWorkflow\(state, printGroup, "print"\)/);
-  assert.match(advanceSource, /createdPrintJobs/);
-  assert.match(advanceSource, /status:\s*"queued"/);
+  assert.match(actionSource, /prepareStoreMobileBatchLabelPreview\(state, previewLabels\)/);
+  assert.doesNotMatch(advanceSource, /createdPrintJobs|status:\s*"queued"|待贴标确认|已完成/);
 });
 
-test("print queue has field summary and keeps every price group separate", () => {
+test("print payload preview has field summary and keeps every price group separate", () => {
   const queueSource = extractFunctionSource(appJs, "renderPriceGroupPrintQueue");
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
 
@@ -648,13 +814,14 @@ test("print queue has field summary and keeps every price group separate", () =>
   assert.match(stateSource, /pending_label_count:\s*210/);
   assert.match(stateSource, /printed_today_count:\s*0/);
   assert.match(stateSource, /current_task_group_id:\s*"A"/);
-  assert.match(queueSource, /当前打印机/);
+  assert.match(queueSource, /print payload 预览/);
   assert.match(queueSource, /待打印总张数/);
-  assert.match(queueSource, /今日已打印/);
+  assert.match(queueSource, /preview_only/);
   assert.match(queueSource, /当前任务/);
   assert.match(queueSource, /mobile-print-queue-summary/);
   assert.match(queueSource, /mobile-print-queue-row/);
-  assert.match(queueSource, /getStoreMobileStatusText\(job\.status \|\| "queued"\)/);
+  assert.match(queueSource, /buildStoreItemLabelPreviewPayload/);
+  assert.doesNotMatch(queueSource, /print-jobs\/item-tokens|Android print bridge|printed/);
 });
 
 test("generation and print task pages guide the next price group", () => {
@@ -669,33 +836,32 @@ test("generation and print task pages guide the next price group", () => {
   assert.match(printPanelSource, /renderNextPriceGroupHint/);
 });
 
-test("per-group workflow advances generate print sticker confirmation and returns to next group", () => {
+test("per-group workflow advances generate then preview without sticker confirmation", () => {
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
   const nextGroupSource = extractFunctionSource(appJs, "getNextIncompleteStoreMobileGroup");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(advanceSource, /待生成[\s\S]*待打印/);
-  assert.match(advanceSource, /待打印[\s\S]*待贴标确认/);
-  assert.match(advanceSource, /待贴标确认[\s\S]*已完成/);
+  assert.match(advanceSource, /待生成[\s\S]*已生成 \/ 待打印/);
+  assert.match(advanceSource, /preview/);
+  assert.doesNotMatch(advanceSource, /待贴标确认|已完成|status:\s*"queued"|createdPrintJobs/);
   assert.match(advanceSource, /getNextIncompleteStoreMobileGroup/);
-  assert.match(advanceSource, /state\.activePage = "pricing"/);
+  assert.match(advanceSource, /state\.activePage = "print_task"/);
   assert.match(nextGroupSource, /!== "已完成"/);
-  assert.match(actionSource, /confirmStickers/);
-  assert.match(appJs, /data-mobile-pricing-confirm-stickers/);
+  assert.match(actionSource, /previewLabels/);
+  assert.doesNotMatch(actionSource, /confirmStickers/);
+  assert.doesNotMatch(appJs, /data-mobile-pricing-confirm-stickers/);
 });
 
-test("completing all groups marks the assigned SDP task complete with summary", () => {
-  const completeSource = extractFunctionSource(appJs, "isStoreMobileTaskComplete");
+test("STORE_ITEM label preview does not mark printed or sticker-confirmed", () => {
   const summarySource = extractFunctionSource(appJs, "renderStoreMobileCompletionSummary");
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(completeSource, /every\(\(group\) => String\(group\.status \|\| ""\) === "已完成"\)/);
-  assert.match(advanceSource, /state\.taskStatus = "已完成"/);
-  assert.match(advanceSource, /state\.activePage = "complete"/);
+  assert.doesNotMatch(actionSource, /sticker_confirmed|marked.*printed|print_status\s*=\s*"printed"|sticker_status\s*=\s*"confirmed"/i);
+  assert.doesNotMatch(advanceSource, /sticker_confirmed|marked.*printed|print_status\s*=\s*"printed"|sticker_status\s*=\s*"confirmed"|state\.taskStatus = "已完成"|state\.activePage = "complete"/i);
   assert.match(summarySource, /总数/);
   assert.match(summarySource, /已生成/);
-  assert.match(summarySource, /已打印\/贴标/);
-  assert.match(summarySource, /价格组 4\/4 已完成/);
+  assert.match(summarySource, /待打印/);
   assert.match(summarySource, /返回任务列表/);
 });
 
@@ -742,15 +908,20 @@ test("pricing workbench moves price groups close to the top", () => {
   assert.match(stylesCss, /\.mobile-pricing-titlebar/);
 });
 
-test("preview actions are mock-only and do not call backend mutations or print complete", () => {
+test("preview actions do not call Android printing or print-complete endpoints", () => {
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
   const renderSource = extractFunctionSource(appJs, "renderStoreMobilePricingPreview");
+  const previewSource = extractFunctionSource(appJs, "prepareStoreMobileBatchLabelPreview");
+  const queueSource = extractFunctionSource(appJs, "queueStoreMobileBatchPrintJobs");
+  const previewBranch = actionSource.slice(actionSource.indexOf("if (previewLabels)"), actionSource.indexOf("if (labelSize)"));
 
   assert.doesNotMatch(actionSource, /\brequest\s*\(/);
   assert.doesNotMatch(actionSource, /fetch\s*\(/);
-  assert.doesNotMatch(actionSource, /\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens|store-items\/generate/);
+  assert.doesNotMatch(previewBranch, /DirectLoopPdaPrinter|printTestLabel|printLabel|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
+  assert.doesNotMatch(previewSource, /DirectLoopPdaPrinter|printTestLabel|printLabel|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
+  assert.doesNotMatch(queueSource, /DirectLoopPdaPrinter|printTestLabel|printLabel|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
   assert.doesNotMatch(renderSource, /\brequest\s*\(/);
   assert.match(actionSource, /storeMobilePricingPreviewState/);
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
-  assert.match(advanceSource, /queued/);
+  assert.match(advanceSource, /preview/);
 });
