@@ -14973,6 +14973,88 @@ class InMemoryState:
         projected["packages"] = packages
         return projected
 
+    def _sync_store_delivery_execution_dispatch_status(
+        self,
+        order: dict[str, Any],
+        *,
+        dispatched_at: str,
+    ) -> Optional[dict[str, Any]]:
+        execution_order = self._find_store_delivery_execution_order_for_transfer(order)
+        if not execution_order:
+            return None
+
+        execution_no = str(
+            execution_order.get("execution_order_no")
+            or execution_order.get("official_delivery_barcode")
+            or order.get("store_delivery_execution_order_no")
+            or order.get("official_delivery_barcode")
+            or ""
+        ).strip().upper()
+        if not execution_no:
+            return None
+
+        stored_order = self.store_delivery_execution_orders.get(execution_no)
+        if not stored_order:
+            stored_order = execution_order
+
+        normalized_order = self._project_store_delivery_execution_order_with_existing_packages(stored_order)
+        package_rows_by_code: dict[str, dict[str, Any]] = {}
+        for package in normalized_order.get("packages") if isinstance(normalized_order.get("packages"), list) else []:
+            if isinstance(package, dict):
+                normalized_package = self._normalize_store_delivery_package(package)
+                package_rows_by_code[normalized_package["display_code"]] = normalized_package
+        for package in self._find_store_delivery_packages_for_order(execution_no):
+            package_rows_by_code[package["display_code"]] = package
+
+        updated_packages: list[dict[str, Any]] = []
+        for package in sorted(
+            package_rows_by_code.values(),
+            key=lambda row: (int(row.get("package_no") or 0), str(row.get("display_code") or "")),
+        ):
+            received_status = str(package.get("received_status") or "pending").strip().lower() or "pending"
+            exception_status = str(package.get("exception_status") or "normal").strip().lower() or "normal"
+            assignment_status = str(package.get("assignment_status") or "unassigned").strip().lower() or "unassigned"
+            if received_status == "received":
+                next_status = "assigned" if assignment_status == "assigned" else "received_unassigned"
+            elif exception_status == "exception":
+                next_status = "exception"
+            else:
+                next_status = "in_transit"
+            package.update(
+                {
+                    "status": next_status,
+                    "delivery_status": "in_transit",
+                    "store_receipt_status": "pending_receipt",
+                    "received_status": received_status,
+                    "exception_status": exception_status,
+                    "assignment_status": assignment_status,
+                    "updated_at": dispatched_at,
+                }
+            )
+            normalized_package = self._normalize_store_delivery_package(package)
+            self.store_delivery_packages[normalized_package["display_code"]] = normalized_package
+            updated_packages.append(normalized_package)
+
+        normalized_order.update(
+            {
+                "status": "in_transit",
+                "delivery_status": "in_transit",
+                "store_receipt_status": "pending_receipt",
+                "updated_at": dispatched_at,
+                "packages": updated_packages,
+            }
+        )
+        if updated_packages:
+            normalized_order["package_count"] = max(int(normalized_order.get("package_count") or 0), len(updated_packages))
+            if all(package.get("item_count") is not None for package in updated_packages):
+                normalized_order["total_item_count"] = sum(int(package.get("item_count") or 0) for package in updated_packages)
+        self.store_delivery_execution_orders[execution_no] = normalized_order
+
+        order["store_delivery_execution_order_no"] = execution_no
+        order["official_delivery_barcode"] = str(normalized_order.get("official_delivery_barcode") or execution_no).strip().upper()
+        order["store_delivery_execution_status"] = normalized_order["status"]
+        return normalized_order
+
     def list_store_delivery_shipments(self) -> list[dict[str, Any]]:
         rows = [
             self._project_transfer_order_with_store_delivery_execution_order(order)
@@ -15055,10 +15137,11 @@ class InMemoryState:
                 self.ship_transfer_order(transfer_no, ship_payload)
             )
             orders.append(shipped_order)
+            synced_execution_order = shipped_order.get("store_delivery_execution_order") or execution_by_transfer[transfer_no]
             shipment_projections.append(
                 self._build_store_delivery_shipment_projection(
                     shipped_order,
-                    execution_by_transfer[transfer_no],
+                    synced_execution_order,
                 )
             )
         return {
@@ -15815,6 +15898,7 @@ class InMemoryState:
             bale["dispatched_by"] = actor["username"]
             bale["updated_at"] = shipped_at
             self._refresh_store_dispatch_bale_summary(bale)
+        self._sync_store_delivery_execution_dispatch_status(order, dispatched_at=shipped_at)
         self._sync_transfer_dispatch_progress(transfer_no)
         self._log_event(
             event_type="transfer.shipped",
