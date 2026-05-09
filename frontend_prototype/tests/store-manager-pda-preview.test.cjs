@@ -414,6 +414,37 @@ test("manager PDA polling preserves selected SDO detail and search while refresh
   assert.match(renderRuntime, /最近刷新|自动刷新中/);
 });
 
+test("manager PDA interval polling preserves scroll around background render", () => {
+  const runPoll = functionSource(appJs, "runPdaRuntimePollOnce");
+  const scrollContainer = functionSource(appJs, "getPdaRuntimeScrollContainer");
+  const captureScroll = functionSource(appJs, "capturePdaRuntimeScrollState");
+  const restoreScroll = functionSource(appJs, "restorePdaRuntimeScrollState");
+  const preservingRender = functionSource(appJs, "renderStoreManagerPdaPreviewPreservingScroll");
+
+  assert.match(scrollContainer, /\.store-manager-pda-body/);
+  assert.match(scrollContainer, /\.store-manager-pda-task-list/);
+  assert.match(scrollContainer, /document\.scrollingElement/);
+  assert.match(captureScroll, /scrollTop/);
+  assert.match(captureScroll, /scrollLeft/);
+  assert.match(captureScroll, /getPdaRuntimeScrollPageKey/);
+  assert.match(restoreScroll, /requestAnimationFrame/);
+  assert.match(restoreScroll, /scrollState\.pageKey !== getPdaRuntimeScrollPageKey\(\)/);
+  assert.match(preservingRender, /capturePdaRuntimeScrollState/);
+  assert.match(preservingRender, /renderStoreManagerPdaPreview\(\)/);
+  assert.match(preservingRender, /restorePdaRuntimeScrollState/);
+  assert.match(runPoll, /shouldPreservePdaRuntimeScrollForPoll\(reason\)/);
+  assert.match(runPoll, /renderStoreManagerPdaPreviewPreservingScroll\(\)/);
+});
+
+test("manual manager PDA navigation does not reuse old polling scroll", () => {
+  const actionHandler = functionSource(appJs, "handleStoreManagerPdaTaskAction");
+
+  assert.match(actionHandler, /storeManagerPdaTab/);
+  assert.match(actionHandler, /state\.activePage = "detail"/);
+  assert.match(actionHandler, /renderStoreManagerPdaPreview\(\)/);
+  assert.doesNotMatch(actionHandler, /renderStoreManagerPdaPreviewPreservingScroll/);
+});
+
 test("manager PDA refreshes immediately after receiving, exception, assignment, and tab entry", () => {
   const actionHandler = functionSource(appJs, "handleStoreManagerPdaTaskAction");
   const receivePackage = functionSource(appJs, "receiveStoreManagerPdaPackage");
