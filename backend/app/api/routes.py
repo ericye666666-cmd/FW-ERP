@@ -4039,9 +4039,38 @@ def generate_store_items_for_sdo_package(
     else:
         data["store_code"] = str(data.get("store_code") or current_user.get("store_code") or "").strip().upper()
         data["clerk"] = str(data.get("clerk") or current_user.get("username") or "").strip()
+    if not data.get("selected_price") and data.get("sale_price_kes"):
+        data["selected_price"] = data["sale_price_kes"]
     data["generated_by"] = current_user["username"]
     return StoreDeliveryPackageStoreItemGenerateResponse(
         **state.generate_store_items_for_sdo_package(package_code, data)
+    )
+
+
+@router.post(
+    "/store-items/generate-from-pricing-batch",
+    response_model=StoreDeliveryPackageStoreItemGenerateResponse,
+    tags=["stores", "transfers"],
+)
+def generate_store_items_from_pricing_batch(
+    payload: StoreDeliveryPackageStoreItemGenerateRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreDeliveryPackageStoreItemGenerateResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    if _is_store_clerk_user(current_user):
+        data["store_code"] = str(current_user.get("store_code") or data.get("store_code") or "").strip().upper()
+        data["assigned_clerk"] = str(current_user.get("username") or data.get("assigned_clerk") or data.get("clerk") or "").strip()
+        data["clerk"] = data["assigned_clerk"]
+    else:
+        data["store_code"] = str(data.get("store_code") or current_user.get("store_code") or "").strip().upper()
+        data["assigned_clerk"] = str(data.get("assigned_clerk") or data.get("clerk") or current_user.get("username") or "").strip()
+        data["clerk"] = data["assigned_clerk"]
+    if not data.get("sale_price_kes") and data.get("selected_price"):
+        data["sale_price_kes"] = data["selected_price"]
+    data["created_by"] = current_user["username"]
+    return StoreDeliveryPackageStoreItemGenerateResponse(
+        **state.generate_store_items_from_pricing_batch(data)
     )
 
 

@@ -263,22 +263,32 @@ class StoreDeliveryPackageAssignRequest(BaseModel):
 
 
 class StoreDeliveryPackageStoreItemGenerateRequest(BaseModel):
+    source_sdp_display_code: str = ""
+    source_sdp_machine_code: str = ""
     store_code: str = ""
     clerk: str = ""
-    rack_code: str = Field(min_length=1)
-    selected_price: float = Field(gt=0)
+    assigned_clerk: str = ""
+    rack_code: str = ""
+    selected_price: float = 0
+    sale_price_kes: float = 0
     category_main: str = ""
     category_sub: str = ""
+    category_short: str = ""
     grade: str = ""
+    pricing_type: str = ""
     quantity: int = Field(ge=1)
     pricing_batch_id: str = ""
     source_line_key: str = ""
 
 
 class StoreDeliveryPackageStoreItemGenerateResponse(BaseModel):
+    pricing_batch_id: str = ""
+    generated_count: int = 0
     package: StoreDeliveryExecutionPackageDetailResponse
     package_progress: dict[str, Any] = Field(default_factory=dict)
     store_items: List[dict[str, Any]] = Field(default_factory=list)
+    tokens: List[dict[str, Any]] = Field(default_factory=list)
+    pending_print_count: int = 0
 
 
 class StoreDeliveryExecutionOrderResponse(BaseModel):
