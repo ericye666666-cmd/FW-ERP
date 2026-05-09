@@ -492,6 +492,8 @@ test("clerk PDA from #208 still keeps two tabs and visibly notes that real assig
 
 test("manager PDA cache-busts app and style assets", () => {
   assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-polling-215" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-polling-215"><\/script>/);
-  assert.match(indexHtml, /<script src="\.\/operations-fulfillment-flow\.js\?v=sdo-package-allocation-211"><\/script>/);
+  assert.match(indexHtml, /"\.\/app\.js\?v=pda-runtime-polling-215"/);
+  assert.match(indexHtml, /"\.\/app\.legacy\.js\?v=pda-legacy-webview-217"/);
+  assert.match(indexHtml, /"\.\/operations-fulfillment-flow\.js\?v=sdo-package-allocation-211"/);
+  assert.match(indexHtml, /"\.\/operations-fulfillment-flow\.legacy\.js\?v=pda-legacy-webview-217"/);
 });

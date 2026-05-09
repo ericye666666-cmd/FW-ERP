@@ -28,7 +28,12 @@ function extractFunctionSource(source, functionName) {
 }
 
 test("formal app loads barcode resolver before app.js", () => {
-  assert.match(indexHtml, /<script src="\.\/barcode-resolver-flow\.js(?:\?v=[^"]+)?"><\/script>[\s\S]*<script src="\.\/app\.js(?:\?v=[^"]+)?"><\/script>/);
+  const resolverPosition = indexHtml.indexOf('<script src="./barcode-resolver-flow.js"></script>');
+  const appLoaderPosition = indexHtml.indexOf('loadPdaRuntimeScript("./app.js?v=pda-runtime-polling-215", "modern")');
+
+  assert.notEqual(resolverPosition, -1, "barcode resolver script should be present");
+  assert.notEqual(appLoaderPosition, -1, "app.js runtime loader should be present");
+  assert.ok(resolverPosition < appLoaderPosition, "barcode resolver should load before app.js runtime loader");
 });
 
 test("high-risk scan pages call the global resolver with explicit context", () => {
