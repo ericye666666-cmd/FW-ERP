@@ -196,6 +196,24 @@ class ApparelDefaultCostResponse(BaseModel):
     updated_by: str = ""
 
 
+class ApparelDefaultSalePriceCreate(BaseModel):
+    category_main: str = Field(min_length=1)
+    category_sub: str = Field(min_length=1)
+    grade: str = Field(min_length=1)
+    default_sale_price_kes: float = Field(gt=0)
+    note: str = ""
+
+
+class ApparelDefaultSalePriceResponse(BaseModel):
+    category_main: str
+    category_sub: str
+    grade: str
+    default_sale_price_kes: float
+    note: str = ""
+    updated_at: str
+    updated_by: str = ""
+
+
 class ApparelSortingRackCreate(BaseModel):
     category_main: str = Field(min_length=1)
     category_sub: str = Field(min_length=1)

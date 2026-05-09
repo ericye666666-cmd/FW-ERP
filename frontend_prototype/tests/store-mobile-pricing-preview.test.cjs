@@ -255,11 +255,101 @@ test("backend task selection loads selected SDP into the scan workflow", () => {
   const selectionSource = extractFunctionSource(appJs, "selectStoreMobileBackendTask");
 
   assert.match(selectionSource, /createStoreMobileSelectedSdpFromBackendTask/);
+  assert.match(selectionSource, /buildStoreMobilePricingSourceLines/);
   assert.match(selectionSource, /state\.selectedSdp\s*=/);
+  assert.match(selectionSource, /state\.pricingSourceLines\s*=/);
+  assert.match(selectionSource, /state\.priceGroups\s*=\s*\[\]/);
   assert.match(selectionSource, /selectedBackendTaskCode/);
   assert.match(selectionSource, /state\.activePage = "verify"/);
   assert.match(selectionSource, /state\.scanError = ""/);
   assert.match(selectionSource, /state\.scanSuccess = ""/);
+  assert.doesNotMatch(selectionSource, /freshWorkflow\.priceGroups|createStoreMobilePricingPreviewState\(\{ selectedSdp \}\)/);
+});
+
+test("backend selected SDP pricing source lines come from the assigned task, not demo groups", () => {
+  const buildSource = extractFunctionSource(appJs, "buildStoreMobilePricingSourceLines");
+  const renderSource = extractFunctionSource(appJs, "renderPriceGroupCards");
+  const batchSource = extractFunctionSource(appJs, "createStoreMobilePricingBatch");
+  const suggestedSource = extractFunctionSource(appJs, "getStoreMobileSuggestedSalePrice");
+
+  assert.match(buildSource, /pricing_source_lines|lines/);
+  assert.match(buildSource, /source_type/);
+  assert.match(buildSource, /SDB/);
+  assert.match(buildSource, /LPK/);
+  assert.match(buildSource, /需补充分拣明细/);
+  assert.doesNotMatch(buildSource, /SDP261250002|SDO260504008|A-01|A-02|牛仔裤 A/);
+  assert.match(renderSource, /pricingSourceLines/);
+  assert.match(renderSource, /P 档默认售价/);
+  assert.match(renderSource, /S 档默认售价/);
+  assert.match(renderSource, /自定义价格/);
+  assert.match(renderSource, /需补充分拣明细/);
+  assert.match(renderSource, /data-mobile-pricing-create-batch/);
+  assert.match(batchSource, /source_sdp_display_code/);
+  assert.match(batchSource, /source_sdp_machine_code/);
+  assert.match(batchSource, /CUSTOM/);
+  assert.match(suggestedSource, /findApparelDefaultSalePriceRecord/);
+});
+
+test("backend selected SDP batch quantity validation blocks over-allocation", () => {
+  const validateSource = extractFunctionSource(appJs, "validateStoreMobilePricingBatchQuantity");
+  const validateBatchQuantity = getExecutableFunction(
+    "validateStoreMobilePricingBatchQuantity",
+    `
+    function toFiniteNumber(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    function getStoreMobileLineRemainingQty(state, sourceLineKey, currentGroupId = "") {
+      const line = (state.pricingSourceLines || []).find((candidate) => candidate.line_key === sourceLineKey);
+      if (!line) return 0;
+      const reserved = (state.priceGroups || []).reduce((sum, group) => {
+        if (group.source_line_key !== sourceLineKey || group.group_id === currentGroupId) return sum;
+        return sum + toFiniteNumber(group.quantity, 0);
+      }, 0);
+      return Math.max(0, toFiniteNumber(line.remaining_qty ?? line.item_count, 0) - reserved);
+    }
+    `
+  );
+  const state = {
+    pricingSourceLines: [{ line_key: "LPK-1", remaining_qty: 5 }],
+    priceGroups: [{ group_id: "BATCH-1", source_line_key: "LPK-1", quantity: 3 }],
+  };
+
+  assert.match(validateSource, /quantity must be positive|数量必须大于 0/);
+  assert.match(validateSource, /cannot exceed remaining quantity|不能超过剩余数量/);
+  assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 2 }).ok, true);
+  assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 3 }).ok, false);
+  assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 0 }).ok, false);
+});
+
+test("real backend SDP batch generation uses STORE_ITEM API and never completes print without bridge response", () => {
+  const generateSource = extractFunctionSource(appJs, "generateStoreMobileBatchStoreItems");
+  const printSource = extractFunctionSource(appJs, "queueStoreMobileBatchPrintJobs");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.match(generateSource, /store-delivery-packages/);
+  assert.match(generateSource, /store-items\/generate/);
+  assert.match(generateSource, /pricing_batch_id/);
+  assert.match(generateSource, /source_line_key/);
+  assert.match(generateSource, /selected_price/);
+  assert.match(generateSource, /source_sdp_display_code/);
+  assert.match(printSource, /print-jobs\/item-tokens/);
+  assert.match(printSource, /Android print bridge|待打印/);
+  assert.doesNotMatch(printSource, /\/print-jobs\/\$\{[^}]+\}\/complete/);
+  assert.match(actionSource, /generateStoreMobileBatchStoreItems/);
+  assert.match(actionSource, /queueStoreMobileBatchPrintJobs/);
+});
+
+test("warehouse sale price management and Clerk PDA read the shared backend sale price API", () => {
+  const loadConfigSource = extractFunctionSource(appJs, "loadConfig");
+  const runtimeLoadSource = extractFunctionSource(appJs, "loadApparelDefaultSalePricesForPdaRuntime");
+  const submitSource = extractFunctionSource(appJs, "submitApparelDefaultSalePrice");
+
+  assert.match(loadConfigSource, /\/warehouse\/apparel-default-sale-prices/);
+  assert.match(runtimeLoadSource, /\/apparel-default-sale-prices/);
+  assert.match(runtimeLoadSource, /normalizeApparelDefaultSalePriceRows/);
+  assert.match(submitSource, /\/warehouse\/apparel-default-sale-prices/);
+  assert.match(submitSource, /method:\s*"POST"/);
 });
 
 test("barcode verification accepts selected backend SDP display or machine code", () => {
