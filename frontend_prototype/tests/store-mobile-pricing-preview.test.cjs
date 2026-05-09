@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const appLegacyJs = fs.readFileSync(path.join(__dirname, "..", "app.legacy.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 
@@ -235,6 +236,19 @@ test("task tab renders backend assigned SDP cards before demo fallback", () => {
   assert.match(actionSource, /selectStoreMobileBackendTask/);
   assert.match(actionSource, /startTask/);
   assert.match(actionSource, /state\.activePage = "verify"/);
+});
+
+test("backend task start button is included in the PDA pricing click listener", () => {
+  const selectorStart = appJs.indexOf('event.target.closest("[data-mobile-pricing-page]');
+  assert.notEqual(selectorStart, -1, "missing store mobile pricing click selector");
+  const handlerCall = appJs.indexOf("handleStoreMobilePricingPreviewAction(button);", selectorStart);
+  assert.notEqual(handlerCall, -1, "missing store mobile pricing handler call");
+  const listenerSource = appJs.slice(selectorStart, handlerCall + "handleStoreMobilePricingPreviewAction(button);".length);
+
+  assert.match(listenerSource, /\[data-mobile-pricing-select-backend-task\]/);
+  assert.match(listenerSource, /event\.target\.closest/);
+  assert.match(listenerSource, /handleStoreMobilePricingPreviewAction\(button\)/);
+  assert.match(appLegacyJs, /\[data-mobile-pricing-select-backend-task\]/);
 });
 
 test("backend task selection loads selected SDP into the scan workflow", () => {
