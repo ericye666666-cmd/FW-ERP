@@ -240,8 +240,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-printer-diagnostics-stable-231/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-diagnostics-stable-231/);
+  assert.match(indexHtml, /app\.js\?v=clerk-printer-diagnostics-scroll-232/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-diagnostics-scroll-232/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -300,6 +300,7 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.match(diagnosticsSource, /last_print_result/);
   assert.match(diagnosticsSource, /last_error/);
   assert.match(diagnosticsSource, /raw JSON from latest getPrinterStatus\(\)/);
+  assert.match(diagnosticsSource, /data-clerk-printer-diagnostics-json="true"/);
   assert.match(diagnosticsSource, /刷新诊断状态/);
   assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-diagnostic-refresh/);
   assert.match(diagnosticsSource, /锁定诊断状态/);
@@ -332,6 +333,28 @@ test("clerk PDA printer diagnostics open state and connected badge survive reren
   assert.doesNotMatch(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
   assert.match(appLegacyJs, /bluetoothPrinterDiagnosticsOpen:\s*false/);
   assert.match(appLegacyJs, /handleClerkPrinterDiagnosticsToggle/);
+});
+
+test("clerk PDA printer diagnostics raw JSON scroll survives rerender", () => {
+  const getJsonNode = extractFunctionSource(appJs, "getClerkPrinterDiagnosticsJsonNode");
+  const captureJsonScroll = extractFunctionSource(appJs, "captureClerkPrinterDiagnosticsJsonScrollState");
+  const restoreJsonScroll = extractFunctionSource(appJs, "restoreClerkPrinterDiagnosticsJsonScrollState");
+  const preservingRender = extractFunctionSource(appJs, "renderStoreMobilePricingPreviewPreservingScroll");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const pollPrinter = extractFunctionSource(appJs, "pollClerkBluetoothPrinterStatus");
+
+  assert.match(diagnosticsSource, /data-clerk-printer-diagnostics-json="true"/);
+  assert.match(getJsonNode, /data-clerk-printer-diagnostics-json="true"/);
+  assert.match(captureJsonScroll, /scrollTop/);
+  assert.match(captureJsonScroll, /scrollLeft/);
+  assert.match(restoreJsonScroll, /node\.scrollTop\s*=\s*Number\(scrollState\.scrollTop/);
+  assert.match(restoreJsonScroll, /node\.scrollLeft\s*=\s*Number\(scrollState\.scrollLeft/);
+  assert.match(preservingRender, /captureClerkPrinterDiagnosticsJsonScrollState/);
+  assert.match(preservingRender, /restoreClerkPrinterDiagnosticsJsonScrollState/);
+  assert.doesNotMatch(pollPrinter, /bluetoothPrinterDiagnosticsOpen\s*=/);
+  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
+  assert.match(appLegacyJs, /data-clerk-printer-diagnostics-json="true"/);
+  assert.match(appLegacyJs, /restoreClerkPrinterDiagnosticsJsonScrollState/);
 });
 
 test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {

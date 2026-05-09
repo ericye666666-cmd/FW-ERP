@@ -3972,6 +3972,37 @@ function renderClerkBluetoothPrinterStatusIfActive() {
   }
 }
 
+function getClerkPrinterDiagnosticsJsonNode() {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  return document.querySelector('[data-clerk-printer-diagnostics-json="true"]');
+}
+
+function captureClerkPrinterDiagnosticsJsonScrollState() {
+  const node = getClerkPrinterDiagnosticsJsonNode();
+  if (!node) {
+    return null;
+  }
+  return {
+    scrollTop: Number(node.scrollTop || 0),
+    scrollLeft: Number(node.scrollLeft || 0),
+  };
+}
+
+function restoreClerkPrinterDiagnosticsJsonScrollState(scrollState = null) {
+  if (!scrollState) {
+    return false;
+  }
+  const node = getClerkPrinterDiagnosticsJsonNode();
+  if (!node) {
+    return false;
+  }
+  node.scrollTop = Number(scrollState.scrollTop || 0);
+  node.scrollLeft = Number(scrollState.scrollLeft || 0);
+  return true;
+}
+
 function shouldPollClerkBluetoothPrinterStatus() {
   const roleCode = getNormalizedRoleCode(currentSession.user);
   if (!currentSession?.token || !isPdaRuntimeMode() || roleCode !== "store_clerk") {
@@ -33130,7 +33161,7 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
       </div>
       <div class="clerk-printer-diagnostics-json">
         <strong>raw JSON from latest getPrinterStatus()</strong>
-        <pre>${escapeHtml(rawStatusJson || "尚未读取 getPrinterStatus()")}</pre>
+        <pre data-clerk-printer-diagnostics-json="true">${escapeHtml(rawStatusJson || "尚未读取 getPrinterStatus()")}</pre>
       </div>
     </details>
   `;
@@ -33426,8 +33457,10 @@ function renderStoreMobilePricingPreview() {
 
 function renderStoreMobilePricingPreviewPreservingScroll() {
   const scrollState = capturePdaRuntimeScrollState();
+  const printerDiagnosticsJsonScrollState = captureClerkPrinterDiagnosticsJsonScrollState();
   renderStoreMobilePricingPreview();
   restorePdaRuntimeScrollState(scrollState);
+  restoreClerkPrinterDiagnosticsJsonScrollState(printerDiagnosticsJsonScrollState);
 }
 
 async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPreviewState, groupId = "") {
