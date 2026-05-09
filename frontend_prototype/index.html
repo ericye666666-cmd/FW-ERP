@@ -3864,6 +3864,7 @@
           return {
             page: "tasks",
             activeGroupId: "A",
+            labelTemplateSize: "60x40",
             scanError: "",
             scanSuccess: "",
             groups: [
@@ -3925,11 +3926,16 @@
           for (var index = 0; index < groups.length; index += 1) {
             var group = groups[index];
             var action = "";
-            if (group.status === "待生成") action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="generate" data-legacy-group-id="' + escapeHtml(group.id) + '">生成本组 STORE_ITEM</button>';
-            if (group.status === "待打印") action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="print" data-legacy-group-id="' + escapeHtml(group.id) + '">打印本组标签</button>';
-            if (group.status === "待贴标确认") action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="confirm" data-legacy-group-id="' + escapeHtml(group.id) + '">已贴完本组</button>';
-            if (group.status === "已完成") action = '<span class="mobile-group-complete-mark">已完成</span>';
-            html += '<article class="mobile-price-group-card mobile-field-group-card' + (legacyStoreClerkState.activeGroupId === group.id ? " is-active" : "") + '"><div class="mobile-field-group-top"><div class="mobile-field-group-left"><strong>' + escapeHtml(group.label) + '</strong><b class="mobile-group-qty">' + escapeHtml(group.qty) + '件</b></div><div class="mobile-field-group-right"><strong>KSh ' + escapeHtml(group.price) + '</strong>' + renderLegacyClerkBadge(group.status) + '</div></div><div class="mobile-field-group-actions">' + action + '</div></article>';
+            var preview = "";
+            if (group.status === "待生成") {
+              action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="generate" data-legacy-group-id="' + escapeHtml(group.id) + '">生成本批商品码</button>';
+            } else {
+              action = '<button type="button" class="primary-button mini-button" data-legacy-clerk-action="preview" data-legacy-group-id="' + escapeHtml(group.id) + '">查看标签预览</button>';
+              if (legacyStoreClerkState.activeGroupId === group.id) {
+                preview = '<div class="mobile-choice-block"><span>标签尺寸</span><div class="mobile-segment-row"><button type="button" class="' + (legacyStoreClerkState.labelTemplateSize === "60x40" ? "is-active" : "") + '" data-legacy-clerk-action="label-size" data-legacy-label-template-size="60x40">60×40 标签</button><button type="button" class="' + (legacyStoreClerkState.labelTemplateSize === "40x30" ? "is-active" : "") + '" data-legacy-clerk-action="label-size" data-legacy-label-template-size="40x30">40×30 标签</button></div></div><div class="empty-state">生成 STORE_ITEM 后显示真实标签预览。</div>';
+              }
+            }
+            html += '<article class="mobile-price-group-card mobile-field-group-card' + (legacyStoreClerkState.activeGroupId === group.id ? " is-active" : "") + '"><div class="mobile-field-group-top"><div class="mobile-field-group-left"><strong>' + escapeHtml(group.label) + '</strong><b class="mobile-group-qty">' + escapeHtml(group.qty) + '件</b></div><div class="mobile-field-group-right"><strong>KSh ' + escapeHtml(group.price) + '</strong>' + renderLegacyClerkBadge(group.status) + '</div></div><div class="mobile-field-group-actions">' + action + '</div>' + preview + '</article>';
           }
           return html + '</div></section>';
         }
@@ -4145,31 +4151,25 @@
           }
           var action = button.getAttribute("data-legacy-clerk-action") || "";
           var groupId = button.getAttribute("data-legacy-group-id") || "";
+          var labelTemplateSize = button.getAttribute("data-legacy-label-template-size") || "";
           if (event && event.preventDefault) event.preventDefault();
           if (event && event.stopPropagation) event.stopPropagation();
           if (action === "tasks") legacyStoreClerkState.page = "tasks";
           if (action === "my") legacyStoreClerkState.page = "my";
           if (action === "start") legacyStoreClerkState.page = "verify";
           if (action === "reset") legacyStoreClerkState = createLegacyStoreClerkState();
+          if (action === "label-size" && labelTemplateSize) {
+            legacyStoreClerkState.labelTemplateSize = labelTemplateSize === "40x30" ? "40x30" : "60x40";
+          }
           for (var index = 0; index < legacyStoreClerkState.groups.length; index += 1) {
             var group = legacyStoreClerkState.groups[index];
             if (group.id !== groupId) continue;
             legacyStoreClerkState.activeGroupId = group.id;
             if (action === "generate" && group.status === "待生成") {
-              group.status = "待打印";
+              group.status = "已生成 / 待打印";
               legacyStoreClerkState.page = "pricing";
-            } else if (action === "print" && group.status === "待打印") {
-              group.status = "待贴标确认";
+            } else if (action === "preview") {
               legacyStoreClerkState.page = "pricing";
-            } else if (action === "confirm" && group.status === "待贴标确认") {
-              group.status = "已完成";
-              var nextGroup = getLegacyNextGroup();
-              if (nextGroup) {
-                legacyStoreClerkState.activeGroupId = nextGroup.id;
-                legacyStoreClerkState.page = "pricing";
-              } else {
-                legacyStoreClerkState.page = "complete";
-              }
             }
           }
           renderLegacyStoreClerkRuntime(legacyStoreClerkTarget);
@@ -4255,10 +4255,10 @@
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=clerk-printer-diagnostics-scroll-232", "modern");
+          loadPdaRuntimeScript("./app.js?v=store-item-label-preview-PR2", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=clerk-printer-diagnostics-scroll-232", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=store-item-label-preview-PR2", "legacy");
       })();
     </script>
   </body>
