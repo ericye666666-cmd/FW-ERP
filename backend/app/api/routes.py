@@ -122,6 +122,8 @@ from app.schemas.sorting import (
     ApparelPieceWeightCreate,
     ApparelDefaultCostCreate,
     ApparelDefaultCostResponse,
+    ApparelDefaultSalePriceCreate,
+    ApparelDefaultSalePriceResponse,
     ApparelSortingRackCreate,
     ApparelSortingRackResponse,
     ApparelPieceWeightResponse,
@@ -2486,6 +2488,48 @@ def delete_apparel_default_cost(
     current_user = _require_current_user(authorization=authorization)
     state.delete_apparel_default_cost(category_main, category_sub, grade, deleted_by=current_user["username"])
     return MessageResponse(message=f"Deleted apparel default cost for {category_main} / {category_sub} / {grade}")
+
+
+@router.get("/apparel-default-sale-prices", response_model=list[ApparelDefaultSalePriceResponse], tags=["warehouse"])
+@router.get("/warehouse/apparel-default-sale-prices", response_model=list[ApparelDefaultSalePriceResponse], tags=["warehouse"])
+def list_apparel_default_sale_prices(
+    authorization: Optional[str] = Header(default=None),
+) -> list[ApparelDefaultSalePriceResponse]:
+    _require_current_user(authorization=authorization)
+    return [ApparelDefaultSalePriceResponse(**row) for row in state.list_apparel_default_sale_prices()]
+
+
+@router.post("/apparel-default-sale-prices", response_model=ApparelDefaultSalePriceResponse, tags=["warehouse"])
+@router.post("/warehouse/apparel-default-sale-prices", response_model=ApparelDefaultSalePriceResponse, tags=["warehouse"])
+def upsert_apparel_default_sale_price(
+    payload: ApparelDefaultSalePriceCreate,
+    authorization: Optional[str] = Header(default=None),
+) -> ApparelDefaultSalePriceResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return ApparelDefaultSalePriceResponse(
+        **state.upsert_apparel_default_sale_price(payload.model_dump(), updated_by=current_user["username"])
+    )
+
+
+@router.delete(
+    "/apparel-default-sale-prices/{category_main}/{category_sub}/{grade}",
+    response_model=MessageResponse,
+    tags=["warehouse"],
+)
+@router.delete(
+    "/warehouse/apparel-default-sale-prices/{category_main}/{category_sub}/{grade}",
+    response_model=MessageResponse,
+    tags=["warehouse"],
+)
+def delete_apparel_default_sale_price(
+    category_main: str,
+    category_sub: str,
+    grade: str,
+    authorization: Optional[str] = Header(default=None),
+) -> MessageResponse:
+    current_user = _require_current_user(authorization=authorization)
+    state.delete_apparel_default_sale_price(category_main, category_sub, grade, deleted_by=current_user["username"])
+    return MessageResponse(message=f"Deleted apparel default sale price for {category_main} / {category_sub} / {grade}")
 
 
 @router.get("/warehouse/apparel-sorting-racks", response_model=list[ApparelSortingRackResponse], tags=["warehouse"])

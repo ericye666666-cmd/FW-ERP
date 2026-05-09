@@ -3722,6 +3722,7 @@ async function loadClerkPdaAssignedTasksForPolling(options = {}) {
     state.assignedBackendTasksLoaded = true;
     return [];
   }
+  await loadApparelDefaultSalePricesForPdaRuntime();
   const rows = await loadStoreAssignedSdoPackageTasks(
     {
       store_code: storeCode,
@@ -3738,6 +3739,18 @@ async function loadClerkPdaAssignedTasksForPolling(options = {}) {
     state.assignedBackendTaskLastForceRefresh = new Date().toISOString();
   }
   return sortedRows;
+}
+
+async function loadApparelDefaultSalePricesForPdaRuntime() {
+  try {
+    const rows = await request("/apparel-default-sale-prices");
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(rows);
+    persistApparelDefaultSalePriceState();
+    return apparelDefaultSalePriceState;
+  } catch (error) {
+    ensureApparelDefaultSalePriceState();
+    return apparelDefaultSalePriceState;
+  }
 }
 
 function stopPdaRuntimePolling() {
@@ -7664,19 +7677,7 @@ function ensureApparelDefaultSalePriceState() {
   if (!Array.isArray(apparelDefaultSalePriceState) || !apparelDefaultSalePriceState.length) {
     apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(DEFAULT_APPAREL_DEFAULT_SALE_PRICES);
   } else {
-    const merged = [...apparelDefaultSalePriceState];
-    DEFAULT_APPAREL_DEFAULT_SALE_PRICES.forEach((row) => {
-      const exists = merged.some(
-        (entry) =>
-          String(entry?.category_main || "").trim().toLowerCase() === String(row.category_main || "").trim().toLowerCase()
-          && String(entry?.category_sub || "").trim().toLowerCase() === String(row.category_sub || "").trim().toLowerCase()
-          && String(entry?.grade || "").trim().toUpperCase() === String(row.grade || "").trim().toUpperCase(),
-      );
-      if (!exists) {
-        merged.push(row);
-      }
-    });
-    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(merged);
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(apparelDefaultSalePriceState);
   }
   return apparelDefaultSalePriceState;
 }
@@ -31499,6 +31500,9 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     assignedBackendTaskLoadError: "",
     assignedBackendTaskLastForceRefresh: "",
     selectedBackendTaskCode: "",
+    pricingSourceLines: [],
+    pricingSourceLineStatus: "",
+    pricingSourceLineMessage: "",
     labelSize: "60×40",
     printer_name: "Deli DL-720C",
     pending_label_count: 210,
@@ -31589,6 +31593,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     printJobs: Array.isArray(overrides.printJobs) ? overrides.printJobs : baseState.printJobs,
     createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
     assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
+    pricingSourceLines: Array.isArray(overrides.pricingSourceLines) ? overrides.pricingSourceLines : baseState.pricingSourceLines,
   };
 }
 
@@ -31598,7 +31603,9 @@ function getStoreMobileTaskGroups(state = storeMobilePricingPreviewState) {
 
 function getStoreMobileTaskTotals(state = storeMobilePricingPreviewState) {
   const groups = getStoreMobileTaskGroups(state);
-  const total = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const groupedTotal = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const selectedSdpTotal = Number(state?.selectedSdp?.total_count || state?.selectedSdp?.item_count || 0);
+  const total = groupedTotal > 0 ? groupedTotal : selectedSdpTotal;
   const generated = groups
     .filter((group) => String(group.status || "") !== "待生成")
     .reduce((sum, group) => sum + Number(group.quantity || 0), 0);
@@ -31741,8 +31748,175 @@ function createStoreMobileSelectedSdpFromBackendTask(row = {}, state = storeMobi
     status: String(row?.status || "").trim(),
     received_status: String(row?.received_status || "").trim(),
     assignment_status: String(row?.assignment_status || "").trim(),
+    pricing_source_lines: Array.isArray(row?.pricing_source_lines) ? row.pricing_source_lines : (Array.isArray(row?.lines) ? row.lines : []),
+    line_detail_status: String(row?.line_detail_status || "").trim(),
+    line_detail_message: String(row?.line_detail_message || "").trim(),
     backend_task: true,
   };
+}
+
+function buildStoreMobilePricingSourceLines(row = {}, selectedSdp = null) {
+  const sdp = selectedSdp || row || {};
+  const rawLines = Array.isArray(row?.pricing_source_lines)
+    ? row.pricing_source_lines
+    : (Array.isArray(row?.lines) ? row.lines : []);
+  const sourceType = String(row?.source_type || sdp?.source_type || "").trim().toUpperCase();
+  const sourceCode = String(row?.source_code || row?.bale_no || sdp?.source_code || "").trim().toUpperCase();
+  const sourceMachineCode = String(row?.source_machine_code || sdp?.source_machine_code || "").replace(/[^0-9]/g, "").trim();
+  const sdpDisplayCode = String(sdp?.display_code || row?.display_code || row?.sdo_package_display_code || "").trim().toUpperCase();
+  const sdpMachineCode = String(sdp?.machine_code || row?.machine_code || row?.sdo_package_machine_code || "").replace(/[^0-9]/g, "").trim();
+  const parentSdoDisplayCode = String(sdp?.sdo_code || row?.parent_sdo_display_code || row?.parent_sdo_order_no || "").trim().toUpperCase();
+  const parentSdoMachineCode = String(sdp?.sdo_machine_code || row?.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim();
+  const normalizeLine = (line = {}, index = 1) => {
+    const parsed = parseCategoryPair(line.category_name || line.category_summary || line.content_summary || "");
+    const categoryMain = String(line.category_main || parsed.category_main || "").trim();
+    const categorySub = String(line.category_sub || parsed.category_sub || "").trim();
+    const itemCount = Number(line.item_count || line.remaining_qty || line.qty || line.quantity || 0);
+    if (!categoryMain || !categorySub || !(itemCount > 0)) {
+      return null;
+    }
+    const lineKey = String(line.line_key || line.source_line_key || `${sourceCode || sdpDisplayCode}:${categoryMain}:${categorySub}:${index}`).trim();
+    return {
+      line_key: lineKey,
+      source_type: String(line.source_type || sourceType || "").trim().toUpperCase(),
+      source_code: String(line.source_code || sourceCode || "").trim().toUpperCase(),
+      source_machine_code: String(line.source_machine_code || sourceMachineCode || "").replace(/[^0-9]/g, "").trim(),
+      category_main: categoryMain,
+      category_sub: categorySub,
+      grade: String(line.grade || "").trim().toUpperCase(),
+      item_count: itemCount,
+      remaining_qty: Number(line.remaining_qty || itemCount),
+      source_sdp_display_code: sdpDisplayCode,
+      source_sdp_machine_code: sdpMachineCode,
+      parent_sdo_display_code: parentSdoDisplayCode,
+      parent_sdo_machine_code: parentSdoMachineCode,
+    };
+  };
+  const normalizedLines = rawLines
+    .map((line, index) => normalizeLine(line, index + 1))
+    .filter(Boolean);
+  if (normalizedLines.length) {
+    return normalizedLines;
+  }
+  if (sourceType === "SDB") {
+    const parsed = parseCategoryPair(row?.content_summary || row?.category || row?.category_name || row?.category_summary || sdp?.category || "");
+    const fallbackLine = normalizeLine(
+      {
+        line_key: `${sourceCode || sdpDisplayCode}:sdb`,
+        source_type: "SDB",
+        source_code: sourceCode,
+        source_machine_code: sourceMachineCode,
+        category_main: parsed.category_main,
+        category_sub: parsed.category_sub,
+        item_count: row?.item_count || sdp?.total_count || sdp?.item_count || 0,
+      },
+      1,
+    );
+    return fallbackLine ? [fallbackLine] : [];
+  }
+  // 需补充分拣明细: LPK without line details must not fall back to fake A/B demo pricing groups.
+  if (sourceType === "LPK") {
+    return [];
+  }
+  return [];
+}
+
+function getStoreMobilePricingSourceLines(state = storeMobilePricingPreviewState) {
+  const pricingSourceLines = Array.isArray(state?.pricingSourceLines) ? state.pricingSourceLines : [];
+  if (pricingSourceLines.length) {
+    return pricingSourceLines;
+  }
+  if (state?.selectedSdp?.backend_task) {
+    return buildStoreMobilePricingSourceLines(state.selectedSdp, state.selectedSdp);
+  }
+  return [];
+}
+
+function getStoreMobileSuggestedSalePrice(categoryMain = "", categorySub = "", grade = "") {
+  const finder = apparelDefaultCostFlow.findApparelDefaultSalePriceRecord;
+  const record = typeof finder === "function"
+    ? finder(ensureApparelDefaultSalePriceState(), categoryMain, categorySub, grade)
+    : getApparelDefaultSalePriceByCategoryGrade(categoryMain, categorySub, grade);
+  return Number(record?.default_sale_price_kes || 0);
+}
+
+function getStoreMobileLineRemainingQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
+  const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
+  if (!line) {
+    return 0;
+  }
+  const reservedQty = getStoreMobileTaskGroups(state).reduce((sum, group) => {
+    if (String(group.source_line_key || "") !== String(sourceLineKey || "") || String(group.group_id || "") === String(currentGroupId || "")) {
+      return sum;
+    }
+    return sum + Number(group.quantity || 0);
+  }, 0);
+  return Math.max(0, Number(line.remaining_qty || line.item_count || 0) - reservedQty);
+}
+
+function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPreviewState, batch = {}) {
+  const quantity = Number(batch.quantity || 0);
+  if (!(quantity > 0)) {
+    return { ok: false, message: "数量必须大于 0 / quantity must be positive" };
+  }
+  const remainingQty = getStoreMobileLineRemainingQty(state, batch.source_line_key, batch.group_id);
+  if (quantity > remainingQty) {
+    return { ok: false, message: "不能超过剩余数量 / cannot exceed remaining quantity" };
+  }
+  return { ok: true, message: "" };
+}
+
+function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, value = "") {
+  const [sourceLineKey = "", rawGrade = ""] = String(value || "").split("||");
+  const grade = String(rawGrade || "P").trim().toUpperCase();
+  const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === sourceLineKey);
+  if (!line) {
+    state.pricingSourceLineMessage = "需补充分拣明细";
+    return null;
+  }
+  const defaultPrice = grade === "CUSTOM" ? 0 : getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, grade);
+  const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
+    (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey,
+  );
+  const quantityInput = [...document.querySelectorAll("[data-mobile-pricing-batch-qty]")].find(
+    (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingBatchQty || "") === sourceLineKey,
+  );
+  const customPrice = Number(customPriceInput instanceof HTMLInputElement ? customPriceInput.value : 0);
+  const remainingQty = getStoreMobileLineRemainingQty(state, sourceLineKey);
+  const quantity = Math.max(1, Math.min(remainingQty, Number(quantityInput instanceof HTMLInputElement ? quantityInput.value : remainingQty) || remainingQty));
+  const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
+  if (!(priceKes > 0)) {
+    state.pricingSourceLineMessage = grade === "CUSTOM" ? "自定义价格必须大于 0。" : "请先在默认售价管理配置 P/S 默认售价。";
+    return null;
+  }
+  const group = {
+    group_id: `BATCH-${String((state.priceGroups || []).length + 1).padStart(2, "0")}-${grade}`,
+    source_line_key: sourceLineKey,
+    category_main: line.category_main,
+    category_sub: line.category_sub,
+    category: `${line.category_main} / ${line.category_sub}`,
+    grade,
+    tier: grade === "CUSTOM" ? "自定义价格" : `${grade} 档默认售价`,
+    price_kes: priceKes,
+    sale_price_kes: priceKes,
+    quantity,
+    rack_code: `PDA-${grade === "CUSTOM" ? "CUS" : grade}-001`,
+    source_sdp_display_code: line.source_sdp_display_code || state.selectedSdp?.display_code || "",
+    source_sdp_machine_code: line.source_sdp_machine_code || state.selectedSdp?.machine_code || "",
+    source_type: line.source_type || state.selectedSdp?.source_type || "",
+    source_code: line.source_code || state.selectedSdp?.source_code || "",
+    status: "待生成 STORE_ITEM",
+  };
+  const validation = validateStoreMobilePricingBatchQuantity(state, group);
+  if (!validation.ok) {
+    state.pricingSourceLineMessage = validation.message;
+    return null;
+  }
+  state.priceGroups = [...getStoreMobileTaskGroups(state), group];
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.pricingSourceLineMessage = "";
+  return group;
 }
 
 function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, taskCode = "") {
@@ -31764,19 +31938,29 @@ function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, ta
     return null;
   }
   const selectedSdp = createStoreMobileSelectedSdpFromBackendTask(task, state);
-  const freshWorkflow = createStoreMobilePricingPreviewState({ selectedSdp });
+  const pricingSourceLines = buildStoreMobilePricingSourceLines(task, selectedSdp);
   state.selectedSdp = selectedSdp;
   state.selectedBackendTaskCode = selectedSdp.display_code;
   state.activePage = "verify";
-  state.activeGroupId = "A";
-  state.current_task_group_id = "A";
+  state.activeGroupId = "";
+  state.current_task_group_id = "";
   state.taskStatus = "待核对";
   state.verified = false;
   state.scanDraft = "";
   state.scanError = "";
   state.scanSuccess = "";
-  state.editorDraft = { ...freshWorkflow.editorDraft };
-  state.priceGroups = freshWorkflow.priceGroups.map((group) => ({ ...group }));
+  state.editorDraft = {
+    tier: "P",
+    grade: "P",
+    price_kes: pricingSourceLines[0] ? getStoreMobileSuggestedSalePrice(pricingSourceLines[0].category_main, pricingSourceLines[0].category_sub, "P") : 0,
+    quantity: pricingSourceLines[0]?.remaining_qty || 1,
+    category: pricingSourceLines[0] ? `${pricingSourceLines[0].category_main} / ${pricingSourceLines[0].category_sub}` : selectedSdp.category,
+    rack_code: "PDA-P-001",
+  };
+  state.pricingSourceLines = pricingSourceLines;
+  state.pricingSourceLineStatus = pricingSourceLines.length ? "ready" : "needs_detail";
+  state.pricingSourceLineMessage = pricingSourceLines.length ? "" : "需补充分拣明细";
+  state.priceGroups = [];
   state.generatedRanges = {};
   state.printJobs = [];
   state.createdPrintJobs = [];
@@ -31923,6 +32107,93 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
 
 function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
+  const pricingSourceLines = getStoreMobilePricingSourceLines(state);
+  if (state.selectedSdp?.backend_task) {
+    const batchCards = groups.map((group) => {
+      const statusText = getStoreMobilePriceGroupStatus(state, group);
+      const isGenerated = /已生成|待打印|打印中|待贴标|已完成/.test(statusText);
+      const primaryAction = /待生成/.test(statusText)
+        ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批 STORE_ITEM</button>`
+        : /已生成|待打印/.test(statusText)
+          ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-print-group="${escapeHtml(group.group_id)}">打印本批标签</button>`
+          : /待贴标确认/.test(statusText)
+            ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id)}">已贴完本批</button>`
+            : /打印中/.test(statusText)
+              ? '<span class="mobile-group-complete-mark">待打印 · Android print bridge</span>'
+              : '<span class="mobile-group-complete-mark">已完成</span>';
+      return `
+        <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""}">
+          <div class="mobile-field-group-top">
+            <div class="mobile-field-group-left">
+              <strong>${escapeHtml(group.tier || "-")}</strong>
+              <b class="mobile-group-qty">${escapeHtml(group.quantity || 0)}件</b>
+            </div>
+            <div class="mobile-field-group-right">
+              <strong>KSh ${escapeHtml(group.price_kes || 0)}</strong>
+              ${renderStoreMobilePricingBadge(statusText)}
+            </div>
+          </div>
+          <div class="mobile-field-group-meta">
+            ${escapeHtml(group.category || `${group.category_main || "-"} / ${group.category_sub || "-"}`)} · ${escapeHtml(group.source_sdp_display_code || state.selectedSdp?.display_code || "-")}
+            ${isGenerated ? " · STORE_ITEM 已创建" : ""}
+          </div>
+          <div class="mobile-field-group-actions">${primaryAction}</div>
+        </article>
+      `;
+    }).join("");
+    if (!pricingSourceLines.length) {
+      return `
+        <div class="mobile-price-group-list">
+          <article class="mobile-price-group-card mobile-field-group-card">
+            <div class="mobile-field-group-top">
+              <div class="mobile-field-group-left">
+                <strong>需补充分拣明细</strong>
+                <b class="mobile-group-qty">${escapeHtml(state.selectedSdp?.total_count || 0)}件</b>
+              </div>
+              ${renderStoreMobilePricingBadge("no demo fallback")}
+            </div>
+            <div class="mobile-field-group-meta">该 ${escapeHtml(state.selectedSdp?.source_type || "LPK")} SDP 暂无 category line 明细，不能显示 A/B 80件 demo 分组。</div>
+          </article>
+        </div>
+      `;
+    }
+    return `
+      <div class="mobile-price-group-list">
+        ${pricingSourceLines.map((line) => {
+          const remainingQty = getStoreMobileLineRemainingQty(state, line.line_key);
+          const pPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
+          const sPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
+          return `
+            <article class="mobile-price-group-card mobile-field-group-card">
+              <div class="mobile-field-group-top">
+                <div class="mobile-field-group-left">
+                  <strong>${escapeHtml(`${line.category_main} / ${line.category_sub}`)}</strong>
+                  <b class="mobile-group-qty">${escapeHtml(remainingQty)}件剩余</b>
+                </div>
+                ${renderStoreMobilePricingBadge(`${line.source_type || "SDP"} source line`)}
+              </div>
+              <div class="mobile-field-group-meta">
+                remaining_qty=${escapeHtml(remainingQty)} · ${escapeHtml(line.source_code || state.selectedSdp?.source_code || "-")} · ${escapeHtml(line.source_sdp_display_code || state.selectedSdp?.display_code || "-")}
+              </div>
+              <div class="mobile-result-grid">
+                <span><b>P 档默认售价</b>${escapeHtml(pPrice ? `KSh ${pPrice}` : "未配置")}</span>
+                <span><b>S 档默认售价</b>${escapeHtml(sPrice ? `KSh ${sPrice}` : "未配置")}</span>
+                <span><b>自定义价格</b><input type="number" min="1" step="1" placeholder="KES" data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}"></span>
+                <span><b>本批数量</b><input type="number" min="1" max="${escapeHtml(remainingQty)}" value="${escapeHtml(remainingQty)}" data-mobile-pricing-batch-qty="${escapeHtml(line.line_key)}"></span>
+              </div>
+              <div class="mobile-field-group-actions">
+                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||P`)}">P 档默认售价</button>
+                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||S`)}">S 档默认售价</button>
+                <button type="button" class="secondary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM`)}">自定义价格</button>
+              </div>
+            </article>
+          `;
+        }).join("")}
+        ${state.pricingSourceLineMessage ? `<div class="mobile-error">${escapeHtml(state.pricingSourceLineMessage)}</div>` : ""}
+        ${batchCards || '<div class="subtle small">选择 P 档默认售价、S 档默认售价或自定义价格后，生成本批 STORE_ITEM。</div>'}
+      </div>
+    `;
+  }
   return `
     <div class="mobile-price-group-list">
       ${groups.map((group) => {
@@ -32035,7 +32306,9 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
     end: "STOREITEM-DEMO-A-080",
     generated_count: group.quantity || 0,
     pending_print_count: group.quantity || 0,
+    demo_only: true,
   };
+  const generationStatus = generated.demo_only ? "待打印 · demo result only" : "已生成 / 待打印";
   return `
     <section class="mobile-generated-result">
       <div class="mobile-section-head">
@@ -32050,7 +32323,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <span><b>已生成</b>${escapeHtml(generated.generated_count || group.quantity || 0)} / ${escapeHtml(group.quantity || 0)}</span>
         <span><b>待打印</b>${escapeHtml(generated.pending_print_count || group.quantity || 0)}</span>
         <span><b>货架</b>${escapeHtml(group.rack_code || "-")}</span>
-        <span><b>状态</b>待打印 · demo result only</span>
+        <span><b>状态</b>${escapeHtml(generationStatus)}</span>
       </div>
       <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>
       ${renderNextPriceGroupHint(state, group)}
@@ -32100,6 +32373,8 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
     ? `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id || "")}">已贴完本组</button>`
     : statusText === "已完成"
       ? '<div class="mobile-group-complete-mark is-wide">本组已完成</div>'
+      : statusText === "打印中"
+        ? '<div class="mobile-group-complete-mark is-wide">待打印 · Android print bridge</div>'
       : `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>`;
   return `
     <section class="mobile-print-panel">
@@ -32110,7 +32385,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       ${summaryHtml}
       ${labelSizeHtml}
       <div class="mobile-print-job-card">
-        <span>本组任务 · demo only</span>
+        <span>${escapeHtml(job.demo_only ? "本组任务 · demo only" : "本批标签任务 · 待打印")}</span>
         <strong>${escapeHtml(getStoreMobileStatusText(job.status || "queued"))}</strong>
         <small>${escapeHtml(job?.job_id || "MOCK-PJ-NEW-001")} · ${escapeHtml(activeSize)} · ${escapeHtml(group.quantity || 0)} 张 · ${escapeHtml(group.tier || "-")}</small>
       </div>
@@ -32509,6 +32784,96 @@ function renderStoreMobilePricingPreviewPreservingScroll() {
   restorePdaRuntimeScrollState(scrollState);
 }
 
+async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPreviewState, groupId = "") {
+  const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || ""));
+  const sdp = state.selectedSdp || {};
+  if (!group || !sdp.backend_task) {
+    return null;
+  }
+  const validation = validateStoreMobilePricingBatchQuantity(state, group);
+  if (!validation.ok) {
+    state.pricingSourceLineMessage = validation.message;
+    throw new Error(validation.message);
+  }
+  const packageCode = String(sdp.display_code || sdp.machine_code || "").trim();
+  if (!packageCode) {
+    throw new Error("缺少 SDP 包号，不能生成 STORE_ITEM。");
+  }
+  const payload = {
+    store_code: sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback(),
+    clerk: sdp.assigned_clerk || currentSession.user?.username || getCurrentStoreWorkerFallback(),
+    rack_code: group.rack_code || "PDA-P-001",
+    selected_price: Number(group.sale_price_kes || group.price_kes || 0),
+    category_main: group.category_main || "",
+    category_sub: group.category_sub || "",
+    grade: group.grade || "",
+    quantity: Number(group.quantity || 0),
+    pricing_batch_id: group.group_id,
+    source_line_key: group.source_line_key,
+    source_sdp_display_code: group.source_sdp_display_code || sdp.display_code,
+    source_sdp_machine_code: group.source_sdp_machine_code || sdp.machine_code,
+  };
+  const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/store-items/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const generatedItems = Array.isArray(result?.store_items) ? result.store_items : [];
+  group.status = "已生成 / 待打印";
+  group.generated_store_items = generatedItems;
+  state.generatedRanges[group.group_id] = {
+    start: generatedItems[0]?.display_code || generatedItems[0]?.token_no || "",
+    end: generatedItems[generatedItems.length - 1]?.display_code || generatedItems[generatedItems.length - 1]?.token_no || "",
+    generated_count: generatedItems.length,
+    pending_print_count: generatedItems.length,
+    demo_only: false,
+  };
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.activePage = "generation";
+  return syncStoreMobileTaskCounters(state);
+}
+
+async function queueStoreMobileBatchPrintJobs(state = storeMobilePricingPreviewState, groupId = "") {
+  const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || ""));
+  if (!group) {
+    return null;
+  }
+  const generatedItems = Array.isArray(group.generated_store_items) ? group.generated_store_items : [];
+  const tokenNos = generatedItems.map((token) => String(token?.token_no || "").trim()).filter(Boolean);
+  if (!tokenNos.length) {
+    throw new Error("当前批次没有待打印 STORE_ITEM。");
+  }
+  const jobs = await request("/print-jobs/item-tokens", {
+    method: "POST",
+    body: JSON.stringify({
+      token_nos: tokenNos,
+      copies: 1,
+      printer_name: state.printer_name || "Deli DL-720C",
+      template_code: getStoreItemLabelTemplateCode(state.labelSize || "40x30"),
+    }),
+  });
+  if (!Array.isArray(state.createdPrintJobs)) {
+    state.createdPrintJobs = [];
+  }
+  state.createdPrintJobs = [
+    ...state.createdPrintJobs.filter((job) => String(job.group_id || "") !== String(group.group_id || "")),
+    {
+      job_id: Array.isArray(jobs) ? (jobs[0]?.job_id || jobs[0]?.id || "") : "",
+      group_id: group.group_id,
+      label_size: state.labelSize || "40×30",
+      copies: tokenNos.length,
+      status: "queued",
+      bridge_note: "待打印 · Android print bridge",
+      jobs: Array.isArray(jobs) ? jobs : [],
+    },
+  ];
+  group.status = "打印中";
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.activePage = "print_task";
+  return syncStoreMobileTaskCounters(state);
+}
+
 function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState, groupId = "", action = "") {
   const groups = getStoreMobileTaskGroups(state);
   const group = groups.find((item) => String(item.group_id || "") === String(groupId || ""));
@@ -32595,6 +32960,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const confirmStickers = button.dataset.mobilePricingConfirmStickers;
   const resetTask = button.dataset.mobilePricingResetTask;
   const selectGroup = button.dataset.mobilePricingSelectGroup;
+  const createBatch = button.dataset.mobilePricingCreateBatch;
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const printGroup = button.dataset.mobilePricingPrintGroup;
   const labelSize = button.dataset.mobilePricingLabelSize;
@@ -32626,11 +32992,39 @@ function handleStoreMobilePricingPreviewAction(button) {
     state.activeGroupId = selectGroup;
     state.activePage = "editor";
   }
+  if (createBatch) {
+    createStoreMobilePricingBatch(state, createBatch);
+    state.activePage = "pricing";
+  }
   if (generateGroup) {
-    advanceStoreMobileGroupWorkflow(state, generateGroup, "generate");
+    if (state.selectedSdp?.backend_task) {
+      generateStoreMobileBatchStoreItems(state, generateGroup)
+        .then(() => {
+          storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+          renderStoreMobilePricingPreview();
+        })
+        .catch((error) => {
+          state.pricingSourceLineMessage = formatErrorMessage(error);
+          renderStoreMobilePricingPreview();
+        });
+    } else {
+      advanceStoreMobileGroupWorkflow(state, generateGroup, "generate");
+    }
   }
   if (printGroup) {
-    advanceStoreMobileGroupWorkflow(state, printGroup, "print");
+    if (state.selectedSdp?.backend_task) {
+      queueStoreMobileBatchPrintJobs(state, printGroup)
+        .then(() => {
+          storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+          renderStoreMobilePricingPreview();
+        })
+        .catch((error) => {
+          state.pricingSourceLineMessage = formatErrorMessage(error);
+          renderStoreMobilePricingPreview();
+        });
+    } else {
+      advanceStoreMobileGroupWorkflow(state, printGroup, "print");
+    }
   }
   if (confirmStickers) {
     advanceStoreMobileGroupWorkflow(state, confirmStickers, "confirm");
@@ -33048,7 +33442,7 @@ async function loadPostLoginDataForRole(user = currentSession.user) {
 }
 
 async function loadConfig() {
-  const [stores, suppliers, barcode, labels, inboundShipments, baleRows, rawBales, chinaSources, apparelWeights, apparelDefaultCosts, apparelSortingRacks] = await Promise.all([
+  const [stores, suppliers, barcode, labels, inboundShipments, baleRows, rawBales, chinaSources, apparelWeights, apparelDefaultCosts, apparelDefaultSalePrices, apparelSortingRacks] = await Promise.all([
     request("/stores"),
     request("/suppliers"),
     request("/settings/barcode"),
@@ -33059,6 +33453,7 @@ async function loadConfig() {
     request("/warehouse/china-sources"),
     request("/warehouse/apparel-piece-weights"),
     request("/warehouse/apparel-default-costs"),
+    request("/warehouse/apparel-default-sale-prices"),
     request("/warehouse/apparel-sorting-racks"),
   ]);
   inboundShipmentState = inboundShipments;
@@ -33067,6 +33462,7 @@ async function loadConfig() {
   chinaSourceBaleState = Array.isArray(chinaSources) ? chinaSources : [];
   apparelPieceWeightState = Array.isArray(apparelWeights) ? apparelWeights : [];
   apparelDefaultCostState = Array.isArray(apparelDefaultCosts) ? apparelDefaultCosts : [];
+  apparelDefaultSalePriceState = Array.isArray(apparelDefaultSalePrices) ? apparelDefaultSalePrices : [];
   apparelSortingRackState = Array.isArray(apparelSortingRacks) ? apparelSortingRacks : [];
   barcodeSettingsState = barcode || {};
   labelTemplateState = Array.isArray(labels) ? labels : [];
@@ -35579,8 +35975,12 @@ async function submitApparelDefaultSalePrice(event) {
   if (!(record.default_sale_price_kes > 0)) {
     throw new Error("请先填写默认售价。");
   }
+  const savedRecord = await request("/warehouse/apparel-default-sale-prices", {
+    method: "POST",
+    body: JSON.stringify(record),
+  });
   const nextRows = [
-    record,
+    savedRecord,
     ...ensureApparelDefaultSalePriceState().filter(
       (row) =>
         !(
@@ -35592,9 +35992,9 @@ async function submitApparelDefaultSalePrice(event) {
   ];
   apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(nextRows);
   persistApparelDefaultSalePriceState();
-  hydrateApparelDefaultSalePriceForm(record);
-  renderApparelDefaultSalePriceSummary(record);
-  writeOutput("#apparelDefaultSalePriceOutput", record);
+  hydrateApparelDefaultSalePriceForm(savedRecord);
+  renderApparelDefaultSalePriceSummary(savedRecord);
+  writeOutput("#apparelDefaultSalePriceOutput", savedRecord);
 }
 
 async function submitApparelSortingRack(event) {
@@ -38940,7 +39340,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -40658,20 +41058,27 @@ document.addEventListener("click", async (event) => {
       return;
     }
     if (apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceDelete) {
-      apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(
-        ensureApparelDefaultSalePriceState().filter(
-          (row) =>
-            !(
-              String(row?.category_main || "").trim().toLowerCase() === categoryMain.trim().toLowerCase()
-              && String(row?.category_sub || "").trim().toLowerCase() === categorySub.trim().toLowerCase()
-              && String(row?.grade || "").trim().toUpperCase() === grade.trim().toUpperCase()
-            ),
-        ),
-      );
-      persistApparelDefaultSalePriceState();
-      hydrateApparelDefaultSalePriceForm(null);
-      renderApparelDefaultSalePriceSummary();
-      writeOutput("#apparelDefaultSalePriceOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认售价表移除。`);
+      try {
+        await request(`/warehouse/apparel-default-sale-prices/${encodeURIComponent(categoryMain)}/${encodeURIComponent(categorySub)}/${encodeURIComponent(grade)}`, {
+          method: "DELETE",
+        });
+        apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(
+          ensureApparelDefaultSalePriceState().filter(
+            (row) =>
+              !(
+                String(row?.category_main || "").trim().toLowerCase() === categoryMain.trim().toLowerCase()
+                && String(row?.category_sub || "").trim().toLowerCase() === categorySub.trim().toLowerCase()
+                && String(row?.grade || "").trim().toUpperCase() === grade.trim().toUpperCase()
+              ),
+          ),
+        );
+        persistApparelDefaultSalePriceState();
+        hydrateApparelDefaultSalePriceForm(null);
+        renderApparelDefaultSalePriceSummary();
+        writeOutput("#apparelDefaultSalePriceOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认售价表移除。`);
+      } catch (error) {
+        renderErrorSummary("#apparelDefaultSalePriceSummary", formatErrorMessage(error));
+      }
       return;
     }
   }

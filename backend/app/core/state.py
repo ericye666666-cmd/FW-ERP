@@ -98,7 +98,32 @@ def _build_default_apparel_sorting_racks() -> list[dict[str, Any]]:
     return rows
 
 
+def _build_default_apparel_default_sale_prices() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for preset in DEFAULT_APPAREL_CATEGORY_PRESETS:
+        rows.extend(
+            [
+                {
+                    "category_main": preset["category_main"],
+                    "category_sub": preset["category_sub"],
+                    "grade": "P",
+                    "default_sale_price_kes": round(float(preset["cost_p"]) * 2, 2),
+                    "note": f"{preset['label']} P 档参考售价 = 默认成本 × 2",
+                },
+                {
+                    "category_main": preset["category_main"],
+                    "category_sub": preset["category_sub"],
+                    "grade": "S",
+                    "default_sale_price_kes": round(float(preset["cost_s"]) * 2, 2),
+                    "note": f"{preset['label']} S 档参考售价 = 默认成本 × 2",
+                },
+            ]
+        )
+    return rows
+
+
 DEFAULT_APPAREL_DEFAULT_COSTS = _build_default_apparel_default_costs()
+DEFAULT_APPAREL_DEFAULT_SALE_PRICES = _build_default_apparel_default_sale_prices()
 DEFAULT_APPAREL_SORTING_RACKS = _build_default_apparel_sorting_racks()
 
 
@@ -186,6 +211,7 @@ class InMemoryState:
         self.china_source_records: dict[str, dict[str, Any]] = {}
         self.apparel_piece_weights: dict[str, dict[str, Any]] = {}
         self.apparel_default_costs: dict[str, dict[str, Any]] = {}
+        self.apparel_default_sale_prices: dict[str, dict[str, Any]] = {}
         self.apparel_sorting_racks: dict[str, dict[str, Any]] = {}
         self.inbound_shipments: dict[str, dict[str, Any]] = {}
         self.parcel_batches: dict[str, dict[str, Any]] = {}
@@ -238,6 +264,7 @@ class InMemoryState:
         self._set_counters()
         self._ensure_seed_label_templates()
         self._ensure_seed_apparel_default_costs()
+        self._ensure_seed_apparel_default_sale_prices()
         self._ensure_seed_apparel_sorting_racks()
         self._ensure_seed_suppliers()
         self._ensure_seed_cargo_types()
@@ -324,6 +351,7 @@ class InMemoryState:
             "china_source_records": self.china_source_records,
             "apparel_piece_weights": self.apparel_piece_weights,
             "apparel_default_costs": self.apparel_default_costs,
+            "apparel_default_sale_prices": self.apparel_default_sale_prices,
             "apparel_sorting_racks": self.apparel_sorting_racks,
             "inbound_shipments": self.inbound_shipments,
             "parcel_batches": self.parcel_batches,
@@ -388,6 +416,7 @@ class InMemoryState:
         self.china_source_records = payload.get("china_source_records", {})
         self.apparel_piece_weights = payload.get("apparel_piece_weights", {})
         self.apparel_default_costs = payload.get("apparel_default_costs", {})
+        self.apparel_default_sale_prices = payload.get("apparel_default_sale_prices", {})
         self.apparel_sorting_racks = payload.get("apparel_sorting_racks", {})
         self.inbound_shipments = payload.get("inbound_shipments", {})
         self.parcel_batches = payload.get("parcel_batches", {})
@@ -455,6 +484,7 @@ class InMemoryState:
         self._set_counters()
         updated_seed_label_templates = self._ensure_seed_label_templates()
         updated_apparel_default_costs = self._ensure_seed_apparel_default_costs()
+        updated_apparel_default_sale_prices = self._ensure_seed_apparel_default_sale_prices()
         updated_apparel_sorting_racks = self._ensure_seed_apparel_sorting_racks()
         self._ensure_seed_suppliers()
         self._ensure_seed_cargo_types()
@@ -485,6 +515,7 @@ class InMemoryState:
             or updated_sorting_tokens
             or updated_inventory_lots
             or updated_apparel_default_costs
+            or updated_apparel_default_sale_prices
             or updated_apparel_sorting_racks
             or updated_store_racks
         ) and self._state_file.exists():
@@ -1758,6 +1789,93 @@ class InMemoryState:
                 machine_code = f"{machine_prefix}{next_sequence:04d}"
             return f"SDP{machine_code[1:]}", machine_code
 
+    def _normalize_store_delivery_package_pricing_source_line(
+        self,
+        package: dict[str, Any],
+        line: dict[str, Any],
+        index: int,
+    ) -> Optional[dict[str, Any]]:
+        category_main = str(line.get("category_main") or "").strip()
+        category_sub = str(line.get("category_sub") or "").strip()
+        if not category_main or not category_sub:
+            parsed_main, parsed_sub = self._parse_sorting_category_name(
+                str(line.get("category_name") or line.get("category_summary") or line.get("content_summary") or "").strip()
+            )
+            category_main = category_main or parsed_main
+            category_sub = category_sub or parsed_sub
+        item_count = (
+            self._parse_optional_nonnegative_int(line.get("item_count"))
+            or self._parse_optional_nonnegative_int(line.get("remaining_qty"))
+            or self._parse_optional_nonnegative_int(line.get("qty"))
+            or self._parse_optional_nonnegative_int(line.get("quantity"))
+            or 0
+        )
+        if not category_main or not category_sub or item_count <= 0:
+            return None
+        source_type = str(line.get("source_type") or package.get("source_type") or "").strip().upper()
+        source_code = str(line.get("source_code") or package.get("source_code") or "").strip().upper()
+        line_key = str(line.get("line_key") or line.get("source_line_key") or "").strip()
+        if not line_key:
+            line_key = f"{source_code or package.get('display_code')}:{category_main}:{category_sub}:{index}"
+        return {
+            "line_key": line_key,
+            "source_type": source_type,
+            "source_code": source_code,
+            "source_machine_code": str(line.get("source_machine_code") or package.get("source_machine_code") or "").strip().upper(),
+            "category_main": category_main,
+            "category_sub": category_sub,
+            "grade": str(line.get("grade") or "").strip().upper(),
+            "item_count": item_count,
+            "remaining_qty": item_count,
+            "source_sdp_display_code": str(package.get("display_code") or "").strip().upper(),
+            "source_sdp_machine_code": str(package.get("machine_code") or "").strip().upper(),
+            "parent_sdo_display_code": str(package.get("parent_sdo_display_code") or "").strip().upper(),
+            "parent_sdo_machine_code": str(package.get("parent_sdo_machine_code") or "").strip().upper(),
+        }
+
+    def _build_store_delivery_package_pricing_source_lines(self, package: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+        explicit_lines: list[dict[str, Any]] = []
+        for field_name in ("pricing_source_lines", "package_lines", "lines"):
+            raw_lines = package.get(field_name)
+            if isinstance(raw_lines, list) and raw_lines:
+                explicit_lines = [row for row in raw_lines if isinstance(row, dict)]
+                break
+        source_type = str(package.get("source_type") or "").strip().upper()
+        lines: list[dict[str, Any]] = []
+        for index, line in enumerate(explicit_lines, start=1):
+            normalized = self._normalize_store_delivery_package_pricing_source_line(package, line, index)
+            if normalized:
+                lines.append(normalized)
+        if lines:
+            return lines, "ready"
+
+        if source_type == "SDB":
+            category_main, category_sub = self._parse_sorting_category_name(
+                str(
+                    package.get("category_name")
+                    or package.get("category_summary")
+                    or package.get("content_summary")
+                    or ""
+                )
+            )
+            fallback_line = self._normalize_store_delivery_package_pricing_source_line(
+                package,
+                {
+                    "line_key": f"{package.get('source_code')}:sdb",
+                    "source_type": source_type,
+                    "source_code": package.get("source_code"),
+                    "source_machine_code": package.get("source_machine_code"),
+                    "category_main": category_main,
+                    "category_sub": category_sub,
+                    "item_count": package.get("item_count"),
+                },
+                1,
+            )
+            if fallback_line:
+                return [fallback_line], "ready"
+
+        return [], "needs_detail"
+
     def _normalize_store_delivery_package(self, row: dict[str, Any]) -> dict[str, Any]:
         normalized = dict(row or {})
         display_code = str(
@@ -1856,6 +1974,11 @@ class InMemoryState:
                 "updated_at": updated_at,
             }
         )
+        pricing_source_lines, line_detail_status = self._build_store_delivery_package_pricing_source_lines(normalized)
+        normalized["pricing_source_lines"] = pricing_source_lines
+        normalized["lines"] = pricing_source_lines
+        normalized["line_detail_status"] = line_detail_status
+        normalized["line_detail_message"] = "" if pricing_source_lines else "需补充分拣明细"
         normalized["print_payload"] = {
             "title": "SDO / DELIVERY",
             "display_code": normalized["display_code"],
@@ -3267,6 +3390,10 @@ class InMemoryState:
         key = self._apparel_default_cost_key(category_main, category_sub, grade)
         return self.apparel_default_costs.get(key)
 
+    def _find_apparel_default_sale_price(self, category_main: str, category_sub: str, grade: str) -> Optional[dict[str, Any]]:
+        key = self._apparel_default_cost_key(category_main, category_sub, grade)
+        return self.apparel_default_sale_prices.get(key)
+
     def _find_apparel_sorting_rack(
         self,
         category_main: str,
@@ -3489,6 +3616,27 @@ class InMemoryState:
                 "category_sub": category_sub,
                 "grade": grade,
                 "default_cost_kes": round(float(payload.get("default_cost_kes") or 0), 2),
+                "note": str(payload.get("note") or "").strip(),
+                "updated_at": now_iso(),
+                "updated_by": "system",
+            }
+            updated = True
+        return updated
+
+    def _ensure_seed_apparel_default_sale_prices(self) -> bool:
+        updated = False
+        for payload in DEFAULT_APPAREL_DEFAULT_SALE_PRICES:
+            category_main = str(payload.get("category_main") or "").strip()
+            category_sub = str(payload.get("category_sub") or "").strip()
+            grade = str(payload.get("grade") or "").strip().upper()
+            key = self._apparel_default_cost_key(category_main, category_sub, grade)
+            if not category_main or not category_sub or grade not in {"P", "S"} or key in self.apparel_default_sale_prices:
+                continue
+            self.apparel_default_sale_prices[key] = {
+                "category_main": category_main,
+                "category_sub": category_sub,
+                "grade": grade,
+                "default_sale_price_kes": round(float(payload.get("default_sale_price_kes") or 0), 2),
                 "note": str(payload.get("note") or "").strip(),
                 "updated_at": now_iso(),
                 "updated_by": "system",
@@ -5897,6 +6045,71 @@ class InMemoryState:
             entity_id=key,
             actor=actor["username"],
             summary=f"Apparel default cost deleted for {category_main} / {category_sub} / {normalized_grade}",
+            details={},
+        )
+        self._persist()
+
+    def list_apparel_default_sale_prices(self) -> list[dict[str, Any]]:
+        return sorted(
+            self.apparel_default_sale_prices.values(),
+            key=lambda row: (
+                str(row.get("category_main") or "").strip().lower(),
+                str(row.get("category_sub") or "").strip().lower(),
+                str(row.get("grade") or "").strip().upper(),
+            ),
+        )
+
+    def upsert_apparel_default_sale_price(self, payload: dict[str, Any], updated_by: str) -> dict[str, Any]:
+        actor = self._require_user_role(updated_by, {"warehouse_supervisor"})
+        category_main = str(payload.get("category_main") or "").strip()
+        category_sub = str(payload.get("category_sub") or "").strip()
+        grade = self._normalize_apparel_grade(payload.get("grade"))
+        default_sale_price_kes = self._normalize_money_two_decimals(
+            payload.get("default_sale_price_kes"),
+            "default_sale_price_kes",
+        )
+        if not category_main or not category_sub:
+            raise HTTPException(status_code=400, detail="category_main and category_sub are required")
+        if default_sale_price_kes <= 0:
+            raise HTTPException(status_code=400, detail="default_sale_price_kes must be greater than 0")
+        key = self._apparel_default_cost_key(category_main, category_sub, grade)
+        row = {
+            "category_main": category_main,
+            "category_sub": category_sub,
+            "grade": grade,
+            "default_sale_price_kes": default_sale_price_kes,
+            "note": str(payload.get("note") or "").strip(),
+            "updated_at": now_iso(),
+            "updated_by": actor["username"],
+        }
+        self.apparel_default_sale_prices[key] = row
+        self._log_event(
+            event_type="apparel_default_sale_price.saved",
+            entity_type="apparel_default_sale_price",
+            entity_id=key,
+            actor=actor["username"],
+            summary=f"Apparel default sale price saved for {category_main} / {category_sub} / {grade}",
+            details={"default_sale_price_kes": default_sale_price_kes},
+        )
+        self._persist()
+        return row
+
+    def delete_apparel_default_sale_price(self, category_main: str, category_sub: str, grade: str, deleted_by: str) -> None:
+        actor = self._require_user_role(deleted_by, {"warehouse_supervisor"})
+        normalized_grade = self._normalize_apparel_grade(grade)
+        key = self._apparel_default_cost_key(category_main, category_sub, normalized_grade)
+        if key not in self.apparel_default_sale_prices:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown apparel default sale price {category_main} / {category_sub} / {normalized_grade}",
+            )
+        del self.apparel_default_sale_prices[key]
+        self._log_event(
+            event_type="apparel_default_sale_price.deleted",
+            entity_type="apparel_default_sale_price",
+            entity_id=key,
+            actor=actor["username"],
+            summary=f"Apparel default sale price deleted for {category_main} / {category_sub} / {normalized_grade}",
             details={},
         )
         self._persist()
@@ -14197,6 +14410,8 @@ class InMemoryState:
         category_main = str(payload.get("category_main") or "").strip()
         category_sub = str(payload.get("category_sub") or "").strip()
         grade = str(payload.get("grade") or "").strip()
+        pricing_batch_id = str(payload.get("pricing_batch_id") or "").strip().upper()
+        source_line_key = str(payload.get("source_line_key") or "").strip()
         category_name = str(
             payload.get("category_name")
             or " / ".join(value for value in [category_main, category_sub, grade] if value)
@@ -14242,6 +14457,10 @@ class InMemoryState:
                 "category_main": category_main or str(lineage.get("category_main") or "").strip(),
                 "category_sub": category_sub or str(lineage.get("category_sub") or "").strip(),
                 "grade": grade or str(lineage.get("grade") or "").strip(),
+                "pricing_batch_id": pricing_batch_id,
+                "pricing_batch_grade": grade or str(lineage.get("grade") or "").strip(),
+                "source_line_key": source_line_key,
+                "pricing_batch_status": "pending_print",
                 "sku_code": "",
                 "rack_code": rack_code,
                 "store_rack_code": rack_code,

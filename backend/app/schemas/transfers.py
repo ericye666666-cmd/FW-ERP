@@ -218,6 +218,10 @@ class StoreDeliveryExecutionPackageDetailResponse(BaseModel):
     category_name: str = ""
     source_token_refs: List[str] = Field(default_factory=list)
     cost_source_refs: List[str] = Field(default_factory=list)
+    pricing_source_lines: List[dict[str, Any]] = Field(default_factory=list)
+    lines: List[dict[str, Any]] = Field(default_factory=list)
+    line_detail_status: str = ""
+    line_detail_message: str = ""
     status: str = "created"
     received_status: str = "pending"
     exception_status: str = "normal"
@@ -267,6 +271,8 @@ class StoreDeliveryPackageStoreItemGenerateRequest(BaseModel):
     category_sub: str = ""
     grade: str = ""
     quantity: int = Field(ge=1)
+    pricing_batch_id: str = ""
+    source_line_key: str = ""
 
 
 class StoreDeliveryPackageStoreItemGenerateResponse(BaseModel):

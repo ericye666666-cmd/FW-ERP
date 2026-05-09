@@ -40,6 +40,7 @@ const STORAGE_KEYS = {
   transferPrepExecution: "retail_ops_transfer_prep_execution",
   apparelPieceWeights: "retail_ops_apparel_piece_weights",
   apparelDefaultCosts: "retail_ops_apparel_default_costs",
+  apparelDefaultSalePrices: "retail_ops_apparel_default_sale_prices",
   apparelSortingRacks: "retail_ops_apparel_sorting_racks",
   directHangUnpacks: "retail_ops_direct_hang_unpacks",
   directHangDispatchOrders: "retail_ops_direct_hang_dispatch_orders",
@@ -1339,6 +1340,7 @@ const workspaceSectionCollapseState = safeParse(localStorage.getItem("retail_ops
 let devTrackerState = safeParse(localStorage.getItem(STORAGE_KEYS.devTracker), null);
 let apparelPieceWeightState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelPieceWeights), []);
 let apparelDefaultCostState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelDefaultCosts), []);
+let apparelDefaultSalePriceState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelDefaultSalePrices), []);
 let apparelSortingRackState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelSortingRacks), []);
 const DEFAULT_APPAREL_PIECE_WEIGHTS = [
   { category_main: "tops", category_sub: "lady tops", standard_weight_kg: 0.24, note: "默认轻薄上衣口径" },
@@ -1372,6 +1374,13 @@ const DEFAULT_APPAREL_DEFAULT_COSTS = apparelDefaultCostFlow.DEFAULT_APPAREL_DEF
   { category_main: "jacket", category_sub: "jacket", grade: "P", default_cost_kes: 260, note: "外套 P 档默认成本" },
   { category_main: "jacket", category_sub: "jacket", grade: "S", default_cost_kes: 198, note: "外套 S 档默认成本" }
 ];
+const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = apparelDefaultCostFlow.DEFAULT_APPAREL_DEFAULT_SALE_PRICES || DEFAULT_APPAREL_DEFAULT_COSTS.map((row) => ({
+  category_main: row.category_main,
+  category_sub: row.category_sub,
+  grade: row.grade,
+  default_sale_price_kes: roundToTwo(Number(row.default_cost_kes || 0) * 2),
+  note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；参考售价 = 默认成本 × 2`
+}));
 const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SORTING_RACKS || [
   { category_main: "tops", category_sub: "lady tops", grade: "P", default_cost_kes: 185, rack_code: "A-TS-P-01", note: "女装上衣 P 档默认分拣库位" },
   { category_main: "tops", category_sub: "lady tops", grade: "S", default_cost_kes: 138, rack_code: "A-TS-S-01", note: "女装上衣 S 档默认分拣库位" },
@@ -3525,6 +3534,7 @@ async function loadClerkPdaAssignedTasksForPolling(options = {}) {
     state.assignedBackendTasksLoaded = true;
     return [];
   }
+  await loadApparelDefaultSalePricesForPdaRuntime();
   const rows = await loadStoreAssignedSdoPackageTasks(
     {
       store_code: storeCode,
@@ -3541,6 +3551,17 @@ async function loadClerkPdaAssignedTasksForPolling(options = {}) {
     state.assignedBackendTaskLastForceRefresh = (/* @__PURE__ */ new Date()).toISOString();
   }
   return sortedRows;
+}
+async function loadApparelDefaultSalePricesForPdaRuntime() {
+  try {
+    const rows = await request("/apparel-default-sale-prices");
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(rows);
+    persistApparelDefaultSalePriceState();
+    return apparelDefaultSalePriceState;
+  } catch (error) {
+    ensureApparelDefaultSalePriceState();
+    return apparelDefaultSalePriceState;
+  }
 }
 function stopPdaRuntimePolling() {
   if (pdaRuntimePollingTimer) {
@@ -7127,6 +7148,38 @@ function ensureApparelDefaultCostState() {
 function persistApparelDefaultCostState() {
   localStorage.setItem(STORAGE_KEYS.apparelDefaultCosts, JSON.stringify(ensureApparelDefaultCostState()));
 }
+function normalizeApparelDefaultSalePriceRows(rows = []) {
+  const normalize = apparelDefaultCostFlow.normalizeApparelDefaultSalePriceRows;
+  if (typeof normalize === "function") {
+    return normalize(rows);
+  }
+  const seen = /* @__PURE__ */ new Set();
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    category_main: String((row == null ? void 0 : row.category_main) || "").trim(),
+    category_sub: String((row == null ? void 0 : row.category_sub) || "").trim(),
+    grade: String((row == null ? void 0 : row.grade) || "").trim().toUpperCase(),
+    default_sale_price_kes: roundToTwo(Number((row == null ? void 0 : row.default_sale_price_kes) || 0)),
+    note: String((row == null ? void 0 : row.note) || "").trim()
+  })).filter((row) => row.category_main && row.category_sub && ["P", "S"].includes(row.grade) && row.default_sale_price_kes > 0).filter((row) => {
+    const key = `${row.category_main.toLowerCase()}||${row.category_sub.toLowerCase()}||${row.grade}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+function ensureApparelDefaultSalePriceState() {
+  if (!Array.isArray(apparelDefaultSalePriceState) || !apparelDefaultSalePriceState.length) {
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(DEFAULT_APPAREL_DEFAULT_SALE_PRICES);
+  } else {
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(apparelDefaultSalePriceState);
+  }
+  return apparelDefaultSalePriceState;
+}
+function persistApparelDefaultSalePriceState() {
+  localStorage.setItem(STORAGE_KEYS.apparelDefaultSalePrices, JSON.stringify(ensureApparelDefaultSalePriceState()));
+}
 function normalizeApparelSortingRackRows(rows = []) {
   const normalize = apparelSortingRackFlow.normalizeApparelSortingRackRows;
   if (typeof normalize === "function") {
@@ -7572,6 +7625,18 @@ function getApparelDefaultCostByCategoryGrade(mainCategory = "", subCategory = "
     (row) => String((row == null ? void 0 : row.category_main) || "").trim().toLowerCase() === normalizedMain && String((row == null ? void 0 : row.category_sub) || "").trim().toLowerCase() === normalizedSub && String((row == null ? void 0 : row.grade) || "").trim().toUpperCase() === normalizedGrade
   ) || null;
 }
+function getApparelDefaultSalePriceByCategoryGrade(mainCategory = "", subCategory = "", grade = "") {
+  const finder = apparelDefaultCostFlow.findApparelDefaultSalePriceRecord;
+  if (typeof finder === "function") {
+    return finder(ensureApparelDefaultSalePriceState(), mainCategory, subCategory, grade);
+  }
+  const normalizedMain = String(mainCategory || "").trim().toLowerCase();
+  const normalizedSub = String(subCategory || "").trim().toLowerCase();
+  const normalizedGrade = String(grade || "").trim().toUpperCase();
+  return ensureApparelDefaultSalePriceState().find(
+    (row) => String((row == null ? void 0 : row.category_main) || "").trim().toLowerCase() === normalizedMain && String((row == null ? void 0 : row.category_sub) || "").trim().toLowerCase() === normalizedSub && String((row == null ? void 0 : row.grade) || "").trim().toUpperCase() === normalizedGrade
+  ) || null;
+}
 function getApparelSortingRackByCategoryGradeCost(mainCategory = "", subCategory = "", grade = "", defaultCostKes = 0) {
   const finder = apparelSortingRackFlow.findApparelSortingRackRecord;
   if (typeof finder === "function") {
@@ -7762,6 +7827,27 @@ function populateApparelDefaultCostSubSelect(selectedValue = "") {
     subSelect.value = selectedValue;
   }
 }
+function populateApparelDefaultSalePriceSubSelect(selectedValue = "") {
+  var _a;
+  const form = document.querySelector("#apparelDefaultSalePriceForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const mainValue = String(((_a = form.querySelector("[name='category_main']")) == null ? void 0 : _a.value) || "").trim();
+  const subSelect = form.querySelector("[name='category_sub']");
+  if (!(subSelect instanceof HTMLSelectElement)) {
+    return;
+  }
+  const categoryTree = getChinaSourceCategoryTree();
+  const options = ['<option value="">请选择商品小类</option>'];
+  (categoryTree[mainValue] || []).forEach((subCategory) => {
+    options.push(`<option value="${escapeHtml(subCategory)}"${subCategory === selectedValue ? " selected" : ""}>${escapeHtml(subCategory)}</option>`);
+  });
+  subSelect.innerHTML = options.join("");
+  if (selectedValue) {
+    subSelect.value = selectedValue;
+  }
+}
 function populateApparelSortingRackSubSelect(selectedValue = "") {
   var _a;
   const form = document.querySelector("#apparelSortingRackForm");
@@ -7902,6 +7988,77 @@ function renderApparelDefaultCostSummary(record = null) {
           </div>
         </article>
       `).join("") : "先新增一条默认成本价配置。";
+}
+function renderApparelDefaultSalePriceSummary(record = null) {
+  var _a, _b;
+  const summaryTarget = document.querySelector("#apparelDefaultSalePriceSummary");
+  const listTarget = document.querySelector("#apparelDefaultSalePriceList");
+  if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
+    return;
+  }
+  const rows = ensureApparelDefaultSalePriceState();
+  const summarize = apparelDefaultCostFlow.summarizeApparelDefaultSalePrices;
+  const summary = typeof summarize === "function" ? summarize(rows) : rows.reduce(
+    (acc, row) => {
+      acc.totalCount += 1;
+      acc.gradeCounts[String((row == null ? void 0 : row.grade) || "").trim().toUpperCase()] += 1;
+      return acc;
+    },
+    { totalCount: 0, gradeCounts: { P: 0, S: 0 } }
+  );
+  const current = record || (() => {
+    const form = document.querySelector("#apparelDefaultSalePriceForm");
+    if (!(form instanceof HTMLFormElement)) {
+      return null;
+    }
+    const payload = Object.fromEntries(new FormData(form).entries());
+    if (!payload.category_main || !payload.category_sub || !payload.grade) {
+      return null;
+    }
+    return {
+      category_main: String(payload.category_main || "").trim(),
+      category_sub: String(payload.category_sub || "").trim(),
+      grade: String(payload.grade || "").trim().toUpperCase(),
+      default_sale_price_kes: roundToTwo(Number(payload.default_sale_price_kes || 0)),
+      note: String(payload.note || "").trim()
+    };
+  })();
+  if (!current || !(Number(current.default_sale_price_kes || 0) > 0)) {
+    summaryTarget.className = "report-summary";
+    summaryTarget.innerHTML = `
+      <div class="report-summary-grid">
+        <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
+        <article class="store-metric"><strong>P 档默认售价</strong><span>${escapeHtml(String(((_a = summary.gradeCounts) == null ? void 0 : _a.P) || 0))}</span></article>
+        <article class="store-metric"><strong>S 档默认售价</strong><span>${escapeHtml(String(((_b = summary.gradeCounts) == null ? void 0 : _b.S) || 0))}</span></article>
+        <article class="store-metric"><strong>说明</strong><span>参考售价 = 默认成本 × 2</span></article>
+      </div>
+      <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+    `;
+  } else {
+    summaryTarget.className = "report-summary";
+    summaryTarget.innerHTML = `
+      <div class="report-summary-grid">
+        <article class="store-metric"><strong>当前口径</strong><span>${escapeHtml(`${current.category_main} / ${current.category_sub}`)}</span></article>
+        <article class="store-metric"><strong>等级</strong><span>${escapeHtml(current.grade)}</span></article>
+        <article class="store-metric"><strong>默认售价 KES</strong><span>${escapeHtml(formatKesAmount(current.default_sale_price_kes, "KES 0.00"))}</span></article>
+        <article class="store-metric"><strong>说明</strong><span>${escapeHtml(current.note || "默认售价配置")}</span></article>
+      </div>
+      <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+    `;
+  }
+  listTarget.className = rows.length ? "candidate-summary" : "candidate-summary empty-state";
+  listTarget.innerHTML = rows.length ? rows.map((row) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(`${row.category_main} / ${row.category_sub} · ${row.grade}`)}</strong>
+            <div class="subtle small">${escapeHtml(`${formatKesAmount(row.default_sale_price_kes, "KES 0.00")} · ${row.note || "默认售价"}`)}</div>
+          </div>
+          <div class="button-row">
+            <button type="button" class="ghost-button mini-button" data-apparel-default-sale-price-edit="${escapeHtml(`${row.category_main}||${row.category_sub}||${row.grade}`)}">编辑</button>
+            <button type="button" class="ghost-button mini-button" data-apparel-default-sale-price-delete="${escapeHtml(`${row.category_main}||${row.category_sub}||${row.grade}`)}">删除</button>
+          </div>
+        </article>
+      `).join("") : "先新增一条默认售价配置。";
 }
 function renderApparelSortingRackSummary(record = null) {
   var _a, _b;
@@ -28755,6 +28912,9 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     assignedBackendTaskLoadError: "",
     assignedBackendTaskLastForceRefresh: "",
     selectedBackendTaskCode: "",
+    pricingSourceLines: [],
+    pricingSourceLineStatus: "",
+    pricingSourceLineMessage: "",
     labelSize: "60×40",
     printer_name: "Deli DL-720C",
     pending_label_count: 210,
@@ -28844,15 +29004,19 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     generatedRanges: { ...baseState.generatedRanges, ...overrides.generatedRanges || {} },
     printJobs: Array.isArray(overrides.printJobs) ? overrides.printJobs : baseState.printJobs,
     createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
-    assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks
+    assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
+    pricingSourceLines: Array.isArray(overrides.pricingSourceLines) ? overrides.pricingSourceLines : baseState.pricingSourceLines
   };
 }
 function getStoreMobileTaskGroups(state = storeMobilePricingPreviewState) {
   return Array.isArray(state.priceGroups) ? state.priceGroups : [];
 }
 function getStoreMobileTaskTotals(state = storeMobilePricingPreviewState) {
+  var _a, _b;
   const groups = getStoreMobileTaskGroups(state);
-  const total = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const groupedTotal = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const selectedSdpTotal = Number(((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.total_count) || ((_b = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _b.item_count) || 0);
+  const total = groupedTotal > 0 ? groupedTotal : selectedSdpTotal;
   const generated = groups.filter((group) => String(group.status || "") !== "待生成").reduce((sum, group) => sum + Number(group.quantity || 0), 0);
   const stickered = groups.filter((group) => String(group.status || "") === "已完成").reduce((sum, group) => sum + Number(group.quantity || 0), 0);
   const completeGroups = groups.filter((group) => String(group.status || "") === "已完成").length;
@@ -28966,10 +29130,167 @@ function createStoreMobileSelectedSdpFromBackendTask(row = {}, state = storeMobi
     status: String((row == null ? void 0 : row.status) || "").trim(),
     received_status: String((row == null ? void 0 : row.received_status) || "").trim(),
     assignment_status: String((row == null ? void 0 : row.assignment_status) || "").trim(),
+    pricing_source_lines: Array.isArray(row == null ? void 0 : row.pricing_source_lines) ? row.pricing_source_lines : Array.isArray(row == null ? void 0 : row.lines) ? row.lines : [],
+    line_detail_status: String((row == null ? void 0 : row.line_detail_status) || "").trim(),
+    line_detail_message: String((row == null ? void 0 : row.line_detail_message) || "").trim(),
     backend_task: true
   };
 }
+function buildStoreMobilePricingSourceLines(row = {}, selectedSdp = null) {
+  const sdp = selectedSdp || row || {};
+  const rawLines = Array.isArray(row == null ? void 0 : row.pricing_source_lines) ? row.pricing_source_lines : Array.isArray(row == null ? void 0 : row.lines) ? row.lines : [];
+  const sourceType = String((row == null ? void 0 : row.source_type) || (sdp == null ? void 0 : sdp.source_type) || "").trim().toUpperCase();
+  const sourceCode = String((row == null ? void 0 : row.source_code) || (row == null ? void 0 : row.bale_no) || (sdp == null ? void 0 : sdp.source_code) || "").trim().toUpperCase();
+  const sourceMachineCode = String((row == null ? void 0 : row.source_machine_code) || (sdp == null ? void 0 : sdp.source_machine_code) || "").replace(/[^0-9]/g, "").trim();
+  const sdpDisplayCode = String((sdp == null ? void 0 : sdp.display_code) || (row == null ? void 0 : row.display_code) || (row == null ? void 0 : row.sdo_package_display_code) || "").trim().toUpperCase();
+  const sdpMachineCode = String((sdp == null ? void 0 : sdp.machine_code) || (row == null ? void 0 : row.machine_code) || (row == null ? void 0 : row.sdo_package_machine_code) || "").replace(/[^0-9]/g, "").trim();
+  const parentSdoDisplayCode = String((sdp == null ? void 0 : sdp.sdo_code) || (row == null ? void 0 : row.parent_sdo_display_code) || (row == null ? void 0 : row.parent_sdo_order_no) || "").trim().toUpperCase();
+  const parentSdoMachineCode = String((sdp == null ? void 0 : sdp.sdo_machine_code) || (row == null ? void 0 : row.parent_sdo_machine_code) || "").replace(/[^0-9]/g, "").trim();
+  const normalizeLine = (line = {}, index = 1) => {
+    const parsed = parseCategoryPair(line.category_name || line.category_summary || line.content_summary || "");
+    const categoryMain = String(line.category_main || parsed.category_main || "").trim();
+    const categorySub = String(line.category_sub || parsed.category_sub || "").trim();
+    const itemCount = Number(line.item_count || line.remaining_qty || line.qty || line.quantity || 0);
+    if (!categoryMain || !categorySub || !(itemCount > 0)) {
+      return null;
+    }
+    const lineKey = String(line.line_key || line.source_line_key || `${sourceCode || sdpDisplayCode}:${categoryMain}:${categorySub}:${index}`).trim();
+    return {
+      line_key: lineKey,
+      source_type: String(line.source_type || sourceType || "").trim().toUpperCase(),
+      source_code: String(line.source_code || sourceCode || "").trim().toUpperCase(),
+      source_machine_code: String(line.source_machine_code || sourceMachineCode || "").replace(/[^0-9]/g, "").trim(),
+      category_main: categoryMain,
+      category_sub: categorySub,
+      grade: String(line.grade || "").trim().toUpperCase(),
+      item_count: itemCount,
+      remaining_qty: Number(line.remaining_qty || itemCount),
+      source_sdp_display_code: sdpDisplayCode,
+      source_sdp_machine_code: sdpMachineCode,
+      parent_sdo_display_code: parentSdoDisplayCode,
+      parent_sdo_machine_code: parentSdoMachineCode
+    };
+  };
+  const normalizedLines = rawLines.map((line, index) => normalizeLine(line, index + 1)).filter(Boolean);
+  if (normalizedLines.length) {
+    return normalizedLines;
+  }
+  if (sourceType === "SDB") {
+    const parsed = parseCategoryPair((row == null ? void 0 : row.content_summary) || (row == null ? void 0 : row.category) || (row == null ? void 0 : row.category_name) || (row == null ? void 0 : row.category_summary) || (sdp == null ? void 0 : sdp.category) || "");
+    const fallbackLine = normalizeLine(
+      {
+        line_key: `${sourceCode || sdpDisplayCode}:sdb`,
+        source_type: "SDB",
+        source_code: sourceCode,
+        source_machine_code: sourceMachineCode,
+        category_main: parsed.category_main,
+        category_sub: parsed.category_sub,
+        item_count: (row == null ? void 0 : row.item_count) || (sdp == null ? void 0 : sdp.total_count) || (sdp == null ? void 0 : sdp.item_count) || 0
+      },
+      1
+    );
+    return fallbackLine ? [fallbackLine] : [];
+  }
+  if (sourceType === "LPK") {
+    return [];
+  }
+  return [];
+}
+function getStoreMobilePricingSourceLines(state = storeMobilePricingPreviewState) {
+  var _a;
+  const pricingSourceLines = Array.isArray(state == null ? void 0 : state.pricingSourceLines) ? state.pricingSourceLines : [];
+  if (pricingSourceLines.length) {
+    return pricingSourceLines;
+  }
+  if ((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.backend_task) {
+    return buildStoreMobilePricingSourceLines(state.selectedSdp, state.selectedSdp);
+  }
+  return [];
+}
+function getStoreMobileSuggestedSalePrice(categoryMain = "", categorySub = "", grade = "") {
+  const finder = apparelDefaultCostFlow.findApparelDefaultSalePriceRecord;
+  const record = typeof finder === "function" ? finder(ensureApparelDefaultSalePriceState(), categoryMain, categorySub, grade) : getApparelDefaultSalePriceByCategoryGrade(categoryMain, categorySub, grade);
+  return Number((record == null ? void 0 : record.default_sale_price_kes) || 0);
+}
+function getStoreMobileLineRemainingQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
+  const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
+  if (!line) {
+    return 0;
+  }
+  const reservedQty = getStoreMobileTaskGroups(state).reduce((sum, group) => {
+    if (String(group.source_line_key || "") !== String(sourceLineKey || "") || String(group.group_id || "") === String(currentGroupId || "")) {
+      return sum;
+    }
+    return sum + Number(group.quantity || 0);
+  }, 0);
+  return Math.max(0, Number(line.remaining_qty || line.item_count || 0) - reservedQty);
+}
+function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPreviewState, batch = {}) {
+  const quantity = Number(batch.quantity || 0);
+  if (!(quantity > 0)) {
+    return { ok: false, message: "数量必须大于 0 / quantity must be positive" };
+  }
+  const remainingQty = getStoreMobileLineRemainingQty(state, batch.source_line_key, batch.group_id);
+  if (quantity > remainingQty) {
+    return { ok: false, message: "不能超过剩余数量 / cannot exceed remaining quantity" };
+  }
+  return { ok: true, message: "" };
+}
+function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, value = "") {
+  var _a, _b, _c2, _d2;
+  const [sourceLineKey = "", rawGrade = ""] = String(value || "").split("||");
+  const grade = String(rawGrade || "P").trim().toUpperCase();
+  const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === sourceLineKey);
+  if (!line) {
+    state.pricingSourceLineMessage = "需补充分拣明细";
+    return null;
+  }
+  const defaultPrice = grade === "CUSTOM" ? 0 : getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, grade);
+  const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
+    (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey
+  );
+  const quantityInput = [...document.querySelectorAll("[data-mobile-pricing-batch-qty]")].find(
+    (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingBatchQty || "") === sourceLineKey
+  );
+  const customPrice = Number(customPriceInput instanceof HTMLInputElement ? customPriceInput.value : 0);
+  const remainingQty = getStoreMobileLineRemainingQty(state, sourceLineKey);
+  const quantity = Math.max(1, Math.min(remainingQty, Number(quantityInput instanceof HTMLInputElement ? quantityInput.value : remainingQty) || remainingQty));
+  const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
+  if (!(priceKes > 0)) {
+    state.pricingSourceLineMessage = grade === "CUSTOM" ? "自定义价格必须大于 0。" : "请先在默认售价管理配置 P/S 默认售价。";
+    return null;
+  }
+  const group = {
+    group_id: `BATCH-${String((state.priceGroups || []).length + 1).padStart(2, "0")}-${grade}`,
+    source_line_key: sourceLineKey,
+    category_main: line.category_main,
+    category_sub: line.category_sub,
+    category: `${line.category_main} / ${line.category_sub}`,
+    grade,
+    tier: grade === "CUSTOM" ? "自定义价格" : `${grade} 档默认售价`,
+    price_kes: priceKes,
+    sale_price_kes: priceKes,
+    quantity,
+    rack_code: `PDA-${grade === "CUSTOM" ? "CUS" : grade}-001`,
+    source_sdp_display_code: line.source_sdp_display_code || ((_a = state.selectedSdp) == null ? void 0 : _a.display_code) || "",
+    source_sdp_machine_code: line.source_sdp_machine_code || ((_b = state.selectedSdp) == null ? void 0 : _b.machine_code) || "",
+    source_type: line.source_type || ((_c2 = state.selectedSdp) == null ? void 0 : _c2.source_type) || "",
+    source_code: line.source_code || ((_d2 = state.selectedSdp) == null ? void 0 : _d2.source_code) || "",
+    status: "待生成 STORE_ITEM"
+  };
+  const validation = validateStoreMobilePricingBatchQuantity(state, group);
+  if (!validation.ok) {
+    state.pricingSourceLineMessage = validation.message;
+    return null;
+  }
+  state.priceGroups = [...getStoreMobileTaskGroups(state), group];
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.pricingSourceLineMessage = "";
+  return group;
+}
 function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, taskCode = "") {
+  var _a;
   const normalizedCode = String(taskCode || "").trim().toUpperCase();
   const normalizedDigits = normalizedCode.replace(/[^0-9]/g, "");
   const task = getStoreMobileAssignedBackendTasks(state).find((row) => {
@@ -28988,19 +29309,29 @@ function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, ta
     return null;
   }
   const selectedSdp = createStoreMobileSelectedSdpFromBackendTask(task, state);
-  const freshWorkflow = createStoreMobilePricingPreviewState({ selectedSdp });
+  const pricingSourceLines = buildStoreMobilePricingSourceLines(task, selectedSdp);
   state.selectedSdp = selectedSdp;
   state.selectedBackendTaskCode = selectedSdp.display_code;
   state.activePage = "verify";
-  state.activeGroupId = "A";
-  state.current_task_group_id = "A";
+  state.activeGroupId = "";
+  state.current_task_group_id = "";
   state.taskStatus = "待核对";
   state.verified = false;
   state.scanDraft = "";
   state.scanError = "";
   state.scanSuccess = "";
-  state.editorDraft = { ...freshWorkflow.editorDraft };
-  state.priceGroups = freshWorkflow.priceGroups.map((group) => ({ ...group }));
+  state.editorDraft = {
+    tier: "P",
+    grade: "P",
+    price_kes: pricingSourceLines[0] ? getStoreMobileSuggestedSalePrice(pricingSourceLines[0].category_main, pricingSourceLines[0].category_sub, "P") : 0,
+    quantity: ((_a = pricingSourceLines[0]) == null ? void 0 : _a.remaining_qty) || 1,
+    category: pricingSourceLines[0] ? `${pricingSourceLines[0].category_main} / ${pricingSourceLines[0].category_sub}` : selectedSdp.category,
+    rack_code: "PDA-P-001"
+  };
+  state.pricingSourceLines = pricingSourceLines;
+  state.pricingSourceLineStatus = pricingSourceLines.length ? "ready" : "needs_detail";
+  state.pricingSourceLineMessage = pricingSourceLines.length ? "" : "需补充分拣明细";
+  state.priceGroups = [];
   state.generatedRanges = {};
   state.printJobs = [];
   state.createdPrintJobs = [];
@@ -29132,7 +29463,89 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
+  var _a, _b, _c2;
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
+  const pricingSourceLines = getStoreMobilePricingSourceLines(state);
+  if ((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) {
+    const batchCards = groups.map((group) => {
+      var _a2;
+      const statusText = getStoreMobilePriceGroupStatus(state, group);
+      const isGenerated = /已生成|待打印|打印中|待贴标|已完成/.test(statusText);
+      const primaryAction = /待生成/.test(statusText) ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批 STORE_ITEM</button>` : /已生成|待打印/.test(statusText) ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-print-group="${escapeHtml(group.group_id)}">打印本批标签</button>` : /待贴标确认/.test(statusText) ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id)}">已贴完本批</button>` : /打印中/.test(statusText) ? '<span class="mobile-group-complete-mark">待打印 · Android print bridge</span>' : '<span class="mobile-group-complete-mark">已完成</span>';
+      return `
+        <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""}">
+          <div class="mobile-field-group-top">
+            <div class="mobile-field-group-left">
+              <strong>${escapeHtml(group.tier || "-")}</strong>
+              <b class="mobile-group-qty">${escapeHtml(group.quantity || 0)}件</b>
+            </div>
+            <div class="mobile-field-group-right">
+              <strong>KSh ${escapeHtml(group.price_kes || 0)}</strong>
+              ${renderStoreMobilePricingBadge(statusText)}
+            </div>
+          </div>
+          <div class="mobile-field-group-meta">
+            ${escapeHtml(group.category || `${group.category_main || "-"} / ${group.category_sub || "-"}`)} · ${escapeHtml(group.source_sdp_display_code || ((_a2 = state.selectedSdp) == null ? void 0 : _a2.display_code) || "-")}
+            ${isGenerated ? " · STORE_ITEM 已创建" : ""}
+          </div>
+          <div class="mobile-field-group-actions">${primaryAction}</div>
+        </article>
+      `;
+    }).join("");
+    if (!pricingSourceLines.length) {
+      return `
+        <div class="mobile-price-group-list">
+          <article class="mobile-price-group-card mobile-field-group-card">
+            <div class="mobile-field-group-top">
+              <div class="mobile-field-group-left">
+                <strong>需补充分拣明细</strong>
+                <b class="mobile-group-qty">${escapeHtml(((_b = state.selectedSdp) == null ? void 0 : _b.total_count) || 0)}件</b>
+              </div>
+              ${renderStoreMobilePricingBadge("no demo fallback")}
+            </div>
+            <div class="mobile-field-group-meta">该 ${escapeHtml(((_c2 = state.selectedSdp) == null ? void 0 : _c2.source_type) || "LPK")} SDP 暂无 category line 明细，不能显示 A/B 80件 demo 分组。</div>
+          </article>
+        </div>
+      `;
+    }
+    return `
+      <div class="mobile-price-group-list">
+        ${pricingSourceLines.map((line) => {
+      var _a2, _b2;
+      const remainingQty = getStoreMobileLineRemainingQty(state, line.line_key);
+      const pPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
+      const sPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
+      return `
+            <article class="mobile-price-group-card mobile-field-group-card">
+              <div class="mobile-field-group-top">
+                <div class="mobile-field-group-left">
+                  <strong>${escapeHtml(`${line.category_main} / ${line.category_sub}`)}</strong>
+                  <b class="mobile-group-qty">${escapeHtml(remainingQty)}件剩余</b>
+                </div>
+                ${renderStoreMobilePricingBadge(`${line.source_type || "SDP"} source line`)}
+              </div>
+              <div class="mobile-field-group-meta">
+                remaining_qty=${escapeHtml(remainingQty)} · ${escapeHtml(line.source_code || ((_a2 = state.selectedSdp) == null ? void 0 : _a2.source_code) || "-")} · ${escapeHtml(line.source_sdp_display_code || ((_b2 = state.selectedSdp) == null ? void 0 : _b2.display_code) || "-")}
+              </div>
+              <div class="mobile-result-grid">
+                <span><b>P 档默认售价</b>${escapeHtml(pPrice ? `KSh ${pPrice}` : "未配置")}</span>
+                <span><b>S 档默认售价</b>${escapeHtml(sPrice ? `KSh ${sPrice}` : "未配置")}</span>
+                <span><b>自定义价格</b><input type="number" min="1" step="1" placeholder="KES" data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}"></span>
+                <span><b>本批数量</b><input type="number" min="1" max="${escapeHtml(remainingQty)}" value="${escapeHtml(remainingQty)}" data-mobile-pricing-batch-qty="${escapeHtml(line.line_key)}"></span>
+              </div>
+              <div class="mobile-field-group-actions">
+                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||P`)}">P 档默认售价</button>
+                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||S`)}">S 档默认售价</button>
+                <button type="button" class="secondary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM`)}">自定义价格</button>
+              </div>
+            </article>
+          `;
+    }).join("")}
+        ${state.pricingSourceLineMessage ? `<div class="mobile-error">${escapeHtml(state.pricingSourceLineMessage)}</div>` : ""}
+        ${batchCards || '<div class="subtle small">选择 P 档默认售价、S 档默认售价或自定义价格后，生成本批 STORE_ITEM。</div>'}
+      </div>
+    `;
+  }
   return `
     <div class="mobile-price-group-list">
       ${groups.map((group) => {
@@ -29231,8 +29644,10 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
     start: "STOREITEM-DEMO-A-001",
     end: "STOREITEM-DEMO-A-080",
     generated_count: group.quantity || 0,
-    pending_print_count: group.quantity || 0
+    pending_print_count: group.quantity || 0,
+    demo_only: true
   };
+  const generationStatus = generated.demo_only ? "待打印 · demo result only" : "已生成 / 待打印";
   return `
     <section class="mobile-generated-result">
       <div class="mobile-section-head">
@@ -29247,7 +29662,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <span><b>已生成</b>${escapeHtml(generated.generated_count || group.quantity || 0)} / ${escapeHtml(group.quantity || 0)}</span>
         <span><b>待打印</b>${escapeHtml(generated.pending_print_count || group.quantity || 0)}</span>
         <span><b>货架</b>${escapeHtml(group.rack_code || "-")}</span>
-        <span><b>状态</b>待打印 · demo result only</span>
+        <span><b>状态</b>${escapeHtml(generationStatus)}</span>
       </div>
       <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>
       ${renderNextPriceGroupHint(state, group)}
@@ -29292,7 +29707,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       </section>
     `;
   }
-  const primaryAction = statusText === "待贴标确认" ? `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id || "")}">已贴完本组</button>` : statusText === "已完成" ? '<div class="mobile-group-complete-mark is-wide">本组已完成</div>' : `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>`;
+  const primaryAction = statusText === "待贴标确认" ? `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-stickers="${escapeHtml(group.group_id || "")}">已贴完本组</button>` : statusText === "已完成" ? '<div class="mobile-group-complete-mark is-wide">本组已完成</div>' : statusText === "打印中" ? '<div class="mobile-group-complete-mark is-wide">待打印 · Android print bridge</div>' : `<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-group="${escapeHtml(group.group_id || "")}">打印本组标签</button>`;
   return `
     <section class="mobile-print-panel">
       <div class="mobile-section-head">
@@ -29302,7 +29717,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       ${summaryHtml}
       ${labelSizeHtml}
       <div class="mobile-print-job-card">
-        <span>本组任务 · demo only</span>
+        <span>${escapeHtml(job.demo_only ? "本组任务 · demo only" : "本批标签任务 · 待打印")}</span>
         <strong>${escapeHtml(getStoreMobileStatusText(job.status || "queued"))}</strong>
         <small>${escapeHtml((job == null ? void 0 : job.job_id) || "MOCK-PJ-NEW-001")} · ${escapeHtml(activeSize)} · ${escapeHtml(group.quantity || 0)} 张 · ${escapeHtml(group.tier || "-")}</small>
       </div>
@@ -29685,6 +30100,96 @@ function renderStoreMobilePricingPreviewPreservingScroll() {
   renderStoreMobilePricingPreview();
   restorePdaRuntimeScrollState(scrollState);
 }
+async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPreviewState, groupId = "") {
+  var _a, _b, _c2, _d2, _e2;
+  const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || ""));
+  const sdp = state.selectedSdp || {};
+  if (!group || !sdp.backend_task) {
+    return null;
+  }
+  const validation = validateStoreMobilePricingBatchQuantity(state, group);
+  if (!validation.ok) {
+    state.pricingSourceLineMessage = validation.message;
+    throw new Error(validation.message);
+  }
+  const packageCode = String(sdp.display_code || sdp.machine_code || "").trim();
+  if (!packageCode) {
+    throw new Error("缺少 SDP 包号，不能生成 STORE_ITEM。");
+  }
+  const payload = {
+    store_code: sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback(),
+    clerk: sdp.assigned_clerk || ((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback(),
+    rack_code: group.rack_code || "PDA-P-001",
+    selected_price: Number(group.sale_price_kes || group.price_kes || 0),
+    category_main: group.category_main || "",
+    category_sub: group.category_sub || "",
+    grade: group.grade || "",
+    quantity: Number(group.quantity || 0),
+    pricing_batch_id: group.group_id,
+    source_line_key: group.source_line_key,
+    source_sdp_display_code: group.source_sdp_display_code || sdp.display_code,
+    source_sdp_machine_code: group.source_sdp_machine_code || sdp.machine_code
+  };
+  const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/store-items/generate`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  const generatedItems = Array.isArray(result == null ? void 0 : result.store_items) ? result.store_items : [];
+  group.status = "已生成 / 待打印";
+  group.generated_store_items = generatedItems;
+  state.generatedRanges[group.group_id] = {
+    start: ((_b = generatedItems[0]) == null ? void 0 : _b.display_code) || ((_c2 = generatedItems[0]) == null ? void 0 : _c2.token_no) || "",
+    end: ((_d2 = generatedItems[generatedItems.length - 1]) == null ? void 0 : _d2.display_code) || ((_e2 = generatedItems[generatedItems.length - 1]) == null ? void 0 : _e2.token_no) || "",
+    generated_count: generatedItems.length,
+    pending_print_count: generatedItems.length,
+    demo_only: false
+  };
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.activePage = "generation";
+  return syncStoreMobileTaskCounters(state);
+}
+async function queueStoreMobileBatchPrintJobs(state = storeMobilePricingPreviewState, groupId = "") {
+  var _a, _b;
+  const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || ""));
+  if (!group) {
+    return null;
+  }
+  const generatedItems = Array.isArray(group.generated_store_items) ? group.generated_store_items : [];
+  const tokenNos = generatedItems.map((token) => String((token == null ? void 0 : token.token_no) || "").trim()).filter(Boolean);
+  if (!tokenNos.length) {
+    throw new Error("当前批次没有待打印 STORE_ITEM。");
+  }
+  const jobs = await request("/print-jobs/item-tokens", {
+    method: "POST",
+    body: JSON.stringify({
+      token_nos: tokenNos,
+      copies: 1,
+      printer_name: state.printer_name || "Deli DL-720C",
+      template_code: getStoreItemLabelTemplateCode(state.labelSize || "40x30")
+    })
+  });
+  if (!Array.isArray(state.createdPrintJobs)) {
+    state.createdPrintJobs = [];
+  }
+  state.createdPrintJobs = [
+    ...state.createdPrintJobs.filter((job) => String(job.group_id || "") !== String(group.group_id || "")),
+    {
+      job_id: Array.isArray(jobs) ? ((_a = jobs[0]) == null ? void 0 : _a.job_id) || ((_b = jobs[0]) == null ? void 0 : _b.id) || "" : "",
+      group_id: group.group_id,
+      label_size: state.labelSize || "40×30",
+      copies: tokenNos.length,
+      status: "queued",
+      bridge_note: "待打印 · Android print bridge",
+      jobs: Array.isArray(jobs) ? jobs : []
+    }
+  ];
+  group.status = "打印中";
+  state.activeGroupId = group.group_id;
+  state.current_task_group_id = group.group_id;
+  state.activePage = "print_task";
+  return syncStoreMobileTaskCounters(state);
+}
 function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState, groupId = "", action = "") {
   const groups = getStoreMobileTaskGroups(state);
   const group = groups.find((item) => String(item.group_id || "") === String(groupId || ""));
@@ -29758,6 +30263,7 @@ function handleStoreMobileScanSubmit(inputValue = "") {
   renderStoreMobilePricingPreview();
 }
 function handleStoreMobilePricingPreviewAction(button) {
+  var _a, _b;
   if (!(button instanceof HTMLElement)) {
     return;
   }
@@ -29769,6 +30275,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const confirmStickers = button.dataset.mobilePricingConfirmStickers;
   const resetTask = button.dataset.mobilePricingResetTask;
   const selectGroup = button.dataset.mobilePricingSelectGroup;
+  const createBatch = button.dataset.mobilePricingCreateBatch;
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const printGroup = button.dataset.mobilePricingPrintGroup;
   const labelSize = button.dataset.mobilePricingLabelSize;
@@ -29800,11 +30307,35 @@ function handleStoreMobilePricingPreviewAction(button) {
     state.activeGroupId = selectGroup;
     state.activePage = "editor";
   }
+  if (createBatch) {
+    createStoreMobilePricingBatch(state, createBatch);
+    state.activePage = "pricing";
+  }
   if (generateGroup) {
-    advanceStoreMobileGroupWorkflow(state, generateGroup, "generate");
+    if ((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) {
+      generateStoreMobileBatchStoreItems(state, generateGroup).then(() => {
+        storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+        renderStoreMobilePricingPreview();
+      }).catch((error) => {
+        state.pricingSourceLineMessage = formatErrorMessage(error);
+        renderStoreMobilePricingPreview();
+      });
+    } else {
+      advanceStoreMobileGroupWorkflow(state, generateGroup, "generate");
+    }
   }
   if (printGroup) {
-    advanceStoreMobileGroupWorkflow(state, printGroup, "print");
+    if ((_b = state.selectedSdp) == null ? void 0 : _b.backend_task) {
+      queueStoreMobileBatchPrintJobs(state, printGroup).then(() => {
+        storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+        renderStoreMobilePricingPreview();
+      }).catch((error) => {
+        state.pricingSourceLineMessage = formatErrorMessage(error);
+        renderStoreMobilePricingPreview();
+      });
+    } else {
+      advanceStoreMobileGroupWorkflow(state, printGroup, "print");
+    }
   }
   if (confirmStickers) {
     advanceStoreMobileGroupWorkflow(state, confirmStickers, "confirm");
@@ -30167,7 +30698,7 @@ async function loadPostLoginDataForRole(user = currentSession.user) {
   await Promise.all([loadDashboard(), loadConfig(), refreshIntegrationSummaries()]);
 }
 async function loadConfig() {
-  const [stores, suppliers, barcode, labels, inboundShipments, baleRows, rawBales, chinaSources, apparelWeights, apparelDefaultCosts, apparelSortingRacks] = await Promise.all([
+  const [stores, suppliers, barcode, labels, inboundShipments, baleRows, rawBales, chinaSources, apparelWeights, apparelDefaultCosts, apparelDefaultSalePrices, apparelSortingRacks] = await Promise.all([
     request("/stores"),
     request("/suppliers"),
     request("/settings/barcode"),
@@ -30178,6 +30709,7 @@ async function loadConfig() {
     request("/warehouse/china-sources"),
     request("/warehouse/apparel-piece-weights"),
     request("/warehouse/apparel-default-costs"),
+    request("/warehouse/apparel-default-sale-prices"),
     request("/warehouse/apparel-sorting-racks")
   ]);
   inboundShipmentState = inboundShipments;
@@ -30186,12 +30718,14 @@ async function loadConfig() {
   chinaSourceBaleState = Array.isArray(chinaSources) ? chinaSources : [];
   apparelPieceWeightState = Array.isArray(apparelWeights) ? apparelWeights : [];
   apparelDefaultCostState = Array.isArray(apparelDefaultCosts) ? apparelDefaultCosts : [];
+  apparelDefaultSalePriceState = Array.isArray(apparelDefaultSalePrices) ? apparelDefaultSalePrices : [];
   apparelSortingRackState = Array.isArray(apparelSortingRacks) ? apparelSortingRacks : [];
   barcodeSettingsState = barcode || {};
   labelTemplateState = Array.isArray(labels) ? labels : [];
   persistChinaSourceBaleState();
   persistApparelPieceWeightState();
   persistApparelDefaultCostState();
+  persistApparelDefaultSalePriceState();
   persistApparelSortingRackState();
   populateStoreSelects(stores);
   populateSupplierSelects(suppliers);
@@ -30213,6 +30747,8 @@ async function loadConfig() {
   renderApparelPieceWeightSummary();
   hydrateApparelDefaultCostForm(null);
   renderApparelDefaultCostSummary();
+  hydrateApparelDefaultSalePriceForm(null);
+  renderApparelDefaultSalePriceSummary();
   hydrateApparelSortingRackForm(null);
   renderApparelSortingRackSummary();
   refreshSortingScannerDeviceState().catch(() => {
@@ -32386,6 +32922,27 @@ function hydrateApparelDefaultCostForm(record = null) {
   setInputValue("#apparelDefaultCostForm [name='default_cost_kes']", (record == null ? void 0 : record.default_cost_kes) || "");
   setInputValue("#apparelDefaultCostForm [name='note']", (record == null ? void 0 : record.note) || "");
 }
+function hydrateApparelDefaultSalePriceForm(record = null) {
+  const form = document.querySelector("#apparelDefaultSalePriceForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const categoryTree = getChinaSourceCategoryTree();
+  const mainSelect = form.querySelector("[name='category_main']");
+  if (mainSelect instanceof HTMLSelectElement) {
+    mainSelect.innerHTML = [
+      '<option value="">请选择商品大类</option>',
+      ...Object.keys(categoryTree).map(
+        (mainCategory) => `<option value="${escapeHtml(mainCategory)}">${escapeHtml(mainCategory)}</option>`
+      )
+    ].join("");
+  }
+  setInputValue("#apparelDefaultSalePriceForm [name='category_main']", (record == null ? void 0 : record.category_main) || "");
+  populateApparelDefaultSalePriceSubSelect((record == null ? void 0 : record.category_sub) || "");
+  setInputValue("#apparelDefaultSalePriceForm [name='grade']", (record == null ? void 0 : record.grade) || "P");
+  setInputValue("#apparelDefaultSalePriceForm [name='default_sale_price_kes']", (record == null ? void 0 : record.default_sale_price_kes) || "");
+  setInputValue("#apparelDefaultSalePriceForm [name='note']", (record == null ? void 0 : record.note) || "");
+}
 function hydrateApparelSortingRackForm(record = null) {
   const form = document.querySelector("#apparelSortingRackForm");
   if (!(form instanceof HTMLFormElement)) {
@@ -32494,6 +33051,45 @@ async function submitApparelDefaultCost(event) {
   renderJsonBuilder("sorting-result-items");
   syncJsonBuilderToField("sorting-result-items");
   writeOutput("#apparelDefaultCostOutput", record);
+}
+async function submitApparelDefaultSalePrice(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  const record = {
+    category_main: String(payload.category_main || "").trim(),
+    category_sub: String(payload.category_sub || "").trim(),
+    grade: String(payload.grade || "").trim().toUpperCase(),
+    default_sale_price_kes: roundToTwo(Number(payload.default_sale_price_kes || 0)),
+    note: String(payload.note || "").trim()
+  };
+  if (!record.category_main) {
+    throw new Error("请先选择商品大类。");
+  }
+  if (!record.category_sub) {
+    throw new Error("请先选择商品小类。");
+  }
+  if (!["P", "S"].includes(record.grade)) {
+    throw new Error("等级只支持 P 或 S。");
+  }
+  if (!(record.default_sale_price_kes > 0)) {
+    throw new Error("请先填写默认售价。");
+  }
+  const savedRecord = await request("/warehouse/apparel-default-sale-prices", {
+    method: "POST",
+    body: JSON.stringify(record)
+  });
+  const nextRows = [
+    savedRecord,
+    ...ensureApparelDefaultSalePriceState().filter(
+      (row) => !(String((row == null ? void 0 : row.category_main) || "").trim().toLowerCase() === record.category_main.toLowerCase() && String((row == null ? void 0 : row.category_sub) || "").trim().toLowerCase() === record.category_sub.toLowerCase() && String((row == null ? void 0 : row.grade) || "").trim().toUpperCase() === record.grade.toUpperCase())
+    )
+  ];
+  apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(nextRows);
+  persistApparelDefaultSalePriceState();
+  hydrateApparelDefaultSalePriceForm(savedRecord);
+  renderApparelDefaultSalePriceSummary(savedRecord);
+  writeOutput("#apparelDefaultSalePriceOutput", savedRecord);
 }
 async function submitApparelSortingRack(event) {
   event.preventDefault();
@@ -34183,6 +34779,7 @@ const FORM_SUMMARY_SELECTORS = {
   "#itemIdentityLedgerForm": "#itemIdentityLedgerSummary",
   "#directHangUnpackForm": "#directHangUnpackSummary",
   "#apparelDefaultCostForm": "#apparelDefaultCostSummary",
+  "#apparelDefaultSalePriceForm": "#apparelDefaultSalePriceSummary",
   "#apparelSortingRackForm": "#apparelSortingRackSummary",
   "#baleSalesRebaleEntryForm": "#baleSalesRebaleEntrySummary",
   "#consignmentBundleForm": "#consignmentBundleSummary",
@@ -34256,6 +34853,9 @@ refreshProductCategoryControls();
 ensureApparelDefaultCostState();
 hydrateApparelDefaultCostForm(null);
 renderApparelDefaultCostSummary();
+ensureApparelDefaultSalePriceState();
+hydrateApparelDefaultSalePriceForm(null);
+renderApparelDefaultSalePriceSummary();
 ensureApparelSortingRackState();
 hydrateApparelSortingRackForm(null);
 renderApparelSortingRackSummary();
@@ -34319,6 +34919,7 @@ bindForm("#chinaSourceCostForm", submitChinaSourceCost, "#chinaSourceCostOutput"
 bindForm("#itemIdentityLedgerForm", submitItemIdentityLedger, "#itemIdentityLedgerOutput");
 bindForm("#directHangUnpackForm", submitDirectHangUnpack, "#directHangUnpackOutput");
 bindForm("#apparelDefaultCostForm", submitApparelDefaultCost, "#apparelDefaultCostOutput");
+bindForm("#apparelDefaultSalePriceForm", submitApparelDefaultSalePrice, "#apparelDefaultSalePriceOutput");
 bindForm("#apparelSortingRackForm", submitApparelSortingRack, "#apparelSortingRackOutput");
 ["has_loss_record", "loss_qty", "loss_weight_kg", "loss_note"].forEach((fieldName) => {
   var _a, _b;
@@ -35690,7 +36291,7 @@ document.addEventListener("click", (event) => {
   openSortingTaskForProcessing(taskNo, targetPanel);
 });
 document.addEventListener("click", (event) => {
-  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task]") : null;
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
@@ -37136,6 +37737,22 @@ document.addEventListener("change", (event) => {
     renderApparelDefaultCostSummary();
     return;
   }
+  if (target instanceof HTMLSelectElement && target.matches("#apparelDefaultSalePriceForm [name='category_main']")) {
+    populateApparelDefaultSalePriceSubSelect();
+    renderApparelDefaultSalePriceSummary();
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.matches("#apparelDefaultSalePriceForm [name='category_sub'], #apparelDefaultSalePriceForm [name='grade']")) {
+    const form = document.querySelector("#apparelDefaultSalePriceForm");
+    if (form instanceof HTMLFormElement) {
+      const payload = Object.fromEntries(new FormData(form).entries());
+      const matched = getApparelDefaultSalePriceByCategoryGrade(payload.category_main, payload.category_sub, payload.grade);
+      setInputValue("#apparelDefaultSalePriceForm [name='default_sale_price_kes']", (matched == null ? void 0 : matched.default_sale_price_kes) || "");
+      setInputValue("#apparelDefaultSalePriceForm [name='note']", (matched == null ? void 0 : matched.note) || "");
+    }
+    renderApparelDefaultSalePriceSummary();
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.matches("#apparelSortingRackForm [name='category_main']")) {
     populateApparelSortingRackSubSelect();
     setInputValue("#apparelSortingRackForm [name='default_cost_kes']", "");
@@ -37263,6 +37880,40 @@ document.addEventListener("click", async (event) => {
         writeOutput("#apparelDefaultCostOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认成本价表移除。`);
       } catch (error) {
         renderErrorSummary("#apparelDefaultCostSummary", formatErrorMessage(error));
+      }
+      return;
+    }
+  }
+  const apparelDefaultSalePriceAction = event.target instanceof HTMLElement ? event.target.closest("[data-apparel-default-sale-price-edit], [data-apparel-default-sale-price-delete]") : null;
+  if (apparelDefaultSalePriceAction instanceof HTMLElement) {
+    const compositeKey = String(
+      apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceEdit || apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceDelete || ""
+    ).trim();
+    const [categoryMain = "", categorySub = "", grade = ""] = compositeKey.split("||");
+    if (apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceEdit) {
+      const record = getApparelDefaultSalePriceByCategoryGrade(categoryMain, categorySub, grade);
+      if (record) {
+        hydrateApparelDefaultSalePriceForm(record);
+        renderApparelDefaultSalePriceSummary(record);
+      }
+      return;
+    }
+    if (apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceDelete) {
+      try {
+        await request(`/warehouse/apparel-default-sale-prices/${encodeURIComponent(categoryMain)}/${encodeURIComponent(categorySub)}/${encodeURIComponent(grade)}`, {
+          method: "DELETE"
+        });
+        apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(
+          ensureApparelDefaultSalePriceState().filter(
+            (row) => !(String((row == null ? void 0 : row.category_main) || "").trim().toLowerCase() === categoryMain.trim().toLowerCase() && String((row == null ? void 0 : row.category_sub) || "").trim().toLowerCase() === categorySub.trim().toLowerCase() && String((row == null ? void 0 : row.grade) || "").trim().toUpperCase() === grade.trim().toUpperCase())
+          )
+        );
+        persistApparelDefaultSalePriceState();
+        hydrateApparelDefaultSalePriceForm(null);
+        renderApparelDefaultSalePriceSummary();
+        writeOutput("#apparelDefaultSalePriceOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认售价表移除。`);
+      } catch (error) {
+        renderErrorSummary("#apparelDefaultSalePriceSummary", formatErrorMessage(error));
       }
       return;
     }

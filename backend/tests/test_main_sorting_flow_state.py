@@ -621,6 +621,90 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(rows[0]["exception_status"], "normal")
         self.assertEqual(rows[0]["assignment_status"], "assigned")
 
+    def test_assigned_sdo_package_sdb_exposes_single_pricing_source_line(self):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][0]
+
+        self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        self.state.assign_store_delivery_package(
+            package["display_code"],
+            {
+                "assigned_clerk": "Mary",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+
+        rows = self.state.list_assigned_store_delivery_packages(store_code="UTAWALA", assigned_clerk="Mary")
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["display_code"], package["display_code"])
+        self.assertEqual(rows[0]["line_detail_status"], "ready")
+        self.assertEqual(len(rows[0]["pricing_source_lines"]), 1)
+        line = rows[0]["pricing_source_lines"][0]
+        self.assertEqual(line["source_type"], "SDB")
+        self.assertEqual(line["source_code"], "SDB260503AAG")
+        self.assertEqual(line["category_main"], "pants")
+        self.assertEqual(line["category_sub"], "jeans pant")
+        self.assertEqual(line["item_count"], 100)
+        self.assertEqual(line["remaining_qty"], 100)
+        self.assertEqual(line["source_sdp_display_code"], package["display_code"])
+        self.assertEqual(line["parent_sdo_display_code"], order["execution_order_no"])
+
+    def test_assigned_sdo_package_lpk_exposes_multiple_pricing_source_lines_when_available(self):
+        order = self._create_store_delivery_package_state_order()
+        package = order["packages"][1]
+        package["pricing_source_lines"] = [
+            {
+                "line_key": "LPK260504001:pants:cargo pant",
+                "category_main": "pants",
+                "category_sub": "cargo pant",
+                "item_count": 28,
+                "source_code": "LPK260504001",
+            },
+            {
+                "line_key": "LPK260504001:jacket:jacket",
+                "category_main": "jacket",
+                "category_sub": "jacket",
+                "item_count": 12,
+                "source_code": "LPK260504001",
+            },
+        ]
+        package["content_summary"] = "多类目补差 · 2 个类目"
+        self.state._save_store_delivery_package(package)
+
+        self.state.receive_store_delivery_package(
+            package["display_code"],
+            {
+                "received_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+        self.state.assign_store_delivery_package(
+            package["display_code"],
+            {
+                "assigned_clerk": "Austin",
+                "assigned_by": "store_manager_1",
+                "store_code": "UTAWALA",
+            },
+        )
+
+        rows = self.state.list_assigned_store_delivery_packages(store_code="UTAWALA", assigned_clerk="Austin")
+
+        self.assertEqual([row["display_code"] for row in rows], [package["display_code"]])
+        self.assertEqual(rows[0]["line_detail_status"], "ready")
+        self.assertEqual(
+            [(line["category_main"], line["category_sub"], line["item_count"]) for line in rows[0]["pricing_source_lines"]],
+            [("pants", "cargo pant", 28), ("jacket", "jacket", 12)],
+        )
+        self.assertTrue(all(line["source_type"] == "LPK" for line in rows[0]["pricing_source_lines"]))
+
     def test_assigned_store_delivery_packages_endpoint_is_declared_for_pda(self):
         routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
 
@@ -1029,6 +1113,40 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(resolved["identity_id"], result["store_items"][0]["identity_no"])
         self.assertEqual(self.state.resolve_barcode(package["machine_code"], context="pos")["barcode_type"], "STORE_DELIVERY_PACKAGE")
         self.assertTrue(self.state.resolve_barcode(package["machine_code"], context="pos")["reject_reason"])
+
+    def test_store_item_generation_preserves_pricing_batch_source_and_price(self):
+        order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=3)
+
+        result = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "PDA-P-001",
+                "selected_price": 410,
+                "category_main": "pants",
+                "category_sub": "cargo pant",
+                "grade": "P",
+                "quantity": 2,
+                "pricing_batch_id": "BATCH-SDP-PANTS-P",
+                "source_line_key": "SDB260503AAG:pants:cargo pant",
+            },
+        )
+
+        for token in result["store_items"]:
+            self.assertEqual(token["sdo_package_display_code"], package["display_code"])
+            self.assertEqual(token["sdo_package_machine_code"], package["machine_code"])
+            self.assertEqual(token["parent_sdo_display_code"], order["execution_order_no"])
+            self.assertEqual(token["source_type"], "SDB")
+            self.assertEqual(token["source_code"], "SDB260503AAG")
+            self.assertEqual(token["category_main"], "pants")
+            self.assertEqual(token["category_sub"], "cargo pant")
+            self.assertEqual(token["grade"], "P")
+            self.assertEqual(token["selected_price"], 410)
+            self.assertEqual(token["selling_price_kes"], 410)
+            self.assertEqual(token["pricing_batch_id"], "BATCH-SDP-PANTS-P")
+            self.assertEqual(token["source_line_key"], "SDB260503AAG:pants:cargo pant")
 
     def test_store_item_generation_inherits_sdo_package_token_and_cost_lineage(self):
         order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
@@ -2031,6 +2149,86 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 for row in self.state.list_apparel_default_costs()
             )
         )
+
+    def test_apparel_default_sale_prices_are_seeded_from_default_costs_and_mutable(self):
+        rows = self.state.list_apparel_default_sale_prices()
+
+        self.assertTrue(
+            any(
+                row["category_main"] == "tops"
+                and row["category_sub"] == "lady tops"
+                and row["grade"] == "P"
+                and row["default_sale_price_kes"] == 370
+                for row in rows
+            )
+        )
+        self.assertTrue(
+            any(
+                row["category_main"] == "pants"
+                and row["category_sub"] == "cargo pant"
+                and row["grade"] == "P"
+                and row["default_sale_price_kes"] == 410
+                for row in rows
+            )
+        )
+        self.assertTrue(
+            any(
+                row["category_main"] == "jacket"
+                and row["category_sub"] == "jacket"
+                and row["grade"] == "S"
+                and row["default_sale_price_kes"] == 396
+                for row in rows
+            )
+        )
+
+        updated = self.state.upsert_apparel_default_sale_price(
+            {
+                "category_main": "pants",
+                "category_sub": "cargo pant",
+                "grade": "P",
+                "default_sale_price_kes": 425,
+                "note": "Austin PDA override",
+            },
+            updated_by="warehouse_supervisor_1",
+        )
+
+        self.assertEqual(updated["default_sale_price_kes"], 425)
+        self.assertEqual(updated["note"], "Austin PDA override")
+        self.assertEqual(
+            len(
+                [
+                    row
+                    for row in self.state.list_apparel_default_sale_prices()
+                    if row["category_main"] == "pants"
+                    and row["category_sub"] == "cargo pant"
+                    and row["grade"] == "P"
+                ]
+            ),
+            1,
+        )
+
+        self.state.delete_apparel_default_sale_price(
+            "pants",
+            "cargo pant",
+            "P",
+            deleted_by="warehouse_supervisor_1",
+        )
+        self.assertFalse(
+            any(
+                row["category_main"] == "pants"
+                and row["category_sub"] == "cargo pant"
+                and row["grade"] == "P"
+                for row in self.state.list_apparel_default_sale_prices()
+            )
+        )
+
+    def test_apparel_default_sale_price_routes_are_declared_for_shared_pda_config(self):
+        routes_source = (Path(__file__).resolve().parents[1] / "app" / "api" / "routes.py").read_text()
+
+        self.assertIn('"/warehouse/apparel-default-sale-prices"', routes_source)
+        self.assertIn('"/apparel-default-sale-prices"', routes_source)
+        self.assertIn("state.list_apparel_default_sale_prices", routes_source)
+        self.assertIn("state.upsert_apparel_default_sale_price", routes_source)
 
     def test_apparel_sorting_rack_upsert_and_delete(self):
         seeded = self.state.list_apparel_sorting_racks()
