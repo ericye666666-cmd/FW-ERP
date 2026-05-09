@@ -157,6 +157,20 @@ test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without re
   assert.match(actionHandler, /startPdaRuntimePolling/);
 });
 
+test("clerk PDA interval polling preserves scroll around runtime render", () => {
+  const runPoll = extractFunctionSource(appJs, "runPdaRuntimePollOnce");
+  const scrollContainer = extractFunctionSource(appJs, "getPdaRuntimeScrollContainer");
+  const preservingRender = extractFunctionSource(appJs, "renderStoreMobilePricingPreviewPreservingScroll");
+
+  assert.match(scrollContainer, /\.mobile-pricing-screen/);
+  assert.match(scrollContainer, /document\.scrollingElement/);
+  assert.match(preservingRender, /capturePdaRuntimeScrollState/);
+  assert.match(preservingRender, /renderStoreMobilePricingPreview\(\)/);
+  assert.match(preservingRender, /restorePdaRuntimeScrollState/);
+  assert.match(runPoll, /shouldPreservePdaRuntimeScrollForPoll\(reason\)/);
+  assert.match(runPoll, /renderStoreMobilePricingPreviewPreservingScroll\(\)/);
+});
+
 test("legacy WebView clerk runtime also uses task-driven two-tab flow", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
 

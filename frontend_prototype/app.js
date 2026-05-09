@@ -3564,6 +3564,102 @@ function isPdaRuntimeInputFocused() {
     || Boolean(active?.closest?.("[data-scan-input], [data-store-manager-pda-sdo-search-form]"));
 }
 
+function getPdaRuntimeScrollPageKey() {
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (roleCode === "store_manager") {
+    const state = ensureStoreManagerPdaTaskState();
+    return [
+      roleCode,
+      state.activeTab || "receiving",
+      state.activePage || "tasks",
+      state.sdoTask?.display_code || "",
+      state.sdoSearchQuery || "",
+    ].join("|");
+  }
+  if (roleCode === "store_clerk") {
+    const state = storeMobilePricingPreviewState || {};
+    return [
+      roleCode,
+      state.activePage || "tasks",
+      state.selectedSdp?.display_code || state.selectedSdp?.sdp_code || "",
+    ].join("|");
+  }
+  return [roleCode, activeWorkspace, activePanelKey].join("|");
+}
+
+function getPdaRuntimeScrollContainer() {
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  const selectors = roleCode === "store_manager"
+    ? [".store-manager-pda-body", ".store-manager-pda-task-list"]
+    : roleCode === "store_clerk"
+      ? [".mobile-pricing-screen"]
+      : [".store-manager-pda-body", ".store-manager-pda-task-list", ".mobile-pricing-screen"];
+  const candidates = selectors
+    .map((selector) => ({ selector, element: document.querySelector(selector), role: roleCode }))
+    .filter((candidate) => candidate.element instanceof HTMLElement);
+  const activeScrolled = candidates.find((candidate) => Number(candidate.element.scrollTop || 0) > 0 || Number(candidate.element.scrollLeft || 0) > 0);
+  if (activeScrolled) {
+    return activeScrolled;
+  }
+  const scrollable = candidates.find((candidate) => candidate.element.scrollHeight > candidate.element.clientHeight || candidate.element.scrollWidth > candidate.element.clientWidth);
+  if (scrollable) {
+    return scrollable;
+  }
+  if (candidates[0]) {
+    return candidates[0];
+  }
+  const fallback = document.scrollingElement || document.documentElement || document.body;
+  return fallback ? { selector: "document.scrollingElement", element: fallback, role: roleCode || "document" } : null;
+}
+
+function capturePdaRuntimeScrollState() {
+  const container = getPdaRuntimeScrollContainer();
+  if (!container || !container.element) {
+    return null;
+  }
+  return {
+    selector: container.selector,
+    role: container.role,
+    pageKey: getPdaRuntimeScrollPageKey(),
+    scrollTop: Number(container.element.scrollTop || 0),
+    scrollLeft: Number(container.element.scrollLeft || 0),
+  };
+}
+
+function getPdaRuntimeScrollElementForState(scrollState = null) {
+  if (!scrollState) {
+    return null;
+  }
+  if (scrollState.selector === "document.scrollingElement") {
+    return document.scrollingElement || document.documentElement || document.body;
+  }
+  const element = document.querySelector(scrollState.selector || "");
+  return element instanceof HTMLElement ? element : null;
+}
+
+function restorePdaRuntimeScrollState(scrollState = null) {
+  const restore = () => {
+    if (!scrollState || scrollState.pageKey !== getPdaRuntimeScrollPageKey() || isPdaRuntimeInputFocused()) {
+      return;
+    }
+    const element = getPdaRuntimeScrollElementForState(scrollState);
+    if (!element) {
+      return;
+    }
+    element.scrollTop = Number(scrollState.scrollTop || 0);
+    element.scrollLeft = Number(scrollState.scrollLeft || 0);
+  };
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(restore);
+  } else {
+    window.setTimeout(restore, 0);
+  }
+}
+
+function shouldPreservePdaRuntimeScrollForPoll(reason = "") {
+  return reason === "interval" || reason === "visible";
+}
+
 function shouldPollStoreManagerReceiving() {
   const roleCode = getNormalizedRoleCode(currentSession.user);
   if (!currentSession?.token || !isPdaRuntimeMode() || !(roleCode === "store_manager")) {
@@ -3669,33 +3765,50 @@ async function runPdaRuntimePollOnce({ force = false, reason = "manual" } = {}) 
   if (pdaRuntimePollingInFlight || pdaRuntimeActionInFlight) {
     return false;
   }
+  const preserveScroll = shouldPreservePdaRuntimeScrollForPoll(reason);
   pdaRuntimePollingInFlight = true;
   try {
     if (pollManager) {
       await refreshStoreManagerPdaReceivingForPolling(ensureStoreManagerPdaTaskState(), {
         force,
-        background: reason === "interval",
+        background: preserveScroll,
       });
       markPdaRuntimeRefreshed();
       if (!isPdaRuntimeInputFocused()) {
-        renderStoreManagerPdaPreview();
+        if (preserveScroll) {
+          renderStoreManagerPdaPreviewPreservingScroll();
+        } else {
+          renderStoreManagerPdaPreview();
+        }
       }
     }
     if (pollClerk) {
       await loadClerkPdaAssignedTasksForPolling({ force });
       markPdaRuntimeRefreshed();
       if (!isPdaRuntimeInputFocused()) {
-        renderStoreMobilePricingPreview();
+        if (preserveScroll) {
+          renderStoreMobilePricingPreviewPreservingScroll();
+        } else {
+          renderStoreMobilePricingPreview();
+        }
       }
     }
     return true;
   } catch (error) {
     pdaRuntimePollingWarning = formatErrorMessage(error);
     if (pollManager && !isPdaRuntimeInputFocused()) {
-      renderStoreManagerPdaPreview();
+      if (preserveScroll) {
+        renderStoreManagerPdaPreviewPreservingScroll();
+      } else {
+        renderStoreManagerPdaPreview();
+      }
     }
     if (pollClerk && !isPdaRuntimeInputFocused()) {
-      renderStoreMobilePricingPreview();
+      if (preserveScroll) {
+        renderStoreMobilePricingPreviewPreservingScroll();
+      } else {
+        renderStoreMobilePricingPreview();
+      }
     }
     return false;
   } finally {
@@ -4640,6 +4753,12 @@ function renderStoreManagerPdaPreview(tabId = "") {
       </nav>
     </div>
   `;
+}
+
+function renderStoreManagerPdaPreviewPreservingScroll() {
+  const scrollState = capturePdaRuntimeScrollState();
+  renderStoreManagerPdaPreview();
+  restorePdaRuntimeScrollState(scrollState);
 }
 
 function findStoreManagerPdaTaskBySdoCode(state = createStoreManagerPdaTaskState(), value = "") {
@@ -31994,6 +32113,12 @@ function renderStoreMobilePricingPreview() {
   `;
 }
 
+function renderStoreMobilePricingPreviewPreservingScroll() {
+  const scrollState = capturePdaRuntimeScrollState();
+  renderStoreMobilePricingPreview();
+  restorePdaRuntimeScrollState(scrollState);
+}
+
 function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState, groupId = "", action = "") {
   const groups = getStoreMobileTaskGroups(state);
   const group = groups.find((item) => String(item.group_id || "") === String(groupId || ""));
@@ -37592,7 +37717,7 @@ document.addEventListener("visibilitychange", () => {
     return;
   }
   if (document.visibilityState === "visible") {
-    startPdaRuntimePolling({ immediate: true });
+    startPdaRuntimePolling();
     runPdaRuntimePollOnce({ force: true, reason: "visible" }).catch(() => {});
   }
 });
