@@ -703,6 +703,83 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(listed_row["driver_phone"], "0712345678")
         self.assertEqual(listed_row["delivery_status"], "in_transit")
 
+    def test_store_delivery_dispatch_syncs_sdo_and_sdp_package_status(self):
+        first = self._create_store_delivery_package_state_order()
+        receiving_eligible_statuses = {
+            "shipped",
+            "dispatched",
+            "in_transit",
+            "pending_receipt",
+            "pending_store_receiving",
+            "receiving_in_progress",
+            "partially_received",
+            "received",
+            "completed",
+            "closed",
+        }
+        execution_no = first["execution_order_no"]
+
+        self.assertEqual(first["status"], "pending_print")
+        self.assertNotIn(first["status"], receiving_eligible_statuses)
+        self.assertEqual([package["status"] for package in first["packages"]], ["created", "created"])
+        for package in first["packages"]:
+            persisted = self.state.store_delivery_packages[package["display_code"]]
+            self.assertEqual(persisted["status"], "created")
+
+        result = self.state.ship_store_delivery_transfers(
+            {
+                "transfer_nos": [first["source_transfer_no"]],
+                "shipped_by": "warehouse_supervisor_1",
+                "driver_name": "Driver A",
+                "vehicle_no": "KDM-001A",
+                "driver_phone": "0712345678",
+                "note": "dispatch to store",
+            }
+        )
+        self.assertEqual(result["shipments"][0]["store_delivery_execution_order"]["status"], "in_transit")
+        self.assertTrue(
+            all(package["status"] == "in_transit" for package in result["shipments"][0]["packages"])
+        )
+
+        transfer = self.state.get_transfer_order(first["source_transfer_no"])
+        self.assertEqual(transfer["status"], "shipped")
+        self.assertEqual(transfer["delivery_status"], "in_transit")
+        self.assertEqual(transfer["store_receipt_status"], "pending_receipt")
+
+        sdo = self.state.store_delivery_execution_orders[execution_no]
+        self.assertNotEqual(sdo["status"], "pending_print")
+        self.assertIn(sdo["status"], receiving_eligible_statuses)
+        self.assertEqual(sdo["delivery_status"], "in_transit")
+        self.assertEqual(sdo["store_receipt_status"], "pending_receipt")
+        self.assertTrue(sdo["updated_at"])
+        self.assertEqual(transfer["store_delivery_execution_status"], sdo["status"])
+
+        for package in sdo["packages"]:
+            self.assertNotEqual(package["status"], "created")
+            self.assertIn(package["status"], receiving_eligible_statuses)
+            self.assertEqual(package["delivery_status"], "in_transit")
+            self.assertEqual(package["store_receipt_status"], "pending_receipt")
+            self.assertEqual(package["received_status"], "pending")
+            self.assertEqual(package["assignment_status"], "unassigned")
+            self.assertEqual(package["exception_status"], "normal")
+            self.assertTrue(package["updated_at"])
+
+            persisted = self.state.store_delivery_packages[package["display_code"]]
+            self.assertEqual(persisted["status"], package["status"])
+            self.assertEqual(persisted["delivery_status"], "in_transit")
+            self.assertEqual(persisted["store_receipt_status"], "pending_receipt")
+            self.assertEqual(persisted["received_status"], "pending")
+            self.assertEqual(persisted["assignment_status"], "unassigned")
+            self.assertEqual(persisted["exception_status"], "normal")
+
+        listed = next(
+            row
+            for row in self.state.list_store_delivery_shipments()
+            if row["transfer_no"] == first["source_transfer_no"]
+        )
+        self.assertIn(listed["store_delivery_execution_order"]["status"], receiving_eligible_statuses)
+        self.assertTrue(all(package["status"] == "in_transit" for package in listed["packages"]))
+
     def test_store_delivery_shipment_accepts_sdo_level_items_and_returns_sdp_packages(self):
         first = self._create_store_delivery_package_state_order()
 
