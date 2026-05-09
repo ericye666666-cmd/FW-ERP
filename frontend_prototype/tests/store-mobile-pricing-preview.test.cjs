@@ -228,10 +228,35 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-bluetooth-printer-actions-227/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-bluetooth-printer-actions-227/);
+  assert.match(indexHtml, /app\.js\?v=clerk-bluetooth-printer-variants-228/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-bluetooth-printer-variants-228/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
+});
+
+test("clerk PDA Bluetooth printer panel exposes Chiteng S1 diagnostic protocol variants", () => {
+  const printerSectionSource = extractFunctionSource(appJs, "renderClerkBluetoothPrinterTestSection");
+  const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const requiredVariants = [
+    ["TSPL_SIMPLE_TEXT", "TSPL 简单文字"],
+    ["TSPL_DENSITY_TEXT", "TSPL 高浓度文字"],
+    ["TSPL_NO_GAP_CONTINUOUS", "TSPL 连续纸测试"],
+    ["TSPL_GAP_DETECT", "TSPL 间隙校准测试"],
+    ["RAW_LF_FEED", "RAW 走纸测试"],
+    ["ESC_POS_TEXT", "ESC/POS 文字测试"],
+    ["CPCL_SIMPLE_TEXT", "CPCL 简单文字"],
+  ];
+
+  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-test="TSPL"/);
+  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-test="CPCL"/);
+  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-test="ESC_POS"/);
+  assert.match(actionHandler, /printTestLabel\(String\(bluetoothPrinterTestProtocol \|\| ""\)\)/);
+  requiredVariants.forEach(([protocol, label]) => {
+    assert.match(printerSectionSource, new RegExp(`data-clerk-bluetooth-printer-test="${protocol}"`));
+    assert.match(printerSectionSource, new RegExp(label));
+    assert.match(appLegacyJs, new RegExp(`data-clerk-bluetooth-printer-test="${protocol}"`));
+  });
+  assert.doesNotMatch(actionHandler, /STORE_ITEM|marked.*printed|printJobs.*printed/);
 });
 
 test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {
