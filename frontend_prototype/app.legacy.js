@@ -30261,6 +30261,13 @@ function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPrevie
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="TSPL" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>打印 TSPL 测试标签</button>
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="CPCL" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>打印 CPCL 测试标签</button>
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="ESC_POS" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>打印 ESC/POS 测试标签</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="TSPL_SIMPLE_TEXT" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>TSPL 简单文字</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="TSPL_DENSITY_TEXT" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>TSPL 高浓度文字</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="TSPL_NO_GAP_CONTINUOUS" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>TSPL 连续纸测试</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="TSPL_GAP_DETECT" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>TSPL 间隙校准测试</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="RAW_LF_FEED" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>RAW 走纸测试</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="ESC_POS_TEXT" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>ESC/POS 文字测试</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="CPCL_SIMPLE_TEXT" ${clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected" ? "disabled" : ""}>CPCL 简单文字</button>
       </div>
     </section>
   `;
