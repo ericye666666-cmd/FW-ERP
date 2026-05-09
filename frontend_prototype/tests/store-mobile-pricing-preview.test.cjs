@@ -240,8 +240,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-printer-diagnostics-230/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-diagnostics-230/);
+  assert.match(indexHtml, /app\.js\?v=clerk-printer-diagnostics-stable-231/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-diagnostics-stable-231/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -280,11 +280,12 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(stateSource, /bluetoothPrinterRawStatusJson:\s*""/);
+  assert.match(stateSource, /bluetoothPrinterDiagnosticsOpen:\s*false/);
   assert.match(updateStatus, /rawStatusJson/);
   assert.match(rawJsonSource, /JSON\.stringify/);
   assert.match(printerPageSource, /renderClerkPrinterDiagnosticDetails/);
   assert.match(diagnosticsSource, /<details class="clerk-printer-diagnostics"/);
-  assert.doesNotMatch(diagnosticsSource, /<details class="clerk-printer-diagnostics" open/);
+  assert.match(diagnosticsSource, /state\.bluetoothPrinterDiagnosticsOpen\s*\?\s*"open"\s*:\s*""/);
   assert.match(diagnosticsSource, /诊断详情 \/ Developer diagnostics/);
   assert.match(diagnosticsSource, /bridge_available/);
   assert.match(diagnosticsSource, /bluetooth_enabled/);
@@ -301,13 +302,36 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.match(diagnosticsSource, /raw JSON from latest getPrinterStatus\(\)/);
   assert.match(diagnosticsSource, /刷新诊断状态/);
   assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-diagnostic-refresh/);
+  assert.match(diagnosticsSource, /锁定诊断状态/);
   assert.match(actionHandler, /clerkBluetoothPrinterDiagnosticRefresh/);
   assert.match(actionHandler, /pollClerkBluetoothPrinterStatus\(\{\s*reason:\s*"manual"/);
   assert.match(pollPrinter, /const status = await bridge\.getPrinterStatus\(\)/);
   assert.match(pollPrinter, /rawStatusJson:\s*formatClerkBluetoothPrinterRawStatusJson\(status\)/);
+  assert.doesNotMatch(pollPrinter, /bluetoothPrinterDiagnosticsOpen\s*=/);
   assert.doesNotMatch(actionHandler, /clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}connectPrinter|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}printTestLabel|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}listPairedPrinters/);
   assert.match(appLegacyJs, /诊断详情 \/ Developer diagnostics/);
   assert.match(appLegacyJs, /data-clerk-bluetooth-printer-diagnostic-refresh/);
+});
+
+test("clerk PDA printer diagnostics open state and connected badge survive rerender", () => {
+  const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const toggleHandler = extractFunctionSource(appJs, "handleClerkPrinterDiagnosticsToggle");
+  const badgeSource = extractFunctionSource(appJs, "renderClerkPrinterStatusBadge");
+
+  assert.match(stateSource, /bluetoothPrinterDiagnosticsOpen:\s*false/);
+  assert.match(diagnosticsSource, /data-clerk-printer-diagnostics="true"/);
+  assert.match(diagnosticsSource, /state\.bluetoothPrinterDiagnosticsOpen\s*\?\s*"open"\s*:\s*""/);
+  assert.match(toggleHandler, /bluetoothPrinterDiagnosticsOpen\s*=\s*Boolean\(details\.open\)/);
+  assert.match(appJs, /document\.addEventListener\("toggle"/);
+  assert.match(appJs, /handleClerkPrinterDiagnosticsToggle/);
+  assert.match(badgeSource, /已连接 \$\{name\}/);
+  assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?min-height:\s*34px/);
+  assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?max-width:\s*190px/);
+  assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?white-space:\s*normal/);
+  assert.doesNotMatch(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
+  assert.match(appLegacyJs, /bluetoothPrinterDiagnosticsOpen:\s*false/);
+  assert.match(appLegacyJs, /handleClerkPrinterDiagnosticsToggle/);
 });
 
 test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {
