@@ -93,7 +93,7 @@ test("login page exposes a subtle staging API mode indicator", () => {
 
 test("login page keeps cache-busted app and style assets", () => {
   assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=[^"]+" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=sdo-package-allocation-211"><\/script>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-polling-215"><\/script>/);
 });
 
 test("login form cannot fall back to native GET with credentials in the URL", () => {

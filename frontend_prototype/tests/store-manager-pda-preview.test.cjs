@@ -46,19 +46,15 @@ function executableStoreManagerSdoVerifier() {
 test("store manager PDA runtime bottom nav keeps the original four manager tabs", () => {
   const renderPreview = functionSource(appJs, "renderStoreManagerPdaPreview");
   const bottomTabs = functionSource(appJs, "renderStoreManagerPdaBottomTabs");
-  const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
 
   assert.match(renderPreview, /isPdaRuntimeMode\(\)/);
   assert.match(renderPreview, /renderStoreManagerPdaRuntimeScreen/);
   assert.match(bottomTabs, /STORE_MANAGER_PDA_TABS\.map/);
   ["经营总览", "收退货", "经营日志", "其他"].forEach((label) => {
     assert.match(appJs, new RegExp(`label: "${label}"`), `missing manager tab ${label}`);
-    assert.match(legacyGuard, new RegExp(`>${label}<`), `legacy guard missing manager tab ${label}`);
   });
   assert.match(bottomTabs, /data-store-manager-pda-tab/);
   assert.doesNotMatch(bottomTabs, /const bottomTabs = \["任务", "我的"\]/);
-  assert.doesNotMatch(legacyGuard, /data-legacy-manager-action="tasks">任务/);
-  assert.doesNotMatch(legacyGuard, /data-legacy-manager-action="my">我的/);
 });
 
 test("PDA bottom nav is fixed or sticky at the physical screen bottom for manager and clerk", () => {
@@ -91,6 +87,39 @@ test("manager runtime state is backend-backed, store scoped, and no longer seeds
   assert.match(backendLoad, /getAssignableStoreClerks\(storeCode\)/);
   assert.match(taskList, /暂无待收货 SDO，请先在仓库端完成门店配送发货。/);
   assert.match(renderPreview, /loadStoreManagerPdaBackendState/);
+});
+
+test("legacy store manager PDA fallback blocks old WebView instead of rendering fake SDO demo data", () => {
+  const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+  const managerFallback = functionSource(indexHtml, "renderLegacyStoreManagerRuntime");
+  const managerClick = functionSource(indexHtml, "handleLegacyManagerRuntimeClick");
+  const managerScan = functionSource(indexHtml, "handleLegacyManagerScanSubmit");
+
+  assert.match(legacyGuard, /renderLegacyStoreManagerRuntime/);
+  assert.match(managerFallback, /当前 PDA WebView 版本不支持店长端实时收货，请升级 Direct Loop PDA App 或 Android WebView。/);
+  assert.match(managerFallback, /Legacy fallback active/);
+  assert.match(managerFallback, /supportsModernSyntax=false/);
+  assert.match(managerFallback, /role:\s*store_manager/);
+  assert.match(managerFallback, /required:\s*modern runtime/);
+  assert.match(managerFallback, /no demo fallback/);
+  assert.doesNotMatch(managerFallback, /SDO260504008/);
+  assert.doesNotMatch(managerFallback, /SDP261250002/);
+  assert.doesNotMatch(managerFallback, /SDP261250003/);
+  assert.doesNotMatch(managerFallback, /演示任务|Demo only/);
+  assert.doesNotMatch(managerFallback, /总件数<\/b>390|total\s+390/);
+  assert.doesNotMatch(managerFallback, /data-legacy-manager-action/);
+  assert.doesNotMatch(managerClick, /SDO260504008|SDP261250002|SDP261250003|data-legacy-manager-action/);
+  assert.doesNotMatch(managerScan, /SDO260504008|4260504008|SDP261250002|SDP261250003/);
+});
+
+test("legacy store clerk fallback remains available for old clerk demo testing", () => {
+  const clerkFallback = functionSource(indexHtml, "renderLegacyStoreClerkRuntime");
+  const clerkTaskList = functionSource(indexHtml, "renderLegacyClerkTaskList");
+
+  assert.match(clerkFallback, /data-pda-runtime-surface="store-clerk"/);
+  assert.match(clerkTaskList, /演示任务 \/ Demo only/);
+  assert.match(clerkTaskList, /SDP261250002/);
+  assert.match(clerkTaskList, /SDO260504008/);
 });
 
 test("manager SDO task adapter maps only dispatched receiving-eligible SDO data and keeps SDB/LPK as source references", () => {

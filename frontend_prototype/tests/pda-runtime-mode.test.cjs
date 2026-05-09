@@ -111,8 +111,9 @@ test("PDA runtime surfaces render a visible failure instead of a blank page", ()
   assert.match(renderActivePdaRuntimeSurface, /ensurePdaRuntimeContent/);
 });
 
-test("legacy WebView guard renders clerk and manager PDA runtime content", () => {
+test("legacy WebView guard keeps clerk runtime but blocks manager fake SDO fallback", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+  const managerFallback = extractFunctionSource(indexHtml, "renderLegacyStoreManagerRuntime");
 
   assert.match(legacyGuard, /renderLegacyStoreClerkRuntime/);
   assert.match(legacyGuard, /data-pda-runtime-surface="store-clerk"/);
@@ -120,13 +121,12 @@ test("legacy WebView guard renders clerk and manager PDA runtime content", () =>
   assert.match(legacyGuard, /SDP261250002/);
   assert.match(legacyGuard, /价格组/);
   assert.match(legacyGuard, /renderLegacyStoreManagerRuntime/);
-  assert.match(legacyGuard, /data-pda-runtime-surface="store-manager"/);
-  assert.match(legacyGuard, /店长 PDA 工作台/);
-  assert.match(legacyGuard, /store-manager-pda-bottom-tabs/);
-  assert.match(legacyGuard, /经营总览/);
-  assert.match(legacyGuard, /收退货/);
-  assert.match(legacyGuard, /经营日志/);
-  assert.match(legacyGuard, /其他/);
+  assert.match(managerFallback, /当前 PDA WebView 版本不支持店长端实时收货，请升级 Direct Loop PDA App 或 Android WebView。/);
+  assert.match(managerFallback, /role:\s*store_manager/);
+  assert.match(managerFallback, /required:\s*modern runtime/);
+  assert.match(managerFallback, /no demo fallback/);
+  assert.doesNotMatch(managerFallback, /SDO260504008|SDP261250002|SDP261250003/);
+  assert.doesNotMatch(managerFallback, /store-manager-pda-bottom-tabs/);
   assert.doesNotMatch(legacyGuard, /data-legacy-manager-action="tasks">任务/);
   assert.doesNotMatch(legacyGuard, /data-legacy-manager-action="my">我的/);
   assert.match(legacyGuard, /PDA 页面加载失败，请联系管理员。/);
@@ -145,6 +145,6 @@ test("desktop preview shell remains available outside PDA runtime", () => {
 });
 
 test("PDA runtime PR cache-busts app and style assets", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=manager-pda-task-flow-209" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=manager-pda-task-flow-209"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-polling-215" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-polling-215"><\/script>/);
 });
