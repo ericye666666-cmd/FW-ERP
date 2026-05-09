@@ -30,6 +30,7 @@ const STORAGE_KEYS = {
   oaPayrollBatches: "retail_ops_oa_payroll_batches",
   oaFinanceApprovals: "retail_ops_oa_finance_approvals",
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
+  pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
 const balePrintFlow = globalThis.BalePrintFlow || {};
@@ -2665,6 +2666,7 @@ let pdaRuntimePollingWarning = "";
 let clerkBluetoothPrinterStatusPollingTimer = null;
 let clerkBluetoothPrinterStatusInFlight = false;
 let clerkBluetoothPrinterPairedPrintersInFlight = false;
+let clerkBluetoothPrinterActionInFlight = false;
 
 const LEGACY_WORKSPACE_MAP = {
   sorting: "warehouse",
@@ -3780,6 +3782,29 @@ function createDefaultClerkBluetoothPrinterStatus() {
   };
 }
 
+function getStoredPdaBluetoothPrinterSelection() {
+  const payload = safeParse(localStorage.getItem(STORAGE_KEYS.pdaBluetoothPrinterSelection), {});
+  if (!payload || typeof payload !== "object") {
+    return {};
+  }
+  return {
+    selected_printer_name: String(payload.selected_printer_name || "").trim(),
+    selected_printer_address: String(payload.selected_printer_address || "").trim(),
+    selected_profile: String(payload.selected_profile || "GENERIC").trim() || "GENERIC",
+  };
+}
+
+function persistPdaBluetoothPrinterSelection(status = {}) {
+  localStorage.setItem(
+    STORAGE_KEYS.pdaBluetoothPrinterSelection,
+    JSON.stringify({
+      selected_printer_name: String(status.selected_printer_name || "").trim(),
+      selected_printer_address: String(status.selected_printer_address || "").trim(),
+      selected_profile: String(status.selected_profile || "GENERIC").trim() || "GENERIC",
+    }),
+  );
+}
+
 function normalizeClerkBluetoothPrinterStatus(raw = {}) {
   const parsed = typeof raw === "string" ? safeParse(raw, {}) : raw;
   const status = parsed && typeof parsed === "object" ? parsed : {};
@@ -3827,7 +3852,11 @@ function getDirectLoopPdaPrinterBridge() {
 
 function updateClerkBluetoothPrinterStatus(status = {}, options = {}) {
   const state = storeMobilePricingPreviewState;
-  state.bluetoothPrinterStatus = normalizeClerkBluetoothPrinterStatus(status);
+  const storedSelection = getStoredPdaBluetoothPrinterSelection();
+  state.bluetoothPrinterStatus = normalizeClerkBluetoothPrinterStatus({
+    ...storedSelection,
+    ...status,
+  });
   state.bluetoothPrinterLastRefreshAt = new Date().toISOString();
   if (!options.keepError) {
     state.bluetoothPrinterError = "";
@@ -3835,6 +3864,7 @@ function updateClerkBluetoothPrinterStatus(status = {}, options = {}) {
   if (options.pairedPrintersLoaded) {
     state.bluetoothPrinterPairedPrintersLoaded = true;
   }
+  persistPdaBluetoothPrinterSelection(state.bluetoothPrinterStatus);
   return state.bluetoothPrinterStatus;
 }
 
@@ -3964,6 +3994,24 @@ async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
     return false;
   } finally {
     clerkBluetoothPrinterPairedPrintersInFlight = false;
+  }
+}
+
+async function runClerkBluetoothPrinterAction(executor) {
+  if (clerkBluetoothPrinterActionInFlight) {
+    return false;
+  }
+  clerkBluetoothPrinterActionInFlight = true;
+  try {
+    await executor();
+    await pollClerkBluetoothPrinterStatus({ reason: "manual" });
+    return true;
+  } catch (error) {
+    setClerkBluetoothPrinterError(formatErrorMessage(error));
+    renderClerkBluetoothPrinterStatusIfActive();
+    throw error;
+  } finally {
+    clerkBluetoothPrinterActionInFlight = false;
   }
 }
 
@@ -32808,7 +32856,9 @@ function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPrevie
     ["bluetooth_enabled", String(Boolean(status.bluetooth_enabled))],
     ["connection_status", status.connection_status || "-"],
     ["selected_printer_name/address", selectedPrinter],
+    ["selected printer", selectedPrinter],
     ["selected_profile", status.selected_profile || "-"],
+    ["selected profile", status.selected_profile || "-"],
     ["last_error", status.last_error || "-"],
     ["last_protocol_tested", status.last_protocol_tested || "-"],
     ["last_print_result", status.last_print_result || "-"],
@@ -32822,6 +32872,13 @@ function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPrevie
       <div class="clerk-bluetooth-printer-refresh-row">
         <span class="subtle small">最近刷新 ${escapeHtml(lastRefresh)}</span>
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-refresh="true">刷新已配对打印机</button>
+      </div>
+      <div class="mobile-field">
+        <label for="clerkBluetoothPrinterProfileSelect">打印机协议档案</label>
+        <select id="clerkBluetoothPrinterProfileSelect" data-clerk-bluetooth-printer-profile="true" ${clerkBluetoothPrinterActionInFlight ? "disabled" : ""}>
+          ${[["CHITENG_S1", "驰腾 S1 / CHITENG_S1"], ["UROVO", "Urovo / UROVO"], ["GENERIC", "通用 / GENERIC"]]
+            .map(([value, label]) => `<option value="${escapeHtml(value)}" ${status.selected_profile === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
+        </select>
       </div>
       ${state.bluetoothPrinterError ? `<div class="alert-banner clerk-bluetooth-printer-error">${escapeHtml(state.bluetoothPrinterError)}</div>` : ""}
       <div class="clerk-bluetooth-printer-status-grid">
@@ -32840,10 +32897,18 @@ function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPrevie
                 <article>
                   <strong>${escapeHtml(printer.name || "-")}</strong>
                   <span>${escapeHtml(printer.address || "-")} · ${escapeHtml(printer.bond_state || "-")}</span>
+                  <button type="button" class="ghost-button" data-clerk-bluetooth-printer-select="${escapeHtml(printer.address || "")}" data-clerk-bluetooth-printer-name="${escapeHtml(printer.name || "")}" ${clerkBluetoothPrinterActionInFlight ? "disabled" : ""}>选择此打印机</button>
                 </article>
               `).join("")
             : '<div class="subtle small">暂无已配对打印机数据。</div>'
         }
+      </div>
+      <div class="mobile-bottom-button-stack">
+        <button type="button" class="primary-button" data-clerk-bluetooth-printer-connect="true" ${(clerkBluetoothPrinterActionInFlight || !status.selected_printer_address || status.connection_status === "connecting") ? "disabled" : ""}>连接打印机</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-disconnect="true" ${clerkBluetoothPrinterActionInFlight ? "disabled" : ""}>断开连接</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="TSPL" ${(clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected") ? "disabled" : ""}>打印 TSPL 测试标签</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="CPCL" ${(clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected") ? "disabled" : ""}>打印 CPCL 测试标签</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="ESC_POS" ${(clerkBluetoothPrinterActionInFlight || status.connection_status !== "connected") ? "disabled" : ""}>打印 ESC/POS 测试标签</button>
       </div>
     </section>
   `;
@@ -33249,8 +33314,67 @@ function handleStoreMobilePricingPreviewAction(button) {
   const categoryChoice = button.dataset.mobilePricingCategoryChoice;
   const qtyStep = button.dataset.mobilePricingQtyStep;
   const refreshBluetoothPrinter = button.dataset.clerkBluetoothPrinterRefresh;
+  const selectBluetoothPrinter = button.dataset.clerkBluetoothPrinterSelect;
+  const connectBluetoothPrinter = button.dataset.clerkBluetoothPrinterConnect;
+  const disconnectBluetoothPrinter = button.dataset.clerkBluetoothPrinterDisconnect;
+  const bluetoothPrinterTestProtocol = button.dataset.clerkBluetoothPrinterTest;
+  const bluetoothPrinterProfileSelect = button.dataset.clerkBluetoothPrinterProfile;
+  if (bluetoothPrinterProfileSelect) {
+    const nextStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+    nextStatus.selected_profile = String(button.value || "GENERIC").trim() || "GENERIC";
+    updateClerkBluetoothPrinterStatus(nextStatus);
+    renderStoreMobilePricingPreview();
+    return;
+  }
+  if (selectBluetoothPrinter) {
+    const nextStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+    nextStatus.selected_printer_address = String(selectBluetoothPrinter || "").trim();
+    nextStatus.selected_printer_name = String(button.dataset.clerkBluetoothPrinterName || "").trim();
+    updateClerkBluetoothPrinterStatus(nextStatus);
+    renderStoreMobilePricingPreview();
+    return;
+  }
   if (refreshBluetoothPrinter) {
     refreshClerkBluetoothPairedPrinters({ reason: "manual" }).catch(() => {});
+    return;
+  }
+  if (connectBluetoothPrinter || disconnectBluetoothPrinter || bluetoothPrinterTestProtocol) {
+    const bridge = getDirectLoopPdaPrinterBridge();
+    if (!bridge) {
+      setClerkBluetoothPrinterError("当前设备不支持蓝牙打印桥接，请使用最新版 Direct Loop PDA Android App。");
+      renderStoreMobilePricingPreview();
+      return;
+    }
+    runClerkBluetoothPrinterAction(async () => {
+      const currentStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+      if (connectBluetoothPrinter) {
+        if (typeof bridge.connectPrinter !== "function") {
+          throw new Error("当前设备不支持 connectPrinter。");
+        }
+        await bridge.connectPrinter(JSON.stringify({
+          profile: currentStatus.selected_profile,
+          address: currentStatus.selected_printer_address,
+          name: currentStatus.selected_printer_name,
+        }));
+      } else if (disconnectBluetoothPrinter) {
+        if (typeof bridge.disconnectPrinter !== "function") {
+          throw new Error("当前设备不支持 disconnectPrinter。");
+        }
+        await bridge.disconnectPrinter();
+      } else if (bluetoothPrinterTestProtocol) {
+        if (typeof bridge.printTestLabel !== "function") {
+          throw new Error("当前设备不支持 printTestLabel。");
+        }
+        await bridge.printTestLabel(String(bluetoothPrinterTestProtocol || ""));
+      }
+    }).then(() => {
+      renderStoreMobilePricingPreview();
+      const currentStatus = normalizeClerkBluetoothPrinterStatus(storeMobilePricingPreviewState.bluetoothPrinterStatus);
+      if (bluetoothPrinterTestProtocol && currentStatus.last_print_result !== "success" && currentStatus.last_error) {
+        window.alert(currentStatus.last_error);
+      }
+    }).catch(() => {});
+    renderStoreMobilePricingPreview();
     return;
   }
   if (resetTask) {
@@ -39627,13 +39751,21 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
   event.preventDefault();
   handleStoreMobilePricingPreviewAction(button);
+});
+
+document.addEventListener("change", (event) => {
+  const field = event.target instanceof HTMLElement ? event.target.closest("[data-clerk-bluetooth-printer-profile]") : null;
+  if (!(field instanceof HTMLElement)) {
+    return;
+  }
+  handleStoreMobilePricingPreviewAction(field);
 });
 
 document.addEventListener("submit", (event) => {
