@@ -35,6 +35,25 @@
     ])),
   );
 
+  const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = Object.freeze(
+    DEFAULT_APPAREL_CATEGORY_PRESETS.flatMap((preset) => ([
+      {
+        category_main: preset.category_main,
+        category_sub: preset.category_sub,
+        grade: "P",
+        default_sale_price_kes: preset.cost_p * 2,
+        note: `${preset.label} P 档默认售价；参考售价 = 默认成本 × 2`,
+      },
+      {
+        category_main: preset.category_main,
+        category_sub: preset.category_sub,
+        grade: "S",
+        default_sale_price_kes: preset.cost_s * 2,
+        note: `${preset.label} S 档默认售价；参考售价 = 默认成本 × 2`,
+      },
+    ])),
+  );
+
   function normalizeText(value) {
     return String(value || "").trim();
   }
@@ -78,6 +97,32 @@
       });
   }
 
+  function normalizeApparelDefaultSalePriceRows(rows = []) {
+    const seen = new Set();
+    return (Array.isArray(rows) ? rows : [])
+      .map((row) => ({
+        category_main: normalizeText(row && row.category_main),
+        category_sub: normalizeText(row && row.category_sub),
+        grade: normalizeGrade(row && row.grade),
+        default_sale_price_kes: roundToTwo(row && row.default_sale_price_kes),
+        note: normalizeText(row && row.note),
+      }))
+      .filter((row) => row.category_main && row.category_sub && row.grade && row.default_sale_price_kes > 0)
+      .filter((row) => {
+        const key = `${normalizeLower(row.category_main)}||${normalizeLower(row.category_sub)}||${row.grade}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .sort((left, right) => {
+        const leftKey = `${left.category_main}/${left.category_sub}/${left.grade}`;
+        const rightKey = `${right.category_main}/${right.category_sub}/${right.grade}`;
+        return leftKey.localeCompare(rightKey, "zh-CN");
+      });
+  }
+
   function findApparelDefaultCostRecord(rows = [], categoryMain = "", categorySub = "", grade = "") {
     const normalizedMain = normalizeLower(categoryMain);
     const normalizedSub = normalizeLower(categorySub);
@@ -86,6 +131,21 @@
       return null;
     }
     return normalizeApparelDefaultCostRows(rows).find(
+      (row) =>
+        normalizeLower(row && row.category_main) === normalizedMain
+        && normalizeLower(row && row.category_sub) === normalizedSub
+        && normalizeGrade(row && row.grade) === normalizedGrade,
+    ) || null;
+  }
+
+  function findApparelDefaultSalePriceRecord(rows = [], categoryMain = "", categorySub = "", grade = "") {
+    const normalizedMain = normalizeLower(categoryMain);
+    const normalizedSub = normalizeLower(categorySub);
+    const normalizedGrade = normalizeGrade(grade);
+    if (!normalizedMain || !normalizedSub || !normalizedGrade) {
+      return null;
+    }
+    return normalizeApparelDefaultSalePriceRows(rows).find(
       (row) =>
         normalizeLower(row && row.category_main) === normalizedMain
         && normalizeLower(row && row.category_sub) === normalizedSub
@@ -107,11 +167,29 @@
     );
   }
 
+  function summarizeApparelDefaultSalePrices(rows = []) {
+    return normalizeApparelDefaultSalePriceRows(rows).reduce(
+      (summary, row) => {
+        summary.totalCount += 1;
+        summary.gradeCounts[row.grade] += 1;
+        return summary;
+      },
+      {
+        totalCount: 0,
+        gradeCounts: { P: 0, S: 0 },
+      },
+    );
+  }
+
   return {
     DEFAULT_APPAREL_CATEGORY_PRESETS,
     DEFAULT_APPAREL_DEFAULT_COSTS,
+    DEFAULT_APPAREL_DEFAULT_SALE_PRICES,
     normalizeApparelDefaultCostRows,
+    normalizeApparelDefaultSalePriceRows,
     findApparelDefaultCostRecord,
+    findApparelDefaultSalePriceRecord,
     summarizeApparelDefaultCosts,
+    summarizeApparelDefaultSalePrices,
   };
 });

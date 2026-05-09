@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   transferPrepExecution: "retail_ops_transfer_prep_execution",
   apparelPieceWeights: "retail_ops_apparel_piece_weights",
   apparelDefaultCosts: "retail_ops_apparel_default_costs",
+  apparelDefaultSalePrices: "retail_ops_apparel_default_sale_prices",
   apparelSortingRacks: "retail_ops_apparel_sorting_racks",
   directHangUnpacks: "retail_ops_direct_hang_unpacks",
   directHangDispatchOrders: "retail_ops_direct_hang_dispatch_orders",
@@ -1353,6 +1354,7 @@ const workspaceSectionCollapseState = safeParse(localStorage.getItem("retail_ops
 let devTrackerState = safeParse(localStorage.getItem(STORAGE_KEYS.devTracker), null);
 let apparelPieceWeightState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelPieceWeights), []);
 let apparelDefaultCostState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelDefaultCosts), []);
+let apparelDefaultSalePriceState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelDefaultSalePrices), []);
 let apparelSortingRackState = safeParse(localStorage.getItem(STORAGE_KEYS.apparelSortingRacks), []);
 
 const DEFAULT_APPAREL_PIECE_WEIGHTS = [
@@ -1387,6 +1389,13 @@ const DEFAULT_APPAREL_DEFAULT_COSTS = apparelDefaultCostFlow.DEFAULT_APPAREL_DEF
   { category_main: "jacket", category_sub: "jacket", grade: "P", default_cost_kes: 260, note: "外套 P 档默认成本" },
   { category_main: "jacket", category_sub: "jacket", grade: "S", default_cost_kes: 198, note: "外套 S 档默认成本" },
 ];
+const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = apparelDefaultCostFlow.DEFAULT_APPAREL_DEFAULT_SALE_PRICES || DEFAULT_APPAREL_DEFAULT_COSTS.map((row) => ({
+  category_main: row.category_main,
+  category_sub: row.category_sub,
+  grade: row.grade,
+  default_sale_price_kes: roundToTwo(Number(row.default_cost_kes || 0) * 2),
+  note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；参考售价 = 默认成本 × 2`,
+}));
 const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SORTING_RACKS || [
   { category_main: "tops", category_sub: "lady tops", grade: "P", default_cost_kes: 185, rack_code: "A-TS-P-01", note: "女装上衣 P 档默认分拣库位" },
   { category_main: "tops", category_sub: "lady tops", grade: "S", default_cost_kes: 138, rack_code: "A-TS-S-01", note: "女装上衣 S 档默认分拣库位" },
@@ -7626,6 +7635,56 @@ function persistApparelDefaultCostState() {
   localStorage.setItem(STORAGE_KEYS.apparelDefaultCosts, JSON.stringify(ensureApparelDefaultCostState()));
 }
 
+function normalizeApparelDefaultSalePriceRows(rows = []) {
+  const normalize = apparelDefaultCostFlow.normalizeApparelDefaultSalePriceRows;
+  if (typeof normalize === "function") {
+    return normalize(rows);
+  }
+  const seen = new Set();
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      category_main: String(row?.category_main || "").trim(),
+      category_sub: String(row?.category_sub || "").trim(),
+      grade: String(row?.grade || "").trim().toUpperCase(),
+      default_sale_price_kes: roundToTwo(Number(row?.default_sale_price_kes || 0)),
+      note: String(row?.note || "").trim(),
+    }))
+    .filter((row) => row.category_main && row.category_sub && ["P", "S"].includes(row.grade) && row.default_sale_price_kes > 0)
+    .filter((row) => {
+      const key = `${row.category_main.toLowerCase()}||${row.category_sub.toLowerCase()}||${row.grade}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function ensureApparelDefaultSalePriceState() {
+  if (!Array.isArray(apparelDefaultSalePriceState) || !apparelDefaultSalePriceState.length) {
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(DEFAULT_APPAREL_DEFAULT_SALE_PRICES);
+  } else {
+    const merged = [...apparelDefaultSalePriceState];
+    DEFAULT_APPAREL_DEFAULT_SALE_PRICES.forEach((row) => {
+      const exists = merged.some(
+        (entry) =>
+          String(entry?.category_main || "").trim().toLowerCase() === String(row.category_main || "").trim().toLowerCase()
+          && String(entry?.category_sub || "").trim().toLowerCase() === String(row.category_sub || "").trim().toLowerCase()
+          && String(entry?.grade || "").trim().toUpperCase() === String(row.grade || "").trim().toUpperCase(),
+      );
+      if (!exists) {
+        merged.push(row);
+      }
+    });
+    apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(merged);
+  }
+  return apparelDefaultSalePriceState;
+}
+
+function persistApparelDefaultSalePriceState() {
+  localStorage.setItem(STORAGE_KEYS.apparelDefaultSalePrices, JSON.stringify(ensureApparelDefaultSalePriceState()));
+}
+
 function normalizeApparelSortingRackRows(rows = []) {
   const normalize = apparelSortingRackFlow.normalizeApparelSortingRackRows;
   if (typeof normalize === "function") {
@@ -8146,6 +8205,22 @@ function getApparelDefaultCostByCategoryGrade(mainCategory = "", subCategory = "
   ) || null;
 }
 
+function getApparelDefaultSalePriceByCategoryGrade(mainCategory = "", subCategory = "", grade = "") {
+  const finder = apparelDefaultCostFlow.findApparelDefaultSalePriceRecord;
+  if (typeof finder === "function") {
+    return finder(ensureApparelDefaultSalePriceState(), mainCategory, subCategory, grade);
+  }
+  const normalizedMain = String(mainCategory || "").trim().toLowerCase();
+  const normalizedSub = String(subCategory || "").trim().toLowerCase();
+  const normalizedGrade = String(grade || "").trim().toUpperCase();
+  return ensureApparelDefaultSalePriceState().find(
+    (row) =>
+      String(row?.category_main || "").trim().toLowerCase() === normalizedMain
+      && String(row?.category_sub || "").trim().toLowerCase() === normalizedSub
+      && String(row?.grade || "").trim().toUpperCase() === normalizedGrade,
+  ) || null;
+}
+
 function getApparelSortingRackByCategoryGradeCost(mainCategory = "", subCategory = "", grade = "", defaultCostKes = 0) {
   const finder = apparelSortingRackFlow.findApparelSortingRackRecord;
   if (typeof finder === "function") {
@@ -8362,6 +8437,27 @@ function populateApparelDefaultCostSubSelect(selectedValue = "") {
   }
 }
 
+function populateApparelDefaultSalePriceSubSelect(selectedValue = "") {
+  const form = document.querySelector("#apparelDefaultSalePriceForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const mainValue = String(form.querySelector("[name='category_main']")?.value || "").trim();
+  const subSelect = form.querySelector("[name='category_sub']");
+  if (!(subSelect instanceof HTMLSelectElement)) {
+    return;
+  }
+  const categoryTree = getChinaSourceCategoryTree();
+  const options = ['<option value="">请选择商品小类</option>'];
+  (categoryTree[mainValue] || []).forEach((subCategory) => {
+    options.push(`<option value="${escapeHtml(subCategory)}"${subCategory === selectedValue ? " selected" : ""}>${escapeHtml(subCategory)}</option>`);
+  });
+  subSelect.innerHTML = options.join("");
+  if (selectedValue) {
+    subSelect.value = selectedValue;
+  }
+}
+
 function populateApparelSortingRackSubSelect(selectedValue = "") {
   const form = document.querySelector("#apparelSortingRackForm");
   if (!(form instanceof HTMLFormElement)) {
@@ -8516,6 +8612,85 @@ function renderApparelDefaultCostSummary(record = null) {
       `)
       .join("")
     : "先新增一条默认成本价配置。";
+}
+
+function renderApparelDefaultSalePriceSummary(record = null) {
+  const summaryTarget = document.querySelector("#apparelDefaultSalePriceSummary");
+  const listTarget = document.querySelector("#apparelDefaultSalePriceList");
+  if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
+    return;
+  }
+  const rows = ensureApparelDefaultSalePriceState();
+  const summarize = apparelDefaultCostFlow.summarizeApparelDefaultSalePrices;
+  const summary = typeof summarize === "function"
+    ? summarize(rows)
+    : rows.reduce(
+      (acc, row) => {
+        acc.totalCount += 1;
+        acc.gradeCounts[String(row?.grade || "").trim().toUpperCase()] += 1;
+        return acc;
+      },
+      { totalCount: 0, gradeCounts: { P: 0, S: 0 } },
+    );
+  const current = record || (() => {
+    const form = document.querySelector("#apparelDefaultSalePriceForm");
+    if (!(form instanceof HTMLFormElement)) {
+      return null;
+    }
+    const payload = Object.fromEntries(new FormData(form).entries());
+    if (!payload.category_main || !payload.category_sub || !payload.grade) {
+      return null;
+    }
+    return {
+      category_main: String(payload.category_main || "").trim(),
+      category_sub: String(payload.category_sub || "").trim(),
+      grade: String(payload.grade || "").trim().toUpperCase(),
+      default_sale_price_kes: roundToTwo(Number(payload.default_sale_price_kes || 0)),
+      note: String(payload.note || "").trim(),
+    };
+  })();
+
+  if (!current || !(Number(current.default_sale_price_kes || 0) > 0)) {
+    summaryTarget.className = "report-summary";
+    summaryTarget.innerHTML = `
+      <div class="report-summary-grid">
+        <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
+        <article class="store-metric"><strong>P 档默认售价</strong><span>${escapeHtml(String(summary.gradeCounts?.P || 0))}</span></article>
+        <article class="store-metric"><strong>S 档默认售价</strong><span>${escapeHtml(String(summary.gradeCounts?.S || 0))}</span></article>
+        <article class="store-metric"><strong>说明</strong><span>参考售价 = 默认成本 × 2</span></article>
+      </div>
+      <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+    `;
+  } else {
+    summaryTarget.className = "report-summary";
+    summaryTarget.innerHTML = `
+      <div class="report-summary-grid">
+        <article class="store-metric"><strong>当前口径</strong><span>${escapeHtml(`${current.category_main} / ${current.category_sub}`)}</span></article>
+        <article class="store-metric"><strong>等级</strong><span>${escapeHtml(current.grade)}</span></article>
+        <article class="store-metric"><strong>默认售价 KES</strong><span>${escapeHtml(formatKesAmount(current.default_sale_price_kes, "KES 0.00"))}</span></article>
+        <article class="store-metric"><strong>说明</strong><span>${escapeHtml(current.note || "默认售价配置")}</span></article>
+      </div>
+      <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+    `;
+  }
+
+  listTarget.className = rows.length ? "candidate-summary" : "candidate-summary empty-state";
+  listTarget.innerHTML = rows.length
+    ? rows
+      .map((row) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(`${row.category_main} / ${row.category_sub} · ${row.grade}`)}</strong>
+            <div class="subtle small">${escapeHtml(`${formatKesAmount(row.default_sale_price_kes, "KES 0.00")} · ${row.note || "默认售价"}`)}</div>
+          </div>
+          <div class="button-row">
+            <button type="button" class="ghost-button mini-button" data-apparel-default-sale-price-edit="${escapeHtml(`${row.category_main}||${row.category_sub}||${row.grade}`)}">编辑</button>
+            <button type="button" class="ghost-button mini-button" data-apparel-default-sale-price-delete="${escapeHtml(`${row.category_main}||${row.category_sub}||${row.grade}`)}">删除</button>
+          </div>
+        </article>
+      `)
+      .join("")
+    : "先新增一条默认售价配置。";
 }
 
 function renderApparelSortingRackSummary(record = null) {
@@ -32898,6 +33073,7 @@ async function loadConfig() {
   persistChinaSourceBaleState();
   persistApparelPieceWeightState();
   persistApparelDefaultCostState();
+  persistApparelDefaultSalePriceState();
   persistApparelSortingRackState();
   populateStoreSelects(stores);
   populateSupplierSelects(suppliers);
@@ -32919,6 +33095,8 @@ async function loadConfig() {
   renderApparelPieceWeightSummary();
   hydrateApparelDefaultCostForm(null);
   renderApparelDefaultCostSummary();
+  hydrateApparelDefaultSalePriceForm(null);
+  renderApparelDefaultSalePriceSummary();
   hydrateApparelSortingRackForm(null);
   renderApparelSortingRackSummary();
   refreshSortingScannerDeviceState().catch(() => {});
@@ -35231,6 +35409,28 @@ function hydrateApparelDefaultCostForm(record = null) {
   setInputValue("#apparelDefaultCostForm [name='note']", record?.note || "");
 }
 
+function hydrateApparelDefaultSalePriceForm(record = null) {
+  const form = document.querySelector("#apparelDefaultSalePriceForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const categoryTree = getChinaSourceCategoryTree();
+  const mainSelect = form.querySelector("[name='category_main']");
+  if (mainSelect instanceof HTMLSelectElement) {
+    mainSelect.innerHTML = [
+      '<option value="">请选择商品大类</option>',
+      ...Object.keys(categoryTree).map(
+        (mainCategory) => `<option value="${escapeHtml(mainCategory)}">${escapeHtml(mainCategory)}</option>`,
+      ),
+    ].join("");
+  }
+  setInputValue("#apparelDefaultSalePriceForm [name='category_main']", record?.category_main || "");
+  populateApparelDefaultSalePriceSubSelect(record?.category_sub || "");
+  setInputValue("#apparelDefaultSalePriceForm [name='grade']", record?.grade || "P");
+  setInputValue("#apparelDefaultSalePriceForm [name='default_sale_price_kes']", record?.default_sale_price_kes || "");
+  setInputValue("#apparelDefaultSalePriceForm [name='note']", record?.note || "");
+}
+
 function hydrateApparelSortingRackForm(record = null) {
   const form = document.querySelector("#apparelSortingRackForm");
   if (!(form instanceof HTMLFormElement)) {
@@ -35354,6 +35554,47 @@ async function submitApparelDefaultCost(event) {
   renderJsonBuilder("sorting-result-items");
   syncJsonBuilderToField("sorting-result-items");
   writeOutput("#apparelDefaultCostOutput", record);
+}
+
+async function submitApparelDefaultSalePrice(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  const record = {
+    category_main: String(payload.category_main || "").trim(),
+    category_sub: String(payload.category_sub || "").trim(),
+    grade: String(payload.grade || "").trim().toUpperCase(),
+    default_sale_price_kes: roundToTwo(Number(payload.default_sale_price_kes || 0)),
+    note: String(payload.note || "").trim(),
+  };
+  if (!record.category_main) {
+    throw new Error("请先选择商品大类。");
+  }
+  if (!record.category_sub) {
+    throw new Error("请先选择商品小类。");
+  }
+  if (!["P", "S"].includes(record.grade)) {
+    throw new Error("等级只支持 P 或 S。");
+  }
+  if (!(record.default_sale_price_kes > 0)) {
+    throw new Error("请先填写默认售价。");
+  }
+  const nextRows = [
+    record,
+    ...ensureApparelDefaultSalePriceState().filter(
+      (row) =>
+        !(
+          String(row?.category_main || "").trim().toLowerCase() === record.category_main.toLowerCase()
+          && String(row?.category_sub || "").trim().toLowerCase() === record.category_sub.toLowerCase()
+          && String(row?.grade || "").trim().toUpperCase() === record.grade.toUpperCase()
+        ),
+    ),
+  ];
+  apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(nextRows);
+  persistApparelDefaultSalePriceState();
+  hydrateApparelDefaultSalePriceForm(record);
+  renderApparelDefaultSalePriceSummary(record);
+  writeOutput("#apparelDefaultSalePriceOutput", record);
 }
 
 async function submitApparelSortingRack(event) {
@@ -37124,6 +37365,7 @@ const FORM_SUMMARY_SELECTORS = {
   "#itemIdentityLedgerForm": "#itemIdentityLedgerSummary",
   "#directHangUnpackForm": "#directHangUnpackSummary",
   "#apparelDefaultCostForm": "#apparelDefaultCostSummary",
+  "#apparelDefaultSalePriceForm": "#apparelDefaultSalePriceSummary",
   "#apparelSortingRackForm": "#apparelSortingRackSummary",
   "#baleSalesRebaleEntryForm": "#baleSalesRebaleEntrySummary",
   "#consignmentBundleForm": "#consignmentBundleSummary",
@@ -37198,6 +37440,9 @@ refreshProductCategoryControls();
 ensureApparelDefaultCostState();
 hydrateApparelDefaultCostForm(null);
 renderApparelDefaultCostSummary();
+ensureApparelDefaultSalePriceState();
+hydrateApparelDefaultSalePriceForm(null);
+renderApparelDefaultSalePriceSummary();
 ensureApparelSortingRackState();
 hydrateApparelSortingRackForm(null);
 renderApparelSortingRackSummary();
@@ -37262,6 +37507,7 @@ bindForm("#chinaSourceCostForm", submitChinaSourceCost, "#chinaSourceCostOutput"
 bindForm("#itemIdentityLedgerForm", submitItemIdentityLedger, "#itemIdentityLedgerOutput");
 bindForm("#directHangUnpackForm", submitDirectHangUnpack, "#directHangUnpackOutput");
 bindForm("#apparelDefaultCostForm", submitApparelDefaultCost, "#apparelDefaultCostOutput");
+bindForm("#apparelDefaultSalePriceForm", submitApparelDefaultSalePrice, "#apparelDefaultSalePriceOutput");
 bindForm("#apparelSortingRackForm", submitApparelSortingRack, "#apparelSortingRackOutput");
 
 ["has_loss_record", "loss_qty", "loss_weight_kg", "loss_note"].forEach((fieldName) => {
@@ -40233,6 +40479,22 @@ document.addEventListener("change", (event) => {
     renderApparelDefaultCostSummary();
     return;
   }
+  if (target instanceof HTMLSelectElement && target.matches("#apparelDefaultSalePriceForm [name='category_main']")) {
+    populateApparelDefaultSalePriceSubSelect();
+    renderApparelDefaultSalePriceSummary();
+    return;
+  }
+  if (target instanceof HTMLSelectElement && target.matches("#apparelDefaultSalePriceForm [name='category_sub'], #apparelDefaultSalePriceForm [name='grade']")) {
+    const form = document.querySelector("#apparelDefaultSalePriceForm");
+    if (form instanceof HTMLFormElement) {
+      const payload = Object.fromEntries(new FormData(form).entries());
+      const matched = getApparelDefaultSalePriceByCategoryGrade(payload.category_main, payload.category_sub, payload.grade);
+      setInputValue("#apparelDefaultSalePriceForm [name='default_sale_price_kes']", matched?.default_sale_price_kes || "");
+      setInputValue("#apparelDefaultSalePriceForm [name='note']", matched?.note || "");
+    }
+    renderApparelDefaultSalePriceSummary();
+    return;
+  }
   if (target instanceof HTMLSelectElement && target.matches("#apparelSortingRackForm [name='category_main']")) {
     populateApparelSortingRackSubSelect();
     setInputValue("#apparelSortingRackForm [name='default_cost_kes']", "");
@@ -40376,6 +40638,40 @@ document.addEventListener("click", async (event) => {
       } catch (error) {
         renderErrorSummary("#apparelDefaultCostSummary", formatErrorMessage(error));
       }
+      return;
+    }
+  }
+  const apparelDefaultSalePriceAction = event.target instanceof HTMLElement
+    ? event.target.closest("[data-apparel-default-sale-price-edit], [data-apparel-default-sale-price-delete]")
+    : null;
+  if (apparelDefaultSalePriceAction instanceof HTMLElement) {
+    const compositeKey = String(
+      apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceEdit || apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceDelete || "",
+    ).trim();
+    const [categoryMain = "", categorySub = "", grade = ""] = compositeKey.split("||");
+    if (apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceEdit) {
+      const record = getApparelDefaultSalePriceByCategoryGrade(categoryMain, categorySub, grade);
+      if (record) {
+        hydrateApparelDefaultSalePriceForm(record);
+        renderApparelDefaultSalePriceSummary(record);
+      }
+      return;
+    }
+    if (apparelDefaultSalePriceAction.dataset.apparelDefaultSalePriceDelete) {
+      apparelDefaultSalePriceState = normalizeApparelDefaultSalePriceRows(
+        ensureApparelDefaultSalePriceState().filter(
+          (row) =>
+            !(
+              String(row?.category_main || "").trim().toLowerCase() === categoryMain.trim().toLowerCase()
+              && String(row?.category_sub || "").trim().toLowerCase() === categorySub.trim().toLowerCase()
+              && String(row?.grade || "").trim().toUpperCase() === grade.trim().toUpperCase()
+            ),
+        ),
+      );
+      persistApparelDefaultSalePriceState();
+      hydrateApparelDefaultSalePriceForm(null);
+      renderApparelDefaultSalePriceSummary();
+      writeOutput("#apparelDefaultSalePriceOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认售价表移除。`);
       return;
     }
   }
