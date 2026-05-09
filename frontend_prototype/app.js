@@ -2656,11 +2656,15 @@ let activeStoreManagerPdaReturnCode = "";
 let storeManagerPdaReturnSubmitted = false;
 let storeManagerPdaTaskState = null;
 const PDA_RUNTIME_POLL_INTERVAL_MS = 3000;
+const CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS = 3000;
 let pdaRuntimePollingTimer = null;
 let pdaRuntimePollingInFlight = false;
 let pdaRuntimeActionInFlight = false;
 let pdaRuntimeLastRefreshAt = "";
 let pdaRuntimePollingWarning = "";
+let clerkBluetoothPrinterStatusPollingTimer = null;
+let clerkBluetoothPrinterStatusInFlight = false;
+let clerkBluetoothPrinterPairedPrintersInFlight = false;
 
 const LEGACY_WORKSPACE_MAP = {
   sorting: "warehouse",
@@ -3757,6 +3761,209 @@ function stopPdaRuntimePolling() {
   if (pdaRuntimePollingTimer) {
     window.clearInterval(pdaRuntimePollingTimer);
     pdaRuntimePollingTimer = null;
+  }
+}
+
+function createDefaultClerkBluetoothPrinterStatus() {
+  return {
+    bridge_available: false,
+    bluetooth_enabled: false,
+    paired_printer_count: 0,
+    paired_printers: [],
+    selected_printer_name: "",
+    selected_printer_address: "",
+    selected_profile: "GENERIC",
+    connection_status: "disconnected",
+    last_error: "",
+    last_protocol_tested: "",
+    last_print_result: "none",
+  };
+}
+
+function normalizeClerkBluetoothPrinterStatus(raw = {}) {
+  const parsed = typeof raw === "string" ? safeParse(raw, {}) : raw;
+  const status = parsed && typeof parsed === "object" ? parsed : {};
+  const printers = Array.isArray(status.paired_printers) ? status.paired_printers : [];
+  return {
+    ...createDefaultClerkBluetoothPrinterStatus(),
+    ...status,
+    bridge_available: Boolean(status.bridge_available),
+    bluetooth_enabled: Boolean(status.bluetooth_enabled),
+    paired_printer_count: Number(status.paired_printer_count ?? printers.length ?? 0),
+    paired_printers: printers.map((printer = {}) => ({
+      name: String(printer.name || "").trim(),
+      address: String(printer.address || "").trim(),
+      bond_state: String(printer.bond_state || "").trim(),
+    })),
+    selected_printer_name: String(status.selected_printer_name || "").trim(),
+    selected_printer_address: String(status.selected_printer_address || "").trim(),
+    selected_profile: String(status.selected_profile || "GENERIC").trim() || "GENERIC",
+    connection_status: String(status.connection_status || "disconnected").trim() || "disconnected",
+    last_error: String(status.last_error || "").trim(),
+    last_protocol_tested: String(status.last_protocol_tested || "").trim(),
+    last_print_result: String(status.last_print_result || "none").trim() || "none",
+  };
+}
+
+function normalizeClerkBluetoothPairedPrinters(raw = []) {
+  const parsed = typeof raw === "string" ? safeParse(raw, []) : raw;
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : (Array.isArray(parsed?.paired_printers) ? parsed.paired_printers : []);
+  return rows.map((printer = {}) => ({
+    name: String(printer.name || "").trim(),
+    address: String(printer.address || "").trim(),
+    bond_state: String(printer.bond_state || "").trim(),
+  }));
+}
+
+function getDirectLoopPdaPrinterBridge() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const bridge = window.DirectLoopPdaPrinter;
+  return bridge && typeof bridge === "object" ? bridge : null;
+}
+
+function updateClerkBluetoothPrinterStatus(status = {}, options = {}) {
+  const state = storeMobilePricingPreviewState;
+  state.bluetoothPrinterStatus = normalizeClerkBluetoothPrinterStatus(status);
+  state.bluetoothPrinterLastRefreshAt = new Date().toISOString();
+  if (!options.keepError) {
+    state.bluetoothPrinterError = "";
+  }
+  if (options.pairedPrintersLoaded) {
+    state.bluetoothPrinterPairedPrintersLoaded = true;
+  }
+  return state.bluetoothPrinterStatus;
+}
+
+function setClerkBluetoothPrinterError(message = "") {
+  const state = storeMobilePricingPreviewState;
+  state.bluetoothPrinterError = String(message || "打印机状态读取失败").trim();
+  state.bluetoothPrinterLastRefreshAt = new Date().toISOString();
+  state.bluetoothPrinterStatus = {
+    ...normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus),
+    bridge_available: Boolean(getDirectLoopPdaPrinterBridge()),
+    last_error: state.bluetoothPrinterError,
+  };
+}
+
+function renderClerkBluetoothPrinterStatusIfActive() {
+  if (storeMobilePricingPreviewState?.activePage !== "my") {
+    return;
+  }
+  if (!isPdaRuntimeInputFocused()) {
+    renderStoreMobilePricingPreviewPreservingScroll();
+  }
+}
+
+function shouldPollClerkBluetoothPrinterStatus() {
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (!currentSession?.token || !isPdaRuntimeMode() || roleCode !== "store_clerk") {
+    return false;
+  }
+  if (document.visibilityState === "hidden") {
+    return false;
+  }
+  const activePage = String(storeMobilePricingPreviewState?.activePage || "tasks");
+  return activePage === "my" && Boolean(document.querySelector("[data-clerk-bluetooth-printer-test-section]"));
+}
+
+function stopClerkBluetoothPrinterStatusPolling() {
+  if (clerkBluetoothPrinterStatusPollingTimer) {
+    window.clearInterval(clerkBluetoothPrinterStatusPollingTimer);
+    clerkBluetoothPrinterStatusPollingTimer = null;
+  }
+}
+
+function startClerkBluetoothPrinterStatusPolling({ immediate = false, includePairedPrinters = false } = {}) {
+  if (!shouldPollClerkBluetoothPrinterStatus()) {
+    stopClerkBluetoothPrinterStatusPolling();
+    return false;
+  }
+  if (!clerkBluetoothPrinterStatusPollingTimer) {
+    clerkBluetoothPrinterStatusPollingTimer = window.setInterval(() => {
+      pollClerkBluetoothPrinterStatus({ reason: "interval" }).catch(() => {});
+    }, CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS);
+  }
+  if (immediate) {
+    pollClerkBluetoothPrinterStatus({ reason: "immediate" }).catch(() => {});
+  }
+  if (includePairedPrinters && !storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLoaded) {
+    refreshClerkBluetoothPairedPrinters({ reason: "open" }).catch(() => {});
+  }
+  return true;
+}
+
+async function pollClerkBluetoothPrinterStatus({ reason = "manual" } = {}) {
+  if (document.visibilityState === "hidden") {
+    stopClerkBluetoothPrinterStatusPolling();
+    return false;
+  }
+  if (reason !== "manual" && !shouldPollClerkBluetoothPrinterStatus()) {
+    stopClerkBluetoothPrinterStatusPolling();
+    return false;
+  }
+  if (clerkBluetoothPrinterStatusInFlight) {
+    return false;
+  }
+  const bridge = window.DirectLoopPdaPrinter;
+  if (!bridge || typeof bridge.getPrinterStatus !== "function") {
+    setClerkBluetoothPrinterError("Android 打印桥不可用：window.DirectLoopPdaPrinter 未注入。");
+    renderClerkBluetoothPrinterStatusIfActive();
+    return false;
+  }
+  clerkBluetoothPrinterStatusInFlight = true;
+  try {
+    const status = await bridge.getPrinterStatus();
+    updateClerkBluetoothPrinterStatus(status);
+    renderClerkBluetoothPrinterStatusIfActive();
+    return true;
+  } catch (error) {
+    setClerkBluetoothPrinterError(formatErrorMessage(error));
+    renderClerkBluetoothPrinterStatusIfActive();
+    return false;
+  } finally {
+    clerkBluetoothPrinterStatusInFlight = false;
+  }
+}
+
+async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
+  if (clerkBluetoothPrinterPairedPrintersInFlight) {
+    return false;
+  }
+  const bridge = getDirectLoopPdaPrinterBridge();
+  if (!bridge || typeof bridge.listPairedPrinters !== "function") {
+    storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLoaded = true;
+    setClerkBluetoothPrinterError("Android 打印桥不可用：无法刷新已配对打印机。");
+    renderClerkBluetoothPrinterStatusIfActive();
+    return false;
+  }
+  clerkBluetoothPrinterPairedPrintersInFlight = true;
+  try {
+    const printers = normalizeClerkBluetoothPairedPrinters(await bridge.listPairedPrinters());
+    const currentStatus = normalizeClerkBluetoothPrinterStatus(storeMobilePricingPreviewState.bluetoothPrinterStatus);
+    updateClerkBluetoothPrinterStatus(
+      {
+        ...currentStatus,
+        bridge_available: true,
+        paired_printer_count: printers.length,
+        paired_printers: printers,
+        last_error: printers.length ? currentStatus.last_error : "没有已配对的蓝牙打印机。",
+      },
+      { pairedPrintersLoaded: true, keepError: printers.length === 0 },
+    );
+    storeMobilePricingPreviewState.bluetoothPrinterError = printers.length ? "" : "没有已配对的蓝牙打印机。";
+    renderClerkBluetoothPrinterStatusIfActive();
+    return true;
+  } catch (error) {
+    storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLoaded = true;
+    setClerkBluetoothPrinterError(formatErrorMessage(error));
+    renderClerkBluetoothPrinterStatusIfActive();
+    return false;
+  } finally {
+    clerkBluetoothPrinterPairedPrintersInFlight = false;
   }
 }
 
@@ -26294,6 +26501,7 @@ function ensureLoginPasswordCleared() {
 
 function clearSession(message = "Not signed in.") {
   stopPdaRuntimePolling();
+  stopClerkBluetoothPrinterStatusPolling();
   currentSession = { token: "", user: null };
   cashierTerminalPrimedStoreCode = "";
   cashierTerminalState = createCashierTerminalState();
@@ -31582,6 +31790,10 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     generatedRanges: {},
     printJobs: [],
     createdPrintJobs: [],
+    bluetoothPrinterStatus: createDefaultClerkBluetoothPrinterStatus(),
+    bluetoothPrinterLastRefreshAt: "",
+    bluetoothPrinterError: "",
+    bluetoothPrinterPairedPrintersLoaded: false,
   };
   return {
     ...baseState,
@@ -31594,6 +31806,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
     assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
     pricingSourceLines: Array.isArray(overrides.pricingSourceLines) ? overrides.pricingSourceLines : baseState.pricingSourceLines,
+    bluetoothPrinterStatus: normalizeClerkBluetoothPrinterStatus(overrides.bluetoothPrinterStatus || baseState.bluetoothPrinterStatus),
   };
 }
 
@@ -32580,6 +32793,62 @@ function renderStoreMobileCompletionSummary(state = storeMobilePricingPreviewSta
   `;
 }
 
+function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPreviewState) {
+  const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+  const lastRefresh = state.bluetoothPrinterLastRefreshAt
+    ? formatPdaRuntimeRefreshTime(state.bluetoothPrinterLastRefreshAt)
+    : "-";
+  const selectedPrinter = [
+    status.selected_printer_name || "-",
+    status.selected_printer_address || "-",
+  ].join(" / ");
+  const pairedPrinters = Array.isArray(status.paired_printers) ? status.paired_printers : [];
+  const statusRows = [
+    ["bridge_available", String(Boolean(status.bridge_available))],
+    ["bluetooth_enabled", String(Boolean(status.bluetooth_enabled))],
+    ["connection_status", status.connection_status || "-"],
+    ["selected_printer_name/address", selectedPrinter],
+    ["selected_profile", status.selected_profile || "-"],
+    ["last_error", status.last_error || "-"],
+    ["last_protocol_tested", status.last_protocol_tested || "-"],
+    ["last_print_result", status.last_print_result || "-"],
+  ];
+  return `
+    <section class="clerk-bluetooth-printer-test" data-clerk-bluetooth-printer-test-section="true">
+      <div class="mobile-section-head">
+        <strong>蓝牙打印机测试</strong>
+        ${renderStoreMobilePricingBadge(`最近刷新 ${lastRefresh}`)}
+      </div>
+      <div class="clerk-bluetooth-printer-refresh-row">
+        <span class="subtle small">最近刷新 ${escapeHtml(lastRefresh)}</span>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-refresh="true">刷新已配对打印机</button>
+      </div>
+      ${state.bluetoothPrinterError ? `<div class="alert-banner clerk-bluetooth-printer-error">${escapeHtml(state.bluetoothPrinterError)}</div>` : ""}
+      <div class="clerk-bluetooth-printer-status-grid">
+        ${statusRows.map(([label, value]) => `
+          <span>
+            <b>${escapeHtml(label)}</b>
+            <strong>${escapeHtml(value)}</strong>
+          </span>
+        `).join("")}
+      </div>
+      <div class="clerk-bluetooth-printer-paired-list">
+        <div class="subtle small">paired_printer_count: ${escapeHtml(status.paired_printer_count || pairedPrinters.length || 0)}</div>
+        ${
+          pairedPrinters.length
+            ? pairedPrinters.map((printer) => `
+                <article>
+                  <strong>${escapeHtml(printer.name || "-")}</strong>
+                  <span>${escapeHtml(printer.address || "-")} · ${escapeHtml(printer.bond_state || "-")}</span>
+                </article>
+              `).join("")
+            : '<div class="subtle small">暂无已配对打印机数据。</div>'
+        }
+      </div>
+    </section>
+  `;
+}
+
 function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
   const sdp = state.selectedSdp || {};
   return `
@@ -32591,6 +32860,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
         <span><b>角色</b><strong>店员</strong></span>
         <span><b>PDA mode / version</b><strong>Direct Loop PDA · task flow 208</strong></span>
       </div>
+      ${renderClerkBluetoothPrinterTestSection(state)}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-reset-task="true">重置演示任务状态</button>
       <button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button>
     </section>
@@ -32740,8 +33010,18 @@ function renderStoreMobilePricingPreview() {
     target.className = "store-mobile-runtime-shell";
     target.innerHTML = renderStoreMobileRuntimeScreen(state);
     startPdaRuntimePolling();
+    if (String(state.activePage || "tasks") === "my") {
+      const shouldRunImmediatePrinterPoll = !clerkBluetoothPrinterStatusPollingTimer;
+      startClerkBluetoothPrinterStatusPolling({
+        immediate: shouldRunImmediatePrinterPoll,
+        includePairedPrinters: !state.bluetoothPrinterPairedPrintersLoaded,
+      });
+    } else {
+      stopClerkBluetoothPrinterStatusPolling();
+    }
     return;
   }
+  stopClerkBluetoothPrinterStatusPolling();
   const pageOptions = getStoreMobilePageOptions().map((page) => [page.key, page.label]);
   target.className = "report-summary store-mobile-preview-shell";
   target.innerHTML = `
@@ -32968,6 +33248,11 @@ function handleStoreMobilePricingPreviewAction(button) {
   const gradeChoice = button.dataset.mobilePricingGradeChoice;
   const categoryChoice = button.dataset.mobilePricingCategoryChoice;
   const qtyStep = button.dataset.mobilePricingQtyStep;
+  const refreshBluetoothPrinter = button.dataset.clerkBluetoothPrinterRefresh;
+  if (refreshBluetoothPrinter) {
+    refreshClerkBluetoothPairedPrinters({ reason: "manual" }).catch(() => {});
+    return;
+  }
   if (resetTask) {
     storeMobilePricingPreviewState = createStoreMobilePricingPreviewState();
     renderStoreMobilePricingPreview();
@@ -38579,10 +38864,12 @@ window.addEventListener("hashchange", () => {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     stopPdaRuntimePolling();
+    stopClerkBluetoothPrinterStatusPolling();
     return;
   }
   if (document.visibilityState === "visible") {
     startPdaRuntimePolling();
+    startClerkBluetoothPrinterStatusPolling({ immediate: true });
     runPdaRuntimePollOnce({ force: true, reason: "visible" }).catch(() => {});
   }
 });

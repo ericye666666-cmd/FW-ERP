@@ -165,6 +165,50 @@ test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without re
   assert.match(actionHandler, /startPdaRuntimePolling/);
 });
 
+test("clerk PDA Bluetooth printer test polls native bridge status without touching task polling", () => {
+  const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+  const myTabSource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
+  const printerSectionSource = extractFunctionSource(appJs, "renderClerkBluetoothPrinterTestSection");
+  const startPrinterPolling = extractFunctionSource(appJs, "startClerkBluetoothPrinterStatusPolling");
+  const stopPrinterPolling = extractFunctionSource(appJs, "stopClerkBluetoothPrinterStatusPolling");
+  const shouldPollPrinter = extractFunctionSource(appJs, "shouldPollClerkBluetoothPrinterStatus");
+  const pollPrinter = extractFunctionSource(appJs, "pollClerkBluetoothPrinterStatus");
+  const refreshPairedPrinters = extractFunctionSource(appJs, "refreshClerkBluetoothPairedPrinters");
+  const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const clearSession = extractFunctionSource(appJs, "clearSession");
+
+  assert.match(appJs, /CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS\s*=\s*3000/);
+  assert.match(stateSource, /bluetoothPrinterStatus/);
+  assert.match(stateSource, /bluetoothPrinterPairedPrintersLoaded:\s*false/);
+  assert.match(myTabSource, /renderClerkBluetoothPrinterTestSection/);
+  assert.match(printerSectionSource, /蓝牙打印机测试/);
+  assert.match(printerSectionSource, /最近刷新/);
+  assert.match(printerSectionSource, /bridge_available/);
+  assert.match(printerSectionSource, /bluetooth_enabled/);
+  assert.match(printerSectionSource, /connection_status/);
+  assert.match(printerSectionSource, /selected_printer_name\/address/);
+  assert.match(printerSectionSource, /selected_profile/);
+  assert.match(printerSectionSource, /last_error/);
+  assert.match(printerSectionSource, /last_protocol_tested/);
+  assert.match(printerSectionSource, /last_print_result/);
+  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-refresh/);
+  assert.match(startPrinterPolling, /pollClerkBluetoothPrinterStatus\(\{\s*reason:\s*"immediate"/);
+  assert.match(startPrinterPolling, /window\.setInterval/);
+  assert.match(startPrinterPolling, /CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS/);
+  assert.match(shouldPollPrinter, /activePage === "my"/);
+  assert.match(shouldPollPrinter, /document\.visibilityState === "hidden"/);
+  assert.match(shouldPollPrinter, /data-clerk-bluetooth-printer-test-section/);
+  assert.match(pollPrinter, /DirectLoopPdaPrinter/);
+  assert.match(pollPrinter, /getPrinterStatus/);
+  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters/);
+  assert.match(refreshPairedPrinters, /listPairedPrinters/);
+  assert.doesNotMatch(refreshPairedPrinters, /connectPrinter|printTestLabel/);
+  assert.match(actionHandler, /refreshClerkBluetoothPairedPrinters/);
+  assert.match(clearSession, /stopClerkBluetoothPrinterStatusPolling/);
+  assert.match(appJs, /document\.visibilityState === "hidden"[\s\S]*stopClerkBluetoothPrinterStatusPolling/);
+  assert.match(appJs, /document\.visibilityState === "visible"[\s\S]*startClerkBluetoothPrinterStatusPolling/);
+});
+
 test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {
   const sortAssignedTasks = getExecutableFunction("sortStoreMobileAssignedBackendTasks");
 
@@ -507,7 +551,7 @@ test("completing all groups marks the assigned SDP task complete with summary", 
   assert.match(summarySource, /返回任务列表/);
 });
 
-test("my tab shows only clerk PDA account settings and logout", () => {
+test("my tab shows clerk PDA account settings, printer test, and logout", () => {
   const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
 
   assert.match(mySource, /当前账号/);
@@ -517,6 +561,7 @@ test("my tab shows only clerk PDA account settings and logout", () => {
   assert.match(mySource, /角色/);
   assert.match(mySource, /店员/);
   assert.match(mySource, /Direct Loop PDA/);
+  assert.match(mySource, /renderClerkBluetoothPrinterTestSection/);
   assert.match(mySource, /data-action="logout"/);
   assert.match(mySource, /重置演示任务状态/);
   assert.doesNotMatch(mySource, /店长|仓库|POS|系统管理|权限/);
