@@ -3705,11 +3705,12 @@ async function refreshStoreManagerPdaReceivingForPolling(state = ensureStoreMana
 async function loadClerkPdaAssignedTasksForPolling(options = {}) {
   const state = storeMobilePricingPreviewState;
   const sdp = state.selectedSdp || {};
-  const storeCode = String(sdp.store_name || currentSession.user?.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
-  const assignedClerk = String(sdp.assigned_clerk || currentSession.user?.username || getCurrentStoreWorkerFallback()).trim();
+  const storeCode = String(currentSession.user?.store_code || sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const assignedClerk = String(currentSession.user?.username || sdp.assigned_clerk || getCurrentStoreWorkerFallback()).trim();
   if (!assignedClerk) {
     state.assignedBackendTasks = [];
     state.assignedBackendTaskCount = 0;
+    state.assignedBackendTasksLoaded = true;
     return [];
   }
   const rows = await loadStoreAssignedSdoPackageTasks(
@@ -3719,13 +3720,15 @@ async function loadClerkPdaAssignedTasksForPolling(options = {}) {
     },
     { render: false },
   );
-  state.assignedBackendTasks = rows;
-  state.assignedBackendTaskCount = rows.length;
+  const sortedRows = sortStoreMobileAssignedBackendTasks(rows);
+  state.assignedBackendTasks = sortedRows;
+  state.assignedBackendTaskCount = sortedRows.length;
+  state.assignedBackendTasksLoaded = true;
   state.assignedBackendTaskLoadError = "";
   if (options.force) {
     state.assignedBackendTaskLastForceRefresh = new Date().toISOString();
   }
-  return rows;
+  return sortedRows;
 }
 
 function stopPdaRuntimePolling() {
@@ -31315,6 +31318,12 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     scanDraft: "",
     scanError: "",
     scanSuccess: "",
+    assignedBackendTasks: [],
+    assignedBackendTaskCount: 0,
+    assignedBackendTasksLoaded: false,
+    assignedBackendTaskLoadError: "",
+    assignedBackendTaskLastForceRefresh: "",
+    selectedBackendTaskCode: "",
     labelSize: "60×40",
     printer_name: "Deli DL-720C",
     pending_label_count: 210,
@@ -31404,6 +31413,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     generatedRanges: { ...baseState.generatedRanges, ...(overrides.generatedRanges || {}) },
     printJobs: Array.isArray(overrides.printJobs) ? overrides.printJobs : baseState.printJobs,
     createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
+    assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
   };
 }
 
@@ -31471,6 +31481,134 @@ function syncStoreMobileTaskCounters(state = storeMobilePricingPreviewState) {
   return state;
 }
 
+function sortStoreMobileAssignedBackendTasks(rows = []) {
+  return [...(Array.isArray(rows) ? rows : [])].sort((left, right) => {
+    const leftAssignedAt = Date.parse(String(left?.assigned_at || "")) || 0;
+    const rightAssignedAt = Date.parse(String(right?.assigned_at || "")) || 0;
+    if (rightAssignedAt !== leftAssignedAt) return rightAssignedAt - leftAssignedAt;
+    const leftUpdatedAt = Date.parse(String(left?.updated_at || "")) || 0;
+    const rightUpdatedAt = Date.parse(String(right?.updated_at || "")) || 0;
+    if (rightUpdatedAt !== leftUpdatedAt) return rightUpdatedAt - leftUpdatedAt;
+    const leftCreatedAt = Date.parse(String(left?.created_at || "")) || 0;
+    const rightCreatedAt = Date.parse(String(right?.created_at || "")) || 0;
+    if (rightCreatedAt !== leftCreatedAt) return rightCreatedAt - leftCreatedAt;
+    return String(left?.sdo_package_display_code || left?.display_code || "").localeCompare(
+      String(right?.sdo_package_display_code || right?.display_code || ""),
+      "en",
+    );
+  });
+}
+
+function getStoreMobileAssignedBackendTasks(state = storeMobilePricingPreviewState) {
+  return sortStoreMobileAssignedBackendTasks(state?.assignedBackendTasks || []);
+}
+
+function getStoreMobileAssignedTaskCode(row = {}) {
+  return String(
+    row?.sdo_package_display_code
+    || row?.display_code
+    || row?.sdp_code
+    || row?.package_id
+    || row?.sdo_package_code
+    || row?.object_id
+    || "",
+  ).trim().toUpperCase();
+}
+
+function getStoreMobileAssignedTaskMachineCode(row = {}) {
+  const machineCode = String(
+    row?.sdo_package_machine_code
+    || row?.machine_code
+    || row?.barcode_value
+    || row?.scan_token
+    || row?.human_readable
+    || "",
+  ).replace(/[^0-9]/g, "").trim();
+  if (/^6\d{9}$/.test(machineCode)) {
+    return machineCode;
+  }
+  const displayCode = getStoreMobileAssignedTaskCode(row);
+  const displayDigits = displayCode.replace(/[^0-9]/g, "");
+  return /^SDP\d{9}$/.test(displayCode) && /^\d{9}$/.test(displayDigits) ? `6${displayDigits}` : "";
+}
+
+function createStoreMobileSelectedSdpFromBackendTask(row = {}, state = storeMobilePricingPreviewState) {
+  const displayCode = getStoreMobileAssignedTaskCode(row);
+  const machineCode = getStoreMobileAssignedTaskMachineCode(row);
+  const parentSdoDisplayCode = String(row?.parent_sdo_display_code || row?.parent_sdo_order_no || row?.sdo_code || row?.source_sdo || "").trim().toUpperCase();
+  const parentSdoMachineCode = String(row?.parent_sdo_machine_code || row?.sdo_machine_code || "").replace(/[^0-9]/g, "").trim();
+  const storeCode = String(row?.store_code || row?.store_name || state?.selectedSdp?.store_name || currentSession.user?.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const packageNo = row?.package_total
+    ? `${row?.package_no || 1}/${row.package_total}`
+    : String(row?.package_no || row?.package_index || state?.selectedSdp?.package_no || "").trim();
+  const itemCount = row?.item_count === null || row?.item_count === undefined || row?.item_count === ""
+    ? Number(state?.selectedSdp?.total_count || 0)
+    : Number(row.item_count || 0);
+  return {
+    ...(state?.selectedSdp || {}),
+    display_code: displayCode,
+    sdp_code: displayCode,
+    machine_code: machineCode,
+    sdo_code: parentSdoDisplayCode,
+    sdo_machine_code: parentSdoMachineCode,
+    store_name: storeCode,
+    store_code: storeCode,
+    package_no: packageNo,
+    source_type: String(row?.source_type || state?.selectedSdp?.source_type || "").trim().toUpperCase(),
+    source_code: String(row?.source_code || row?.bale_no || state?.selectedSdp?.source_code || "").trim().toUpperCase(),
+    source_machine_code: String(row?.source_machine_code || state?.selectedSdp?.source_machine_code || "").replace(/[^0-9]/g, "").trim(),
+    category: String(row?.content_summary || row?.category || row?.category_name || row?.category_summary || state?.selectedSdp?.category || "混合").trim(),
+    content_summary: String(row?.content_summary || row?.category || "").trim(),
+    total_count: Number.isFinite(itemCount) && itemCount > 0 ? itemCount : Number(state?.selectedSdp?.total_count || 0),
+    item_count: Number.isFinite(itemCount) ? itemCount : 0,
+    assigned_clerk: String(row?.assigned_clerk || row?.assigned_employee || state?.selectedSdp?.assigned_clerk || currentSession.user?.username || "").trim(),
+    assigned_at: String(row?.assigned_at || "").trim(),
+    status: String(row?.status || "").trim(),
+    received_status: String(row?.received_status || "").trim(),
+    assignment_status: String(row?.assignment_status || "").trim(),
+    backend_task: true,
+  };
+}
+
+function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, taskCode = "") {
+  const normalizedCode = String(taskCode || "").trim().toUpperCase();
+  const normalizedDigits = normalizedCode.replace(/[^0-9]/g, "");
+  const task = getStoreMobileAssignedBackendTasks(state).find((row) => {
+    const keys = [
+      getStoreMobileAssignedTaskCode(row),
+      getStoreMobileAssignedTaskMachineCode(row),
+      row?.sdo_package_display_code,
+      row?.sdo_package_machine_code,
+      row?.display_code,
+      row?.machine_code,
+      row?.barcode_value,
+    ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+    return keys.some((key) => key === normalizedCode || (normalizedDigits && key.replace(/[^0-9]/g, "") === normalizedDigits));
+  });
+  if (!task) {
+    return null;
+  }
+  const selectedSdp = createStoreMobileSelectedSdpFromBackendTask(task, state);
+  const freshWorkflow = createStoreMobilePricingPreviewState({ selectedSdp });
+  state.selectedSdp = selectedSdp;
+  state.selectedBackendTaskCode = selectedSdp.display_code;
+  state.activePage = "verify";
+  state.activeGroupId = "A";
+  state.current_task_group_id = "A";
+  state.taskStatus = "待核对";
+  state.verified = false;
+  state.scanDraft = "";
+  state.scanError = "";
+  state.scanSuccess = "";
+  state.editorDraft = { ...freshWorkflow.editorDraft };
+  state.priceGroups = freshWorkflow.priceGroups.map((group) => ({ ...group }));
+  state.generatedRanges = {};
+  state.printJobs = [];
+  state.createdPrintJobs = [];
+  state.pending_label_count = Number(selectedSdp.total_count || 0);
+  return syncStoreMobileTaskCounters(state);
+}
+
 function getStoreMobileGeneratedRangeForGroup(group = {}) {
   const cleanGroupId = String(group.group_id || "A").replace(/[^0-9A-Z]/g, "").padEnd(4, "0");
   const quantity = Number(group.quantity || 0);
@@ -31485,12 +31623,21 @@ function getStoreMobileGeneratedRangeForGroup(group = {}) {
 
 function verifyStoreMobileSdpBarcode(value = "", state = storeMobilePricingPreviewState) {
   const rawValue = String(value || "").trim().toUpperCase();
+  const rawDigits = rawValue.replace(/[^0-9]/g, "");
   const sdp = state.selectedSdp || {};
-  const validCodes = [
-    String(sdp.display_code || "SDP261250002").trim().toUpperCase(),
-    String(sdp.machine_code || "6261250002").trim().toUpperCase(),
-  ];
-  if (validCodes.includes(rawValue)) {
+  const displayCodes = [
+    String(sdp.display_code || "").trim().toUpperCase(),
+    String(sdp.sdp_code || "").trim().toUpperCase(),
+  ].filter(Boolean);
+  const displayDigits = String(sdp.display_code || sdp.sdp_code || "").replace(/[^0-9]/g, "");
+  const derivedMachineCode = /^SDP\d{9}$/.test(String(sdp.display_code || sdp.sdp_code || "").trim().toUpperCase()) && /^\d{9}$/.test(displayDigits)
+    ? `6${displayDigits}`
+    : "";
+  const machineCodes = [
+    String(sdp.machine_code || "").replace(/[^0-9]/g, "").trim(),
+    derivedMachineCode,
+  ].filter(Boolean);
+  if (displayCodes.includes(rawValue) || (rawDigits && machineCodes.includes(rawDigits))) {
     return { ok: true, message: "核对成功" };
   }
   if (rawValue === "SDO260504008" || rawValue === "4260504008" || /^SDO/.test(rawValue) || /^4\d{9}$/.test(rawValue)) {
@@ -31838,6 +31985,74 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
+  const backendTasks = getStoreMobileAssignedBackendTasks(state);
+  if (backendTasks.length) {
+    const selectedCode = String(
+      state.selectedBackendTaskCode
+      || (state.selectedSdp?.backend_task ? (state.selectedSdp?.display_code || state.selectedSdp?.sdp_code) : "")
+      || "",
+    ).trim().toUpperCase();
+    return `
+      <section class="mobile-task-list">
+        <h3>我的 SDP 任务</h3>
+        <div class="subtle small">后台 assigned SDP 任务 · 最新 assigned_at 优先。</div>
+        ${backendTasks.map((task) => {
+          const displayCode = getStoreMobileAssignedTaskCode(task);
+          const machineCode = getStoreMobileAssignedTaskMachineCode(task);
+          const parentSdoDisplayCode = String(task.parent_sdo_display_code || task.sdo_code || task.source_sdo || "-").trim().toUpperCase();
+          const storeCode = String(task.store_code || task.store_name || state.selectedSdp?.store_name || "-").trim().toUpperCase();
+          const contentSummary = String(task.content_summary || task.category || task.category_name || "未填品类").trim();
+          const itemCount = task.item_count === null || task.item_count === undefined || task.item_count === "" ? "-" : `${task.item_count} 件`;
+          const sourceType = String(task.source_type || "-").trim().toUpperCase();
+          const sourceCode = String(task.source_code || task.bale_no || "-").trim().toUpperCase();
+          const assignedAt = String(task.assigned_at || "-").trim();
+          const status = String(task.status || "assigned").trim();
+          const receivedStatus = String(task.received_status || "-").trim();
+          const assignmentStatus = String(task.assignment_status || "-").trim();
+          const isSelected = selectedCode && selectedCode === displayCode;
+          return `
+            <article class="mobile-task-card ${isSelected ? "is-active" : ""}">
+              <div class="mobile-task-card-head">
+                <div>
+                  <span>后台任务 / Backend assigned</span>
+                  <strong>${escapeHtml(displayCode || machineCode || "-")}</strong>
+                  <small>${escapeHtml(`${contentSummary} · ${itemCount} · ${storeCode} · 来源 ${parentSdoDisplayCode}`)}</small>
+                </div>
+                ${renderStoreMobilePricingBadge(status)}
+              </div>
+              <div class="mobile-task-facts">
+                <span><b>machine_code</b>${escapeHtml(machineCode || "-")}</span>
+                <span><b>parent SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
+                <span><b>来源</b>${escapeHtml(`${sourceType} ${sourceCode}`.trim())}</span>
+                <span><b>assigned_at</b>${escapeHtml(assignedAt)}</span>
+                <span><b>status</b>${escapeHtml(status || "-")}</span>
+                <span><b>received_status</b>${escapeHtml(receivedStatus || "-")}</span>
+                <span><b>assignment_status</b>${escapeHtml(assignmentStatus || "-")}</span>
+              </div>
+              <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-select-backend-task="${escapeHtml(displayCode || machineCode || "")}">开始核对</button>
+            </article>
+          `;
+        }).join("")}
+      </section>
+    `;
+  }
+  if (isPdaRuntimeMode() && !state.assignedBackendTasksLoaded) {
+    return `
+      <section class="mobile-task-list">
+        <h3>我的 SDP 任务</h3>
+        <div class="mobile-task-card">
+          <div class="mobile-task-card-head">
+            <div>
+              <span>正在读取后台任务</span>
+              <strong>Assigned SDP loading</strong>
+              <small>等待 /store-delivery-packages/assigned 返回。</small>
+            </div>
+            ${renderStoreMobilePricingBadge("读取中")}
+          </div>
+        </div>
+      </section>
+    `;
+  }
   const sdp = state.selectedSdp || {};
   const taskStatus = getStoreMobileTaskStatus(state) || "待核对";
   const totals = getStoreMobileTaskTotals(state);
@@ -31850,7 +32065,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
   return `
     <section class="mobile-task-list">
       <h3>我的 SDP 任务</h3>
-      <div class="subtle small">当前店员端为演示流程；真实 assigned SDP 接入在后续 PR。</div>
+      <div class="subtle small">没有后台 assigned SDP 时才显示演示任务；真实 PDA 优先使用 backend assigned SDP。</div>
       <article class="mobile-task-card ${completed ? "is-complete" : ""}">
         <div class="mobile-task-card-head">
           <div>
@@ -32200,6 +32415,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const state = storeMobilePricingPreviewState;
   const page = button.dataset.mobilePricingPage;
   const startTask = button.dataset.mobilePricingStartTask;
+  const selectBackendTask = button.dataset.mobilePricingSelectBackendTask;
   const confirmScan = button.dataset.mobilePricingConfirmScan;
   const confirmStickers = button.dataset.mobilePricingConfirmStickers;
   const resetTask = button.dataset.mobilePricingResetTask;
@@ -32219,6 +32435,9 @@ function handleStoreMobilePricingPreviewAction(button) {
   if (confirmScan) {
     handleStoreMobileScanSubmit();
     return;
+  }
+  if (selectBackendTask) {
+    selectStoreMobileBackendTask(state, selectBackendTask);
   }
   if (startTask) {
     state.activePage = "verify";
