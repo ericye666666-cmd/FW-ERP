@@ -93,7 +93,8 @@ test("login page exposes a subtle staging API mode indicator", () => {
 
 test("login page keeps cache-busted app and style assets", () => {
   assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=[^"]+" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-polling-215"><\/script>/);
+  assert.match(indexHtml, /"\.\/app\.js\?v=pda-runtime-polling-215"/);
+  assert.match(indexHtml, /"\.\/app\.legacy\.js\?v=pda-legacy-webview-217"/);
 });
 
 test("login form cannot fall back to native GET with credentials in the URL", () => {
@@ -140,13 +141,19 @@ test("login button click fallback invokes JS login without native form GET", () 
 
 test("legacy WebView guard prevents GET fallback when app.js cannot parse", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+  const compatibilitySetupPosition = indexHtml.indexOf("function setupPdaRuntimeCompatibility");
   const legacyGuardPosition = indexHtml.indexOf("function legacyPdaLoginGuard");
-  const appScriptPosition = indexHtml.search(/<script src="\.\/app\.js\?v=[^"]+"><\/script>/);
 
+  assert.notEqual(compatibilitySetupPosition, -1, "PDA compatibility setup should exist");
   assert.notEqual(legacyGuardPosition, -1, "legacy guard should exist");
-  assert.ok(legacyGuardPosition < appScriptPosition, "legacy guard should bind before app.js loads");
+  assert.ok(compatibilitySetupPosition < legacyGuardPosition, "syntax detection should be available before the legacy guard");
   assert.match(legacyGuard, /supportsModernSyntax/);
-  assert.match(legacyGuard, /row\?\.user\?\.name/);
+  assert.match(legacyGuard, /row\?\.user\?\.name \?\?/);
+  assert.match(legacyGuard, /loadPdaRuntimeScript\("\.\/app\.js\?v=pda-runtime-polling-215", "modern"\)/);
+  assert.match(legacyGuard, /loadPdaRuntimeScript\("\.\/app\.legacy\.js\?v=pda-legacy-webview-217", "legacy"\)/);
+  assert.match(legacyGuard, /script\.onerror/);
+  assert.match(legacyGuard, /pda-legacy-bundle-failed/);
+  assert.match(legacyGuard, /bindLegacyFallbackHandlers/);
   assert.match(legacyGuard, /loginForm\.addEventListener\("submit", handleLegacyLogin\)/);
   assert.match(legacyGuard, /loginSubmitButton\.addEventListener\("click", handleLegacyLogin\)/);
   assert.match(legacyGuard, /event\.preventDefault/);

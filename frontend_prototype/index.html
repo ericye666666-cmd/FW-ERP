@@ -3704,7 +3704,32 @@
     <script src="./warehouse-mainflow-demo-flow.js"></script>
     <script src="./china-source-receipt-sheet-flow.js"></script>
     <script src="./store-execution-flow.js"></script>
-    <script src="./operations-fulfillment-flow.js?v=sdo-package-allocation-211"></script>
+    <script>
+      (function setupPdaRuntimeCompatibility() {
+        function supportsModernSyntax() {
+          try {
+            new Function("var row = { user: { name: 'ok' }, count: null }; var label = row?.user?.name ?? 'fallback'; return label === 'ok';");
+            return true;
+          } catch (error) {
+            return false;
+          }
+        }
+
+        window.__directLoopPdaSupportsModernSyntax = supportsModernSyntax;
+        window.__directLoopPdaSelectScript = function selectPdaRuntimeScript(modernSrc, legacySrc) {
+          return supportsModernSyntax() ? modernSrc : legacySrc;
+        };
+      })();
+    </script>
+    <script>
+      (function loadOperationsFulfillmentFlowScript() {
+        var scriptSrc = window.__directLoopPdaSelectScript(
+          "./operations-fulfillment-flow.js?v=sdo-package-allocation-211",
+          "./operations-fulfillment-flow.legacy.js?v=pda-legacy-webview-217"
+        );
+        document.write('<script src="' + scriptSrc + '"><\/script>');
+      })();
+    </script>
     <script src="./apparel-default-cost-flow.js"></script>
     <script src="./apparel-sorting-rack-flow.js"></script>
     <script>
@@ -3713,6 +3738,7 @@
         var loginSubmitButton = document.getElementById("loginSubmitButton");
         var stagingApiBase = "https://fw-erp-34-35-52-250.nip.io/api/v1";
         var legacyStoreManagerTarget = null;
+        var legacyFallbackBound = false;
 
         function removeUnsafeLoginQueryParams() {
           if (!window.location.search || !window.history || typeof window.history.replaceState !== "function") {
@@ -3734,8 +3760,11 @@
         }
 
         function supportsModernSyntax() {
+          if (window.__directLoopPdaSupportsModernSyntax) {
+            return window.__directLoopPdaSupportsModernSyntax();
+          }
           try {
-            new Function("var row = { user: { name: 'ok' } }; return row?.user?.name;");
+            new Function("var row = { user: { name: 'ok' }, count: null }; var label = row?.user?.name ?? 'fallback'; return label === 'ok';");
             return true;
           } catch (error) {
             return false;
@@ -4153,21 +4182,52 @@
           return;
         }
 
+        function bindLegacyFallbackHandlers() {
+          if (legacyFallbackBound || !loginForm) {
+            return false;
+          }
+          legacyFallbackBound = true;
+          loginForm.addEventListener("submit", handleLegacyLogin);
+          if (loginSubmitButton) {
+            loginSubmitButton.addEventListener("click", handleLegacyLogin);
+          }
+          document.addEventListener("click", handleLegacyClerkRuntimeClick);
+          document.addEventListener("click", handleLegacyManagerRuntimeClick);
+          document.addEventListener("submit", handleLegacyClerkScanSubmit);
+          document.addEventListener("submit", handleLegacyManagerScanSubmit);
+          return true;
+        }
+
+        function renderPdaLegacyBundleFailure() {
+          document.body.setAttribute("data-pda-legacy-bundle-failed", "true");
+          bindLegacyFallbackHandlers();
+          renderLegacyLoginError("Legacy fallback active: pda-legacy-bundle-failed. 请升级 Direct Loop PDA App 或 Android WebView，或联系管理员重新发布 PDA legacy bundle。");
+        }
+
+        function loadPdaRuntimeScript(src, mode) {
+          var script = document.createElement("script");
+          script.src = src;
+          script.async = false;
+          script.setAttribute("data-pda-runtime-script", mode || "modern");
+          window.__directLoopPdaRuntimeScript = src;
+          script.onerror = function handlePdaRuntimeScriptError() {
+            if (mode === "legacy") {
+              renderPdaLegacyBundleFailure();
+            } else {
+              renderLegacyLoginError("PDA 页面加载失败，请联系管理员。");
+            }
+          };
+          (document.body || document.documentElement).appendChild(script);
+        }
+
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
-        if (supportsModernSyntax() || !loginForm) {
+        if (supportsModernSyntax()) {
+          loadPdaRuntimeScript("./app.js?v=pda-runtime-polling-215", "modern");
           return;
         }
-        loginForm.addEventListener("submit", handleLegacyLogin);
-        if (loginSubmitButton) {
-          loginSubmitButton.addEventListener("click", handleLegacyLogin);
-        }
-        document.addEventListener("click", handleLegacyClerkRuntimeClick);
-        document.addEventListener("click", handleLegacyManagerRuntimeClick);
-        document.addEventListener("submit", handleLegacyClerkScanSubmit);
-        document.addEventListener("submit", handleLegacyManagerScanSubmit);
+        loadPdaRuntimeScript("./app.legacy.js?v=pda-legacy-webview-217", "legacy");
       })();
     </script>
-    <script src="./app.js?v=pda-runtime-polling-215"></script>
   </body>
 </html>
