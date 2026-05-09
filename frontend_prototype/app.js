@@ -2646,6 +2646,12 @@ let activeStoreManagerPdaTab = "overview";
 let activeStoreManagerPdaReturnCode = "";
 let storeManagerPdaReturnSubmitted = false;
 let storeManagerPdaTaskState = null;
+const PDA_RUNTIME_POLL_INTERVAL_MS = 3000;
+let pdaRuntimePollingTimer = null;
+let pdaRuntimePollingInFlight = false;
+let pdaRuntimeActionInFlight = false;
+let pdaRuntimeLastRefreshAt = "";
+let pdaRuntimePollingWarning = "";
 
 const LEGACY_WORKSPACE_MAP = {
   sorting: "warehouse",
@@ -3521,6 +3527,182 @@ function resetStoreManagerPdaTaskState() {
   return storeManagerPdaTaskState;
 }
 
+function formatPdaRuntimeRefreshTime(value = pdaRuntimeLastRefreshAt) {
+  if (!value) {
+    return "";
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
+function markPdaRuntimeRefreshed() {
+  pdaRuntimeLastRefreshAt = new Date().toISOString();
+  pdaRuntimePollingWarning = "";
+}
+
+function renderPdaRuntimeRefreshIndicator() {
+  const refreshText = pdaRuntimeLastRefreshAt
+    ? `最近刷新: ${formatPdaRuntimeRefreshTime(pdaRuntimeLastRefreshAt)}`
+    : "自动刷新中 · 3秒";
+  const warningText = pdaRuntimePollingWarning ? ` · ${pdaRuntimePollingWarning}` : "";
+  return `<span class="pda-runtime-refresh-indicator subtle small">${escapeHtml(refreshText + warningText)}</span>`;
+}
+
+function isPdaRuntimeInputFocused() {
+  const active = document.activeElement;
+  return active instanceof HTMLInputElement
+    || active instanceof HTMLTextAreaElement
+    || active instanceof HTMLSelectElement
+    || Boolean(active?.closest?.("[data-scan-input], [data-store-manager-pda-sdo-search-form]"));
+}
+
+function shouldPollStoreManagerReceiving() {
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (!currentSession?.token || !isPdaRuntimeMode() || !(roleCode === "store_manager")) {
+    return false;
+  }
+  if (document.visibilityState === "hidden") {
+    return false;
+  }
+  const state = ensureStoreManagerPdaTaskState();
+  return String(state.activeTab || "receiving") === "receiving";
+}
+
+function shouldPollClerkTasks() {
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (!currentSession?.token || !isPdaRuntimeMode() || !(roleCode === "store_clerk")) {
+    return false;
+  }
+  if (document.visibilityState === "hidden") {
+    return false;
+  }
+  const activePage = String(storeMobilePricingPreviewState?.activePage || "tasks");
+  return activePage !== "my";
+}
+
+async function refreshStoreManagerPdaReceivingForPolling(state = ensureStoreManagerPdaTaskState(), options = {}) {
+  const selectedSdoCode = String(options.selectedSdoCode || state.sdoTask?.display_code || "").trim().toUpperCase();
+  const previousTab = state.activeTab || "receiving";
+  const previousPage = state.activePage || "tasks";
+  const previousSearchQuery = state.sdoSearchQuery || "";
+  await loadStoreManagerPdaBackendState({
+    force: Boolean(options.force),
+    keepActivePage: true,
+    background: Boolean(options.background),
+  });
+  state.activeTab = previousTab;
+  state.activePage = previousPage;
+  state.sdoSearchQuery = previousSearchQuery;
+  selectStoreManagerPdaTask(state, selectedSdoCode || state.sdoTask?.display_code || "");
+  updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
+  return state;
+}
+
+async function loadClerkPdaAssignedTasksForPolling(options = {}) {
+  const state = storeMobilePricingPreviewState;
+  const sdp = state.selectedSdp || {};
+  const storeCode = String(sdp.store_name || currentSession.user?.store_code || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const assignedClerk = String(sdp.assigned_clerk || currentSession.user?.username || getCurrentStoreWorkerFallback()).trim();
+  if (!assignedClerk) {
+    state.assignedBackendTasks = [];
+    state.assignedBackendTaskCount = 0;
+    return [];
+  }
+  const rows = await loadStoreAssignedSdoPackageTasks(
+    {
+      store_code: storeCode,
+      assigned_clerk: assignedClerk,
+    },
+    { render: false },
+  );
+  state.assignedBackendTasks = rows;
+  state.assignedBackendTaskCount = rows.length;
+  state.assignedBackendTaskLoadError = "";
+  if (options.force) {
+    state.assignedBackendTaskLastForceRefresh = new Date().toISOString();
+  }
+  return rows;
+}
+
+function stopPdaRuntimePolling() {
+  if (pdaRuntimePollingTimer) {
+    window.clearInterval(pdaRuntimePollingTimer);
+    pdaRuntimePollingTimer = null;
+  }
+}
+
+function startPdaRuntimePolling({ immediate = false } = {}) {
+  if (!shouldPollStoreManagerReceiving() && !shouldPollClerkTasks()) {
+    stopPdaRuntimePolling();
+    return false;
+  }
+  if (!pdaRuntimePollingTimer) {
+    pdaRuntimePollingTimer = window.setInterval(() => {
+      runPdaRuntimePollOnce({ reason: "interval" }).catch(() => {});
+    }, PDA_RUNTIME_POLL_INTERVAL_MS);
+  }
+  if (immediate) {
+    runPdaRuntimePollOnce({ reason: "immediate", force: true }).catch(() => {});
+  }
+  return true;
+}
+
+async function runPdaRuntimePollOnce({ force = false, reason = "manual" } = {}) {
+  if (document.visibilityState === "hidden") {
+    stopPdaRuntimePolling();
+    return false;
+  }
+  const pollManager = shouldPollStoreManagerReceiving();
+  const pollClerk = shouldPollClerkTasks();
+  if (!pollManager && !pollClerk) {
+    stopPdaRuntimePolling();
+    return false;
+  }
+  if (pdaRuntimePollingInFlight || pdaRuntimeActionInFlight) {
+    return false;
+  }
+  pdaRuntimePollingInFlight = true;
+  try {
+    if (pollManager) {
+      await refreshStoreManagerPdaReceivingForPolling(ensureStoreManagerPdaTaskState(), {
+        force,
+        background: reason === "interval",
+      });
+      markPdaRuntimeRefreshed();
+      if (!isPdaRuntimeInputFocused()) {
+        renderStoreManagerPdaPreview();
+      }
+    }
+    if (pollClerk) {
+      await loadClerkPdaAssignedTasksForPolling({ force });
+      markPdaRuntimeRefreshed();
+      if (!isPdaRuntimeInputFocused()) {
+        renderStoreMobilePricingPreview();
+      }
+    }
+    return true;
+  } catch (error) {
+    pdaRuntimePollingWarning = formatErrorMessage(error);
+    if (pollManager && !isPdaRuntimeInputFocused()) {
+      renderStoreManagerPdaPreview();
+    }
+    if (pollClerk && !isPdaRuntimeInputFocused()) {
+      renderStoreMobilePricingPreview();
+    }
+    return false;
+  } finally {
+    pdaRuntimePollingInFlight = false;
+  }
+}
+
 function getStoreManagerPdaPackageStatus(pkg = {}) {
   const exceptionStatus = String(pkg.exception_status || "").trim().toLowerCase();
   const receivedStatus = String(pkg.received_status || "").trim().toLowerCase();
@@ -3714,13 +3896,16 @@ function syncStoreManagerPdaBackendSnapshot(state = ensureStoreManagerPdaTaskSta
   return state;
 }
 
-async function loadStoreManagerPdaBackendState({ force = false, keepActivePage = true } = {}) {
+async function loadStoreManagerPdaBackendState({ force = false, keepActivePage = true, background = false } = {}) {
   const state = ensureStoreManagerPdaTaskState();
   if (state.loading) {
     return state;
   }
   const previousPage = state.activePage;
-  state.loading = true;
+  if (!background) {
+    state.loading = true;
+  }
+  state.polling = Boolean(background);
   state.loadError = "";
   try {
     await loadTransferOrders();
@@ -3732,11 +3917,13 @@ async function loadStoreManagerPdaBackendState({ force = false, keepActivePage =
     updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
     state.loaded = true;
     state.loading = false;
+    state.polling = false;
     if (keepActivePage) {
       state.activePage = previousPage || state.activePage || "tasks";
     }
   } catch (error) {
     state.loading = false;
+    state.polling = false;
     state.loaded = true;
     state.loadError = formatErrorMessage(error);
   }
@@ -3781,6 +3968,7 @@ async function receiveStoreManagerPdaPackage(state = ensureStoreManagerPdaTaskSt
   await receiveStoreReceivingPackage(pkg.display_code || packageCode, pkg);
   await loadTransferOrders();
   syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: state.sdoTask?.display_code || "" });
+  await refreshStoreManagerPdaReceivingForPolling(state, { force: true, selectedSdoCode: state.sdoTask?.display_code || "" });
   state.notice = `${pkg.display_code} 已收货，待分配店员。`;
   updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
   return state;
@@ -3794,6 +3982,7 @@ async function markStoreManagerPdaPackageException(state = ensureStoreManagerPda
   await markStoreReceivingPackageException(pkg.display_code || packageCode, pkg);
   await loadTransferOrders();
   syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: state.sdoTask?.display_code || "" });
+  await refreshStoreManagerPdaReceivingForPolling(state, { force: true, selectedSdoCode: state.sdoTask?.display_code || "" });
   state.notice = `${pkg.display_code} 已标记异常，暂不可分配。`;
   updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
   return state;
@@ -3819,6 +4008,7 @@ async function assignStoreManagerPdaPackageToClerk(state = ensureStoreManagerPda
     assigned_clerk: clerkName,
   }, { render: false });
   syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: state.sdoTask?.display_code || "" });
+  await refreshStoreManagerPdaReceivingForPolling(state, { force: true, selectedSdoCode: state.sdoTask?.display_code || "" });
   state.notice = `已分配给 ${clerkName}`;
   updateStoreManagerPdaTaskCompletion(state);
   return state;
@@ -4372,7 +4562,10 @@ function renderStoreManagerPdaRuntimeScreen(state = ensureStoreManagerPdaTaskSta
             <span>店长端</span>
             <h3>${escapeHtml(getStoreManagerPdaRuntimeTitle(state))}</h3>
           </div>
-          <small>${escapeHtml(state.sdoTask?.store_code || getCurrentStoreCodeFallback())}</small>
+          <small aria-label="最近刷新 / 自动刷新中">
+            ${escapeHtml(state.sdoTask?.store_code || getCurrentStoreCodeFallback())}
+            ${renderPdaRuntimeRefreshIndicator()}
+          </small>
         </header>
         <main class="store-manager-pda-body">
           ${renderStoreManagerPdaRuntimeBody(state)}
@@ -4407,6 +4600,7 @@ function renderStoreManagerPdaPreview(tabId = "") {
     }
     target.className = "store-manager-pda-preview store-manager-pda-runtime-preview";
     target.innerHTML = renderStoreManagerPdaRuntimeScreen(state);
+    startPdaRuntimePolling();
     return;
   }
   const activeTab = getStoreManagerPdaTab(tabId);
@@ -4530,52 +4724,68 @@ function handleStoreManagerPdaSdoQuickSearchSubmit(event) {
 }
 
 async function handleStoreManagerPdaTaskAction(button) {
+  if (pdaRuntimeActionInFlight) {
+    return;
+  }
   const state = ensureStoreManagerPdaTaskState();
-  if (button.dataset.storeManagerPdaTab) {
-    state.activeTab = button.dataset.storeManagerPdaTab;
-    state.notice = "";
+  let shouldRefreshAfterAction = false;
+  pdaRuntimeActionInFlight = true;
+  try {
+    if (button.dataset.storeManagerPdaTab) {
+      state.activeTab = button.dataset.storeManagerPdaTab;
+      state.notice = "";
+      if (button.dataset.storeManagerPdaTab === "receiving") {
+        shouldRefreshAfterAction = true;
+      }
+    }
+    if (button.dataset.storeManagerPdaPage) {
+      state.activeTab = "receiving";
+      state.activePage = button.dataset.storeManagerPdaPage;
+      state.notice = "";
+    }
+    if (button.dataset.storeManagerPdaOpenTask || button.dataset.storeManagerPdaStartTask) {
+      state.activeTab = "receiving";
+      state.activePage = "detail";
+      selectStoreManagerPdaTask(state, button.dataset.storeManagerPdaOpenTask || button.dataset.storeManagerPdaStartTask);
+      state.verified = true;
+      state.notice = "";
+      state.scanError = "";
+      state.scanSuccess = "";
+      state.sdoSearchError = "";
+    }
+    if (button.dataset.storeManagerPdaReload) {
+      state.loaded = false;
+      state.loading = false;
+      state.loadError = "";
+      await loadStoreManagerPdaBackendState({ force: true });
+    }
+    if (button.dataset.storeManagerPdaReceivePackage) {
+      state.activeTab = "receiving";
+      await receiveStoreManagerPdaPackage(state, button.dataset.storeManagerPdaReceivePackage);
+      state.activePage = "detail";
+    }
+    if (button.dataset.storeManagerPdaExceptionPackage) {
+      state.activeTab = "receiving";
+      await markStoreManagerPdaPackageException(state, button.dataset.storeManagerPdaExceptionPackage);
+      state.activePage = "detail";
+    }
+    if (button.dataset.storeManagerPdaAssignPackage) {
+      state.activeTab = "receiving";
+      await assignStoreManagerPdaPackageToClerk(
+        state,
+        button.dataset.storeManagerPdaAssignPackage,
+        button.dataset.storeManagerPdaClerk || "",
+      );
+    }
+  } finally {
+    pdaRuntimeActionInFlight = false;
   }
-  if (button.dataset.storeManagerPdaPage) {
-    state.activeTab = "receiving";
-    state.activePage = button.dataset.storeManagerPdaPage;
-    state.notice = "";
-  }
-  if (button.dataset.storeManagerPdaOpenTask || button.dataset.storeManagerPdaStartTask) {
-    state.activeTab = "receiving";
-    state.activePage = "detail";
-    selectStoreManagerPdaTask(state, button.dataset.storeManagerPdaOpenTask || button.dataset.storeManagerPdaStartTask);
-    state.verified = true;
-    state.notice = "";
-    state.scanError = "";
-    state.scanSuccess = "";
-    state.sdoSearchError = "";
-  }
-  if (button.dataset.storeManagerPdaReload) {
-    state.loaded = false;
-    state.loading = false;
-    state.loadError = "";
-    await loadStoreManagerPdaBackendState({ force: true });
-  }
-  if (button.dataset.storeManagerPdaReceivePackage) {
-    state.activeTab = "receiving";
-    await receiveStoreManagerPdaPackage(state, button.dataset.storeManagerPdaReceivePackage);
-    state.activePage = "detail";
-  }
-  if (button.dataset.storeManagerPdaExceptionPackage) {
-    state.activeTab = "receiving";
-    await markStoreManagerPdaPackageException(state, button.dataset.storeManagerPdaExceptionPackage);
-    state.activePage = "detail";
-  }
-  if (button.dataset.storeManagerPdaAssignPackage) {
-    state.activeTab = "receiving";
-    await assignStoreManagerPdaPackageToClerk(
-      state,
-      button.dataset.storeManagerPdaAssignPackage,
-      button.dataset.storeManagerPdaClerk || "",
-    );
+  if (shouldRefreshAfterAction) {
+    await runPdaRuntimePollOnce({ force: true, reason: "store-manager-tab" });
   }
   updateStoreManagerPdaTaskCompletion(state);
   persistStoreManagerPdaTaskState(state);
+  startPdaRuntimePolling();
   renderStoreManagerPdaPreview();
 }
 
@@ -25785,6 +25995,7 @@ function ensureLoginPasswordCleared() {
 }
 
 function clearSession(message = "Not signed in.") {
+  stopPdaRuntimePolling();
   currentSession = { token: "", user: null };
   cashierTerminalPrimedStoreCode = "";
   cashierTerminalState = createCashierTerminalState();
@@ -25850,6 +26061,7 @@ function renderSessionState() {
   }
   applyUserDefaultLanding(currentSession.user);
   autoLoadRoleHome(currentSession.user);
+  startPdaRuntimePolling({ immediate: true });
   syncCashierTerminalMode();
   syncCashierTerminalDraftsFromForms();
   renderCashierTerminal();
@@ -31694,7 +31906,7 @@ function renderStoreMobileRuntimeScreen(state = storeMobilePricingPreviewState) 
       <header class="mobile-pricing-topbar">
         <div class="mobile-pricing-titlebar">
           <strong>${escapeHtml(getStoreMobileActivePageLabel(state))}</strong>
-          <span>⌗</span>
+          <span aria-label="最近刷新 / 自动刷新中">${renderPdaRuntimeRefreshIndicator()}</span>
         </div>
       </header>
       <main class="mobile-pricing-screen">
@@ -31743,6 +31955,7 @@ function renderStoreMobilePricingPreview() {
   if (isPdaRuntimeMode()) {
     target.className = "store-mobile-runtime-shell";
     target.innerHTML = renderStoreMobileRuntimeScreen(state);
+    startPdaRuntimePolling();
     return;
   }
   const pageOptions = getStoreMobilePageOptions().map((page) => [page.key, page.label]);
@@ -31920,6 +32133,7 @@ function handleStoreMobilePricingPreviewAction(button) {
     state.editorDraft.quantity = Math.max(1, Number(state.editorDraft.quantity || 0) + Number(qtyStep || 0));
   }
   storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+  startPdaRuntimePolling();
   renderStoreMobilePricingPreview();
 }
 
@@ -37370,6 +37584,17 @@ workspaceNextButton?.addEventListener("click", () => {
 
 window.addEventListener("hashchange", () => {
   applyHashRoute();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    stopPdaRuntimePolling();
+    return;
+  }
+  if (document.visibilityState === "visible") {
+    startPdaRuntimePolling({ immediate: true });
+    runPdaRuntimePollOnce({ force: true, reason: "visible" }).catch(() => {});
+  }
 });
 
 function handleJsonBuilderInputEvent(event) {

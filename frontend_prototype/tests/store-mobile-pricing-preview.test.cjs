@@ -136,6 +136,27 @@ test("PDA pricing preview keeps #195 page components but runtime bottom nav only
   assert.doesNotMatch(frameSource, /pending_print|pending_putaway|resolver projection|source_token_refs|lineage payload|transfer projection/);
 });
 
+test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without resetting workflow state", () => {
+  const shouldPollClerk = extractFunctionSource(appJs, "shouldPollClerkTasks");
+  const loadClerkTasks = extractFunctionSource(appJs, "loadClerkPdaAssignedTasksForPolling");
+  const runPoll = extractFunctionSource(appJs, "runPdaRuntimePollOnce");
+  const renderRuntime = extractFunctionSource(appJs, "renderStoreMobileRuntimeScreen");
+  const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.match(appJs, /PDA_RUNTIME_POLL_INTERVAL_MS\s*=\s*3000/);
+  assert.match(shouldPollClerk, /isPdaRuntimeMode\(\)/);
+  assert.match(shouldPollClerk, /roleCode === "store_clerk"/);
+  assert.match(shouldPollClerk, /activePage !== "my"/);
+  assert.match(loadClerkTasks, /loadStoreAssignedSdoPackageTasks/);
+  assert.match(loadClerkTasks, /render:\s*false/);
+  assert.match(loadClerkTasks, /assignedBackendTasks/);
+  assert.doesNotMatch(loadClerkTasks, /activePage\s*=\s*"tasks"|activeGroupId\s*=\s*"A"|current_task_group_id\s*=\s*"A"/);
+  assert.match(runPoll, /shouldPollClerkTasks/);
+  assert.match(runPoll, /loadClerkPdaAssignedTasksForPolling/);
+  assert.match(renderRuntime, /renderPdaRuntimeRefreshIndicator/);
+  assert.match(actionHandler, /startPdaRuntimePolling/);
+});
+
 test("legacy WebView clerk runtime also uses task-driven two-tab flow", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
 
