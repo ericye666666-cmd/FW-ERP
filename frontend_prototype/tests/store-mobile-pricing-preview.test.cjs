@@ -165,10 +165,14 @@ test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without re
   assert.match(actionHandler, /startPdaRuntimePolling/);
 });
 
-test("clerk PDA Bluetooth printer test polls native bridge status without touching task polling", () => {
+test("clerk PDA printer connection UI is clerk-friendly and hides protocol diagnostics", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const myTabSource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
-  const printerSectionSource = extractFunctionSource(appJs, "renderClerkBluetoothPrinterTestSection");
+  const entrySource = extractFunctionSource(appJs, "renderClerkPrinterConnectionEntryCard");
+  const pageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
+  const badgeSource = extractFunctionSource(appJs, "renderClerkPrinterStatusBadge");
+  const screenSource = extractFunctionSource(appJs, "renderStoreMobileDeviceScreen");
+  const runtimeSource = extractFunctionSource(appJs, "renderStoreMobileRuntimeScreen");
   const startPrinterPolling = extractFunctionSource(appJs, "startClerkBluetoothPrinterStatusPolling");
   const stopPrinterPolling = extractFunctionSource(appJs, "stopClerkBluetoothPrinterStatusPolling");
   const shouldPollPrinter = extractFunctionSource(appJs, "shouldPollClerkBluetoothPrinterStatus");
@@ -180,27 +184,33 @@ test("clerk PDA Bluetooth printer test polls native bridge status without touchi
   assert.match(appJs, /CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS\s*=\s*3000/);
   assert.match(stateSource, /bluetoothPrinterStatus/);
   assert.match(stateSource, /bluetoothPrinterPairedPrintersLoaded:\s*false/);
-  assert.match(myTabSource, /renderClerkBluetoothPrinterTestSection/);
-  assert.match(printerSectionSource, /蓝牙打印机测试/);
-  assert.match(printerSectionSource, /最近刷新/);
-  assert.match(printerSectionSource, /bridge_available/);
-  assert.match(printerSectionSource, /bluetooth_enabled/);
-  assert.match(printerSectionSource, /connection_status/);
-  assert.match(printerSectionSource, /selected_printer_name\/address/);
-  assert.match(printerSectionSource, /selected_profile/);
-  assert.match(printerSectionSource, /last_error/);
-  assert.match(printerSectionSource, /last_protocol_tested/);
-  assert.match(printerSectionSource, /last_print_result/);
-  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-refresh/);
+  assert.match(myTabSource, /renderClerkPrinterConnectionEntryCard/);
+  assert.match(entrySource, /打印机连接/);
+  assert.match(entrySource, /当前打印机/);
+  assert.match(entrySource, /data-mobile-pricing-page="printer_connection"/);
+  assert.doesNotMatch(myTabSource, /蓝牙打印机测试|打印 TSPL|打印 CPCL|ESC\/POS|RAW 走纸/);
+  assert.match(pageSource, /打印机连接/);
+  assert.match(pageSource, /打印机状态/);
+  assert.match(pageSource, /当前型号/);
+  assert.match(pageSource, /最近刷新/);
+  assert.match(pageSource, /搜索附近打印机/);
+  assert.match(pageSource, /刷新已配对打印机/);
+  assert.match(pageSource, /连接打印机/);
+  assert.match(pageSource, /断开连接/);
+  assert.match(pageSource, /打印测试标签/);
+  assert.match(screenSource, /page === "printer_connection"/);
+  assert.match(runtimeSource, /renderClerkPrinterStatusBadge/);
+  assert.match(badgeSource, /data-clerk-printer-status-badge/);
+  assert.match(badgeSource, /data-mobile-pricing-page="printer_connection"/);
+  assert.doesNotMatch(pageSource, /bridge_available|bluetooth_enabled|last_protocol_tested|last_print_result|TSPL_SIMPLE_TEXT|TSPL_DENSITY_TEXT|RAW_LF_FEED/);
   assert.match(startPrinterPolling, /pollClerkBluetoothPrinterStatus\(\{\s*reason:\s*"immediate"/);
   assert.match(startPrinterPolling, /window\.setInterval/);
   assert.match(startPrinterPolling, /CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS/);
-  assert.match(shouldPollPrinter, /activePage === "my"/);
   assert.match(shouldPollPrinter, /document\.visibilityState === "hidden"/);
-  assert.match(shouldPollPrinter, /data-clerk-bluetooth-printer-test-section/);
+  assert.match(shouldPollPrinter, /data-clerk-printer-status-badge/);
   assert.match(pollPrinter, /DirectLoopPdaPrinter/);
   assert.match(pollPrinter, /getPrinterStatus/);
-  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters/);
+  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
   assert.match(refreshPairedPrinters, /listPairedPrinters/);
   assert.doesNotMatch(refreshPairedPrinters, /connectPrinter|printTestLabel/);
   assert.match(actionHandler, /refreshClerkBluetoothPairedPrinters/);
@@ -214,7 +224,7 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   const updateStatus = extractFunctionSource(appJs, "updateClerkBluetoothPrinterStatus");
   const pollPrinter = extractFunctionSource(appJs, "pollClerkBluetoothPrinterStatus");
   const refreshPairedPrinters = extractFunctionSource(appJs, "refreshClerkBluetoothPairedPrinters");
-  const printerSectionSource = extractFunctionSource(appJs, "renderClerkBluetoothPrinterTestSection");
+  const printerPageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
 
   assert.match(stateSource, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(stateSource, /bluetoothPrinterPairedPrintersLoaded:\s*false/);
@@ -222,40 +232,40 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(refreshPairedPrinters, /bluetoothPrinterPairedPrinters\s*=\s*printers/);
   assert.match(refreshPairedPrinters, /bluetoothPrinterPairedPrintersLastRefreshAt\s*=/);
   assert.match(refreshPairedPrinters, /没有已配对的蓝牙打印机，请先在 Android 系统蓝牙设置中配对打印机。/);
-  assert.match(printerSectionSource, /bluetoothPrinterPairedPrintersLoaded[\s\S]*bluetoothPrinterPairedPrinters[\s\S]*status\.paired_printers/);
+  assert.match(printerPageSource, /getClerkBluetoothPrinterRowsForDisplay/);
+  assert.match(appJs, /bluetoothPrinterPairedPrintersLoaded[\s\S]*bluetoothPrinterPairedPrinters[\s\S]*status\.paired_printers/);
   assert.match(updateStatus, /selected_printer_name/);
   assert.match(updateStatus, /selected_printer_address/);
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
-  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-bluetooth-printer-variants-228/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-bluetooth-printer-variants-228/);
+  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
+  assert.match(indexHtml, /app\.js\?v=clerk-printer-connection-229/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-connection-229/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
 
-test("clerk PDA Bluetooth printer panel exposes Chiteng S1 diagnostic protocol variants", () => {
-  const printerSectionSource = extractFunctionSource(appJs, "renderClerkBluetoothPrinterTestSection");
+test("clerk PDA printer connection page uses official Chiteng test print without exposing protocols", () => {
+  const printerPageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
   const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
-  const requiredVariants = [
-    ["TSPL_SIMPLE_TEXT", "TSPL 简单文字"],
-    ["TSPL_DENSITY_TEXT", "TSPL 高浓度文字"],
-    ["TSPL_NO_GAP_CONTINUOUS", "TSPL 连续纸测试"],
-    ["TSPL_GAP_DETECT", "TSPL 间隙校准测试"],
-    ["RAW_LF_FEED", "RAW 走纸测试"],
-    ["ESC_POS_TEXT", "ESC/POS 文字测试"],
-    ["CPCL_SIMPLE_TEXT", "CPCL 简单文字"],
-  ];
+  const discoverySource = extractFunctionSource(appJs, "startClerkBluetoothPrinterDiscovery");
 
-  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-test="TSPL"/);
-  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-test="CPCL"/);
-  assert.match(printerSectionSource, /data-clerk-bluetooth-printer-test="ESC_POS"/);
-  assert.match(actionHandler, /printTestLabel\(String\(bluetoothPrinterTestProtocol \|\| ""\)\)/);
-  requiredVariants.forEach(([protocol, label]) => {
-    assert.match(printerSectionSource, new RegExp(`data-clerk-bluetooth-printer-test="${protocol}"`));
-    assert.match(printerSectionSource, new RegExp(label));
-    assert.match(appLegacyJs, new RegExp(`data-clerk-bluetooth-printer-test="${protocol}"`));
-  });
+  assert.match(printerPageSource, /CHITENG_S1_OFFICIAL/);
+  assert.match(printerPageSource, /驰腾 S1/);
+  assert.match(printerPageSource, /Urovo/);
+  assert.match(printerPageSource, /通用/);
+  assert.match(printerPageSource, /data-clerk-bluetooth-printer-search/);
+  assert.match(printerPageSource, /data-clerk-bluetooth-printer-refresh/);
+  assert.match(printerPageSource, /请先在 Android 系统蓝牙中完成配对后再连接。/);
+  assert.match(actionHandler, /printTestLabel\("CHITENG_S1_OFFICIAL"\)/);
+  assert.match(actionHandler, /该型号测试打印暂未配置/);
+  assert.match(discoverySource, /startPrinterDiscovery/);
+  assert.match(discoverySource, /getDiscoveredPrinters/);
+  assert.match(discoverySource, /当前版本暂只支持已配对打印机/);
+  assert.doesNotMatch(printerPageSource, /打印 TSPL 测试标签|打印 CPCL 测试标签|打印 ESC\/POS 测试标签|TSPL 简单文字|TSPL 高浓度文字|TSPL 连续纸测试|TSPL 间隙校准测试|RAW 走纸测试|ESC\/POS 文字测试|CPCL 简单文字/);
+  assert.doesNotMatch(appLegacyJs, /打印 TSPL 测试标签|打印 CPCL 测试标签|打印 ESC\/POS 测试标签|TSPL 简单文字|TSPL 高浓度文字|TSPL 连续纸测试|TSPL 间隙校准测试|RAW 走纸测试|ESC\/POS 文字测试|CPCL 简单文字/);
+  assert.match(appLegacyJs, /data-clerk-printer-status-badge/);
+  assert.match(appLegacyJs, /CHITENG_S1_OFFICIAL/);
   assert.doesNotMatch(actionHandler, /STORE_ITEM|marked.*printed|printJobs.*printed/);
 });
 
@@ -601,7 +611,7 @@ test("completing all groups marks the assigned SDP task complete with summary", 
   assert.match(summarySource, /返回任务列表/);
 });
 
-test("my tab shows clerk PDA account settings, printer test, and logout", () => {
+test("my tab shows clerk PDA account settings, printer connection entry, and logout", () => {
   const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
 
   assert.match(mySource, /当前账号/);
@@ -611,7 +621,7 @@ test("my tab shows clerk PDA account settings, printer test, and logout", () => 
   assert.match(mySource, /角色/);
   assert.match(mySource, /店员/);
   assert.match(mySource, /Direct Loop PDA/);
-  assert.match(mySource, /renderClerkBluetoothPrinterTestSection/);
+  assert.match(mySource, /renderClerkPrinterConnectionEntryCard/);
   assert.match(mySource, /data-action="logout"/);
   assert.match(mySource, /重置演示任务状态/);
   assert.doesNotMatch(mySource, /店长|仓库|POS|系统管理|权限/);
