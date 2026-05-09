@@ -8038,6 +8038,14 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   text-align: right;
 }
 
+.pda-runtime-refresh-indicator {
+  display: inline-block;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.78;
+}
+
 .mobile-pricing-screen {
   min-height: 0;
   overflow: auto;
@@ -8780,6 +8788,12 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
   color: #172017;
   font-size: 24px;
   line-height: 1.08;
+}
+
+.store-manager-pda-title .pda-runtime-refresh-indicator {
+  display: block;
+  margin-top: 3px;
+  text-align: right;
 }
 
 .store-manager-pda-body {

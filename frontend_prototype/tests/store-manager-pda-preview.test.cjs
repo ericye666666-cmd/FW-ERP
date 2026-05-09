@@ -350,6 +350,67 @@ test("package receive, exception, assignment, and completion use backend package
   assert.match(completion, /返回任务列表/);
 });
 
+test("manager PDA receiving runtime polls backend every 3000ms without overlapping requests", () => {
+  const startPolling = functionSource(appJs, "startPdaRuntimePolling");
+  const runPoll = functionSource(appJs, "runPdaRuntimePollOnce");
+  const shouldPollManager = functionSource(appJs, "shouldPollStoreManagerReceiving");
+  const refreshManager = functionSource(appJs, "refreshStoreManagerPdaReceivingForPolling");
+
+  assert.match(appJs, /PDA_RUNTIME_POLL_INTERVAL_MS\s*=\s*3000/);
+  assert.match(startPolling, /window\.setInterval/);
+  assert.match(startPolling, /PDA_RUNTIME_POLL_INTERVAL_MS/);
+  assert.match(shouldPollManager, /isPdaRuntimeMode\(\)/);
+  assert.match(shouldPollManager, /roleCode === "store_manager"/);
+  assert.match(shouldPollManager, /activeTab.*receiving/);
+  assert.match(runPoll, /pdaRuntimePollingInFlight/);
+  assert.match(runPoll, /pdaRuntimeActionInFlight/);
+  assert.match(runPoll, /return false/);
+  assert.match(refreshManager, /loadStoreManagerPdaBackendState/);
+  assert.doesNotMatch(runPoll, /window\.location\.reload|location\.reload|localStorage\.clear|clearSession/);
+});
+
+test("manager PDA polling preserves selected SDO detail and search while refreshing data", () => {
+  const refreshManager = functionSource(appJs, "refreshStoreManagerPdaReceivingForPolling");
+  const renderDetail = functionSource(appJs, "renderStoreManagerPdaSdoDetail");
+  const renderRuntime = functionSource(appJs, "renderStoreManagerPdaRuntimeScreen");
+
+  assert.match(refreshManager, /selectedSdoCode/);
+  assert.match(refreshManager, /previousPage/);
+  assert.match(refreshManager, /previousSearchQuery/);
+  assert.match(refreshManager, /selectStoreManagerPdaTask\(state,\s*selectedSdoCode/);
+  assert.match(refreshManager, /state\.activePage = previousPage/);
+  assert.match(refreshManager, /state\.sdoSearchQuery = previousSearchQuery/);
+  assert.match(renderDetail, /renderStoreManagerPdaPackageCard/);
+  assert.match(renderRuntime, /renderPdaRuntimeRefreshIndicator/);
+  assert.match(renderRuntime, /最近刷新|自动刷新中/);
+});
+
+test("manager PDA refreshes immediately after receiving, exception, assignment, and tab entry", () => {
+  const actionHandler = functionSource(appJs, "handleStoreManagerPdaTaskAction");
+  const receivePackage = functionSource(appJs, "receiveStoreManagerPdaPackage");
+  const markException = functionSource(appJs, "markStoreManagerPdaPackageException");
+  const assignPackage = functionSource(appJs, "assignStoreManagerPdaPackageToClerk");
+
+  assert.match(actionHandler, /storeManagerPdaTab[\s\S]*runPdaRuntimePollOnce/);
+  assert.match(actionHandler, /pdaRuntimeActionInFlight = true/);
+  assert.match(actionHandler, /pdaRuntimeActionInFlight = false/);
+  assert.match(receivePackage, /refreshStoreManagerPdaReceivingForPolling/);
+  assert.match(markException, /refreshStoreManagerPdaReceivingForPolling/);
+  assert.match(assignPackage, /refreshStoreManagerPdaReceivingForPolling/);
+});
+
+test("PDA polling pauses on logout and hidden visibility then resumes visible", () => {
+  const clearSession = functionSource(appJs, "clearSession");
+  const stopPolling = functionSource(appJs, "stopPdaRuntimePolling");
+
+  assert.match(clearSession, /stopPdaRuntimePolling/);
+  assert.match(stopPolling, /window\.clearInterval/);
+  assert.match(appJs, /document\.addEventListener\("visibilitychange"/);
+  assert.match(appJs, /document\.visibilityState === "hidden"[\s\S]*stopPdaRuntimePolling/);
+  assert.match(appJs, /document\.visibilityState === "visible"[\s\S]*startPdaRuntimePolling/);
+  assert.match(appJs, /document\.visibilityState === "visible"[\s\S]*runPdaRuntimePollOnce/);
+});
+
 test("manager available clerk list is data-driven from active UTAWALA store_clerk users", () => {
   const backendLoad = functionSource(appJs, "loadStoreManagerPdaBackendState");
   const packageCard = functionSource(appJs, "renderStoreManagerPdaPackageCard");
@@ -401,7 +462,7 @@ test("clerk PDA from #208 still keeps two tabs and visibly notes that real assig
 });
 
 test("manager PDA cache-busts app and style assets", () => {
-  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=manager-pda-backend-210" \/>/);
-  assert.match(indexHtml, /<script src="\.\/app\.js\?v=store-manager-receiving-list-213"><\/script>/);
+  assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=pda-runtime-polling-215" \/>/);
+  assert.match(indexHtml, /<script src="\.\/app\.js\?v=pda-runtime-polling-215"><\/script>/);
   assert.match(indexHtml, /<script src="\.\/operations-fulfillment-flow\.js\?v=sdo-package-allocation-211"><\/script>/);
 });
