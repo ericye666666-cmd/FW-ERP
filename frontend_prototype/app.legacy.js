@@ -3611,10 +3611,36 @@ function persistPdaBluetoothPrinterSelection(status = {}) {
     })
   );
 }
+function getClerkBluetoothPrinterStatusObject(raw = {}) {
+  const parsed = typeof raw === "string" ? safeParse(raw, {}) : raw;
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+function getFirstNonEmptyClerkBluetoothValue(...values) {
+  for (const value of values) {
+    const normalized = String(value || "").trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
+}
+function getClerkBluetoothSelectedProfile(rawStatus = {}, currentStatus = {}, storedSelection = {}) {
+  const rawProfile = String(rawStatus.selected_profile || "").trim();
+  if (rawProfile && rawProfile !== "GENERIC") {
+    return rawProfile;
+  }
+  const currentProfile = String(currentStatus.selected_profile || "").trim();
+  const storedProfile = String(storedSelection.selected_profile || "").trim();
+  return getFirstNonEmptyClerkBluetoothValue(
+    storedProfile,
+    currentProfile === "GENERIC" && storedProfile ? "" : currentProfile,
+    rawProfile,
+    "GENERIC"
+  );
+}
 function normalizeClerkBluetoothPrinterStatus(raw = {}) {
   var _a, _b;
-  const parsed = typeof raw === "string" ? safeParse(raw, {}) : raw;
-  const status = parsed && typeof parsed === "object" ? parsed : {};
+  const status = getClerkBluetoothPrinterStatusObject(raw);
   const printers = Array.isArray(status.paired_printers) ? status.paired_printers : [];
   return {
     ...createDefaultClerkBluetoothPrinterStatus(),
@@ -3654,10 +3680,27 @@ function getDirectLoopPdaPrinterBridge() {
 }
 function updateClerkBluetoothPrinterStatus(status = {}, options = {}) {
   const state = storeMobilePricingPreviewState;
+  const rawStatus = getClerkBluetoothPrinterStatusObject(status);
+  const currentStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
   const storedSelection = getStoredPdaBluetoothPrinterSelection();
+  const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
+  const pairedPrintersForDisplay = state.bluetoothPrinterPairedPrintersLoaded ? Array.isArray(state.bluetoothPrinterPairedPrinters) ? state.bluetoothPrinterPairedPrinters : [] : normalizedStatus.paired_printers;
   state.bluetoothPrinterStatus = normalizeClerkBluetoothPrinterStatus({
+    ...normalizedStatus,
     ...storedSelection,
-    ...status
+    selected_printer_name: getFirstNonEmptyClerkBluetoothValue(
+      rawStatus.selected_printer_name,
+      currentStatus.selected_printer_name,
+      storedSelection.selected_printer_name
+    ),
+    selected_printer_address: getFirstNonEmptyClerkBluetoothValue(
+      rawStatus.selected_printer_address,
+      currentStatus.selected_printer_address,
+      storedSelection.selected_printer_address
+    ),
+    selected_profile: getClerkBluetoothSelectedProfile(rawStatus, currentStatus, storedSelection),
+    paired_printer_count: state.bluetoothPrinterPairedPrintersLoaded ? pairedPrintersForDisplay.length : normalizedStatus.paired_printer_count,
+    paired_printers: pairedPrintersForDisplay
   });
   state.bluetoothPrinterLastRefreshAt = (/* @__PURE__ */ new Date()).toISOString();
   if (!options.keepError) {
@@ -3763,7 +3806,6 @@ async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
   }
   const bridge = getDirectLoopPdaPrinterBridge();
   if (!bridge || typeof bridge.listPairedPrinters !== "function") {
-    storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLoaded = true;
     setClerkBluetoothPrinterError("Android 打印桥不可用：无法刷新已配对打印机。");
     renderClerkBluetoothPrinterStatusIfActive();
     return false;
@@ -3771,6 +3813,10 @@ async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
   clerkBluetoothPrinterPairedPrintersInFlight = true;
   try {
     const printers = normalizeClerkBluetoothPairedPrinters(await bridge.listPairedPrinters());
+    const noPairedPrinterMessage = "没有已配对的蓝牙打印机，请先在 Android 系统蓝牙设置中配对打印机。";
+    storeMobilePricingPreviewState.bluetoothPrinterPairedPrinters = printers;
+    storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLoaded = true;
+    storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLastRefreshAt = (/* @__PURE__ */ new Date()).toISOString();
     const currentStatus = normalizeClerkBluetoothPrinterStatus(storeMobilePricingPreviewState.bluetoothPrinterStatus);
     updateClerkBluetoothPrinterStatus(
       {
@@ -3778,15 +3824,14 @@ async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
         bridge_available: true,
         paired_printer_count: printers.length,
         paired_printers: printers,
-        last_error: printers.length ? currentStatus.last_error : "没有已配对的蓝牙打印机。"
+        last_error: printers.length ? currentStatus.last_error : noPairedPrinterMessage
       },
       { pairedPrintersLoaded: true, keepError: printers.length === 0 }
     );
-    storeMobilePricingPreviewState.bluetoothPrinterError = printers.length ? "" : "没有已配对的蓝牙打印机。";
+    storeMobilePricingPreviewState.bluetoothPrinterError = printers.length ? "" : noPairedPrinterMessage;
     renderClerkBluetoothPrinterStatusIfActive();
     return true;
   } catch (error) {
-    storeMobilePricingPreviewState.bluetoothPrinterPairedPrintersLoaded = true;
     setClerkBluetoothPrinterError(formatErrorMessage(error));
     renderClerkBluetoothPrinterStatusIfActive();
     return false;
@@ -29240,7 +29285,9 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     bluetoothPrinterStatus: createDefaultClerkBluetoothPrinterStatus(),
     bluetoothPrinterLastRefreshAt: "",
     bluetoothPrinterError: "",
-    bluetoothPrinterPairedPrintersLoaded: false
+    bluetoothPrinterPairedPrinters: [],
+    bluetoothPrinterPairedPrintersLoaded: false,
+    bluetoothPrinterPairedPrintersLastRefreshAt: ""
   };
   return {
     ...baseState,
@@ -29253,7 +29300,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
     assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
     pricingSourceLines: Array.isArray(overrides.pricingSourceLines) ? overrides.pricingSourceLines : baseState.pricingSourceLines,
-    bluetoothPrinterStatus: normalizeClerkBluetoothPrinterStatus(overrides.bluetoothPrinterStatus || baseState.bluetoothPrinterStatus)
+    bluetoothPrinterStatus: normalizeClerkBluetoothPrinterStatus(overrides.bluetoothPrinterStatus || baseState.bluetoothPrinterStatus),
+    bluetoothPrinterPairedPrinters: Array.isArray(overrides.bluetoothPrinterPairedPrinters) ? overrides.bluetoothPrinterPairedPrinters : baseState.bluetoothPrinterPairedPrinters
   };
 }
 function getStoreMobileTaskGroups(state = storeMobilePricingPreviewState) {
@@ -30158,7 +30206,8 @@ function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPrevie
     status.selected_printer_name || "-",
     status.selected_printer_address || "-"
   ].join(" / ");
-  const pairedPrinters = Array.isArray(status.paired_printers) ? status.paired_printers : [];
+  const pairedPrinters = (state.bluetoothPrinterPairedPrintersLoaded ? state.bluetoothPrinterPairedPrinters : status.paired_printers) || [];
+  const pairedPrinterCount = state.bluetoothPrinterPairedPrintersLoaded ? pairedPrinters.length : status.paired_printer_count || pairedPrinters.length || 0;
   const statusRows = [
     ["bridge_available", String(Boolean(status.bridge_available))],
     ["bluetooth_enabled", String(Boolean(status.bluetooth_enabled))],
@@ -30197,7 +30246,7 @@ function renderClerkBluetoothPrinterTestSection(state = storeMobilePricingPrevie
         `).join("")}
       </div>
       <div class="clerk-bluetooth-printer-paired-list">
-        <div class="subtle small">paired_printer_count: ${escapeHtml(status.paired_printer_count || pairedPrinters.length || 0)}</div>
+        <div class="subtle small">paired_printer_count: ${escapeHtml(pairedPrinterCount)}</div>
         ${pairedPrinters.length ? pairedPrinters.map((printer) => `
                 <article>
                   <strong>${escapeHtml(printer.name || "-")}</strong>

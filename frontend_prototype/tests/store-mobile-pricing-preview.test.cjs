@@ -209,6 +209,31 @@ test("clerk PDA Bluetooth printer test polls native bridge status without touchi
   assert.match(appJs, /document\.visibilityState === "visible"[\s\S]*startClerkBluetoothPrinterStatusPolling/);
 });
 
+test("clerk PDA Bluetooth paired printer rows persist across status polling", () => {
+  const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+  const updateStatus = extractFunctionSource(appJs, "updateClerkBluetoothPrinterStatus");
+  const pollPrinter = extractFunctionSource(appJs, "pollClerkBluetoothPrinterStatus");
+  const refreshPairedPrinters = extractFunctionSource(appJs, "refreshClerkBluetoothPairedPrinters");
+  const printerSectionSource = extractFunctionSource(appJs, "renderClerkBluetoothPrinterTestSection");
+
+  assert.match(stateSource, /bluetoothPrinterPairedPrinters:\s*\[\]/);
+  assert.match(stateSource, /bluetoothPrinterPairedPrintersLoaded:\s*false/);
+  assert.match(stateSource, /bluetoothPrinterPairedPrintersLastRefreshAt:\s*""/);
+  assert.match(refreshPairedPrinters, /bluetoothPrinterPairedPrinters\s*=\s*printers/);
+  assert.match(refreshPairedPrinters, /bluetoothPrinterPairedPrintersLastRefreshAt\s*=/);
+  assert.match(refreshPairedPrinters, /没有已配对的蓝牙打印机，请先在 Android 系统蓝牙设置中配对打印机。/);
+  assert.match(printerSectionSource, /bluetoothPrinterPairedPrintersLoaded[\s\S]*bluetoothPrinterPairedPrinters[\s\S]*status\.paired_printers/);
+  assert.match(updateStatus, /selected_printer_name/);
+  assert.match(updateStatus, /selected_printer_address/);
+  assert.match(updateStatus, /selected_profile/);
+  assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
+  assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters/);
+  assert.match(indexHtml, /app\.js\?v=clerk-bluetooth-printer-actions-227/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-bluetooth-printer-actions-227/);
+  assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
+  assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
+});
+
 test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {
   const sortAssignedTasks = getExecutableFunction("sortStoreMobileAssignedBackendTasks");
 

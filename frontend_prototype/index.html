@@ -4255,10 +4255,10 @@
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=clerk-bluetooth-printer-polling-224", "modern");
+          loadPdaRuntimeScript("./app.js?v=clerk-bluetooth-printer-actions-227", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=clerk-bluetooth-printer-polling-224", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=clerk-bluetooth-printer-actions-227", "legacy");
       })();
     </script>
   </body>
