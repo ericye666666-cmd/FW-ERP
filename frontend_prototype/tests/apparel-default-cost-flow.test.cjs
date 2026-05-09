@@ -114,8 +114,8 @@ test("default sale price seeds derive P and S rows from every default cost prese
 
     assert.equal(pRecord.default_sale_price_kes, preset.cost_p * 2);
     assert.equal(sRecord.default_sale_price_kes, preset.cost_s * 2);
-    assert.match(pRecord.note, /参考售价 = 默认成本 × 2/);
-    assert.match(sRecord.note, /参考售价 = 默认成本 × 2/);
+    assert.match(pRecord.note, /初始默认售价由默认成本 × 2 生成/);
+    assert.match(sRecord.note, /初始默认售价由默认成本 × 2 生成/);
   });
 });
 
@@ -180,8 +180,9 @@ test("warehouse comprehensive UI shows default sale price management below defau
   assert.match(indexHtml, /默认售价 KES/);
   assert.match(indexHtml, /P 档默认售价/);
   assert.match(indexHtml, /S 档默认售价/);
-  assert.match(indexHtml, /参考售价 = 默认成本 × 2/);
-  assert.match(indexHtml, /后续可作为店员分堆标价 \/ 默认售价建议使用；当前仅为配置参考。/);
+  assert.match(indexHtml, /初始默认售价由默认成本 × 2 生成，可在此独立修改。/);
+  assert.match(indexHtml, /店员端默认售价以本表配置为准。/);
+  assert.doesNotMatch(indexHtml, /参考售价 = 默认成本 × 2/);
   assert.match(appJs, /renderApparelDefaultSalePriceSummary/);
   assert.match(appJs, /data-apparel-default-sale-price-edit/);
   assert.match(appJs, /data-apparel-default-sale-price-delete/);

@@ -290,6 +290,68 @@ test("backend selected SDP pricing source lines come from the assigned task, not
   assert.match(suggestedSource, /findApparelDefaultSalePriceRecord/);
 });
 
+test("clerk PDA pricing resolves configured default sale prices without cost multiplier fallback", () => {
+  const resolveSource = extractFunctionSource(appJs, "resolveStoreMobilePricingBatchPrice");
+  const resolvePrice = getExecutableFunction(
+    "resolveStoreMobilePricingBatchPrice",
+    `
+    const STORE_MOBILE_MISSING_DEFAULT_SALE_PRICE_MESSAGE = "该品类未配置默认售价，请先在仓库端默认售价管理中维护。";
+    const STORE_MOBILE_CUSTOM_PRICE_BELOW_DEFAULT_MESSAGE = "自定义价格不能低于默认售价。请联系仓库管理员修改默认售价。";
+    const configuredPrices = {
+      "pants||cargo pant||P": 450,
+      "pants||cargo pant||S": 330,
+    };
+    function getStoreMobileSuggestedSalePrice(categoryMain, categorySub, grade) {
+      return configuredPrices[\`\${categoryMain}||\${categorySub}||\${grade}\`] || 0;
+    }
+    `
+  );
+  const line = { category_main: "pants", category_sub: "cargo pant" };
+
+  assert.match(resolveSource, /getStoreMobileSuggestedSalePrice/);
+  assert.doesNotMatch(resolveSource, /default_cost|cost_p|cost_s|\*\s*2/);
+  const pResolution = resolvePrice(line, "P");
+  const sResolution = resolvePrice(line, "S");
+  assert.equal(pResolution.ok, true);
+  assert.equal(pResolution.pricing_type, "P");
+  assert.equal(pResolution.baseline_grade, "P");
+  assert.equal(pResolution.default_sale_price_kes, 450);
+  assert.equal(pResolution.sale_price_kes, 450);
+  assert.equal(sResolution.ok, true);
+  assert.equal(sResolution.pricing_type, "S");
+  assert.equal(sResolution.baseline_grade, "S");
+  assert.equal(sResolution.default_sale_price_kes, 330);
+  assert.equal(sResolution.sale_price_kes, 330);
+  assert.equal(resolvePrice(line, "CUSTOM", "P", 449).ok, false);
+  assert.match(resolvePrice(line, "CUSTOM", "P", 449).message, /自定义价格不能低于默认售价/);
+  assert.equal(resolvePrice(line, "CUSTOM", "P", 450).ok, true);
+  assert.equal(resolvePrice(line, "CUSTOM", "S", 500).sale_price_kes, 500);
+  assert.match(resolvePrice({ category_main: "bags", category_sub: "bags" }, "P").message, /该品类未配置默认售价/);
+  assert.equal(resolvePrice({ category_main: "bags", category_sub: "bags" }, "CUSTOM", "P", 999).ok, false);
+});
+
+test("backend selected SDP pricing UI treats P and S as read-only configured selections", () => {
+  const renderSource = extractFunctionSource(appJs, "renderPriceGroupCards");
+  const batchSource = extractFunctionSource(appJs, "createStoreMobilePricingBatch");
+
+  assert.match(renderSource, /P 档默认售价/);
+  assert.match(renderSource, /S 档默认售价/);
+  assert.match(renderSource, /基准档位/);
+  assert.match(renderSource, /\|\|CUSTOM\|\|P/);
+  assert.match(renderSource, /\|\|CUSTOM\|\|S/);
+  assert.match(renderSource, /STORE_MOBILE_MISSING_DEFAULT_SALE_PRICE_MESSAGE/);
+  assert.match(appJs, /该品类未配置默认售价，请先在仓库端默认售价管理中维护。/);
+  assert.doesNotMatch(renderSource, /data-mobile-pricing-default-sale-price|data-mobile-pricing-p-default-price|data-mobile-pricing-s-default-price/);
+  assert.match(batchSource, /resolveStoreMobilePricingBatchPrice/);
+  assert.match(batchSource, /baseline_grade/);
+  assert.match(batchSource, /default_sale_price_kes/);
+  assert.match(batchSource, /pricing_type/);
+  assert.match(appLegacyJs, /自定义价格不能低于默认售价。请联系仓库管理员修改默认售价。/);
+  assert.match(appLegacyJs, /该品类未配置默认售价，请先在仓库端默认售价管理中维护。/);
+  assert.match(appLegacyJs, /baseline_grade/);
+  assert.match(appLegacyJs, /pricing_type/);
+});
+
 test("backend selected SDP batch quantity validation blocks over-allocation", () => {
   const validateSource = extractFunctionSource(appJs, "validateStoreMobilePricingBatchQuantity");
   const validateBatchQuantity = getExecutableFunction(
@@ -332,6 +394,10 @@ test("real backend SDP batch generation uses STORE_ITEM API and never completes 
   assert.match(generateSource, /pricing_batch_id/);
   assert.match(generateSource, /source_line_key/);
   assert.match(generateSource, /selected_price/);
+  assert.match(generateSource, /pricing_type/);
+  assert.match(generateSource, /baseline_grade/);
+  assert.match(generateSource, /default_sale_price_kes/);
+  assert.match(generateSource, /sale_price_kes/);
   assert.match(generateSource, /source_sdp_display_code/);
   assert.match(printSource, /print-jobs\/item-tokens/);
   assert.match(printSource, /Android print bridge|待打印/);

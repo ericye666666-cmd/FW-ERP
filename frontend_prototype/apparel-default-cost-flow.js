@@ -42,14 +42,14 @@
         category_sub: preset.category_sub,
         grade: "P",
         default_sale_price_kes: preset.cost_p * 2,
-        note: `${preset.label} P 档默认售价；参考售价 = 默认成本 × 2`,
+        note: `${preset.label} P 档默认售价；初始默认售价由默认成本 × 2 生成，可独立修改`,
       },
       {
         category_main: preset.category_main,
         category_sub: preset.category_sub,
         grade: "S",
         default_sale_price_kes: preset.cost_s * 2,
-        note: `${preset.label} S 档默认售价；参考售价 = 默认成本 × 2`,
+        note: `${preset.label} S 档默认售价；初始默认售价由默认成本 × 2 生成，可独立修改`,
       },
     ])),
   );

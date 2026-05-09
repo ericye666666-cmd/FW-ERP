@@ -2590,7 +2590,7 @@
         <div class="panel-head">
           <h2>默认售价管理</h2>
         </div>
-        <div class="subtle small">参考售价 = 默认成本 × 2。后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+        <div class="subtle small">初始默认售价由默认成本 × 2 生成，可在此独立修改。店员端默认售价以本表配置为准。</div>
         <div class="subtle small">字段：大类 category_main / 小类 category_sub / 档位 grade / 默认售价 default_sale_price_kes / 备注 note / 操作</div>
         <div class="split-grid">
           <form id="apparelDefaultSalePriceForm" class="form-grid compact">
@@ -2613,7 +2613,7 @@
           </div>
         </div>
         <div id="apparelDefaultSalePriceList" class="candidate-summary empty-state">
-          这里会显示已经保存的默认售价配置；参考售价 = 默认成本 × 2。
+          这里会显示已经保存的默认售价配置；店员端默认售价以本表配置为准。
         </div>
         <pre id="apparelDefaultSalePriceOutput" class="output hidden-output"></pre>
       </section>

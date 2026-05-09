@@ -1394,7 +1394,7 @@ const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = apparelDefaultCostFlow.DEFAULT_APPAR
   category_sub: row.category_sub,
   grade: row.grade,
   default_sale_price_kes: roundToTwo(Number(row.default_cost_kes || 0) * 2),
-  note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；参考售价 = 默认成本 × 2`,
+  note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；初始默认售价由默认成本 × 2 生成，可独立修改`,
 }));
 const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SORTING_RACKS || [
   { category_main: "tops", category_sub: "lady tops", grade: "P", default_cost_kes: 185, rack_code: "A-TS-P-01", note: "女装上衣 P 档默认分拣库位" },
@@ -8658,9 +8658,9 @@ function renderApparelDefaultSalePriceSummary(record = null) {
         <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
         <article class="store-metric"><strong>P 档默认售价</strong><span>${escapeHtml(String(summary.gradeCounts?.P || 0))}</span></article>
         <article class="store-metric"><strong>S 档默认售价</strong><span>${escapeHtml(String(summary.gradeCounts?.S || 0))}</span></article>
-        <article class="store-metric"><strong>说明</strong><span>参考售价 = 默认成本 × 2</span></article>
+        <article class="store-metric"><strong>说明</strong><span>初始默认售价可独立修改</span></article>
       </div>
-      <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+      <div class="subtle small">初始默认售价由默认成本 × 2 生成，可在此独立修改。店员端默认售价以本表配置为准。</div>
     `;
   } else {
     summaryTarget.className = "report-summary";
@@ -8671,7 +8671,7 @@ function renderApparelDefaultSalePriceSummary(record = null) {
         <article class="store-metric"><strong>默认售价 KES</strong><span>${escapeHtml(formatKesAmount(current.default_sale_price_kes, "KES 0.00"))}</span></article>
         <article class="store-metric"><strong>说明</strong><span>${escapeHtml(current.note || "默认售价配置")}</span></article>
       </div>
-      <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+      <div class="subtle small">初始默认售价由默认成本 × 2 生成，可在此独立修改。店员端默认售价以本表配置为准。</div>
     `;
   }
 
@@ -31840,6 +31840,78 @@ function getStoreMobileSuggestedSalePrice(categoryMain = "", categorySub = "", g
   return Number(record?.default_sale_price_kes || 0);
 }
 
+const STORE_MOBILE_MISSING_DEFAULT_SALE_PRICE_MESSAGE = "该品类未配置默认售价，请先在仓库端默认售价管理中维护。";
+const STORE_MOBILE_CUSTOM_PRICE_BELOW_DEFAULT_MESSAGE = "自定义价格不能低于默认售价。请联系仓库管理员修改默认售价。";
+
+function resolveStoreMobilePricingBatchPrice(line = {}, pricingType = "P", baselineGrade = "", customPrice = 0) {
+  const normalizedType = String(pricingType || "P").trim().toUpperCase();
+  const resolvedType = normalizedType === "S" ? "S" : normalizedType === "CUSTOM" ? "CUSTOM" : "P";
+  const normalizedBaseline = String(baselineGrade || "").trim().toUpperCase();
+  const resolvedBaseline = resolvedType === "CUSTOM"
+    ? normalizedBaseline
+    : resolvedType;
+  if (resolvedBaseline !== "P" && resolvedBaseline !== "S") {
+    return {
+      ok: false,
+      message: "请选择自定义价格基准档位。",
+      pricing_type: resolvedType,
+      baseline_grade: "",
+      default_sale_price_kes: 0,
+      sale_price_kes: 0,
+    };
+  }
+  const defaultSalePrice = Math.round((Number(getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, resolvedBaseline) || 0) + Number.EPSILON) * 100) / 100;
+  if (!(defaultSalePrice > 0)) {
+    return {
+      ok: false,
+      message: STORE_MOBILE_MISSING_DEFAULT_SALE_PRICE_MESSAGE,
+      pricing_type: resolvedType,
+      baseline_grade: resolvedBaseline,
+      default_sale_price_kes: 0,
+      sale_price_kes: 0,
+    };
+  }
+  if (resolvedType === "CUSTOM") {
+    const customSalePrice = Math.round((Number(customPrice || 0) + Number.EPSILON) * 100) / 100;
+    if (!(customSalePrice > 0)) {
+      return {
+        ok: false,
+        message: "自定义价格必须大于 0。",
+        pricing_type: resolvedType,
+        baseline_grade: resolvedBaseline,
+        default_sale_price_kes: defaultSalePrice,
+        sale_price_kes: 0,
+      };
+    }
+    if (customSalePrice < defaultSalePrice) {
+      return {
+        ok: false,
+        message: STORE_MOBILE_CUSTOM_PRICE_BELOW_DEFAULT_MESSAGE,
+        pricing_type: resolvedType,
+        baseline_grade: resolvedBaseline,
+        default_sale_price_kes: defaultSalePrice,
+        sale_price_kes: customSalePrice,
+      };
+    }
+    return {
+      ok: true,
+      message: "",
+      pricing_type: resolvedType,
+      baseline_grade: resolvedBaseline,
+      default_sale_price_kes: defaultSalePrice,
+      sale_price_kes: customSalePrice,
+    };
+  }
+  return {
+    ok: true,
+    message: "",
+    pricing_type: resolvedType,
+    baseline_grade: resolvedBaseline,
+    default_sale_price_kes: defaultSalePrice,
+    sale_price_kes: defaultSalePrice,
+  };
+}
+
 function getStoreMobileLineRemainingQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
   if (!line) {
@@ -31867,14 +31939,13 @@ function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPrevi
 }
 
 function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, value = "") {
-  const [sourceLineKey = "", rawGrade = ""] = String(value || "").split("||");
-  const grade = String(rawGrade || "P").trim().toUpperCase();
+  const [sourceLineKey = "", rawPricingType = "", rawBaselineGrade = ""] = String(value || "").split("||");
+  const pricingType = String(rawPricingType || "P").trim().toUpperCase();
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === sourceLineKey);
   if (!line) {
     state.pricingSourceLineMessage = "需补充分拣明细";
     return null;
   }
-  const defaultPrice = grade === "CUSTOM" ? 0 : getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, grade);
   const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
     (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey,
   );
@@ -31884,23 +31955,28 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   const customPrice = Number(customPriceInput instanceof HTMLInputElement ? customPriceInput.value : 0);
   const remainingQty = getStoreMobileLineRemainingQty(state, sourceLineKey);
   const quantity = Math.max(1, Math.min(remainingQty, Number(quantityInput instanceof HTMLInputElement ? quantityInput.value : remainingQty) || remainingQty));
-  const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
-  if (!(priceKes > 0)) {
-    state.pricingSourceLineMessage = grade === "CUSTOM" ? "自定义价格必须大于 0。" : "请先在默认售价管理配置 P/S 默认售价。";
+  const priceResolution = resolveStoreMobilePricingBatchPrice(line, pricingType, rawBaselineGrade, customPrice);
+  if (!priceResolution.ok) {
+    state.pricingSourceLineMessage = priceResolution.message;
     return null;
   }
+  const grade = priceResolution.baseline_grade;
+  const priceKes = priceResolution.sale_price_kes;
   const group = {
-    group_id: `BATCH-${String((state.priceGroups || []).length + 1).padStart(2, "0")}-${grade}`,
+    group_id: `BATCH-${String((state.priceGroups || []).length + 1).padStart(2, "0")}-${priceResolution.pricing_type}-${grade}`,
     source_line_key: sourceLineKey,
     category_main: line.category_main,
     category_sub: line.category_sub,
     category: `${line.category_main} / ${line.category_sub}`,
     grade,
-    tier: grade === "CUSTOM" ? "自定义价格" : `${grade} 档默认售价`,
+    pricing_type: priceResolution.pricing_type,
+    baseline_grade: priceResolution.baseline_grade,
+    default_sale_price_kes: priceResolution.default_sale_price_kes,
+    tier: priceResolution.pricing_type === "CUSTOM" ? `自定义价格（基准 ${grade} 档）` : `${grade} 档默认售价`,
     price_kes: priceKes,
     sale_price_kes: priceKes,
     quantity,
-    rack_code: `PDA-${grade === "CUSTOM" ? "CUS" : grade}-001`,
+    rack_code: `PDA-${priceResolution.pricing_type === "CUSTOM" ? "CUS" : grade}-001`,
     source_sdp_display_code: line.source_sdp_display_code || state.selectedSdp?.display_code || "",
     source_sdp_machine_code: line.source_sdp_machine_code || state.selectedSdp?.machine_code || "",
     source_type: line.source_type || state.selectedSdp?.source_type || "",
@@ -32163,6 +32239,7 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
           const remainingQty = getStoreMobileLineRemainingQty(state, line.line_key);
           const pPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
           const sPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
+          const hasMissingDefaultPrice = !(pPrice > 0) || !(sPrice > 0);
           return `
             <article class="mobile-price-group-card mobile-field-group-card">
               <div class="mobile-field-group-top">
@@ -32179,12 +32256,16 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
                 <span><b>P 档默认售价</b>${escapeHtml(pPrice ? `KSh ${pPrice}` : "未配置")}</span>
                 <span><b>S 档默认售价</b>${escapeHtml(sPrice ? `KSh ${sPrice}` : "未配置")}</span>
                 <span><b>自定义价格</b><input type="number" min="1" step="1" placeholder="KES" data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}"></span>
+                <span><b>基准档位</b>
+                  <button type="button" class="ghost-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM||P`)}"${pPrice ? "" : " disabled"}>基准 P</button>
+                  <button type="button" class="ghost-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM||S`)}"${sPrice ? "" : " disabled"}>基准 S</button>
+                </span>
                 <span><b>本批数量</b><input type="number" min="1" max="${escapeHtml(remainingQty)}" value="${escapeHtml(remainingQty)}" data-mobile-pricing-batch-qty="${escapeHtml(line.line_key)}"></span>
               </div>
+              ${hasMissingDefaultPrice ? `<div class="mobile-error">${escapeHtml(STORE_MOBILE_MISSING_DEFAULT_SALE_PRICE_MESSAGE)}</div>` : ""}
               <div class="mobile-field-group-actions">
-                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||P`)}">P 档默认售价</button>
-                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||S`)}">S 档默认售价</button>
-                <button type="button" class="secondary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM`)}">自定义价格</button>
+                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||P`)}"${pPrice ? "" : " disabled"}>选择 P 默认售价</button>
+                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||S`)}"${sPrice ? "" : " disabled"}>选择 S 默认售价</button>
               </div>
             </article>
           `;
@@ -32804,6 +32885,10 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
     clerk: sdp.assigned_clerk || currentSession.user?.username || getCurrentStoreWorkerFallback(),
     rack_code: group.rack_code || "PDA-P-001",
     selected_price: Number(group.sale_price_kes || group.price_kes || 0),
+    pricing_type: group.pricing_type || group.grade || "",
+    baseline_grade: group.baseline_grade || group.grade || "",
+    default_sale_price_kes: Number(group.default_sale_price_kes || 0),
+    sale_price_kes: Number(group.sale_price_kes || group.price_kes || 0),
     category_main: group.category_main || "",
     category_sub: group.category_sub || "",
     grade: group.grade || "",

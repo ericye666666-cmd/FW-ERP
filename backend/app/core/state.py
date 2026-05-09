@@ -108,14 +108,14 @@ def _build_default_apparel_default_sale_prices() -> list[dict[str, Any]]:
                     "category_sub": preset["category_sub"],
                     "grade": "P",
                     "default_sale_price_kes": round(float(preset["cost_p"]) * 2, 2),
-                    "note": f"{preset['label']} P 档参考售价 = 默认成本 × 2",
+                    "note": f"{preset['label']} P 档初始默认售价由默认成本 × 2 生成，可独立修改",
                 },
                 {
                     "category_main": preset["category_main"],
                     "category_sub": preset["category_sub"],
                     "grade": "S",
                     "default_sale_price_kes": round(float(preset["cost_s"]) * 2, 2),
-                    "note": f"{preset['label']} S 档参考售价 = 默认成本 × 2",
+                    "note": f"{preset['label']} S 档初始默认售价由默认成本 × 2 生成，可独立修改",
                 },
             ]
         )
@@ -14412,6 +14412,37 @@ class InMemoryState:
         grade = str(payload.get("grade") or "").strip()
         pricing_batch_id = str(payload.get("pricing_batch_id") or "").strip().upper()
         source_line_key = str(payload.get("source_line_key") or "").strip()
+        explicit_pricing_type = str(payload.get("pricing_type") or "").strip().upper()
+        pricing_type = explicit_pricing_type if explicit_pricing_type in {"P", "S", "CUSTOM"} else ""
+        baseline_grade = str(payload.get("baseline_grade") or "").strip().upper()
+        if pricing_type in {"P", "S"}:
+            baseline_grade = pricing_type
+        if pricing_type == "CUSTOM" and baseline_grade not in {"P", "S"}:
+            raise HTTPException(status_code=400, detail="baseline_grade must be P or S for custom pricing")
+        try:
+            requested_sale_price = round(float(payload.get("sale_price_kes") or selected_price), 2)
+        except (TypeError, ValueError):
+            requested_sale_price = selected_price
+        try:
+            submitted_default_sale_price = round(float(payload.get("default_sale_price_kes") or 0), 2)
+        except (TypeError, ValueError):
+            submitted_default_sale_price = 0.0
+        default_sale_price_kes = submitted_default_sale_price if submitted_default_sale_price > 0 else None
+        sale_price_kes = requested_sale_price if requested_sale_price > 0 else selected_price
+        if pricing_type:
+            default_record = self._find_apparel_default_sale_price(category_main, category_sub, baseline_grade)
+            if not default_record:
+                raise HTTPException(status_code=409, detail="该品类未配置默认售价，请先在仓库端默认售价管理中维护。")
+            default_sale_price_kes = round(float(default_record.get("default_sale_price_kes") or 0), 2)
+            if default_sale_price_kes <= 0:
+                raise HTTPException(status_code=409, detail="该品类未配置默认售价，请先在仓库端默认售价管理中维护。")
+            if pricing_type in {"P", "S"}:
+                sale_price_kes = default_sale_price_kes
+                selected_price = default_sale_price_kes
+            elif sale_price_kes < default_sale_price_kes:
+                raise HTTPException(status_code=409, detail="自定义价格不能低于默认售价。请联系仓库管理员修改默认售价。")
+            else:
+                selected_price = sale_price_kes
         category_name = str(
             payload.get("category_name")
             or " / ".join(value for value in [category_main, category_sub, grade] if value)
@@ -14459,6 +14490,10 @@ class InMemoryState:
                 "grade": grade or str(lineage.get("grade") or "").strip(),
                 "pricing_batch_id": pricing_batch_id,
                 "pricing_batch_grade": grade or str(lineage.get("grade") or "").strip(),
+                "pricing_type": pricing_type,
+                "baseline_grade": baseline_grade,
+                "default_sale_price_kes": default_sale_price_kes,
+                "sale_price_kes": sale_price_kes,
                 "source_line_key": source_line_key,
                 "pricing_batch_status": "pending_print",
                 "sku_code": "",
@@ -14466,8 +14501,8 @@ class InMemoryState:
                 "store_rack_code": rack_code,
                 "suggested_rack_code": rack_code,
                 "selected_price": selected_price,
-                "selling_price_kes": selected_price,
-                "suggested_price_kes": selected_price,
+                "selling_price_kes": sale_price_kes,
+                "suggested_price_kes": sale_price_kes,
                 "qty_index": qty_index,
                 "qty_total": item_count,
                 "token_group_no": int(package.get("package_no") or 1),

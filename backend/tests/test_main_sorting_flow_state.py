@@ -1131,6 +1131,10 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 "quantity": 2,
                 "pricing_batch_id": "BATCH-SDP-PANTS-P",
                 "source_line_key": "SDB260503AAG:pants:cargo pant",
+                "pricing_type": "P",
+                "baseline_grade": "P",
+                "default_sale_price_kes": 410,
+                "sale_price_kes": 410,
             },
         )
 
@@ -1147,6 +1151,79 @@ class MainSortingFlowStateTest(unittest.TestCase):
             self.assertEqual(token["selling_price_kes"], 410)
             self.assertEqual(token["pricing_batch_id"], "BATCH-SDP-PANTS-P")
             self.assertEqual(token["source_line_key"], "SDB260503AAG:pants:cargo pant")
+            self.assertEqual(token["pricing_type"], "P")
+            self.assertEqual(token["baseline_grade"], "P")
+            self.assertEqual(token["default_sale_price_kes"], 410)
+            self.assertEqual(token["sale_price_kes"], 410)
+
+    def test_store_item_generation_rejects_custom_price_below_default_baseline(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=4)
+        self.state.upsert_apparel_default_sale_price(
+            {
+                "category_main": "pants",
+                "category_sub": "cargo pant",
+                "grade": "P",
+                "default_sale_price_kes": 450,
+                "note": "configured P default",
+            },
+            updated_by="warehouse_supervisor_1",
+        )
+
+        base_payload = {
+            "store_code": "UTAWALA",
+            "clerk": "Austin",
+            "generated_by": "Austin",
+            "rack_code": "PDA-CUS-001",
+            "category_main": "pants",
+            "category_sub": "cargo pant",
+            "grade": "P",
+            "quantity": 1,
+            "pricing_batch_id": "BATCH-CUSTOM-P",
+            "source_line_key": "SDB260503AAG:pants:cargo pant",
+            "pricing_type": "CUSTOM",
+            "baseline_grade": "P",
+            "default_sale_price_kes": 450,
+        }
+
+        with self.assertRaises(HTTPException) as lower_error:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {**base_payload, "selected_price": 449, "sale_price_kes": 449},
+            )
+        self.assertEqual(lower_error.exception.status_code, 409)
+        self.assertIn("自定义价格不能低于默认售价", lower_error.exception.detail)
+
+        configured_default = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                **base_payload,
+                "rack_code": "PDA-P-001",
+                "pricing_batch_id": "BATCH-P-CONFIGURED",
+                "pricing_type": "P",
+                "baseline_grade": "P",
+                "selected_price": 410,
+                "sale_price_kes": 410,
+            },
+        )
+        equal = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {**base_payload, "pricing_batch_id": "BATCH-CUSTOM-P-EQUAL", "selected_price": 450, "sale_price_kes": 450},
+        )
+        higher = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {**base_payload, "pricing_batch_id": "BATCH-CUSTOM-P-HIGH", "selected_price": 500, "sale_price_kes": 500},
+        )
+
+        self.assertEqual(configured_default["store_items"][0]["selected_price"], 450)
+        self.assertEqual(configured_default["store_items"][0]["sale_price_kes"], 450)
+        self.assertEqual(configured_default["store_items"][0]["default_sale_price_kes"], 450)
+        self.assertEqual(configured_default["store_items"][0]["pricing_type"], "P")
+        self.assertEqual(equal["store_items"][0]["sale_price_kes"], 450)
+        self.assertEqual(equal["store_items"][0]["default_sale_price_kes"], 450)
+        self.assertEqual(higher["store_items"][0]["sale_price_kes"], 500)
+        self.assertEqual(higher["store_items"][0]["default_sale_price_kes"], 450)
+        self.assertEqual(higher["store_items"][0]["pricing_type"], "CUSTOM")
+        self.assertEqual(higher["store_items"][0]["baseline_grade"], "P")
 
     def test_store_item_generation_inherits_sdo_package_token_and_cost_lineage(self):
         order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
@@ -2194,6 +2271,17 @@ class MainSortingFlowStateTest(unittest.TestCase):
 
         self.assertEqual(updated["default_sale_price_kes"], 425)
         self.assertEqual(updated["note"], "Austin PDA override")
+        self.state._ensure_seed_apparel_default_sale_prices()
+        self.assertEqual(
+            next(
+                row
+                for row in self.state.list_apparel_default_sale_prices()
+                if row["category_main"] == "pants"
+                and row["category_sub"] == "cargo pant"
+                and row["grade"] == "P"
+            )["default_sale_price_kes"],
+            425,
+        )
         self.assertEqual(
             len(
                 [
@@ -2206,6 +2294,24 @@ class MainSortingFlowStateTest(unittest.TestCase):
             ),
             1,
         )
+
+        from app.api import routes as api_routes
+
+        original_route_state = api_routes.state
+        api_routes.state = self.state
+        try:
+            token = self.state.authenticate_user("warehouse_supervisor_1", "demo1234")["access_token"]
+            api_rows = api_routes.list_apparel_default_sale_prices(authorization=f"Bearer {token}")
+            api_pants_p = next(
+                row
+                for row in api_rows
+                if row.category_main == "pants"
+                and row.category_sub == "cargo pant"
+                and row.grade == "P"
+            )
+            self.assertEqual(api_pants_p.default_sale_price_kes, 425)
+        finally:
+            api_routes.state = original_route_state
 
         self.state.delete_apparel_default_sale_price(
             "pants",
