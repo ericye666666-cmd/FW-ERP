@@ -1295,8 +1295,9 @@ class MainSortingFlowStateTest(unittest.TestCase):
 
         pending = self.state.resolve_barcode(token["machine_code"], context="pos")
         self.assertEqual(pending["barcode_type"], "STORE_ITEM")
-        self.assertFalse(pending["pos_allowed"])
-        self.assertTrue(pending["reject_reason"])
+        self.assertTrue(pending["pos_allowed"])
+        self.assertFalse(pending["reject_reason"])
+        self.assertIn("pos", pending["allowed_contexts"])
         self.assertEqual(pending["store_code"], "UTAWALA")
         self.assertEqual(pending["assigned_clerk"], "Austin")
         self.assertEqual(pending["assigned_employee"], "Austin")
@@ -1325,7 +1326,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(pending["cost_status"], "known")
         self.assertEqual(pending["lineage_status"], "complete")
         self.assertEqual(pending["print_status"], "pending_print")
-        self.assertEqual(pending["sale_status"], "pending_putaway")
+        self.assertEqual(pending["sale_status"], "ready_for_sale")
         self.assertEqual(pending["status"], "pending_print")
 
         response = BarcodeResolveResponse(**pending)
