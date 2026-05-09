@@ -509,14 +509,14 @@ test("PDA runtime does not render the desktop preview shell", () => {
   assert.match(renderPreview, /STORE_MANAGER_PDA_TABS/);
 });
 
-test("clerk PDA from #208 still keeps two tabs and visibly notes that real assigned SDP linkage is not wired", () => {
+test("clerk PDA keeps two tabs and keeps demo fallback secondary to backend assigned SDP", () => {
   const bottomTabs = functionSource(appJs, "renderStoreMobileBottomTabs");
   const taskList = functionSource(appJs, "renderStoreMobileTaskList");
   const actionHandler = functionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(bottomTabs, /const bottomTabs = \["任务", "我的"\]/);
   assert.doesNotMatch(bottomTabs, /扫描|标价|打印/);
-  assert.match(taskList, /当前店员端为演示流程；真实 assigned SDP 接入在后续 PR。/);
+  assert.match(taskList, /真实 PDA 优先使用 backend assigned SDP/);
   assert.match(actionHandler, /mobilePricingStartTask/);
   assert.match(actionHandler, /advanceStoreMobileGroupWorkflow/);
 });

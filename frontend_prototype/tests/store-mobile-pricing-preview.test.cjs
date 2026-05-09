@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
@@ -25,6 +26,10 @@ function extractFunctionSource(source, functionName) {
     }
   }
   throw new Error(`could not extract ${functionName}`);
+}
+
+function getExecutableFunction(functionName, dependencies = "") {
+  return vm.runInNewContext(`${dependencies}\n${extractFunctionSource(appJs, functionName)}\n${functionName};`);
 }
 
 test("admin store page exposes an Android PDA batch pricing preview frame", () => {
@@ -149,12 +154,30 @@ test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without re
   assert.match(shouldPollClerk, /activePage !== "my"/);
   assert.match(loadClerkTasks, /loadStoreAssignedSdoPackageTasks/);
   assert.match(loadClerkTasks, /render:\s*false/);
+  assert.match(loadClerkTasks, /sortStoreMobileAssignedBackendTasks/);
   assert.match(loadClerkTasks, /assignedBackendTasks/);
+  assert.doesNotMatch(loadClerkTasks, /selectedSdp\s*=/);
   assert.doesNotMatch(loadClerkTasks, /activePage\s*=\s*"tasks"|activeGroupId\s*=\s*"A"|current_task_group_id\s*=\s*"A"/);
   assert.match(runPoll, /shouldPollClerkTasks/);
   assert.match(runPoll, /loadClerkPdaAssignedTasksForPolling/);
   assert.match(renderRuntime, /renderPdaRuntimeRefreshIndicator/);
   assert.match(actionHandler, /startPdaRuntimePolling/);
+});
+
+test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {
+  const sortAssignedTasks = getExecutableFunction("sortStoreMobileAssignedBackendTasks");
+
+  const sorted = sortAssignedTasks([
+    { display_code: "SDP261250002", assigned_at: "2026-05-06T21:45:42" },
+    { display_code: "SDP261290018", assigned_at: "2026-05-09T02:17:24" },
+    { display_code: "SDP261290019", assigned_at: "2026-05-09T02:17:36" },
+  ]);
+
+  assert.deepEqual([...sorted.map((task) => task.display_code)], [
+    "SDP261290019",
+    "SDP261290018",
+    "SDP261250002",
+  ]);
 });
 
 test("clerk PDA interval polling preserves scroll around runtime render", () => {
@@ -189,34 +212,66 @@ test("legacy WebView clerk runtime also uses task-driven two-tab flow", () => {
   assert.match(legacyGuard, /已贴完本组/);
 });
 
-test("task tab shows assigned SDP task and opens barcode verification", () => {
+test("task tab renders backend assigned SDP cards before demo fallback", () => {
   const taskListSource = extractFunctionSource(appJs, "renderStoreMobileTaskList");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(taskListSource, /我的 SDP 任务/);
-  assert.match(taskListSource, /SDP261250002/);
-  assert.match(taskListSource, /牛仔裤/);
-  assert.match(taskListSource, /210 件/);
-  assert.match(taskListSource, /UTAWALA/);
-  assert.match(taskListSource, /来源 \$\{sdoCode\}/);
+  assert.match(taskListSource, /getStoreMobileAssignedBackendTasks/);
+  assert.match(taskListSource, /backendTasks\.length/);
+  assert.match(taskListSource, /selectedSdp\?\.backend_task/);
+  assert.match(taskListSource, /data-mobile-pricing-select-backend-task/);
+  assert.match(taskListSource, /assigned_at/);
+  assert.match(taskListSource, /parent_sdo_display_code|sdo_code/);
+  assert.match(taskListSource, /content_summary|category/);
+  assert.match(taskListSource, /source_type/);
+  assert.match(taskListSource, /source_code/);
+  assert.match(taskListSource, /received_status/);
+  assert.match(taskListSource, /assignment_status/);
+  assert.match(taskListSource, /演示任务 \/ Demo only/);
   assert.match(taskListSource, /待核对/);
-  assert.match(taskListSource, /开始任务/);
   assert.match(taskListSource, /data-mobile-pricing-start-task/);
+  assert.match(actionSource, /mobilePricingSelectBackendTask/);
+  assert.match(actionSource, /selectStoreMobileBackendTask/);
   assert.match(actionSource, /startTask/);
   assert.match(actionSource, /state\.activePage = "verify"/);
 });
 
-test("barcode verification accepts only the assigned SDP display or machine code", () => {
+test("backend task selection loads selected SDP into the scan workflow", () => {
+  const selectionSource = extractFunctionSource(appJs, "selectStoreMobileBackendTask");
+
+  assert.match(selectionSource, /createStoreMobileSelectedSdpFromBackendTask/);
+  assert.match(selectionSource, /state\.selectedSdp\s*=/);
+  assert.match(selectionSource, /selectedBackendTaskCode/);
+  assert.match(selectionSource, /state\.activePage = "verify"/);
+  assert.match(selectionSource, /state\.scanError = ""/);
+  assert.match(selectionSource, /state\.scanSuccess = ""/);
+});
+
+test("barcode verification accepts selected backend SDP display or machine code", () => {
   const scanScreenSource = extractFunctionSource(appJs, "renderStoreMobileScanStep");
   const verifierSource = extractFunctionSource(appJs, "verifyStoreMobileSdpBarcode");
   const submitSource = extractFunctionSource(appJs, "handleStoreMobileScanSubmit");
+  const verifyBarcode = getExecutableFunction("verifyStoreMobileSdpBarcode");
+  const state = {
+    selectedSdp: {
+      display_code: "SDP261290019",
+      sdp_code: "SDP261290019",
+      machine_code: "6261290019",
+    },
+  };
 
   assert.match(scanScreenSource, /扫描实体包/);
   assert.match(scanScreenSource, /请扫描 SDP 实体包条码/);
   assert.match(scanScreenSource, /data-scan-input="true"/);
   assert.match(scanScreenSource, /手动确认 \/ 核对/);
-  assert.match(verifierSource, /SDP261250002/);
-  assert.match(verifierSource, /6261250002/);
+  assert.equal(verifyBarcode("SDP261290019", state).ok, true);
+  assert.equal(verifyBarcode("6261290019", state).ok, true);
+  assert.equal(verifyBarcode("SDP261250002", state).ok, false);
+  assert.doesNotMatch(verifierSource, /SDP261250002|6261250002/);
+  assert.match(verifierSource, /sdp\.display_code/);
+  assert.match(verifierSource, /sdp\.sdp_code/);
+  assert.match(verifierSource, /sdp\.machine_code/);
   assert.match(verifierSource, /SDO260504008|4260504008/);
   assert.match(verifierSource, /SDB|LPK/);
   assert.match(verifierSource, /STORE_ITEM/);
