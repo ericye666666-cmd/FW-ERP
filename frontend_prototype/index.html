@@ -4255,10 +4255,10 @@
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=clerk-printer-connection-229", "modern");
+          loadPdaRuntimeScript("./app.js?v=clerk-printer-diagnostics-230", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=clerk-printer-connection-229", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=clerk-printer-diagnostics-230", "legacy");
       })();
     </script>
   </body>

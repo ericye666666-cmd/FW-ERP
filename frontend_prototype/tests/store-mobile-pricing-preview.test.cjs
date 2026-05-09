@@ -202,7 +202,8 @@ test("clerk PDA printer connection UI is clerk-friendly and hides protocol diagn
   assert.match(runtimeSource, /renderClerkPrinterStatusBadge/);
   assert.match(badgeSource, /data-clerk-printer-status-badge/);
   assert.match(badgeSource, /data-mobile-pricing-page="printer_connection"/);
-  assert.doesNotMatch(pageSource, /bridge_available|bluetooth_enabled|last_protocol_tested|last_print_result|TSPL_SIMPLE_TEXT|TSPL_DENSITY_TEXT|RAW_LF_FEED/);
+  assert.doesNotMatch(myTabSource, /bridge_available|bluetooth_enabled|last_protocol_tested|last_print_result|TSPL_SIMPLE_TEXT|TSPL_DENSITY_TEXT|RAW_LF_FEED/);
+  assert.doesNotMatch(pageSource, /TSPL_SIMPLE_TEXT|TSPL_DENSITY_TEXT|RAW_LF_FEED/);
   assert.match(startPrinterPolling, /pollClerkBluetoothPrinterStatus\(\{\s*reason:\s*"immediate"/);
   assert.match(startPrinterPolling, /window\.setInterval/);
   assert.match(startPrinterPolling, /CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS/);
@@ -239,8 +240,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-printer-connection-229/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-connection-229/);
+  assert.match(indexHtml, /app\.js\?v=clerk-printer-diagnostics-230/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-printer-diagnostics-230/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -267,6 +268,46 @@ test("clerk PDA printer connection page uses official Chiteng test print without
   assert.match(appLegacyJs, /data-clerk-printer-status-badge/);
   assert.match(appLegacyJs, /CHITENG_S1_OFFICIAL/);
   assert.doesNotMatch(actionHandler, /STORE_ITEM|marked.*printed|printJobs.*printed/);
+});
+
+test("clerk PDA printer connection page has collapsed developer diagnostics refreshed by status only", () => {
+  const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+  const updateStatus = extractFunctionSource(appJs, "updateClerkBluetoothPrinterStatus");
+  const rawJsonSource = extractFunctionSource(appJs, "formatClerkBluetoothPrinterRawStatusJson");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const printerPageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
+  const pollPrinter = extractFunctionSource(appJs, "pollClerkBluetoothPrinterStatus");
+  const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.match(stateSource, /bluetoothPrinterRawStatusJson:\s*""/);
+  assert.match(updateStatus, /rawStatusJson/);
+  assert.match(rawJsonSource, /JSON\.stringify/);
+  assert.match(printerPageSource, /renderClerkPrinterDiagnosticDetails/);
+  assert.match(diagnosticsSource, /<details class="clerk-printer-diagnostics"/);
+  assert.doesNotMatch(diagnosticsSource, /<details class="clerk-printer-diagnostics" open/);
+  assert.match(diagnosticsSource, /诊断详情 \/ Developer diagnostics/);
+  assert.match(diagnosticsSource, /bridge_available/);
+  assert.match(diagnosticsSource, /bluetooth_enabled/);
+  assert.match(diagnosticsSource, /connection_status/);
+  assert.match(diagnosticsSource, /selected_printer_name/);
+  assert.match(diagnosticsSource, /selected_printer_address/);
+  assert.match(diagnosticsSource, /selected_profile/);
+  assert.match(diagnosticsSource, /discovery_status/);
+  assert.match(diagnosticsSource, /paired_printer_count/);
+  assert.match(diagnosticsSource, /discovered_printer_count/);
+  assert.match(diagnosticsSource, /last_protocol_tested/);
+  assert.match(diagnosticsSource, /last_print_result/);
+  assert.match(diagnosticsSource, /last_error/);
+  assert.match(diagnosticsSource, /raw JSON from latest getPrinterStatus\(\)/);
+  assert.match(diagnosticsSource, /刷新诊断状态/);
+  assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-diagnostic-refresh/);
+  assert.match(actionHandler, /clerkBluetoothPrinterDiagnosticRefresh/);
+  assert.match(actionHandler, /pollClerkBluetoothPrinterStatus\(\{\s*reason:\s*"manual"/);
+  assert.match(pollPrinter, /const status = await bridge\.getPrinterStatus\(\)/);
+  assert.match(pollPrinter, /rawStatusJson:\s*formatClerkBluetoothPrinterRawStatusJson\(status\)/);
+  assert.doesNotMatch(actionHandler, /clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}connectPrinter|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}printTestLabel|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}listPairedPrinters/);
+  assert.match(appLegacyJs, /诊断详情 \/ Developer diagnostics/);
+  assert.match(appLegacyJs, /data-clerk-bluetooth-printer-diagnostic-refresh/);
 });
 
 test("assigned backend SDP tasks sort newest assignments before old historical tasks", () => {

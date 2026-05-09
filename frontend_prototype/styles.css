@@ -8741,6 +8741,77 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   background: #eff6ff;
 }
 
+.clerk-printer-diagnostics {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.clerk-printer-diagnostics summary {
+  cursor: pointer;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.clerk-printer-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.clerk-printer-diagnostics-grid div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.clerk-printer-diagnostics-grid strong,
+.clerk-printer-diagnostics-json strong {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.clerk-printer-diagnostics-grid span {
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.clerk-printer-diagnostics-actions {
+  margin-top: 8px;
+}
+
+.clerk-printer-diagnostics-json {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.clerk-printer-diagnostics-json pre {
+  max-height: 180px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 7px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .mobile-task-complete-note,
 .mobile-scan-success {
   padding: 10px 12px;

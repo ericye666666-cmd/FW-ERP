@@ -3686,6 +3686,17 @@ function normalizeClerkBluetoothDiscoveredPrinters(raw = []) {
   const rows = Array.isArray(parsed) ? parsed : Array.isArray(parsed == null ? void 0 : parsed.discovered_printers) ? parsed.discovered_printers : [];
   return normalizeClerkBluetoothPrinterRows(rows);
 }
+function formatClerkBluetoothPrinterRawStatusJson(rawStatus = {}) {
+  if (rawStatus === void 0 || rawStatus === null || rawStatus === "") {
+    return "";
+  }
+  const parsed = typeof rawStatus === "string" ? safeParse(rawStatus, rawStatus) : rawStatus;
+  try {
+    return JSON.stringify(parsed, null, 2);
+  } catch (error) {
+    return String(rawStatus);
+  }
+}
 function getDirectLoopPdaPrinterBridge() {
   if (typeof window === "undefined") {
     return null;
@@ -3718,6 +3729,9 @@ function updateClerkBluetoothPrinterStatus(status = {}, options = {}) {
     paired_printers: pairedPrintersForDisplay
   });
   state.bluetoothPrinterLastRefreshAt = (/* @__PURE__ */ new Date()).toISOString();
+  if (Object.prototype.hasOwnProperty.call(options, "rawStatusJson")) {
+    state.bluetoothPrinterRawStatusJson = options.rawStatusJson;
+  }
   if (!options.keepError) {
     state.bluetoothPrinterError = "";
   }
@@ -3803,7 +3817,9 @@ async function pollClerkBluetoothPrinterStatus({ reason = "manual" } = {}) {
   clerkBluetoothPrinterStatusInFlight = true;
   try {
     const status = await bridge.getPrinterStatus();
-    updateClerkBluetoothPrinterStatus(status);
+    updateClerkBluetoothPrinterStatus(status, {
+      rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(status)
+    });
     renderClerkBluetoothPrinterStatusIfActive();
     return true;
   } catch (error) {
@@ -29332,6 +29348,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     printJobs: [],
     createdPrintJobs: [],
     bluetoothPrinterStatus: createDefaultClerkBluetoothPrinterStatus(),
+    bluetoothPrinterRawStatusJson: "",
     bluetoothPrinterLastRefreshAt: "",
     bluetoothPrinterError: "",
     bluetoothPrinterPairedPrinters: [],
@@ -30338,6 +30355,53 @@ function renderClerkPrinterConnectionEntryCard(state = storeMobilePricingPreview
     </section>
   `;
 }
+function formatClerkPrinterDiagnosticValue(value) {
+  if (value === void 0 || value === null || value === "") {
+    return "-";
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  return String(value);
+}
+function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewState) {
+  const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+  const diagnostics = [
+    ["bridge_available", status.bridge_available],
+    ["bluetooth_enabled", status.bluetooth_enabled],
+    ["connection_status", status.connection_status],
+    ["selected_printer_name", status.selected_printer_name],
+    ["selected_printer_address", status.selected_printer_address],
+    ["selected_profile", status.selected_profile],
+    ["discovery_status", status.discovery_status],
+    ["paired_printer_count", status.paired_printer_count],
+    ["discovered_printer_count", status.discovered_printer_count],
+    ["last_protocol_tested", status.last_protocol_tested],
+    ["last_print_result", status.last_print_result],
+    ["last_error", status.last_error]
+  ];
+  const rawStatusJson = String(state.bluetoothPrinterRawStatusJson || "").trim();
+  return `
+    <details class="clerk-printer-diagnostics" data-clerk-printer-diagnostics="true">
+      <summary>诊断详情 / Developer diagnostics</summary>
+      <div class="clerk-printer-diagnostics-grid">
+        ${diagnostics.map(([label, value]) => `
+          <div>
+            <strong>${escapeHtml(label)}</strong>
+            <span>${escapeHtml(formatClerkPrinterDiagnosticValue(value))}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="clerk-printer-diagnostics-actions">
+        <button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-diagnostic-refresh="true" ${clerkBluetoothPrinterStatusInFlight ? "disabled" : ""}>刷新诊断状态</button>
+      </div>
+      <div class="clerk-printer-diagnostics-json">
+        <strong>raw JSON from latest getPrinterStatus()</strong>
+        <pre>${escapeHtml(rawStatusJson || "尚未读取 getPrinterStatus()")}</pre>
+      </div>
+    </details>
+  `;
+}
 function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState) {
   const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
   const lastRefresh = state.bluetoothPrinterLastRefreshAt ? formatPdaRuntimeRefreshTime(state.bluetoothPrinterLastRefreshAt) : "-";
@@ -30397,6 +30461,8 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="true" ${canRunTestPrint ? "" : "disabled"}>打印测试标签</button>
         ${selectedProfile !== "CHITENG_S1_OFFICIAL" ? '<div class="subtle small">该型号测试打印暂未配置。</div>' : ""}
       </div>
+
+      ${renderClerkPrinterDiagnosticDetails(state)}
     </section>
   `;
 }
@@ -30794,6 +30860,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const qtyStep = button.dataset.mobilePricingQtyStep;
   const searchBluetoothPrinter = button.dataset.clerkBluetoothPrinterSearch;
   const refreshBluetoothPrinter = button.dataset.clerkBluetoothPrinterRefresh;
+  const clerkBluetoothPrinterDiagnosticRefresh = button.dataset.clerkBluetoothPrinterDiagnosticRefresh;
   const selectBluetoothPrinter = button.dataset.clerkBluetoothPrinterSelect;
   const connectBluetoothPrinter = button.dataset.clerkBluetoothPrinterConnect;
   const disconnectBluetoothPrinter = button.dataset.clerkBluetoothPrinterDisconnect;
@@ -30821,6 +30888,11 @@ function handleStoreMobilePricingPreviewAction(button) {
   }
   if (searchBluetoothPrinter) {
     startClerkBluetoothPrinterDiscovery({ reason: "manual" }).catch(() => {
+    });
+    return;
+  }
+  if (clerkBluetoothPrinterDiagnosticRefresh) {
+    pollClerkBluetoothPrinterStatus({ reason: "manual" }).catch(() => {
     });
     return;
   }
@@ -36877,7 +36949,7 @@ document.addEventListener("click", (event) => {
   openSortingTaskForProcessing(taskNo, targetPanel);
 });
 document.addEventListener("click", (event) => {
-  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]") : null;
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-print-group], [data-mobile-pricing-confirm-stickers], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
