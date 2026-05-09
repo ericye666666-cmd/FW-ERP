@@ -29349,6 +29349,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     createdPrintJobs: [],
     bluetoothPrinterStatus: createDefaultClerkBluetoothPrinterStatus(),
     bluetoothPrinterRawStatusJson: "",
+    bluetoothPrinterDiagnosticsOpen: false,
     bluetoothPrinterLastRefreshAt: "",
     bluetoothPrinterError: "",
     bluetoothPrinterPairedPrinters: [],
@@ -30341,6 +30342,14 @@ function renderClerkPrinterStatusBadge(state = storeMobilePricingPreviewState) {
     </button>
   `;
 }
+function handleClerkPrinterDiagnosticsToggle(target) {
+  const details = target instanceof HTMLElement ? target.closest("[data-clerk-printer-diagnostics]") : null;
+  if (!(details instanceof HTMLDetailsElement)) {
+    return false;
+  }
+  storeMobilePricingPreviewState.bluetoothPrinterDiagnosticsOpen = Boolean(details.open);
+  return true;
+}
 function renderClerkPrinterConnectionEntryCard(state = storeMobilePricingPreviewState) {
   const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
   const printerName = status.connection_status === "connected" ? `${status.selected_printer_name || "已连接"} 已连接` : "未连接";
@@ -30382,8 +30391,9 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
   ];
   const rawStatusJson = String(state.bluetoothPrinterRawStatusJson || "").trim();
   return `
-    <details class="clerk-printer-diagnostics" data-clerk-printer-diagnostics="true">
+    <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
       <summary>诊断详情 / Developer diagnostics</summary>
+      <div class="subtle small">锁定诊断状态：${state.bluetoothPrinterDiagnosticsOpen ? "已展开，轮询不会收起" : "展开后会保持打开"}</div>
       <div class="clerk-printer-diagnostics-grid">
         ${diagnostics.map(([label, value]) => `
           <div>
@@ -36963,6 +36973,13 @@ document.addEventListener("change", (event) => {
   }
   handleStoreMobilePricingPreviewAction(field);
 });
+document.addEventListener("toggle", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !target.matches("[data-clerk-printer-diagnostics]")) {
+    return;
+  }
+  handleClerkPrinterDiagnosticsToggle(target);
+}, true);
 document.addEventListener("submit", (event) => {
   const form = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-scan-form]") : null;
   if (!(form instanceof HTMLFormElement)) {

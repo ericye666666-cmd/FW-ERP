@@ -8687,16 +8687,18 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
 }
 
 .clerk-printer-status-badge {
-  min-height: 28px;
-  max-width: 128px;
-  padding: 4px 7px;
+  min-height: 34px;
+  max-width: 190px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.18);
   border-color: rgba(255, 255, 255, 0.56);
   color: #ffffff;
-  font-size: 11px;
-  line-height: 1.1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
 }
 
 .clerk-printer-entry-card,
