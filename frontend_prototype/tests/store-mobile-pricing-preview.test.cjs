@@ -48,6 +48,57 @@ test("admin store page exposes an Android PDA batch pricing preview frame", () =
   assert.match(stylesCss, /\.android-pda-frame\s*\{/);
 });
 
+test("login page shows FW-ERP web, PDA bundle, and Android bridge version info", () => {
+  assert.match(indexHtml, /data-direct-loop-version-info="login"/);
+  assert.match(indexHtml, /FW-ERP Web:/);
+  assert.match(indexHtml, /fw-erp-web-20260510-version-display/);
+  assert.match(indexHtml, /PDA Bundle:/);
+  assert.match(indexHtml, /version-display-241/);
+  assert.match(indexHtml, /Android App:/);
+  assert.match(indexHtml, /Android Bridge:/);
+  assert.match(indexHtml, /app\.js\?v=version-display-241/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=version-display-241/);
+});
+
+test("PDA version info detects Android bridge methods without requiring native app info", () => {
+  const versionSource = extractFunctionSource(appJs, "renderDirectLoopVersionInfoBlock");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
+  const bridgeInfo = getExecutableBundle(
+    ["getDirectLoopAndroidBridgeInfo"],
+    `
+      const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
+        "getPrinterStatus",
+        "connectPrinter",
+        "disconnectPrinter",
+        "printTestLabel",
+        "printStoreItemLabelPreview",
+      ];
+    `,
+    "({ getDirectLoopAndroidBridgeInfo })",
+  );
+
+  assert.equal(bridgeInfo.getDirectLoopAndroidBridgeInfo(null).bridge_available, false);
+  assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ getPrinterStatus() {}, printStoreItemLabelPreview() {} }).supported_methods.printStoreItemLabelPreview,
+    true,
+  );
+  assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ getPrinterStatus() {} }).supported_methods.printStoreItemLabelPreview,
+    false,
+  );
+  assert.match(versionSource, /FW-ERP Web:/);
+  assert.match(versionSource, /PDA Bundle:/);
+  assert.match(versionSource, /Android App:/);
+  assert.match(versionSource, /Android Bridge:/);
+  assert.match(versionSource, /STORE_ITEM preview print:/);
+  assert.match(versionSource, /not supported by current Android APK/);
+  assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
+  assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-version-display/);
+  assert.match(appLegacyJs, /printStoreItemLabelPreview/);
+});
+
 test("price groups render separately with independent STORE_ITEM generation and preview actions", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const cardSource = extractFunctionSource(appJs, "renderPriceGroupCards");
@@ -247,8 +298,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-item-label-preview-239-click-fix/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-label-preview-239-click-fix/);
+  assert.match(indexHtml, /app\.js\?v=version-display-241/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=version-display-241/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
