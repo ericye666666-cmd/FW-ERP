@@ -33119,6 +33119,16 @@ function buildStoreItemLabelPreviewPayload(labelTemplateSize = "60x40", storeIte
   };
 }
 
+function buildStoreItemLabelPreviewPrintPayload(labelTemplateSize = "60x40", storeItems = [], group = {}) {
+  const previewItems = Array.isArray(storeItems) ? storeItems.slice(0, 1) : [];
+  const payload = buildStoreItemLabelPreviewPayload(labelTemplateSize, previewItems, group);
+  return {
+    ...payload,
+    labels: payload.labels.slice(0, 1),
+    print_mode: "preview_one",
+  };
+}
+
 function renderCode128BarcodePreview(machineCode = "") {
   const value = String(machineCode || "").replace(/[^0-9]/g, "").trim();
   return `<div class="store-item-code128-barcode" role="img" aria-label="Code128 barcode" data-code128-barcode="${escapeHtml(value)}"></div>`;
@@ -33207,8 +33217,12 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const group = getStoreMobilePricingActiveGroup(state);
   const generatedItems = getStoreMobileGeneratedStoreItems(group);
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
-  const payload = buildStoreItemLabelPreviewPayload(labelConfig.label_template_size, generatedItems, group);
+  const payload = buildStoreItemLabelPreviewPrintPayload(labelConfig.label_template_size, generatedItems, group);
   const statusText = getStoreMobilePriceGroupStatus(state, group);
+  const printerReady = canRunClerkBluetoothPrinterPreviewPrint(state.bluetoothPrinterStatus);
+  const previewPrintStatus = String(group.preview_print_status || "").trim();
+  const previewPrintMessage = String(group.preview_print_message || "").trim();
+  const previewPrintError = String(group.preview_print_error || "").trim();
   const summaryHtml = `
     <div class="mobile-print-summary">
       <span><b>档位</b><strong>${escapeHtml(group.tier || "-")}</strong></span>
@@ -33242,6 +33256,11 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <summary>JSON preview payload</summary>
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${printerReady && payload.labels.length ? "" : "disabled"}>打印一张预览标签</button>
+      ${printerReady ? "" : '<div class="subtle small">请先连接并确认打印机在线。</div>'}
+      ${previewPrintStatus ? `<div class="subtle small">预览打印状态：${escapeHtml(previewPrintStatus)}</div>` : ""}
+      ${previewPrintMessage ? `<div class="success-banner">${escapeHtml(previewPrintMessage)}</div>` : ""}
+      ${previewPrintError ? `<div class="mobile-error">${escapeHtml(previewPrintError)}</div>` : ""}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回分批定价</button>
       ${renderNextPriceGroupHint(state, group)}
     </section>
@@ -33468,6 +33487,10 @@ function isClerkOfficialChitengPrinterOnlineReady(status = {}) {
 }
 
 function canRunClerkBluetoothPrinterTestPrint(status = {}) {
+  return isClerkOfficialChitengPrinterOnlineReady(status);
+}
+
+function canRunClerkBluetoothPrinterPreviewPrint(status = {}) {
   return isClerkOfficialChitengPrinterOnlineReady(status);
 }
 
@@ -34045,6 +34068,48 @@ async function queueStoreMobileBatchPrintJobs(state = storeMobilePricingPreviewS
   return prepareStoreMobileBatchLabelPreview(state, groupId);
 }
 
+async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingPreviewState, groupId = "") {
+  const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || state.activeGroupId || ""));
+  if (!group) {
+    throw new Error("找不到当前价格组。");
+  }
+  const generatedItems = getStoreMobileGeneratedStoreItems(group);
+  const previewItems = generatedItems.slice(0, 1);
+  const labelConfig = applyStoreMobileLabelSize(state, group.label_template_size || state.label_template_size || state.labelSize || "60x40", group.group_id);
+  const payload = buildStoreItemLabelPreviewPrintPayload(labelConfig.label_template_size, previewItems, group);
+  if (!payload.labels.length) {
+    throw new Error("请先生成 STORE_ITEM 商品码。");
+  }
+  if (!canRunClerkBluetoothPrinterPreviewPrint(state.bluetoothPrinterStatus)) {
+    throw new Error("请先连接并确认打印机在线。");
+  }
+  const bridge = getDirectLoopPdaPrinterBridge();
+  if (!bridge || typeof bridge.printStoreItemLabelPreview !== "function") {
+    throw new Error("当前 Android 版本不支持 STORE_ITEM 预览打印，请升级 Direct Loop PDA Android App。");
+  }
+  group.preview_print_status = "printing";
+  group.preview_print_error = "";
+  group.preview_print_message = "";
+  const actionStarted = await runClerkBluetoothPrinterAction(async () => {
+    const printStatusRaw = await bridge.printStoreItemLabelPreview(JSON.stringify(payload));
+    const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
+      rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
+      keepError: true,
+    });
+    if (printStatus.last_print_result !== "success") {
+      throw new Error(printStatus.last_error || "STORE_ITEM 标签打印失败。");
+    }
+  });
+  if (!actionStarted) {
+    throw new Error("打印机正在执行上一条操作，请稍后再试。");
+  }
+  group.preview_print_status = "sent_to_printer";
+  group.preview_print_message = "已发送 1 张 STORE_ITEM 预览标签到打印机。";
+  group.preview_print_error = "";
+  setStoreMobileActivePage(state, "label_preview", { groupId: group.group_id, source: "preview_print", recordHistory: false });
+  return syncStoreMobileTaskCounters(state);
+}
+
 function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState, groupId = "", action = "") {
   const groups = getStoreMobileTaskGroups(state);
   const group = groups.find((item) => String(item.group_id || "") === String(groupId || ""));
@@ -34112,6 +34177,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const deleteGroup = button.dataset.mobilePricingDeleteGroup;
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const previewLabels = button.dataset.mobilePricingPreviewLabels;
+  const printLabels = button.dataset.mobilePricingPrintLabels;
   const labelSize = button.dataset.mobilePricingLabelSize;
   const priceChoice = button.dataset.mobilePricingPriceChoice;
   const gradeChoice = button.dataset.mobilePricingGradeChoice;
@@ -34250,6 +34316,21 @@ function handleStoreMobilePricingPreviewAction(button) {
     } else {
       advanceStoreMobileGroupWorkflow(state, previewLabels, "preview");
     }
+  }
+  if (printLabels) {
+    printStoreMobileStoreItemLabelPreview(state, printLabels)
+      .then(() => {
+        storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+        renderStoreMobilePricingPreview();
+      })
+      .catch((error) => {
+        const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(printLabels || state.activeGroupId || ""));
+        if (group) {
+          group.preview_print_status = "error";
+          group.preview_print_error = formatErrorMessage(error);
+        }
+        renderStoreMobilePricingPreview();
+      });
   }
   if (labelSize) {
     applyStoreMobileLabelSize(state, labelSize, state.activeGroupId);
@@ -40565,7 +40646,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
