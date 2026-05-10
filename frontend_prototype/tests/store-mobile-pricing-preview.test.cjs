@@ -247,8 +247,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=printer-truthful-badge-238/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=printer-truthful-badge-238/);
+  assert.match(indexHtml, /app\.js\?v=store-item-direct-print-239/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-direct-print-239/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -1222,6 +1222,46 @@ test("STORE_ITEM label preview payload uses machine_code and excludes source cha
   assert.doesNotMatch(JSON.stringify(payload), /SDO|SDP|SDB|LPK|transfer_no|pricing_batch_id|source_sdp|store_code|display_code|STOREITEM|UTAWALA/);
 });
 
+test("STORE_ITEM direct print payload keeps only customer label fields", () => {
+  const buildPrintPayload = getExecutableFunction(
+    "buildStoreItemLabelPrintPayload",
+    `
+    ${extractFunctionSource(appJs, "getStoreItemLabelSizeConfig")}
+    ${extractFunctionSource(appJs, "normalizeStoreItemForLabelPreview")}
+    ${extractFunctionSource(appJs, "buildStoreItemLabelPreviewPayload")}
+    `,
+  );
+  const payload = buildPrintPayload("40x30", [{
+    machine_code: "526129000123",
+    sale_price_kes: 450,
+    category_short: "Cargo",
+    grade: "P",
+    display_code: "STOREITEM26129000123",
+    source_sdp_display_code: "SDP261290019",
+    parent_sdo_display_code: "SDO260504008",
+    source_code: "SDB-TO202605-002",
+    transfer_no: "TO202605-001",
+    pricing_batch_id: "PB-1",
+    store_code: "UTAWALA",
+  }]);
+
+  assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
+    printer_profile: "CHITENG_S1_OFFICIAL",
+    label_template_size: "40x30",
+    label_width_mm: 40,
+    label_height_mm: 30,
+    print_mode: "direct_print",
+    labels: [{
+      machine_code: "526129000123",
+      barcode_value: "526129000123",
+      price_kes: 450,
+      category_short: "Cargo",
+      grade: "P",
+    }],
+  });
+  assert.doesNotMatch(JSON.stringify(payload), /SDO|SDP|SDB|LPK|transfer_no|pricing_batch_id|source_sdp|store_code|display_code|STOREITEM|UTAWALA/);
+});
+
 test("STORE_ITEM label preview renders one Code128 barcode under text for both sizes", () => {
   const renderPreview = getExecutableFunction(
     "renderStoreItemLabelPreview",
@@ -1279,10 +1319,13 @@ test("legacy PDA bundle contains the same STORE_ITEM list and label preview logi
 
   assert.match(appLegacyJs, /function renderStoreMobileGeneratedStoreItemList/);
   assert.match(appLegacyJs, /function buildStoreItemLabelPreviewPayload/);
+  assert.match(appLegacyJs, /function buildStoreItemLabelPrintPayload/);
   assert.match(appLegacyJs, /function renderStoreItemLabelPreview/);
   assert.match(appLegacyJs, /data-code128-barcode/);
   assert.match(appLegacyJs, /label_template_size/);
   assert.match(appLegacyJs, /preview_only/);
+  assert.match(appLegacyJs, /direct_print/);
+  assert.match(appLegacyJs, /printStoreItemLabels/);
   assert.match(appLegacyJs, /生成本批商品码/);
   assert.match(appLegacyJs, /查看标签预览/);
   assert.doesNotMatch(legacyPreviewBranch, /data-mobile-pricing-confirm-stickers|DirectLoopPdaPrinter|printTestLabel|print-jobs\/item-tokens/);
@@ -1350,7 +1393,7 @@ test("price group editor uses PDA-friendly quick controls", () => {
   assert.match(editorSource, /A-01/);
 });
 
-test("STORE_ITEM label preview supports 60x40 and 40x30 without printing", () => {
+test("STORE_ITEM label preview supports 60x40 and 40x30 with direct print action", () => {
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const queueSource = extractFunctionSource(appJs, "renderPriceGroupPrintQueue");
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
@@ -1367,7 +1410,10 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 without printing", () =>
   assert.match(sizeSource, /label_template_size:\s*"40x30"[\s\S]*label_width_mm:\s*40[\s\S]*label_height_mm:\s*30/);
   assert.match(payloadSource, /print_mode:\s*"preview_only"/);
   assert.match(payloadSource, /printer_profile:\s*"CHITENG_S1_OFFICIAL"/);
-  assert.doesNotMatch(printPanelSource, /打印本组标签|已贴完本组|Android print bridge|data-mobile-pricing-confirm-stickers/);
+  assert.match(printPanelSource, /打印本批标签/);
+  assert.match(printPanelSource, /data-mobile-pricing-print-labels/);
+  assert.match(printPanelSource, /请先连接并确认打印机在线/);
+  assert.doesNotMatch(printPanelSource, /已贴完本组|已贴完本批|data-mobile-pricing-confirm-stickers/);
   assert.match(printPanelSource, /group\.tier/);
   assert.match(printPanelSource, /group\.quantity/);
   assert.match(cardSource, /group\.tier/);
@@ -1383,10 +1429,11 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 without printing", () =>
   assert.doesNotMatch(queueSource, /混合总任务|全部价格组|all groups/i);
 });
 
-test("label preview panel is preview-only and never creates print jobs or sticker confirmation", () => {
+test("label preview print action uses Android bridge without creating print jobs or sticker confirmation", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const directPrintSource = extractFunctionSource(appJs, "printStoreMobileBatchStoreItemLabels");
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
 
   assert.match(stateSource, /createdPrintJobs:\s*\[\]/);
@@ -1395,10 +1442,20 @@ test("label preview panel is preview-only and never creates print jobs or sticke
   assert.match(printPanelSource, /renderStoreItemLabelPreview/);
   assert.match(printPanelSource, /JSON preview payload/);
   assert.doesNotMatch(printPanelSource, /if \(!job\)/);
-  assert.doesNotMatch(printPanelSource, /打印本组标签|已贴完本组|data-mobile-pricing-confirm-stickers/);
+  assert.match(printPanelSource, /打印本批标签/);
+  assert.match(actionSource, /printStoreMobileBatchStoreItemLabels/);
+  assert.match(actionSource, /mobilePricingPrintLabels/);
+  assert.match(appJs, /printStoreItemLabels/);
+  assert.match(appJs, /buildStoreItemLabelPrintPayload/);
+  assert.match(appJs, /canRunClerkBluetoothPrinterProductionPrint/);
+  assert.match(directPrintSource, /updateClerkBluetoothPrinterStatus/);
+  assert.match(directPrintSource, /last_print_result !== "success"/);
+  assert.doesNotMatch(actionSource, /printTestLabel\([^)]*STORE_ITEM|printTestLabel\([^)]*label/i);
+  assert.doesNotMatch(printPanelSource, /已贴完本组|data-mobile-pricing-confirm-stickers/);
   assert.doesNotMatch(printPanelSource, /创建打印任务/);
   assert.doesNotMatch(printPanelSource, /返回打印队列/);
   assert.doesNotMatch(printPanelSource, /打印任务创建成功/);
+  assert.doesNotMatch(actionSource, /\/print-jobs\/item-tokens|\/print-jobs\/\$\{[^}]+\}\/complete|sticker_confirmed|marked.*printed/i);
   assert.match(actionSource, /prepareStoreMobileBatchLabelPreview\(state, previewLabels\)/);
   assert.doesNotMatch(advanceSource, /createdPrintJobs|status:\s*"queued"|待贴标确认|已完成/);
 });
@@ -1647,18 +1704,22 @@ test("pricing workbench moves price groups close to the top", () => {
   assert.match(stylesCss, /\.mobile-pricing-titlebar/);
 });
 
-test("preview actions do not call Android printing or print-complete endpoints", () => {
+test("preview actions do not print; direct print action does not call backend completion endpoints", () => {
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
   const renderSource = extractFunctionSource(appJs, "renderStoreMobilePricingPreview");
   const previewSource = extractFunctionSource(appJs, "prepareStoreMobileBatchLabelPreview");
   const queueSource = extractFunctionSource(appJs, "queueStoreMobileBatchPrintJobs");
   const previewBranch = actionSource.slice(actionSource.indexOf("if (previewLabels)"), actionSource.indexOf("if (labelSize)"));
+  const printBranch = actionSource.slice(actionSource.indexOf("if (printLabels)"), actionSource.indexOf("if (labelSize)"));
 
   assert.doesNotMatch(actionSource, /\brequest\s*\(/);
   assert.doesNotMatch(actionSource, /fetch\s*\(/);
-  assert.doesNotMatch(previewBranch, /DirectLoopPdaPrinter|printTestLabel|printLabel|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
-  assert.doesNotMatch(previewSource, /DirectLoopPdaPrinter|printTestLabel|printLabel|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
-  assert.doesNotMatch(queueSource, /DirectLoopPdaPrinter|printTestLabel|printLabel|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
+  assert.match(printBranch, /printStoreMobileBatchStoreItemLabels/);
+  assert.match(appJs, /printStoreItemLabels/);
+  assert.doesNotMatch(previewBranch, /DirectLoopPdaPrinter|printTestLabel|printStoreItemLabels|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
+  assert.doesNotMatch(previewSource, /DirectLoopPdaPrinter|printTestLabel|printStoreItemLabels|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
+  assert.doesNotMatch(queueSource, /DirectLoopPdaPrinter|printTestLabel|printStoreItemLabels|\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens/);
+  assert.doesNotMatch(printBranch, /\/print-jobs\/\$\{[^}]+\}\/complete|\/print-jobs\/item-tokens|sticker_confirmed|marked.*printed/i);
   assert.doesNotMatch(renderSource, /\brequest\s*\(/);
   assert.match(actionSource, /storeMobilePricingPreviewState/);
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
