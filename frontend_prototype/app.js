@@ -33,6 +33,18 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-version-display";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "version-display-241";
+const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
+  "getPrinterStatus",
+  "connectPrinter",
+  "disconnectPrinter",
+  "printTestLabel",
+  "printStoreItemLabelPreview",
+];
+let directLoopAndroidAppInfo = null;
+let directLoopAndroidAppInfoRequestStarted = false;
+
 const balePrintFlow = globalThis.BalePrintFlow || {};
 const rawBaleStockFlow = globalThis.RawBaleStockFlow || {};
 const warehouseStockHubFlow = globalThis.WarehouseStockHubFlow || {};
@@ -3943,6 +3955,132 @@ function getDirectLoopPdaPrinterBridge() {
   }
   const bridge = window.DirectLoopPdaPrinter;
   return bridge && typeof bridge === "object" ? bridge : null;
+}
+
+function getDirectLoopPdaRuntimeScriptVersion() {
+  if (typeof window !== "undefined") {
+    const runtimeScript = String(window.__directLoopPdaRuntimeScript || "").trim();
+    if (runtimeScript) {
+      return runtimeScript;
+    }
+    const configuredBundleVersion = String(window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ || "").trim();
+    if (configuredBundleVersion) {
+      return configuredBundleVersion;
+    }
+  }
+  return DIRECT_LOOP_PDA_BUNDLE_VERSION;
+}
+
+function parseDirectLoopAndroidAppInfo(rawInfo = null) {
+  if (!rawInfo) {
+    return null;
+  }
+  if (typeof rawInfo === "string") {
+    const trimmed = rawInfo.trim();
+    if (!trimmed) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (error) {
+      return { app_version: trimmed };
+    }
+  }
+  return typeof rawInfo === "object" ? rawInfo : null;
+}
+
+function getDirectLoopAndroidBridgeInfo(bridge = getDirectLoopPdaPrinterBridge()) {
+  const supportedMethods = {};
+  DIRECT_LOOP_ANDROID_PRINTER_METHODS.forEach((method) => {
+    supportedMethods[method] = Boolean(bridge && typeof bridge[method] === "function");
+  });
+  return {
+    bridge_available: Boolean(bridge),
+    supported_methods: supportedMethods,
+  };
+}
+
+function getDirectLoopAndroidAppVersion() {
+  const statusInfo = storeMobilePricingPreviewState?.bluetoothPrinterStatus || {};
+  const sources = [directLoopAndroidAppInfo, statusInfo];
+  for (const source of sources) {
+    if (!source || typeof source !== "object") {
+      continue;
+    }
+    const version = String(
+      source.android_version
+        || source.android_app_version
+        || source.app_version
+        || source.version
+        || "",
+    ).trim();
+    if (version) {
+      return version;
+    }
+  }
+  return "unknown";
+}
+
+function requestDirectLoopAndroidAppInfo() {
+  const bridge = getDirectLoopPdaPrinterBridge();
+  if (!bridge || typeof bridge.getAppInfo !== "function" || directLoopAndroidAppInfoRequestStarted) {
+    return false;
+  }
+  directLoopAndroidAppInfoRequestStarted = true;
+  Promise.resolve()
+    .then(() => bridge.getAppInfo())
+    .then((rawInfo) => {
+      directLoopAndroidAppInfo = parseDirectLoopAndroidAppInfo(rawInfo);
+      hydrateDirectLoopLoginVersionBlock();
+      renderClerkBluetoothPrinterStatusIfActive();
+    })
+    .catch(() => {
+      directLoopAndroidAppInfo = null;
+    });
+  return true;
+}
+
+function formatDirectLoopVersionMethodSupport(isSupported = false) {
+  return isSupported ? "supported" : "missing";
+}
+
+function renderDirectLoopVersionInfoBlock(context = "default") {
+  requestDirectLoopAndroidAppInfo();
+  const bridgeInfo = getDirectLoopAndroidBridgeInfo();
+  const supportedMethods = bridgeInfo.supported_methods || {};
+  const bridgeText = bridgeInfo.bridge_available ? "available" : "unavailable";
+  const previewPrintSupported = Boolean(supportedMethods.printStoreItemLabelPreview);
+  const previewPrintText = previewPrintSupported
+    ? "supported"
+    : "not supported by current Android APK";
+  const loginAttribute = context === "login" ? ' data-direct-loop-login-version-info="true"' : "";
+  return `
+    <section class="direct-loop-version-info" data-direct-loop-version-info="${escapeHtml(context)}"${loginAttribute}>
+      <div><strong>FW-ERP Web:</strong><span>${escapeHtml(DIRECT_LOOP_WEB_VERSION)}</span></div>
+      <div><strong>PDA Bundle:</strong><span>${escapeHtml(getDirectLoopPdaRuntimeScriptVersion())}</span></div>
+      <div><strong>Android App:</strong><span>${escapeHtml(getDirectLoopAndroidAppVersion())}</span></div>
+      <div><strong>Android Bridge:</strong><span>${escapeHtml(bridgeText)}</span></div>
+      <div><strong>STORE_ITEM preview print:</strong><span>${escapeHtml(previewPrintText)}</span></div>
+      <div class="direct-loop-version-methods">
+        ${DIRECT_LOOP_ANDROID_PRINTER_METHODS.map((method) => `
+          <span><b>${escapeHtml(method)}</b>: ${escapeHtml(formatDirectLoopVersionMethodSupport(supportedMethods[method]))}</span>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function hydrateDirectLoopLoginVersionBlock() {
+  if (typeof document === "undefined") {
+    return false;
+  }
+  const versionBlock = document.querySelector('[data-direct-loop-login-version-info="true"]');
+  if (!versionBlock) {
+    return false;
+  }
+  versionBlock.outerHTML = renderDirectLoopVersionInfoBlock("login");
+  return true;
 }
 
 function updateClerkBluetoothPrinterStatus(status = {}, options = {}) {
@@ -33655,6 +33793,7 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
     <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
       <summary>诊断详情 / Developer diagnostics</summary>
       <div class="subtle small">锁定诊断状态：${state.bluetoothPrinterDiagnosticsOpen ? "已展开，轮询不会收起" : "展开后会保持打开"}</div>
+      ${renderDirectLoopVersionInfoBlock("printer_diagnostics")}
       <div class="clerk-printer-diagnostics-grid">
         ${diagnostics.map(([label, value]) => `
           <div>
@@ -33774,6 +33913,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
         <span><b>角色</b><strong>店员</strong></span>
         <span><b>PDA mode / version</b><strong>Direct Loop PDA · task flow 208</strong></span>
       </div>
+      ${renderDirectLoopVersionInfoBlock("clerk_my")}
       ${renderClerkPrinterConnectionEntryCard(state)}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-reset-task="true">重置演示任务状态</button>
       <button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button>
@@ -43876,6 +44016,7 @@ renderSaleRefundResultSummary(null);
 renderPaymentAnomalyResultSummary(null);
 renderShiftSummaryPanel(null);
 ensureLoginPasswordCleared();
+hydrateDirectLoopLoginVersionBlock();
 renderRawBaleStockSummary(null);
 renderStorePrepBaleTaskSummary();
 ensureDevTrackerState();
