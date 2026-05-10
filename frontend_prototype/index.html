@@ -4255,10 +4255,10 @@
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=store-item-direct-print-239", "modern");
+          loadPdaRuntimeScript("./app.js?v=store-item-label-preview-239", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=store-item-direct-print-239", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=store-item-label-preview-239", "legacy");
       })();
     </script>
   </body>
