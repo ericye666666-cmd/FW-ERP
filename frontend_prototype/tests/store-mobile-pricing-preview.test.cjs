@@ -247,8 +247,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-item-label-preview-239/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-label-preview-239/);
+  assert.match(indexHtml, /app\.js\?v=store-item-label-preview-239-click-fix/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-label-preview-239-click-fix/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -360,6 +360,50 @@ test("clerk PDA Chiteng S1 badge only shows connected after online and SDK proof
   assert.match(errorHtml, /错误 S1-3696/);
 });
 
+test("clerk PDA infers Chiteng S1 profile from selected S1 printer name", () => {
+  const printerStatus = getExecutableBundle(
+    [
+      "createDefaultClerkBluetoothPrinterStatus",
+      "getClerkBluetoothPrinterStatusObject",
+      "normalizeClerkBluetoothPrinterRows",
+      "getClerkBluetoothBooleanValue",
+      "normalizeClerkBluetoothPrinterStatus",
+      "getClerkBluetoothPrinterProfileValue",
+      "getClerkBluetoothPrinterOnlineStatusValue",
+      "isClerkOfficialChitengPrinterProfile",
+      "isClerkOfficialChitengPrinterOnlineReady",
+      "canRunClerkBluetoothPrinterPreviewPrint",
+      "getClerkBluetoothPrinterStateLabel",
+      "getClerkBluetoothPrinterBadgeText",
+    ],
+    "",
+    "({ getClerkBluetoothPrinterBadgeText, canRunClerkBluetoothPrinterPreviewPrint })",
+  );
+  const missingProfileS1 = {
+    selected_profile: "GENERIC",
+    selected_printer_name: "S1-3696",
+    selected_printer_address: "00:11:22:33",
+    connection_status: "connected",
+  };
+
+  assert.equal(
+    printerStatus.getClerkBluetoothPrinterBadgeText({
+      ...missingProfileS1,
+      printer_online_status: "unknown",
+      official_sdk_connected: false,
+    }),
+    "🖨 未验证 S1-3696",
+  );
+  assert.equal(
+    printerStatus.canRunClerkBluetoothPrinterPreviewPrint({
+      ...missingProfileS1,
+      printer_online_status: "online",
+      official_sdk_connected: true,
+    }),
+    true,
+  );
+});
+
 test("clerk PDA Chiteng S1 test print and diagnostics require truthful online status", () => {
   const canRunTestPrint = getExecutableBundle(
     [
@@ -390,7 +434,7 @@ test("clerk PDA Chiteng S1 test print and diagnostics require truthful online st
   assert.equal(canRunTestPrint({ ...baseStatus, official_sdk_connected: false }), false);
   assert.equal(canRunTestPrint({ ...baseStatus, printer_online_status: "unknown", official_sdk_connected: true }), false);
   assert.equal(canRunTestPrint({ ...baseStatus, printer_online_status: "offline", official_sdk_connected: true }), false);
-  assert.equal(canRunTestPrint({ ...baseStatus, selected_profile: "GENERIC", official_sdk_connected: true }), false);
+  assert.equal(canRunTestPrint({ ...baseStatus, selected_profile: "GENERIC", selected_printer_name: "Generic-01", official_sdk_connected: true }), false);
   assert.match(printerPageSource, /canRunClerkBluetoothPrinterTestPrint/);
   assert.match(printerPageSource, /请先连接并确认打印机在线。/);
   assert.match(printerPageSource, /在线状态 printer_online_status/);
@@ -1423,6 +1467,8 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 with one-label preview p
   assert.match(printPanelSource, /打印一张预览标签/);
   assert.match(printPanelSource, /data-mobile-pricing-print-labels/);
   assert.match(printPanelSource, /请先连接并确认打印机在线/);
+  assert.match(printPanelSource, /payload\.labels\.length\s*\?\s*""\s*:\s*"disabled"/);
+  assert.doesNotMatch(printPanelSource, /printerReady\s*&&\s*payload\.labels\.length\s*\?\s*""\s*:\s*"disabled"/);
   assert.doesNotMatch(printPanelSource, /已贴完本组|已贴完本批|data-mobile-pricing-confirm-stickers/);
   assert.match(printPanelSource, /group\.tier/);
   assert.match(printPanelSource, /group\.quantity/);

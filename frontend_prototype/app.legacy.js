@@ -3636,17 +3636,23 @@ function getFirstNonEmptyClerkBluetoothValue(...values) {
 }
 function getClerkBluetoothSelectedProfile(rawStatus = {}, currentStatus = {}, storedSelection = {}) {
   const rawProfile = String(rawStatus.selected_profile || "").trim();
-  if (rawProfile && rawProfile !== "GENERIC") {
-    return rawProfile;
-  }
   const currentProfile = String(currentStatus.selected_profile || "").trim();
   const storedProfile = String(storedSelection.selected_profile || "").trim();
-  return getFirstNonEmptyClerkBluetoothValue(
-    storedProfile,
-    currentProfile === "GENERIC" && storedProfile ? "" : currentProfile,
+  const selectedPrinterName = getFirstNonEmptyClerkBluetoothValue(
+    rawStatus.selected_printer_name,
+    currentStatus.selected_printer_name,
+    storedSelection.selected_printer_name
+  );
+  const explicitProfile = getFirstNonEmptyClerkBluetoothValue(
+    rawProfile && rawProfile !== "GENERIC" ? rawProfile : "",
+    currentProfile && currentProfile !== "GENERIC" ? currentProfile : "",
+    storedProfile && storedProfile !== "GENERIC" ? storedProfile : "",
     rawProfile,
+    currentProfile,
+    storedProfile,
     "GENERIC"
   );
+  return getClerkBluetoothPrinterProfileValue(explicitProfile, selectedPrinterName);
 }
 function normalizeClerkBluetoothPrinterRows(raw = []) {
   const rows = Array.isArray(raw) ? raw : [];
@@ -3677,6 +3683,7 @@ function normalizeClerkBluetoothPrinterStatus(raw = {}) {
   const status = getClerkBluetoothPrinterStatusObject(raw);
   const printers = Array.isArray(status.paired_printers) ? status.paired_printers : [];
   const discoveredPrinters = Array.isArray(status.discovered_printers) ? status.discovered_printers : [];
+  const selectedPrinterName = String(status.selected_printer_name || "").trim();
   return {
     ...createDefaultClerkBluetoothPrinterStatus(),
     ...status,
@@ -3687,9 +3694,9 @@ function normalizeClerkBluetoothPrinterStatus(raw = {}) {
     discovered_printers: normalizeClerkBluetoothPrinterRows(discoveredPrinters),
     paired_printer_count: Number((_d2 = (_c2 = status.paired_printer_count) != null ? _c2 : printers.length) != null ? _d2 : 0),
     paired_printers: normalizeClerkBluetoothPrinterRows(printers),
-    selected_printer_name: String(status.selected_printer_name || "").trim(),
+    selected_printer_name: selectedPrinterName,
     selected_printer_address: String(status.selected_printer_address || "").trim(),
-    selected_profile: String(status.selected_profile || "GENERIC").trim() || "GENERIC",
+    selected_profile: getClerkBluetoothPrinterProfileValue(status.selected_profile, selectedPrinterName),
     connection_status: String(status.connection_status || "disconnected").trim() || "disconnected",
     printer_online_status: getClerkBluetoothPrinterOnlineStatusValue(status.printer_online_status),
     printer_health_checked_at: String(status.printer_health_checked_at || "").trim(),
@@ -30532,7 +30539,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <summary>JSON preview payload</summary>
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${printerReady && payload.labels.length ? "" : "disabled"}>打印一张预览标签</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${payload.labels.length ? "" : "disabled"}>打印一张预览标签</button>
       ${printerReady ? "" : '<div class="subtle small">请先连接并确认打印机在线。</div>'}
       ${previewPrintStatus ? `<div class="subtle small">预览打印状态：${escapeHtml(previewPrintStatus)}</div>` : ""}
       ${previewPrintMessage ? `<div class="success-banner">${escapeHtml(previewPrintMessage)}</div>` : ""}
@@ -30727,13 +30734,17 @@ function getClerkBluetoothPrinterProfileLabel(profile = "") {
   }
   return "通用";
 }
-function getClerkBluetoothPrinterProfileValue(profile = "") {
+function getClerkBluetoothPrinterProfileValue(profile = "", printerName = "") {
   const normalized = String(profile || "GENERIC").trim().toUpperCase();
   if (normalized === "CHITENG_S1" || normalized === "CHITENG_S1_OFFICIAL") {
     return "CHITENG_S1_OFFICIAL";
   }
   if (normalized === "UROVO") {
     return "UROVO";
+  }
+  const normalizedName = String(printerName || "").trim().toUpperCase();
+  if (/(^|[^A-Z0-9])S1([^A-Z0-9]|$)|CHITENG|CTAIOT|驰腾/.test(normalizedName)) {
+    return "CHITENG_S1_OFFICIAL";
   }
   return "GENERIC";
 }
