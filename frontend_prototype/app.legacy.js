@@ -59,10 +59,10 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-cpcl-code128-diagnostics-253";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-cpcl-code128-diagnostics-253";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#253";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#32";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-code128-scan-tests";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-code128-scan-tests";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#254";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#33";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -81,6 +81,10 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printK300EscposMinText",
   "printK300CpclMinText",
   "printK300CpclCode128Test",
+  "printK300CpclCode128WideTest",
+  "printK300CpclCode128TallTest",
+  "printK300CpclCode128QuietZoneTest",
+  "printK300CpclCode128CompactTopTest",
   "printK300CpclStoreItemPreview",
   "printK300TsplMinText",
   "printK300TsplBlackBox",
@@ -4205,6 +4209,58 @@ function getClerkS1PreviewProtocolDiagnostics() {
       label: "测试 K300 CPCL Code128",
       method: "printK300CpclCode128Test",
       expectedProtocol: "K300_CPCL_CODE128_TEST",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false
+    },
+    {
+      key: "k300_cpcl_code128_wide_test",
+      label: "测试 Code128 宽条码",
+      method: "printK300CpclCode128WideTest",
+      expectedProtocol: "K300_CPCL_CODE128_WIDE_TEST",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false
+    },
+    {
+      key: "k300_cpcl_code128_tall_test",
+      label: "测试 Code128 高条码",
+      method: "printK300CpclCode128TallTest",
+      expectedProtocol: "K300_CPCL_CODE128_TALL_TEST",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false
+    },
+    {
+      key: "k300_cpcl_code128_quiet_zone_test",
+      label: "测试 Code128 留白",
+      method: "printK300CpclCode128QuietZoneTest",
+      expectedProtocol: "K300_CPCL_CODE128_QUIET_ZONE_TEST",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false
+    },
+    {
+      key: "k300_cpcl_code128_compact_top_test",
+      label: "测试 Code128 上移",
+      method: "printK300CpclCode128CompactTopTest",
+      expectedProtocol: "K300_CPCL_CODE128_COMPACT_TOP_TEST",
       expectedTransport: "K300_BLUETOOTH_SPP",
       requiresPayload: false,
       requiresSelectedPrinter: true,

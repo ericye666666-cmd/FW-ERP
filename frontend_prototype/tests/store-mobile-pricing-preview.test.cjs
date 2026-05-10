@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#253/);
+  assert.match(loginVersionSection, /#254/);
   assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#32/);
+  assert.match(loginVersionSection, /#33/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=k300-cpcl-code128-diagnostics-253/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-cpcl-code128-diagnostics-253/);
+  assert.match(indexHtml, /app\.js\?v=k300-code128-scan-tests/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-code128-scan-tests/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -87,6 +87,10 @@ test("PDA version info detects Android bridge methods without requiring native a
         "printK300EscposMinText",
         "printK300CpclMinText",
         "printK300CpclCode128Test",
+        "printK300CpclCode128WideTest",
+        "printK300CpclCode128TallTest",
+        "printK300CpclCode128QuietZoneTest",
+        "printK300CpclCode128CompactTopTest",
         "printK300CpclStoreItemPreview",
         "printK300TsplMinText",
         "printK300TsplBlackBox",
@@ -134,6 +138,14 @@ test("PDA version info detects Android bridge methods without requiring native a
     true,
   );
   assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ printK300CpclCode128WideTest() {}, printK300CpclCode128TallTest() {} }).supported_methods.printK300CpclCode128WideTest,
+    true,
+  );
+  assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ printK300CpclCode128QuietZoneTest() {}, printK300CpclCode128CompactTopTest() {} }).supported_methods.printK300CpclCode128CompactTopTest,
+    true,
+  );
+  assert.equal(
     bridgeInfo.getDirectLoopAndroidBridgeInfo({ printK300CpclCode128Test() {}, printK300CpclStoreItemPreview() {} }).supported_methods.printK300CpclStoreItemPreview,
     true,
   );
@@ -153,7 +165,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-cpcl-code128-diagnostics-253/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-code128-scan-tests/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -166,6 +178,10 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(appLegacyJs, /printK300EscposMinText/);
   assert.match(appLegacyJs, /printK300CpclMinText/);
   assert.match(appLegacyJs, /printK300CpclCode128Test/);
+  assert.match(appLegacyJs, /printK300CpclCode128WideTest/);
+  assert.match(appLegacyJs, /printK300CpclCode128TallTest/);
+  assert.match(appLegacyJs, /printK300CpclCode128QuietZoneTest/);
+  assert.match(appLegacyJs, /printK300CpclCode128CompactTopTest/);
   assert.match(appLegacyJs, /printK300CpclStoreItemPreview/);
   assert.match(appLegacyJs, /printK300TsplMinText/);
   assert.match(appLegacyJs, /printK300TsplBlackBox/);
@@ -371,8 +387,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=k300-cpcl-code128-diagnostics-253/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-cpcl-code128-diagnostics-253/);
+  assert.match(indexHtml, /app\.js\?v=k300-code128-scan-tests/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-code128-scan-tests/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -797,7 +813,7 @@ test("clerk PDA diagnostics expose Urovo K300 protocol buttons for Android #29",
   assert.match(appLegacyJs, /payloadPrinterProfile:\s*"UROVO_K300"/);
 });
 
-test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons for Android #32", () => {
+test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons for Android #33", () => {
   const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
   const protocolConfigSource = extractFunctionSource(appJs, "getClerkS1PreviewProtocolDiagnostics");
   const visibleProtocolSource = extractFunctionSource(appJs, "getVisibleClerkS1PreviewProtocolDiagnostics");
@@ -830,12 +846,20 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(protocolConfigSource, /测试 K300 ESC\/POS 文字/);
   assert.match(protocolConfigSource, /测试 K300 CPCL 文字/);
   assert.match(protocolConfigSource, /测试 K300 CPCL Code128/);
+  assert.match(protocolConfigSource, /测试 Code128 宽条码/);
+  assert.match(protocolConfigSource, /测试 Code128 高条码/);
+  assert.match(protocolConfigSource, /测试 Code128 留白/);
+  assert.match(protocolConfigSource, /测试 Code128 上移/);
   assert.match(protocolConfigSource, /测试 K300 CPCL STORE_ITEM 预览/);
   assert.match(protocolConfigSource, /测试 K300 TSPL 文字/);
   assert.match(protocolConfigSource, /测试 K300 TSPL 黑块/);
   assert.match(protocolConfigSource, /key:\s*"k300_escpos_min_text"[\s\S]*?method:\s*"printK300EscposMinText"[\s\S]*?expectedProtocol:\s*"K300_ESCPOS_MIN_TEXT"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
   assert.match(protocolConfigSource, /key:\s*"k300_cpcl_min_text"[\s\S]*?method:\s*"printK300CpclMinText"[\s\S]*?expectedProtocol:\s*"K300_CPCL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
   assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_test"[\s\S]*?method:\s*"printK300CpclCode128Test"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_TEST"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_wide_test"[\s\S]*?method:\s*"printK300CpclCode128WideTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_WIDE_TEST"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_tall_test"[\s\S]*?method:\s*"printK300CpclCode128TallTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_TALL_TEST"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresK300SppAvailable:\s*true/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_quiet_zone_test"[\s\S]*?method:\s*"printK300CpclCode128QuietZoneTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_QUIET_ZONE_TEST"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresK300SppAvailable:\s*true/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_compact_top_test"[\s\S]*?method:\s*"printK300CpclCode128CompactTopTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_COMPACT_TOP_TEST"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresK300SppAvailable:\s*true/);
   assert.match(protocolConfigSource, /key:\s*"k300_cpcl_store_item_preview"[\s\S]*?method:\s*"printK300CpclStoreItemPreview"[\s\S]*?expectedProtocol:\s*"K300_CPCL_STORE_ITEM_PREVIEW"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*true[\s\S]*?payloadPrinterProfile:\s*"UROVO_K300"[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
   assert.match(protocolConfigSource, /key:\s*"k300_tspl_min_text"[\s\S]*?method:\s*"printK300TsplMinText"[\s\S]*?expectedProtocol:\s*"K300_TSPL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
   assert.match(protocolConfigSource, /key:\s*"k300_tspl_black_box"[\s\S]*?method:\s*"printK300TsplBlackBox"[\s\S]*?expectedProtocol:\s*"K300_TSPL_BLACK_BOX"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
@@ -868,6 +892,10 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(appLegacyJs, /测试 K300 ESC\/POS 文字/);
   assert.match(appLegacyJs, /测试 K300 CPCL 文字/);
   assert.match(appLegacyJs, /测试 K300 CPCL Code128/);
+  assert.match(appLegacyJs, /测试 Code128 宽条码/);
+  assert.match(appLegacyJs, /测试 Code128 高条码/);
+  assert.match(appLegacyJs, /测试 Code128 留白/);
+  assert.match(appLegacyJs, /测试 Code128 上移/);
   assert.match(appLegacyJs, /测试 K300 CPCL STORE_ITEM 预览/);
   assert.match(appLegacyJs, /测试 K300 TSPL 文字/);
   assert.match(appLegacyJs, /测试 K300 TSPL 黑块/);
@@ -875,6 +903,10 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(appLegacyJs, /printK300EscposMinText/);
   assert.match(appLegacyJs, /printK300CpclMinText/);
   assert.match(appLegacyJs, /printK300CpclCode128Test/);
+  assert.match(appLegacyJs, /printK300CpclCode128WideTest/);
+  assert.match(appLegacyJs, /printK300CpclCode128TallTest/);
+  assert.match(appLegacyJs, /printK300CpclCode128QuietZoneTest/);
+  assert.match(appLegacyJs, /printK300CpclCode128CompactTopTest/);
   assert.match(appLegacyJs, /printK300CpclStoreItemPreview/);
   assert.match(appLegacyJs, /printK300TsplMinText/);
   assert.match(appLegacyJs, /printK300TsplBlackBox/);
