@@ -81,7 +81,7 @@
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
           <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#242</span></div>
+            <div><strong>FW-ERP 主线 PR:</strong><span>#243</span></div>
             <div><strong>Android PR:</strong><span>#25</span></div>
           </section>
           <pre id="authOutput" class="output hidden-output"></pre>
@@ -4256,16 +4256,16 @@
           (document.body || document.documentElement).appendChild(script);
         }
 
-        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260510-pda-back-stack-242";
-        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "pda-back-stack-242";
+        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260510-force-tspl-diagnostic-242";
+        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "force-tspl-diagnostic-242";
 
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=pda-back-stack-242", "modern");
+          loadPdaRuntimeScript("./app.js?v=force-tspl-diagnostic-242", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=pda-back-stack-242", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=force-tspl-diagnostic-242", "legacy");
       })();
     </script>
   </body>
