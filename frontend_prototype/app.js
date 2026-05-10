@@ -33,10 +33,10 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-urovo-k300-diagnostics-250";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "urovo-k300-diagnostics-250";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#250";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#29";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-k300-bluetooth-protocol-diagnostics-251";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-bluetooth-protocol-diagnostics-251";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#251";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#30";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -52,6 +52,10 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printUrovoK300MinText",
   "printUrovoK300BlackBox",
   "printUrovoK300StoreItemPreview",
+  "printK300EscposMinText",
+  "printK300CpclMinText",
+  "printK300TsplMinText",
+  "printK300TsplBlackBox",
 ];
 let directLoopAndroidAppInfo = null;
 let directLoopAndroidAppInfoRequestStarted = false;
@@ -4395,6 +4399,54 @@ function getClerkS1PreviewProtocolDiagnostics() {
       payloadPrinterProfile: "UROVO_K300",
       requiresSelectedPrinter: false,
       group: "urovo",
+      alwaysVisible: false,
+    },
+    {
+      key: "k300_escpos_min_text",
+      label: "测试 K300 ESC/POS 文字",
+      method: "printK300EscposMinText",
+      expectedProtocol: "K300_ESCPOS_MIN_TEXT",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false,
+    },
+    {
+      key: "k300_cpcl_min_text",
+      label: "测试 K300 CPCL 文字",
+      method: "printK300CpclMinText",
+      expectedProtocol: "K300_CPCL_MIN_TEXT",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false,
+    },
+    {
+      key: "k300_tspl_min_text",
+      label: "测试 K300 TSPL 文字",
+      method: "printK300TsplMinText",
+      expectedProtocol: "K300_TSPL_MIN_TEXT",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false,
+    },
+    {
+      key: "k300_tspl_black_box",
+      label: "测试 K300 TSPL 黑块",
+      method: "printK300TsplBlackBox",
+      expectedProtocol: "K300_TSPL_BLACK_BOX",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
       alwaysVisible: false,
     },
   ];
@@ -34261,7 +34313,8 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
   const diagnosticsPaused = isClerkBluetoothPrinterDiagnosticPollingPaused();
   const previewProtocols = getVisibleClerkS1PreviewProtocolDiagnostics(status);
   const urovoProtocols = previewProtocols.filter((protocol) => protocol.group === "urovo");
-  const s1PreviewProtocols = previewProtocols.filter((protocol) => protocol.group !== "urovo");
+  const k300BluetoothProtocols = previewProtocols.filter((protocol) => protocol.group === "k300_bluetooth");
+  const s1PreviewProtocols = previewProtocols.filter((protocol) => protocol.group !== "urovo" && protocol.group !== "k300_bluetooth");
   return `
     <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
       <summary>诊断详情 / Developer diagnostics</summary>
@@ -34294,7 +34347,16 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
           }).join("")}
         </div>
       ` : ""}
-      <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #29 返回 ${previewProtocols.map((protocol) => `${protocol.expectedProtocol} / ${protocol.expectedTransport}`).join("、")}。</div>
+      ${k300BluetoothProtocols.length ? `
+        <div class="clerk-printer-diagnostics-actions">
+          <strong>K300 蓝牙协议测试</strong>
+          ${k300BluetoothProtocols.map((protocol) => {
+            const canRunProtocol = canRunClerkS1PreviewProtocolDiagnostic(status, protocol.key) && !clerkBluetoothPrinterActionInFlight && !diagnosticsPaused;
+            return `<button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-preview-protocol="${escapeHtml(protocol.key)}" ${canRunProtocol ? "" : "disabled"}>${escapeHtml(protocol.label)}</button>`;
+          }).join("")}
+        </div>
+      ` : ""}
+      <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #30 返回 ${previewProtocols.map((protocol) => `${protocol.expectedProtocol} / ${protocol.expectedTransport}`).join("、")}。</div>
       <div class="clerk-printer-diagnostics-json">
         <strong>raw JSON from latest getPrinterStatus()</strong>
         <div class="clerk-printer-diagnostics-actions">
