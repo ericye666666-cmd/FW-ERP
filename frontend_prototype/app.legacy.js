@@ -59,8 +59,10 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-version-display";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "version-display-241";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-pda-back-stack-242";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "pda-back-stack-242";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#242";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#25";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -3831,6 +3833,14 @@ function renderDirectLoopVersionInfoBlock(context = "default") {
   const previewPrintSupported = Boolean(supportedMethods.printStoreItemLabelPreview);
   const previewPrintText = previewPrintSupported ? "supported" : "not supported by current Android APK";
   const loginAttribute = context === "login" ? ' data-direct-loop-login-version-info="true"' : "";
+  if (context === "login") {
+    return `
+      <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login"${loginAttribute}>
+        <div><strong>FW-ERP 主线 PR:</strong><span>${escapeHtml(DIRECT_LOOP_MAIN_PR_VERSION)}</span></div>
+        <div><strong>Android PR:</strong><span>${escapeHtml(DIRECT_LOOP_ANDROID_PR_VERSION)}</span></div>
+      </section>
+    `;
+  }
   return `
     <section class="direct-loop-version-info" data-direct-loop-version-info="${escapeHtml(context)}"${loginAttribute}>
       <div><strong>FW-ERP Web:</strong><span>${escapeHtml(DIRECT_LOOP_WEB_VERSION)}</span></div>
@@ -5323,6 +5333,25 @@ function applyHashRoute() {
   const targetPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === panelKey);
   if (!targetPanel) {
     return false;
+  }
+  if (isPdaRuntimeMode(currentSession.user) && requiresRoleLanding(currentSession.user)) {
+    const landing = getUserRoleLanding(currentSession.user);
+    const landingPanelKey = landing ? getPanelKeyByTitle(landing.workspace, landing.panelTitle) : "";
+    if (landingPanelKey && panelKey !== landingPanelKey) {
+      if (activeWorkspace !== landing.workspace) {
+        setActiveWorkspace(landing.workspace);
+      }
+      setActivePanel(landingPanelKey, { syncHash: false });
+      const nextHash = `#${encodeURIComponent(landingPanelKey)}`;
+      if (window.location.hash !== nextHash) {
+        if (window.history && typeof window.history.replaceState === "function") {
+          window.history.replaceState(window.history.state, "", nextHash);
+        } else {
+          window.location.hash = nextHash;
+        }
+      }
+      return true;
+    }
   }
   setActivePanel(panelKey, { syncHash: false });
   return true;

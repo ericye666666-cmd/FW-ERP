@@ -48,16 +48,18 @@ test("admin store page exposes an Android PDA batch pricing preview frame", () =
   assert.match(stylesCss, /\.android-pda-frame\s*\{/);
 });
 
-test("login page shows FW-ERP web, PDA bundle, and Android bridge version info", () => {
+test("login page shows compact FW-ERP and Android PR version status", () => {
+  const loginVersionSection = indexHtml.match(/<section class="direct-loop-version-info[^"]*" data-direct-loop-version-info="login"[\s\S]*?<\/section>/)?.[0] || "";
+
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
-  assert.match(indexHtml, /FW-ERP Web:/);
-  assert.match(indexHtml, /fw-erp-web-20260510-version-display/);
-  assert.match(indexHtml, /PDA Bundle:/);
-  assert.match(indexHtml, /version-display-241/);
-  assert.match(indexHtml, /Android App:/);
-  assert.match(indexHtml, /Android Bridge:/);
-  assert.match(indexHtml, /app\.js\?v=version-display-241/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=version-display-241/);
+  assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
+  assert.match(loginVersionSection, /#242/);
+  assert.match(loginVersionSection, /Android PR:/);
+  assert.match(loginVersionSection, /#25/);
+  assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
+  assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
+  assert.match(indexHtml, /app\.js\?v=pda-back-stack-242/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=pda-back-stack-242/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -95,7 +97,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-version-display/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-pda-back-stack-242/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
 });
 
@@ -298,8 +300,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=version-display-241/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=version-display-241/);
+  assert.match(indexHtml, /app\.js\?v=pda-back-stack-242/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=pda-back-stack-242/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -1714,6 +1716,69 @@ test("clerk PDA browser popstate handles Android back through the internal page 
   assert.equal(browserBack.getState().priceGroups[0].generated_store_items.length, 1);
   assert.equal(browserBack.getState().selectedSdp.display_code, "SDP261290019");
   assert.equal(browserBack.getRenderCount(), 1);
+});
+
+test("clerk PDA hash back keeps the runtime on the PDA pricing panel", () => {
+  const route = getExecutableBundle(
+    ["applyHashRoute"],
+    `
+    var activeWorkspace = "store";
+    var activePanelKey = "store-pda-pricing";
+    var setCalls = [];
+    var replaceCalls = [];
+    var currentSession = { token: "token", user: { role_code: "store_clerk", store_code: "UTAWALA" } };
+    var window = {
+      location: { hash: "#store-clerk-home" },
+      history: {
+        state: { directLoopClerkPda: true },
+        replaceState(state, title, nextHash) {
+          replaceCalls.push(nextHash);
+          window.location.hash = nextHash;
+        },
+      },
+    };
+    var workspacePanelsList = [
+      { dataset: { panelKey: "store-clerk-home", workspacePanel: "store", panelTitle: "6.2 我的当前 bale" } },
+      { dataset: { panelKey: "store-pda-pricing", workspacePanel: "store", panelTitle: "PDA 现场分堆标价 UI Preview" } },
+    ];
+    function getHashPanelKey() {
+      return "store-clerk-home";
+    }
+    function setActiveWorkspace(workspace) {
+      activeWorkspace = workspace;
+    }
+    function setActivePanel(panelKey, options) {
+      setCalls.push({ panelKey: panelKey, options: options });
+      activePanelKey = panelKey;
+    }
+    function getNormalizedRoleCode(user) {
+      return String(user && (user.role_code || user.role || "") || "");
+    }
+    function isPdaRuntimeMode() {
+      return true;
+    }
+    function requiresRoleLanding() {
+      return true;
+    }
+    function getUserRoleLanding() {
+      return { workspace: "store", panelTitle: "PDA 现场分堆标价 UI Preview" };
+    }
+    function getPanelKeyByTitle(workspace, panelTitlePrefix) {
+      var target = workspacePanelsList.find(function (panel) {
+        return panel.dataset.workspacePanel === workspace
+          && String(panel.dataset.panelTitle || "").indexOf(panelTitlePrefix) === 0;
+      });
+      return target ? target.dataset.panelKey : "";
+    }
+    `,
+    "({ applyHashRoute, getSetCalls() { return setCalls; }, getReplaceCalls() { return replaceCalls; }, getActivePanelKey() { return activePanelKey; } })",
+  );
+
+  assert.equal(route.applyHashRoute(), true);
+  assert.equal(route.getSetCalls()[0].panelKey, "store-pda-pricing");
+  assert.equal(route.getSetCalls()[0].options.syncHash, false);
+  assert.equal(route.getReplaceCalls()[0], "#store-pda-pricing");
+  assert.equal(route.getActivePanelKey(), "store-pda-pricing");
 });
 
 test("clerk PDA back supports printer connection to my, then my to tasks", () => {
