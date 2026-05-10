@@ -32455,7 +32455,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   const quantity = Math.max(1, Math.min(remainingQty, Number(quantityInput instanceof HTMLInputElement ? quantityInput.value : remainingQty) || remainingQty));
   const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
   if (!(priceKes > 0)) {
-    state.pricingSourceLineMessage = grade === "CUSTOM" ? "自定义价格必须大于 0。" : "请先在默认售价管理配置 P/S 默认售价。";
+    state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在默认售价管理配置 P/S 默认售价。";
     return null;
   }
   const group = {
@@ -32465,7 +32465,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     category_sub: line.category_sub,
     category: `${line.category_main} / ${line.category_sub}`,
     grade,
-    tier: grade === "CUSTOM" ? "自定义价格" : `${grade} 档默认售价`,
+    tier: grade === "CUSTOM" ? "自定义" : `${grade}档`,
     price_kes: priceKes,
     sale_price_kes: priceKes,
     quantity,
@@ -32474,7 +32474,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     source_sdp_machine_code: line.source_sdp_machine_code || state.selectedSdp?.machine_code || "",
     source_type: line.source_type || state.selectedSdp?.source_type || "",
     source_code: line.source_code || state.selectedSdp?.source_code || "",
-    status: "待生成 STORE_ITEM",
+    status: "待生成商品码",
     workflow_status: "draft",
   };
   const validation = validateStoreMobilePricingBatchQuantity(state, group);
@@ -32629,12 +32629,12 @@ function isStoreMobilePriceGroupLocked(group = {}) {
 function getStoreMobilePriceGroupStatus(state = storeMobilePricingPreviewState, group = {}) {
   const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
   if (workflowStatus === "preview") {
-    return "preview / 正在看标签预览";
+    return "正在看标签预览";
   }
   if (workflowStatus === "generated" || workflowStatus === "locked") {
-    return "generated / 已生成 / 待打印";
+    return "已生成 / 待打印";
   }
-  return String(group.status || "draft / 待生成商品码");
+  return "待生成商品码";
 }
 
 function renderNextPriceGroupHint(state = storeMobilePricingPreviewState, currentGroup = {}) {
@@ -32722,44 +32722,57 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
 function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
   const pricingSourceLines = getStoreMobilePricingSourceLines(state);
+  const getGroupTierText = (group = {}) => {
+    const rawTier = String(group.tier || group.grade || group.pricing_type || "").trim();
+    const normalizedTier = rawTier.toUpperCase();
+    if (normalizedTier === "P" || normalizedTier.startsWith("P ")) return "P档";
+    if (normalizedTier === "S" || normalizedTier.startsWith("S ")) return "S档";
+    if (normalizedTier.includes("CUSTOM") || rawTier.includes("自定义")) return "自定义";
+    return rawTier || "-";
+  };
   if (state.selectedSdp?.backend_task) {
-    const batchCards = groups.map((group) => {
-      const statusText = getStoreMobilePriceGroupStatus(state, group);
-      const generatedStatusLabel = "已生成 / 待打印";
-      const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
-      const isLocked = isStoreMobilePriceGroupLocked(group);
-      const isGenerated = isLocked || statusText.includes(generatedStatusLabel) || /已生成|待打印/.test(statusText);
-      const primaryAction = workflowStatus === "draft"
-        ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批商品码</button>`
-        : `<button type="button" class="primary-button mini-button" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id)}">查看标签预览</button>`;
-      const deleteAction = isLocked
-        ? '<button type="button" class="ghost-button mini-button" disabled>locked / 不可删除</button>'
-        : `<button type="button" class="ghost-button mini-button" data-mobile-pricing-delete-group="${escapeHtml(group.group_id)}">删除本批</button>`;
-      const generatedItems = getStoreMobileGeneratedStoreItems(group);
-      return `
-        <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""} ${isLocked ? "is-locked" : ""}" data-mobile-pricing-group-status="${escapeHtml(workflowStatus)}">
-          <div class="mobile-field-group-top">
-            <div class="mobile-field-group-left">
-              <strong>${escapeHtml(group.tier || "-")}</strong>
-              <b class="mobile-group-qty">${escapeHtml(group.quantity || 0)}件</b>
+    const renderCreatedGroupCards = (lineGroups = []) => {
+      if (!lineGroups.length) {
+        return '<div class="subtle small">还没有价格组。请先输入数量并选择售价。</div>';
+      }
+      return lineGroups.map((group, index) => {
+        const statusText = getStoreMobilePriceGroupStatus(state, group);
+        const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
+        const isLocked = isStoreMobilePriceGroupLocked(group);
+        const generatedItems = getStoreMobileGeneratedStoreItems(group);
+        const generatedQty = getStoreMobileGroupGeneratedQty(group) || generatedItems.length;
+        const tierText = getGroupTierText(group);
+        const primaryAction = workflowStatus === "draft"
+          ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批商品码</button>`
+          : `<button type="button" class="primary-button mini-button" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id)}">查看标签预览</button>`;
+        const deleteAction = isLocked
+          ? '<button type="button" class="ghost-button mini-button" disabled>locked / 不可删除</button>'
+          : `<button type="button" class="ghost-button mini-button" data-mobile-pricing-delete-group="${escapeHtml(group.group_id)}">删除</button>`;
+        return `
+          <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""} ${isLocked ? "is-locked" : ""}" data-mobile-pricing-group-status="${escapeHtml(workflowStatus)}">
+            <div class="mobile-field-group-top">
+              <div class="mobile-field-group-left">
+                <strong>价格组 ${escapeHtml(index + 1)}</strong>
+                <b class="mobile-group-qty">${escapeHtml(`${tierText} · KSh ${group.price_kes || 0} · ${group.quantity || 0}件`)}</b>
+              </div>
+              <div class="mobile-field-group-right">
+                ${renderStoreMobilePricingBadge(statusText)}
+                ${isLocked ? renderStoreMobilePricingBadge("locked / 已生成，不可删除") : ""}
+              </div>
             </div>
-            <div class="mobile-field-group-right">
-              <strong>KSh ${escapeHtml(group.price_kes || 0)}</strong>
-              ${renderStoreMobilePricingBadge(statusText)}
-              ${isLocked ? renderStoreMobilePricingBadge("locked / 已生成，不可删除") : ""}
+            <div class="mobile-field-group-meta">
+              ${escapeHtml(group.category_short || group.category || `${group.category_main || "-"} / ${group.category_sub || "-"}`)}
             </div>
-          </div>
-          <div class="mobile-field-group-meta">
-            ${escapeHtml(group.category_short || group.category || `${group.category_main || "-"} / ${group.category_sub || "-"}`)}
-            ${isGenerated ? ` · 已生成 ${generatedItems.length || group.quantity || 0} 件 · 待打印 ${getStoreMobilePendingPrintCount(generatedItems) || group.quantity || 0} 件` : ""}
-          </div>
-          <div class="mobile-field-group-actions">${primaryAction}${deleteAction}</div>
-        </article>
-      `;
-    }).join("");
+            <div class="mobile-field-group-meta">状态：${escapeHtml(isLocked ? "已生成 / 待打印" : "待生成商品码")}</div>
+            ${isLocked ? `<div class="mobile-field-group-meta">已生成：${escapeHtml(generatedQty || group.quantity || 0)}件</div>` : ""}
+            <div class="mobile-field-group-actions">${primaryAction}${deleteAction}</div>
+          </article>
+        `;
+      }).join("");
+    };
     if (!pricingSourceLines.length) {
       return `
-        <div class="mobile-price-group-list">
+        <div class="mobile-price-group-list" aria-label="分批定价">
           <article class="mobile-price-group-card mobile-field-group-card">
             <div class="mobile-field-group-top">
               <div class="mobile-field-group-left">
@@ -32774,44 +32787,60 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
       `;
     }
     return `
-      <div class="mobile-price-group-list">
+      <div class="mobile-price-group-list" aria-label="分批定价">
         ${pricingSourceLines.map((line) => {
           const progress = getStoreMobileSourceLineProgress(state, line.line_key);
           const remainingQty = progress.remaining_qty;
           const pPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
           const sPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
+          const lineGroups = groups.filter((group) => String(group.source_line_key || "") === String(line.line_key || ""));
+          const createDisabled = remainingQty <= 0;
+          const sourceLineTitle = `${line.category_main} / ${line.category_sub}`;
           return `
             <article class="mobile-price-group-card mobile-field-group-card">
               <div class="mobile-field-group-top">
                 <div class="mobile-field-group-left">
-                  <strong>${escapeHtml(`${line.category_main} / ${line.category_sub}`)}</strong>
+                  <strong>${escapeHtml(sourceLineTitle)}</strong>
                   <b class="mobile-group-qty">${escapeHtml(remainingQty)}件剩余</b>
                 </div>
-                ${renderStoreMobilePricingBadge("待分批")}
+                ${renderStoreMobilePricingBadge(remainingQty > 0 ? "待分批" : "已全部分批")}
               </div>
-              <div class="mobile-field-group-meta">
-                ${escapeHtml(`${line.category_main} / ${line.category_sub}`)} · ${escapeHtml(remainingQty)} 件剩余
+              <div class="mobile-sdp-stat-strip mobile-source-line-stat-strip">
+                <span><b>总数</b><strong>${escapeHtml(progress.total_qty)}</strong></span>
+                <span><b>已分批</b><strong>${escapeHtml(progress.allocated_qty)}</strong></span>
+                <span><b>已生成</b><strong>${escapeHtml(progress.generated_qty)}</strong></span>
+                <span><b>剩余</b><strong>${escapeHtml(progress.remaining_qty)}</strong></span>
               </div>
-              <div class="mobile-result-grid">
-                <span><b>总数</b>${escapeHtml(progress.total_qty)}</span>
-                <span><b>已分批</b>${escapeHtml(progress.allocated_qty)}</span>
-                <span><b>已生成</b>${escapeHtml(progress.generated_qty)}</span>
-                <span><b>剩余</b>${escapeHtml(progress.remaining_qty)}</span>
-                <span><b>P 档默认售价</b>${escapeHtml(pPrice ? `KSh ${pPrice}` : "未配置")}</span>
-                <span><b>S 档默认售价</b>${escapeHtml(sPrice ? `KSh ${sPrice}` : "未配置")}</span>
-                <span><b>自定义价格</b><input type="number" min="1" step="1" placeholder="KES" data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}"></span>
-                <span><b>本批数量</b><input type="number" min="1" max="${escapeHtml(remainingQty)}" value="${escapeHtml(remainingQty)}" data-mobile-pricing-batch-qty="${escapeHtml(line.line_key)}"></span>
-              </div>
-              <div class="mobile-field-group-actions">
-                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||P`)}">P 档默认售价</button>
-                <button type="button" class="primary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||S`)}">S 档默认售价</button>
-                <button type="button" class="secondary-button mini-button" data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM`)}">自定义价格</button>
-              </div>
+              <section class="mobile-create-pricing-group">
+                <div class="mobile-section-head">
+                  <strong>创建新价格组</strong>
+                </div>
+                <label class="mobile-rack-input">
+                  <span>本批数量，可修改</span>
+                  <input type="number" min="1" max="${escapeHtml(remainingQty)}" value="${escapeHtml(remainingQty)}" ${createDisabled ? "disabled" : ""} data-mobile-pricing-batch-qty="${escapeHtml(line.line_key)}">
+                </label>
+                <div class="subtle small">先输入这一批数量，再选择售价创建价格组。</div>
+                <label class="mobile-rack-input">
+                  <span>自定义价格</span>
+                  <input type="number" min="1" step="1" placeholder="请输入自定义价格" ${createDisabled ? "disabled" : ""} data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}">
+                </label>
+                ${createDisabled ? '<div class="mobile-task-complete-note">本 source line 已全部分批。</div>' : ""}
+                <div class="mobile-field-group-actions">
+                  <button type="button" class="primary-button mini-button" ${createDisabled || !(pPrice > 0) ? "disabled" : ""} data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||P`)}">创建 P档价格组 · ${escapeHtml(pPrice ? `KSh ${pPrice}` : "未配置")}</button>
+                  <button type="button" class="primary-button mini-button" ${createDisabled || !(sPrice > 0) ? "disabled" : ""} data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||S`)}">创建 S档价格组 · ${escapeHtml(sPrice ? `KSh ${sPrice}` : "未配置")}</button>
+                  <button type="button" class="secondary-button mini-button" ${createDisabled ? "disabled" : ""} data-mobile-pricing-create-batch="${escapeHtml(`${line.line_key}||CUSTOM`)}">创建自定义价格组</button>
+                </div>
+              </section>
+              <section class="mobile-created-pricing-groups">
+                <div class="mobile-section-head">
+                  <strong>已创建价格组</strong>
+                </div>
+                ${renderCreatedGroupCards(lineGroups)}
+              </section>
             </article>
           `;
         }).join("")}
         ${state.pricingSourceLineMessage ? `<div class="mobile-error">${escapeHtml(state.pricingSourceLineMessage)}</div>` : ""}
-        ${batchCards || '<div class="subtle small">选择 P 档默认售价、S 档默认售价或自定义价格后，生成本批商品码。</div>'}
       </div>
     `;
   }
@@ -32819,12 +32848,13 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
     <div class="mobile-price-group-list">
       ${groups.map((group) => {
         const statusText = getStoreMobilePriceGroupStatus(state, group);
+        const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
         const isComplete = statusText === "已完成";
         const isCurrent = String(state.activeGroupId || "") === String(group.group_id || "");
-        const primaryAction = statusText === "待生成"
+        const primaryAction = workflowStatus === "draft"
           ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批商品码</button>`
           : `<button type="button" class="primary-button mini-button" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id)}">查看标签预览</button>`;
-        const nextAction = statusText === "待生成"
+        const nextAction = workflowStatus === "draft"
           ? "下一步：生成本批商品码"
           : "下一步：查看标签预览";
         return `
@@ -33124,7 +33154,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <span><b>状态</b>${escapeHtml("已生成 / 待打印")}</span>
       </div>
       ${renderStoreMobileGeneratedStoreItemList(group)}
-      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回分批页面</button>
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回分批定价</button>
       <div class="mobile-choice-block">
         <span>标签尺寸</span>
         <div class="mobile-segment-row">
@@ -33179,8 +33209,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <summary>JSON preview payload</summary>
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
-      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回价格组列表</button>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">继续分下一批</button>
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回分批定价</button>
       ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
@@ -33655,7 +33684,7 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
         <h3>SDP 详情</h3>
         ${renderStoreMobileSdpCard(state)}
         <div class="mobile-progress-row"><span>店长收货</span><span>分配店员</span><span>现场标价</span></div>
-        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">进入现场分堆标价</button>
+        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">进入分批定价</button>
       </section>
     `;
   }
@@ -33674,11 +33703,10 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
   if (page === "pricing_split") {
     return `
       <section class="mobile-pricing-workbench">
-        <h3>现场分堆标价</h3>
+        <h3>分批定价</h3>
         ${renderStoreMobileSdpCard(state)}
         ${renderPriceGroupCards(state)}
         <div class="mobile-bottom-button-stack">
-          <button type="button" class="ghost-button" data-mobile-pricing-page="pricing_split">返回价格组列表</button>
           <button type="button" class="ghost-button" data-mobile-pricing-page="tasks">返回任务</button>
         </div>
       </section>
@@ -33686,11 +33714,10 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
   }
   return `
     <section class="mobile-pricing-workbench">
-      <h3>现场分堆标价</h3>
+      <h3>分批定价</h3>
       ${renderStoreMobileSdpCard(state)}
       ${renderPriceGroupCards(state)}
       <div class="mobile-bottom-button-stack">
-        <button type="button" class="ghost-button" data-mobile-pricing-page="pricing_split">返回价格组列表</button>
         <button type="button" class="ghost-button" data-mobile-pricing-page="tasks">返回任务</button>
       </div>
     </section>
@@ -33701,7 +33728,7 @@ function getStoreMobilePageOptions() {
   return [
     { key: "tasks", label: "我的 SDP 任务" },
     { key: "detail", label: "SDP 详情" },
-    { key: "pricing_split", label: "现场分堆标价 / 分批页面 / 当前 source line / 价格组列表" },
+    { key: "pricing_split", label: "分批定价" },
     { key: "group_generated", label: "本批 STORE_ITEM 生成结果" },
     { key: "label_preview", label: "本批标签预览" },
     { key: "print_queue", label: "print payload 预览" },
@@ -33711,7 +33738,7 @@ function getStoreMobilePageOptions() {
 
 function getStoreMobileActivePageLabel(state = storeMobilePricingPreviewState) {
   const activePage = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
-  return getStoreMobilePageOptions().find((page) => page.key === activePage)?.label || "现场分堆标价";
+  return getStoreMobilePageOptions().find((page) => page.key === activePage)?.label || "分批定价";
 }
 
 function renderStoreMobileBottomTabs(state = storeMobilePricingPreviewState) {
