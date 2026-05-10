@@ -13,7 +13,7 @@ from tempfile import NamedTemporaryFile
 from textwrap import wrap
 from typing import Any, Optional, Union
 
-from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse
 from openpyxl import Workbook, load_workbook
 from PIL import Image, ImageDraw, ImageFont
@@ -2063,6 +2063,30 @@ def logout(
     current_user = state.get_authenticated_user(token)
     state.logout_user(token)
     return MessageResponse(message=f"User {current_user['username']} logged out")
+
+
+@router.post("/diagnostics/pda-events", tags=["diagnostics"])
+def create_pda_diagnostic_event(
+    payload: dict[str, Any],
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+) -> dict[str, Any]:
+    current_user = _require_current_user(authorization=authorization)
+    remote_addr = request.client.host if request.client else ""
+    return state.record_pda_diagnostic_event(
+        payload,
+        authenticated_user=current_user,
+        remote_addr=remote_addr,
+    )
+
+
+@router.get("/diagnostics/pda-events", tags=["diagnostics"])
+def list_pda_diagnostic_events(
+    limit: int = Query(default=50, ge=1, le=300),
+    authorization: Optional[str] = Header(default=None),
+) -> list[dict[str, Any]]:
+    _require_current_user(authorization=authorization)
+    return state.list_pda_diagnostic_events(limit=limit)
 
 
 @router.get("/dashboard/summary", response_model=list[SummaryCard], tags=["dashboard"])

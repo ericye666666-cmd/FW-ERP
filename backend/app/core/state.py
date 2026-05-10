@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from itertools import count
+import json
 import math
 import random
 import re
@@ -23,6 +24,22 @@ SALES_FX_RATES_TO_KES = {
     "KES": 1.0,
     "USD": 129.1531,
     "CNY": 17.8097,
+}
+PDA_DIAGNOSTIC_EVENT_LIMIT = 300
+PDA_DIAGNOSTIC_EVENT_TYPES = {
+    "s1_printer_diagnostic_click",
+    "s1_printer_diagnostic_result",
+    "s1_printer_diagnostic_error",
+    "pda_runtime_info",
+}
+PDA_DIAGNOSTIC_SECRET_KEYS = {
+    "authorization",
+    "authorization_header",
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "token",
+    "password",
 }
 DEFAULT_APPAREL_CATEGORY_PRESETS = [
     {"category_main": "tops", "category_sub": "lady tops", "label": "女装上衣", "rack_prefix": "A-TS-LT", "cost_p": 185, "cost_s": 138},
@@ -249,6 +266,7 @@ class InMemoryState:
         self.inventory_adjustments: list[dict[str, Any]] = []
         self.inventory_movements: list[dict[str, Any]] = []
         self.audit_events: list[dict[str, Any]] = []
+        self.pda_diagnostic_events: list[dict[str, Any]] = []
         self.cashier_shifts: dict[str, dict[str, Any]] = {}
         self.cashier_handover_logs: dict[str, dict[str, Any]] = {}
         self.payment_anomalies: dict[str, dict[str, Any]] = {}
@@ -389,6 +407,7 @@ class InMemoryState:
             "inventory_adjustments": self.inventory_adjustments,
             "inventory_movements": self.inventory_movements,
             "audit_events": self.audit_events,
+            "pda_diagnostic_events": self.pda_diagnostic_events,
             "cashier_shifts": self.cashier_shifts,
             "cashier_handover_logs": self.cashier_handover_logs,
             "payment_anomalies": self.payment_anomalies,
@@ -455,6 +474,7 @@ class InMemoryState:
         self.inventory_adjustments = payload.get("inventory_adjustments", [])
         self.inventory_movements = payload.get("inventory_movements", [])
         self.audit_events = payload.get("audit_events", [])
+        self.pda_diagnostic_events = payload.get("pda_diagnostic_events", [])[-PDA_DIAGNOSTIC_EVENT_LIMIT:]
         self.cashier_shifts = payload.get("cashier_shifts", {})
         self.cashier_handover_logs = payload.get("cashier_handover_logs", {})
         self.payment_anomalies = payload.get("payment_anomalies", {})
@@ -17149,6 +17169,62 @@ class InMemoryState:
 
     def list_audit_events(self) -> list[dict[str, Any]]:
         return sorted(self.audit_events, key=lambda row: row["id"], reverse=True)
+
+    def record_pda_diagnostic_event(
+        self,
+        payload: dict[str, Any],
+        authenticated_user: Optional[dict[str, Any]] = None,
+        remote_addr: str = "",
+    ) -> dict[str, Any]:
+        safe_payload = self._sanitize_pda_diagnostic_value(payload)
+        if not isinstance(safe_payload, dict):
+            safe_payload = {}
+        event_type = str(safe_payload.get("event_type") or "").strip()
+        if event_type not in PDA_DIAGNOSTIC_EVENT_TYPES:
+            raise HTTPException(status_code=400, detail="Unsupported PDA diagnostic event_type")
+
+        actor = authenticated_user or {}
+        event = {
+            "server_received_at": now_iso(),
+            **safe_payload,
+            "authenticated_username": str(actor.get("username") or "").strip(),
+            "authenticated_role_code": str(actor.get("role_code") or "").strip(),
+            "remote_addr": str(remote_addr or "").strip(),
+        }
+        self.pda_diagnostic_events.append(event)
+        self.pda_diagnostic_events = self.pda_diagnostic_events[-PDA_DIAGNOSTIC_EVENT_LIMIT:]
+        self._persist()
+        self._append_pda_diagnostic_event_log(event)
+        return dict(event)
+
+    def list_pda_diagnostic_events(self, limit: int = 50) -> list[dict[str, Any]]:
+        normalized_limit = max(1, min(int(limit or 50), PDA_DIAGNOSTIC_EVENT_LIMIT))
+        return list(reversed(self.pda_diagnostic_events[-normalized_limit:]))
+
+    def _sanitize_pda_diagnostic_value(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            safe: dict[str, Any] = {}
+            for key, child in value.items():
+                normalized_key = str(key or "").strip()
+                if normalized_key.lower() in PDA_DIAGNOSTIC_SECRET_KEYS:
+                    continue
+                safe[normalized_key] = self._sanitize_pda_diagnostic_value(child)
+            return safe
+        if isinstance(value, list):
+            return [self._sanitize_pda_diagnostic_value(item) for item in value]
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        return str(value)
+
+    def _append_pda_diagnostic_event_log(self, event: dict[str, Any]) -> None:
+        log_path = self._state_file.parent / "pda_diagnostic_events.log"
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")))
+                handle.write("\n")
+        except OSError:
+            return
 
     def _log_event(
         self,

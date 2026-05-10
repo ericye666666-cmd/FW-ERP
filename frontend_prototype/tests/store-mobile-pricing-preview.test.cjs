@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#247/);
+  assert.match(loginVersionSection, /#248/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#28/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=s1-diagnostic-polling-pause-247/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=s1-diagnostic-polling-pause-247/);
+  assert.match(indexHtml, /app\.js\?v=pda-diagnostic-event-reporting-248/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=pda-diagnostic-event-reporting-248/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -114,7 +114,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-s1-diagnostic-polling-pause-247/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-pda-diagnostic-event-reporting-248/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -322,8 +322,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=s1-diagnostic-polling-pause-247/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=s1-diagnostic-polling-pause-247/);
+  assert.match(indexHtml, /app\.js\?v=pda-diagnostic-event-reporting-248/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=pda-diagnostic-event-reporting-248/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -731,6 +731,55 @@ test("clerk PDA S1 protocol diagnostics pause printer polling for 15 seconds", (
   assert.match(appLegacyJs, /CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS = (15000|15e3)/);
   assert.match(appLegacyJs, /测试发送中，请等待 15 秒，不要重复点击。/);
   assert.match(appLegacyJs, /诊断轮询已恢复。/);
+});
+
+test("clerk PDA S1 protocol diagnostics report frontend events to backend", () => {
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const reportSource = extractFunctionSource(appJs, "reportPdaDiagnosticEvent");
+  const contextSource = extractFunctionSource(appJs, "buildPdaDiagnosticEventContext");
+  const statusReportSource = extractFunctionSource(appJs, "reportCurrentPdaDiagnosticStatus");
+  const actionSource = extractFunctionSource(appJs, "sendClerkS1PreviewProtocolDiagnostic");
+  const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const selectorStart = appJs.indexOf('event.target.closest("[data-mobile-pricing-page]');
+  const handlerCall = appJs.indexOf("handleStoreMobilePricingPreviewAction(button);", selectorStart);
+  const listenerSource = appJs.slice(selectorStart, handlerCall + "handleStoreMobilePricingPreviewAction(button);".length);
+
+  assert.match(appJs, /function reportPdaDiagnosticEvent/);
+  assert.match(reportSource, /\/diagnostics\/pda-events/);
+  assert.match(reportSource, /method:\s*"POST"/);
+  assert.match(reportSource, /catch/);
+  assert.match(contextSource, /currentSession/);
+  assert.match(contextSource, /getDirectLoopPdaRuntimeScriptVersion/);
+  assert.match(contextSource, /DIRECT_LOOP_WEB_VERSION/);
+  assert.match(contextSource, /getDirectLoopAndroidBridgeInfo/);
+  assert.match(contextSource, /bluetoothPrinterStatus/);
+  assert.match(actionSource, /event_type:\s*"s1_printer_diagnostic_click"/);
+  assert.match(actionSource, /event_type:\s*"s1_printer_diagnostic_result"/);
+  assert.match(actionSource, /event_type:\s*"s1_printer_diagnostic_error"/);
+  assert.match(actionSource, /reportPdaDiagnosticEvent/);
+  assert.match(actionSource, /before_status/);
+  assert.match(actionSource, /android_result/);
+  assert.match(actionSource, /after_status/);
+  assert.match(actionSource, /error_message/);
+  assert.ok(
+    actionSource.indexOf('event_type: "s1_printer_diagnostic_click"') < actionSource.indexOf("await bridge[protocol.method]"),
+    "click event should be reported before Android bridge call",
+  );
+  assert.match(diagnosticsSource, /诊断事件会上报到服务器，方便远程排查。/);
+  assert.match(diagnosticsSource, /上报当前诊断状态/);
+  assert.match(diagnosticsSource, /data-clerk-printer-report-current/);
+  assert.match(statusReportSource, /event_type:\s*"pda_runtime_info"/);
+  assert.match(statusReportSource, /bluetoothPrinterRawStatusJson/);
+  assert.match(statusReportSource, /getDirectLoopAndroidBridgeInfo/);
+  assert.match(actionHandler, /clerkPrinterReportCurrent/);
+  assert.match(actionHandler, /reportCurrentPdaDiagnosticStatus/);
+  assert.match(listenerSource, /data-clerk-printer-report-current/);
+  assert.match(appLegacyJs, /reportPdaDiagnosticEvent/);
+  assert.match(appLegacyJs, /s1_printer_diagnostic_click/);
+  assert.match(appLegacyJs, /s1_printer_diagnostic_result/);
+  assert.match(appLegacyJs, /s1_printer_diagnostic_error/);
+  assert.match(appLegacyJs, /上报当前诊断状态/);
+  assert.match(appLegacyJs, /诊断事件会上报到服务器，方便远程排查。/);
 });
 
 test("clerk PDA printer diagnostics open state and connected badge survive rerender", () => {
