@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#248/);
+  assert.match(loginVersionSection, /#249/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#28/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=pda-diagnostic-event-reporting-248/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=pda-diagnostic-event-reporting-248/);
+  assert.match(indexHtml, /app\.js\?v=s1-minimal-diagnostic-call-fix-249/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=s1-minimal-diagnostic-call-fix-249/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -114,7 +114,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-pda-diagnostic-event-reporting-248/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-s1-minimal-diagnostic-call-fix-249/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -322,8 +322,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=pda-diagnostic-event-reporting-248/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=pda-diagnostic-event-reporting-248/);
+  assert.match(indexHtml, /app\.js\?v=s1-minimal-diagnostic-call-fix-249/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=s1-minimal-diagnostic-call-fix-249/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -655,6 +655,11 @@ test("clerk PDA diagnostics expose explicit S1 preview protocol buttons without 
   assert.match(protocolConfigSource, /printStoreItemLabelPreviewRawTspl/);
   assert.match(protocolConfigSource, /printS1RawTsplMinText/);
   assert.match(protocolConfigSource, /printS1RawTsplBlackBox/);
+  assert.match(protocolConfigSource, /key:\s*"ctpl_no_label_mode"[\s\S]*?requiresPayload:\s*true/);
+  assert.match(protocolConfigSource, /key:\s*"ctpl_bitmap_demo"[\s\S]*?requiresPayload:\s*true/);
+  assert.match(protocolConfigSource, /key:\s*"raw_tspl"[\s\S]*?requiresPayload:\s*true/);
+  assert.match(protocolConfigSource, /key:\s*"raw_tspl_min_text"[\s\S]*?requiresPayload:\s*false/);
+  assert.match(protocolConfigSource, /key:\s*"raw_tspl_black_box"[\s\S]*?requiresPayload:\s*false/);
   assert.match(visibleProtocolSource, /alwaysVisible/);
   assert.match(visibleProtocolSource, /typeof bridge\[protocol\.method\] === "function"/);
   assert.match(diagnosticsSource, /getVisibleClerkS1PreviewProtocolDiagnostics\(status\)/);
@@ -669,7 +674,10 @@ test("clerk PDA diagnostics expose explicit S1 preview protocol buttons without 
   assert.match(forcePayloadSource, /price_kes:\s*410/);
   assert.match(forcePayloadSource, /category_short:\s*"CARGO PANT"/);
   assert.match(forcePayloadSource, /grade:\s*"P"/);
-  assert.match(forceActionSource, /bridge\[protocol\.method\]\(JSON\.stringify\(payload\)\)/);
+  assert.match(forceActionSource, /protocol\.requiresPayload === false/);
+  assert.match(forceActionSource, /bridge\[protocol\.method\]\(\)/);
+  assert.match(forceActionSource, /bridge\[protocol\.method\]\(JSON\.stringify\(reportPayload\)\)/);
+  assert.match(forceActionSource, /payload:\s*reportPayload/);
   assert.match(forceActionSource, /updateClerkBluetoothPrinterStatus/);
   assert.match(forceActionSource, /rawStatusJson:\s*formatClerkBluetoothPrinterRawStatusJson/);
   assert.match(forceActionSource, /pauseClerkBluetoothPrinterDiagnostics/);
@@ -687,6 +695,9 @@ test("clerk PDA diagnostics expose explicit S1 preview protocol buttons without 
   assert.match(appLegacyJs, /STORE_ITEM_LABEL_PREVIEW_TSPL/);
   assert.match(appLegacyJs, /STORE_ITEM_LABEL_PREVIEW_CTPL_NO_LABEL_MODE/);
   assert.match(appLegacyJs, /STORE_ITEM_LABEL_PREVIEW_CTPL_BITMAP_DEMO/);
+  assert.match(appLegacyJs, /requiresPayload:\s*false/);
+  assert.match(appLegacyJs, /bridge\[protocol\.method\]\(\)/);
+  assert.match(appLegacyJs, /JSON\.stringify\(reportPayload\)/);
   assert.doesNotMatch(appLegacyJs, /强制发送 TSPL 测试标签/);
 });
 

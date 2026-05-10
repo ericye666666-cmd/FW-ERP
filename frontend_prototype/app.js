@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-pda-diagnostic-event-reporting-248";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "pda-diagnostic-event-reporting-248";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#248";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-s1-minimal-diagnostic-call-fix-249";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "s1-minimal-diagnostic-call-fix-249";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#249";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#28";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
@@ -4312,6 +4312,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
       method: "printStoreItemLabelPreviewCtplNoLabelMode",
       expectedProtocol: "STORE_ITEM_LABEL_PREVIEW_CTPL_NO_LABEL_MODE",
       expectedTransport: "CTPL_SDK_NO_LABEL_MODE",
+      requiresPayload: true,
       alwaysVisible: true,
     },
     {
@@ -4320,6 +4321,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
       method: "printStoreItemLabelPreviewCtplBitmapDemo",
       expectedProtocol: "STORE_ITEM_LABEL_PREVIEW_CTPL_BITMAP_DEMO",
       expectedTransport: "CTPL_SDK_BITMAP_DEMO",
+      requiresPayload: true,
       alwaysVisible: true,
     },
     {
@@ -4328,6 +4330,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
       method: "printStoreItemLabelPreviewRawTspl",
       expectedProtocol: "STORE_ITEM_LABEL_PREVIEW_TSPL",
       expectedTransport: "RAW_TSPL_SPP",
+      requiresPayload: true,
       alwaysVisible: true,
     },
     {
@@ -4336,6 +4339,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
       method: "printS1RawTsplMinText",
       expectedProtocol: "S1_RAW_TSPL_MIN_TEXT",
       expectedTransport: "RAW_TSPL_SPP",
+      requiresPayload: false,
       alwaysVisible: false,
     },
     {
@@ -4344,6 +4348,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
       method: "printS1RawTsplBlackBox",
       expectedProtocol: "S1_RAW_TSPL_BLACK_BOX",
       expectedTransport: "RAW_TSPL_SPP",
+      requiresPayload: false,
       alwaysVisible: false,
     },
   ];
@@ -4397,7 +4402,8 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
   const bridge = getDirectLoopPdaPrinterBridge();
   const protocol = getClerkS1PreviewProtocolDiagnostic(protocolKey);
   const currentStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
-  const payload = buildClerkS1PreviewProtocolDiagnosticPayload();
+  const requiresPayload = protocol ? protocol.requiresPayload !== false : true;
+  const reportPayload = requiresPayload ? buildClerkS1PreviewProtocolDiagnosticPayload() : null;
   const method = protocol ? protocol.method : "";
   const protocolKeyForReport = protocol ? protocol.key : String(protocolKey || "");
   try {
@@ -4414,14 +4420,16 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
       event_type: "s1_printer_diagnostic_click",
       method,
       protocol_key: protocolKeyForReport,
-      payload,
+      payload: reportPayload,
       before_status: clonePdaDiagnosticValue(currentStatus),
     });
     pauseClerkBluetoothPrinterDiagnostics({ durationMs: CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS });
     state.bluetoothPrinterError = "";
     clerkBluetoothPrinterActionInFlight = true;
     renderClerkBluetoothPrinterStatusIfActive();
-    const printStatusRaw = await bridge[protocol.method](JSON.stringify(payload));
+    const printStatusRaw = protocol.requiresPayload === false
+      ? await bridge[protocol.method]()
+      : await bridge[protocol.method](JSON.stringify(reportPayload));
     const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
       rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
       keepError: true,
@@ -4430,7 +4438,7 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
       event_type: "s1_printer_diagnostic_result",
       method,
       protocol_key: protocolKeyForReport,
-      payload,
+      payload: reportPayload,
       before_status: clonePdaDiagnosticValue(currentStatus),
       after_status: clonePdaDiagnosticValue(printStatus),
       android_result: clonePdaDiagnosticValue(printStatus),
@@ -4450,7 +4458,7 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
       event_type: "s1_printer_diagnostic_error",
       method,
       protocol_key: protocolKeyForReport,
-      payload,
+      payload: reportPayload,
       before_status: clonePdaDiagnosticValue(currentStatus),
       error_message: formatErrorMessage(error),
     });
