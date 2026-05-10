@@ -53,11 +53,12 @@ test("login page shows FW-ERP web, PDA bundle, and Android bridge version info",
   assert.match(indexHtml, /FW-ERP Web:/);
   assert.match(indexHtml, /fw-erp-web-20260510-version-display/);
   assert.match(indexHtml, /PDA Bundle:/);
-  assert.match(indexHtml, /version-display-241/);
+  assert.match(indexHtml, /version-display-241-label-fix/);
   assert.match(indexHtml, /Android App:/);
   assert.match(indexHtml, /Android Bridge:/);
-  assert.match(indexHtml, /app\.js\?v=version-display-241/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=version-display-241/);
+  assert.match(indexHtml, /app\.js\?v=version-display-241-label-fix/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=version-display-241-label-fix/);
+  assert.match(appJs, /DIRECT_LOOP_PDA_BUNDLE_VERSION = "version-display-241-label-fix"/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -97,6 +98,31 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
   assert.match(appLegacyJs, /fw-erp-web-20260510-version-display/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
+});
+
+test("PDA version info reads Android getAppInfo version_name and version_code", () => {
+  const appVersion = getExecutableBundle(
+    ["getDirectLoopAndroidAppVersion"],
+    `
+      var directLoopAndroidAppInfo = { version_name: "0.1.0", version_code: 23 };
+      var storeMobilePricingPreviewState = { bluetoothPrinterStatus: {} };
+    `,
+    "({ getDirectLoopAndroidAppVersion })",
+  );
+  const statusVersion = getExecutableBundle(
+    ["getDirectLoopAndroidAppVersion"],
+    `
+      var directLoopAndroidAppInfo = null;
+      var storeMobilePricingPreviewState = { bluetoothPrinterStatus: { version_name: "0.1.1", version_code: 24 } };
+    `,
+    "({ getDirectLoopAndroidAppVersion })",
+  );
+
+  assert.equal(appVersion.getDirectLoopAndroidAppVersion(), "0.1.0 (23)");
+  assert.equal(statusVersion.getDirectLoopAndroidAppVersion(), "0.1.1 (24)");
+  assert.match(appJs, /version_name/);
+  assert.match(appJs, /version_code/);
+  assert.match(appLegacyJs, /version_name/);
 });
 
 test("price groups render separately with independent STORE_ITEM generation and preview actions", () => {
@@ -573,6 +599,23 @@ test("clerk PDA printer diagnostics open state and connected badge survive reren
   assert.doesNotMatch(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
   assert.match(appLegacyJs, /bluetoothPrinterDiagnosticsOpen:\s*false/);
   assert.match(appLegacyJs, /handleClerkPrinterDiagnosticsToggle/);
+});
+
+test("STORE_ITEM label payload JSON open state survives rerender", () => {
+  const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
+  const previewSource = extractFunctionSource(appJs, "renderStoreItemLabelPreview");
+  const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
+  const toggleHandler = extractFunctionSource(appJs, "handleStoreItemLabelPayloadPreviewToggle");
+
+  assert.match(stateSource, /labelPayloadPreviewOpen:\s*false/);
+  assert.match(previewSource, /data-store-item-label-payload-preview-details="true"/);
+  assert.match(previewSource, /labelPayloadPreviewOpen/);
+  assert.match(printPanelSource, /data-store-item-label-payload-preview-details="true"/);
+  assert.match(printPanelSource, /labelPayloadPreviewOpen/);
+  assert.match(toggleHandler, /labelPayloadPreviewOpen\s*=\s*Boolean\(details\.open\)/);
+  assert.match(appJs, /document\.addEventListener\("toggle"/);
+  assert.match(appJs, /handleStoreItemLabelPayloadPreviewToggle/);
+  assert.match(appLegacyJs, /data-store-item-label-payload-preview-details="true"/);
 });
 
 test("clerk PDA printer diagnostics raw JSON scroll survives rerender", () => {
@@ -1503,12 +1546,16 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 with one-label preview p
   const sizeSource = extractFunctionSource(appJs, "getStoreItemLabelSizeConfig");
   const payloadSource = extractFunctionSource(appJs, "buildStoreItemLabelPreviewPayload");
   const printPayloadSource = extractFunctionSource(appJs, "buildStoreItemLabelPreviewPrintPayload");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(printPanelSource, /data-mobile-pricing-label-size="60x40"/);
   assert.match(printPanelSource, /data-mobile-pricing-label-size="40x30"/);
+  assert.match(printPanelSource, /data-mobile-pricing-label-size-group/);
   assert.match(printPanelSource, /本批标签预览/);
   assert.match(printPanelSource, /renderStoreItemLabelPreview/);
   assert.match(printPanelSource, /buildStoreItemLabelPreviewPrintPayload/);
+  assert.match(actionSource, /button\.dataset\.mobilePricingLabelSizeGroup/);
+  assert.match(actionSource, /applyStoreMobileLabelSize\(state,\s*labelSize,\s*targetGroupId\)/);
   assert.match(sizeSource, /label_template_size:\s*"60x40"[\s\S]*label_width_mm:\s*60[\s\S]*label_height_mm:\s*40/);
   assert.match(sizeSource, /label_template_size:\s*"40x30"[\s\S]*label_width_mm:\s*40[\s\S]*label_height_mm:\s*30/);
   assert.match(payloadSource, /print_mode:\s*"preview_only"/);
@@ -1534,6 +1581,70 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 with one-label preview p
   assert.match(stateSource, /label_width_mm:\s*60/);
   assert.match(stateSource, /label_height_mm:\s*40/);
   assert.doesNotMatch(queueSource, /混合总任务|全部价格组|all groups/i);
+});
+
+test("selected 40x30 label size is applied to the active generated group payload", () => {
+  const helpers = getExecutableBundle(
+    [
+      "getStoreMobileTaskGroups",
+      "getStoreItemLabelSizeConfig",
+      "applyStoreMobileLabelSize",
+      "normalizeStoreItemForLabelPreview",
+      "buildStoreItemLabelPreviewPayload",
+      "buildStoreItemLabelPreviewPrintPayload",
+    ],
+    "",
+    "({ applyStoreMobileLabelSize, buildStoreItemLabelPreviewPrintPayload })",
+  );
+  const state = {
+    activeGroupId: "STALE-GROUP",
+    current_task_group_id: "STALE-GROUP",
+    label_template_size: "60x40",
+    label_width_mm: 60,
+    label_height_mm: 40,
+    priceGroups: [
+      {
+        group_id: "BATCH-01-P",
+        label_template_size: "60x40",
+        label_width_mm: 60,
+        label_height_mm: 40,
+        price_kes: 410,
+        category_short: "CARGO PANT",
+        grade: "P",
+        generated_store_items: [{
+          machine_code: "5261300000052",
+          barcode_value: "5261300000052",
+          sale_price_kes: 410,
+          category_short: "CARGO PANT",
+          grade: "P",
+        }],
+      },
+      {
+        group_id: "STALE-GROUP",
+        label_template_size: "60x40",
+        label_width_mm: 60,
+        label_height_mm: 40,
+        generated_store_items: [],
+      },
+    ],
+  };
+
+  helpers.applyStoreMobileLabelSize(state, "40x30", "BATCH-01-P");
+  const activeGroup = state.priceGroups[0];
+  const payload = helpers.buildStoreItemLabelPreviewPrintPayload(
+    activeGroup.label_template_size,
+    activeGroup.generated_store_items,
+    activeGroup,
+  );
+
+  assert.equal(activeGroup.label_template_size, "40x30");
+  assert.equal(activeGroup.label_width_mm, 40);
+  assert.equal(activeGroup.label_height_mm, 30);
+  assert.equal(payload.label_template_size, "40x30");
+  assert.equal(payload.label_width_mm, 40);
+  assert.equal(payload.label_height_mm, 30);
+  assert.equal(payload.labels.length, 1);
+  assert.equal(payload.labels[0].machine_code, "5261300000052");
 });
 
 test("label preview one-label print action uses Android bridge without creating print jobs or sticker confirmation", () => {

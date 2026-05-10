@@ -34,7 +34,7 @@ const STORAGE_KEYS = {
 };
 
 const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-version-display";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "version-display-241";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "version-display-241-label-fix";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -4009,14 +4009,16 @@ function getDirectLoopAndroidAppVersion() {
       continue;
     }
     const version = String(
-      source.android_version
+      source.version_name
+        || source.android_version
         || source.android_app_version
         || source.app_version
         || source.version
         || "",
     ).trim();
     if (version) {
-      return version;
+      const versionCode = String(source.version_code || source.android_version_code || "").trim();
+      return versionCode ? `${version} (${versionCode})` : version;
     }
   }
   return "unknown";
@@ -32177,6 +32179,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     bluetoothPrinterStatus: createDefaultClerkBluetoothPrinterStatus(),
     bluetoothPrinterRawStatusJson: "",
     bluetoothPrinterDiagnosticsOpen: false,
+    labelPayloadPreviewOpen: false,
     bluetoothPrinterLastRefreshAt: "",
     bluetoothPrinterError: "",
     bluetoothPrinterPairedPrinters: [],
@@ -33286,6 +33289,8 @@ function renderStoreItemLabelPreview(storeItems = [], labelTemplateSize = "60x40
   if (!firstLabel) {
     return '<div class="empty-state">生成 STORE_ITEM 后显示标签预览。</div>';
   }
+  const payloadPreviewOpen = typeof storeMobilePricingPreviewState !== "undefined"
+    && Boolean(storeMobilePricingPreviewState?.labelPayloadPreviewOpen);
   const gradeText = String(firstLabel.grade || "").trim();
   const categoryLine = config.label_template_size === "40x30"
     ? [firstLabel.category_short, gradeText].filter(Boolean).join(" / ")
@@ -33305,7 +33310,7 @@ function renderStoreItemLabelPreview(storeItems = [], labelTemplateSize = "60x40
         ${renderCode128BarcodePreview(firstLabel.barcode_value)}
         <div class="store-item-label-machine-code">${escapeHtml(firstLabel.machine_code)}</div>
       </div>
-      <details class="store-item-label-payload-preview">
+      <details class="store-item-label-payload-preview" data-store-item-label-payload-preview-details="true" ${payloadPreviewOpen ? "open" : ""}>
         <summary>JSON preview payload</summary>
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
@@ -33317,6 +33322,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
   const group = getStoreMobilePricingActiveGroup(state);
   const generatedItems = getStoreMobileGeneratedStoreItems(group);
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
+  const groupId = String(group.group_id || "");
   const generated = state.generatedRanges?.[group.group_id] || {
     generated_count: generatedItems.length,
     pending_print_count: getStoreMobilePendingPrintCount(generatedItems),
@@ -33346,8 +33352,8 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
       <div class="mobile-choice-block">
         <span>标签尺寸</span>
         <div class="mobile-segment-row">
-          <button type="button" class="${labelConfig.label_template_size === "60x40" ? "is-active" : ""}" data-mobile-pricing-label-size="60x40">60×40 标签</button>
-          <button type="button" class="${labelConfig.label_template_size === "40x30" ? "is-active" : ""}" data-mobile-pricing-label-size="40x30">40×30 标签</button>
+          <button type="button" class="${labelConfig.label_template_size === "60x40" ? "is-active" : ""}" data-mobile-pricing-label-size="60x40" data-mobile-pricing-label-size-group="${escapeHtml(groupId)}">60×40 标签</button>
+          <button type="button" class="${labelConfig.label_template_size === "40x30" ? "is-active" : ""}" data-mobile-pricing-label-size="40x30" data-mobile-pricing-label-size-group="${escapeHtml(groupId)}">40×30 标签</button>
         </div>
       </div>
       ${renderStoreItemLabelPreview(generatedItems, labelConfig.label_template_size, group)}
@@ -33363,6 +33369,8 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const generatedItems = getStoreMobileGeneratedStoreItems(group);
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
   const payload = buildStoreItemLabelPreviewPrintPayload(labelConfig.label_template_size, generatedItems, group);
+  const groupId = String(group.group_id || "");
+  const payloadPreviewOpen = Boolean(state.labelPayloadPreviewOpen);
   const statusText = getStoreMobilePriceGroupStatus(state, group);
   const printerReady = canRunClerkBluetoothPrinterPreviewPrint(state.bluetoothPrinterStatus);
   const previewPrintStatus = String(group.preview_print_status || "").trim();
@@ -33382,8 +33390,8 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
     <div class="mobile-choice-block">
       <span>标签尺寸</span>
       <div class="mobile-segment-row">
-        <button type="button" class="${labelConfig.label_template_size === "60x40" ? "is-active" : ""}" data-mobile-pricing-label-size="60x40">60×40 标签</button>
-        <button type="button" class="${labelConfig.label_template_size === "40x30" ? "is-active" : ""}" data-mobile-pricing-label-size="40x30">40×30 标签</button>
+        <button type="button" class="${labelConfig.label_template_size === "60x40" ? "is-active" : ""}" data-mobile-pricing-label-size="60x40" data-mobile-pricing-label-size-group="${escapeHtml(groupId)}">60×40 标签</button>
+        <button type="button" class="${labelConfig.label_template_size === "40x30" ? "is-active" : ""}" data-mobile-pricing-label-size="40x30" data-mobile-pricing-label-size-group="${escapeHtml(groupId)}">40×30 标签</button>
       </div>
     </div>
   `;
@@ -33397,7 +33405,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="group_generated">返回本批生成结果</button>
       ${labelSizeHtml}
       ${renderStoreItemLabelPreview(generatedItems, labelConfig.label_template_size, group)}
-      <details class="store-item-label-payload-preview" open>
+      <details class="store-item-label-payload-preview" data-store-item-label-payload-preview-details="true" ${payloadPreviewOpen ? "open" : ""}>
         <summary>JSON preview payload</summary>
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
@@ -33735,6 +33743,17 @@ function handleClerkPrinterDiagnosticsToggle(target) {
     return false;
   }
   storeMobilePricingPreviewState.bluetoothPrinterDiagnosticsOpen = Boolean(details.open);
+  return true;
+}
+
+function handleStoreItemLabelPayloadPreviewToggle(target) {
+  const details = target instanceof HTMLElement
+    ? target.closest("[data-store-item-label-payload-preview-details]")
+    : null;
+  if (!(details instanceof HTMLDetailsElement)) {
+    return false;
+  }
+  storeMobilePricingPreviewState.labelPayloadPreviewOpen = Boolean(details.open);
   return true;
 }
 
@@ -34330,6 +34349,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const previewLabels = button.dataset.mobilePricingPreviewLabels;
   const printLabels = button.dataset.mobilePricingPrintLabels;
   const labelSize = button.dataset.mobilePricingLabelSize;
+  const labelSizeGroup = button.dataset.mobilePricingLabelSizeGroup;
   const priceChoice = button.dataset.mobilePricingPriceChoice;
   const gradeChoice = button.dataset.mobilePricingGradeChoice;
   const categoryChoice = button.dataset.mobilePricingCategoryChoice;
@@ -34484,7 +34504,12 @@ function handleStoreMobilePricingPreviewAction(button) {
       });
   }
   if (labelSize) {
-    applyStoreMobileLabelSize(state, labelSize, state.activeGroupId);
+    const targetGroupId = String(labelSizeGroup || state.activeGroupId || state.current_task_group_id || "").trim();
+    if (targetGroupId) {
+      state.activeGroupId = targetGroupId;
+      state.current_task_group_id = targetGroupId;
+    }
+    applyStoreMobileLabelSize(state, labelSize, targetGroupId);
   }
   if (priceChoice && priceChoice !== "custom") {
     state.editorDraft.price_kes = Number(priceChoice || state.editorDraft.price_kes || 0);
@@ -40816,10 +40841,16 @@ document.addEventListener("change", (event) => {
 
 document.addEventListener("toggle", (event) => {
   const target = event.target;
-  if (!(target instanceof HTMLElement) || !target.matches("[data-clerk-printer-diagnostics]")) {
+  if (!(target instanceof HTMLElement)) {
     return;
   }
-  handleClerkPrinterDiagnosticsToggle(target);
+  if (target.matches("[data-clerk-printer-diagnostics]")) {
+    handleClerkPrinterDiagnosticsToggle(target);
+    return;
+  }
+  if (target.matches("[data-store-item-label-payload-preview-details]")) {
+    handleStoreItemLabelPayloadPreviewToggle(target);
+  }
 }, true);
 
 document.addEventListener("submit", (event) => {
