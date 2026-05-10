@@ -29300,6 +29300,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     label_template_size: "60x40",
     label_width_mm: 60,
     label_height_mm: 40,
+    previousPage: "",
+    pdaPageStack: [],
     printer_name: "Deli DL-720C",
     pending_label_count: 210,
     printed_today_count: 0,
@@ -29342,7 +29344,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         category: "牛仔裤",
         grade: "A",
         rack_code: "A-01",
-        status: "待生成"
+        status: "待生成",
+        workflow_status: "draft"
       },
       {
         group_id: "B",
@@ -29352,7 +29355,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         category: "牛仔裤",
         grade: "B",
         rack_code: "A-02",
-        status: "待生成"
+        status: "待生成",
+        workflow_status: "draft"
       },
       {
         group_id: "S",
@@ -29362,7 +29366,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         category: "牛仔裤",
         grade: "S",
         rack_code: "S-01",
-        status: "待生成"
+        status: "待生成",
+        workflow_status: "draft"
       },
       {
         group_id: "CUSTOM-200",
@@ -29372,7 +29377,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
         category: "牛仔裤",
         grade: "A",
         rack_code: "A-03",
-        status: "待生成"
+        status: "待生成",
+        workflow_status: "draft"
       }
     ],
     generatedRanges: {},
@@ -29396,6 +29402,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     generatedRanges: { ...baseState.generatedRanges, ...overrides.generatedRanges || {} },
     printJobs: Array.isArray(overrides.printJobs) ? overrides.printJobs : baseState.printJobs,
     createdPrintJobs: Array.isArray(overrides.createdPrintJobs) ? overrides.createdPrintJobs : baseState.createdPrintJobs,
+    pdaPageStack: Array.isArray(overrides.pdaPageStack) ? overrides.pdaPageStack : baseState.pdaPageStack,
     assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
     pricingSourceLines: Array.isArray(overrides.pricingSourceLines) ? overrides.pricingSourceLines : baseState.pricingSourceLines,
     bluetoothPrinterStatus: normalizeClerkBluetoothPrinterStatus(overrides.bluetoothPrinterStatus || baseState.bluetoothPrinterStatus),
@@ -29405,23 +29412,153 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
 function getStoreMobileTaskGroups(state = storeMobilePricingPreviewState) {
   return Array.isArray(state.priceGroups) ? state.priceGroups : [];
 }
+function normalizeStoreMobilePdaPage(page = "") {
+  const normalized = String(page || "tasks").trim();
+  const aliases = {
+    pricing: "pricing_split",
+    groups: "pricing_split",
+    generation: "group_generated",
+    print_task: "label_preview",
+    print_queue: "label_preview"
+  };
+  return aliases[normalized] || normalized || "tasks";
+}
+function getStoreMobilePdaPageSnapshot(state = storeMobilePricingPreviewState) {
+  return {
+    page: normalizeStoreMobilePdaPage(state.activePage || "tasks"),
+    activeGroupId: String(state.activeGroupId || ""),
+    current_task_group_id: String(state.current_task_group_id || "")
+  };
+}
+function restoreStoreMobilePdaPageSnapshot(state = storeMobilePricingPreviewState, snapshot = {}) {
+  state.activePage = normalizeStoreMobilePdaPage(snapshot.page || state.activePage || "tasks");
+  state.activeGroupId = String(snapshot.activeGroupId || state.activeGroupId || "");
+  state.current_task_group_id = String(snapshot.current_task_group_id || state.activeGroupId || "");
+  return state;
+}
+function pushStoreMobilePdaBrowserHistory(state = storeMobilePricingPreviewState, page = "") {
+  if (typeof window === "undefined" || !window.history || typeof window.history.pushState !== "function") {
+    return false;
+  }
+  try {
+    window.history.pushState(
+      {
+        directLoopClerkPda: true,
+        page: normalizeStoreMobilePdaPage(page || state.activePage || "tasks")
+      },
+      "",
+      window.location ? window.location.href : void 0
+    );
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+function setStoreMobileActivePage(state = storeMobilePricingPreviewState, page = "", options = {}) {
+  const nextPage = normalizeStoreMobilePdaPage(page || "tasks");
+  const currentPage = normalizeStoreMobilePdaPage(state.activePage || "tasks");
+  const groupId = String(options.groupId || state.activeGroupId || "");
+  const shouldRecordHistory = options.recordHistory !== false && currentPage && currentPage !== nextPage;
+  if (shouldRecordHistory) {
+    const stack = Array.isArray(state.pdaPageStack) ? state.pdaPageStack : [];
+    stack.push(getStoreMobilePdaPageSnapshot(state));
+    state.pdaPageStack = stack.slice(-30);
+    state.previousPage = currentPage;
+    if (options.pushBrowserHistory !== false) {
+      pushStoreMobilePdaBrowserHistory(state, nextPage);
+    }
+  }
+  state.activePage = nextPage;
+  if (groupId) {
+    state.activeGroupId = groupId;
+    state.current_task_group_id = groupId;
+  }
+  return state;
+}
+function navigateStoreMobilePdaBack(state = storeMobilePricingPreviewState) {
+  const stack = Array.isArray(state.pdaPageStack) ? state.pdaPageStack : [];
+  const previous = stack.pop();
+  state.pdaPageStack = stack;
+  if (!previous) {
+    return false;
+  }
+  restoreStoreMobilePdaPageSnapshot(state, previous);
+  state.previousPage = stack.length ? normalizeStoreMobilePdaPage(stack[stack.length - 1].page || "") : "";
+  return true;
+}
+function handleStoreMobilePdaPopState() {
+  const handled = navigateStoreMobilePdaBack(storeMobilePricingPreviewState);
+  if (!handled) {
+    return false;
+  }
+  renderStoreMobilePricingPreview();
+  return true;
+}
+function getStoreMobileGroupGeneratedQty(group = {}) {
+  const items = Array.isArray(group.generated_store_items) ? group.generated_store_items : [];
+  if (items.length) {
+    return items.length;
+  }
+  const explicit = Number(group.generated_count || group.generated_qty || 0);
+  return Number.isFinite(explicit) && explicit > 0 ? explicit : 0;
+}
+function getStoreMobileLineAllocatedQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
+  return getStoreMobileTaskGroups(state).reduce((sum, group) => {
+    if (String(group.source_line_key || "") !== String(sourceLineKey || "") || String(group.group_id || "") === String(currentGroupId || "")) {
+      return sum;
+    }
+    return sum + Number(group.quantity || 0);
+  }, 0);
+}
+function getStoreMobileLineGeneratedQty(state = storeMobilePricingPreviewState, sourceLineKey = "") {
+  return getStoreMobileTaskGroups(state).reduce((sum, group) => {
+    if (String(group.source_line_key || "") !== String(sourceLineKey || "")) {
+      return sum;
+    }
+    return sum + getStoreMobileGroupGeneratedQty(group);
+  }, 0);
+}
+function getStoreMobileSourceLineProgress(state = storeMobilePricingPreviewState, sourceLineKey = "") {
+  var _a, _b, _c2, _d2;
+  const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
+  const totalQty = Number(
+    (_d2 = (_c2 = (_b = (_a = line == null ? void 0 : line.total_qty) != null ? _a : line == null ? void 0 : line.item_count) != null ? _b : line == null ? void 0 : line.quantity) != null ? _c2 : line == null ? void 0 : line.remaining_qty) != null ? _d2 : 0
+  );
+  const allocatedQty = getStoreMobileLineAllocatedQty(state, sourceLineKey);
+  const generatedQty = getStoreMobileLineGeneratedQty(state, sourceLineKey);
+  return {
+    source_line_key: String(sourceLineKey || ""),
+    total_qty: Number.isFinite(totalQty) ? totalQty : 0,
+    allocated_qty: allocatedQty,
+    generated_qty: generatedQty,
+    remaining_qty: Math.max(0, (Number.isFinite(totalQty) ? totalQty : 0) - allocatedQty)
+  };
+}
 function getStoreMobileTaskTotals(state = storeMobilePricingPreviewState) {
   var _a, _b;
   const groups = getStoreMobileTaskGroups(state);
   const groupedTotal = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const sourceLines = getStoreMobilePricingSourceLines(state);
+  const sourceTotal = sourceLines.reduce((sum, line) => {
+    var _a2, _b2, _c2, _d2;
+    return sum + Number((_d2 = (_c2 = (_b2 = (_a2 = line.total_qty) != null ? _a2 : line.item_count) != null ? _b2 : line.quantity) != null ? _c2 : line.remaining_qty) != null ? _d2 : 0);
+  }, 0);
   const selectedSdpTotal = Number(((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.total_count) || ((_b = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _b.item_count) || 0);
-  const total = groupedTotal > 0 ? groupedTotal : selectedSdpTotal;
-  const generated = groups.filter((group) => String(group.status || "") !== "待生成").reduce((sum, group) => sum + Number(group.quantity || 0), 0);
+  const total = selectedSdpTotal || sourceTotal || groupedTotal;
+  const allocated = groupedTotal;
+  const generated = groups.reduce((sum, group) => sum + getStoreMobileGroupGeneratedQty(group), 0);
   const stickered = groups.filter((group) => String(group.status || "") === "已完成").reduce((sum, group) => sum + Number(group.quantity || 0), 0);
   const completeGroups = groups.filter((group) => String(group.status || "") === "已完成").length;
   return {
     total,
+    allocated,
     generated,
     stickered,
     printed: stickered,
     completeGroups,
     groupCount: groups.length,
-    pendingGenerate: Math.max(0, total - generated),
+    pendingGenerate: Math.max(0, total - allocated),
+    remaining: Math.max(0, total - allocated),
     pendingSticker: Math.max(0, generated - stickered)
   };
 }
@@ -29442,13 +29579,15 @@ function getNextIncompleteStoreMobileGroup(state = storeMobilePricingPreviewStat
   const groups = getStoreMobileTaskGroups(state);
   const activeIndex = groups.findIndex((group) => String(group.group_id || "") === String(state.activeGroupId || ""));
   const orderedGroups = activeIndex > -1 ? groups.slice(activeIndex + 1).concat(groups.slice(0, activeIndex + 1)) : groups;
-  return orderedGroups.find((group) => String(group.status || "") !== "已完成") || null;
+  return orderedGroups.find((group) => getStoreMobilePriceGroupWorkflowStatus(group) === "draft") || null;
 }
 function syncStoreMobileTaskCounters(state = storeMobilePricingPreviewState) {
   const totals = getStoreMobileTaskTotals(state);
   if (state.selectedSdp) {
     state.selectedSdp.pending_generate_count = totals.pendingGenerate;
     state.selectedSdp.pending_print_count = totals.pendingSticker;
+    state.selectedSdp.allocated_count = totals.allocated;
+    state.selectedSdp.remaining_count = totals.remaining;
     state.selectedSdp.generated_count = totals.generated;
     state.selectedSdp.printed_count = totals.stickered;
   }
@@ -29607,17 +29746,14 @@ function getStoreMobileSuggestedSalePrice(categoryMain = "", categorySub = "", g
   return Number((record == null ? void 0 : record.default_sale_price_kes) || 0);
 }
 function getStoreMobileLineRemainingQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
+  var _a, _b, _c2, _d2;
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
   if (!line) {
     return 0;
   }
-  const reservedQty = getStoreMobileTaskGroups(state).reduce((sum, group) => {
-    if (String(group.source_line_key || "") !== String(sourceLineKey || "") || String(group.group_id || "") === String(currentGroupId || "")) {
-      return sum;
-    }
-    return sum + Number(group.quantity || 0);
-  }, 0);
-  return Math.max(0, Number(line.remaining_qty || line.item_count || 0) - reservedQty);
+  const totalQty = Number((_d2 = (_c2 = (_b = (_a = line.total_qty) != null ? _a : line.item_count) != null ? _b : line.quantity) != null ? _c2 : line.remaining_qty) != null ? _d2 : 0);
+  const allocatedQty = getStoreMobileLineAllocatedQty(state, sourceLineKey, currentGroupId);
+  return Math.max(0, (Number.isFinite(totalQty) ? totalQty : 0) - allocatedQty);
 }
 function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPreviewState, batch = {}) {
   const quantity = Number(batch.quantity || 0);
@@ -29670,7 +29806,8 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     source_sdp_machine_code: line.source_sdp_machine_code || ((_b = state.selectedSdp) == null ? void 0 : _b.machine_code) || "",
     source_type: line.source_type || ((_c2 = state.selectedSdp) == null ? void 0 : _c2.source_type) || "",
     source_code: line.source_code || ((_d2 = state.selectedSdp) == null ? void 0 : _d2.source_code) || "",
-    status: "待生成 STORE_ITEM"
+    status: "待生成 STORE_ITEM",
+    workflow_status: "draft"
   };
   const validation = validateStoreMobilePricingBatchQuantity(state, group);
   if (!validation.ok) {
@@ -29682,6 +29819,20 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   state.current_task_group_id = group.group_id;
   state.pricingSourceLineMessage = "";
   return group;
+}
+function deleteStoreMobilePricingBatch(state = storeMobilePricingPreviewState, groupId = "") {
+  const groups = getStoreMobileTaskGroups(state);
+  const target = groups.find((group) => String(group.group_id || "") === String(groupId || ""));
+  if (!target || isStoreMobilePriceGroupLocked(target)) {
+    return null;
+  }
+  state.priceGroups = groups.filter((group) => String(group.group_id || "") !== String(groupId || ""));
+  if (String(state.activeGroupId || "") === String(groupId || "")) {
+    const nextGroup = state.priceGroups[0] || {};
+    state.activeGroupId = String(nextGroup.group_id || "");
+    state.current_task_group_id = String(nextGroup.group_id || "");
+  }
+  return syncStoreMobileTaskCounters(state);
 }
 function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, taskCode = "") {
   var _a;
@@ -29706,7 +29857,6 @@ function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, ta
   const pricingSourceLines = buildStoreMobilePricingSourceLines(task, selectedSdp);
   state.selectedSdp = selectedSdp;
   state.selectedBackendTaskCode = selectedSdp.display_code;
-  state.activePage = "verify";
   state.activeGroupId = "";
   state.current_task_group_id = "";
   state.taskStatus = "待核对";
@@ -29730,6 +29880,7 @@ function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, ta
   state.printJobs = [];
   state.createdPrintJobs = [];
   state.pending_label_count = Number(selectedSdp.total_count || 0);
+  setStoreMobileActivePage(state, "verify", { groupId: "", source: "select_task" });
   return syncStoreMobileTaskCounters(state);
 }
 function getStoreMobileGeneratedRangeForGroup(group = {}) {
@@ -29779,8 +29930,33 @@ function getStoreMobileCreatedPrintJobForGroup(state = storeMobilePricingPreview
   const jobs = Array.isArray(state.createdPrintJobs) ? state.createdPrintJobs : [];
   return jobs.find((job) => String(job.group_id || "") === String(groupId || "")) || null;
 }
+function getStoreMobilePriceGroupWorkflowStatus(group = {}) {
+  const explicit = String(group.workflow_status || "").trim().toLowerCase();
+  if (["draft", "generated", "preview", "locked"].includes(explicit)) {
+    return explicit;
+  }
+  const statusText = String(group.status || "").trim();
+  if (/正在看标签预览|preview/.test(statusText)) {
+    return "preview";
+  }
+  if (/已生成|待打印|locked|generated/.test(statusText) || getStoreMobileGroupGeneratedQty(group) > 0) {
+    return "generated";
+  }
+  return "draft";
+}
+function isStoreMobilePriceGroupLocked(group = {}) {
+  const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
+  return ["generated", "preview", "locked"].includes(workflowStatus) || getStoreMobileGroupGeneratedQty(group) > 0;
+}
 function getStoreMobilePriceGroupStatus(state = storeMobilePricingPreviewState, group = {}) {
-  return String(group.status || "待生成");
+  const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
+  if (workflowStatus === "preview") {
+    return "preview / 正在看标签预览";
+  }
+  if (workflowStatus === "generated" || workflowStatus === "locked") {
+    return "generated / 已生成 / 待打印";
+  }
+  return String(group.status || "draft / 待生成商品码");
 }
 function renderNextPriceGroupHint(state = storeMobilePricingPreviewState, currentGroup = {}) {
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
@@ -29834,7 +30010,9 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   const sourceDisplayCode = String(sdp.source_code || "-").trim();
   const stats = [
     ["总数", sdp.total_count || totals.total || 0],
+    ["已分批", totals.allocated],
     ["已生成", totals.generated],
+    ["剩余", totals.remaining],
     ["已贴标", totals.stickered],
     ["价格组", `${totals.completeGroups}/${totals.groupCount}`]
   ];
@@ -29864,11 +30042,14 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
     const batchCards = groups.map((group) => {
       const statusText = getStoreMobilePriceGroupStatus(state, group);
       const generatedStatusLabel = "已生成 / 待打印";
-      const isGenerated = statusText === generatedStatusLabel || /已生成|待打印/.test(statusText);
-      const primaryAction = /待生成/.test(statusText) ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批商品码</button>` : `<button type="button" class="primary-button mini-button" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id)}">查看标签预览</button>`;
+      const workflowStatus = getStoreMobilePriceGroupWorkflowStatus(group);
+      const isLocked = isStoreMobilePriceGroupLocked(group);
+      const isGenerated = isLocked || statusText.includes(generatedStatusLabel) || /已生成|待打印/.test(statusText);
+      const primaryAction = workflowStatus === "draft" ? `<button type="button" class="primary-button mini-button" data-mobile-pricing-generate-group="${escapeHtml(group.group_id)}">生成本批商品码</button>` : `<button type="button" class="primary-button mini-button" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id)}">查看标签预览</button>`;
+      const deleteAction = isLocked ? '<button type="button" class="ghost-button mini-button" disabled>locked / 不可删除</button>' : `<button type="button" class="ghost-button mini-button" data-mobile-pricing-delete-group="${escapeHtml(group.group_id)}">删除本批</button>`;
       const generatedItems = getStoreMobileGeneratedStoreItems(group);
       return `
-        <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""}">
+        <article class="mobile-price-group-card mobile-field-group-card ${String(state.activeGroupId || "") === String(group.group_id || "") ? "is-active" : ""} ${isLocked ? "is-locked" : ""}" data-mobile-pricing-group-status="${escapeHtml(workflowStatus)}">
           <div class="mobile-field-group-top">
             <div class="mobile-field-group-left">
               <strong>${escapeHtml(group.tier || "-")}</strong>
@@ -29877,13 +30058,14 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
             <div class="mobile-field-group-right">
               <strong>KSh ${escapeHtml(group.price_kes || 0)}</strong>
               ${renderStoreMobilePricingBadge(statusText)}
+              ${isLocked ? renderStoreMobilePricingBadge("locked / 已生成，不可删除") : ""}
             </div>
           </div>
           <div class="mobile-field-group-meta">
             ${escapeHtml(group.category_short || group.category || `${group.category_main || "-"} / ${group.category_sub || "-"}`)}
             ${isGenerated ? ` · 已生成 ${generatedItems.length || group.quantity || 0} 件 · 待打印 ${getStoreMobilePendingPrintCount(generatedItems) || group.quantity || 0} 件` : ""}
           </div>
-          <div class="mobile-field-group-actions">${primaryAction}</div>
+          <div class="mobile-field-group-actions">${primaryAction}${deleteAction}</div>
         </article>
       `;
     }).join("");
@@ -29906,7 +30088,8 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
     return `
       <div class="mobile-price-group-list">
         ${pricingSourceLines.map((line) => {
-      const remainingQty = getStoreMobileLineRemainingQty(state, line.line_key);
+      const progress = getStoreMobileSourceLineProgress(state, line.line_key);
+      const remainingQty = progress.remaining_qty;
       const pPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
       const sPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
       return `
@@ -29922,6 +30105,10 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
                 ${escapeHtml(`${line.category_main} / ${line.category_sub}`)} · ${escapeHtml(remainingQty)} 件剩余
               </div>
               <div class="mobile-result-grid">
+                <span><b>总数</b>${escapeHtml(progress.total_qty)}</span>
+                <span><b>已分批</b>${escapeHtml(progress.allocated_qty)}</span>
+                <span><b>已生成</b>${escapeHtml(progress.generated_qty)}</span>
+                <span><b>剩余</b>${escapeHtml(progress.remaining_qty)}</span>
                 <span><b>P 档默认售价</b>${escapeHtml(pPrice ? `KSh ${pPrice}` : "未配置")}</span>
                 <span><b>S 档默认售价</b>${escapeHtml(sPrice ? `KSh ${sPrice}` : "未配置")}</span>
                 <span><b>自定义价格</b><input type="number" min="1" step="1" placeholder="KES" data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}"></span>
@@ -30027,7 +30214,7 @@ function renderPriceGroupEditor(state = storeMobilePricingPreviewState) {
         <span>货架位 rack_code</span>
         <input value="${escapeHtml(draft.rack_code || "A-01")}" placeholder="A-01 / A-02 / S-01" readonly />
       </label>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing">保存分组</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">保存分组</button>
     </section>
   `;
 }
@@ -30217,6 +30404,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <span><b>状态</b>${escapeHtml("已生成 / 待打印")}</span>
       </div>
       ${renderStoreMobileGeneratedStoreItemList(group)}
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回分批页面</button>
       <div class="mobile-choice-block">
         <span>标签尺寸</span>
         <div class="mobile-segment-row">
@@ -30225,7 +30413,8 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         </div>
       </div>
       ${renderStoreItemLabelPreview(generatedItems, labelConfig.label_template_size, group)}
-      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id || "")}">查看 print payload 预览</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-preview-labels="${escapeHtml(group.group_id || "")}">查看标签预览</button>
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">继续分下一批</button>
       ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
@@ -30262,12 +30451,15 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         ${renderStoreMobilePricingBadge(statusText)}
       </div>
       ${summaryHtml}
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="group_generated">返回本批生成结果</button>
       ${labelSizeHtml}
       ${renderStoreItemLabelPreview(generatedItems, labelConfig.label_template_size, group)}
       <details class="store-item-label-payload-preview" open>
         <summary>JSON preview payload</summary>
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回价格组列表</button>
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">继续分下一批</button>
       ${renderNextPriceGroupHint(state, group)}
     </section>
   `;
@@ -30675,7 +30867,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
-  const page = String(state.activePage || "pricing");
+  const page = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
   if (page === "tasks") {
     return renderStoreMobileTaskList(state);
   }
@@ -30697,29 +30889,34 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
         <h3>SDP 详情</h3>
         ${renderStoreMobileSdpCard(state)}
         <div class="mobile-progress-row"><span>店长收货</span><span>分配店员</span><span>现场标价</span></div>
-        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing">进入现场分堆标价</button>
-      </section>
-    `;
-  }
-  if (page === "groups") {
-    return `
-      <section class="mobile-task-list">
-        <h3>价格组列表</h3>
-        ${renderPriceGroupCards(state)}
+        <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">进入现场分堆标价</button>
       </section>
     `;
   }
   if (page === "editor") {
     return renderPriceGroupEditor(state);
   }
-  if (page === "generation") {
+  if (page === "group_generated") {
     return renderPriceGroupGenerationResult(state);
   }
-  if (page === "print_task") {
+  if (page === "label_preview") {
     return renderPriceGroupPrintPanel(state);
   }
   if (page === "print_queue") {
     return renderPriceGroupPrintQueue(state);
+  }
+  if (page === "pricing_split") {
+    return `
+      <section class="mobile-pricing-workbench">
+        <h3>现场分堆标价</h3>
+        ${renderStoreMobileSdpCard(state)}
+        ${renderPriceGroupCards(state)}
+        <div class="mobile-bottom-button-stack">
+          <button type="button" class="ghost-button" data-mobile-pricing-page="pricing_split">返回价格组列表</button>
+          <button type="button" class="ghost-button" data-mobile-pricing-page="tasks">返回任务</button>
+        </div>
+      </section>
+    `;
   }
   return `
     <section class="mobile-pricing-workbench">
@@ -30727,7 +30924,7 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
       ${renderStoreMobileSdpCard(state)}
       ${renderPriceGroupCards(state)}
       <div class="mobile-bottom-button-stack">
-        <button type="button" class="ghost-button" data-mobile-pricing-page="groups">查看价格组列表</button>
+        <button type="button" class="ghost-button" data-mobile-pricing-page="pricing_split">返回价格组列表</button>
         <button type="button" class="ghost-button" data-mobile-pricing-page="tasks">返回任务</button>
       </div>
     </section>
@@ -30737,22 +30934,21 @@ function getStoreMobilePageOptions() {
   return [
     { key: "tasks", label: "我的 SDP 任务" },
     { key: "detail", label: "SDP 详情" },
-    { key: "pricing", label: "现场分堆标价" },
-    { key: "groups", label: "价格组列表" },
-    { key: "generation", label: "本批 STORE_ITEM 生成结果" },
-    { key: "print_task", label: "本批标签预览" },
+    { key: "pricing_split", label: "现场分堆标价 / 分批页面 / 当前 source line / 价格组列表" },
+    { key: "group_generated", label: "本批 STORE_ITEM 生成结果" },
+    { key: "label_preview", label: "本批标签预览" },
     { key: "print_queue", label: "print payload 预览" },
     { key: "printer_connection", label: "打印机连接" }
   ];
 }
 function getStoreMobileActivePageLabel(state = storeMobilePricingPreviewState) {
   var _a;
-  const activePage = String(state.activePage || "pricing");
+  const activePage = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
   return ((_a = getStoreMobilePageOptions().find((page) => page.key === activePage)) == null ? void 0 : _a.label) || "现场分堆标价";
 }
 function renderStoreMobileBottomTabs(state = storeMobilePricingPreviewState) {
   const bottomTabs = ["任务", "我的"];
-  const activePage = String(state.activePage || "pricing");
+  const activePage = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
   return `
     ${bottomTabs.map((tab) => `
       <button type="button" class="${tab === "我的" && activePage === "my" || tab === "任务" && activePage !== "my" ? "is-active" : ""}" data-mobile-pricing-page="${tab === "任务" ? "tasks" : "my"}">
@@ -30841,7 +31037,7 @@ function renderStoreMobilePricingPreview() {
           <strong>页面列表</strong>
           <div class="mobile-preview-page-list">
             ${pageOptions.map(([key, label]) => `
-              <button type="button" class="${state.activePage === key ? "is-active" : ""}" data-mobile-pricing-page="${escapeHtml(key)}">${escapeHtml(label)}</button>
+              <button type="button" class="${normalizeStoreMobilePdaPage(state.activePage) === key ? "is-active" : ""}" data-mobile-pricing-page="${escapeHtml(key)}">${escapeHtml(label)}</button>
             `).join("")}
           </div>
         </div>
@@ -30877,14 +31073,13 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
   }
   if (getStoreMobileGeneratedStoreItems(group).length) {
     group.status = "已生成 / 待打印";
+    group.workflow_status = "locked";
     state.generatedRanges[group.group_id] = {
       generated_count: getStoreMobileGeneratedStoreItems(group).length,
       pending_print_count: getStoreMobilePendingPrintCount(getStoreMobileGeneratedStoreItems(group)),
       demo_only: false
     };
-    state.activeGroupId = group.group_id;
-    state.current_task_group_id = group.group_id;
-    state.activePage = "generation";
+    setStoreMobileActivePage(state, "group_generated", { groupId: group.group_id, source: "generate_existing" });
     return syncStoreMobileTaskCounters(state);
   }
   const validation = validateStoreMobilePricingBatchQuantity(state, group);
@@ -30923,6 +31118,7 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
   const generatedItems = Array.isArray(result == null ? void 0 : result.store_items) ? result.store_items : [];
   const generatedTokens = Array.isArray(result == null ? void 0 : result.tokens) ? result.tokens : [];
   group.status = "已生成 / 待打印";
+  group.workflow_status = "locked";
   group.generated_store_items = generatedItems;
   group.item_barcode_tokens = generatedTokens;
   group.pricing_batch_id = (result == null ? void 0 : result.pricing_batch_id) || payload.pricing_batch_id;
@@ -30932,9 +31128,7 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
     pending_print_count: Number((result == null ? void 0 : result.pending_print_count) || getStoreMobilePendingPrintCount(generatedItems)),
     demo_only: false
   };
-  state.activeGroupId = group.group_id;
-  state.current_task_group_id = group.group_id;
-  state.activePage = "generation";
+  setStoreMobileActivePage(state, "group_generated", { groupId: group.group_id, source: "generate" });
   return syncStoreMobileTaskCounters(state);
 }
 function prepareStoreMobileBatchLabelPreview(state = storeMobilePricingPreviewState, groupId = "") {
@@ -30946,9 +31140,8 @@ function prepareStoreMobileBatchLabelPreview(state = storeMobilePricingPreviewSt
   const labelConfig = applyStoreMobileLabelSize(state, group.label_template_size || state.label_template_size || state.labelSize || "60x40", group.group_id);
   group.label_preview_payload = buildStoreItemLabelPreviewPayload(labelConfig.label_template_size, generatedItems, group);
   group.label_preview_payload.print_mode = "preview_only";
-  state.activeGroupId = group.group_id;
-  state.current_task_group_id = group.group_id;
-  state.activePage = "print_task";
+  group.workflow_status = getStoreMobileGroupGeneratedQty(group) > 0 ? "preview" : getStoreMobilePriceGroupWorkflowStatus(group);
+  setStoreMobileActivePage(state, "label_preview", { groupId: group.group_id, source: "preview" });
   return syncStoreMobileTaskCounters(state);
 }
 async function queueStoreMobileBatchPrintJobs(state = storeMobilePricingPreviewState, groupId = "") {
@@ -30963,12 +31156,15 @@ function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState,
   state.activeGroupId = group.group_id;
   state.current_task_group_id = group.group_id;
   state.taskStatus = "进行中";
-  if (action === "generate" && String(group.status || "") === "待生成") {
+  if (action === "generate" && getStoreMobilePriceGroupWorkflowStatus(group) === "draft") {
     group.status = "已生成 / 待打印";
+    group.workflow_status = "locked";
+    group.generated_count = Number(group.quantity || 0);
     state.generatedRanges[group.group_id] = getStoreMobileGeneratedRangeForGroup(group);
-    state.activePage = "generation";
+    setStoreMobileActivePage(state, "group_generated", { groupId: group.group_id, source: "generate" });
   } else if (action === "preview") {
-    state.activePage = "print_task";
+    group.workflow_status = isStoreMobilePriceGroupLocked(group) ? "preview" : getStoreMobilePriceGroupWorkflowStatus(group);
+    setStoreMobileActivePage(state, "label_preview", { groupId: group.group_id, source: "preview" });
     const nextGroup = getNextIncompleteStoreMobileGroup(state);
     if (nextGroup && String(nextGroup.group_id || "") !== String(group.group_id || "")) {
       state.next_preview_group_id = nextGroup.group_id;
@@ -30992,11 +31188,11 @@ function handleStoreMobileScanSubmit(inputValue = "") {
       state.activeGroupId = nextGroup.group_id;
       state.current_task_group_id = nextGroup.group_id;
     }
-    state.activePage = "pricing";
+    setStoreMobileActivePage(state, "pricing_split", { source: "scan_success" });
   } else {
     state.scanSuccess = "";
     state.scanError = result.message;
-    state.activePage = "verify";
+    setStoreMobileActivePage(state, "verify", { source: "scan_error" });
   }
   storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
   renderStoreMobilePricingPreview();
@@ -31014,6 +31210,7 @@ function handleStoreMobilePricingPreviewAction(button) {
   const resetTask = button.dataset.mobilePricingResetTask;
   const selectGroup = button.dataset.mobilePricingSelectGroup;
   const createBatch = button.dataset.mobilePricingCreateBatch;
+  const deleteGroup = button.dataset.mobilePricingDeleteGroup;
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const previewLabels = button.dataset.mobilePricingPreviewLabels;
   const labelSize = button.dataset.mobilePricingLabelSize;
@@ -31115,20 +31312,24 @@ function handleStoreMobilePricingPreviewAction(button) {
     selectStoreMobileBackendTask(state, selectBackendTask);
   }
   if (startTask) {
-    state.activePage = "verify";
+    setStoreMobileActivePage(state, "verify", { source: "start_task" });
     state.scanError = "";
     state.scanSuccess = "";
   }
   if (page) {
-    state.activePage = page;
+    setStoreMobileActivePage(state, page, { source: "button" });
   }
   if (selectGroup) {
     state.activeGroupId = selectGroup;
-    state.activePage = "editor";
+    setStoreMobileActivePage(state, "editor", { groupId: selectGroup, source: "select_group" });
   }
   if (createBatch) {
     createStoreMobilePricingBatch(state, createBatch);
-    state.activePage = "pricing";
+    setStoreMobileActivePage(state, "pricing_split", { source: "create_batch" });
+  }
+  if (deleteGroup) {
+    deleteStoreMobilePricingBatch(state, deleteGroup);
+    setStoreMobileActivePage(state, "pricing_split", { source: "delete_batch" });
   }
   if (generateGroup) {
     if ((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) {
@@ -36050,6 +36251,7 @@ document.addEventListener("click", (event) => {
 });
 window.addEventListener("online", handleCashierTerminalNetworkChange);
 window.addEventListener("offline", handleCashierTerminalNetworkChange);
+window.addEventListener("popstate", handleStoreMobilePdaPopState);
 document.addEventListener("keydown", handleCashierTerminalHotkeys);
 closeSortingRackModalButton == null ? void 0 : closeSortingRackModalButton.addEventListener("click", closeSortingRackModal);
 sortingRackModal == null ? void 0 : sortingRackModal.addEventListener("click", (event) => {
@@ -37103,7 +37305,7 @@ document.addEventListener("click", (event) => {
   openSortingTaskForProcessing(taskNo, targetPanel);
 });
 document.addEventListener("click", (event) => {
-  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]") : null;
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
