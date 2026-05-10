@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#255/);
+  assert.match(loginVersionSection, /#257/);
   assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#33/);
+  assert.match(loginVersionSection, /#34/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=k300-code128-batch-test/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-code128-batch-test/);
+  assert.match(indexHtml, /app\.js\?v=k300-raw-cpcl-formal-batch/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-raw-cpcl-formal-batch/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -91,6 +91,7 @@ test("PDA version info detects Android bridge methods without requiring native a
         "printK300CpclCode128TallTest",
         "printK300CpclCode128QuietZoneTest",
         "printK300CpclCode128CompactTopTest",
+        "printK300CpclRawPreview",
         "printK300CpclStoreItemPreview",
         "printK300TsplMinText",
         "printK300TsplBlackBox",
@@ -150,6 +151,10 @@ test("PDA version info detects Android bridge methods without requiring native a
     true,
   );
   assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ printK300CpclRawPreview() {} }).supported_methods.printK300CpclRawPreview,
+    true,
+  );
+  assert.equal(
     bridgeInfo.getDirectLoopAndroidBridgeInfo({ testK300SppConnection() {} }).supported_methods.testK300SppConnection,
     true,
   );
@@ -165,7 +170,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-code128-batch-test/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-raw-cpcl-formal-batch/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -182,6 +187,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(appLegacyJs, /printK300CpclCode128TallTest/);
   assert.match(appLegacyJs, /printK300CpclCode128QuietZoneTest/);
   assert.match(appLegacyJs, /printK300CpclCode128CompactTopTest/);
+  assert.match(appLegacyJs, /printK300CpclRawPreview/);
   assert.match(appLegacyJs, /printK300CpclStoreItemPreview/);
   assert.match(appLegacyJs, /printK300TsplMinText/);
   assert.match(appLegacyJs, /printK300TsplBlackBox/);
@@ -387,8 +393,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=k300-code128-batch-test/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-code128-batch-test/);
+  assert.match(indexHtml, /app\.js\?v=k300-raw-cpcl-formal-batch/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-raw-cpcl-formal-batch/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -846,6 +852,7 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(protocolConfigSource, /测试 K300 ESC\/POS 文字/);
   assert.match(protocolConfigSource, /测试 K300 CPCL 文字/);
   assert.match(protocolConfigSource, /连续测试 5 张 Code128/);
+  assert.match(protocolConfigSource, /连续打印 5 张正式模板/);
   assert.doesNotMatch(protocolConfigSource, /测试 K300 CPCL Code128/);
   assert.match(protocolConfigSource, /测试 Code128 宽条码/);
   assert.match(protocolConfigSource, /测试 Code128 高条码/);
@@ -862,6 +869,7 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(protocolConfigSource, /method:\s*"printK300CpclCode128TallTest"[\s\S]*?label:\s*"高条码"[\s\S]*?variantKey:\s*"tall"/);
   assert.match(protocolConfigSource, /method:\s*"printK300CpclCode128QuietZoneTest"[\s\S]*?label:\s*"留白"[\s\S]*?variantKey:\s*"quiet_zone"/);
   assert.match(protocolConfigSource, /method:\s*"printK300CpclCode128CompactTopTest"[\s\S]*?label:\s*"上移"[\s\S]*?variantKey:\s*"compact_top"/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_raw_formal_batch"[\s\S]*?label:\s*"连续打印 5 张正式模板"[\s\S]*?method:\s*"printK300CpclRawPreview"[\s\S]*?expectedProtocol:\s*"K300_CPCL_RAW_PREVIEW"[\s\S]*?requiresPayload:\s*true[\s\S]*?requiresK300SppAvailable:\s*true/);
   assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_wide_test"[\s\S]*?method:\s*"printK300CpclCode128WideTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_WIDE_TEST"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
   assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_tall_test"[\s\S]*?method:\s*"printK300CpclCode128TallTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_TALL_TEST"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresK300SppAvailable:\s*true/);
   assert.match(protocolConfigSource, /key:\s*"k300_cpcl_code128_quiet_zone_test"[\s\S]*?method:\s*"printK300CpclCode128QuietZoneTest"[\s\S]*?expectedProtocol:\s*"K300_CPCL_CODE128_QUIET_ZONE_TEST"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresK300SppAvailable:\s*true/);
@@ -899,6 +907,7 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(appLegacyJs, /测试 K300 ESC\/POS 文字/);
   assert.match(appLegacyJs, /测试 K300 CPCL 文字/);
   assert.match(appLegacyJs, /连续测试 5 张 Code128/);
+  assert.match(appLegacyJs, /连续打印 5 张正式模板/);
   assert.match(appLegacyJs, /测试 Code128 宽条码/);
   assert.match(appLegacyJs, /测试 Code128 高条码/);
   assert.match(appLegacyJs, /测试 Code128 留白/);
@@ -914,6 +923,8 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(appLegacyJs, /printK300CpclCode128TallTest/);
   assert.match(appLegacyJs, /printK300CpclCode128QuietZoneTest/);
   assert.match(appLegacyJs, /printK300CpclCode128CompactTopTest/);
+  assert.match(appLegacyJs, /printK300CpclRawPreview/);
+  assert.match(appLegacyJs, /sendClerkK300RawCpclFormalBatchDiagnostic/);
   assert.match(appLegacyJs, /sendClerkK300Code128BatchDiagnostic/);
   assert.match(appLegacyJs, /printK300CpclStoreItemPreview/);
   assert.match(appLegacyJs, /printK300TsplMinText/);
@@ -948,6 +959,50 @@ test("K300 Code128 batch diagnostic sequentially sends five existing bridge meth
   assert.match(appLegacyJs, /正在打印第/);
   assert.match(appLegacyJs, /k300_cpcl_code128_batch_\$\{variant\.variantKey\}/);
   assert.match(appLegacyJs, /variantKey:\s*"compact_top"/);
+});
+
+test("K300 raw CPCL formal batch sends five web-provided templates", () => {
+  const protocolConfigSource = extractFunctionSource(appJs, "getClerkS1PreviewProtocolDiagnostics");
+  const actionSource = extractFunctionSource(appJs, "sendClerkS1PreviewProtocolDiagnostic");
+  const batchSource = extractFunctionSource(appJs, "sendClerkK300RawCpclFormalBatchDiagnostic");
+  const delaySource = extractFunctionSource(appJs, "waitForClerkPrinterDiagnosticDelay");
+
+  assert.match(appJs, /const CLERK_K300_RAW_CPCL_FORMAL_BATCH_DIAGNOSTIC_PAUSE_MS = 45000/);
+  assert.match(appJs, /const CLERK_K300_RAW_CPCL_FORMAL_BATCH_STEP_DELAY_MS = 2500/);
+  assert.match(protocolConfigSource, /label:\s*"连续打印 5 张正式模板"/);
+  assert.match(protocolConfigSource, /method:\s*"printK300CpclRawPreview"/);
+  assert.match(protocolConfigSource, /rawCpclTemplates:\s*\[/);
+  assert.match(protocolConfigSource, /testName:\s*"formal_layout_A"/);
+  assert.match(protocolConfigSource, /testName:\s*"formal_layout_B"/);
+  assert.match(protocolConfigSource, /testName:\s*"formal_layout_C"/);
+  assert.match(protocolConfigSource, /testName:\s*"formal_layout_D"/);
+  assert.match(protocolConfigSource, /testName:\s*"formal_layout_E"/);
+  assert.match(protocolConfigSource, /TEXT 7 0 14 8 KES 410/);
+  assert.match(protocolConfigSource, /BARCODE 128 2 1 70 28 85 5261300000038/);
+  assert.match(protocolConfigSource, /BARCODE 128 1 1 85 35 85 5261300000038/);
+  assert.match(actionSource, /sendClerkK300RawCpclFormalBatchDiagnostic/);
+  assert.match(batchSource, /正在连续打印 5 张正式模板，请不要重复点击。/);
+  assert.match(batchSource, /正在打印第 \$\{index \+ 1\}\/\$\{templates\.length\} 张：\$\{template\.label\}/);
+  assert.match(batchSource, /5 张正式模板已发送，请逐张扫码并检查版式。/);
+  assert.match(batchSource, /CLERK_K300_RAW_CPCL_FORMAL_BATCH_DIAGNOSTIC_PAUSE_MS/);
+  assert.match(batchSource, /CLERK_K300_RAW_CPCL_FORMAL_BATCH_STEP_DELAY_MS/);
+  assert.match(batchSource, /waitForClerkPrinterDiagnosticDelay\(CLERK_K300_RAW_CPCL_FORMAL_BATCH_STEP_DELAY_MS\)/);
+  assert.match(delaySource, /setTimeout\(resolve,\s*durationMs\)/);
+  assert.match(batchSource, /bridge\[protocol\.method\]\(JSON\.stringify\(payload\)\)/);
+  assert.match(batchSource, /label_template_size:\s*"40x30"/);
+  assert.match(batchSource, /protocol:\s*"CPCL"/);
+  assert.match(batchSource, /test_name:\s*template\.testName/);
+  assert.match(batchSource, /cpcl_command:\s*template\.cpclCommand/);
+  assert.match(batchSource, /protocol_key:\s*`k300_cpcl_raw_formal_\$\{template\.templateKey\}`/);
+  assert.match(batchSource, /event_type:\s*"s1_printer_diagnostic_click"/);
+  assert.match(batchSource, /event_type:\s*"s1_printer_diagnostic_result"/);
+  assert.match(batchSource, /event_type:\s*"s1_printer_diagnostic_error"/);
+  assert.doesNotMatch(batchSource, /throw error/);
+  assert.match(batchSource, /clerkBluetoothPrinterActionInFlight = true/);
+  assert.match(batchSource, /clerkBluetoothPrinterActionInFlight = false/);
+  assert.match(appLegacyJs, /连续打印 5 张正式模板/);
+  assert.match(appLegacyJs, /printK300CpclRawPreview/);
+  assert.match(appLegacyJs, /formal_layout_E/);
 });
 
 test("clerk PDA S1 protocol diagnostics pause printer polling for 15 seconds", () => {
