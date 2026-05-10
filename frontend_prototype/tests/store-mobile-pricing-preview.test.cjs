@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#245/);
+  assert.match(loginVersionSection, /#246/);
   assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#25/);
+  assert.match(loginVersionSection, /#27/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=printer-json-copy-clear-245/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=printer-json-copy-clear-245/);
+  assert.match(indexHtml, /app\.js\?v=s1-protocol-diagnostics-246/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=s1-protocol-diagnostics-246/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -75,6 +75,9 @@ test("PDA version info detects Android bridge methods without requiring native a
         "disconnectPrinter",
         "printTestLabel",
         "printStoreItemLabelPreview",
+        "printStoreItemLabelPreviewCtplNoLabelMode",
+        "printStoreItemLabelPreviewCtplBitmapDemo",
+        "printStoreItemLabelPreviewRawTspl",
       ];
     `,
     "({ getDirectLoopAndroidBridgeInfo })",
@@ -83,6 +86,10 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.equal(bridgeInfo.getDirectLoopAndroidBridgeInfo(null).bridge_available, false);
   assert.equal(
     bridgeInfo.getDirectLoopAndroidBridgeInfo({ getPrinterStatus() {}, printStoreItemLabelPreview() {} }).supported_methods.printStoreItemLabelPreview,
+    true,
+  );
+  assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ printStoreItemLabelPreviewRawTspl() {} }).supported_methods.printStoreItemLabelPreviewRawTspl,
     true,
   );
   assert.equal(
@@ -97,8 +104,11 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-printer-json-copy-clear-245/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-s1-protocol-diagnostics-246/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
+  assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
+  assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
+  assert.match(appLegacyJs, /printStoreItemLabelPreviewRawTspl/);
 });
 
 test("price groups render separately with independent STORE_ITEM generation and preview actions", () => {
@@ -300,8 +310,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=printer-json-copy-clear-245/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=printer-json-copy-clear-245/);
+  assert.match(indexHtml, /app\.js\?v=s1-protocol-diagnostics-246/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=s1-protocol-diagnostics-246/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -604,21 +614,31 @@ test("clerk PDA printer diagnostics raw JSON can be cleared or copied", () => {
   assert.match(appLegacyJs, /copyTextToClipboardWithFallback/);
 });
 
-test("clerk PDA diagnostics can force a raw TSPL preview label without online gating", () => {
+test("clerk PDA diagnostics expose explicit S1 preview protocol buttons without online gating", () => {
   const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
-  const forcePayloadSource = extractFunctionSource(appJs, "buildClerkForceTsplPreviewDiagnosticPayload");
-  const forceActionSource = extractFunctionSource(appJs, "forceSendClerkTsplPreviewDiagnostic");
-  const canRunSource = extractFunctionSource(appJs, "canRunClerkForceTsplPreviewDiagnostic");
+  const protocolConfigSource = extractFunctionSource(appJs, "getClerkS1PreviewProtocolDiagnostics");
+  const forcePayloadSource = extractFunctionSource(appJs, "buildClerkS1PreviewProtocolDiagnosticPayload");
+  const forceActionSource = extractFunctionSource(appJs, "sendClerkS1PreviewProtocolDiagnostic");
+  const canRunSource = extractFunctionSource(appJs, "canRunClerkS1PreviewProtocolDiagnostic");
   const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(diagnosticsSource, /强制发送 TSPL 测试标签/);
-  assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-force-tspl-preview/);
-  assert.match(diagnosticsSource, /STORE_ITEM_LABEL_PREVIEW_TSPL/);
+  assert.match(protocolConfigSource, /测试 CTPL 不设标签模式/);
+  assert.match(protocolConfigSource, /测试 CTPL 官方 Bitmap/);
+  assert.match(protocolConfigSource, /测试 Raw TSPL/);
+  assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-preview-protocol/);
+  assert.doesNotMatch(diagnosticsSource, /强制发送 TSPL 测试标签/);
+  assert.match(protocolConfigSource, /STORE_ITEM_LABEL_PREVIEW_TSPL/);
+  assert.match(protocolConfigSource, /STORE_ITEM_LABEL_PREVIEW_CTPL_NO_LABEL_MODE/);
+  assert.match(protocolConfigSource, /STORE_ITEM_LABEL_PREVIEW_CTPL_BITMAP_DEMO/);
   assert.match(diagnosticsSource, /last_preview_transport/);
+  assert.match(diagnosticsSource, /last_preview_sdk_operations/);
   assert.match(diagnosticsSource, /last_preview_tspl_command/);
   assert.match(diagnosticsSource, /last_preview_tspl_lines/);
   assert.match(diagnosticsSource, /last_preview_tspl_bytes/);
-  assert.match(canRunSource, /printStoreItemLabelPreview/);
+  assert.match(protocolConfigSource, /printStoreItemLabelPreviewCtplNoLabelMode/);
+  assert.match(protocolConfigSource, /printStoreItemLabelPreviewCtplBitmapDemo/);
+  assert.match(protocolConfigSource, /printStoreItemLabelPreviewRawTspl/);
+  assert.match(canRunSource, /bridge\[protocol\.method\]/);
   assert.match(canRunSource, /selected_printer_address/);
   assert.doesNotMatch(canRunSource, /printer_online_status|official_sdk_connected|connection_status|canRunClerkBluetoothPrinterTestPrint|canRunClerkBluetoothPrinterPreviewPrint/);
   assert.match(forcePayloadSource, /printer_profile:\s*"CHITENG_S1_OFFICIAL"/);
@@ -629,17 +649,22 @@ test("clerk PDA diagnostics can force a raw TSPL preview label without online ga
   assert.match(forcePayloadSource, /price_kes:\s*410/);
   assert.match(forcePayloadSource, /category_short:\s*"CARGO PANT"/);
   assert.match(forcePayloadSource, /grade:\s*"P"/);
-  assert.match(forceActionSource, /printStoreItemLabelPreview\(JSON\.stringify\(payload\)\)/);
+  assert.match(forceActionSource, /bridge\[protocol\.method\]\(JSON\.stringify\(payload\)\)/);
   assert.match(forceActionSource, /updateClerkBluetoothPrinterStatus/);
   assert.match(forceActionSource, /rawStatusJson:\s*formatClerkBluetoothPrinterRawStatusJson/);
-  assert.match(forceActionSource, /正在发送 TSPL 测试标签\.\.\./);
-  assert.match(forceActionSource, /TSPL 测试标签已发送，请查看诊断字段。/);
+  assert.match(forceActionSource, /正在发送\.\.\./);
+  assert.match(forceActionSource, /请查看 last_protocol_tested 和 last_preview_transport。/);
   assert.doesNotMatch(forceActionSource, /printer_online_status|official_sdk_connected|connection_status|canRunClerkBluetoothPrinterTestPrint|canRunClerkBluetoothPrinterPreviewPrint/);
-  assert.match(actionHandler, /clerkBluetoothPrinterForceTsplPreview/);
-  assert.match(actionHandler, /forceSendClerkTsplPreviewDiagnostic/);
-  assert.match(appLegacyJs, /强制发送 TSPL 测试标签/);
-  assert.match(appLegacyJs, /forceSendClerkTsplPreviewDiagnostic/);
+  assert.match(actionHandler, /clerkBluetoothPrinterPreviewProtocol/);
+  assert.match(actionHandler, /sendClerkS1PreviewProtocolDiagnostic/);
+  assert.match(appLegacyJs, /测试 CTPL 不设标签模式/);
+  assert.match(appLegacyJs, /测试 CTPL 官方 Bitmap/);
+  assert.match(appLegacyJs, /测试 Raw TSPL/);
+  assert.match(appLegacyJs, /sendClerkS1PreviewProtocolDiagnostic/);
   assert.match(appLegacyJs, /STORE_ITEM_LABEL_PREVIEW_TSPL/);
+  assert.match(appLegacyJs, /STORE_ITEM_LABEL_PREVIEW_CTPL_NO_LABEL_MODE/);
+  assert.match(appLegacyJs, /STORE_ITEM_LABEL_PREVIEW_CTPL_BITMAP_DEMO/);
+  assert.doesNotMatch(appLegacyJs, /强制发送 TSPL 测试标签/);
 });
 
 test("clerk PDA printer diagnostics open state and connected badge survive rerender", () => {
@@ -768,13 +793,15 @@ test("backend task start button is included in the PDA pricing click listener", 
   const listenerSource = appJs.slice(selectorStart, handlerCall + "handleStoreMobilePricingPreviewAction(button);".length);
 
   assert.match(listenerSource, /\[data-mobile-pricing-select-backend-task\]/);
-  assert.match(listenerSource, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
+  assert.match(listenerSource, /\[data-clerk-bluetooth-printer-preview-protocol\]/);
+  assert.doesNotMatch(listenerSource, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
   assert.match(listenerSource, /\[data-clerk-printer-json-clear\]/);
   assert.match(listenerSource, /\[data-clerk-printer-json-copy\]/);
   assert.match(listenerSource, /event\.target\.closest/);
   assert.match(listenerSource, /handleStoreMobilePricingPreviewAction\(button\)/);
   assert.match(appLegacyJs, /\[data-mobile-pricing-select-backend-task\]/);
-  assert.match(appLegacyJs, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
+  assert.match(appLegacyJs, /\[data-clerk-bluetooth-printer-preview-protocol\]/);
+  assert.doesNotMatch(appLegacyJs, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
   assert.match(appLegacyJs, /\[data-clerk-printer-json-clear\]/);
   assert.match(appLegacyJs, /\[data-clerk-printer-json-copy\]/);
 });
