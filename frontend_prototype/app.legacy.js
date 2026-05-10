@@ -59,10 +59,10 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-s1-protocol-diagnostics-246";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "s1-protocol-diagnostics-246";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#246";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#27";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-s1-diagnostic-polling-pause-247";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "s1-diagnostic-polling-pause-247";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#247";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#28";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -71,7 +71,9 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printStoreItemLabelPreview",
   "printStoreItemLabelPreviewCtplNoLabelMode",
   "printStoreItemLabelPreviewCtplBitmapDemo",
-  "printStoreItemLabelPreviewRawTspl"
+  "printStoreItemLabelPreviewRawTspl",
+  "printS1RawTsplMinText",
+  "printS1RawTsplBlackBox"
 ];
 let directLoopAndroidAppInfo = null;
 let directLoopAndroidAppInfoRequestStarted = false;
@@ -2623,12 +2625,14 @@ let storeManagerPdaReturnSubmitted = false;
 let storeManagerPdaTaskState = null;
 const PDA_RUNTIME_POLL_INTERVAL_MS = 3e3;
 const CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS = 3e3;
+const CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS = 15e3;
 let pdaRuntimePollingTimer = null;
 let pdaRuntimePollingInFlight = false;
 let pdaRuntimeActionInFlight = false;
 let pdaRuntimeLastRefreshAt = "";
 let pdaRuntimePollingWarning = "";
 let clerkBluetoothPrinterStatusPollingTimer = null;
+let clerkBluetoothPrinterDiagnosticPauseTimer = null;
 let clerkBluetoothPrinterStatusInFlight = false;
 let clerkBluetoothPrinterPairedPrintersInFlight = false;
 let clerkBluetoothPrinterDiscoveryInFlight = false;
@@ -3979,6 +3983,36 @@ function stopClerkBluetoothPrinterStatusPolling() {
     clerkBluetoothPrinterStatusPollingTimer = null;
   }
 }
+function isClerkBluetoothPrinterDiagnosticPollingPaused(now = Date.now()) {
+  const pausedUntil = Number(storeMobilePricingPreviewState.bluetoothPrinterDiagnosticPollingPausedUntil || 0);
+  return pausedUntil > Number(now || 0);
+}
+function resumeClerkBluetoothPrinterDiagnostics() {
+  if (clerkBluetoothPrinterDiagnosticPauseTimer) {
+    window.clearTimeout(clerkBluetoothPrinterDiagnosticPauseTimer);
+    clerkBluetoothPrinterDiagnosticPauseTimer = null;
+  }
+  storeMobilePricingPreviewState.bluetoothPrinterDiagnosticPollingPausedUntil = 0;
+  storeMobilePricingPreviewState.bluetoothPrinterDiagnosticsOpen = true;
+  storeMobilePricingPreviewState.bluetoothPrinterDiagnosticMessage = "诊断轮询已恢复。";
+  renderClerkBluetoothPrinterStatusIfActive();
+  startClerkBluetoothPrinterStatusPolling({ immediate: false, includePairedPrinters: false });
+}
+function pauseClerkBluetoothPrinterDiagnostics({ durationMs = CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS } = {}) {
+  const state = storeMobilePricingPreviewState;
+  const pausedUntil = Date.now() + durationMs;
+  state.bluetoothPrinterDiagnosticsOpen = true;
+  state.bluetoothPrinterDiagnosticPollingPausedUntil = pausedUntil;
+  state.bluetoothPrinterDiagnosticMessage = "测试发送中，请等待 15 秒，不要重复点击。";
+  stopClerkBluetoothPrinterStatusPolling();
+  if (clerkBluetoothPrinterDiagnosticPauseTimer) {
+    window.clearTimeout(clerkBluetoothPrinterDiagnosticPauseTimer);
+  }
+  clerkBluetoothPrinterDiagnosticPauseTimer = window.setTimeout(() => {
+    resumeClerkBluetoothPrinterDiagnostics();
+  }, durationMs);
+  return pausedUntil;
+}
 function getClerkS1PreviewProtocolDiagnostics() {
   return [
     {
@@ -3986,23 +4020,46 @@ function getClerkS1PreviewProtocolDiagnostics() {
       label: "测试 CTPL 不设标签模式",
       method: "printStoreItemLabelPreviewCtplNoLabelMode",
       expectedProtocol: "STORE_ITEM_LABEL_PREVIEW_CTPL_NO_LABEL_MODE",
-      expectedTransport: "CTPL_SDK_NO_LABEL_MODE"
+      expectedTransport: "CTPL_SDK_NO_LABEL_MODE",
+      alwaysVisible: true
     },
     {
       key: "ctpl_bitmap_demo",
       label: "测试 CTPL 官方 Bitmap",
       method: "printStoreItemLabelPreviewCtplBitmapDemo",
       expectedProtocol: "STORE_ITEM_LABEL_PREVIEW_CTPL_BITMAP_DEMO",
-      expectedTransport: "CTPL_SDK_BITMAP_DEMO"
+      expectedTransport: "CTPL_SDK_BITMAP_DEMO",
+      alwaysVisible: true
     },
     {
       key: "raw_tspl",
       label: "测试 Raw TSPL",
       method: "printStoreItemLabelPreviewRawTspl",
       expectedProtocol: "STORE_ITEM_LABEL_PREVIEW_TSPL",
-      expectedTransport: "RAW_TSPL_SPP"
+      expectedTransport: "RAW_TSPL_SPP",
+      alwaysVisible: true
+    },
+    {
+      key: "raw_tspl_min_text",
+      label: "测试 Raw TSPL 最小文字",
+      method: "printS1RawTsplMinText",
+      expectedProtocol: "S1_RAW_TSPL_MIN_TEXT",
+      expectedTransport: "RAW_TSPL_SPP",
+      alwaysVisible: false
+    },
+    {
+      key: "raw_tspl_black_box",
+      label: "测试 Raw TSPL 黑块",
+      method: "printS1RawTsplBlackBox",
+      expectedProtocol: "S1_RAW_TSPL_BLACK_BOX",
+      expectedTransport: "RAW_TSPL_SPP",
+      alwaysVisible: false
     }
   ];
+}
+function getVisibleClerkS1PreviewProtocolDiagnostics(status = storeMobilePricingPreviewState.bluetoothPrinterStatus) {
+  const bridge = getDirectLoopPdaPrinterBridge();
+  return getClerkS1PreviewProtocolDiagnostics().filter((protocol) => protocol.alwaysVisible || bridge && typeof bridge[protocol.method] === "function");
 }
 function getClerkS1PreviewProtocolDiagnostic(protocolKey = "") {
   const key = String(protocolKey || "").trim();
@@ -4049,8 +4106,7 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     throw new Error("请先选择一个已配对打印机。");
   }
   const payload = buildClerkS1PreviewProtocolDiagnosticPayload();
-  state.bluetoothPrinterDiagnosticsOpen = true;
-  state.bluetoothPrinterDiagnosticMessage = `${protocol.label} 正在发送...`;
+  pauseClerkBluetoothPrinterDiagnostics({ durationMs: CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS });
   state.bluetoothPrinterError = "";
   clerkBluetoothPrinterActionInFlight = true;
   renderClerkBluetoothPrinterStatusIfActive();
@@ -4062,7 +4118,8 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     });
     if (printStatus.last_print_result === "success") {
       state.bluetoothPrinterError = "";
-      state.bluetoothPrinterDiagnosticMessage = `${protocol.label} 已发送，请查看 last_protocol_tested 和 last_preview_transport。`;
+      state.bluetoothPrinterDiagnosticsOpen = true;
+      state.bluetoothPrinterDiagnosticMessage = "测试已返回，请查看 raw JSON 和纸张结果。";
     } else {
       state.bluetoothPrinterError = printStatus.last_error || `${protocol.label} 发送失败。`;
       state.bluetoothPrinterDiagnosticMessage = "";
@@ -4076,6 +4133,7 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     throw error;
   } finally {
     clerkBluetoothPrinterActionInFlight = false;
+    renderClerkBluetoothPrinterStatusIfActive();
   }
 }
 function clearClerkPrinterDiagnosticsRawJson(state = storeMobilePricingPreviewState) {
@@ -4143,6 +4201,10 @@ async function copyClerkPrinterDiagnosticsRawJson(state = storeMobilePricingPrev
   }
 }
 function startClerkBluetoothPrinterStatusPolling({ immediate = false, includePairedPrinters = false } = {}) {
+  if (isClerkBluetoothPrinterDiagnosticPollingPaused()) {
+    stopClerkBluetoothPrinterStatusPolling();
+    return false;
+  }
   if (!shouldPollClerkBluetoothPrinterStatus()) {
     stopClerkBluetoothPrinterStatusPolling();
     return false;
@@ -4164,6 +4226,9 @@ function startClerkBluetoothPrinterStatusPolling({ immediate = false, includePai
   return true;
 }
 async function pollClerkBluetoothPrinterStatus({ reason = "manual" } = {}) {
+  if (isClerkBluetoothPrinterDiagnosticPollingPaused()) {
+    return false;
+  }
   if (document.visibilityState === "hidden") {
     stopClerkBluetoothPrinterStatusPolling();
     return false;
@@ -4198,6 +4263,9 @@ async function pollClerkBluetoothPrinterStatus({ reason = "manual" } = {}) {
   }
 }
 async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
+  if (isClerkBluetoothPrinterDiagnosticPollingPaused()) {
+    return false;
+  }
   if (clerkBluetoothPrinterPairedPrintersInFlight) {
     return false;
   }
@@ -4237,6 +4305,9 @@ async function refreshClerkBluetoothPairedPrinters({ reason = "manual" } = {}) {
   }
 }
 async function startClerkBluetoothPrinterDiscovery({ reason = "manual" } = {}) {
+  if (isClerkBluetoothPrinterDiagnosticPollingPaused()) {
+    return false;
+  }
   if (clerkBluetoothPrinterDiscoveryInFlight) {
     return false;
   }
@@ -29746,6 +29817,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     bluetoothPrinterRawStatusJson: "",
     bluetoothPrinterDiagnosticsOpen: false,
     bluetoothPrinterDiagnosticMessage: "",
+    bluetoothPrinterDiagnosticPollingPausedUntil: 0,
     bluetoothPrinterLastRefreshAt: "",
     bluetoothPrinterError: "",
     bluetoothPrinterPairedPrinters: [],
@@ -31223,7 +31295,8 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
     ["last_preview_sdk_operations", status.last_preview_sdk_operations]
   ];
   const rawStatusJson = String(state.bluetoothPrinterRawStatusJson || "").trim();
-  const previewProtocols = getClerkS1PreviewProtocolDiagnostics();
+  const diagnosticsPaused = isClerkBluetoothPrinterDiagnosticPollingPaused();
+  const previewProtocols = getVisibleClerkS1PreviewProtocolDiagnostics(status);
   return `
     <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
       <summary>诊断详情 / Developer diagnostics</summary>
@@ -31239,13 +31312,13 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
         `).join("")}
       </div>
       <div class="clerk-printer-diagnostics-actions">
-        <button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-diagnostic-refresh="true" ${clerkBluetoothPrinterStatusInFlight ? "disabled" : ""}>刷新诊断状态</button>
+        <button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-diagnostic-refresh="true" ${clerkBluetoothPrinterStatusInFlight || diagnosticsPaused ? "disabled" : ""}>刷新诊断状态</button>
         ${previewProtocols.map((protocol) => {
-    const canRunProtocol = canRunClerkS1PreviewProtocolDiagnostic(status, protocol.key) && !clerkBluetoothPrinterActionInFlight;
+    const canRunProtocol = canRunClerkS1PreviewProtocolDiagnostic(status, protocol.key) && !clerkBluetoothPrinterActionInFlight && !diagnosticsPaused;
     return `<button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-preview-protocol="${escapeHtml(protocol.key)}" ${canRunProtocol ? "" : "disabled"}>${escapeHtml(protocol.label)}</button>`;
   }).join("")}
       </div>
-      <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #27 返回 ${previewProtocols.map((protocol) => `${protocol.expectedProtocol} / ${protocol.expectedTransport}`).join("、")}。</div>
+      <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #28 返回 ${previewProtocols.map((protocol) => `${protocol.expectedProtocol} / ${protocol.expectedTransport}`).join("、")}。</div>
       <div class="clerk-printer-diagnostics-json">
         <strong>raw JSON from latest getPrinterStatus()</strong>
         <div class="clerk-printer-diagnostics-actions">
@@ -31259,6 +31332,7 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
 }
 function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState) {
   const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+  const diagnosticsPaused = isClerkBluetoothPrinterDiagnosticPollingPaused();
   const lastRefresh = state.bluetoothPrinterLastRefreshAt ? formatPdaRuntimeRefreshTime(state.bluetoothPrinterLastRefreshAt) : "-";
   const selectedProfile = getClerkBluetoothPrinterProfileValue(status.selected_profile);
   const printerRows = getClerkBluetoothPrinterRowsForDisplay(state);
@@ -31297,8 +31371,8 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
       </div>
 
       <div class="clerk-bluetooth-printer-refresh-row">
-        <button type="button" class="primary-button" data-clerk-bluetooth-printer-search="true" ${clerkBluetoothPrinterDiscoveryInFlight ? "disabled" : ""}>搜索附近打印机</button>
-        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-refresh="true" ${clerkBluetoothPrinterPairedPrintersInFlight ? "disabled" : ""}>刷新已配对打印机</button>
+        <button type="button" class="primary-button" data-clerk-bluetooth-printer-search="true" ${clerkBluetoothPrinterDiscoveryInFlight || diagnosticsPaused ? "disabled" : ""}>搜索附近打印机</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-refresh="true" ${clerkBluetoothPrinterPairedPrintersInFlight || diagnosticsPaused ? "disabled" : ""}>刷新已配对打印机</button>
       </div>
 
       <div class="clerk-bluetooth-printer-paired-list">
