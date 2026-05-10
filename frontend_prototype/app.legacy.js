@@ -59,10 +59,10 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-spp-connect-status-252";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-spp-connect-status-252";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#252";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#31";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-cpcl-code128-diagnostics-253";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-cpcl-code128-diagnostics-253";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#253";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#32";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -80,6 +80,8 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printUrovoK300StoreItemPreview",
   "printK300EscposMinText",
   "printK300CpclMinText",
+  "printK300CpclCode128Test",
+  "printK300CpclStoreItemPreview",
   "printK300TsplMinText",
   "printK300TsplBlackBox",
   "testK300SppConnection"
@@ -4192,6 +4194,33 @@ function getClerkS1PreviewProtocolDiagnostics() {
       expectedProtocol: "K300_CPCL_MIN_TEXT",
       expectedTransport: "K300_BLUETOOTH_SPP",
       requiresPayload: false,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false
+    },
+    {
+      key: "k300_cpcl_code128_test",
+      label: "测试 K300 CPCL Code128",
+      method: "printK300CpclCode128Test",
+      expectedProtocol: "K300_CPCL_CODE128_TEST",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: false,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false
+    },
+    {
+      key: "k300_cpcl_store_item_preview",
+      label: "测试 K300 CPCL STORE_ITEM 预览",
+      method: "printK300CpclStoreItemPreview",
+      expectedProtocol: "K300_CPCL_STORE_ITEM_PREVIEW",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: true,
+      payloadPrinterProfile: "UROVO_K300",
       requiresSelectedPrinter: true,
       requiresK300SppAvailable: true,
       preferredPrinterPattern: /K300/i,
