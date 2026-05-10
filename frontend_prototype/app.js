@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-force-tspl-diagnostic-click-244";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "force-tspl-diagnostic-click-244";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#244";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-printer-json-copy-clear-245";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "printer-json-copy-clear-245";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#245";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#25";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
@@ -4279,6 +4279,78 @@ async function forceSendClerkTsplPreviewDiagnostic(state = storeMobilePricingPre
     throw error;
   } finally {
     clerkBluetoothPrinterActionInFlight = false;
+  }
+}
+
+function clearClerkPrinterDiagnosticsRawJson(state = storeMobilePricingPreviewState) {
+  state.bluetoothPrinterDiagnosticsOpen = true;
+  state.bluetoothPrinterRawStatusJson = "";
+  state.bluetoothPrinterDiagnosticMessage = "raw JSON 已清空。";
+  renderStoreMobilePricingPreviewPreservingScroll();
+}
+
+async function copyTextToClipboardWithFallback(text = "") {
+  const value = String(text || "");
+  if (typeof navigator !== "undefined"
+    && navigator.clipboard
+    && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch (error) {
+      // Android WebView may expose navigator.clipboard without allowing it.
+    }
+  }
+  if (typeof document === "undefined"
+    || typeof document.createElement !== "function"
+    || typeof document.execCommand !== "function") {
+    throw new Error("Clipboard copy is not available.");
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "readonly");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  const parent = document.body || document.documentElement;
+  if (!parent || typeof parent.appendChild !== "function") {
+    throw new Error("Clipboard copy is not available.");
+  }
+  const activeElement = document.activeElement;
+  parent.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("Copy command failed.");
+    }
+    return true;
+  } finally {
+    parent.removeChild(textarea);
+    if (activeElement && typeof activeElement.focus === "function") {
+      activeElement.focus();
+    }
+  }
+}
+
+async function copyClerkPrinterDiagnosticsRawJson(state = storeMobilePricingPreviewState) {
+  state.bluetoothPrinterDiagnosticsOpen = true;
+  const rawStatusJson = String(state.bluetoothPrinterRawStatusJson || "").trim();
+  if (!rawStatusJson) {
+    state.bluetoothPrinterDiagnosticMessage = "没有可复制的 raw JSON，请先刷新诊断状态。";
+    renderStoreMobilePricingPreviewPreservingScroll();
+    return false;
+  }
+  try {
+    await copyTextToClipboardWithFallback(rawStatusJson);
+    state.bluetoothPrinterDiagnosticMessage = "raw JSON 已复制。";
+    renderStoreMobilePricingPreviewPreservingScroll();
+    return true;
+  } catch (error) {
+    state.bluetoothPrinterDiagnosticMessage = "复制失败，请长按 raw JSON 手动复制。";
+    renderStoreMobilePricingPreviewPreservingScroll();
+    return false;
   }
 }
 
@@ -33923,6 +33995,10 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
       <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #24 返回 last_protocol_tested = STORE_ITEM_LABEL_PREVIEW_TSPL。</div>
       <div class="clerk-printer-diagnostics-json">
         <strong>raw JSON from latest getPrinterStatus()</strong>
+        <div class="clerk-printer-diagnostics-actions">
+          <button type="button" class="ghost-button mini-button" data-clerk-printer-json-clear="true">清空 raw JSON</button>
+          <button type="button" class="ghost-button mini-button" data-clerk-printer-json-copy="true">一键复制 raw JSON</button>
+        </div>
         <pre data-clerk-printer-diagnostics-json="true">${escapeHtml(rawStatusJson || "尚未读取 getPrinterStatus()")}</pre>
       </div>
     </details>
@@ -34454,6 +34530,8 @@ function handleStoreMobilePricingPreviewAction(button) {
   const refreshBluetoothPrinter = button.dataset.clerkBluetoothPrinterRefresh;
   const clerkBluetoothPrinterDiagnosticRefresh = button.dataset.clerkBluetoothPrinterDiagnosticRefresh;
   const clerkBluetoothPrinterForceTsplPreview = button.dataset.clerkBluetoothPrinterForceTsplPreview;
+  const clerkPrinterJsonClear = button.dataset.clerkPrinterJsonClear;
+  const clerkPrinterJsonCopy = button.dataset.clerkPrinterJsonCopy;
   const selectBluetoothPrinter = button.dataset.clerkBluetoothPrinterSelect;
   const connectBluetoothPrinter = button.dataset.clerkBluetoothPrinterConnect;
   const disconnectBluetoothPrinter = button.dataset.clerkBluetoothPrinterDisconnect;
@@ -34484,6 +34562,14 @@ function handleStoreMobilePricingPreviewAction(button) {
   }
   if (clerkBluetoothPrinterDiagnosticRefresh) {
     pollClerkBluetoothPrinterStatus({ reason: "manual" }).catch(() => {});
+    return;
+  }
+  if (clerkPrinterJsonClear) {
+    clearClerkPrinterDiagnosticsRawJson(state);
+    return;
+  }
+  if (clerkPrinterJsonCopy) {
+    copyClerkPrinterDiagnosticsRawJson(state).catch(() => {});
     return;
   }
   if (clerkBluetoothPrinterForceTsplPreview) {
@@ -40923,7 +41009,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-force-tspl-preview], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-printer-json-clear], [data-clerk-printer-json-copy], [data-clerk-bluetooth-printer-force-tspl-preview], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
