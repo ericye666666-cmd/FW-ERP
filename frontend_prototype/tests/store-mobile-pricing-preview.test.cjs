@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#251/);
+  assert.match(loginVersionSection, /#252/);
   assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#30/);
+  assert.match(loginVersionSection, /#31/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
+  assert.match(indexHtml, /app\.js\?v=k300-spp-connect-status-252/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-spp-connect-status-252/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -88,6 +88,7 @@ test("PDA version info detects Android bridge methods without requiring native a
         "printK300CpclMinText",
         "printK300TsplMinText",
         "printK300TsplBlackBox",
+        "testK300SppConnection",
       ];
     `,
     "({ getDirectLoopAndroidBridgeInfo })",
@@ -127,6 +128,10 @@ test("PDA version info detects Android bridge methods without requiring native a
     true,
   );
   assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ testK300SppConnection() {} }).supported_methods.testK300SppConnection,
+    true,
+  );
+  assert.equal(
     bridgeInfo.getDirectLoopAndroidBridgeInfo({ getPrinterStatus() {} }).supported_methods.printStoreItemLabelPreview,
     false,
   );
@@ -138,7 +143,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-k300-bluetooth-protocol-diagnostics-251/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-spp-connect-status-252/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -152,6 +157,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(appLegacyJs, /printK300CpclMinText/);
   assert.match(appLegacyJs, /printK300TsplMinText/);
   assert.match(appLegacyJs, /printK300TsplBlackBox/);
+  assert.match(appLegacyJs, /testK300SppConnection/);
 });
 
 test("price groups render separately with independent STORE_ITEM generation and preview actions", () => {
@@ -353,8 +359,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
+  assert.match(indexHtml, /app\.js\?v=k300-spp-connect-status-252/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-spp-connect-status-252/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -394,6 +400,7 @@ test("clerk PDA Chiteng S1 badge only shows connected after online and SDK proof
       "getClerkBluetoothPrinterProfileValue",
       "getClerkBluetoothPrinterOnlineStatusValue",
       "isClerkOfficialChitengPrinterProfile",
+      "isClerkK300BluetoothPrinterProfile",
       "isClerkOfficialChitengPrinterOnlineReady",
       "getClerkBluetoothPrinterStateLabel",
       "getClerkBluetoothPrinterStatusText",
@@ -477,6 +484,7 @@ test("clerk PDA infers Chiteng S1 profile from selected S1 printer name", () => 
       "getClerkBluetoothPrinterProfileValue",
       "getClerkBluetoothPrinterOnlineStatusValue",
       "isClerkOfficialChitengPrinterProfile",
+      "isClerkK300BluetoothPrinterProfile",
       "isClerkOfficialChitengPrinterOnlineReady",
       "canRunClerkBluetoothPrinterPreviewPrint",
       "getClerkBluetoothPrinterStateLabel",
@@ -777,36 +785,71 @@ test("clerk PDA diagnostics expose Urovo K300 protocol buttons for Android #29",
   assert.match(appLegacyJs, /payloadPrinterProfile:\s*"UROVO_K300"/);
 });
 
-test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons for Android #30", () => {
+test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons for Android #31", () => {
   const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
   const protocolConfigSource = extractFunctionSource(appJs, "getClerkS1PreviewProtocolDiagnostics");
   const visibleProtocolSource = extractFunctionSource(appJs, "getVisibleClerkS1PreviewProtocolDiagnostics");
   const actionSource = extractFunctionSource(appJs, "sendClerkS1PreviewProtocolDiagnostic");
   const canRunSource = extractFunctionSource(appJs, "canRunClerkS1PreviewProtocolDiagnostic");
+  const statusSource = extractFunctionSource(appJs, "normalizeClerkBluetoothPrinterStatus");
+  const defaultStatusSource = extractFunctionSource(appJs, "createDefaultClerkBluetoothPrinterStatus");
+  const stateLabelSource = extractFunctionSource(appJs, "getClerkBluetoothPrinterStateLabel");
+  const badgeSource = extractFunctionSource(appJs, "getClerkBluetoothPrinterBadgeText");
+  const connectionPageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
+  const connectHelperSource = extractFunctionSource(appJs, "connectClerkBluetoothPrinterViaBridge");
+  const actionHandlerSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(diagnosticsSource, /K300 蓝牙协议测试/);
   assert.match(diagnosticsSource, /k300BluetoothProtocols/);
   assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-preview-protocol/);
+  assert.match(diagnosticsSource, /k300_spp_available/);
+  assert.match(diagnosticsSource, /k300_spp_last_checked_at/);
+  assert.match(diagnosticsSource, /k300_spp_last_error/);
+  assert.match(connectionPageSource, /k300_spp_available/);
+  assert.match(connectionPageSource, /k300_spp_last_checked_at/);
+  assert.match(connectionPageSource, /k300_spp_last_error/);
+  assert.match(defaultStatusSource, /k300_spp_available:\s*false/);
+  assert.match(defaultStatusSource, /k300_spp_last_checked_at:\s*""/);
+  assert.match(defaultStatusSource, /k300_spp_last_error:\s*""/);
+  assert.match(statusSource, /k300_spp_available:\s*getClerkBluetoothBooleanValue/);
+  assert.match(protocolConfigSource, /测试 K300 蓝牙连接/);
+  assert.match(protocolConfigSource, /key:\s*"k300_spp_connection"[\s\S]*?method:\s*"testK300SppConnection"[\s\S]*?expectedProtocol:\s*"K300_SPP_CONNECT_TEST"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?group:\s*"k300_bluetooth"/);
   assert.match(protocolConfigSource, /测试 K300 ESC\/POS 文字/);
   assert.match(protocolConfigSource, /测试 K300 CPCL 文字/);
   assert.match(protocolConfigSource, /测试 K300 TSPL 文字/);
   assert.match(protocolConfigSource, /测试 K300 TSPL 黑块/);
-  assert.match(protocolConfigSource, /key:\s*"k300_escpos_min_text"[\s\S]*?method:\s*"printK300EscposMinText"[\s\S]*?expectedProtocol:\s*"K300_ESCPOS_MIN_TEXT"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
-  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_min_text"[\s\S]*?method:\s*"printK300CpclMinText"[\s\S]*?expectedProtocol:\s*"K300_CPCL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
-  assert.match(protocolConfigSource, /key:\s*"k300_tspl_min_text"[\s\S]*?method:\s*"printK300TsplMinText"[\s\S]*?expectedProtocol:\s*"K300_TSPL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
-  assert.match(protocolConfigSource, /key:\s*"k300_tspl_black_box"[\s\S]*?method:\s*"printK300TsplBlackBox"[\s\S]*?expectedProtocol:\s*"K300_TSPL_BLACK_BOX"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
+  assert.match(protocolConfigSource, /key:\s*"k300_escpos_min_text"[\s\S]*?method:\s*"printK300EscposMinText"[\s\S]*?expectedProtocol:\s*"K300_ESCPOS_MIN_TEXT"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_min_text"[\s\S]*?method:\s*"printK300CpclMinText"[\s\S]*?expectedProtocol:\s*"K300_CPCL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
+  assert.match(protocolConfigSource, /key:\s*"k300_tspl_min_text"[\s\S]*?method:\s*"printK300TsplMinText"[\s\S]*?expectedProtocol:\s*"K300_TSPL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
+  assert.match(protocolConfigSource, /key:\s*"k300_tspl_black_box"[\s\S]*?method:\s*"printK300TsplBlackBox"[\s\S]*?expectedProtocol:\s*"K300_TSPL_BLACK_BOX"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?requiresK300SppAvailable:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
   assert.match(visibleProtocolSource, /typeof bridge\[protocol\.method\] === "function"/);
   assert.match(canRunSource, /selected_printer_address/);
-  assert.doesNotMatch(canRunSource, /urovo_printer_available|printer_online_status|official_sdk_connected|connection_status/);
+  assert.match(canRunSource, /requiresK300SppAvailable/);
+  assert.match(canRunSource, /normalizedStatus\.k300_spp_available === true/);
+  assert.doesNotMatch(canRunSource, /urovo_printer_available|printer_online_status|official_sdk_connected/);
   assert.match(actionSource, /protocol\.requiresPayload === false/);
   assert.match(actionSource, /bridge\[protocol\.method\]\(\)/);
+  assert.match(actionSource, /requiresK300SppAvailable/);
   assert.match(actionSource, /reportPdaDiagnosticEvent/);
   assert.match(actionSource, /pauseClerkBluetoothPrinterDiagnostics/);
+  assert.match(stateLabelSource, /K300 蓝牙可用/);
+  assert.match(stateLabelSource, /K300 蓝牙未连接 \/ 错误/);
+  assert.match(badgeSource, /已连接 \$\{name\}/);
+  assert.match(badgeSource, /K300 蓝牙未连接 \/ 错误/);
+  assert.match(actionHandlerSource, /testK300SppConnection/);
+  assert.match(actionHandlerSource, /connectClerkBluetoothPrinterViaBridge\(bridge, currentStatus\)/);
+  assert.match(actionHandlerSource, /connectClerkBluetoothPrinterViaBridge\(bridge, nextStatus\)/);
+  assert.match(connectHelperSource, /bridge\.connectPrinter\(JSON\.stringify\(config\)\)/);
+  assert.match(connectHelperSource, /testK300SppConnection/);
+  assert.match(connectHelperSource, /last_protocol_tested !== "K300_SPP_CONNECT_TEST"/);
+  assert.match(connectHelperSource, /K300 蓝牙连接可用/);
   assert.match(appLegacyJs, /K300 蓝牙协议测试/);
+  assert.match(appLegacyJs, /测试 K300 蓝牙连接/);
   assert.match(appLegacyJs, /测试 K300 ESC\/POS 文字/);
   assert.match(appLegacyJs, /测试 K300 CPCL 文字/);
   assert.match(appLegacyJs, /测试 K300 TSPL 文字/);
   assert.match(appLegacyJs, /测试 K300 TSPL 黑块/);
+  assert.match(appLegacyJs, /testK300SppConnection/);
   assert.match(appLegacyJs, /printK300EscposMinText/);
   assert.match(appLegacyJs, /printK300CpclMinText/);
   assert.match(appLegacyJs, /printK300TsplMinText/);
