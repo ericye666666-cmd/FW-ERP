@@ -59,9 +59,9 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-force-tspl-diagnostic-242";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "force-tspl-diagnostic-242";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#243";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-force-tspl-diagnostic-click-244";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "force-tspl-diagnostic-click-244";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#244";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#25";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
@@ -4011,17 +4011,27 @@ async function forceSendClerkTsplPreviewDiagnostic(state = storeMobilePricingPre
   }
   const payload = buildClerkForceTsplPreviewDiagnosticPayload();
   state.bluetoothPrinterDiagnosticsOpen = true;
+  state.bluetoothPrinterDiagnosticMessage = "正在发送 TSPL 测试标签...";
+  state.bluetoothPrinterError = "";
   clerkBluetoothPrinterActionInFlight = true;
+  renderClerkBluetoothPrinterStatusIfActive();
   try {
     const printStatusRaw = await bridge.printStoreItemLabelPreview(JSON.stringify(payload));
     const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
       rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
       keepError: true
     });
-    state.bluetoothPrinterError = printStatus.last_print_result === "success" ? "" : printStatus.last_error || "TSPL 诊断标签发送失败。";
+    if (printStatus.last_print_result === "success") {
+      state.bluetoothPrinterError = "";
+      state.bluetoothPrinterDiagnosticMessage = "TSPL 测试标签已发送，请查看诊断字段。";
+    } else {
+      state.bluetoothPrinterError = printStatus.last_error || "TSPL 诊断标签发送失败。";
+      state.bluetoothPrinterDiagnosticMessage = "";
+    }
     renderClerkBluetoothPrinterStatusIfActive();
     return printStatus;
   } catch (error) {
+    state.bluetoothPrinterDiagnosticMessage = "";
     setClerkBluetoothPrinterError(formatErrorMessage(error));
     renderClerkBluetoothPrinterStatusIfActive();
     throw error;
@@ -29632,6 +29642,7 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     bluetoothPrinterStatus: createDefaultClerkBluetoothPrinterStatus(),
     bluetoothPrinterRawStatusJson: "",
     bluetoothPrinterDiagnosticsOpen: false,
+    bluetoothPrinterDiagnosticMessage: "",
     bluetoothPrinterLastRefreshAt: "",
     bluetoothPrinterError: "",
     bluetoothPrinterPairedPrinters: [],
@@ -31113,6 +31124,7 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
     <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
       <summary>诊断详情 / Developer diagnostics</summary>
       <div class="subtle small">锁定诊断状态：${state.bluetoothPrinterDiagnosticsOpen ? "已展开，轮询不会收起" : "展开后会保持打开"}</div>
+      ${state.bluetoothPrinterDiagnosticMessage ? `<div class="subtle small clerk-printer-diagnostic-message">${escapeHtml(state.bluetoothPrinterDiagnosticMessage)}</div>` : ""}
       ${renderDirectLoopVersionInfoBlock("printer_diagnostics")}
       <div class="clerk-printer-diagnostics-grid">
         ${diagnostics.map(([label, value]) => `
@@ -37739,7 +37751,7 @@ document.addEventListener("click", (event) => {
   openSortingTaskForProcessing(taskNo, targetPanel);
 });
 document.addEventListener("click", (event) => {
-  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]") : null;
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-bluetooth-printer-force-tspl-preview], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
