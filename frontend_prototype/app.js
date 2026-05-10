@@ -33,10 +33,10 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-s1-minimal-diagnostic-call-fix-249";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "s1-minimal-diagnostic-call-fix-249";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#249";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#28";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260510-urovo-k300-diagnostics-250";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "urovo-k300-diagnostics-250";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#250";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#29";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -48,6 +48,10 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printStoreItemLabelPreviewRawTspl",
   "printS1RawTsplMinText",
   "printS1RawTsplBlackBox",
+  "getUrovoPrinterStatus",
+  "printUrovoK300MinText",
+  "printUrovoK300BlackBox",
+  "printUrovoK300StoreItemPreview",
 ];
 let directLoopAndroidAppInfo = null;
 let directLoopAndroidAppInfoRequestStarted = false;
@@ -3807,6 +3811,9 @@ function createDefaultClerkBluetoothPrinterStatus() {
     official_sdk_connected: false,
     official_sdk_last_message: "",
     official_sdk_last_error: "",
+    urovo_printer_available: false,
+    urovo_last_status_code: null,
+    urovo_last_status_text: "",
     last_error: "",
     last_protocol_tested: "",
     last_print_result: "none",
@@ -3929,6 +3936,11 @@ function normalizeClerkBluetoothPrinterStatus(raw = {}) {
     official_sdk_connected: getClerkBluetoothBooleanValue(status.official_sdk_connected),
     official_sdk_last_message: String(status.official_sdk_last_message || "").trim(),
     official_sdk_last_error: String(status.official_sdk_last_error || "").trim(),
+    urovo_printer_available: getClerkBluetoothBooleanValue(status.urovo_printer_available),
+    urovo_last_status_code: status.urovo_last_status_code === undefined || status.urovo_last_status_code === null
+      ? null
+      : Number(status.urovo_last_status_code),
+    urovo_last_status_text: String(status.urovo_last_status_text || "").trim(),
     last_error: String(status.last_error || "").trim(),
     last_protocol_tested: String(status.last_protocol_tested || "").trim(),
     last_print_result: String(status.last_print_result || "none").trim() || "none",
@@ -4351,6 +4363,40 @@ function getClerkS1PreviewProtocolDiagnostics() {
       requiresPayload: false,
       alwaysVisible: false,
     },
+    {
+      key: "urovo_min_text",
+      label: "测试 Urovo 文字",
+      method: "printUrovoK300MinText",
+      expectedProtocol: "UROVO_K300_MIN_TEXT",
+      expectedTransport: "UROVO_PRINTER_MANAGER",
+      requiresPayload: false,
+      requiresSelectedPrinter: false,
+      group: "urovo",
+      alwaysVisible: false,
+    },
+    {
+      key: "urovo_black_box",
+      label: "测试 Urovo 黑块",
+      method: "printUrovoK300BlackBox",
+      expectedProtocol: "UROVO_K300_BLACK_BOX",
+      expectedTransport: "UROVO_PRINTER_MANAGER",
+      requiresPayload: false,
+      requiresSelectedPrinter: false,
+      group: "urovo",
+      alwaysVisible: false,
+    },
+    {
+      key: "urovo_store_item_preview",
+      label: "测试 Urovo STORE_ITEM 预览",
+      method: "printUrovoK300StoreItemPreview",
+      expectedProtocol: "UROVO_K300_STORE_ITEM_PREVIEW",
+      expectedTransport: "UROVO_PRINTER_MANAGER",
+      requiresPayload: true,
+      payloadPrinterProfile: "UROVO_K300",
+      requiresSelectedPrinter: false,
+      group: "urovo",
+      alwaysVisible: false,
+    },
   ];
 }
 
@@ -4366,9 +4412,10 @@ function getClerkS1PreviewProtocolDiagnostic(protocolKey = "") {
   return getClerkS1PreviewProtocolDiagnostics().find((protocol) => protocol.key === key) || null;
 }
 
-function buildClerkS1PreviewProtocolDiagnosticPayload() {
+function buildClerkS1PreviewProtocolDiagnosticPayload(protocol = {}) {
+  const printerProfile = String(protocol.payloadPrinterProfile || "CHITENG_S1_OFFICIAL").trim() || "CHITENG_S1_OFFICIAL";
   return {
-    printer_profile: "CHITENG_S1_OFFICIAL",
+    printer_profile: printerProfile,
     label_template_size: "40x30",
     print_mode: "preview_one",
     labels: [
@@ -4387,9 +4434,10 @@ function canRunClerkS1PreviewProtocolDiagnostic(status = storeMobilePricingPrevi
   const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
   const bridge = getDirectLoopPdaPrinterBridge();
   const protocol = getClerkS1PreviewProtocolDiagnostic(protocolKey);
+  const requiresSelectedPrinter = protocol ? protocol.requiresSelectedPrinter !== false : true;
   return Boolean(
     protocol
-      && normalizedStatus.selected_printer_address
+      && (!requiresSelectedPrinter || normalizedStatus.selected_printer_address)
       && bridge
       && typeof bridge[protocol.method] === "function",
   );
@@ -4403,7 +4451,7 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
   const protocol = getClerkS1PreviewProtocolDiagnostic(protocolKey);
   const currentStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
   const requiresPayload = protocol ? protocol.requiresPayload !== false : true;
-  const reportPayload = requiresPayload ? buildClerkS1PreviewProtocolDiagnosticPayload() : null;
+  const reportPayload = requiresPayload ? buildClerkS1PreviewProtocolDiagnosticPayload(protocol) : null;
   const method = protocol ? protocol.method : "";
   const protocolKeyForReport = protocol ? protocol.key : String(protocolKey || "");
   try {
@@ -4413,7 +4461,7 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     if (!bridge || typeof bridge[protocol.method] !== "function") {
       throw new Error(`当前 Android 版本不支持 ${protocol.label}，请升级 Direct Loop PDA Android App。`);
     }
-    if (!currentStatus.selected_printer_address) {
+    if (protocol.requiresSelectedPrinter !== false && !currentStatus.selected_printer_address) {
       throw new Error("请先选择一个已配对打印机。");
     }
     reportPdaDiagnosticEvent({
@@ -34006,6 +34054,9 @@ function getClerkBluetoothPrinterProfileLabel(profile = "") {
   if (normalized === "CHITENG_S1_OFFICIAL" || normalized === "CHITENG_S1") {
     return "驰腾 S1";
   }
+  if (normalized === "UROVO_K300") {
+    return "Urovo K300";
+  }
   if (normalized === "UROVO") {
     return "Urovo";
   }
@@ -34017,12 +34068,18 @@ function getClerkBluetoothPrinterProfileValue(profile = "", printerName = "") {
   if (normalized === "CHITENG_S1" || normalized === "CHITENG_S1_OFFICIAL") {
     return "CHITENG_S1_OFFICIAL";
   }
+  if (normalized === "UROVO_K300") {
+    return "UROVO_K300";
+  }
   if (normalized === "UROVO") {
     return "UROVO";
   }
   const normalizedName = String(printerName || "").trim().toUpperCase();
   if (/(^|[^A-Z0-9])S1([^A-Z0-9]|$)|CHITENG|CTAIOT|驰腾/.test(normalizedName)) {
     return "CHITENG_S1_OFFICIAL";
+  }
+  if (/UROVO|K300/.test(normalizedName)) {
+    return "UROVO_K300";
   }
   return "GENERIC";
 }
@@ -34182,6 +34239,9 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
     ["official_sdk_connected", status.official_sdk_connected],
     ["official_sdk_last_message", status.official_sdk_last_message],
     ["official_sdk_last_error", status.official_sdk_last_error],
+    ["urovo_printer_available", status.urovo_printer_available],
+    ["urovo_last_status_code", status.urovo_last_status_code],
+    ["urovo_last_status_text", status.urovo_last_status_text],
     ["selected_printer_name", status.selected_printer_name],
     ["selected_printer_address", status.selected_printer_address],
     ["selected_profile", status.selected_profile],
@@ -34200,6 +34260,8 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
   const rawStatusJson = String(state.bluetoothPrinterRawStatusJson || "").trim();
   const diagnosticsPaused = isClerkBluetoothPrinterDiagnosticPollingPaused();
   const previewProtocols = getVisibleClerkS1PreviewProtocolDiagnostics(status);
+  const urovoProtocols = previewProtocols.filter((protocol) => protocol.group === "urovo");
+  const s1PreviewProtocols = previewProtocols.filter((protocol) => protocol.group !== "urovo");
   return `
     <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
       <summary>诊断详情 / Developer diagnostics</summary>
@@ -34218,12 +34280,21 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
       <div class="clerk-printer-diagnostics-actions">
         <button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-diagnostic-refresh="true" ${clerkBluetoothPrinterStatusInFlight || diagnosticsPaused ? "disabled" : ""}>刷新诊断状态</button>
         <button type="button" class="ghost-button mini-button" data-clerk-printer-report-current="true">上报当前诊断状态</button>
-        ${previewProtocols.map((protocol) => {
+        ${s1PreviewProtocols.map((protocol) => {
           const canRunProtocol = canRunClerkS1PreviewProtocolDiagnostic(status, protocol.key) && !clerkBluetoothPrinterActionInFlight && !diagnosticsPaused;
           return `<button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-preview-protocol="${escapeHtml(protocol.key)}" ${canRunProtocol ? "" : "disabled"}>${escapeHtml(protocol.label)}</button>`;
         }).join("")}
       </div>
-      <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #28 返回 ${previewProtocols.map((protocol) => `${protocol.expectedProtocol} / ${protocol.expectedTransport}`).join("、")}。</div>
+      ${urovoProtocols.length ? `
+        <div class="clerk-printer-diagnostics-actions">
+          <strong>Urovo K300 测试:</strong>
+          ${urovoProtocols.map((protocol) => {
+            const canRunProtocol = canRunClerkS1PreviewProtocolDiagnostic(status, protocol.key) && !clerkBluetoothPrinterActionInFlight && !diagnosticsPaused;
+            return `<button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-preview-protocol="${escapeHtml(protocol.key)}" ${canRunProtocol ? "" : "disabled"}>${escapeHtml(protocol.label)}</button>`;
+          }).join("")}
+        </div>
+      ` : ""}
+      <div class="subtle small">固定 40×30 STORE_ITEM 预览 payload；预期 Android #29 返回 ${previewProtocols.map((protocol) => `${protocol.expectedProtocol} / ${protocol.expectedTransport}`).join("、")}。</div>
       <div class="clerk-printer-diagnostics-json">
         <strong>raw JSON from latest getPrinterStatus()</strong>
         <div class="clerk-printer-diagnostics-actions">
@@ -34281,7 +34352,7 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
       <div class="mobile-field">
         <label for="clerkBluetoothPrinterProfileSelect">打印机型号</label>
         <select id="clerkBluetoothPrinterProfileSelect" data-clerk-bluetooth-printer-profile="true" ${clerkBluetoothPrinterActionInFlight ? "disabled" : ""}>
-          ${[["CHITENG_S1_OFFICIAL", "驰腾 S1"], ["UROVO", "Urovo"], ["GENERIC", "通用"]]
+          ${[["CHITENG_S1_OFFICIAL", "驰腾 S1"], ["UROVO_K300", "Urovo K300"], ["UROVO", "Urovo"], ["GENERIC", "通用"]]
             .map(([value, label]) => `<option value="${escapeHtml(value)}" ${selectedProfile === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}
         </select>
       </div>
