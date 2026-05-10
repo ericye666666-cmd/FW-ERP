@@ -59,9 +59,9 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-code128-scan-tests";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-code128-scan-tests";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#254";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-code128-batch-test";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-code128-batch-test";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#255";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#33";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
@@ -2641,6 +2641,8 @@ let storeManagerPdaTaskState = null;
 const PDA_RUNTIME_POLL_INTERVAL_MS = 3e3;
 const CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS = 3e3;
 const CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS = 15e3;
+const CLERK_K300_CODE128_BATCH_DIAGNOSTIC_PAUSE_MS = 3e4;
+const CLERK_K300_CODE128_BATCH_STEP_DELAY_MS = 2e3;
 let pdaRuntimePollingTimer = null;
 let pdaRuntimePollingInFlight = false;
 let pdaRuntimeActionInFlight = false;
@@ -4206,7 +4208,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
     },
     {
       key: "k300_cpcl_code128_test",
-      label: "测试 K300 CPCL Code128",
+      label: "连续测试 5 张 Code128",
       method: "printK300CpclCode128Test",
       expectedProtocol: "K300_CPCL_CODE128_TEST",
       expectedTransport: "K300_BLUETOOTH_SPP",
@@ -4215,7 +4217,14 @@ function getClerkS1PreviewProtocolDiagnostics() {
       requiresK300SppAvailable: true,
       preferredPrinterPattern: /K300/i,
       group: "k300_bluetooth",
-      alwaysVisible: false
+      alwaysVisible: false,
+      batchMethods: [
+        { method: "printK300CpclCode128Test", label: "基础 Code128", variantKey: "base" },
+        { method: "printK300CpclCode128WideTest", label: "宽条码", variantKey: "wide" },
+        { method: "printK300CpclCode128TallTest", label: "高条码", variantKey: "tall" },
+        { method: "printK300CpclCode128QuietZoneTest", label: "留白", variantKey: "quiet_zone" },
+        { method: "printK300CpclCode128CompactTopTest", label: "上移", variantKey: "compact_top" }
+      ]
     },
     {
       key: "k300_cpcl_code128_wide_test",
@@ -4313,7 +4322,7 @@ function getClerkS1PreviewProtocolDiagnostics() {
 }
 function getVisibleClerkS1PreviewProtocolDiagnostics(status = storeMobilePricingPreviewState.bluetoothPrinterStatus) {
   const bridge = getDirectLoopPdaPrinterBridge();
-  return getClerkS1PreviewProtocolDiagnostics().filter((protocol) => protocol.alwaysVisible || bridge && typeof bridge[protocol.method] === "function");
+  return getClerkS1PreviewProtocolDiagnostics().filter((protocol) => protocol.alwaysVisible || bridge && typeof bridge[protocol.method] === "function" && (!Array.isArray(protocol.batchMethods) || protocol.batchMethods.every((variant) => typeof bridge[variant.method] === "function")));
 }
 function getClerkS1PreviewProtocolDiagnostic(protocolKey = "") {
   const key = String(protocolKey || "").trim();
@@ -4343,8 +4352,96 @@ function canRunClerkS1PreviewProtocolDiagnostic(status = storeMobilePricingPrevi
   const requiresSelectedPrinter = protocol ? protocol.requiresSelectedPrinter !== false : true;
   const requiresK300SppAvailable = protocol ? protocol.requiresK300SppAvailable === true : false;
   return Boolean(
-    protocol && (!requiresSelectedPrinter || normalizedStatus.selected_printer_address) && (!requiresK300SppAvailable || normalizedStatus.k300_spp_available === true) && bridge && typeof bridge[protocol.method] === "function"
+    protocol && (!requiresSelectedPrinter || normalizedStatus.selected_printer_address) && (!requiresK300SppAvailable || normalizedStatus.k300_spp_available === true) && bridge && typeof bridge[protocol.method] === "function" && (!Array.isArray(protocol.batchMethods) || protocol.batchMethods.every((variant) => typeof bridge[variant.method] === "function"))
   );
+}
+function waitForClerkPrinterDiagnosticDelay(durationMs = CLERK_K300_CODE128_BATCH_STEP_DELAY_MS) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+}
+async function sendClerkK300Code128BatchDiagnostic({
+  state = storeMobilePricingPreviewState,
+  bridge,
+  protocol,
+  currentStatus
+} = {}) {
+  const batchMethods = Array.isArray(protocol == null ? void 0 : protocol.batchMethods) ? protocol.batchMethods : [];
+  if (!batchMethods.length) {
+    throw new Error("K300 Code128 连续测试配置为空。");
+  }
+  for (const variant of batchMethods) {
+    if (!bridge || typeof bridge[variant.method] !== "function") {
+      throw new Error(`当前 Android 版本不支持 ${variant.label}，请升级 Direct Loop PDA Android App。`);
+    }
+  }
+  pauseClerkBluetoothPrinterDiagnostics({ durationMs: CLERK_K300_CODE128_BATCH_DIAGNOSTIC_PAUSE_MS });
+  state.bluetoothPrinterError = "";
+  state.bluetoothPrinterDiagnosticsOpen = true;
+  state.bluetoothPrinterDiagnosticMessage = "正在连续打印 5 张 Code128 测试标签，请不要重复点击。";
+  clerkBluetoothPrinterActionInFlight = true;
+  renderClerkBluetoothPrinterStatusIfActive();
+  let latestStatus = currentStatus;
+  try {
+    for (let index = 0; index < batchMethods.length; index += 1) {
+      const variant = batchMethods[index];
+      state.bluetoothPrinterDiagnosticMessage = `正在打印第 ${index + 1}/${batchMethods.length} 张：${variant.label}`;
+      renderClerkBluetoothPrinterStatusIfActive();
+      reportPdaDiagnosticEvent({
+        event_type: "s1_printer_diagnostic_click",
+        method: variant.method,
+        protocol_key: `k300_cpcl_code128_batch_${variant.variantKey}`,
+        payload: null,
+        before_status: clonePdaDiagnosticValue(latestStatus)
+      });
+      try {
+        const printStatusRaw = await bridge[variant.method]();
+        const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
+          rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
+          keepError: true
+        });
+        latestStatus = printStatus;
+        reportPdaDiagnosticEvent({
+          event_type: "s1_printer_diagnostic_result",
+          method: variant.method,
+          protocol_key: `k300_cpcl_code128_batch_${variant.variantKey}`,
+          payload: null,
+          before_status: clonePdaDiagnosticValue(currentStatus),
+          after_status: clonePdaDiagnosticValue(printStatus),
+          android_result: clonePdaDiagnosticValue(printStatus)
+        });
+        if (printStatus.last_print_result !== "success") {
+          throw new Error(printStatus.last_error || `${variant.label} 发送失败。`);
+        }
+      } catch (error) {
+        reportPdaDiagnosticEvent({
+          event_type: "s1_printer_diagnostic_error",
+          method: variant.method,
+          protocol_key: `k300_cpcl_code128_batch_${variant.variantKey}`,
+          payload: null,
+          before_status: clonePdaDiagnosticValue(latestStatus),
+          error_message: formatErrorMessage(error)
+        });
+        throw error;
+      }
+      if (index < batchMethods.length - 1) {
+        await waitForClerkPrinterDiagnosticDelay(CLERK_K300_CODE128_BATCH_STEP_DELAY_MS);
+      }
+    }
+    state.bluetoothPrinterError = "";
+    state.bluetoothPrinterDiagnosticsOpen = true;
+    state.bluetoothPrinterDiagnosticMessage = "5 张 Code128 测试标签已发送，请逐张扫码并记录结果。";
+    renderClerkBluetoothPrinterStatusIfActive();
+    return latestStatus;
+  } catch (error) {
+    state.bluetoothPrinterDiagnosticMessage = "";
+    setClerkBluetoothPrinterError(formatErrorMessage(error));
+    renderClerkBluetoothPrinterStatusIfActive();
+    throw error;
+  } finally {
+    clerkBluetoothPrinterActionInFlight = false;
+    renderClerkBluetoothPrinterStatusIfActive();
+  }
 }
 async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPreviewState, protocolKey = "") {
   if (clerkBluetoothPrinterActionInFlight) {
@@ -4369,6 +4466,14 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     }
     if (protocol.requiresK300SppAvailable === true && currentStatus.k300_spp_available !== true) {
       throw new Error("请先测试 K300 蓝牙连接，确认 K300 SPP 可用。");
+    }
+    if (Array.isArray(protocol.batchMethods) && protocol.batchMethods.length) {
+      return await sendClerkK300Code128BatchDiagnostic({
+        state,
+        bridge,
+        protocol,
+        currentStatus
+      });
     }
     reportPdaDiagnosticEvent({
       event_type: "s1_printer_diagnostic_click",
