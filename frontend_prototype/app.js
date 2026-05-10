@@ -32451,8 +32451,11 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingBatchQty || "") === sourceLineKey,
   );
   const customPrice = Number(customPriceInput instanceof HTMLInputElement ? customPriceInput.value : 0);
-  const remainingQty = getStoreMobileLineRemainingQty(state, sourceLineKey);
-  const quantity = Math.max(1, Math.min(remainingQty, Number(quantityInput instanceof HTMLInputElement ? quantityInput.value : remainingQty) || remainingQty));
+  const quantity = Number(quantityInput instanceof HTMLInputElement ? quantityInput.value : 0);
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    state.pricingSourceLineMessage = "请输入本批数量。";
+    return null;
+  }
   const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
   if (!(priceKes > 0)) {
     state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在默认售价管理配置 P/S 默认售价。";
@@ -32469,6 +32472,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     price_kes: priceKes,
     sale_price_kes: priceKes,
     quantity,
+    requested_quantity: quantity,
     rack_code: `PDA-${grade === "CUSTOM" ? "CUS" : grade}-001`,
     source_sdp_display_code: line.source_sdp_display_code || state.selectedSdp?.display_code || "",
     source_sdp_machine_code: line.source_sdp_machine_code || state.selectedSdp?.machine_code || "",
@@ -33135,8 +33139,8 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
     pending_print_count: getStoreMobilePendingPrintCount(generatedItems),
     demo_only: true,
   };
-  const generatedCount = Number(generated.generated_count || generatedItems.length || 0);
-  const pendingPrintCount = Number(generated.pending_print_count || getStoreMobilePendingPrintCount(generatedItems) || 0);
+  const generatedCount = generatedItems.length || Number(generated.generated_count || 0);
+  const pendingPrintCount = generatedItems.length ? getStoreMobilePendingPrintCount(generatedItems) : Number(generated.pending_print_count || 0);
   return `
     <section class="mobile-generated-result">
       <div class="mobile-section-head">
@@ -33148,8 +33152,9 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
         <strong>${escapeHtml(generatedCount)} 件 STORE_ITEM</strong>
       </div>
       <div class="mobile-result-grid">
-        <span><b>已生成数量</b>${escapeHtml(generatedCount)} / ${escapeHtml(group.quantity || 0)}</span>
-        <span><b>待打印数量</b>${escapeHtml(pendingPrintCount)}</span>
+        <span><b>本批数量</b>${escapeHtml(group.quantity || 0)}</span>
+        <span><b>已生成</b>${escapeHtml(generatedCount)}</span>
+        <span><b>待打印</b>${escapeHtml(pendingPrintCount)}</span>
         <span><b>标签模板</b>${escapeHtml(labelConfig.display_label)}</span>
         <span><b>状态</b>${escapeHtml("已生成 / 待打印")}</span>
       </div>
@@ -33891,6 +33896,13 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
     throw new Error("缺少 SDP 包号，不能生成 STORE_ITEM。");
   }
   const pricingType = getStoreMobilePricingTypeForGroup(group);
+  const groupQuantity = Number(group.quantity || 0);
+  const requestedQuantity = Number(group.requested_quantity || group.quantity || 0);
+  const quantityErrorMessage = "生成数量异常，请返回重新创建价格组。";
+  if (!Number.isInteger(groupQuantity) || groupQuantity <= 0 || requestedQuantity !== groupQuantity) {
+    state.pricingSourceLineMessage = quantityErrorMessage;
+    throw new Error(quantityErrorMessage);
+  }
   const payload = {
     store_code: sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback(),
     assigned_clerk: sdp.assigned_clerk || currentSession.user?.username || getCurrentStoreWorkerFallback(),
@@ -33903,12 +33915,16 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
     category_short: group.category_short || group.category_sub || group.category || group.category_main || "",
     grade: group.grade || "",
     pricing_type: pricingType,
-    quantity: Number(group.quantity || 0),
+    quantity: groupQuantity,
     pricing_batch_id: group.pricing_batch_id || group.group_id,
     source_line_key: group.source_line_key,
     source_sdp_display_code: sourceSdpDisplayCode,
     source_sdp_machine_code: sourceSdpMachineCode,
   };
+  if (Number(payload.quantity || 0) !== groupQuantity) {
+    state.pricingSourceLineMessage = quantityErrorMessage;
+    throw new Error(quantityErrorMessage);
+  }
   const result = await request("/store-items/generate-from-pricing-batch", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -33923,7 +33939,7 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
   applyStoreMobileLabelSize(state, group.label_template_size || state.label_template_size || "60x40", group.group_id);
   state.generatedRanges[group.group_id] = {
     generated_count: generatedItems.length,
-    pending_print_count: Number(result?.pending_print_count || getStoreMobilePendingPrintCount(generatedItems)),
+    pending_print_count: getStoreMobilePendingPrintCount(generatedItems),
     demo_only: false,
   };
   setStoreMobileActivePage(state, "group_generated", { groupId: group.group_id, source: "generate" });
