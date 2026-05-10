@@ -134,8 +134,8 @@ test("PDA pricing preview keeps #195 page components but runtime bottom nav only
 
   assert.match(pageOptionsSource, /我的 SDP 任务/);
   assert.match(pageOptionsSource, /SDP 详情/);
-  assert.match(pageOptionsSource, /现场分堆标价/);
-  assert.match(pageOptionsSource, /价格组列表/);
+  assert.match(pageOptionsSource, /分批定价/);
+  assert.doesNotMatch(pageOptionsSource, /当前 source line|价格组列表/);
   assert.match(pageOptionsSource, /本批 STORE_ITEM 生成结果/);
   assert.match(pageOptionsSource, /本批标签预览/);
   assert.match(pageOptionsSource, /print payload 预览/);
@@ -246,8 +246,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-item-incremental-pricing-back-PR235/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-incremental-pricing-back-PR235/);
+  assert.match(indexHtml, /app\.js\?v=clerk-pricing-split-clear-ui-236/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-pricing-split-clear-ui-236/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -479,15 +479,128 @@ test("backend selected SDP pricing source lines come from the assigned task, not
   assert.match(buildSource, /需补充分拣明细/);
   assert.doesNotMatch(buildSource, /SDP261250002|SDO260504008|A-01|A-02|牛仔裤 A/);
   assert.match(renderSource, /pricingSourceLines/);
-  assert.match(renderSource, /P 档默认售价/);
-  assert.match(renderSource, /S 档默认售价/);
-  assert.match(renderSource, /自定义价格/);
+  assert.match(renderSource, /分批定价/);
+  assert.match(renderSource, /创建新价格组/);
+  assert.match(renderSource, /本批数量，可修改/);
+  assert.match(renderSource, /先输入这一批数量，再选择售价创建价格组。/);
+  assert.match(renderSource, /创建 P档价格组/);
+  assert.match(renderSource, /创建 S档价格组/);
+  assert.match(renderSource, /创建自定义价格组/);
+  assert.match(renderSource, /已创建价格组/);
+  assert.match(renderSource, /还没有价格组。请先输入数量并选择售价。/);
   assert.match(renderSource, /需补充分拣明细/);
   assert.match(renderSource, /data-mobile-pricing-create-batch/);
   assert.match(batchSource, /source_sdp_display_code/);
   assert.match(batchSource, /source_sdp_machine_code/);
   assert.match(batchSource, /CUSTOM/);
   assert.match(suggestedSource, /findApparelDefaultSalePriceRecord/);
+});
+
+test("pricing split page explains source line progress and created price groups in clerk language", () => {
+  const renderCards = getExecutableBundle(
+    [
+      "getStoreMobileTaskGroups",
+      "getStoreMobilePricingSourceLines",
+      "getStoreMobileLineAllocatedQty",
+      "getStoreMobileGroupGeneratedQty",
+      "getStoreMobileLineGeneratedQty",
+      "getStoreMobileSourceLineProgress",
+      "getStoreMobilePriceGroupWorkflowStatus",
+      "isStoreMobilePriceGroupLocked",
+      "getStoreMobilePriceGroupStatus",
+      "getStoreMobilePricingTone",
+      "renderStoreMobilePricingBadge",
+      "normalizeStoreItemForLabelPreview",
+      "getStoreMobileGeneratedStoreItems",
+      "getStoreMobilePendingPrintCount",
+      "renderPriceGroupCards",
+    ],
+    `
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+    function getStoreMobileSuggestedSalePrice(categoryMain, categorySub, grade) {
+      if (grade === "P") return 410;
+      if (grade === "S") return 312;
+      return 0;
+    }
+    `,
+    "renderPriceGroupCards",
+  );
+  const state = {
+    selectedSdp: {
+      backend_task: true,
+      display_code: "SDP261290019",
+      machine_code: "6261290019",
+      total_count: 100,
+    },
+    pricingSourceLines: [{
+      line_key: "line-100",
+      category_main: "pants",
+      category_sub: "cargo pant",
+      category_short: "Cargo",
+      total_qty: 100,
+      item_count: 100,
+      remaining_qty: 100,
+      source_sdp_display_code: "SDP261290019",
+      source_sdp_machine_code: "6261290019",
+    }],
+    priceGroups: [],
+  };
+
+  const emptyHtml = renderCards(state);
+  assert.match(emptyHtml, /pants \/ cargo pant/);
+  assert.match(emptyHtml, /总数[\s\S]*100/);
+  assert.match(emptyHtml, /已分批[\s\S]*0/);
+  assert.match(emptyHtml, /已生成[\s\S]*0/);
+  assert.match(emptyHtml, /剩余[\s\S]*100/);
+  assert.match(emptyHtml, /创建新价格组/);
+  assert.match(emptyHtml, /本批数量，可修改/);
+  assert.match(emptyHtml, /先输入这一批数量，再选择售价创建价格组。/);
+  assert.match(emptyHtml, /创建 P档价格组 · KSh 410/);
+  assert.match(emptyHtml, /创建 S档价格组 · KSh 312/);
+  assert.match(emptyHtml, /创建自定义价格组/);
+  assert.match(emptyHtml, /已创建价格组/);
+  assert.match(emptyHtml, /还没有价格组。请先输入数量并选择售价。/);
+
+  state.priceGroups = [{
+    group_id: "BATCH-01-P",
+    source_line_key: "line-100",
+    category_main: "pants",
+    category_sub: "cargo pant",
+    category_short: "Cargo",
+    tier: "P档",
+    grade: "P",
+    price_kes: 410,
+    quantity: 30,
+    status: "待生成 STORE_ITEM",
+    workflow_status: "draft",
+  }];
+  const draftHtml = renderCards(state);
+  assert.match(draftHtml, /剩余[\s\S]*70/);
+  assert.match(draftHtml, /价格组 1/);
+  assert.match(draftHtml, /P档 · KSh 410 · 30件/);
+  assert.match(draftHtml, /状态：待生成商品码/);
+  assert.match(draftHtml, /生成本批商品码/);
+  assert.match(draftHtml, />删除</);
+
+  state.priceGroups[0].status = "已生成 / 待打印";
+  state.priceGroups[0].workflow_status = "locked";
+  state.priceGroups[0].generated_store_items = Array.from({ length: 30 }, (_, index) => ({
+    machine_code: `526129000${String(index + 1).padStart(3, "0")}`,
+    print_status: "pending_print",
+  }));
+  const generatedHtml = renderCards(state);
+  assert.match(generatedHtml, /状态：已生成 \/ 待打印/);
+  assert.match(generatedHtml, /已生成：30件/);
+  assert.match(generatedHtml, /查看标签预览/);
+  assert.match(generatedHtml, /locked \/ 不可删除/);
+  assert.doesNotMatch(generatedHtml, /data-mobile-pricing-delete-group/);
 });
 
 test("backend selected SDP batch quantity validation blocks over-allocation", () => {
@@ -594,6 +707,8 @@ test("incremental pricing batches track allocated, generated, and remaining quan
   assert.equal(pBatch.quantity, 30);
   assert.equal(pBatch.price_kes, 410);
   assert.equal(pBatch.workflow_status, "draft");
+  assert.equal(pBatch.generated_store_items, undefined);
+  assert.equal(state.priceGroups.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(helpers.getStoreMobileSourceLineProgress(state, "line-100"))), {
     source_line_key: "line-100",
     total_qty: 100,
@@ -958,10 +1073,12 @@ test("generation and print task pages guide the next price group", () => {
   assert.match(helperSource, /price_kes/);
   assert.match(generationSource, /renderNextPriceGroupHint/);
   assert.match(printPanelSource, /renderNextPriceGroupHint/);
-  assert.match(generationSource, /返回分批页面/);
+  assert.match(generationSource, /返回分批定价/);
   assert.match(generationSource, /查看标签预览/);
-  assert.match(printPanelSource, /返回价格组列表/);
-  assert.match(printPanelSource, /继续分下一批/);
+  assert.match(generationSource, /继续分下一批/);
+  assert.match(printPanelSource, /返回本批生成结果/);
+  assert.match(printPanelSource, /返回分批定价/);
+  assert.doesNotMatch(printPanelSource, /返回价格组列表|继续分下一批/);
 });
 
 test("per-group workflow advances generate then preview without sticker confirmation", () => {
@@ -1162,6 +1279,8 @@ test("pricing workbench moves price groups close to the top", () => {
   assert.ok(sdpIndex > -1, "pricing screen renders compact SDP card");
   assert.ok(groupsIndex > sdpIndex, "price groups follow SDP card");
   assert.ok(addIndex > groupsIndex, "actions stay below price groups");
+  assert.match(screenSource, /<h3>分批定价<\/h3>/);
+  assert.doesNotMatch(screenSource, /返回价格组列表/);
   assert.doesNotMatch(screenSource.slice(sdpIndex, groupsIndex), /mobile-section-head[\s\S]*?价格组总览/);
   assert.match(frameSource, /mobile-pricing-statusbar/);
   assert.match(frameSource, /mobile-pricing-titlebar/);
@@ -1195,6 +1314,11 @@ test("legacy PDA bundle includes incremental split and Android back behavior", (
   assert.match(appLegacyJs, /pricing_split/);
   assert.match(appLegacyJs, /group_generated/);
   assert.match(appLegacyJs, /label_preview/);
-  assert.match(appLegacyJs, /返回分批页面/);
+  assert.match(appLegacyJs, /分批定价/);
+  assert.match(appLegacyJs, /创建新价格组/);
+  assert.match(appLegacyJs, /创建 P档价格组/);
+  assert.match(appLegacyJs, /创建 S档价格组/);
+  assert.match(appLegacyJs, /创建自定义价格组/);
+  assert.match(appLegacyJs, /返回分批定价/);
   assert.match(appLegacyJs, /继续分下一批/);
 });
