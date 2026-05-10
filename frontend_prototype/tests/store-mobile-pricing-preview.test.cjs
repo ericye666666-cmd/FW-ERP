@@ -12,6 +12,7 @@ const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf
 function extractFunctionSource(source, functionName) {
   const start = source.indexOf(`function ${functionName}`);
   assert.notEqual(start, -1, `missing function ${functionName}`);
+  const functionStart = source.slice(Math.max(0, start - 6), start) === "async " ? start - 6 : start;
   const signatureEnd = source.indexOf(") {", start);
   assert.notEqual(signatureEnd, -1, `missing function body for ${functionName}`);
   const braceStart = signatureEnd + 2;
@@ -22,7 +23,7 @@ function extractFunctionSource(source, functionName) {
     if (char === "}") {
       depth -= 1;
       if (depth === 0) {
-        return source.slice(start, index + 1);
+        return source.slice(functionStart, index + 1);
       }
     }
   }
@@ -246,8 +247,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-pricing-split-clear-ui-236/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-pricing-split-clear-ui-236/);
+  assert.match(indexHtml, /app\.js\?v=store-item-batch-quantity-fix-237/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-batch-quantity-fix-237/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -736,6 +737,224 @@ test("incremental pricing batches track allocated, generated, and remaining quan
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 0);
 });
 
+test("pricing batch creation refuses missing quantity input instead of using source line total", () => {
+  const helpers = getExecutableBundle(
+    [
+      "getStoreMobileTaskGroups",
+      "getStoreMobilePricingSourceLines",
+      "getStoreMobileLineAllocatedQty",
+      "getStoreMobileLineRemainingQty",
+      "validateStoreMobilePricingBatchQuantity",
+      "createStoreMobilePricingBatch",
+    ],
+    `
+    class HTMLInputElement {
+      constructor(value, dataset) {
+        this.value = String(value);
+        this.dataset = dataset || {};
+      }
+    }
+    var includeQuantityInput = false;
+    var document = {
+      querySelectorAll(selector) {
+        if (selector === "[data-mobile-pricing-batch-qty]") {
+          return includeQuantityInput ? [new HTMLInputElement(20, { mobilePricingBatchQty: "line-100" })] : [];
+        }
+        if (selector === "[data-mobile-pricing-custom-price]") {
+          return [new HTMLInputElement(0, { mobilePricingCustomPrice: "line-100" })];
+        }
+        return [];
+      },
+    };
+    function getStoreMobileSuggestedSalePrice(categoryMain, categorySub, grade) {
+      return grade === "P" ? 410 : 312;
+    }
+    `,
+    "({ createStoreMobilePricingBatch })",
+  );
+  const state = {
+    selectedSdp: {
+      display_code: "SDP261290018",
+      machine_code: "6261290018",
+      total_count: 100,
+      backend_task: true,
+    },
+    pricingSourceLines: [{
+      line_key: "line-100",
+      category_main: "pants",
+      category_sub: "cargo pant",
+      item_count: 100,
+      remaining_qty: 100,
+    }],
+    priceGroups: [],
+  };
+
+  const result = helpers.createStoreMobilePricingBatch(state, "line-100||P");
+
+  assert.equal(result, null);
+  assert.equal(state.priceGroups.length, 0);
+  assert.match(state.pricingSourceLineMessage, /请输入本批数量/);
+});
+
+test("STORE_ITEM generation request uses exact pricing group quantity and preview counts", async () => {
+  const helpers = getExecutableBundle(
+    [
+      "normalizeStoreMobilePdaPage",
+      "getStoreMobilePdaPageSnapshot",
+      "pushStoreMobilePdaBrowserHistory",
+      "setStoreMobileActivePage",
+      "getStoreMobileTaskGroups",
+      "getStoreMobilePricingSourceLines",
+      "getStoreMobileLineAllocatedQty",
+      "getStoreMobileGroupGeneratedQty",
+      "getStoreMobileLineGeneratedQty",
+      "getStoreMobileSourceLineProgress",
+      "getStoreMobileLineRemainingQty",
+      "validateStoreMobilePricingBatchQuantity",
+      "createStoreMobilePricingBatch",
+      "isStoreMobileTaskComplete",
+      "getStoreMobileTaskStatus",
+      "getStoreMobileTaskTotals",
+      "syncStoreMobileTaskCounters",
+      "getStoreMobilePricingTypeForGroup",
+      "getStoreMobileGeneratedStoreItems",
+      "getStoreMobilePendingPrintCount",
+      "getStoreItemLabelSizeConfig",
+      "applyStoreMobileLabelSize",
+      "normalizeStoreItemForLabelPreview",
+      "buildStoreItemLabelPreviewPayload",
+      "renderCode128BarcodePreview",
+      "renderStoreItemLabelPreview",
+      "generateStoreMobileBatchStoreItems",
+    ],
+    `
+    class HTMLInputElement {
+      constructor(value, dataset) {
+        this.value = String(value);
+        this.dataset = dataset || {};
+      }
+    }
+    var mockQuantity = 20;
+    var mockCustomPrice = 0;
+    var capturedRequests = [];
+    var currentSession = { user: { username: "Austin", store_code: "UTAWALA" } };
+    var document = {
+      querySelectorAll(selector) {
+        if (selector === "[data-mobile-pricing-batch-qty]") {
+          return [new HTMLInputElement(mockQuantity, { mobilePricingBatchQty: "line-100" })];
+        }
+        if (selector === "[data-mobile-pricing-custom-price]") {
+          return [new HTMLInputElement(mockCustomPrice, { mobilePricingCustomPrice: "line-100" })];
+        }
+        return [];
+      },
+    };
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+    function getStoreMobileSuggestedSalePrice(categoryMain, categorySub, grade) {
+      if (grade === "P") return 410;
+      if (grade === "S") return 312;
+      return 0;
+    }
+    function getCurrentStoreCodeFallback() {
+      return "UTAWALA";
+    }
+    function getCurrentStoreWorkerFallback() {
+      return "Austin";
+    }
+    async function request(url, options) {
+      const payload = JSON.parse(options.body);
+      capturedRequests.push({ url, payload });
+      return {
+        pricing_batch_id: payload.pricing_batch_id,
+        store_items: Array.from({ length: payload.quantity }, (_, index) => ({
+          machine_code: "526129" + String(capturedRequests.length).padStart(2, "0") + String(index + 1).padStart(4, "0"),
+          barcode_value: "526129" + String(capturedRequests.length).padStart(2, "0") + String(index + 1).padStart(4, "0"),
+          sale_price_kes: payload.sale_price_kes,
+          category_short: payload.category_short,
+          grade: payload.grade,
+          pricing_type: payload.pricing_type,
+          print_status: "pending_print",
+          sticker_status: "pending",
+        })),
+        tokens: [],
+        pending_print_count: payload.quantity,
+      };
+    }
+    `,
+    `({
+      setMockQuantity(value) {
+        mockQuantity = value;
+      },
+      capturedRequests,
+      createStoreMobilePricingBatch,
+      generateStoreMobileBatchStoreItems,
+      getStoreMobileSourceLineProgress,
+      buildStoreItemLabelPreviewPayload,
+      renderStoreItemLabelPreview,
+    })`,
+  );
+  const state = {
+    selectedSdp: {
+      display_code: "SDP261290018",
+      machine_code: "6261290018",
+      total_count: 100,
+      store_name: "UTAWALA",
+      assigned_clerk: "Austin",
+      backend_task: true,
+    },
+    pricingSourceLines: [{
+      line_key: "line-100",
+      category_main: "pants",
+      category_sub: "cargo pant",
+      category_short: "CARGO PANT",
+      item_count: 100,
+      remaining_qty: 100,
+      source_sdp_display_code: "SDP261290018",
+      source_sdp_machine_code: "6261290018",
+    }],
+    priceGroups: [],
+    generatedRanges: {},
+  };
+
+  helpers.setMockQuantity(20);
+  const pBatch = helpers.createStoreMobilePricingBatch(state, "line-100||P");
+  assert.equal(pBatch.quantity, 20);
+  assert.notEqual(pBatch.quantity, 100);
+  assert.equal(pBatch.requested_quantity ?? pBatch.quantity, 20);
+  assert.equal(state.priceGroups.length, 1);
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").allocated_qty, 20);
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 80);
+  assert.equal(pBatch.generated_store_items, undefined);
+
+  await helpers.generateStoreMobileBatchStoreItems(state, pBatch.group_id);
+  assert.equal(helpers.capturedRequests[0].url, "/store-items/generate-from-pricing-batch");
+  assert.equal(helpers.capturedRequests[0].payload.quantity, 20);
+  assert.equal(helpers.capturedRequests[0].payload.sale_price_kes, 410);
+  assert.equal(helpers.capturedRequests[0].payload.pricing_batch_id, pBatch.group_id);
+  assert.equal(helpers.capturedRequests[0].payload.source_sdp_display_code, "SDP261290018");
+  assert.equal(pBatch.generated_store_items.length, 20);
+  assert.match(helpers.renderStoreItemLabelPreview(pBatch.generated_store_items, "60x40", pBatch), /第 1 \/ 20 张/);
+  assert.equal(helpers.buildStoreItemLabelPreviewPayload("60x40", pBatch.generated_store_items, pBatch).labels.length, 20);
+
+  helpers.setMockQuantity(30);
+  const sBatch = helpers.createStoreMobilePricingBatch(state, "line-100||S");
+  assert.equal(sBatch.quantity, 30);
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 50);
+  await helpers.generateStoreMobileBatchStoreItems(state, sBatch.group_id);
+  assert.equal(helpers.capturedRequests[1].payload.quantity, 30);
+  assert.equal(helpers.capturedRequests[1].payload.sale_price_kes, 312);
+  assert.equal(sBatch.generated_store_items.length, 30);
+  assert.match(helpers.renderStoreItemLabelPreview(sBatch.generated_store_items, "60x40", sBatch), /第 1 \/ 30 张/);
+  assert.equal(helpers.buildStoreItemLabelPreviewPayload("60x40", sBatch.generated_store_items, sBatch).labels.length, 30);
+});
+
 test("generated pricing groups are locked and draft pricing groups remain deletable", () => {
   const lockHelpers = getExecutableBundle(
     ["getStoreMobileGeneratedStoreItems", "getStoreMobileGroupGeneratedQty", "isStoreMobilePriceGroupLocked", "getStoreMobilePriceGroupWorkflowStatus"],
@@ -769,6 +988,7 @@ test("real backend SDP batch generation uses pricing batch STORE_ITEM API and st
   assert.match(generateSource, /category_short/);
   assert.match(generateSource, /assigned_clerk/);
   assert.match(generateSource, /source_sdp_display_code/);
+  assert.match(generateSource, /生成数量异常，请返回重新创建价格组。/);
   assert.match(previewActionSource, /buildStoreItemLabelPreviewPayload/);
   assert.match(previewActionSource, /preview_only/);
   assert.doesNotMatch(previewActionSource, /print-jobs\/item-tokens|DirectLoopPdaPrinter|printTestLabel|sticker_confirmed|marked.*printed/i);
