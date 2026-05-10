@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#244/);
+  assert.match(loginVersionSection, /#245/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#25/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=force-tspl-diagnostic-click-244/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=force-tspl-diagnostic-click-244/);
+  assert.match(indexHtml, /app\.js\?v=printer-json-copy-clear-245/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=printer-json-copy-clear-245/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -97,7 +97,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-force-tspl-diagnostic-click-244/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-printer-json-copy-clear-245/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
 });
 
@@ -300,8 +300,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=force-tspl-diagnostic-click-244/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=force-tspl-diagnostic-click-244/);
+  assert.match(indexHtml, /app\.js\?v=printer-json-copy-clear-245/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=printer-json-copy-clear-245/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -543,6 +543,10 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.match(diagnosticsSource, /last_error/);
   assert.match(diagnosticsSource, /raw JSON from latest getPrinterStatus\(\)/);
   assert.match(diagnosticsSource, /data-clerk-printer-diagnostics-json="true"/);
+  assert.match(diagnosticsSource, /清空 raw JSON/);
+  assert.match(diagnosticsSource, /data-clerk-printer-json-clear/);
+  assert.match(diagnosticsSource, /一键复制 raw JSON/);
+  assert.match(diagnosticsSource, /data-clerk-printer-json-copy/);
   assert.match(diagnosticsSource, /刷新诊断状态/);
   assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-diagnostic-refresh/);
   assert.match(diagnosticsSource, /锁定诊断状态/);
@@ -554,6 +558,50 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.doesNotMatch(actionHandler, /clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}connectPrinter|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}printTestLabel|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}listPairedPrinters/);
   assert.match(appLegacyJs, /诊断详情 \/ Developer diagnostics/);
   assert.match(appLegacyJs, /data-clerk-bluetooth-printer-diagnostic-refresh/);
+  assert.match(appLegacyJs, /data-clerk-printer-json-clear/);
+  assert.match(appLegacyJs, /data-clerk-printer-json-copy/);
+});
+
+test("clerk PDA printer diagnostics raw JSON can be cleared or copied", () => {
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const clearSource = extractFunctionSource(appJs, "clearClerkPrinterDiagnosticsRawJson");
+  const copySource = extractFunctionSource(appJs, "copyClerkPrinterDiagnosticsRawJson");
+  const clipboardSource = extractFunctionSource(appJs, "copyTextToClipboardWithFallback");
+  const actionHandler = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const selectorStart = appJs.indexOf('event.target.closest("[data-mobile-pricing-page]');
+  const handlerCall = appJs.indexOf("handleStoreMobilePricingPreviewAction(button);", selectorStart);
+  const listenerSource = appJs.slice(selectorStart, handlerCall + "handleStoreMobilePricingPreviewAction(button);".length);
+
+  assert.match(diagnosticsSource, /清空 raw JSON/);
+  assert.match(diagnosticsSource, /data-clerk-printer-json-clear/);
+  assert.match(diagnosticsSource, /一键复制 raw JSON/);
+  assert.match(diagnosticsSource, /data-clerk-printer-json-copy/);
+  assert.match(listenerSource, /\[data-clerk-printer-json-clear\]/);
+  assert.match(listenerSource, /\[data-clerk-printer-json-copy\]/);
+  assert.match(actionHandler, /clerkPrinterJsonClear/);
+  assert.match(actionHandler, /clearClerkPrinterDiagnosticsRawJson/);
+  assert.match(actionHandler, /clerkPrinterJsonCopy/);
+  assert.match(actionHandler, /copyClerkPrinterDiagnosticsRawJson/);
+  assert.match(clearSource, /bluetoothPrinterRawStatusJson\s*=\s*""/);
+  assert.match(clearSource, /raw JSON 已清空。/);
+  assert.match(clearSource, /bluetoothPrinterDiagnosticsOpen\s*=\s*true/);
+  assert.match(clearSource, /renderStoreMobilePricingPreviewPreservingScroll/);
+  assert.doesNotMatch(clearSource, /bluetoothPrinterStatus|selected_printer|last_protocol_tested|disconnectPrinter|connection_status/);
+  assert.match(copySource, /没有可复制的 raw JSON，请先刷新诊断状态。/);
+  assert.match(copySource, /raw JSON 已复制。/);
+  assert.match(copySource, /复制失败，请长按 raw JSON 手动复制。/);
+  assert.match(copySource, /copyTextToClipboardWithFallback/);
+  assert.match(copySource, /renderStoreMobilePricingPreviewPreservingScroll/);
+  assert.match(clipboardSource, /navigator\.clipboard/);
+  assert.match(clipboardSource, /writeText/);
+  assert.match(clipboardSource, /document\.createElement\("textarea"\)/);
+  assert.match(clipboardSource, /select\(\)/);
+  assert.match(clipboardSource, /document\.execCommand\("copy"\)/);
+  assert.match(appLegacyJs, /清空 raw JSON/);
+  assert.match(appLegacyJs, /一键复制 raw JSON/);
+  assert.match(appLegacyJs, /data-clerk-printer-json-clear/);
+  assert.match(appLegacyJs, /data-clerk-printer-json-copy/);
+  assert.match(appLegacyJs, /copyTextToClipboardWithFallback/);
 });
 
 test("clerk PDA diagnostics can force a raw TSPL preview label without online gating", () => {
@@ -721,10 +769,14 @@ test("backend task start button is included in the PDA pricing click listener", 
 
   assert.match(listenerSource, /\[data-mobile-pricing-select-backend-task\]/);
   assert.match(listenerSource, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
+  assert.match(listenerSource, /\[data-clerk-printer-json-clear\]/);
+  assert.match(listenerSource, /\[data-clerk-printer-json-copy\]/);
   assert.match(listenerSource, /event\.target\.closest/);
   assert.match(listenerSource, /handleStoreMobilePricingPreviewAction\(button\)/);
   assert.match(appLegacyJs, /\[data-mobile-pricing-select-backend-task\]/);
   assert.match(appLegacyJs, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
+  assert.match(appLegacyJs, /\[data-clerk-printer-json-clear\]/);
+  assert.match(appLegacyJs, /\[data-clerk-printer-json-copy\]/);
 });
 
 test("backend task selection loads selected SDP into the scan workflow", () => {
