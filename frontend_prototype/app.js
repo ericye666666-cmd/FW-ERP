@@ -3780,6 +3780,12 @@ function createDefaultClerkBluetoothPrinterStatus() {
     selected_printer_address: "",
     selected_profile: "GENERIC",
     connection_status: "disconnected",
+    printer_online_status: "unknown",
+    printer_health_checked_at: "",
+    official_sdk_available: false,
+    official_sdk_connected: false,
+    official_sdk_last_message: "",
+    official_sdk_last_error: "",
     last_error: "",
     last_protocol_tested: "",
     last_print_result: "none",
@@ -3850,6 +3856,22 @@ function normalizeClerkBluetoothPrinterRows(raw = []) {
   }));
 }
 
+function getClerkBluetoothBooleanValue(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+}
+
+function getClerkBluetoothPrinterOnlineStatusValue(value = "") {
+  const normalized = String(value || "unknown").trim().toLowerCase();
+  if (normalized === "online" || normalized === "offline" || normalized === "error") {
+    return normalized;
+  }
+  return "unknown";
+}
+
 function normalizeClerkBluetoothPrinterStatus(raw = {}) {
   const status = getClerkBluetoothPrinterStatusObject(raw);
   const printers = Array.isArray(status.paired_printers) ? status.paired_printers : [];
@@ -3868,6 +3890,12 @@ function normalizeClerkBluetoothPrinterStatus(raw = {}) {
     selected_printer_address: String(status.selected_printer_address || "").trim(),
     selected_profile: String(status.selected_profile || "GENERIC").trim() || "GENERIC",
     connection_status: String(status.connection_status || "disconnected").trim() || "disconnected",
+    printer_online_status: getClerkBluetoothPrinterOnlineStatusValue(status.printer_online_status),
+    printer_health_checked_at: String(status.printer_health_checked_at || "").trim(),
+    official_sdk_available: getClerkBluetoothBooleanValue(status.official_sdk_available),
+    official_sdk_connected: getClerkBluetoothBooleanValue(status.official_sdk_connected),
+    official_sdk_last_message: String(status.official_sdk_last_message || "").trim(),
+    official_sdk_last_error: String(status.official_sdk_last_error || "").trim(),
     last_error: String(status.last_error || "").trim(),
     last_protocol_tested: String(status.last_protocol_tested || "").trim(),
     last_print_result: String(status.last_print_result || "none").trim() || "none",
@@ -33427,13 +33455,42 @@ function getClerkBluetoothPrinterProfileValue(profile = "") {
   return "GENERIC";
 }
 
+function isClerkOfficialChitengPrinterProfile(status = {}) {
+  return getClerkBluetoothPrinterProfileValue(status.selected_profile) === "CHITENG_S1_OFFICIAL";
+}
+
+function isClerkOfficialChitengPrinterOnlineReady(status = {}) {
+  const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
+  return isClerkOfficialChitengPrinterProfile(normalizedStatus)
+    && normalizedStatus.connection_status === "connected"
+    && normalizedStatus.printer_online_status === "online"
+    && normalizedStatus.official_sdk_connected === true;
+}
+
+function canRunClerkBluetoothPrinterTestPrint(status = {}) {
+  return isClerkOfficialChitengPrinterOnlineReady(status);
+}
+
 function getClerkBluetoothPrinterStateLabel(status = {}) {
-  const connectionStatus = String(status.connection_status || "disconnected").trim();
-  const discoveryStatus = String(status.discovery_status || "idle").trim();
+  const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
+  const connectionStatus = String(normalizedStatus.connection_status || "disconnected").trim();
+  const discoveryStatus = String(normalizedStatus.discovery_status || "idle").trim();
   if (discoveryStatus === "searching") {
     return "搜索中";
   }
   if (connectionStatus === "connected") {
+    if (isClerkOfficialChitengPrinterProfile(normalizedStatus)) {
+      if (isClerkOfficialChitengPrinterOnlineReady(normalizedStatus)) {
+        return "已连接";
+      }
+      if (normalizedStatus.printer_online_status === "offline") {
+        return "离线";
+      }
+      if (normalizedStatus.printer_online_status === "error") {
+        return "错误";
+      }
+      return "未验证";
+    }
     return "已连接";
   }
   if (connectionStatus === "connecting") {
@@ -33451,6 +33508,16 @@ function getClerkBluetoothPrinterStatusText(status = {}) {
     return "正常";
   }
   return stateLabel;
+}
+
+function getClerkBluetoothPrinterBadgeText(status = {}) {
+  const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
+  const stateLabel = getClerkBluetoothPrinterStateLabel(normalizedStatus);
+  const name = String(normalizedStatus.selected_printer_name || "").trim();
+  if (name && (stateLabel === "已连接" || isClerkOfficialChitengPrinterProfile(normalizedStatus))) {
+    return `🖨 ${stateLabel} ${name}`;
+  }
+  return `🖨 ${stateLabel}`;
 }
 
 function getClerkBluetoothPrinterRowsForDisplay(state = storeMobilePricingPreviewState) {
@@ -33480,11 +33547,7 @@ function isClerkBluetoothPrinterBonded(printer = {}) {
 
 function renderClerkPrinterStatusBadge(state = storeMobilePricingPreviewState) {
   const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
-  const stateLabel = getClerkBluetoothPrinterStateLabel(status);
-  const name = String(status.selected_printer_name || "").trim();
-  const text = stateLabel === "已连接" && name
-    ? `🖨 已连接 ${name}`
-    : `🖨 ${stateLabel}`;
+  const text = getClerkBluetoothPrinterBadgeText(status);
   return `
     <button type="button" class="ghost-button mini-button clerk-printer-status-badge" data-clerk-printer-status-badge="true" data-mobile-pricing-page="printer_connection">
       ${escapeHtml(text)}
@@ -33505,9 +33568,10 @@ function handleClerkPrinterDiagnosticsToggle(target) {
 
 function renderClerkPrinterConnectionEntryCard(state = storeMobilePricingPreviewState) {
   const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
-  const printerName = status.connection_status === "connected"
-    ? `${status.selected_printer_name || "已连接"} 已连接`
-    : "未连接";
+  const stateLabel = getClerkBluetoothPrinterStateLabel(status);
+  const printerName = status.selected_printer_name
+    ? `${status.selected_printer_name} ${stateLabel}`
+    : stateLabel;
   return `
     <section class="clerk-printer-entry-card">
       <div>
@@ -33536,6 +33600,12 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
     ["bridge_available", status.bridge_available],
     ["bluetooth_enabled", status.bluetooth_enabled],
     ["connection_status", status.connection_status],
+    ["printer_online_status", status.printer_online_status],
+    ["printer_health_checked_at", status.printer_health_checked_at],
+    ["official_sdk_available", status.official_sdk_available],
+    ["official_sdk_connected", status.official_sdk_connected],
+    ["official_sdk_last_message", status.official_sdk_last_message],
+    ["official_sdk_last_error", status.official_sdk_last_error],
     ["selected_printer_name", status.selected_printer_name],
     ["selected_printer_address", status.selected_printer_address],
     ["selected_profile", status.selected_profile],
@@ -33580,7 +33650,12 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
   const noRowsMessage = state.bluetoothPrinterPairedPrintersLoaded
     ? "请先在 Android 系统蓝牙设置中配对打印机。"
     : "点击搜索或刷新，查找可连接的蓝牙打印机。";
-  const canRunTestPrint = selectedProfile === "CHITENG_S1_OFFICIAL" && status.connection_status === "connected" && !clerkBluetoothPrinterActionInFlight;
+  const canRunTestPrint = canRunClerkBluetoothPrinterTestPrint(status) && !clerkBluetoothPrinterActionInFlight;
+  const canConnectPrinter = !clerkBluetoothPrinterActionInFlight
+    && Boolean(status.selected_printer_address)
+    && status.connection_status !== "connecting";
+  const canDisconnectPrinter = !clerkBluetoothPrinterActionInFlight
+    && (status.connection_status === "connected" || status.connection_status === "error");
   return `
     <section class="clerk-printer-connection-page" data-clerk-printer-connection-page="true">
       <div class="mobile-section-head">
@@ -33595,6 +33670,11 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
           <div><strong>地址</strong><span>${escapeHtml(status.selected_printer_address || "-")}</span></div>
           <div><strong>当前型号</strong><span>${escapeHtml(getClerkBluetoothPrinterProfileLabel(selectedProfile))}</span></div>
           <div><strong>最近刷新</strong><span>${escapeHtml(lastRefresh)}</span></div>
+          <div><strong>在线状态 printer_online_status</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.printer_online_status))}</span></div>
+          <div><strong>SDK connected official_sdk_connected</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.official_sdk_connected))}</span></div>
+          <div><strong>SDK message official_sdk_last_message</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.official_sdk_last_message))}</span></div>
+          <div><strong>SDK error official_sdk_last_error</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.official_sdk_last_error))}</span></div>
+          <div><strong>health checked time printer_health_checked_at</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.printer_health_checked_at))}</span></div>
         </div>
         ${(state.bluetoothPrinterError || status.connection_status === "error" || status.last_error)
           ? `<div class="alert-banner clerk-bluetooth-printer-error">${escapeHtml(state.bluetoothPrinterError || status.last_error || "打印机状态异常")}</div>`
@@ -33637,9 +33717,10 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
       </div>
 
       <div class="mobile-bottom-button-stack">
-        <button type="button" class="primary-button" data-clerk-bluetooth-printer-connect="true" ${(clerkBluetoothPrinterActionInFlight || !status.selected_printer_address || status.connection_status === "connecting") ? "disabled" : ""}>连接打印机</button>
-        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-disconnect="true" ${clerkBluetoothPrinterActionInFlight ? "disabled" : ""}>断开连接</button>
+        <button type="button" class="primary-button" data-clerk-bluetooth-printer-connect="true" ${canConnectPrinter ? "" : "disabled"}>连接打印机</button>
+        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-disconnect="true" ${canDisconnectPrinter ? "" : "disabled"}>断开连接</button>
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="true" ${canRunTestPrint ? "" : "disabled"}>打印测试标签</button>
+        ${selectedProfile === "CHITENG_S1_OFFICIAL" && !canRunTestPrint ? '<div class="subtle small">请先连接并确认打印机在线。</div>' : ""}
         ${selectedProfile !== "CHITENG_S1_OFFICIAL" ? '<div class="subtle small">该型号测试打印暂未配置。</div>' : ""}
       </div>
 
@@ -34100,6 +34181,9 @@ function handleStoreMobilePricingPreviewAction(button) {
         }
         if (getClerkBluetoothPrinterProfileValue(currentStatus.selected_profile) !== "CHITENG_S1_OFFICIAL") {
           throw new Error("该型号测试打印暂未配置");
+        }
+        if (!canRunClerkBluetoothPrinterTestPrint(currentStatus)) {
+          throw new Error("请先连接并确认打印机在线。");
         }
         await bridge.printTestLabel("CHITENG_S1_OFFICIAL");
       }

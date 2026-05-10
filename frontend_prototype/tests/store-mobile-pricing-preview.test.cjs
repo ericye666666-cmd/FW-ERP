@@ -247,8 +247,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-item-batch-quantity-fix-237/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-batch-quantity-fix-237/);
+  assert.match(indexHtml, /app\.js\?v=printer-truthful-badge-238/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=printer-truthful-badge-238/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -277,6 +277,138 @@ test("clerk PDA printer connection page uses official Chiteng test print without
   assert.doesNotMatch(actionHandler, /STORE_ITEM|marked.*printed|printJobs.*printed/);
 });
 
+test("clerk PDA Chiteng S1 badge only shows connected after online and SDK proof", () => {
+  const printerBadge = getExecutableBundle(
+    [
+      "createDefaultClerkBluetoothPrinterStatus",
+      "getClerkBluetoothPrinterStatusObject",
+      "normalizeClerkBluetoothPrinterRows",
+      "getClerkBluetoothBooleanValue",
+      "normalizeClerkBluetoothPrinterStatus",
+      "getClerkBluetoothPrinterProfileValue",
+      "getClerkBluetoothPrinterOnlineStatusValue",
+      "isClerkOfficialChitengPrinterProfile",
+      "isClerkOfficialChitengPrinterOnlineReady",
+      "getClerkBluetoothPrinterStateLabel",
+      "getClerkBluetoothPrinterStatusText",
+      "getClerkBluetoothPrinterBadgeText",
+      "renderClerkPrinterStatusBadge",
+    ],
+    `
+      const storeMobilePricingPreviewState = {};
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+    `,
+    "({ renderClerkPrinterStatusBadge, getClerkBluetoothPrinterStatusText })",
+  );
+  const baseStatus = {
+    selected_profile: "CHITENG_S1_OFFICIAL",
+    selected_printer_name: "S1-3696",
+    selected_printer_address: "00:11:22:33",
+    connection_status: "connected",
+  };
+
+  const unknownHtml = printerBadge.renderClerkPrinterStatusBadge({
+    bluetoothPrinterStatus: {
+      ...baseStatus,
+      printer_online_status: "unknown",
+      official_sdk_connected: false,
+    },
+  });
+  assert.doesNotMatch(unknownHtml, /已连接 S1-3696/);
+  assert.match(unknownHtml, /未验证 S1-3696/);
+  assert.equal(
+    printerBadge.getClerkBluetoothPrinterStatusText({
+      ...baseStatus,
+      printer_online_status: "unknown",
+      official_sdk_connected: false,
+    }),
+    "未验证",
+  );
+
+  const onlineHtml = printerBadge.renderClerkPrinterStatusBadge({
+    bluetoothPrinterStatus: {
+      ...baseStatus,
+      printer_online_status: "online",
+      official_sdk_connected: true,
+    },
+  });
+  assert.match(onlineHtml, /已连接 S1-3696/);
+
+  const offlineHtml = printerBadge.renderClerkPrinterStatusBadge({
+    bluetoothPrinterStatus: {
+      ...baseStatus,
+      printer_online_status: "offline",
+      official_sdk_connected: true,
+    },
+  });
+  assert.match(offlineHtml, /离线 S1-3696/);
+
+  const errorHtml = printerBadge.renderClerkPrinterStatusBadge({
+    bluetoothPrinterStatus: {
+      ...baseStatus,
+      printer_online_status: "error",
+      official_sdk_connected: true,
+    },
+  });
+  assert.match(errorHtml, /错误 S1-3696/);
+});
+
+test("clerk PDA Chiteng S1 test print and diagnostics require truthful online status", () => {
+  const canRunTestPrint = getExecutableBundle(
+    [
+      "createDefaultClerkBluetoothPrinterStatus",
+      "getClerkBluetoothPrinterStatusObject",
+      "normalizeClerkBluetoothPrinterRows",
+      "getClerkBluetoothBooleanValue",
+      "normalizeClerkBluetoothPrinterStatus",
+      "getClerkBluetoothPrinterProfileValue",
+      "getClerkBluetoothPrinterOnlineStatusValue",
+      "isClerkOfficialChitengPrinterProfile",
+      "isClerkOfficialChitengPrinterOnlineReady",
+      "canRunClerkBluetoothPrinterTestPrint",
+    ],
+    "",
+    "canRunClerkBluetoothPrinterTestPrint",
+  );
+  const printerPageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const baseStatus = {
+    selected_profile: "CHITENG_S1_OFFICIAL",
+    selected_printer_name: "S1-3696",
+    connection_status: "connected",
+    printer_online_status: "online",
+  };
+
+  assert.equal(canRunTestPrint({ ...baseStatus, official_sdk_connected: true }), true);
+  assert.equal(canRunTestPrint({ ...baseStatus, official_sdk_connected: false }), false);
+  assert.equal(canRunTestPrint({ ...baseStatus, printer_online_status: "unknown", official_sdk_connected: true }), false);
+  assert.equal(canRunTestPrint({ ...baseStatus, printer_online_status: "offline", official_sdk_connected: true }), false);
+  assert.equal(canRunTestPrint({ ...baseStatus, selected_profile: "GENERIC", official_sdk_connected: true }), false);
+  assert.match(printerPageSource, /canRunClerkBluetoothPrinterTestPrint/);
+  assert.match(printerPageSource, /请先连接并确认打印机在线。/);
+  assert.match(printerPageSource, /在线状态 printer_online_status/);
+  assert.match(printerPageSource, /SDK connected official_sdk_connected/);
+  assert.match(printerPageSource, /SDK message official_sdk_last_message/);
+  assert.match(printerPageSource, /SDK error official_sdk_last_error/);
+  assert.match(printerPageSource, /health checked time printer_health_checked_at/);
+  assert.match(diagnosticsSource, /printer_online_status/);
+  assert.match(diagnosticsSource, /official_sdk_connected/);
+  assert.match(diagnosticsSource, /official_sdk_available/);
+  assert.match(diagnosticsSource, /official_sdk_last_message/);
+  assert.match(diagnosticsSource, /official_sdk_last_error/);
+  assert.match(appLegacyJs, /canRunClerkBluetoothPrinterTestPrint/);
+  assert.match(appLegacyJs, /未验证 S1-3696|未验证/);
+  assert.match(appLegacyJs, /printer_online_status/);
+  assert.match(appLegacyJs, /official_sdk_connected/);
+});
+
 test("clerk PDA printer connection page has collapsed developer diagnostics refreshed by status only", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const updateStatus = extractFunctionSource(appJs, "updateClerkBluetoothPrinterStatus");
@@ -297,6 +429,12 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.match(diagnosticsSource, /bridge_available/);
   assert.match(diagnosticsSource, /bluetooth_enabled/);
   assert.match(diagnosticsSource, /connection_status/);
+  assert.match(diagnosticsSource, /printer_online_status/);
+  assert.match(diagnosticsSource, /printer_health_checked_at/);
+  assert.match(diagnosticsSource, /official_sdk_available/);
+  assert.match(diagnosticsSource, /official_sdk_connected/);
+  assert.match(diagnosticsSource, /official_sdk_last_message/);
+  assert.match(diagnosticsSource, /official_sdk_last_error/);
   assert.match(diagnosticsSource, /selected_printer_name/);
   assert.match(diagnosticsSource, /selected_printer_address/);
   assert.match(diagnosticsSource, /selected_profile/);
@@ -333,7 +471,7 @@ test("clerk PDA printer diagnostics open state and connected badge survive reren
   assert.match(toggleHandler, /bluetoothPrinterDiagnosticsOpen\s*=\s*Boolean\(details\.open\)/);
   assert.match(appJs, /document\.addEventListener\("toggle"/);
   assert.match(appJs, /handleClerkPrinterDiagnosticsToggle/);
-  assert.match(badgeSource, /已连接 \$\{name\}/);
+  assert.match(badgeSource, /getClerkBluetoothPrinterBadgeText/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?min-height:\s*34px/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?max-width:\s*190px/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?white-space:\s*normal/);
