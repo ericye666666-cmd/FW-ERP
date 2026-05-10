@@ -33,10 +33,10 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-code128-batch-test";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-code128-batch-test";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#255";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#33";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-raw-cpcl-formal-batch";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-raw-cpcl-formal-batch";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#257";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#34";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -59,6 +59,7 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printK300CpclCode128TallTest",
   "printK300CpclCode128QuietZoneTest",
   "printK300CpclCode128CompactTopTest",
+  "printK300CpclRawPreview",
   "printK300CpclStoreItemPreview",
   "printK300TsplMinText",
   "printK300TsplBlackBox",
@@ -2695,6 +2696,8 @@ const CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS = 3000;
 const CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS = 15000;
 const CLERK_K300_CODE128_BATCH_DIAGNOSTIC_PAUSE_MS = 30000;
 const CLERK_K300_CODE128_BATCH_STEP_DELAY_MS = 2000;
+const CLERK_K300_RAW_CPCL_FORMAL_BATCH_DIAGNOSTIC_PAUSE_MS = 45000;
+const CLERK_K300_RAW_CPCL_FORMAL_BATCH_STEP_DELAY_MS = 2500;
 let pdaRuntimePollingTimer = null;
 let pdaRuntimePollingInFlight = false;
 let pdaRuntimeActionInFlight = false;
@@ -4475,6 +4478,51 @@ function getClerkS1PreviewProtocolDiagnostics() {
       ],
     },
     {
+      key: "k300_cpcl_raw_formal_batch",
+      label: "连续打印 5 张正式模板",
+      method: "printK300CpclRawPreview",
+      expectedProtocol: "K300_CPCL_RAW_PREVIEW",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: true,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false,
+      rawCpclTemplates: [
+        {
+          templateKey: "A",
+          label: "Template A",
+          testName: "formal_layout_A",
+          cpclCommand: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 48 CARGO PANT / P\r\nBARCODE 128 2 1 70 28 85 5261300000038\r\nTEXT 4 0 55 168 5261300000038\r\nPRINT\r\n",
+        },
+        {
+          templateKey: "B",
+          label: "Template B",
+          testName: "formal_layout_B",
+          cpclCommand: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 7 0 14 45 CARGO PANT / P\r\nBARCODE 128 2 1 62 28 98 5261300000038\r\nTEXT 4 0 55 172 5261300000038\r\nPRINT\r\n",
+        },
+        {
+          templateKey: "C",
+          label: "Template C",
+          testName: "formal_layout_C",
+          cpclCommand: "! 0 200 200 240 1\r\nTEXT 7 0 14 10 KES 410\r\nTEXT 4 0 14 52 CARGO PANT / P\r\nBARCODE 128 2 1 72 25 95 5261300000038\r\nTEXT 4 0 55 178 5261300000038\r\nPRINT\r\n",
+        },
+        {
+          templateKey: "D",
+          label: "Template D",
+          testName: "formal_layout_D",
+          cpclCommand: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 45 CARGO PANT / P\r\nBARCODE 128 1 1 85 35 85 5261300000038\r\nTEXT 4 0 60 182 5261300000038\r\nPRINT\r\n",
+        },
+        {
+          templateKey: "E",
+          label: "Template E",
+          testName: "formal_layout_E",
+          cpclCommand: "! 0 200 200 240 1\r\nTEXT 4 0 14 8 CARGO PANT / P\r\nTEXT 7 0 14 35 KES 410\r\nBARCODE 128 2 1 70 28 88 5261300000038\r\nTEXT 4 0 55 172 5261300000038\r\nPRINT\r\n",
+        },
+      ],
+    },
+    {
       key: "k300_cpcl_code128_wide_test",
       label: "测试 Code128 宽条码",
       method: "printK300CpclCode128WideTest",
@@ -4709,6 +4757,91 @@ async function sendClerkK300Code128BatchDiagnostic({
   }
 }
 
+async function sendClerkK300RawCpclFormalBatchDiagnostic({
+  state = storeMobilePricingPreviewState,
+  bridge,
+  protocol,
+  currentStatus,
+} = {}) {
+  const templates = Array.isArray(protocol?.rawCpclTemplates) ? protocol.rawCpclTemplates : [];
+  if (!templates.length) {
+    throw new Error("K300 CPCL 正式模板配置为空。");
+  }
+  if (!bridge || typeof bridge[protocol.method] !== "function") {
+    throw new Error("当前 Android 版本不支持 K300 raw CPCL 预览，请升级 Direct Loop PDA Android App。");
+  }
+  pauseClerkBluetoothPrinterDiagnostics({ durationMs: CLERK_K300_RAW_CPCL_FORMAL_BATCH_DIAGNOSTIC_PAUSE_MS });
+  state.bluetoothPrinterError = "";
+  state.bluetoothPrinterDiagnosticsOpen = true;
+  state.bluetoothPrinterDiagnosticMessage = "正在连续打印 5 张正式模板，请不要重复点击。";
+  clerkBluetoothPrinterActionInFlight = true;
+  renderClerkBluetoothPrinterStatusIfActive();
+  let latestStatus = currentStatus;
+  const failures = [];
+  try {
+    for (let index = 0; index < templates.length; index += 1) {
+      const template = templates[index];
+      const payload = {
+        label_template_size: "40x30",
+        protocol: "CPCL",
+        test_name: template.testName,
+        cpcl_command: template.cpclCommand,
+      };
+      state.bluetoothPrinterDiagnosticMessage = `正在打印第 ${index + 1}/${templates.length} 张：${template.label}`;
+      renderClerkBluetoothPrinterStatusIfActive();
+      reportPdaDiagnosticEvent({
+        event_type: "s1_printer_diagnostic_click",
+        method: protocol.method,
+        protocol_key: `k300_cpcl_raw_formal_${template.templateKey}`,
+        payload: clonePdaDiagnosticValue(payload),
+        before_status: clonePdaDiagnosticValue(latestStatus),
+      });
+      try {
+        const beforeStatus = latestStatus;
+        const printStatusRaw = await bridge[protocol.method](JSON.stringify(payload));
+        const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
+          rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
+          keepError: true,
+        });
+        latestStatus = printStatus;
+        reportPdaDiagnosticEvent({
+          event_type: "s1_printer_diagnostic_result",
+          method: protocol.method,
+          protocol_key: `k300_cpcl_raw_formal_${template.templateKey}`,
+          payload: clonePdaDiagnosticValue(payload),
+          before_status: clonePdaDiagnosticValue(beforeStatus),
+          after_status: clonePdaDiagnosticValue(printStatus),
+          android_result: clonePdaDiagnosticValue(printStatus),
+        });
+        if (printStatus.last_print_result !== "success") {
+          failures.push(`${template.label}: ${printStatus.last_error || "发送失败"}`);
+        }
+      } catch (error) {
+        failures.push(`${template.label}: ${formatErrorMessage(error)}`);
+        reportPdaDiagnosticEvent({
+          event_type: "s1_printer_diagnostic_error",
+          method: protocol.method,
+          protocol_key: `k300_cpcl_raw_formal_${template.templateKey}`,
+          payload: clonePdaDiagnosticValue(payload),
+          before_status: clonePdaDiagnosticValue(latestStatus),
+          error_message: formatErrorMessage(error),
+        });
+      }
+      if (index < templates.length - 1) {
+        await waitForClerkPrinterDiagnosticDelay(CLERK_K300_RAW_CPCL_FORMAL_BATCH_STEP_DELAY_MS);
+      }
+    }
+    state.bluetoothPrinterDiagnosticsOpen = true;
+    state.bluetoothPrinterDiagnosticMessage = "5 张正式模板已发送，请逐张扫码并检查版式。";
+    state.bluetoothPrinterError = failures.length ? `${failures.length} 张模板发送失败：${failures.join("；")}` : "";
+    renderClerkBluetoothPrinterStatusIfActive();
+    return latestStatus;
+  } finally {
+    clerkBluetoothPrinterActionInFlight = false;
+    renderClerkBluetoothPrinterStatusIfActive();
+  }
+}
+
 async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPreviewState, protocolKey = "") {
   if (clerkBluetoothPrinterActionInFlight) {
     throw new Error("打印机正在执行上一条操作，请稍后再试。");
@@ -4735,6 +4868,14 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     }
     if (Array.isArray(protocol.batchMethods) && protocol.batchMethods.length) {
       return await sendClerkK300Code128BatchDiagnostic({
+        state,
+        bridge,
+        protocol,
+        currentStatus,
+      });
+    }
+    if (Array.isArray(protocol.rawCpclTemplates) && protocol.rawCpclTemplates.length) {
+      return await sendClerkK300RawCpclFormalBatchDiagnostic({
         state,
         bridge,
         protocol,
