@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#250/);
+  assert.match(loginVersionSection, /#251/);
   assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#29/);
+  assert.match(loginVersionSection, /#30/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=urovo-k300-diagnostics-250/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=urovo-k300-diagnostics-250/);
+  assert.match(indexHtml, /app\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -84,6 +84,10 @@ test("PDA version info detects Android bridge methods without requiring native a
         "printUrovoK300MinText",
         "printUrovoK300BlackBox",
         "printUrovoK300StoreItemPreview",
+        "printK300EscposMinText",
+        "printK300CpclMinText",
+        "printK300TsplMinText",
+        "printK300TsplBlackBox",
       ];
     `,
     "({ getDirectLoopAndroidBridgeInfo })",
@@ -115,6 +119,14 @@ test("PDA version info detects Android bridge methods without requiring native a
     true,
   );
   assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ printK300EscposMinText() {}, printK300TsplBlackBox() {} }).supported_methods.printK300EscposMinText,
+    true,
+  );
+  assert.equal(
+    bridgeInfo.getDirectLoopAndroidBridgeInfo({ printK300CpclMinText() {}, printK300TsplMinText() {} }).supported_methods.printK300TsplMinText,
+    true,
+  );
+  assert.equal(
     bridgeInfo.getDirectLoopAndroidBridgeInfo({ getPrinterStatus() {} }).supported_methods.printStoreItemLabelPreview,
     false,
   );
@@ -126,7 +138,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-urovo-k300-diagnostics-250/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-k300-bluetooth-protocol-diagnostics-251/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -136,6 +148,10 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(appLegacyJs, /printUrovoK300MinText/);
   assert.match(appLegacyJs, /printUrovoK300BlackBox/);
   assert.match(appLegacyJs, /printUrovoK300StoreItemPreview/);
+  assert.match(appLegacyJs, /printK300EscposMinText/);
+  assert.match(appLegacyJs, /printK300CpclMinText/);
+  assert.match(appLegacyJs, /printK300TsplMinText/);
+  assert.match(appLegacyJs, /printK300TsplBlackBox/);
 });
 
 test("price groups render separately with independent STORE_ITEM generation and preview actions", () => {
@@ -337,8 +353,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=urovo-k300-diagnostics-250/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=urovo-k300-diagnostics-250/);
+  assert.match(indexHtml, /app\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-bluetooth-protocol-diagnostics-251/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -759,6 +775,42 @@ test("clerk PDA diagnostics expose Urovo K300 protocol buttons for Android #29",
   assert.match(appLegacyJs, /printUrovoK300BlackBox/);
   assert.match(appLegacyJs, /printUrovoK300StoreItemPreview/);
   assert.match(appLegacyJs, /payloadPrinterProfile:\s*"UROVO_K300"/);
+});
+
+test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons for Android #30", () => {
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const protocolConfigSource = extractFunctionSource(appJs, "getClerkS1PreviewProtocolDiagnostics");
+  const visibleProtocolSource = extractFunctionSource(appJs, "getVisibleClerkS1PreviewProtocolDiagnostics");
+  const actionSource = extractFunctionSource(appJs, "sendClerkS1PreviewProtocolDiagnostic");
+  const canRunSource = extractFunctionSource(appJs, "canRunClerkS1PreviewProtocolDiagnostic");
+
+  assert.match(diagnosticsSource, /K300 蓝牙协议测试/);
+  assert.match(diagnosticsSource, /k300BluetoothProtocols/);
+  assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-preview-protocol/);
+  assert.match(protocolConfigSource, /测试 K300 ESC\/POS 文字/);
+  assert.match(protocolConfigSource, /测试 K300 CPCL 文字/);
+  assert.match(protocolConfigSource, /测试 K300 TSPL 文字/);
+  assert.match(protocolConfigSource, /测试 K300 TSPL 黑块/);
+  assert.match(protocolConfigSource, /key:\s*"k300_escpos_min_text"[\s\S]*?method:\s*"printK300EscposMinText"[\s\S]*?expectedProtocol:\s*"K300_ESCPOS_MIN_TEXT"[\s\S]*?expectedTransport:\s*"K300_BLUETOOTH_SPP"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i[\s\S]*?group:\s*"k300_bluetooth"/);
+  assert.match(protocolConfigSource, /key:\s*"k300_cpcl_min_text"[\s\S]*?method:\s*"printK300CpclMinText"[\s\S]*?expectedProtocol:\s*"K300_CPCL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
+  assert.match(protocolConfigSource, /key:\s*"k300_tspl_min_text"[\s\S]*?method:\s*"printK300TsplMinText"[\s\S]*?expectedProtocol:\s*"K300_TSPL_MIN_TEXT"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
+  assert.match(protocolConfigSource, /key:\s*"k300_tspl_black_box"[\s\S]*?method:\s*"printK300TsplBlackBox"[\s\S]*?expectedProtocol:\s*"K300_TSPL_BLACK_BOX"[\s\S]*?requiresPayload:\s*false[\s\S]*?requiresSelectedPrinter:\s*true[\s\S]*?preferredPrinterPattern:\s*\/K300\/i/);
+  assert.match(visibleProtocolSource, /typeof bridge\[protocol\.method\] === "function"/);
+  assert.match(canRunSource, /selected_printer_address/);
+  assert.doesNotMatch(canRunSource, /urovo_printer_available|printer_online_status|official_sdk_connected|connection_status/);
+  assert.match(actionSource, /protocol\.requiresPayload === false/);
+  assert.match(actionSource, /bridge\[protocol\.method\]\(\)/);
+  assert.match(actionSource, /reportPdaDiagnosticEvent/);
+  assert.match(actionSource, /pauseClerkBluetoothPrinterDiagnostics/);
+  assert.match(appLegacyJs, /K300 蓝牙协议测试/);
+  assert.match(appLegacyJs, /测试 K300 ESC\/POS 文字/);
+  assert.match(appLegacyJs, /测试 K300 CPCL 文字/);
+  assert.match(appLegacyJs, /测试 K300 TSPL 文字/);
+  assert.match(appLegacyJs, /测试 K300 TSPL 黑块/);
+  assert.match(appLegacyJs, /printK300EscposMinText/);
+  assert.match(appLegacyJs, /printK300CpclMinText/);
+  assert.match(appLegacyJs, /printK300TsplMinText/);
+  assert.match(appLegacyJs, /printK300TsplBlackBox/);
 });
 
 test("clerk PDA S1 protocol diagnostics pause printer polling for 15 seconds", () => {
