@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#243/);
+  assert.match(loginVersionSection, /#244/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#25/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=force-tspl-diagnostic-242/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=force-tspl-diagnostic-242/);
+  assert.match(indexHtml, /app\.js\?v=force-tspl-diagnostic-click-244/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=force-tspl-diagnostic-click-244/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -97,7 +97,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260510-force-tspl-diagnostic-242/);
+  assert.match(appLegacyJs, /fw-erp-web-20260510-force-tspl-diagnostic-click-244/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
 });
 
@@ -300,8 +300,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=force-tspl-diagnostic-242/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=force-tspl-diagnostic-242/);
+  assert.match(indexHtml, /app\.js\?v=force-tspl-diagnostic-click-244/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=force-tspl-diagnostic-click-244/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -584,6 +584,8 @@ test("clerk PDA diagnostics can force a raw TSPL preview label without online ga
   assert.match(forceActionSource, /printStoreItemLabelPreview\(JSON\.stringify\(payload\)\)/);
   assert.match(forceActionSource, /updateClerkBluetoothPrinterStatus/);
   assert.match(forceActionSource, /rawStatusJson:\s*formatClerkBluetoothPrinterRawStatusJson/);
+  assert.match(forceActionSource, /正在发送 TSPL 测试标签\.\.\./);
+  assert.match(forceActionSource, /TSPL 测试标签已发送，请查看诊断字段。/);
   assert.doesNotMatch(forceActionSource, /printer_online_status|official_sdk_connected|connection_status|canRunClerkBluetoothPrinterTestPrint|canRunClerkBluetoothPrinterPreviewPrint/);
   assert.match(actionHandler, /clerkBluetoothPrinterForceTsplPreview/);
   assert.match(actionHandler, /forceSendClerkTsplPreviewDiagnostic/);
@@ -718,9 +720,11 @@ test("backend task start button is included in the PDA pricing click listener", 
   const listenerSource = appJs.slice(selectorStart, handlerCall + "handleStoreMobilePricingPreviewAction(button);".length);
 
   assert.match(listenerSource, /\[data-mobile-pricing-select-backend-task\]/);
+  assert.match(listenerSource, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
   assert.match(listenerSource, /event\.target\.closest/);
   assert.match(listenerSource, /handleStoreMobilePricingPreviewAction\(button\)/);
   assert.match(appLegacyJs, /\[data-mobile-pricing-select-backend-task\]/);
+  assert.match(appLegacyJs, /\[data-clerk-bluetooth-printer-force-tspl-preview\]/);
 });
 
 test("backend task selection loads selected SDP into the scan workflow", () => {
