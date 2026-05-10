@@ -33,6 +33,11 @@ function getExecutableFunction(functionName, dependencies = "") {
   return vm.runInNewContext(`${dependencies}\n${extractFunctionSource(appJs, functionName)}\n${functionName};`);
 }
 
+function getExecutableBundle(functionNames = [], dependencies = "", exportExpression = "") {
+  const sources = functionNames.map((functionName) => extractFunctionSource(appJs, functionName)).join("\n");
+  return vm.runInNewContext(`${dependencies}\n${sources}\n${exportExpression};`);
+}
+
 test("admin store page exposes an Android PDA batch pricing preview frame", () => {
   assert.match(indexHtml, /id="storeMobilePricingPreviewSummary"/);
   assert.match(indexHtml, /PDA 现场分堆标价 UI Preview/);
@@ -241,8 +246,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-item-label-preview-PR2/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-label-preview-PR2/);
+  assert.match(indexHtml, /app\.js\?v=store-item-incremental-pricing-back-PR235/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-incremental-pricing-back-PR235/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -430,7 +435,7 @@ test("task tab renders backend assigned SDP cards before demo fallback", () => {
   assert.match(actionSource, /mobilePricingSelectBackendTask/);
   assert.match(actionSource, /selectStoreMobileBackendTask/);
   assert.match(actionSource, /startTask/);
-  assert.match(actionSource, /state\.activePage = "verify"/);
+  assert.match(actionSource, /setStoreMobileActivePage\(state,\s*"verify"/);
 });
 
 test("backend task start button is included in the PDA pricing click listener", () => {
@@ -455,7 +460,7 @@ test("backend task selection loads selected SDP into the scan workflow", () => {
   assert.match(selectionSource, /state\.pricingSourceLines\s*=/);
   assert.match(selectionSource, /state\.priceGroups\s*=\s*\[\]/);
   assert.match(selectionSource, /selectedBackendTaskCode/);
-  assert.match(selectionSource, /state\.activePage = "verify"/);
+  assert.match(selectionSource, /setStoreMobileActivePage\(state,\s*"verify"/);
   assert.match(selectionSource, /state\.scanError = ""/);
   assert.match(selectionSource, /state\.scanSuccess = ""/);
   assert.doesNotMatch(selectionSource, /freshWorkflow\.priceGroups|createStoreMobilePricingPreviewState\(\{ selectedSdp \}\)/);
@@ -515,6 +520,125 @@ test("backend selected SDP batch quantity validation blocks over-allocation", ()
   assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 2 }).ok, true);
   assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 3 }).ok, false);
   assert.equal(validateBatchQuantity(state, { source_line_key: "LPK-1", quantity: 0 }).ok, false);
+});
+
+test("incremental pricing batches track allocated, generated, and remaining quantities per source line", () => {
+  const helpers = getExecutableBundle(
+    [
+      "getStoreMobileTaskGroups",
+      "getStoreMobilePricingSourceLines",
+      "getStoreMobileLineAllocatedQty",
+      "getStoreMobileGroupGeneratedQty",
+      "getStoreMobileLineGeneratedQty",
+      "getStoreMobileSourceLineProgress",
+      "getStoreMobileLineRemainingQty",
+      "validateStoreMobilePricingBatchQuantity",
+      "createStoreMobilePricingBatch",
+    ],
+    `
+    class HTMLInputElement {
+      constructor(value, dataset) {
+        this.value = String(value);
+        this.dataset = dataset || {};
+      }
+    }
+    var mockQuantity = 30;
+    var mockCustomPrice = 999;
+    var document = {
+      querySelectorAll(selector) {
+        if (selector === "[data-mobile-pricing-batch-qty]") {
+          return [new HTMLInputElement(mockQuantity, { mobilePricingBatchQty: "line-100" })];
+        }
+        if (selector === "[data-mobile-pricing-custom-price]") {
+          return [new HTMLInputElement(mockCustomPrice, { mobilePricingCustomPrice: "line-100" })];
+        }
+        return [];
+      },
+    };
+    function getStoreMobileSuggestedSalePrice(categoryMain, categorySub, grade) {
+      if (grade === "P") return 410;
+      if (grade === "S") return 312;
+      return 0;
+    }
+    `,
+    `({
+      setMockInputs(quantity, customPrice) {
+        mockQuantity = quantity;
+        mockCustomPrice = customPrice;
+      },
+      getStoreMobileSourceLineProgress,
+      createStoreMobilePricingBatch,
+    })`,
+  );
+  const state = {
+    selectedSdp: {
+      display_code: "SDP261290019",
+      machine_code: "6261290019",
+      total_count: 100,
+      backend_task: true,
+    },
+    pricingSourceLines: [{
+      line_key: "line-100",
+      category_main: "Pants",
+      category_sub: "Cargo Pant",
+      item_count: 100,
+      remaining_qty: 100,
+      source_sdp_display_code: "SDP261290019",
+      source_sdp_machine_code: "6261290019",
+    }],
+    priceGroups: [],
+  };
+
+  helpers.setMockInputs(30, 0);
+  const pBatch = helpers.createStoreMobilePricingBatch(state, "line-100||P");
+  assert.equal(pBatch.quantity, 30);
+  assert.equal(pBatch.price_kes, 410);
+  assert.equal(pBatch.workflow_status, "draft");
+  assert.deepEqual(JSON.parse(JSON.stringify(helpers.getStoreMobileSourceLineProgress(state, "line-100"))), {
+    source_line_key: "line-100",
+    total_qty: 100,
+    allocated_qty: 30,
+    generated_qty: 0,
+    remaining_qty: 70,
+  });
+
+  pBatch.workflow_status = "locked";
+  pBatch.status = "已生成 / 待打印";
+  pBatch.generated_store_items = Array.from({ length: 30 }, (_, index) => ({ machine_code: `526129000${String(index + 1).padStart(3, "0")}` }));
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 70);
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").generated_qty, 30);
+
+  helpers.setMockInputs(50, 0);
+  const sBatch = helpers.createStoreMobilePricingBatch(state, "line-100||S");
+  assert.equal(sBatch.quantity, 50);
+  assert.equal(sBatch.price_kes, 312);
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 20);
+
+  helpers.setMockInputs(20, 275);
+  const customBatch = helpers.createStoreMobilePricingBatch(state, "line-100||CUSTOM");
+  assert.equal(customBatch.quantity, 20);
+  assert.equal(customBatch.price_kes, 275);
+  assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 0);
+});
+
+test("generated pricing groups are locked and draft pricing groups remain deletable", () => {
+  const lockHelpers = getExecutableBundle(
+    ["getStoreMobileGeneratedStoreItems", "getStoreMobileGroupGeneratedQty", "isStoreMobilePriceGroupLocked", "getStoreMobilePriceGroupWorkflowStatus"],
+    "",
+    "({ isStoreMobilePriceGroupLocked, getStoreMobilePriceGroupWorkflowStatus })",
+  );
+  const cardSource = extractFunctionSource(appJs, "renderPriceGroupCards");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.equal(lockHelpers.getStoreMobilePriceGroupWorkflowStatus({ workflow_status: "draft", status: "待生成 STORE_ITEM" }), "draft");
+  assert.equal(lockHelpers.isStoreMobilePriceGroupLocked({ workflow_status: "draft", status: "待生成 STORE_ITEM" }), false);
+  assert.equal(lockHelpers.getStoreMobilePriceGroupWorkflowStatus({ workflow_status: "generated", generated_store_items: [{ machine_code: "526129000123" }] }), "generated");
+  assert.equal(lockHelpers.isStoreMobilePriceGroupLocked({ workflow_status: "generated", generated_store_items: [{ machine_code: "526129000123" }] }), true);
+  assert.equal(lockHelpers.getStoreMobilePriceGroupWorkflowStatus({ workflow_status: "preview" }), "preview");
+  assert.equal(lockHelpers.getStoreMobilePriceGroupWorkflowStatus({ workflow_status: "locked" }), "locked");
+  assert.match(cardSource, /data-mobile-pricing-delete-group/);
+  assert.match(cardSource, /isStoreMobilePriceGroupLocked/);
+  assert.match(actionSource, /deleteStoreMobilePricingBatch/);
 });
 
 test("real backend SDP batch generation uses pricing batch STORE_ITEM API and stays preview-only", () => {
@@ -735,7 +859,7 @@ test("barcode verification accepts selected backend SDP display or machine code"
   assert.match(verifierSource, /wrong SDP|不是当前 SDP 任务条码/);
   assert.match(submitSource, /state\.verified = true/);
   assert.match(submitSource, /state\.scanSuccess = "核对成功"/);
-  assert.match(submitSource, /state\.activePage = "pricing"/);
+  assert.match(submitSource, /setStoreMobileActivePage\(state,\s*"pricing_split"/);
 });
 
 test("price group editor uses PDA-friendly quick controls", () => {
@@ -834,6 +958,10 @@ test("generation and print task pages guide the next price group", () => {
   assert.match(helperSource, /price_kes/);
   assert.match(generationSource, /renderNextPriceGroupHint/);
   assert.match(printPanelSource, /renderNextPriceGroupHint/);
+  assert.match(generationSource, /返回分批页面/);
+  assert.match(generationSource, /查看标签预览/);
+  assert.match(printPanelSource, /返回价格组列表/);
+  assert.match(printPanelSource, /继续分下一批/);
 });
 
 test("per-group workflow advances generate then preview without sticker confirmation", () => {
@@ -841,15 +969,149 @@ test("per-group workflow advances generate then preview without sticker confirma
   const nextGroupSource = extractFunctionSource(appJs, "getNextIncompleteStoreMobileGroup");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(advanceSource, /待生成[\s\S]*已生成 \/ 待打印/);
+  assert.match(advanceSource, /draft[\s\S]*已生成 \/ 待打印/);
   assert.match(advanceSource, /preview/);
   assert.doesNotMatch(advanceSource, /待贴标确认|已完成|status:\s*"queued"|createdPrintJobs/);
   assert.match(advanceSource, /getNextIncompleteStoreMobileGroup/);
-  assert.match(advanceSource, /state\.activePage = "print_task"/);
-  assert.match(nextGroupSource, /!== "已完成"/);
+  assert.match(advanceSource, /setStoreMobileActivePage\(state,\s*"label_preview"/);
+  assert.match(nextGroupSource, /getStoreMobilePriceGroupWorkflowStatus\(group\) === "draft"/);
   assert.match(actionSource, /previewLabels/);
   assert.doesNotMatch(actionSource, /confirmStickers/);
   assert.doesNotMatch(appJs, /data-mobile-pricing-confirm-stickers/);
+});
+
+test("clerk PDA internal back stack restores prior pages without clearing pricing state", () => {
+  const navigation = getExecutableBundle(
+    [
+      "normalizeStoreMobilePdaPage",
+      "getStoreMobilePdaPageSnapshot",
+      "restoreStoreMobilePdaPageSnapshot",
+      "pushStoreMobilePdaBrowserHistory",
+      "setStoreMobileActivePage",
+      "navigateStoreMobilePdaBack",
+    ],
+    `
+    var pushEvents = [];
+    var window = {
+      history: {
+        pushState(state) {
+          pushEvents.push(state);
+        },
+      },
+      location: { href: "https://fw-erp.example/app" },
+    };
+    `,
+    "({ setStoreMobileActivePage, navigateStoreMobilePdaBack, pushEvents })",
+  );
+  const selectedSdp = { display_code: "SDP261290019", total_count: 100 };
+  const generatedItems = Array.from({ length: 30 }, (_, index) => ({ machine_code: `526129000${String(index + 1).padStart(3, "0")}` }));
+  const state = {
+    activePage: "tasks",
+    activeGroupId: "",
+    current_task_group_id: "",
+    selectedSdp,
+    priceGroups: [{ group_id: "P-30", workflow_status: "locked", generated_store_items: generatedItems }],
+    pdaPageStack: [],
+  };
+
+  navigation.setStoreMobileActivePage(state, "pricing_split", { source: "button" });
+  navigation.setStoreMobileActivePage(state, "group_generated", { groupId: "P-30", source: "generate" });
+  assert.equal(state.activePage, "group_generated");
+  assert.equal(navigation.navigateStoreMobilePdaBack(state), true);
+  assert.equal(state.activePage, "pricing_split");
+  assert.equal(state.priceGroups.length, 1);
+  assert.equal(state.priceGroups[0].generated_store_items.length, 30);
+  assert.equal(state.selectedSdp, selectedSdp);
+
+  navigation.setStoreMobileActivePage(state, "group_generated", { groupId: "P-30", source: "button" });
+  navigation.setStoreMobileActivePage(state, "label_preview", { groupId: "P-30", source: "button" });
+  assert.equal(state.activePage, "label_preview");
+  assert.equal(navigation.navigateStoreMobilePdaBack(state), true);
+  assert.equal(state.activePage, "group_generated");
+  assert.equal(state.priceGroups[0].generated_store_items.length, 30);
+  assert.equal(state.selectedSdp, selectedSdp);
+  assert.ok(navigation.pushEvents.length >= 4);
+});
+
+test("clerk PDA browser popstate handles Android back through the internal page stack", () => {
+  const browserBack = getExecutableBundle(
+    [
+      "normalizeStoreMobilePdaPage",
+      "getStoreMobilePdaPageSnapshot",
+      "restoreStoreMobilePdaPageSnapshot",
+      "navigateStoreMobilePdaBack",
+      "handleStoreMobilePdaPopState",
+    ],
+    `
+    var renderCount = 0;
+    var storeMobilePricingPreviewState = {
+      activePage: "label_preview",
+      activeGroupId: "P-30",
+      current_task_group_id: "P-30",
+      selectedSdp: { display_code: "SDP261290019" },
+      priceGroups: [{ group_id: "P-30", generated_store_items: [{ machine_code: "526129000123" }] }],
+      pdaPageStack: [
+        { page: "pricing_split", activeGroupId: "P-30", current_task_group_id: "P-30" },
+        { page: "group_generated", activeGroupId: "P-30", current_task_group_id: "P-30" },
+      ],
+    };
+    function renderStoreMobilePricingPreview() {
+      renderCount += 1;
+    }
+    `,
+    "({ handleStoreMobilePdaPopState, getState() { return storeMobilePricingPreviewState; }, getRenderCount() { return renderCount; } })",
+  );
+
+  assert.equal(browserBack.handleStoreMobilePdaPopState({ state: { directLoopClerkPda: true } }), true);
+  assert.equal(browserBack.getState().activePage, "group_generated");
+  assert.equal(browserBack.getState().priceGroups[0].generated_store_items.length, 1);
+  assert.equal(browserBack.getState().selectedSdp.display_code, "SDP261290019");
+  assert.equal(browserBack.getRenderCount(), 1);
+});
+
+test("clerk PDA back supports printer connection to my, then my to tasks", () => {
+  const navigation = getExecutableBundle(
+    [
+      "normalizeStoreMobilePdaPage",
+      "getStoreMobilePdaPageSnapshot",
+      "restoreStoreMobilePdaPageSnapshot",
+      "pushStoreMobilePdaBrowserHistory",
+      "setStoreMobileActivePage",
+      "navigateStoreMobilePdaBack",
+    ],
+    `
+    var window = {
+      history: { pushState() {} },
+      location: { href: "https://fw-erp.example/app" },
+    };
+    `,
+    "({ setStoreMobileActivePage, navigateStoreMobilePdaBack })",
+  );
+  const state = { activePage: "tasks", pdaPageStack: [], selectedSdp: { display_code: "SDP261290019" }, priceGroups: [] };
+
+  navigation.setStoreMobileActivePage(state, "my", { source: "tab" });
+  navigation.setStoreMobileActivePage(state, "printer_connection", { source: "button" });
+  assert.equal(navigation.navigateStoreMobilePdaBack(state), true);
+  assert.equal(state.activePage, "my");
+  assert.equal(navigation.navigateStoreMobilePdaBack(state), true);
+  assert.equal(state.activePage, "tasks");
+  assert.equal(navigation.navigateStoreMobilePdaBack(state), false);
+});
+
+test("clerk PDA navigation names explicit split, generated, and label preview pages", () => {
+  const optionsSource = extractFunctionSource(appJs, "getStoreMobilePageOptions");
+  const screenSource = extractFunctionSource(appJs, "renderStoreMobileDeviceScreen");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.match(optionsSource, /pricing_split/);
+  assert.match(optionsSource, /group_generated/);
+  assert.match(optionsSource, /label_preview/);
+  assert.match(screenSource, /page === "pricing_split"/);
+  assert.match(screenSource, /page === "group_generated"/);
+  assert.match(screenSource, /page === "label_preview"/);
+  assert.match(actionSource, /setStoreMobileActivePage/);
+  assert.match(appJs, /window\.addEventListener\("popstate",\s*handleStoreMobilePdaPopState/);
+  assert.match(appJs, /window\.history\.pushState/);
 });
 
 test("STORE_ITEM label preview does not mark printed or sticker-confirmed", () => {
@@ -924,4 +1186,15 @@ test("preview actions do not call Android printing or print-complete endpoints",
   assert.match(actionSource, /storeMobilePricingPreviewState/);
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
   assert.match(advanceSource, /preview/);
+});
+
+test("legacy PDA bundle includes incremental split and Android back behavior", () => {
+  assert.match(appLegacyJs, /getStoreMobileSourceLineProgress/);
+  assert.match(appLegacyJs, /setStoreMobileActivePage/);
+  assert.match(appLegacyJs, /handleStoreMobilePdaPopState/);
+  assert.match(appLegacyJs, /pricing_split/);
+  assert.match(appLegacyJs, /group_generated/);
+  assert.match(appLegacyJs, /label_preview/);
+  assert.match(appLegacyJs, /返回分批页面/);
+  assert.match(appLegacyJs, /继续分下一批/);
 });
