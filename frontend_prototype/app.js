@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-final-40x30-retail-clothing-template";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-final-40x30-retail-clothing-template";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#259";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-clean-clerk-printer-test-panel";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "clean-clerk-printer-test-panel";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#260";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -34988,9 +34988,11 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
   const urovoProtocols = previewProtocols.filter((protocol) => protocol.group === "urovo");
   const k300BluetoothProtocols = previewProtocols.filter((protocol) => protocol.group === "k300_bluetooth");
   const s1PreviewProtocols = previewProtocols.filter((protocol) => protocol.group !== "urovo" && protocol.group !== "k300_bluetooth");
+  const canRunTestPrint = canRunClerkBluetoothPrinterTestPrint(status) && !clerkBluetoothPrinterActionInFlight && !diagnosticsPaused;
   return `
-    <details class="clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
-      <summary>诊断详情 / Developer diagnostics</summary>
+    <details class="clerk-printer-test-panel clerk-printer-diagnostics" ${state.bluetoothPrinterDiagnosticsOpen ? "open" : ""} data-clerk-printer-diagnostics="true">
+      <summary>🧪 打印机测试</summary>
+      <div class="subtle small">诊断详情 / Developer diagnostics</div>
       <div class="subtle small">锁定诊断状态：${state.bluetoothPrinterDiagnosticsOpen ? "已展开，轮询不会收起" : "展开后会保持打开"}</div>
       <div class="subtle small">诊断事件会上报到服务器，方便远程排查。</div>
       <div class="subtle small">K300 外接蓝牙请先点“测试 K300 蓝牙连接”，确认 SPP 可用后再测试 ESC/POS / CPCL / TSPL。</div>
@@ -35007,6 +35009,7 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
       <div class="clerk-printer-diagnostics-actions">
         <button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-diagnostic-refresh="true" ${clerkBluetoothPrinterStatusInFlight || diagnosticsPaused ? "disabled" : ""}>刷新诊断状态</button>
         <button type="button" class="ghost-button mini-button" data-clerk-printer-report-current="true">上报当前诊断状态</button>
+        <button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-test="true" ${canRunTestPrint ? "" : "disabled"}>打印测试标签</button>
         ${s1PreviewProtocols.map((protocol) => {
           const canRunProtocol = canRunClerkS1PreviewProtocolDiagnostic(status, protocol.key) && !clerkBluetoothPrinterActionInFlight && !diagnosticsPaused;
           return `<button type="button" class="ghost-button mini-button" data-clerk-bluetooth-printer-preview-protocol="${escapeHtml(protocol.key)}" ${canRunProtocol ? "" : "disabled"}>${escapeHtml(protocol.label)}</button>`;
@@ -35043,6 +35046,10 @@ function renderClerkPrinterDiagnosticDetails(state = storeMobilePricingPreviewSt
   `;
 }
 
+function renderClerkPrinterTestPanel(state = storeMobilePricingPreviewState) {
+  return renderClerkPrinterDiagnosticDetails(state);
+}
+
 function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState) {
   const status = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
   const diagnosticsPaused = isClerkBluetoothPrinterDiagnosticPollingPaused();
@@ -35052,14 +35059,13 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
   const selectedProfile = getClerkBluetoothPrinterProfileValue(status.selected_profile);
   const k300SppMessage = selectedProfile === "UROVO_K300"
     ? (status.k300_spp_available
-        ? "K300 蓝牙 SPP 可用，可以继续做协议测试。"
-        : `K300 蓝牙 SPP 未连接 / 错误${status.k300_spp_last_error ? `：${status.k300_spp_last_error}` : ""}`)
+        ? "K300 蓝牙可用"
+        : `K300 蓝牙未连接${status.k300_spp_last_error ? `：${status.k300_spp_last_error}` : ""}`)
     : "";
   const printerRows = getClerkBluetoothPrinterRowsForDisplay(state);
   const noRowsMessage = state.bluetoothPrinterPairedPrintersLoaded
     ? "请先在 Android 系统蓝牙设置中配对打印机。"
     : "点击搜索或刷新，查找可连接的蓝牙打印机。";
-  const canRunTestPrint = canRunClerkBluetoothPrinterTestPrint(status) && !clerkBluetoothPrinterActionInFlight;
   const canConnectPrinter = !clerkBluetoothPrinterActionInFlight
     && Boolean(status.selected_printer_address)
     && status.connection_status !== "connecting";
@@ -35079,14 +35085,6 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
           <div><strong>地址</strong><span>${escapeHtml(status.selected_printer_address || "-")}</span></div>
           <div><strong>当前型号</strong><span>${escapeHtml(getClerkBluetoothPrinterProfileLabel(selectedProfile))}</span></div>
           <div><strong>最近刷新</strong><span>${escapeHtml(lastRefresh)}</span></div>
-          <div><strong>在线状态 printer_online_status</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.printer_online_status))}</span></div>
-          <div><strong>SDK connected official_sdk_connected</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.official_sdk_connected))}</span></div>
-          <div><strong>SDK message official_sdk_last_message</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.official_sdk_last_message))}</span></div>
-          <div><strong>SDK error official_sdk_last_error</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.official_sdk_last_error))}</span></div>
-          <div><strong>health checked time printer_health_checked_at</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.printer_health_checked_at))}</span></div>
-          <div><strong>K300 SPP available k300_spp_available</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.k300_spp_available))}</span></div>
-          <div><strong>K300 SPP checked k300_spp_last_checked_at</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.k300_spp_last_checked_at))}</span></div>
-          <div><strong>K300 SPP error k300_spp_last_error</strong><span>${escapeHtml(formatClerkPrinterDiagnosticValue(status.k300_spp_last_error))}</span></div>
         </div>
         ${k300SppMessage ? `<div class="subtle small">${escapeHtml(k300SppMessage)}</div>` : ""}
         ${(state.bluetoothPrinterError || status.connection_status === "error" || status.last_error)
@@ -35132,12 +35130,9 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
       <div class="mobile-bottom-button-stack">
         <button type="button" class="primary-button" data-clerk-bluetooth-printer-connect="true" ${canConnectPrinter ? "" : "disabled"}>连接打印机</button>
         <button type="button" class="ghost-button" data-clerk-bluetooth-printer-disconnect="true" ${canDisconnectPrinter ? "" : "disabled"}>断开连接</button>
-        <button type="button" class="ghost-button" data-clerk-bluetooth-printer-test="true" ${canRunTestPrint ? "" : "disabled"}>打印测试标签</button>
-        ${selectedProfile === "CHITENG_S1_OFFICIAL" && !canRunTestPrint ? '<div class="subtle small">请先连接并确认打印机在线。</div>' : ""}
-        ${selectedProfile !== "CHITENG_S1_OFFICIAL" ? '<div class="subtle small">该型号测试打印暂未配置。</div>' : ""}
       </div>
 
-      ${renderClerkPrinterDiagnosticDetails(state)}
+      ${renderClerkPrinterTestPanel(state)}
     </section>
   `;
 }

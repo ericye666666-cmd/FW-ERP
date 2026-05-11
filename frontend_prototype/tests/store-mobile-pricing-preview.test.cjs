@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#259/);
+  assert.match(loginVersionSection, /#260/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=k300-final-40x30-retail-clothing-template/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-final-40x30-retail-clothing-template/);
+  assert.match(indexHtml, /app\.js\?v=clean-clerk-printer-test-panel/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clean-clerk-printer-test-panel/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -175,7 +175,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-final-40x30-retail-clothing-template/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-clean-clerk-printer-test-panel/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -329,6 +329,7 @@ test("clerk PDA printer connection UI is clerk-friendly and hides protocol diagn
   const myTabSource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
   const entrySource = extractFunctionSource(appJs, "renderClerkPrinterConnectionEntryCard");
   const pageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
   const badgeSource = extractFunctionSource(appJs, "renderClerkPrinterStatusBadge");
   const screenSource = extractFunctionSource(appJs, "renderStoreMobileDeviceScreen");
   const runtimeSource = extractFunctionSource(appJs, "renderStoreMobileRuntimeScreen");
@@ -356,7 +357,9 @@ test("clerk PDA printer connection UI is clerk-friendly and hides protocol diagn
   assert.match(pageSource, /刷新已配对打印机/);
   assert.match(pageSource, /连接打印机/);
   assert.match(pageSource, /断开连接/);
-  assert.match(pageSource, /打印测试标签/);
+  assert.doesNotMatch(pageSource, /打印测试标签/);
+  assert.match(pageSource, /renderClerkPrinterTestPanel/);
+  assert.match(diagnosticsSource, /打印测试标签/);
   assert.match(screenSource, /page === "printer_connection"/);
   assert.match(runtimeSource, /renderClerkPrinterStatusBadge/);
   assert.match(badgeSource, /data-clerk-printer-status-badge/);
@@ -399,8 +402,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=k300-final-40x30-retail-clothing-template/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=k300-final-40x30-retail-clothing-template/);
+  assert.match(indexHtml, /app\.js\?v=clean-clerk-printer-test-panel/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clean-clerk-printer-test-panel/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -589,13 +592,16 @@ test("clerk PDA Chiteng S1 test print and diagnostics require truthful online st
   assert.equal(canRunTestPrint({ ...baseStatus, printer_online_status: "unknown", official_sdk_connected: true }), false);
   assert.equal(canRunTestPrint({ ...baseStatus, printer_online_status: "offline", official_sdk_connected: true }), false);
   assert.equal(canRunTestPrint({ ...baseStatus, selected_profile: "GENERIC", selected_printer_name: "Generic-01", official_sdk_connected: true }), false);
-  assert.match(printerPageSource, /canRunClerkBluetoothPrinterTestPrint/);
-  assert.match(printerPageSource, /请先连接并确认打印机在线。/);
-  assert.match(printerPageSource, /在线状态 printer_online_status/);
-  assert.match(printerPageSource, /SDK connected official_sdk_connected/);
-  assert.match(printerPageSource, /SDK message official_sdk_last_message/);
-  assert.match(printerPageSource, /SDK error official_sdk_last_error/);
-  assert.match(printerPageSource, /health checked time printer_health_checked_at/);
+  assert.doesNotMatch(printerPageSource, /canRunClerkBluetoothPrinterTestPrint/);
+  assert.match(diagnosticsSource, /canRunClerkBluetoothPrinterTestPrint/);
+  assert.doesNotMatch(printerPageSource, /请先连接并确认打印机在线。/);
+  assert.doesNotMatch(printerPageSource, /在线状态 printer_online_status/);
+  assert.doesNotMatch(printerPageSource, /SDK connected official_sdk_connected/);
+  assert.doesNotMatch(printerPageSource, /SDK message official_sdk_last_message/);
+  assert.doesNotMatch(printerPageSource, /SDK error official_sdk_last_error/);
+  assert.doesNotMatch(printerPageSource, /health checked time printer_health_checked_at/);
+  assert.match(diagnosticsSource, /打印测试标签/);
+  assert.match(diagnosticsSource, /data-clerk-bluetooth-printer-test/);
   assert.match(diagnosticsSource, /printer_online_status/);
   assert.match(diagnosticsSource, /official_sdk_connected/);
   assert.match(diagnosticsSource, /official_sdk_available/);
@@ -620,9 +626,11 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.match(stateSource, /bluetoothPrinterDiagnosticsOpen:\s*false/);
   assert.match(updateStatus, /rawStatusJson/);
   assert.match(rawJsonSource, /JSON\.stringify/);
-  assert.match(printerPageSource, /renderClerkPrinterDiagnosticDetails/);
-  assert.match(diagnosticsSource, /<details class="clerk-printer-diagnostics"/);
+  assert.match(printerPageSource, /renderClerkPrinterTestPanel/);
+  assert.doesNotMatch(printerPageSource, /renderClerkPrinterDiagnosticDetails/);
+  assert.match(diagnosticsSource, /<details class="clerk-printer-test-panel clerk-printer-diagnostics"/);
   assert.match(diagnosticsSource, /state\.bluetoothPrinterDiagnosticsOpen\s*\?\s*"open"\s*:\s*""/);
+  assert.match(diagnosticsSource, /🧪 打印机测试/);
   assert.match(diagnosticsSource, /诊断详情 \/ Developer diagnostics/);
   assert.match(diagnosticsSource, /bridge_available/);
   assert.match(diagnosticsSource, /bluetooth_enabled/);
@@ -657,10 +665,48 @@ test("clerk PDA printer connection page has collapsed developer diagnostics refr
   assert.match(pollPrinter, /rawStatusJson:\s*formatClerkBluetoothPrinterRawStatusJson\(status\)/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterDiagnosticsOpen\s*=/);
   assert.doesNotMatch(actionHandler, /clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}connectPrinter|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}printTestLabel|clerkBluetoothPrinterDiagnosticRefresh[\s\S]{0,240}listPairedPrinters/);
+  assert.match(appLegacyJs, /🧪 打印机测试/);
   assert.match(appLegacyJs, /诊断详情 \/ Developer diagnostics/);
   assert.match(appLegacyJs, /data-clerk-bluetooth-printer-diagnostic-refresh/);
   assert.match(appLegacyJs, /data-clerk-printer-json-clear/);
   assert.match(appLegacyJs, /data-clerk-printer-json-copy/);
+});
+
+test("clerk PDA printer normal page keeps diagnostics behind the printer test panel", () => {
+  const printerPageSource = extractFunctionSource(appJs, "renderClerkPrinterConnectionPage");
+  const testPanelSource = extractFunctionSource(appJs, "renderClerkPrinterTestPanel");
+  const diagnosticsSource = extractFunctionSource(appJs, "renderClerkPrinterDiagnosticDetails");
+  const protocolConfigSource = extractFunctionSource(appJs, "getClerkS1PreviewProtocolDiagnostics");
+
+  assert.match(printerPageSource, /打印机状态:/);
+  assert.match(printerPageSource, /当前打印机/);
+  assert.match(printerPageSource, /打印机型号/);
+  assert.match(printerPageSource, /选择 \/ 连接/);
+  assert.match(printerPageSource, /连接打印机/);
+  assert.match(printerPageSource, /断开连接/);
+  assert.match(printerPageSource, /K300 蓝牙可用/);
+  assert.match(printerPageSource, /K300 蓝牙未连接/);
+  assert.match(printerPageSource, /renderClerkPrinterTestPanel/);
+  assert.match(testPanelSource, /renderClerkPrinterDiagnosticDetails/);
+
+  assert.doesNotMatch(printerPageSource, /raw JSON from latest getPrinterStatus\(\)/);
+  assert.doesNotMatch(printerPageSource, /一键复制 raw JSON|清空 raw JSON|上报当前诊断状态|刷新诊断状态/);
+  assert.doesNotMatch(printerPageSource, /K300 蓝牙协议测试|Urovo K300 测试|测试 Raw TSPL|连续测试 5 张 Code128|连续打印 5 张正式模板|连续打印 5 张 D 微调版/);
+  assert.doesNotMatch(printerPageSource, /data-clerk-bluetooth-printer-preview-protocol/);
+  assert.doesNotMatch(printerPageSource, /official_sdk_last_message|official_sdk_last_error|last_preview_tspl_command/);
+  assert.doesNotMatch(printerPageSource, /data-clerk-bluetooth-printer-test/);
+
+  assert.match(diagnosticsSource, /🧪 打印机测试/);
+  assert.match(diagnosticsSource, /K300 蓝牙协议测试/);
+  assert.match(diagnosticsSource, /Urovo K300 测试/);
+  assert.match(protocolConfigSource, /测试 Raw TSPL/);
+  assert.match(diagnosticsSource, /raw JSON from latest getPrinterStatus\(\)/);
+  assert.match(diagnosticsSource, /一键复制 raw JSON/);
+  assert.match(diagnosticsSource, /清空 raw JSON/);
+  assert.match(diagnosticsSource, /上报当前诊断状态/);
+  assert.match(diagnosticsSource, /刷新诊断状态/);
+  assert.match(appLegacyJs, /🧪 打印机测试/);
+  assert.match(appLegacyJs, /K300 蓝牙协议测试/);
 });
 
 test("clerk PDA printer diagnostics raw JSON can be cleared or copied", () => {
@@ -847,7 +893,7 @@ test("clerk PDA diagnostics expose external K300 Bluetooth SPP protocol buttons 
   assert.match(diagnosticsSource, /k300_spp_last_checked_at/);
   assert.match(diagnosticsSource, /k300_spp_last_error/);
   assert.match(connectionPageSource, /k300_spp_available/);
-  assert.match(connectionPageSource, /k300_spp_last_checked_at/);
+  assert.doesNotMatch(connectionPageSource, /k300_spp_last_checked_at/);
   assert.match(connectionPageSource, /k300_spp_last_error/);
   assert.match(defaultStatusSource, /k300_spp_available:\s*false/);
   assert.match(defaultStatusSource, /k300_spp_last_checked_at:\s*""/);
