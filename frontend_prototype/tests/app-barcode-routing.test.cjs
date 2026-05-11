@@ -29,7 +29,8 @@ function extractFunctionSource(source, functionName) {
 
 test("formal app loads barcode resolver before app.js", () => {
   const resolverPosition = indexHtml.indexOf('<script src="./barcode-resolver-flow.js"></script>');
-  const appLoaderPosition = indexHtml.indexOf('loadPdaRuntimeScript("./app.js?v=pda-runtime-polling-215", "modern")');
+  const appLoaderMatch = indexHtml.match(/loadPdaRuntimeScript\("\.\/app\.js\?v=[^"]+", "modern"\)/);
+  const appLoaderPosition = appLoaderMatch ? appLoaderMatch.index : -1;
 
   assert.notEqual(resolverPosition, -1, "barcode resolver script should be present");
   assert.notEqual(appLoaderPosition, -1, "app.js runtime loader should be present");

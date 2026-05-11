@@ -30177,6 +30177,8 @@ const CASHIER_TERMINAL_REJECT_MESSAGES = Object.freeze({
   RAW_BALE: "RAW_BALE 是仓库原始包码，不能在 POS 销售。",
   SDP: "SDP 是门店配送包裹，不能在 POS 销售，请扫描 STORE_ITEM 商品码。",
 });
+const CASHIER_TERMINAL_LOCAL_DEMO_NOTICE = "当前使用本地演示数据，真实扫码接口不可用。";
+const CASHIER_TERMINAL_SALEABLE_STORE_ITEM_STATUSES = new Set(["on_shelf", "in_stock", "available", "printed_in_store", "shelved"]);
 
 function formatCashierPreviewMoney(value) {
   return `KSh ${Number(value || 0).toLocaleString("en-KE", {
@@ -30277,6 +30279,7 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.holdSequence = Number(cashierTerminalState.holdSequence || 8);
   cashierTerminalState.printFeedback = cashierTerminalState.printFeedback || "";
   cashierTerminalState.switchStoreFeedback = cashierTerminalState.switchStoreFeedback || "";
+  cashierTerminalState.scanFallbackNotice = cashierTerminalState.scanFallbackNotice || "";
 }
 
 syncCashierTerminalMode = function () {
@@ -30383,10 +30386,15 @@ renderCashierTerminalLookupPanel = function () {
   if (!(cashierTerminalLookupCard instanceof HTMLElement)) {
     return;
   }
+  ensureCashierTerminalPreviewState();
+  const fallbackNotice = cashierTerminalState.scanFallbackNotice
+    ? `<span class="cashier-terminal-fallback-warning">${escapeHtml(cashierTerminalState.scanFallbackNotice)}</span>`
+    : "";
   cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
   cashierTerminalLookupCard.innerHTML = `
     <strong>仅支持 STORE_ITEM 商品码</strong>
-    <span>可试扫：5250511000123、5250511000122、5250511000121、5250511000120</span>
+    <span>真实扫码接口优先；本地演示备用码：5250511000123、5250511000122、5250511000121、5250511000120</span>
+    ${fallbackNotice}
   `;
 }
 
@@ -30742,43 +30750,210 @@ function findCashierTerminalPreviewItem(query) {
   });
 }
 
-function inferCashierTerminalRejectedType(query) {
-  const normalized = normalizeCashierPreviewScan(query);
-  if (normalized.startsWith("SDO")) return "SDO";
-  if (normalized.startsWith("SDB")) return "SDB";
-  if (normalized.startsWith("LPK")) return "LPK";
-  if (normalized.startsWith("RAW")) return "RAW_BALE";
-  if (normalized.startsWith("SDP")) return "SDP";
-  return "";
+function getCashierTerminalResolvedBusinessObject(resolved = {}) {
+  const businessObject = resolved?.business_object;
+  return businessObject && typeof businessObject === "object" ? businessObject : {};
+}
+
+function getFirstCashierTerminalField(...values) {
+  const value = values.find((candidate) => String(candidate ?? "").trim());
+  return String(value ?? "").trim();
+}
+
+function getCashierTerminalResolvedStatuses(resolved = {}) {
+  const businessObject = getCashierTerminalResolvedBusinessObject(resolved);
+  return [
+    resolved.status,
+    resolved.store_item_status,
+    resolved.sale_status,
+    resolved.print_status,
+    businessObject.status,
+    businessObject.store_item_status,
+    businessObject.sale_status,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function ensureCashierTerminalResolvedItemCanEnterCart(resolved = {}, query = "") {
+  const rejectReason = String(resolved?.reject_reason || resolved?.rejection_message || "").trim();
+  if (rejectReason) {
+    throw new Error(rejectReason);
+  }
+  const barcodeType = String(resolved?.barcode_type || "").trim().toUpperCase();
+  if (barcodeType !== "STORE_ITEM") {
+    throw new Error("只能扫描 STORE_ITEM 商品码。");
+  }
+  if (resolved?.pos_allowed !== true) {
+    throw new Error("该 STORE_ITEM 暂未被允许在 POS 销售。");
+  }
+  const businessObject = getCashierTerminalResolvedBusinessObject(resolved);
+  const storeCode = getFirstCashierTerminalField(resolved.store_code, businessObject.store_code).toUpperCase();
+  if (!storeCode) {
+    throw new Error("无法确认商品所属门店，不能在当前 POS 销售。");
+  }
+  if (storeCode !== getCashierTerminalStoreCode()) {
+    throw new Error("其他门店商品不能在当前 POS 销售。");
+  }
+  const statuses = getCashierTerminalResolvedStatuses(resolved);
+  const blockedStatuses = new Set(["sold", "sold_pending_sync", "held", "reserved", "transferred_out", "voided", "pending_print", "pending_putaway"]);
+  const blockedStatus = statuses.find((status) => blockedStatuses.has(status));
+  if (blockedStatus === "sold" || blockedStatus === "sold_pending_sync") {
+    throw new Error("该商品已售出，不能重复销售。");
+  }
+  if (blockedStatus === "held" || blockedStatus === "reserved") {
+    throw new Error("该商品正在挂单保留中，不能重复销售。");
+  }
+  if (blockedStatus === "transferred_out") {
+    throw new Error("该商品已转出当前门店，不能销售。");
+  }
+  if (blockedStatus === "voided") {
+    throw new Error("该商品已作废，不能销售。");
+  }
+  if (blockedStatus === "pending_print" || blockedStatus === "pending_putaway") {
+    throw new Error("该商品还未上架，不可销售。");
+  }
+  if (!statuses.some((status) => CASHIER_TERMINAL_SALEABLE_STORE_ITEM_STATUSES.has(status))) {
+    throw new Error("该商品还未上架，不可销售。");
+  }
+  const resolvedCodes = [
+    resolved.display_code,
+    resolved.store_item_display_code,
+    resolved.barcode_value,
+    resolved.machine_code,
+    resolved.store_item_machine_code,
+    resolved.object_id,
+    resolved.identity_id,
+    query,
+  ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+  if (cashierTerminalState.cartItems.some((row) => {
+    const rowCodes = [
+      row.display_code,
+      row.machine_code,
+      row.store_item_display_code,
+      row.store_item_machine_code,
+      row.barcode,
+      row.object_id,
+      row.identity_id,
+    ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+    return resolvedCodes.some((code) => rowCodes.includes(code));
+  })) {
+    throw new Error("该商品已在购物车中，不能重复加入。");
+  }
+}
+
+function mapCashierTerminalResolvedStoreItem(resolved = {}, query = "") {
+  const businessObject = getCashierTerminalResolvedBusinessObject(resolved);
+  const barcodeValue = getFirstCashierTerminalField(resolved.barcode_value, resolved.machine_code, resolved.store_item_machine_code, query);
+  const displayCode = getFirstCashierTerminalField(resolved.display_code, resolved.store_item_display_code, resolved.object_id, barcodeValue);
+  const category = getFirstCashierTerminalField(
+    resolved.category_name,
+    resolved.category,
+    [resolved.category_main, resolved.category_sub].filter(Boolean).join(" / "),
+    businessObject.category_name,
+    businessObject.category,
+    "未分类",
+  );
+  const price = Number(getFirstCashierTerminalField(
+    resolved.selling_price_kes,
+    resolved.selected_price,
+    resolved.expected_price,
+    resolved.price,
+    businessObject.selling_price_kes,
+    businessObject.selected_price,
+    0,
+  ) || 0);
+  return {
+    display_code: displayCode || barcodeValue,
+    machine_code: barcodeValue,
+    store_item_machine_code: barcodeValue,
+    barcode: barcodeValue,
+    type: "STORE_ITEM",
+    barcode_type: "STORE_ITEM",
+    object_id: getFirstCashierTerminalField(resolved.object_id, businessObject.id),
+    identity_id: getFirstCashierTerminalField(resolved.identity_id, businessObject.identity_id),
+    category,
+    shelf_location: getFirstCashierTerminalField(resolved.store_rack_code, resolved.shelf_location, resolved.rack_code, businessObject.store_rack_code),
+    store_rack_code: getFirstCashierTerminalField(resolved.store_rack_code, resolved.shelf_location, resolved.rack_code, businessObject.store_rack_code),
+    price,
+    selling_price: price,
+    expected_price: price,
+    qty: 1,
+    store: getFirstCashierTerminalField(resolved.store_code, businessObject.store_code, getCashierTerminalStoreCode()),
+    status: getFirstCashierTerminalResolvedStatuses(resolved)[0] || "on_shelf",
+    resolver_result: resolved,
+  };
+}
+
+function resolveCashierTerminalLocalDemoItem(query) {
+  const normalizedQuery = normalizeCashierPreviewScan(query);
+  const item = findCashierTerminalPreviewItem(normalizedQuery);
+  if (item && item?.type !== "STORE_ITEM") {
+    throw new Error(CASHIER_TERMINAL_REJECT_MESSAGES[item?.type] || "只能扫描 STORE_ITEM 商品码。");
+  }
+  if (!item) {
+    throw new Error("未识别条码，请确认是否为 STORE_ITEM 商品码。");
+  }
+  ensureCashierTerminalResolvedItemCanEnterCart({
+    ...item,
+    barcode_type: "STORE_ITEM",
+    pos_allowed: true,
+    store_code: item.store,
+    barcode_value: item.machine_code,
+    selling_price_kes: item.price,
+  }, normalizedQuery);
+  return {
+    ...item,
+    barcode: item.machine_code,
+    store_item_machine_code: item.machine_code,
+    selling_price: Number(item.price || 0),
+    expected_price: Number(item.price || 0),
+    local_demo_notice: CASHIER_TERMINAL_LOCAL_DEMO_NOTICE,
+  };
+}
+
+function isCashierTerminalResolverUnavailableError(error) {
+  const status = Number(error?.status || 0);
+  if (!status) {
+    return true;
+  }
+  if (status >= 500) {
+    return true;
+  }
+  const message = formatErrorMessage(error);
+  return status === 404 && /not found|cannot get|barcode\/resolve/i.test(message);
+}
+
+async function resolveCashierTerminalStoreItemForPos(query) {
+  const normalizedQuery = normalizeCashierPreviewScan(query);
+  if (!normalizedQuery) {
+    throw new Error("请先扫描 STORE_ITEM 商品码。");
+  }
+  let resolved = null;
+  try {
+    resolved = await resolveBarcodeForContext(normalizedQuery, "pos", [], { rejectOnContextReject: false });
+  } catch (error) {
+    if (!isCashierTerminalResolverUnavailableError(error)) {
+      throw error;
+    }
+    ensureCashierTerminalPreviewState();
+    cashierTerminalState.scanFallbackNotice = CASHIER_TERMINAL_LOCAL_DEMO_NOTICE;
+    const fallback = resolveCashierTerminalLocalDemoItem(normalizedQuery);
+    fallback.local_demo_notice = CASHIER_TERMINAL_LOCAL_DEMO_NOTICE;
+    return fallback;
+  }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.scanFallbackNotice = "";
+  ensureCashierTerminalResolvedItemCanEnterCart(resolved, normalizedQuery);
+  return mapCashierTerminalResolvedStoreItem(resolved, normalizedQuery);
 }
 
 function resolveCashierTerminalPreviewScan(query) {
-  const item = findCashierTerminalPreviewItem(query);
-  const rejectedType = item?.type !== "STORE_ITEM" ? item?.type : inferCashierTerminalRejectedType(query);
-  if (rejectedType && rejectedType !== "STORE_ITEM") {
-    throw new Error(CASHIER_TERMINAL_REJECT_MESSAGES[rejectedType] || "只能扫描 STORE_ITEM 商品码。");
-  }
-  if (!item) {
-    try {
-      return resolvePosStoreItemTokenByMachineCode(query);
-    } catch {
-      throw new Error("未识别条码，请确认是否为 STORE_ITEM 商品码。");
-    }
-  }
-  if (String(item.store || "").toUpperCase() !== getCashierTerminalStoreCode()) {
-    throw new Error("其他门店商品不能在当前 POS 销售。");
-  }
-  const status = String(item.status || "").toLowerCase();
-  if (status === "sold" || status === "sold_pending_sync") {
-    throw new Error("该商品已售出，不能重复销售。");
-  }
-  if (status === "held" || status === "reserved") {
-    throw new Error("该商品正在挂单保留中，不能重复销售。");
-  }
-  if (status === "pending_print" || status === "pending_putaway" || status !== "on_shelf") {
+  const fallback = resolveCashierTerminalLocalDemoItem(query);
+  if (!fallback) {
     throw new Error("该商品还未上架，不可销售。");
   }
-  return { ...item, barcode: item.machine_code, selling_price: Number(item.price || 0), expected_price: Number(item.price || 0) };
+  return fallback;
 }
 
 upsertCashierTerminalCartItem = function (result) {
@@ -30827,11 +31002,12 @@ submitCashierTerminalLookup = async function ({ addToCart = false } = {}) {
   if (!query) {
     throw new Error("请先扫描 STORE_ITEM 商品码。");
   }
-  const result = resolveCashierTerminalPreviewScan(query);
+  const result = await resolveCashierTerminalStoreItemForPos(query);
   cashierTerminalState.currentLookupResult = result;
   if (addToCart) {
     upsertCashierTerminalCartItem(result);
-    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物车：${result.display_code || result.barcode}`, "success", 1600);
+    const fallbackNotice = result.local_demo_notice ? ` · ${result.local_demo_notice}` : "";
+    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物车：${result.display_code || result.barcode}${fallbackNotice}`, result.local_demo_notice ? "warning" : "success", 1800);
     clearCashierTerminalLookupInputs();
   }
   renderCashierTerminal();
