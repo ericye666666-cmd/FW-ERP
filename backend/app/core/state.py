@@ -17741,6 +17741,26 @@ class InMemoryState:
         location_type = str(payload.get("location_type") or "SHELF").strip().upper()
         if location_type not in {"SHELF", "BACKROOM"}:
             raise HTTPException(status_code=400, detail="location_type must be SHELF or BACKROOM")
+        default_backroom_code = self._store_backroom_location_code(store["code"])
+        if location_type == "BACKROOM" and location_code != default_backroom_code:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Each store has only one backroom in this version; use {default_backroom_code}.",
+            )
+        if location_type == "BACKROOM":
+            active_backrooms = [
+                row for row in self.store_rack_locations.values()
+                if str(row.get("store_code") or "").strip().upper() == store["code"]
+                and str(row.get("location_type") or "").strip().upper() == "BACKROOM"
+                and str(row.get("location_code") or row.get("rack_code") or "").strip().upper() != default_backroom_code
+                and row.get("active") is not False
+                and str(row.get("status") or "active").strip().lower() != "inactive"
+            ]
+            if active_backrooms:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Each store can only have one active backroom in this version.",
+                )
         key = f"{store['code']}||{location_code}"
         previous = self.store_rack_locations.get(key, {})
         timestamp = now_iso()

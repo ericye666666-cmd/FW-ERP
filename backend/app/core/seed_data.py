@@ -466,6 +466,9 @@ LABEL_TEMPLATES = [
     },
 ]
 
+# First-version store shelf source.
+# This list mirrors the current apparel category hints used by the SDP / STORE_ITEM
+# flow until a separate product-category master is introduced.
 STORE_RACK_TEMPLATE = [
     {"rack_code": "PT-SW", "category_hint": "sweat pant"},
     {"rack_code": "PT-CR", "category_hint": "cargo pant"},

@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fastapi import HTTPException
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -67,3 +69,54 @@ class StoreShelfLocationStateTest(unittest.TestCase):
         self.assertFalse(updated["active"])
         self.assertEqual(updated["sort_order"], 7)
 
+    def test_backroom_is_single_default_location_per_store(self):
+        self.state.initialize_store_racks("UTAWALA", STORE_RACK_TEMPLATE, initialized_by="store_manager_1")
+
+        with self.assertRaises(HTTPException) as second_backroom:
+            self.state.upsert_store_location(
+                "UTAWALA",
+                {
+                    "location_code": "UT-BACKROOM-02",
+                    "location_name": "后仓二",
+                    "location_type": "BACKROOM",
+                    "active": True,
+                    "updated_by": "store_manager_1",
+                },
+            )
+        self.assertEqual(second_backroom.exception.status_code, 400)
+        self.assertIn("only one backroom", second_backroom.exception.detail)
+
+        with self.assertRaises(HTTPException) as converted_shelf:
+            self.state.upsert_store_location(
+                "UTAWALA",
+                {
+                    "location_code": "PT-CR",
+                    "location_name": "错误后仓",
+                    "location_type": "BACKROOM",
+                    "active": True,
+                    "updated_by": "store_manager_1",
+                },
+            )
+        self.assertEqual(converted_shelf.exception.status_code, 400)
+
+        updated_default = self.state.upsert_store_location(
+            "UTAWALA",
+            {
+                "location_code": "UT-BACKROOM",
+                "location_name": "门店后仓",
+                "location_type": "BACKROOM",
+                "active": True,
+                "sort_order": 99,
+                "updated_by": "store_manager_1",
+            },
+        )
+        self.assertEqual(updated_default["location_code"], "UT-BACKROOM")
+        self.assertEqual(updated_default["location_type"], "BACKROOM")
+        self.assertEqual(updated_default["location_name"], "门店后仓")
+
+        rows = self.state.list_store_racks("UTAWALA")
+        active_backrooms = [
+            row for row in rows
+            if row["location_type"] == "BACKROOM" and row["active"]
+        ]
+        self.assertEqual([row["location_code"] for row in active_backrooms], ["UT-BACKROOM"])

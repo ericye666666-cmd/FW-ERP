@@ -25143,7 +25143,9 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
             <span class="meta-pill">商品 ${escapeHtml(row.item_count ?? 0)}</span>
           </div>
         </div>
-        <button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button>
+        ${row.location_type === "BACKROOM"
+          ? `<span class="meta-pill">系统固定后仓</span>`
+          : `<button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button>`}
       </article>
     `)
     .join("");

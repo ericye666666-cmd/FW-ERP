@@ -37,6 +37,8 @@ test("shelf editor page exposes store, location type, category binding, active a
   assert.match(section, /location_type/);
   assert.match(section, /SHELF/);
   assert.match(section, /BACKROOM/);
+  assert.doesNotMatch(section, /<option value="BACKROOM"/);
+  assert.match(section, /后仓由系统固定为/);
   assert.match(section, /category_name/);
   assert.match(section, /active/);
   assert.match(section, /sort_order/);

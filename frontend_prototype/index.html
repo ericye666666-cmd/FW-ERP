@@ -3104,7 +3104,6 @@
           <input name="location_name" placeholder="货架位名称，例如 cargo pant货架" />
           <select name="location_type">
             <option value="SHELF">SHELF 货架位</option>
-            <option value="BACKROOM">BACKROOM 后仓</option>
           </select>
           <input name="category_name" placeholder="绑定品类，例如 cargo pant" />
           <select name="active">
@@ -3115,7 +3114,7 @@
           <button type="submit">保存货架位</button>
         </form>
         <div id="storeShelfLocationSummary" class="candidate-summary empty-state">
-          当前门店会有一个默认后仓；每个现有品类模板会生成一个货架位。这里只维护货架位，不做货架码打印。
+          当前门店会有一个默认后仓；后仓由系统固定为 UT-BACKROOM，不做后仓分区。每个现有品类模板会生成一个货架位。这里只维护货架位，不做货架码打印。
         </div>
         <div id="storeShelfLocationList" class="candidate-list"></div>
         <pre id="storeShelfLocationOutput" class="output hidden-output"></pre>
