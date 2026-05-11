@@ -174,6 +174,8 @@ from app.schemas.store_racks import (
     StoreRackAssignmentRequest,
     StoreRackAssignmentResponse,
     StoreRackInitializationResponse,
+    StoreItemStockInConfirmRequest,
+    StoreItemStockInConfirmResponse,
     StoreRackLocationResponse,
     StoreRackLocationUpsertRequest,
     StoreRackTemplateResponse,
@@ -3375,6 +3377,29 @@ def assign_store_rack(
             barcode=payload.barcode,
             rack_code=payload.rack_code,
             updated_by=current_user["username"],
+        )
+    )
+
+
+@router.post(
+    "/stores/{store_code}/store-items/{machine_code}/confirm-stock-in",
+    response_model=StoreItemStockInConfirmResponse,
+    tags=["stores"],
+)
+def confirm_store_item_stock_in(
+    store_code: str,
+    machine_code: str,
+    payload: StoreItemStockInConfirmRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreItemStockInConfirmResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["confirmed_by"] = current_user["username"]
+    return StoreItemStockInConfirmResponse(
+        **state.confirm_store_item_stock_in(
+            store_code=store_code,
+            machine_code=machine_code,
+            payload=data,
         )
     )
 
