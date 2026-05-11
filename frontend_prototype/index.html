@@ -665,7 +665,7 @@
                 <div id="sortingHandlerNamesBuilder" class="line-builder-body"></div>
               </div>
               <input name="note" placeholder="例如：今天先完成这批夏装包裹分拣" value="今天先完成这批夏装包裹分拣" />
-              <button type="submit" class="flow-primary-action">确认创建分拣任务</button>
+              <button type="submit" class="flow-primary-action">创建并分配分拣任务</button>
             </section>
           </div>
         </form>
@@ -725,7 +725,7 @@
             <div class="line-builder-head">
               <div>
                 <strong>分拣结果明细</strong>
-                <p>一行代表一组“大类 / 小类 + 等级 P/S + 实际分拣重量 KG + 件数 + 本次单件成本 + 锁定分拣库位”。本次单件成本按来源总成本和实际可售 KG 分摊；成本档位只用于 4.8 库位匹配，当前模式未贴码，不允许同库位混放。</p>
+                <p>一行代表一组“大类 / 小类 + 等级 P/S + 件数 + 目标库位”。先提交分拣结果，再由主管确认入库存；本步骤不生成 STORE_ITEM 商品码。</p>
               </div>
               <button type="button" class="ghost-button mini-button" data-builder-add="sorting-result-items">新增一行</button>
             </div>
@@ -754,7 +754,7 @@
           </section>
           <input name="note" placeholder="例如：这批分拣完成，按 P / S 已确认入库到对应库位" value="这批分拣完成，按 P / S 已确认入库到对应库位" />
           <input type="hidden" name="mark_task_completed" value="true" />
-          <button type="submit" class="flow-primary-action">确认件数入库并生成商品 token</button>
+          <button type="submit" class="flow-primary-action">提交分拣结果</button>
         </form>
         <div id="sortingResultSubmitSummary" class="candidate-summary empty-state">
           这里会显示分拣确认入库后的摘要，比如入了多少类、多少件、哪些库位。

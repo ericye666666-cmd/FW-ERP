@@ -485,11 +485,17 @@ class ItemBarcodeTokenStoreEditRequest(BaseModel):
 
 
 class SortingTaskResultItemCreate(BaseModel):
-    category_name: str = Field(min_length=1)
+    category_name: str = ""
+    category_main: str = ""
+    category_sub: str = ""
+    category_short: str = ""
     grade: str = Field(min_length=1)
     actual_weight_kg: Optional[float] = Field(default=None, gt=0)
     qty: int = Field(ge=1)
     rack_code: str = ""
+    target_location: str = ""
+    condition: str = ""
+    notes: str = ""
     confirm_to_inventory: bool = True
     default_cost_kes: Optional[float] = Field(default=None, gt=0)
     estimated_unit_cost_kes: Optional[float] = Field(default=None, ge=0)
@@ -511,9 +517,17 @@ class SortingTaskLossRecord(BaseModel):
 
 class SortingTaskCreate(BaseModel):
     shipment_no: str = ""
+    task_no: str = ""
+    source_raw_bale_display_code: str = ""
+    source_raw_bale_machine_code: str = ""
+    sorter_name: str = ""
+    assigned_worker: str = ""
+    warehouse_code: str = ""
+    store_code: str = ""
+    task_status: str = ""
     category_filters: list[str] = Field(default_factory=list)
-    bale_barcodes: list[str] = Field(min_length=1)
-    handler_names: list[str] = Field(min_length=1)
+    bale_barcodes: list[str] = Field(default_factory=list)
+    handler_names: list[str] = Field(default_factory=list)
     note: str = ""
 
 
@@ -529,13 +543,30 @@ class SortingTaskResultSubmit(BaseModel):
     source_pool_tokens: list[str] = Field(default_factory=list)
 
 
+class SortingTaskStartRequest(BaseModel):
+    started_by: str = ""
+    note: str = ""
+
+
+class SortingTaskConfirmRequest(BaseModel):
+    confirmed_by: str = ""
+    note: str = ""
+
+
 class SortingTaskResultItemResponse(BaseModel):
     category_name: str
+    category_main: str = ""
+    category_sub: str = ""
+    category_short: str = ""
     grade: str
     sku_code: str
     actual_weight_kg: Optional[float] = None
     qty: int
     rack_code: str
+    target_location: str = ""
+    condition: str = ""
+    notes: str = ""
+    sorting_line_id: str = ""
     confirm_to_inventory: bool
     default_cost_kes: Optional[float] = None
     generated_token_count: int = 0
@@ -557,7 +588,16 @@ class SortingTaskResponse(BaseModel):
     legacy_bale_barcodes: list[str] = Field(default_factory=list)
     category_filters: list[str] = Field(default_factory=list)
     handler_names: list[str]
+    assigned_worker: str = ""
+    source_raw_bale_display_code: str = ""
+    source_raw_bale_machine_code: str = ""
+    task_status: str = ""
     started_at: str
+    started_by: str = ""
+    submitted_at: Optional[str] = None
+    submitted_by: str = ""
+    confirmed_at: Optional[str] = None
+    confirmed_by: str = ""
     completed_at: Optional[str] = None
     note: str = ""
     status: str
@@ -583,6 +623,10 @@ class SortingStockResponse(BaseModel):
     unit_cost_kes: Optional[float] = None
     total_cost_kes: Optional[float] = None
     qty_on_hand: int
+    source_raw_bale_display_code: str = ""
+    source_raw_bale_machine_code: str = ""
+    sorting_task_no: str = ""
+    sorting_line_id: str = ""
     cost_layers: list[dict] = Field(default_factory=list)
     updated_at: str
 

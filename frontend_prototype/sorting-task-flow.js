@@ -473,8 +473,9 @@
   function buildSortingTaskManagerBuckets(rows, activeDate) {
     const normalizedRows = Array.isArray(rows) ? rows : [];
     const normalizedDate = normalizeText(activeDate);
-    const openRows = normalizedRows.filter((row) => normalizeSearchValue(row && row.status) === "open");
-    const completedSourceRows = normalizedRows.filter((row) => normalizeSearchValue(row && row.status) !== "open");
+    const openStatuses = new Set(["open", "draft", "assigned", "in_progress", "submitted"]);
+    const openRows = normalizedRows.filter((row) => openStatuses.has(normalizeSearchValue(row && row.status)));
+    const completedSourceRows = normalizedRows.filter((row) => !openStatuses.has(normalizeSearchValue(row && row.status)));
     const completedRows = normalizedDate
       ? completedSourceRows.filter((row) => getLocalDateKey(row && row.started_at) === normalizedDate)
       : completedSourceRows;

@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const loadedFlow = require("../sorting-task-flow.js");
 const SortingTaskFlow = Object.keys(loadedFlow).length ? loadedFlow : (globalThis.SortingTaskFlow || {});
@@ -10,6 +12,9 @@ const {
   getSortingScannerDiagnostic,
   buildSortingTaskManagerBuckets,
 } = SortingTaskFlow;
+
+const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 
 test("mergeSortingTaskLookupBales keeps raw bale machine_code for sorting lookup", () => {
   const merged = mergeSortingTaskLookupBales(
@@ -565,13 +570,46 @@ test("buildSortingTaskManagerBuckets always keeps open tasks visible and date-fi
     [
       { task_no: "ST-OPEN-OLD", status: "open", started_at: "2026-04-20T08:00:00+00:00" },
       { task_no: "ST-OPEN-TODAY", status: "open", started_at: "2026-04-22T08:00:00+00:00" },
+      { task_no: "ST-ASSIGNED", status: "assigned", started_at: "", created_at: "2026-04-22T08:15:00+00:00" },
+      { task_no: "ST-IN-PROGRESS", status: "in_progress", started_at: "2026-04-22T08:30:00+00:00" },
+      { task_no: "ST-SUBMITTED", status: "submitted", started_at: "2026-04-22T08:45:00+00:00", submitted_at: "2026-04-22T09:10:00+00:00" },
       { task_no: "ST-DONE-TODAY", status: "confirmed", started_at: "2026-04-22T09:00:00+00:00" },
       { task_no: "ST-DONE-OLD", status: "confirmed", started_at: "2026-04-20T09:00:00+00:00" },
     ],
     "2026-04-22",
   );
 
-  assert.deepEqual(buckets.openRows.map((row) => row.task_no), ["ST-OPEN-OLD", "ST-OPEN-TODAY"]);
+  assert.deepEqual(buckets.openRows.map((row) => row.task_no), [
+    "ST-OPEN-OLD",
+    "ST-OPEN-TODAY",
+    "ST-ASSIGNED",
+    "ST-IN-PROGRESS",
+    "ST-SUBMITTED",
+  ]);
   assert.deepEqual(buckets.completedRows.map((row) => row.task_no), ["ST-DONE-TODAY"]);
-  assert.deepEqual(buckets.visibleRows.map((row) => row.task_no), ["ST-OPEN-OLD", "ST-OPEN-TODAY", "ST-DONE-TODAY"]);
+  assert.deepEqual(buckets.visibleRows.map((row) => row.task_no), [
+    "ST-OPEN-OLD",
+    "ST-OPEN-TODAY",
+    "ST-ASSIGNED",
+    "ST-IN-PROGRESS",
+    "ST-SUBMITTED",
+    "ST-DONE-TODAY",
+  ]);
+});
+
+test("warehouse sorting task UI uses start submit confirm lifecycle endpoints", () => {
+  assert.match(appJs, /payload\.task_status\s*=\s*"assigned"/);
+  assert.match(appJs, /source_raw_bale_display_code/);
+  assert.match(appJs, /source_raw_bale_machine_code/);
+  assert.ok(appJs.includes("/warehouse/sorting-tasks/${encodeURIComponent(normalizedTaskNo)}/start"));
+  assert.ok(appJs.includes("/warehouse/sorting-tasks/${encodeURIComponent(taskNo)}/submit"));
+  assert.ok(appJs.includes("/warehouse/sorting-tasks/${encodeURIComponent(normalizedTaskNo)}/confirm"));
+  assert.match(appJs, /data-sorting-task-start/);
+  assert.match(appJs, /data-sorting-task-confirm/);
+  assert.match(appJs, /开始分拣/);
+  assert.match(appJs, /确认入库存/);
+  assert.match(appJs, /本步骤只生成仓库分拣库存，不生成 STORE_ITEM 商品码/);
+  assert.match(indexHtml, /创建并分配分拣任务/);
+  assert.match(indexHtml, /提交分拣结果/);
+  assert.doesNotMatch(indexHtml, /确认件数入库并生成商品 token/);
 });
