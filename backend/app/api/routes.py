@@ -3416,6 +3416,19 @@ def confirm_store_item_stock_in(
 
 
 @router.get(
+    "/stores/{store_code}/store-items/{machine_code}/trace",
+    tags=["stores"],
+)
+def get_store_item_trace(
+    store_code: str,
+    machine_code: str,
+    authorization: Optional[str] = Header(default=None),
+) -> dict[str, Any]:
+    _require_current_user(authorization=authorization)
+    return state.get_store_item_trace(store_code, machine_code)
+
+
+@router.get(
     "/stores/{store_code}/inventory-overview",
     tags=["stores"],
 )

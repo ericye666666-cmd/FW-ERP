@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#274/);
+  assert.match(loginVersionSection, /#279/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=inventory-overview-ui-polish-305/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=inventory-overview-ui-polish-305/);
+  assert.match(indexHtml, /app\.js\?v=store-item-trace-lookup-308/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-trace-lookup-308/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -402,8 +402,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=inventory-overview-ui-polish-305/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=inventory-overview-ui-polish-305/);
+  assert.match(indexHtml, /app\.js\?v=store-item-trace-lookup-308/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-trace-lookup-308/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });

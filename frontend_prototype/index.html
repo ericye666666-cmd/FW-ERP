@@ -81,7 +81,7 @@
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
           <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#274</span></div>
+            <div><strong>FW-ERP 主线 PR:</strong><span>#279</span></div>
             <div><strong>Android PR:</strong><span>#35</span></div>
           </section>
           <pre id="authOutput" class="output hidden-output"></pre>
@@ -3098,6 +3098,17 @@
         <div id="storeInventoryOverviewSummary" class="candidate-summary empty-state">
           请选择门店查看 STORE_ITEM 库存总览：待完成入库 / 未关联货架 / 后仓 / 已上货架 / 门店总库存 / 今日新增入库 / 今日已售。
         </div>
+        <div class="candidate-summary">
+          <div class="flow-summary-note">STORE_ITEM 查询</div>
+          <form id="storeItemTraceLookupForm" class="form-grid compact">
+            <label>
+              请输入 / 扫描 STORE_ITEM 码
+              <input name="machine_code" aria-label="请输入 / 扫描 STORE_ITEM 码" />
+            </label>
+            <button type="submit">查询</button>
+          </form>
+          <div id="storeItemTraceLookupResult" class="empty-state">输入 STORE_ITEM machine_code 后查看当前状态、货架、来源和销售信息。</div>
+        </div>
         <div class="segmented-control" role="tablist" aria-label="库存总览视角">
           <button type="button" class="secondary-button" data-store-inventory-tab="category">按品类</button>
           <button type="button" class="secondary-button" data-store-inventory-tab="location">按货架</button>
@@ -4293,16 +4304,16 @@
           (document.body || document.documentElement).appendChild(script);
         }
 
-        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-inventory-overview-ui-polish-305";
-        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "inventory-overview-ui-polish-305";
+        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-store-item-trace-lookup-308";
+        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "store-item-trace-lookup-308";
 
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=inventory-overview-ui-polish-305", "modern");
+          loadPdaRuntimeScript("./app.js?v=store-item-trace-lookup-308", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=inventory-overview-ui-polish-305", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=store-item-trace-lookup-308", "legacy");
       })();
     </script>
   </body>
