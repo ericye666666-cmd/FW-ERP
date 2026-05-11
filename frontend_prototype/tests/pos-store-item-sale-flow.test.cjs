@@ -325,6 +325,8 @@ test("POS real receipt reprint loads sale detail/list without creating a sale", 
   assert.match(detailSource, /已加载销售单：/);
   assert.match(detailSource, /收据已准备重打：/);
   assert.match(actionSource, /case "reprint-receipt":/);
+  assert.match(actionSource, /openCashierTerminalReprintConfirmation\(""\)/);
+  assert.match(actionSource, /case "confirm-reprint":/);
   assert.match(actionSource, /await loadCashierTerminalLatestReceiptForReprint\(\)/);
   assert.doesNotMatch(detailSource, /submitCashierTerminalBackendSale/);
   assert.doesNotMatch(detailSource, /resetCashierTerminalForNextSale/);
@@ -346,7 +348,7 @@ test("POS recent sales drawer can list, view, and reprint real sales", () => {
   assert.match(actionSource, /case "view-sale-detail":/);
   assert.match(actionSource, /await loadCashierTerminalSaleReceiptForReprint\(target\.dataset\.terminalSaleNo,\s*\{\s*reprint:\s*false\s*\}\)/);
   assert.match(actionSource, /case "reprint-sale":/);
-  assert.match(actionSource, /await loadCashierTerminalSaleReceiptForReprint\(target\.dataset\.terminalSaleNo,\s*\{\s*reprint:\s*true\s*\}\)/);
+  assert.match(actionSource, /openCashierTerminalReprintConfirmation\(target\.dataset\.terminalSaleNo\)/);
 });
 
 test("POS shift flow blocks sale until open shift and sends shift_id", () => {
@@ -387,6 +389,86 @@ test("POS shift close uses real API, records variance, and clears closed shift",
   assert.match(actionSource, /await openCashierTerminalShift\(\)/);
   assert.match(actionSource, /case "close-shift":/);
   assert.match(actionSource, /await closeCashierTerminalShiftBackend\(\)/);
+});
+
+test("POS cashier UX strongly guides no-shift state and returns focus after shift or drawer actions", () => {
+  const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
+  const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+
+  assert.match(paymentSource, /POS 暂不可收银/);
+  assert.match(paymentSource, /当前没有开班，请先开班后再收银/);
+  assert.match(paymentSource, /开班并开始收银/);
+  assert.match(paymentSource, /data-terminal-action="open-drawer" data-terminal-drawer="shift"/);
+  assert.match(openSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
+  assert.match(actionSource, /case "close-drawer":[\s\S]*focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
+});
+
+test("POS payment validation uses cashier-facing shortage and M-Pesa messages", () => {
+  const source = extractFunctionSource(appJs, "validateCashierTerminalPayment");
+  const context = {
+    cashierTerminalState: {
+      activePaymentMode: "cash",
+      cashReceived: "100",
+      mpesaAmount: "250",
+      mpesaReference: "",
+      mixedCashAmount: "100",
+      mixedMpesaAmount: "50",
+      mixedMpesaReference: "",
+    },
+    getCashierTerminalTotals: () => ({ totalItems: 1, totalAmount: 250 }),
+    normalizeCashierTerminalNumber: (value) => Math.max(Number(value || 0) || 0, 0),
+    formatCashierPreviewMoney: (value) => `KSh ${Number(value || 0)}`,
+  };
+  const fn = vm.runInNewContext(`${source}\nvalidateCashierTerminalPayment;`, context);
+
+  assert.throws(() => fn(), /还差 KSh 150/);
+  context.cashierTerminalState.activePaymentMode = "mpesa";
+  assert.throws(() => fn(), /请输入 M-Pesa Reference/);
+  context.cashierTerminalState.activePaymentMode = "mixed";
+  assert.throws(() => fn(), /Cash \+ M-Pesa 还差 KSh 100/);
+});
+
+test("POS M-Pesa UI warns manual reference is not automatic settlement proof", () => {
+  const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
+  assert.match(paymentSource, /请确认 M-Pesa 已到账，再点击完成收款。/);
+});
+
+test("POS scan failures keep resolver details but show cashier-facing main error and refocus scan", () => {
+  const formatterSource = extractFunctionSource(appJs, "formatCashierTerminalScanError");
+  const lookupSource = extractAssignedFunctionSource(appJs, "submitCashierTerminalLookup");
+  const scanListenerMatch = appJs.match(/cashierTerminalScanForm\?\.addEventListener\("submit"[\s\S]*?\n\}\);/);
+  assert.ok(scanListenerMatch, "missing cashier terminal scan listener");
+
+  assert.match(formatterSource, /不能销售：请扫描商品码 STORE_ITEM/);
+  assert.match(formatterSource, /你扫到的是 SDO 送货单码。/);
+  assert.match(formatterSource, /reject_reason/);
+  assert.match(lookupSource, /formatCashierTerminalScanError\(error\)/);
+  assert.match(lookupSource, /cashierTerminalState\.scanErrorTitle/);
+  assert.match(lookupSource, /focusCashierTerminalScanInput\(\{\s*select:\s*true\s*\}\)/);
+  assert.match(scanListenerMatch[0], /finally[\s\S]*focusCashierTerminalScanInput\(\{\s*select:\s*true\s*\}\)/);
+});
+
+test("POS reprint confirmation loads real receipt only after cashier confirmation", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  const detailSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalSaleReceiptForReprint");
+
+  assert.match(drawerSource, /drawer === "reprint-confirm"/);
+  assert.match(drawerSource, /这是重打小票，不会重新销售，也不会扣库存。/);
+  assert.match(drawerSource, /确认重打/);
+  assert.match(drawerSource, /取消/);
+  assert.match(actionSource, /case "reprint-receipt":[\s\S]*openCashierTerminalReprintConfirmation/);
+  assert.match(actionSource, /case "reprint-sale":[\s\S]*openCashierTerminalReprintConfirmation/);
+  assert.match(actionSource, /case "confirm-reprint":[\s\S]*loadCashierTerminalLatestReceiptForReprint/);
+  assert.doesNotMatch(actionSource, /case "confirm-reprint":[\s\S]*submitCashierTerminalBackendSale/);
+  assert.match(detailSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
+});
+
+test("POS close-shift drawer highlights non-zero cash variance with manager note guidance", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  assert.match(drawerSource, /cashier-shift-variance[\s\S]*danger/);
+  assert.match(drawerSource, /现金有差异，请填写原因并让店长确认。/);
 });
 
 test("cashier terminal shell only activates on the POS sales panel", () => {
