@@ -291,6 +291,16 @@ test("POS complete sale posts to the real backend sale API and never fabricates 
   assert.doesNotMatch(backendSource, /resolveCashierTerminalLocalDemoItem/);
 });
 
+test("POS sale completion depends on backend sale_no for inventory sale-out reconciliation", () => {
+  const backendSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
+  const receiptSource = extractFunctionSource(appJs, "normalizeCashierTerminalBackendSale");
+
+  assert.match(backendSource, /\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-sales/);
+  assert.match(backendSource, /cashierTerminalState\.latestCompletedSale\s*=\s*sale/);
+  assert.match(receiptSource, /sale_no:\s*sale\.sale_no/);
+  assert.doesNotMatch(backendSource, /SALE-MOCK|mock sale|模拟销售成功/i);
+});
+
 test("POS sale API unavailable detection does not hide backend business errors", () => {
   const source = extractFunctionSource(appJs, "isCashierTerminalSaleApiUnavailableError");
   const fn = vm.runInNewContext(`${source}\nisCashierTerminalSaleApiUnavailableError;`, {

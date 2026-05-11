@@ -73,6 +73,17 @@ test("inventory overview detail table is wired for confirmed STORE_ITEM stock-in
   assert.match(appJs, /unconfirmed_items/);
 });
 
+test("inventory overview copy keeps sold items outside active store inventory", () => {
+  const metricSource = extractFunctionSource(appJs, "renderStoreInventoryOverviewMetrics");
+  const detailSource = extractFunctionSource(appJs, "renderStoreInventoryOverviewDetail");
+
+  assert.match(metricSource, /主库存只统计已点击确认完成入库的 STORE_ITEM/);
+  assert.match(metricSource, /待完成入库单独处理/);
+  assert.match(detailSource, /STORE_ITEM machine_code \/ barcode/);
+  assert.match(detailSource, /当前货架位/);
+  assert.doesNotMatch(detailSource, /sale_no|sold_at|sold_by/);
+});
+
 test("inventory overview unconfirmed metric opens a recoverable stock-in list", () => {
   const metricSource = extractFunctionSource(appJs, "renderStoreInventoryOverviewMetrics");
   const listSource = extractFunctionSource(appJs, "renderStoreInventoryUnconfirmedItems");

@@ -19027,6 +19027,7 @@ class InMemoryState:
             result_status = "confirmed"
 
         timestamp = str(primary_row.get("stock_in_confirmed_at") or "").strip() if result_status == "already_confirmed" else now_iso()
+        sale_ready_statuses = {"", "pending", "pending_print", "pending_putaway", "pending_label", "printed", "printed_in_store", "active"}
         for row in candidate_rows:
             row["store_code"] = store["code"]
             row["current_location_code"] = location_code
@@ -19035,6 +19036,10 @@ class InMemoryState:
             row["stock_in_confirmed"] = True
             row["stock_in_confirmed_at"] = timestamp
             row["stock_in_confirmed_by"] = actor["username"]
+            for status_field in ("status", "store_item_status", "sale_status"):
+                current_status = str(row.get(status_field) or "").strip().lower()
+                if current_status in sale_ready_statuses:
+                    row[status_field] = "ready_for_sale"
             row["updated_at"] = timestamp
 
         self._log_event(
