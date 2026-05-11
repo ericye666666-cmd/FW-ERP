@@ -401,6 +401,29 @@ test("POS shift close uses real API, records variance, and clears closed shift",
   assert.match(actionSource, /await closeCashierTerminalShiftBackend\(\)/);
 });
 
+test("POS shift reports load real X/Z APIs and render printable read-only drawer", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const loadReportSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftReport");
+  const printReportSource = extractFunctionSource(appJs, "printCashierTerminalShiftReport");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+
+  assert.match(drawerSource, /查看 X-report/);
+  assert.match(drawerSource, /结班后可查看 Z-report/);
+  assert.match(drawerSource, /drawer === "shift-report"/);
+  assert.match(drawerSource, /DIRECT LOOP POS/);
+  assert.match(drawerSource, /Cash Accountability/);
+  assert.match(drawerSource, /Payment Breakdown/);
+  assert.match(drawerSource, /Category Breakdown/);
+  assert.match(drawerSource, /data-terminal-action="print-shift-report"/);
+  assert.match(loadReportSource, /\/pos-shifts\/\$\{encodeURIComponent\(shiftId\)\}\/\$\{reportSlug\}-report/);
+  assert.match(loadReportSource, /cashierTerminalState\.shiftReport\s*=/);
+  assert.match(loadReportSource, /cashierTerminalState\.activeDrawer\s*=\s*"shift-report"/);
+  assert.doesNotMatch(loadReportSource, /submitCashierTerminalBackendSale|resetCashierTerminalForNextSale|cashierTerminalState\.cartItems\s*=\s*\[\]|cashierTerminalState\.currentShift\s*=\s*null/);
+  assert.match(printReportSource, /window\.print\(\)/);
+  assert.match(actionSource, /case "load-shift-report":[\s\S]*await loadCashierTerminalShiftReport\(target\.dataset\.terminalReportType\)/);
+  assert.match(actionSource, /case "print-shift-report":[\s\S]*printCashierTerminalShiftReport\(\)/);
+});
+
 test("POS hold flow uses real hold APIs and blocks empty cart or missing shift", () => {
   const createSource = extractAsyncFunctionSource(appJs, "createCashierTerminalHold");
   const listSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalHoldList");

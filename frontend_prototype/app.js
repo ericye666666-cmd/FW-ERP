@@ -30445,6 +30445,8 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.saleLookupFeedback = cashierTerminalState.saleLookupFeedback || "";
   cashierTerminalState.currentShift = cashierTerminalState.currentShift || null;
   cashierTerminalState.shiftSummary = cashierTerminalState.shiftSummary || null;
+  cashierTerminalState.shiftReport = cashierTerminalState.shiftReport || null;
+  cashierTerminalState.shiftReportFeedback = cashierTerminalState.shiftReportFeedback || "";
   cashierTerminalState.shiftFeedback = cashierTerminalState.shiftFeedback || "";
   if (!cashierTerminalState.activePaymentMode) {
     cashierTerminalState.activePaymentMode = "cash";
@@ -31009,6 +31011,8 @@ renderCashierTerminalDrawer = function () {
     const countedCash = normalizeCashierTerminalNumber(cashierTerminalState.countedCash);
     const variance = cashierTerminalState.countedCash === "" ? 0 : countedCash - expectedCash;
     const activeHoldCount = Number(summary.hold_count ?? (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length);
+    const reportShiftId = currentShift?.shift_id || summary.shift_id || cashierTerminalState.shiftNo || "";
+    const zReportReady = String(summary.status || cashierTerminalState.shiftStatus || "").toLowerCase() === "closed";
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">SHIFT</p><h3>班次 / 交接班</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body">
@@ -31035,6 +31039,12 @@ renderCashierTerminalDrawer = function () {
           <span><strong>挂单数量</strong>${escapeHtml(activeHoldCount)}</span>
           <span><strong>取消订单数</strong>${escapeHtml(summary.cancelled_order_count || 0)}</span>
         </div>
+        <h4>班次报表</h4>
+        <div class="shift-report-actions">
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="x"${!currentShift?.shift_id ? " disabled" : ""}>查看 X-report</button>
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="z"${!reportShiftId || !zReportReady ? " disabled" : ""}>查看 Z-report</button>
+          <span class="drawer-hint">${zReportReady ? "Z-report 可查看和打印。" : "结班后可查看 Z-report"}</span>
+        </div>
         <h4>开班 / 结班</h4>
         ${currentShift?.shift_id ? `
           <label class="field"><span>应有现金</span><input type="text" value="${escapeHtml(formatCashierPreviewMoney(expectedCash))}" disabled /></label>
@@ -31055,6 +31065,72 @@ renderCashierTerminalDrawer = function () {
           <button type="button" class="secondary-inline" data-terminal-action="load-shift-summary">刷新本班统计</button>
           <button type="button" class="primary-inline" data-terminal-action="close-shift">关闭班次</button>
         ` : `<button type="button" class="primary-inline" data-terminal-action="open-shift">开班</button>`}
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "shift-report") {
+    const report = cashierTerminalState.shiftReport || {};
+    const isZReport = report.report_type === "Z_REPORT";
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">REPORT</p><h3>DIRECT LOOP POS ${isZReport ? "Z-REPORT" : "X-REPORT"}</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body shift-report-body">
+        ${cashierTerminalState.shiftReportFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.shiftReportFeedback)}</div>` : ""}
+        <div class="drawer-card cashier-shift-report-title">
+          <strong>${isZReport ? "FINAL SHIFT REPORT / Z-REPORT" : "MID-SHIFT REPORT / X-REPORT"}</strong>
+          <span>${escapeHtml(report.store_code || getCashierTerminalStoreCode())} · ${escapeHtml(report.shift_id || "-")} · ${escapeHtml(report.generated_at || "-")}</span>
+        </div>
+        <h4>Shift</h4>
+        <div class="shift-info-grid">
+          <span><strong>Store</strong>${escapeHtml(report.store_code || getCashierTerminalStoreCode())}</span>
+          <span><strong>Shift</strong>${escapeHtml(report.shift_id || "-")}</span>
+          <span><strong>Cashier</strong>${escapeHtml(report.cashier_id || "-")}</span>
+          <span><strong>Terminal</strong>${escapeHtml(report.terminal_id || "-")}</span>
+          <span><strong>Opened At</strong>${escapeHtml(report.opened_at || "-")}</span>
+          <span><strong>Generated At</strong>${escapeHtml(report.generated_at || "-")}</span>
+          ${isZReport ? `<span><strong>Closed At</strong>${escapeHtml(report.closed_at || "-")}</span>` : ""}
+          <span><strong>Status</strong>${escapeHtml(report.status || "-")}</span>
+        </div>
+        <h4>Sales Summary</h4>
+        <div class="shift-stats-grid">
+          <span><strong>Total Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.total_sales || 0))}</span>
+          <span><strong>Orders</strong>${escapeHtml(report.order_count || 0)}</span>
+          <span><strong>Items</strong>${escapeHtml(report.item_count || 0)}</span>
+          <span><strong>Cash Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.cash_sales || 0))}</span>
+          <span><strong>M-Pesa Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.mpesa_sales || 0))}</span>
+          <span><strong>Mixed Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_cash || 0))}</span>
+          <span><strong>Mixed M-Pesa</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_mpesa || 0))}</span>
+        </div>
+        <h4>Cash Accountability</h4>
+        <div class="shift-stats-grid">
+          <span><strong>Opening Float</strong>${escapeHtml(formatCashierPreviewMoney(report.opening_float || 0))}</span>
+          <span><strong>Expected Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.expected_cash || 0))}</span>
+          <span><strong>Counted Cash</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.counted_cash || 0) : "-")}</span>
+          <span><strong>Cash Variance</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.cash_variance || 0) : "-")}</span>
+        </div>
+        <h4>Hold Summary</h4>
+        <div class="shift-stats-grid">
+          <span><strong>Total Holds</strong>${escapeHtml(report.hold_count || 0)}</span>
+          <span><strong>Active Holds</strong>${escapeHtml(report.active_hold_count || 0)}</span>
+          <span><strong>Completed Holds</strong>${escapeHtml(report.completed_hold_count || 0)}</span>
+          <span><strong>Cancelled Holds</strong>${escapeHtml(report.cancelled_hold_count || 0)}</span>
+        </div>
+        <h4>Payment Breakdown</h4>
+        <div class="report-breakdown-list">
+          ${(report.payment_breakdown || []).length ? report.payment_breakdown.map((row) => `
+            <div class="receipt-line"><span>${escapeHtml(row.method || "-")} · ${escapeHtml(row.orders || 0)} orders</span><strong>${escapeHtml(formatCashierPreviewMoney(row.amount || 0))}</strong></div>
+          `).join("") : `<div class="cashier-terminal-empty-card">暂无支付数据。</div>`}
+        </div>
+        <h4>Category Breakdown</h4>
+        <div class="report-breakdown-list">
+          ${(report.category_breakdown || []).length ? report.category_breakdown.map((row) => `
+            <div class="receipt-line"><span>${escapeHtml(row.category || "-")} · ${escapeHtml(row.qty || 0)} pcs</span><strong>${escapeHtml(formatCashierPreviewMoney(row.amount || 0))}</strong></div>
+          `).join("") : `<div class="cashier-terminal-empty-card">暂无品类数据。</div>`}
+        </div>
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="close-drawer">Close</button>
+        <button type="button" class="primary-inline" data-terminal-action="print-shift-report">Print Report</button>
       </div>
     `;
     return;
@@ -31740,6 +31816,93 @@ async function loadCashierTerminalShiftSummary(shiftId = cashierTerminalState.cu
   return summary;
 }
 
+function normalizeCashierTerminalSignedNumber(value) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function normalizeCashierTerminalShiftReport(report = {}) {
+  const paymentBreakdown = Array.isArray(report.payment_breakdown) ? report.payment_breakdown : [];
+  const categoryBreakdown = Array.isArray(report.category_breakdown) ? report.category_breakdown : [];
+  return {
+    ...report,
+    report_type: String(report.report_type || "").trim().toUpperCase(),
+    store_code: String(report.store_code || getCashierTerminalStoreCode()).trim().toUpperCase(),
+    shift_id: String(report.shift_id || "").trim(),
+    cashier_id: String(report.cashier_id || "").trim(),
+    terminal_id: String(report.terminal_id || "").trim(),
+    status: String(report.status || "").trim(),
+    opened_at: String(report.opened_at || "").trim(),
+    closed_at: report.closed_at || "",
+    closed_by: String(report.closed_by || "").trim(),
+    manager_confirmed_by: String(report.manager_confirmed_by || "").trim(),
+    generated_at: String(report.generated_at || "").trim(),
+    opening_float: normalizeCashierTerminalNumber(report.opening_float),
+    total_sales: normalizeCashierTerminalNumber(report.total_sales),
+    order_count: Number(report.order_count || 0),
+    item_count: Number(report.item_count || 0),
+    cash_sales: normalizeCashierTerminalNumber(report.cash_sales),
+    mpesa_sales: normalizeCashierTerminalNumber(report.mpesa_sales),
+    mixed_cash: normalizeCashierTerminalNumber(report.mixed_cash),
+    mixed_mpesa: normalizeCashierTerminalNumber(report.mixed_mpesa),
+    expected_cash: normalizeCashierTerminalNumber(report.expected_cash),
+    counted_cash: report.counted_cash == null ? null : normalizeCashierTerminalNumber(report.counted_cash),
+    cash_variance: report.cash_variance == null ? null : normalizeCashierTerminalSignedNumber(report.cash_variance),
+    hold_count: Number(report.hold_count || 0),
+    active_hold_count: Number(report.active_hold_count || 0),
+    completed_hold_count: Number(report.completed_hold_count || 0),
+    cancelled_hold_count: Number(report.cancelled_hold_count || 0),
+    cancelled_order_count: Number(report.cancelled_order_count || 0),
+    payment_breakdown: paymentBreakdown.map((row) => ({
+      method: String(row.method || "").trim(),
+      orders: Number(row.orders || 0),
+      amount: normalizeCashierTerminalNumber(row.amount),
+    })),
+    category_breakdown: categoryBreakdown.map((row) => ({
+      category: String(row.category || "未分类").trim() || "未分类",
+      qty: Number(row.qty || 0),
+      amount: normalizeCashierTerminalNumber(row.amount),
+    })),
+  };
+}
+
+async function loadCashierTerminalShiftReport(reportType = "x") {
+  ensureCashierTerminalPreviewState();
+  const normalizedReportType = String(reportType || "x").trim().toLowerCase();
+  const reportSlug = normalizedReportType.startsWith("z") ? "z" : "x";
+  const shiftId = String(
+    cashierTerminalState.currentShift?.shift_id
+      || cashierTerminalState.shiftSummary?.shift_id
+      || cashierTerminalState.shiftNo
+      || "",
+  ).trim();
+  if (!shiftId) {
+    cashierTerminalState.shiftReportFeedback = "请先选择班次后再查看报表。";
+    renderCashierTerminalDrawer();
+    throw new Error(cashierTerminalState.shiftReportFeedback);
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const report = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/${reportSlug}-report`);
+  cashierTerminalState.shiftReport = normalizeCashierTerminalShiftReport(report);
+  cashierTerminalState.shiftReportFeedback = `已加载 ${cashierTerminalState.shiftReport.report_type === "Z_REPORT" ? "Z-report" : "X-report"}：${cashierTerminalState.shiftReport.shift_id}`;
+  cashierTerminalState.activeDrawer = "shift-report";
+  renderCashierTerminalDrawer();
+  return cashierTerminalState.shiftReport;
+}
+
+function printCashierTerminalShiftReport() {
+  ensureCashierTerminalPreviewState();
+  const report = cashierTerminalState.shiftReport;
+  if (!report?.shift_id) {
+    throw new Error("请先加载班次报表。");
+  }
+  cashierTerminalState.shiftReportFeedback = `${report.report_type === "Z_REPORT" ? "Z-report" : "X-report"} 已准备打印：${report.shift_id}`;
+  renderCashierTerminalDrawer();
+  if (typeof window.print === "function") {
+    window.print();
+  }
+}
+
 async function closeCashierTerminalShiftBackend() {
   ensureCashierTerminalPreviewState();
   const shiftId = cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo;
@@ -32122,6 +32285,12 @@ handleCashierTerminalAction = async function (action, target) {
       return;
     case "load-shift-summary":
       await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo);
+      return;
+    case "load-shift-report":
+      await loadCashierTerminalShiftReport(target.dataset.terminalReportType);
+      return;
+    case "print-shift-report":
+      printCashierTerminalShiftReport();
       return;
     case "confirm-hold":
       await createCashierTerminalHold();
