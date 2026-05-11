@@ -16309,6 +16309,16 @@ function renderSortingTaskResultSummary(kind, data) {
   ])}
   `;
 }
+function getSortingTaskStatusLabel(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "draft") return "草稿";
+  if (normalized === "assigned") return "已分配";
+  if (normalized === "in_progress" || normalized === "open") return "分拣中";
+  if (normalized === "submitted") return "已提交待确认";
+  if (normalized === "confirmed") return "已确认入库存";
+  if (normalized === "cancelled") return "已取消";
+  return status || "-";
+}
 function openSortingTaskForProcessing(taskNo = "", targetPanel = "manager") {
   const normalizedTaskNo = String(taskNo || "").trim().toUpperCase();
   if (!normalizedTaskNo) {
@@ -16795,9 +16805,10 @@ function renderSortingTaskManagerSummary(kind, data) {
   }
   const activeDate = sortingTaskManagerDateFilter || getLocalDateKey((/* @__PURE__ */ new Date()).toISOString());
   const bucketBuilder = sortingTaskFlow.buildSortingTaskManagerBuckets;
+  const openSortingStatuses = /* @__PURE__ */ new Set(["open", "draft", "assigned", "in_progress", "submitted"]);
   const buckets = typeof bucketBuilder === "function" ? bucketBuilder(rows, activeDate) : {
-    openRows: rows.filter((row) => String((row == null ? void 0 : row.status) || "").trim().toLowerCase() === "open"),
-    completedRows: activeDate ? rows.filter((row) => String((row == null ? void 0 : row.status) || "").trim().toLowerCase() !== "open" && getLocalDateKey(row == null ? void 0 : row.started_at) === activeDate) : rows.filter((row) => String((row == null ? void 0 : row.status) || "").trim().toLowerCase() !== "open"),
+    openRows: rows.filter((row) => openSortingStatuses.has(String((row == null ? void 0 : row.status) || "").trim().toLowerCase())),
+    completedRows: activeDate ? rows.filter((row) => !openSortingStatuses.has(String((row == null ? void 0 : row.status) || "").trim().toLowerCase()) && getLocalDateKey((row == null ? void 0 : row.started_at) || (row == null ? void 0 : row.created_at)) === activeDate) : rows.filter((row) => !openSortingStatuses.has(String((row == null ? void 0 : row.status) || "").trim().toLowerCase())),
     visibleRows: []
   };
   const openRows = Array.isArray(buckets.openRows) ? buckets.openRows : [];
@@ -16827,9 +16838,10 @@ function renderSortingTaskManagerSummary(kind, data) {
     const totalWeight = detailRows.reduce((sum, detail) => sum + Number(detail.perPackageWeight || 0), 0);
     const costMeta = getSortingTaskCostStatusMeta(row);
     const shipmentMeta = getSortingTaskShipmentMeta(row);
-    const taskStatus = String(row.status || "").trim() === "open" ? "进行中" : "已完成";
+    const normalizedStatus = String(row.status || "").trim().toLowerCase();
+    const taskStatus = getSortingTaskStatusLabel(normalizedStatus);
     return `
-            <article class="task-manager-card ${String(row.status || "").trim() === "open" ? "is-open" : "is-done"} ${getStatusCardClass(taskStatus)}">
+            <article class="task-manager-card ${openSortingStatuses.has(normalizedStatus) ? "is-open" : "is-done"} ${getStatusCardClass(taskStatus)}">
               <div class="task-manager-head">
                 <div>
                   <strong>${escapeHtml(row.task_no || "-")}</strong>
@@ -16843,8 +16855,12 @@ function renderSortingTaskManagerSummary(kind, data) {
                   <span>${escapeHtml(formatLocalDateTime(row.started_at) || "-")}</span>
                 </div>
                 <div class="task-manager-time-item">
+                  <strong>提交时间</strong>
+                  <span>${escapeHtml(formatLocalDateTime(row.submitted_at) || "-")}</span>
+                </div>
+                <div class="task-manager-time-item">
                   <strong>结束时间</strong>
-                  <span>${escapeHtml(formatLocalDateTime(row.completed_at) || (String(row.status || "").trim() === "open" ? "进行中" : "-"))}</span>
+                  <span>${escapeHtml(formatLocalDateTime(row.confirmed_at || row.completed_at) || (openSortingStatuses.has(normalizedStatus) ? "未确认" : "-"))}</span>
                 </div>
                 <div class="task-manager-time-item">
                   <strong>进行时间</strong>
@@ -16864,7 +16880,7 @@ function renderSortingTaskManagerSummary(kind, data) {
                 </div>
                 <div class="task-manager-time-item">
                   <strong>商品 token</strong>
-                  <span>${renderStatusBadge(Number(row.generated_token_count || 0) ? `${row.generated_token_count} 个` : "待生成", Number(row.generated_token_count || 0) ? "success" : "warning")}</span>
+                  <span>${renderStatusBadge(Number(row.generated_token_count || 0) ? `${row.generated_token_count} 个` : "不生成 STORE_ITEM", Number(row.generated_token_count || 0) ? "success" : "neutral")}</span>
                 </div>
                 <div class="task-manager-time-item">
                   <strong>成本口径</strong>
@@ -16887,7 +16903,9 @@ function renderSortingTaskManagerSummary(kind, data) {
                     `).join("") : '<div class="empty-state">这张任务当前还没有读取到包裹详情。</div>'}
               </div>
               <div class="button-row">
-                <button type="button" class="ghost-button mini-button" data-sorting-task-manage="result" data-task-no="${escapeHtml(row.task_no || "")}">${String(row.status || "").trim() === "open" ? "确认并完成分拣" : "查看分拣结果"}</button>
+                ${normalizedStatus === "assigned" || normalizedStatus === "draft" ? `<button type="button" class="ghost-button mini-button" data-sorting-task-start="${escapeHtml(row.task_no || "")}">开始分拣</button>` : ""}
+                <button type="button" class="ghost-button mini-button" data-sorting-task-manage="result" data-task-no="${escapeHtml(row.task_no || "")}">${openSortingStatuses.has(normalizedStatus) ? "录入 / 查看结果" : "查看分拣结果"}</button>
+                ${normalizedStatus === "submitted" ? `<button type="button" class="primary-button mini-button" data-sorting-task-confirm="${escapeHtml(row.task_no || "")}">确认入库存</button>` : ""}
               </div>
             </article>
           `;
@@ -16910,14 +16928,16 @@ function renderSortingResultSubmitSummary(result) {
   const generatedTokenCount = Number(result.generated_token_count || 0);
   const costMeta = getSortingTaskCostStatusMeta(result);
   const lossRecord = getNormalizedSortingLossRecord(result.loss_record || null);
+  const normalizedStatus = String(result.status || "").trim().toLowerCase();
+  const isSubmitted = normalizedStatus === "submitted";
   target.className = "report-summary";
   target.innerHTML = `
-    ${renderStatusAlert("分拣结果已提交，分拣库存已更新，并已为门店后续贴码生成商品 token。", "success")}
+    ${renderStatusAlert(isSubmitted ? "分拣结果已提交，等待仓库主管确认入库存。" : "分拣结果已确认，分拣库存已更新。", isSubmitted ? "info" : "success")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>任务号</strong><span>${escapeHtml(result.task_no || "-")}</span></article>
       <article class="store-metric"><strong>结果条数</strong><span>${items.length}</span></article>
       <article class="store-metric"><strong>总件数</strong><span>${totalQty}</span></article>
-      <article class="store-metric"><strong>生成 token</strong><span>${escapeHtml(generatedTokenCount || 0)}</span></article>
+      <article class="store-metric"><strong>STORE_ITEM</strong><span>${escapeHtml(generatedTokenCount ? `${generatedTokenCount} 个 token` : "本步骤不生成")}</span></article>
       <article class="store-metric"><strong>状态</strong><span>${renderStatusBadge(result.status || "-", result.status || "success")}</span></article>
       <article class="store-metric"><strong>关联批次</strong><span>${escapeHtml((result.parcel_batch_nos || []).length)}</span></article>
       <article class="store-metric"><strong>处理人</strong><span>${escapeHtml((result.handler_names || []).join(" / ") || "-")}</span></article>
@@ -16927,24 +16947,22 @@ function renderSortingResultSubmitSummary(result) {
     </div>
     <div class="meta">${escapeHtml(costMeta.detail)}</div>
     ${lossRecord.has_loss ? `<div class="subtle small">损耗照片 ${escapeHtml(lossRecord.photos.length)} 张 · ${escapeHtml(lossRecord.note || "已记录损耗，未补说明。")}</div>` : ""}
-    <div class="subtle small">本次任务商品 token 预览</div>
-    ${renderSortingTokenPreview(result.generated_token_preview || [], "当前还没有生成商品 token。")}
+    <div class="subtle small">本步骤只生成仓库分拣库存，不生成 STORE_ITEM 商品码。</div>
     <div class="candidate-list">
       ${items.length ? items.map(
     (row) => `
                 <article class="candidate-row">
                   <div class="candidate-main">
                     <strong>${escapeHtml(`${row.category_name || "-"} · ${row.grade || "-"}`)}</strong>
-                    <div class="subtle small">${escapeHtml(`${row.qty || 0} 件 · 库位 ${row.rack_code || "-"} · 已生成 ${row.generated_token_count || 0} 个 token`)}</div>
+                    <div class="subtle small">${escapeHtml(`${row.qty || 0} 件 · 库位 ${row.rack_code || row.target_location || "-"} · ${isSubmitted ? "待主管确认" : "已入分拣库存"}`)}</div>
                     <div class="subtle small">${escapeHtml(`${costMeta.label} · 单件 ${formatKesAmount(row.unit_cost_kes || 0, "待分摊")} · 行成本 ${formatKesAmount(row.total_cost_kes || 0, "待分摊")}`)}</div>
                   </div>
-                  <div class="candidate-side">
-                    ${renderSortingTokenPreview(row.generated_token_preview || [], "待生成")}
-                  </div>
+                  <div class="candidate-side">${renderStatusBadge(getSortingTaskStatusLabel(result.status || ""), result.status || "neutral")}</div>
                 </article>
               `
   ).join("") : '<div class="empty-state">当前还没有分拣结果行。</div>'}
     </div>
+    ${isSubmitted ? `<div class="button-row"><button type="button" class="primary-button" data-sorting-task-confirm="${escapeHtml(result.task_no || "")}">确认入库存</button></div>` : ""}
     ${renderSummaryActions([
     { panelKey: getPanelKeyByTitle("store", "6. 送货单验收详情 / Store Receiving Detail"), label: "下一步：去送货单验收详情" },
     { panelKey: getPanelKeyByTitle("warehouse", "0.1 原始 Bale 总库存"), label: "下一步：查看总控页里的已分拣服装" },
@@ -34394,6 +34412,7 @@ async function routeRawBaleFromWorkbench(baleBarcode, destination) {
   }
 }
 async function submitSortingTask(event) {
+  var _a, _b, _c2;
   event.preventDefault();
   syncJsonBuilderToField("sorting-handler-names");
   const form = new FormData(event.currentTarget);
@@ -34408,6 +34427,11 @@ async function submitSortingTask(event) {
     (row) => selectedSortingBales.has(row.bale_barcode) && isRawBaleEligibleForSortingTask(row)
   );
   payload.bale_barcodes = selectedRows.map((row) => row.bale_barcode).filter(Boolean);
+  payload.task_status = "assigned";
+  payload.source_raw_bale_display_code = ((_a = selectedRows[0]) == null ? void 0 : _a.bale_barcode) || "";
+  payload.source_raw_bale_machine_code = ((_b = selectedRows[0]) == null ? void 0 : _b.machine_code) || ((_c2 = selectedRows[0]) == null ? void 0 : _c2.barcode_value) || "";
+  payload.assigned_worker = payload.handler_names[0] || "";
+  payload.sorter_name = payload.handler_names[0] || "";
   if (!payload.bale_barcodes.length) {
     throw new Error("请先通过扫码或检索，把至少一个当前可分拣的 bale 加入右侧任务清单。");
   }
@@ -34452,25 +34476,14 @@ async function submitSortingResults(event) {
   task = getSortingTaskByNo(taskNo);
   payload.result_items = parseJsonField(payload.result_items_json, []);
   payload.loss_record = await buildSortingLossRecordPayload(formElement);
-  payload.mark_task_completed = payload.mark_task_completed === "true";
   payload.result_items.forEach((row, index) => {
-    if (!(Number((row == null ? void 0 : row.actual_weight_kg) || 0) > 0)) {
-      throw new Error(`第 ${index + 1} 行请先录入实际分拣重量 KG。`);
-    }
-    if (String(row == null ? void 0 : row.confirm_to_inventory) === "false" || (row == null ? void 0 : row.confirm_to_inventory) === false) {
-      return;
-    }
-    if (!String((row == null ? void 0 : row.rack_code) || "").trim()) {
-      throw new Error(`第 ${index + 1} 行还没有绑定分拣库位，请先去 4.8 配置。`);
+    if (!(Number((row == null ? void 0 : row.qty) || 0) > 0)) {
+      throw new Error(`第 ${index + 1} 行数量必须大于 0。`);
     }
   });
-  const costMeta = getSortingTaskFormalCostPayload(task, payload.result_items, payload.loss_record);
-  if (costMeta.cost_status !== "cost_locked") {
-    throw new Error(costMeta.detail || "当前分拣重量还不能正式锁成本。");
-  }
   delete payload.task_no;
   delete payload.result_items_json;
-  const result = await request(`/warehouse/sorting-tasks/${encodeURIComponent(taskNo)}/results`, {
+  const result = await request(`/warehouse/sorting-tasks/${encodeURIComponent(taskNo)}/submit`, {
     method: "POST",
     body: JSON.stringify(payload)
   });
@@ -34491,6 +34504,38 @@ async function submitSortingResults(event) {
     lastShipmentNo: result.shipment_no || ""
   });
   await loadTable("load-sorting-stock");
+}
+async function startSortingTaskFromManager(taskNo) {
+  const normalizedTaskNo = String(taskNo || "").trim().toUpperCase();
+  if (!normalizedTaskNo) {
+    return;
+  }
+  const result = await request(`/warehouse/sorting-tasks/${encodeURIComponent(normalizedTaskNo)}/start`, {
+    method: "POST",
+    body: JSON.stringify({ note: "warehouse sorter started task" })
+  });
+  sortingTaskState = [result, ...sortingTaskState.filter((row) => row.task_no !== result.task_no)];
+  renderSortingTaskManagerSummary("list", sortingTaskState);
+  hydrateSortingTaskForms(result);
+  writeOutput("#sortingTaskManagerOutput", result);
+  showTransientInlineNotice("#sortingTaskNotice", `分拣任务 ${result.task_no || ""} 已开始。`, "success", 1800);
+}
+async function confirmSortingTaskIntoInventory(taskNo) {
+  const normalizedTaskNo = String(taskNo || "").trim().toUpperCase();
+  if (!normalizedTaskNo) {
+    return;
+  }
+  const result = await request(`/warehouse/sorting-tasks/${encodeURIComponent(normalizedTaskNo)}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({ note: "warehouse manager confirmed sorted inventory" })
+  });
+  sortingTaskState = [result, ...sortingTaskState.filter((row) => row.task_no !== result.task_no)];
+  await syncSortingFlowSnapshot(result.shipment_no || "");
+  renderSortingTaskManagerSummary("list", sortingTaskState);
+  renderSortingResultSubmitSummary(result);
+  hydrateSortingTaskForms(result);
+  writeOutput("#sortingResultOutput", result);
+  showTransientInlineNotice("#sortingTaskNotice", `分拣任务 ${result.task_no || ""} 已确认入库存。`, "success", 1800);
 }
 async function submitStorePrepBaleTask(event) {
   event.preventDefault();
@@ -38859,8 +38904,28 @@ document.addEventListener("click", (event) => {
   });
 });
 document.addEventListener("click", (event) => {
-  const button = event.target instanceof HTMLElement ? event.target.closest("[data-sorting-task-manage]") : null;
+  const button = event.target instanceof HTMLElement ? event.target.closest("[data-sorting-task-manage], [data-sorting-task-start], [data-sorting-task-confirm]") : null;
   if (!(button instanceof HTMLElement)) {
+    return;
+  }
+  const startTaskNo = String(button.dataset.sortingTaskStart || "").trim();
+  const confirmTaskNo = String(button.dataset.sortingTaskConfirm || "").trim();
+  if (startTaskNo) {
+    event.preventDefault();
+    startSortingTaskFromManager(startTaskNo).catch((error) => {
+      const message = formatErrorMessage(error);
+      writeOutput("#sortingTaskManagerOutput", message);
+      renderErrorSummary("#sortingTaskManagerSummary", message);
+    });
+    return;
+  }
+  if (confirmTaskNo) {
+    event.preventDefault();
+    confirmSortingTaskIntoInventory(confirmTaskNo).catch((error) => {
+      const message = formatErrorMessage(error);
+      writeOutput("#sortingResultOutput", message);
+      renderErrorSummary("#sortingResultSubmitSummary", message);
+    });
     return;
   }
   const taskNo = String(button.dataset.taskNo || "").trim();

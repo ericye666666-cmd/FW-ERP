@@ -157,8 +157,10 @@ from app.schemas.sorting import (
     StoreDispatchBaleAssignRequest,
     StoreDispatchBaleResponse,
     SortingTaskCreate,
+    SortingTaskConfirmRequest,
     SortingTaskResponse,
     SortingTaskResultSubmit,
+    SortingTaskStartRequest,
 )
 from app.schemas.returns import (
     ReturnCandidateResponse,
@@ -2938,6 +2940,42 @@ def list_sorting_tasks(
 ) -> list[SortingTaskResponse]:
     _require_current_user(authorization=authorization)
     return [SortingTaskResponse(**row) for row in state.list_sorting_tasks(status=status)]
+
+
+@router.post("/warehouse/sorting-tasks/{task_no}/start", response_model=SortingTaskResponse, tags=["warehouse"])
+def start_sorting_task(
+    task_no: str,
+    payload: SortingTaskStartRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> SortingTaskResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["started_by"] = data.get("started_by") or current_user["username"]
+    return SortingTaskResponse(**state.start_sorting_task(task_no, data))
+
+
+@router.post("/warehouse/sorting-tasks/{task_no}/submit", response_model=SortingTaskResponse, tags=["warehouse"])
+def submit_sorting_task_for_review(
+    task_no: str,
+    payload: SortingTaskResultSubmit,
+    authorization: Optional[str] = Header(default=None),
+) -> SortingTaskResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["submitted_by"] = current_user["username"]
+    return SortingTaskResponse(**state.submit_sorting_task_for_review(task_no, data))
+
+
+@router.post("/warehouse/sorting-tasks/{task_no}/confirm", response_model=SortingTaskResponse, tags=["warehouse"])
+def confirm_sorting_task(
+    task_no: str,
+    payload: SortingTaskConfirmRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> SortingTaskResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["confirmed_by"] = current_user["username"]
+    return SortingTaskResponse(**state.confirm_sorting_task(task_no, data))
 
 
 @router.post("/warehouse/store-prep-bale-tasks", response_model=StorePrepBaleTaskResponse, tags=["warehouse"])

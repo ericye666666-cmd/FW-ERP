@@ -1812,6 +1812,120 @@ class MainSortingFlowStateTest(unittest.TestCase):
         self.assertEqual(listed_task["handler_names"], ["warehouse_clerk_1"])
         self.assertEqual(listed_task["status"], "open")
 
+    def test_sorting_task_lifecycle_submits_then_confirms_sorted_inventory(self):
+        _, bales, _, _ = self._create_ready_bales_with_source_cost(
+            customs_notice_no="SORTLIFECYCLE",
+            package_count=1,
+            category_name="pants / cargo pant",
+        )
+        raw_bale = bales[0]
+
+        task = self.state.create_sorting_task(
+            {
+                "source_raw_bale_display_code": raw_bale["bale_barcode"],
+                "source_raw_bale_machine_code": raw_bale["machine_code"],
+                "sorter_name": "warehouse_clerk_1",
+                "task_status": "assigned",
+                "note": "lifecycle sorting",
+                "created_by": "warehouse_supervisor_1",
+            }
+        )
+
+        self.assertEqual(task["status"], "assigned")
+        self.assertEqual(task["task_status"], "assigned")
+        self.assertEqual(task["source_raw_bale_display_code"], raw_bale["bale_barcode"])
+        self.assertEqual(task["source_raw_bale_machine_code"], raw_bale["machine_code"])
+        self.assertEqual(task["assigned_worker"], "warehouse_clerk_1")
+        self.assertEqual(task["handler_names"], ["warehouse_clerk_1"])
+
+        started = self.state.start_sorting_task(
+            task["task_no"],
+            {"started_by": "warehouse_clerk_1"},
+        )
+        self.assertEqual(started["status"], "in_progress")
+        self.assertTrue(started["started_at"])
+        self.assertEqual(started["started_by"], "warehouse_clerk_1")
+
+        with self.assertRaises(HTTPException):
+            self.state.submit_sorting_task_for_review(
+                task["task_no"],
+                {
+                    "submitted_by": "warehouse_clerk_1",
+                    "result_items": [
+                        {
+                            "category_main": "pants",
+                            "category_short": "CARGO PANT",
+                            "grade": "P",
+                            "qty": 0,
+                        }
+                    ],
+                },
+            )
+
+        submitted = self.state.submit_sorting_task_for_review(
+            task["task_no"],
+            {
+                "submitted_by": "warehouse_clerk_1",
+                "result_items": [
+                    {
+                        "category_main": "pants",
+                        "category_sub": "cargo pant",
+                        "category_short": "CARGO PANT",
+                        "grade": "P",
+                        "qty": 50,
+                        "condition": "sellable",
+                        "target_location": "SORT-PANTS-P",
+                        "default_cost_kes": 120,
+                        "confirm_to_inventory": True,
+                    }
+                ],
+                "note": "ready for manager confirmation",
+            },
+        )
+
+        self.assertEqual(submitted["status"], "submitted")
+        self.assertTrue(submitted["submitted_at"])
+        self.assertEqual(submitted["submitted_by"], "warehouse_clerk_1")
+        self.assertEqual(submitted["result_items"][0]["category_name"], "pants / cargo pant")
+        self.assertEqual(submitted["result_items"][0]["category_short"], "CARGO PANT")
+        self.assertEqual(submitted["result_items"][0]["qty"], 50)
+        self.assertEqual(len(self.state.list_sorting_stock()), 0)
+        self.assertEqual(len(self.state.store_items), 0)
+
+        confirmed = self.state.confirm_sorting_task(
+            task["task_no"],
+            {"confirmed_by": "warehouse_supervisor_1", "note": "confirm into sorted inventory"},
+        )
+
+        self.assertEqual(confirmed["status"], "confirmed")
+        self.assertTrue(confirmed["confirmed_at"])
+        self.assertEqual(confirmed["confirmed_by"], "warehouse_supervisor_1")
+        stock_rows = self.state.list_sorting_stock()
+        self.assertEqual(len(stock_rows), 1)
+        stock = stock_rows[0]
+        self.assertEqual(stock["qty_on_hand"], 50)
+        self.assertEqual(stock["source_raw_bale_display_code"], raw_bale["bale_barcode"])
+        self.assertEqual(stock["source_raw_bale_machine_code"], raw_bale["machine_code"])
+        self.assertEqual(stock["sorting_task_no"], task["task_no"])
+        self.assertEqual(stock["sorting_line_id"], f"{task['task_no']}-001")
+        self.assertEqual(len(self.state.store_items), 0)
+
+        with self.assertRaises(HTTPException):
+            self.state.submit_sorting_task_for_review(
+                task["task_no"],
+                {
+                    "submitted_by": "warehouse_clerk_1",
+                    "result_items": [
+                        {
+                            "category_name": "pants / cargo pant",
+                            "grade": "S",
+                            "qty": 1,
+                            "default_cost_kes": 120,
+                        }
+                    ],
+                },
+            )
+
     def _create_confirmed_sorting_inventory(
         self,
         customs_notice_no="SORT240423",

@@ -6949,6 +6949,16 @@ class InMemoryState:
             task["bale_barcodes"] = canonical_bale_barcodes
         task["legacy_bale_barcodes"] = legacy_bale_barcodes
         task["loss_record"] = self._normalize_sorting_loss_record(task.get("loss_record"))
+        task.setdefault("task_status", str(task.get("status") or "draft").strip().lower() or "draft")
+        task.setdefault("assigned_worker", (task.get("handler_names") or [""])[0] if task.get("handler_names") else "")
+        task.setdefault("source_raw_bale_display_code", (task.get("bale_barcodes") or [""])[0] if task.get("bale_barcodes") else "")
+        task.setdefault("source_raw_bale_machine_code", "")
+        task.setdefault("started_by", "")
+        task.setdefault("submitted_at", None)
+        task.setdefault("submitted_by", "")
+        task.setdefault("confirmed_at", task.get("completed_at") if str(task.get("status") or "").lower() == "confirmed" else None)
+        task.setdefault("confirmed_by", "")
+        task.setdefault("created_at", task.get("started_at") or task.get("updated_at") or now_iso())
         shipment_nos = [
             str(value).strip().upper()
             for value in task.get("shipment_nos", []) or []
@@ -6970,6 +6980,8 @@ class InMemoryState:
                     shipment_nos.append(shipment_no)
                 if customs_notice_no and customs_notice_no not in customs_notice_nos:
                     customs_notice_nos.append(customs_notice_no)
+                if not str(task.get("source_raw_bale_machine_code") or "").strip():
+                    task["source_raw_bale_machine_code"] = str(bale.get("machine_code") or bale.get("barcode_value") or "").strip().upper()
         if not shipment_nos:
             shipment_no = str(task.get("shipment_no") or "").strip().upper()
             if shipment_no and shipment_no != "MULTI":
@@ -6987,9 +6999,19 @@ class InMemoryState:
     def create_sorting_task(self, payload: dict[str, Any]) -> dict[str, Any]:
         actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})
         requested_references = [str(code).strip().upper() for code in payload.get("bale_barcodes") or [] if str(code).strip()]
+        source_raw_bale_display_code = str(payload.get("source_raw_bale_display_code") or "").strip().upper()
+        source_raw_bale_machine_code = str(payload.get("source_raw_bale_machine_code") or "").strip().upper()
+        if source_raw_bale_display_code and source_raw_bale_display_code not in requested_references:
+            requested_references.append(source_raw_bale_display_code)
+        if source_raw_bale_machine_code and source_raw_bale_machine_code not in requested_references:
+            requested_references.append(source_raw_bale_machine_code)
         if not requested_references:
             raise HTTPException(status_code=400, detail="请至少选择一包 bale barcode 再创建分拣任务")
-        handler_names = [str(name).strip() for name in payload["handler_names"] if str(name).strip()]
+        handler_names = [str(name).strip() for name in payload.get("handler_names") or [] if str(name).strip()]
+        for alias_key in ("sorter_name", "assigned_worker"):
+            alias_name = str(payload.get(alias_key) or "").strip()
+            if alias_name and alias_name not in handler_names:
+                handler_names.append(alias_name)
         if not handler_names:
             raise HTTPException(status_code=400, detail="请至少填写一位分拣处理人")
         for handler_name in handler_names:
@@ -7031,8 +7053,15 @@ class InMemoryState:
                 customs_notice_nos.append(customs_notice_no)
 
         task_id = next(self._sorting_task_ids)
-        task_no = f"ST-{datetime.now(NAIROBI_TZ).strftime('%Y%m%d')}-{task_id:03d}"
-        started_at = now_iso()
+        requested_task_no = str(payload.get("task_no") or "").strip().upper()
+        task_no = requested_task_no or f"ST-{datetime.now(NAIROBI_TZ).strftime('%Y%m%d')}-{task_id:03d}"
+        if task_no in self.sorting_tasks:
+            raise HTTPException(status_code=409, detail=f"Sorting task {task_no} already exists")
+        created_at = now_iso()
+        requested_status = str(payload.get("task_status") or "").strip().lower()
+        task_status = requested_status if requested_status in {"draft", "assigned", "in_progress"} else "open"
+        started_at = created_at if task_status in {"open", "in_progress"} else ""
+        first_bale = self._get_raw_bale_or_raise(bale_barcodes[0]) if bale_barcodes else {}
         task = {
             "id": task_id,
             "task_no": task_no,
@@ -7045,15 +7074,27 @@ class InMemoryState:
             "legacy_bale_barcodes": legacy_bale_barcodes,
             "category_filters": category_filters,
             "handler_names": handler_names,
+            "assigned_worker": handler_names[0] if handler_names else "",
+            "source_raw_bale_display_code": str(first_bale.get("bale_barcode") or source_raw_bale_display_code or "").strip().upper(),
+            "source_raw_bale_machine_code": str(first_bale.get("machine_code") or first_bale.get("barcode_value") or source_raw_bale_machine_code or "").strip().upper(),
+            "warehouse_code": str(payload.get("warehouse_code") or "").strip().upper(),
+            "store_code": str(payload.get("store_code") or "").strip().upper(),
+            "created_at": created_at,
             "started_at": started_at,
+            "started_by": actor["username"] if started_at else "",
+            "submitted_at": None,
+            "submitted_by": "",
+            "confirmed_at": None,
+            "confirmed_by": "",
             "completed_at": None,
             "note": payload.get("note", ""),
-            "status": "open",
+            "status": task_status,
+            "task_status": task_status,
             "loss_record": self._normalize_sorting_loss_record(),
             "result_items": [],
             "generated_token_count": 0,
             "generated_token_preview": [],
-            "updated_at": started_at,
+            "updated_at": created_at,
             "created_by": actor["username"],
         }
         self.sorting_tasks[task_no] = task
@@ -7086,9 +7127,13 @@ class InMemoryState:
         rows = list(self.sorting_tasks.values())
         if status:
             normalized_status = status.strip().lower()
-            rows = [row for row in rows if row["status"].lower() == normalized_status]
+            if normalized_status == "open":
+                open_statuses = {"open", "draft", "assigned", "in_progress", "submitted"}
+                rows = [row for row in rows if str(row.get("status") or "").strip().lower() in open_statuses]
+            else:
+                rows = [row for row in rows if str(row.get("status") or "").strip().lower() == normalized_status]
         rows = [self._ensure_sorting_task_defaults(row) for row in rows]
-        return sorted(rows, key=lambda row: row["started_at"], reverse=True)
+        return sorted(rows, key=lambda row: row.get("started_at") or row.get("created_at") or "", reverse=True)
 
     def _split_category_name_parts(self, category_name: str) -> tuple[str, str]:
         normalized = str(category_name or "").strip()
@@ -8817,6 +8862,140 @@ class InMemoryState:
         self._persist()
         return token
 
+    def start_sorting_task(self, task_no: str, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload.get("started_by") or payload.get("created_by"), {"warehouse_clerk", "warehouse_supervisor"})
+        normalized_task_no = str(task_no or "").strip().upper()
+        task = self.sorting_tasks.get(normalized_task_no)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Unknown sorting task {normalized_task_no}")
+        task = self._ensure_sorting_task_defaults(task)
+        current_status = str(task.get("status") or "").strip().lower()
+        if current_status in {"submitted", "confirmed", "cancelled"}:
+            raise HTTPException(status_code=409, detail=f"{normalized_task_no} 当前状态是 {current_status}，不能开始分拣")
+        started_at = now_iso()
+        task["status"] = "in_progress"
+        task["task_status"] = "in_progress"
+        task["started_at"] = task.get("started_at") or started_at
+        task["started_by"] = actor["username"]
+        task["updated_at"] = started_at
+        if payload.get("note"):
+            task["note"] = payload.get("note")
+        self._log_event(
+            event_type="sorting_task.started",
+            entity_type="sorting_task",
+            entity_id=normalized_task_no,
+            actor=actor["username"],
+            summary=f"Sorting task {normalized_task_no} started",
+            details={},
+        )
+        self._persist()
+        return task
+
+    def _normalize_sorting_task_result_items_for_lifecycle(self, raw_items: Any) -> list[dict[str, Any]]:
+        if not raw_items:
+            raise HTTPException(status_code=400, detail="请至少录入一条分拣结果")
+        normalized_items: list[dict[str, Any]] = []
+        for index, item in enumerate(raw_items or [], start=1):
+            category_name = str((item or {}).get("category_name") or "").strip()
+            category_main = str((item or {}).get("category_main") or "").strip()
+            category_sub = str((item or {}).get("category_sub") or (item or {}).get("category_short") or "").strip()
+            if not category_name:
+                category_name = f"{category_main} / {category_sub or category_main}".strip(" /")
+            if not category_name:
+                raise HTTPException(status_code=400, detail=f"第 {index} 行缺少品类")
+            grade = str((item or {}).get("grade") or "").strip().upper()
+            if not grade:
+                raise HTTPException(status_code=400, detail=f"第 {index} 行缺少等级")
+            qty = int((item or {}).get("qty") or (item or {}).get("quantity") or 0)
+            if qty <= 0:
+                raise HTTPException(status_code=400, detail=f"第 {index} 行数量必须大于 0")
+            rack_code = str((item or {}).get("rack_code") or (item or {}).get("target_location") or "").strip().upper()
+            normalized_items.append(
+                {
+                    **(item or {}),
+                    "category_name": category_name,
+                    "category_main": category_main or self._split_category_name_parts(category_name)[0],
+                    "category_sub": category_sub or self._split_category_name_parts(category_name)[1],
+                    "category_short": str((item or {}).get("category_short") or category_sub or category_main or category_name).strip(),
+                    "grade": grade,
+                    "qty": qty,
+                    "rack_code": rack_code,
+                    "target_location": str((item or {}).get("target_location") or rack_code).strip().upper(),
+                    "condition": str((item or {}).get("condition") or "").strip(),
+                    "notes": str((item or {}).get("notes") or (item or {}).get("note") or "").strip(),
+                }
+            )
+        return normalized_items
+
+    def submit_sorting_task_for_review(self, task_no: str, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload.get("submitted_by") or payload.get("created_by"), {"warehouse_clerk", "warehouse_supervisor"})
+        normalized_task_no = str(task_no or "").strip().upper()
+        task = self.sorting_tasks.get(normalized_task_no)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Unknown sorting task {normalized_task_no}")
+        task = self._ensure_sorting_task_defaults(task)
+        current_status = str(task.get("status") or "").strip().lower()
+        if current_status in {"submitted", "confirmed", "cancelled"}:
+            raise HTTPException(status_code=409, detail=f"{normalized_task_no} 当前状态是 {current_status}，不能修改分拣结果")
+        result_items = self._normalize_sorting_task_result_items_for_lifecycle(payload.get("result_items"))
+        submitted_at = now_iso()
+        for index, row in enumerate(result_items, start=1):
+            row["sku_code"] = self._sorting_sku_code(row["category_name"], row["grade"], row.get("default_cost_kes"))
+            row["actual_weight_kg"] = row.get("actual_weight_kg")
+            row["confirm_to_inventory"] = bool(row.get("confirm_to_inventory", True))
+            row["generated_token_count"] = 0
+            row["generated_token_preview"] = []
+            row["cost_status"] = ""
+            row["unit_cost_kes"] = row.get("estimated_unit_cost_kes")
+            row["total_cost_kes"] = None
+            row["sorting_line_id"] = f"{normalized_task_no}-{index:03d}"
+        task["result_items"] = result_items
+        task["status"] = "submitted"
+        task["task_status"] = "submitted"
+        task["submitted_at"] = submitted_at
+        task["submitted_by"] = actor["username"]
+        task["updated_at"] = submitted_at
+        task["note"] = payload.get("note", task.get("note", ""))
+        self._log_event(
+            event_type="sorting_task.submitted",
+            entity_type="sorting_task",
+            entity_id=normalized_task_no,
+            actor=actor["username"],
+            summary=f"Sorting task {normalized_task_no} submitted",
+            details={"result_count": len(result_items)},
+        )
+        self._persist()
+        return task
+
+    def confirm_sorting_task(self, task_no: str, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload.get("confirmed_by") or payload.get("created_by"), {"warehouse_supervisor"})
+        normalized_task_no = str(task_no or "").strip().upper()
+        task = self.sorting_tasks.get(normalized_task_no)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Unknown sorting task {normalized_task_no}")
+        task = self._ensure_sorting_task_defaults(task)
+        if str(task.get("status") or "").strip().lower() != "submitted":
+            raise HTTPException(status_code=409, detail=f"{normalized_task_no} 必须先提交分拣结果，再由主管确认入库")
+        result_items = self._normalize_sorting_task_result_items_for_lifecycle(task.get("result_items"))
+        confirmed = self.submit_sorting_task_results(
+            normalized_task_no,
+            {
+                "created_by": actor["username"],
+                "result_items": result_items,
+                "loss_record": task.get("loss_record"),
+                "note": payload.get("note", task.get("note", "")),
+                "mark_task_completed": True,
+                "generate_item_tokens": False,
+            },
+        )
+        confirmed["status"] = "confirmed"
+        confirmed["task_status"] = "confirmed"
+        confirmed["confirmed_at"] = confirmed.get("completed_at") or now_iso()
+        confirmed["confirmed_by"] = actor["username"]
+        confirmed["updated_at"] = confirmed["confirmed_at"]
+        self._persist()
+        return confirmed
+
     def submit_sorting_task_results(self, task_no: str, payload: dict[str, Any]) -> dict[str, Any]:
         actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})
         normalized_task_no = task_no.strip().upper()
@@ -8891,14 +9070,21 @@ class InMemoryState:
             store_dispatch_bale_no = self._store_dispatch_bale_no(normalized_task_no, token_group_no)
             row = {
                 "category_name": category_name,
+                "category_main": str(item.get("category_main") or self._split_category_name_parts(category_name)[0] or "").strip(),
+                "category_sub": str(item.get("category_sub") or self._split_category_name_parts(category_name)[1] or "").strip(),
+                "category_short": str(item.get("category_short") or "").strip(),
                 "grade": grade,
                 "sku_code": sku_code,
                 "actual_weight_kg": row_estimate.get("actual_weight_kg"),
                 "qty": row_token_count,
                 "rack_code": rack_code,
+                "target_location": str(item.get("target_location") or item.get("rack_code") or "").strip(),
+                "condition": str(item.get("condition") or "").strip(),
+                "notes": str(item.get("notes") or item.get("note") or "").strip(),
+                "sorting_line_id": f"{normalized_task_no}-{token_group_no:03d}",
                 "confirm_to_inventory": confirm_to_inventory,
                 "default_cost_kes": default_cost_kes,
-                "generated_token_count": row_token_count,
+                "generated_token_count": row_token_count if payload.get("generate_item_tokens", True) else 0,
                 "generated_token_preview": row_token_preview,
                 "cost_status": cost_status,
                 "unit_cost_kes": row_unit_cost_kes,
@@ -8977,6 +9163,10 @@ class InMemoryState:
                     "unit_cost_kes": next_unit_cost_kes,
                     "total_cost_kes": next_total_cost_kes,
                     "qty_on_hand": next_qty,
+                    "source_raw_bale_display_code": str(task.get("source_raw_bale_display_code") or (task_bale_barcodes[0] if task_bale_barcodes else "")).strip().upper(),
+                    "source_raw_bale_machine_code": str(task.get("source_raw_bale_machine_code") or "").strip().upper(),
+                    "sorting_task_no": normalized_task_no,
+                    "sorting_line_id": row["sorting_line_id"],
                     "cost_layers": existing_cost_layers,
                     "updated_at": now_iso(),
                 }
@@ -8993,7 +9183,7 @@ class InMemoryState:
                     note="Sorting result confirmed into warehouse category stock",
                     details={"category_name": category_name, "grade": grade},
                 )
-            for item_index in range(1, row_token_count + 1):
+            for item_index in range(1, row_token_count + 1) if payload.get("generate_item_tokens", True) else []:
                 token_no = self._sorting_item_token_no(normalized_task_no, token_serial)
                 barcode_value = self._store_item_barcode_value(normalized_task_no, token_serial)
                 token_row = {
@@ -9055,7 +9245,10 @@ class InMemoryState:
         task["updated_at"] = now_iso()
         if payload.get("mark_task_completed", True):
             task["status"] = "confirmed"
+            task["task_status"] = "confirmed"
             task["completed_at"] = task["updated_at"]
+            task["confirmed_at"] = task.get("confirmed_at") or task["completed_at"]
+            task["confirmed_by"] = task.get("confirmed_by") or actor["username"]
             for bale_barcode in task.get("bale_barcodes", []):
                 bale = self._find_raw_bale_by_reference_no_defaults(bale_barcode)
                 if bale:
