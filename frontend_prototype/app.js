@@ -30411,7 +30411,6 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.countedCash = String(cashierTerminalState.countedCash ?? "");
   cashierTerminalState.shiftCloseNote = cashierTerminalState.shiftCloseNote || "";
   cashierTerminalState.managerConfirmedBy = cashierTerminalState.managerConfirmedBy || "";
-  cashierTerminalState.managerTransferConfirmed = Boolean(cashierTerminalState.managerTransferConfirmed);
   cashierTerminalState.todaySalesAmount = Number(cashierTerminalState.todaySalesAmount || 48620);
   cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 126);
   cashierTerminalState.shiftSalesAmount = Number(cashierTerminalState.shiftSalesAmount || 18450);
@@ -30851,7 +30850,6 @@ renderCashierTerminalDrawer = function () {
             <div class="hold-actions">
               <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>继续收款</button>
               <button type="button" class="secondary-inline danger" data-terminal-action="cancel-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>取消挂单</button>
-              <button type="button" class="secondary-inline" data-terminal-action="transfer-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>转交下一班</button>
             </div>
           </article>
         `).join("") : `<div class="cashier-terminal-empty-card">当前没有挂单。</div>`}
@@ -32000,20 +31998,10 @@ async function cancelCashierTerminalHold(holdNo) {
   return hold;
 }
 
-function transferCashierTerminalHold(holdNo) {
-  const index = (cashierTerminalState.holdOrders || []).findIndex((hold) => hold.hold_no === holdNo);
-  const hold = cashierTerminalState.holdOrders[index];
-  if (!hold || hold.status !== "held") {
-    return;
-  }
-  cashierTerminalState.holdOrders[index] = { ...hold, status: "manager_confirmed_transfer" };
-  renderCashierTerminal();
-}
-
 function closeCashierTerminalShift() {
   const activeHoldCount = (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length;
-  if (activeHoldCount && !cashierTerminalState.managerTransferConfirmed) {
-    throw new Error("当前还有挂单未处理，请完成收款、取消挂单，或由店长确认转交下一班。");
+  if (activeHoldCount) {
+    throw new Error("当前还有挂单未处理，请完成收款或取消挂单。");
   }
   cashierTerminalState.shiftStatus = "closed";
   showTransientInlineNotice("#cashierTerminalInlineNotice", "本地预览：班次已关闭。下一位收银员需要重新开班。", "success", 2200);
@@ -32077,14 +32065,6 @@ handleCashierTerminalAction = async function (action, target) {
       return;
     case "cancel-hold":
       await cancelCashierTerminalHold(target.dataset.terminalHoldNo);
-      return;
-    case "transfer-hold":
-      transferCashierTerminalHold(target.dataset.terminalHoldNo);
-      return;
-    case "manager-confirm-transfer":
-      cashierTerminalState.managerTransferConfirmed = true;
-      showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认挂单可转交下一班。", "success", 1800);
-      renderCashierTerminal();
       return;
     case "manager-confirm-shift":
       showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认本班现金差异记录。", "success", 1800);

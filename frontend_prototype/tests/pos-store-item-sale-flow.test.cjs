@@ -443,6 +443,9 @@ test("POS hold drawer renders real hold rows without source-chain fields and shi
   assert.match(drawerSource, /drawer === "hold-list"/);
   assert.match(drawerSource, /data-terminal-hold-no/);
   assert.doesNotMatch(drawerSource, /data-terminal-hold-index/);
+  assert.doesNotMatch(drawerSource, /data-terminal-action="transfer-hold"/);
+  assert.doesNotMatch(appJs, /function transferCashierTerminalHold/);
+  assert.doesNotMatch(appJs, /case "transfer-hold":/);
   assert.doesNotMatch(drawerSource, /来源链/);
   assert.match(summarySource, /cashierTerminalState\.shiftSummary\s*=\s*summary/);
   assert.match(drawerSource, /当前还有 \$\{escapeHtml\(activeHoldCount\)\} 笔挂单未处理，请完成收款或取消挂单。/);
