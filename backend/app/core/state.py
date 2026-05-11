@@ -262,6 +262,7 @@ class InMemoryState:
         self.bale_sales_orders: dict[str, dict[str, Any]] = {}
         self.sale_void_requests: dict[str, dict[str, Any]] = {}
         self.sale_refund_requests: dict[str, dict[str, Any]] = {}
+        self.pos_holds: dict[str, dict[str, Any]] = {}
         self.store_rack_locations: dict[str, dict[str, Any]] = {}
         self.inventory_adjustments: list[dict[str, Any]] = []
         self.inventory_movements: list[dict[str, Any]] = []
@@ -351,6 +352,7 @@ class InMemoryState:
         self._bale_sales_order_ids = count(len(self.bale_sales_orders) + 1)
         self._sale_void_request_ids = count(len(self.sale_void_requests) + 1)
         self._sale_refund_request_ids = count(len(self.sale_refund_requests) + 1)
+        self._pos_hold_ids = count(len(self.pos_holds) + 1)
         self._adjustment_ids = count(max((row["id"] for row in self.inventory_adjustments), default=0) + 1)
         self._movement_ids = count(max((row["id"] for row in self.inventory_movements), default=0) + 1)
         self._audit_ids = count(max((row["id"] for row in self.audit_events), default=0) + 1)
@@ -403,6 +405,7 @@ class InMemoryState:
             "bale_sales_orders": self.bale_sales_orders,
             "sale_void_requests": self.sale_void_requests,
             "sale_refund_requests": self.sale_refund_requests,
+            "pos_holds": self.pos_holds,
             "store_rack_locations": self.store_rack_locations,
             "inventory_adjustments": self.inventory_adjustments,
             "inventory_movements": self.inventory_movements,
@@ -470,6 +473,7 @@ class InMemoryState:
         self.bale_sales_orders = payload.get("bale_sales_orders", {})
         self.sale_void_requests = payload.get("sale_void_requests", {})
         self.sale_refund_requests = payload.get("sale_refund_requests", {})
+        self.pos_holds = payload.get("pos_holds", {})
         self.store_rack_locations = payload.get("store_rack_locations", {})
         self.inventory_adjustments = payload.get("inventory_adjustments", [])
         self.inventory_movements = payload.get("inventory_movements", [])
@@ -11617,6 +11621,13 @@ class InMemoryState:
                 mixed_cash += round(float(sale.get("cash_amount") or 0), 2)
                 mixed_mpesa += round(float(sale.get("mpesa_amount") or 0), 2)
         expected_cash = round(normalized_shift["opening_float"] + cash_sales + mixed_cash, 2)
+        active_hold_count = sum(
+            1
+            for hold in self.pos_holds.values()
+            if str(hold.get("store_code") or "").strip().upper() == normalized_shift["store_code"]
+            and str(hold.get("shift_id") or "").strip() == normalized_shift["shift_id"]
+            and str(hold.get("status") or "").strip().lower() in self._active_pos_hold_statuses()
+        )
         return {
             **normalized_shift,
             "total_sales": round(total_sales, 2),
@@ -11626,7 +11637,7 @@ class InMemoryState:
             "mixed_cash": round(mixed_cash, 2),
             "mixed_mpesa": round(mixed_mpesa, 2),
             "expected_cash": expected_cash,
-            "hold_count": 0,
+            "hold_count": active_hold_count,
             "cancelled_order_count": cancelled_order_count,
         }
 
@@ -17367,6 +17378,8 @@ class InMemoryState:
         store_code: str,
         item: dict[str, Any],
         line_no: int,
+        *,
+        allow_hold_no: str = "",
     ) -> dict[str, Any]:
         barcode = str(item.get("machine_code") or item.get("barcode_value") or item.get("display_code") or "").strip().upper()
         display_code = str(item.get("display_code") or "").strip().upper()
@@ -17414,14 +17427,24 @@ class InMemoryState:
             "pending_print",
             "pending_putaway",
         }
-        blocked = sorted(statuses & blocked_statuses)
+        normalized_hold_no = str(allow_hold_no or "").strip().upper()
+        hold_statuses = statuses & {"held", "reserved"}
+        row_hold_nos = {
+            str(row.get(field_name) or "").strip().upper()
+            for row in (store_item, token or {})
+            for field_name in ("hold_no", "hold_id")
+            if str(row.get(field_name) or "").strip()
+        }
+        hold_item_matches = bool(hold_statuses and normalized_hold_no and normalized_hold_no in row_hold_nos)
+        ignored_hold_statuses = {"held", "reserved"} if hold_item_matches else set()
+        blocked = sorted((statuses & blocked_statuses) - ignored_hold_statuses)
         if blocked:
             blocked_label = blocked[0]
             if blocked_label == "sold":
                 raise HTTPException(status_code=400, detail=f"{barcode} 已售出，不能重复销售。")
             raise HTTPException(status_code=400, detail=f"{barcode} 当前状态为 {blocked_label}，不能 POS 销售。")
         allowed_statuses = {"on_shelf", "in_stock", "available", "printed_in_store", "shelved", "ready_for_sale", "active"}
-        if statuses and not (statuses & allowed_statuses):
+        if statuses and not (statuses & allowed_statuses) and not hold_item_matches:
             raise HTTPException(status_code=400, detail=f"{barcode} 当前状态不可销售。")
 
         stock_confirmed = any(
@@ -17461,7 +17484,7 @@ class InMemoryState:
             "original_price": original_price,
             "final_price": final_price,
             "discount_amount": round(original_price - final_price, 2),
-            "from_status": next((status for status in statuses if status in allowed_statuses), ""),
+            "from_status": next((status for status in statuses if status in allowed_statuses), "") or ("held" if hold_item_matches else ""),
         }
 
     def _validate_pos_sale_payment(
@@ -17491,6 +17514,291 @@ class InMemoryState:
                 raise HTTPException(status_code=400, detail="M-Pesa reference is required for mixed payment.")
         return normalized_method, round(max(cash_amount + mpesa_amount - total_amount, 0), 2)
 
+    def _active_pos_hold_statuses(self) -> set[str]:
+        return {"held", "resumed"}
+
+    def _normalize_pos_hold(self, hold: dict[str, Any]) -> dict[str, Any]:
+        items = hold.get("items") or []
+        normalized_items = []
+        for index, item in enumerate(items, start=1):
+            normalized_items.append(
+                {
+                    "hold_id": str(item.get("hold_id") or hold.get("hold_id") or hold.get("hold_no") or "").strip(),
+                    "hold_no": str(item.get("hold_no") or hold.get("hold_no") or "").strip(),
+                    "line_no": int(item.get("line_no") or index),
+                    "store_item_id": str(item.get("store_item_id") or "").strip(),
+                    "display_code": str(item.get("display_code") or "").strip(),
+                    "machine_code": str(item.get("machine_code") or "").strip(),
+                    "category": str(item.get("category") or "").strip(),
+                    "shelf_location": str(item.get("shelf_location") or "").strip(),
+                    "original_price": round(float(item.get("original_price") or 0), 2),
+                    "final_price": round(float(item.get("final_price") or 0), 2),
+                    "discount_amount": round(float(item.get("discount_amount") or 0), 2),
+                    "previous_status": str(item.get("previous_status") or "").strip(),
+                    "previous_sale_status": str(item.get("previous_sale_status") or "").strip(),
+                    "previous_store_item_status": str(item.get("previous_store_item_status") or "").strip(),
+                    "hold_status": str(item.get("hold_status") or hold.get("status") or "held").strip().lower(),
+                    "store_code": str(item.get("store_code") or hold.get("store_code") or "").strip().upper(),
+                }
+            )
+        return {
+            "hold_id": str(hold.get("hold_id") or hold.get("hold_no") or "").strip(),
+            "hold_no": str(hold.get("hold_no") or hold.get("hold_id") or "").strip(),
+            "store_code": str(hold.get("store_code") or "").strip().upper(),
+            "cashier_id": str(hold.get("cashier_id") or "").strip(),
+            "shift_id": str(hold.get("shift_id") or "").strip(),
+            "terminal_id": str(hold.get("terminal_id") or "").strip(),
+            "reason": str(hold.get("reason") or "").strip(),
+            "customer_name": str(hold.get("customer_name") or "").strip(),
+            "customer_phone": str(hold.get("customer_phone") or "").strip(),
+            "note": str(hold.get("note") or "").strip(),
+            "status": str(hold.get("status") or "held").strip().lower(),
+            "created_at": str(hold.get("created_at") or "").strip(),
+            "created_by": str(hold.get("created_by") or "").strip(),
+            "resumed_at": hold.get("resumed_at"),
+            "resumed_by": str(hold.get("resumed_by") or "").strip(),
+            "completed_sale_id": str(hold.get("completed_sale_id") or "").strip(),
+            "completed_at": hold.get("completed_at"),
+            "completed_by": str(hold.get("completed_by") or "").strip(),
+            "cancelled_at": hold.get("cancelled_at"),
+            "cancelled_by": str(hold.get("cancelled_by") or "").strip(),
+            "cancel_reason": str(hold.get("cancel_reason") or "").strip(),
+            "item_count": len(normalized_items),
+            "total_amount": round(sum(item["final_price"] for item in normalized_items), 2),
+            "items": normalized_items,
+        }
+
+    def _get_pos_hold_for_store(self, store_code: str, hold_no: str) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_hold_no = str(hold_no or "").strip().upper()
+        if not normalized_hold_no:
+            raise HTTPException(status_code=404, detail="未找到该挂单。")
+        hold = self.pos_holds.get(normalized_hold_no)
+        if not hold:
+            raise HTTPException(status_code=404, detail="未找到该挂单。")
+        if str(hold.get("store_code") or "").strip().upper() != store["code"]:
+            raise HTTPException(status_code=404, detail="该挂单不属于当前门店。")
+        return hold
+
+    def _pos_hold_row_status(self, row: dict[str, Any], field_name: str) -> str:
+        return str(row.get(field_name) or "").strip().lower()
+
+    def _build_pos_hold_item(self, hold_no: str, validated: dict[str, Any]) -> dict[str, Any]:
+        store_item = validated["store_item"]
+        return {
+            "hold_id": hold_no,
+            "hold_no": hold_no,
+            "line_no": validated["line_no"],
+            "store_item_id": validated["store_item_id"],
+            "display_code": validated["display_code"],
+            "machine_code": validated["machine_code"],
+            "category": validated["category"],
+            "shelf_location": validated["shelf_location"],
+            "original_price": validated["original_price"],
+            "final_price": validated["final_price"],
+            "discount_amount": validated["discount_amount"],
+            "previous_status": self._pos_hold_row_status(store_item, "status") or validated["from_status"],
+            "previous_sale_status": self._pos_hold_row_status(store_item, "sale_status") or validated["from_status"],
+            "previous_store_item_status": self._pos_hold_row_status(store_item, "store_item_status") or validated["from_status"],
+            "hold_status": "held",
+            "store_code": str(store_item.get("store_code") or "").strip().upper(),
+        }
+
+    def _set_pos_hold_item_status(self, validated_items: list[dict[str, Any]], hold_no: str, cashier_id: str, actor: str, held_at: str) -> None:
+        for validated in validated_items:
+            for row in (validated["store_item"], validated.get("token")):
+                if not row:
+                    continue
+                row["status"] = "held"
+                row["sale_status"] = "held"
+                row["store_item_status"] = "held"
+                row["hold_id"] = hold_no
+                row["hold_no"] = hold_no
+                row["held_at"] = held_at
+                row["held_by"] = cashier_id
+                row["updated_at"] = held_at
+                row["updated_by"] = actor
+
+    def _restore_pos_hold_item_statuses(self, hold: dict[str, Any], actor: str, released_at: str) -> None:
+        for item in hold.get("items") or []:
+            store_item_id = str(item.get("store_item_id") or "").strip().upper()
+            machine_code = str(item.get("machine_code") or "").strip().upper()
+            display_code = str(item.get("display_code") or "").strip().upper()
+            rows: list[dict[str, Any]] = []
+            store_item = self.store_items.get(store_item_id)
+            if store_item:
+                rows.append(store_item)
+            token = None
+            for token_candidate in self.item_barcode_tokens.values():
+                values = {
+                    str(token_candidate.get(key) or "").strip().upper()
+                    for key in ("store_item_id", "entity_id", "display_code", "token_no", "identity_no", "machine_code", "barcode_value")
+                    if str(token_candidate.get(key) or "").strip()
+                }
+                if {store_item_id, machine_code, display_code} & values:
+                    token = token_candidate
+                    break
+            if token and token not in rows:
+                rows.append(token)
+            for row in rows:
+                row["status"] = str(item.get("previous_status") or "printed_in_store").strip().lower()
+                row["sale_status"] = str(item.get("previous_sale_status") or item.get("previous_status") or "ready_for_sale").strip().lower()
+                row["store_item_status"] = str(item.get("previous_store_item_status") or item.get("previous_status") or "printed_in_store").strip().lower()
+                row["last_hold_no"] = str(hold.get("hold_no") or hold.get("hold_id") or "").strip()
+                row["hold_id"] = ""
+                row["hold_no"] = ""
+                row["held_at"] = None
+                row["held_by"] = ""
+                row["hold_released_at"] = released_at
+                row["updated_at"] = released_at
+                row["updated_by"] = actor
+
+    def _ensure_pos_hold_matches_sale_items(self, hold: dict[str, Any], validated_items: list[dict[str, Any]]) -> None:
+        hold_ids = {
+            str(item.get("store_item_id") or "").strip().upper()
+            for item in hold.get("items") or []
+            if str(item.get("store_item_id") or "").strip()
+        }
+        sale_ids = {row["store_item_id"] for row in validated_items}
+        if hold_ids != sale_ids or len(hold_ids) != len(validated_items):
+            raise HTTPException(status_code=400, detail=f"{hold.get('hold_no') or 'HOLD'} 挂单商品与本次收款商品不一致。")
+
+    def create_pos_hold(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_store = store["code"]
+        cashier_id = str(payload.get("cashier_id") or created_by or "").strip()
+        if not cashier_id:
+            raise HTTPException(status_code=400, detail="cashier_id is required")
+        terminal_id = str(payload.get("terminal_id") or "").strip()
+        shift = self._validate_pos_sale_shift(normalized_store, str(payload.get("shift_id") or "").strip(), cashier_id, terminal_id)
+        items = payload.get("items") or []
+        if not items:
+            raise HTTPException(status_code=400, detail="POS hold requires at least one STORE_ITEM.")
+
+        validated_items: list[dict[str, Any]] = []
+        seen_store_item_ids: set[str] = set()
+        for index, item in enumerate(items, start=1):
+            validated = self._validate_pos_sale_item(normalized_store, item, index)
+            if validated["store_item_id"] in seen_store_item_ids:
+                raise HTTPException(status_code=400, detail=f"{validated['display_code']} 已在本张挂单中，不能重复挂单。")
+            seen_store_item_ids.add(validated["store_item_id"])
+            validated_items.append(validated)
+
+        hold_sequence = next(self._pos_hold_ids)
+        hold_no = f"HOLD-{self._pos_sale_store_prefix(normalized_store)}-{datetime.now(NAIROBI_TZ).strftime('%y%m%d')}-{hold_sequence:04d}"
+        created_at = now_iso()
+        actor = created_by or cashier_id
+        hold_items = [self._build_pos_hold_item(hold_no, validated) for validated in validated_items]
+        hold = {
+            "hold_id": hold_no,
+            "hold_no": hold_no,
+            "store_code": normalized_store,
+            "cashier_id": cashier_id,
+            "shift_id": shift["shift_id"],
+            "terminal_id": terminal_id or shift.get("terminal_id", ""),
+            "reason": str(payload.get("reason") or "").strip(),
+            "customer_name": str(payload.get("customer_name") or "").strip(),
+            "customer_phone": str(payload.get("customer_phone") or "").strip(),
+            "note": str(payload.get("note") or "").strip(),
+            "status": "held",
+            "created_at": created_at,
+            "created_by": actor,
+            "resumed_at": None,
+            "resumed_by": "",
+            "completed_sale_id": "",
+            "completed_at": None,
+            "completed_by": "",
+            "cancelled_at": None,
+            "cancelled_by": "",
+            "cancel_reason": "",
+            "items": hold_items,
+        }
+        self.pos_holds[hold_no] = hold
+        self._set_pos_hold_item_status(validated_items, hold_no, cashier_id, actor, created_at)
+        self._log_event(
+            event_type="pos.hold.created",
+            entity_type="pos_hold",
+            entity_id=hold_no,
+            actor=actor,
+            summary=f"POS hold {hold_no} created in {normalized_store}",
+            details={
+                "store_code": normalized_store,
+                "cashier_id": cashier_id,
+                "shift_id": shift["shift_id"],
+                "terminal_id": terminal_id or shift.get("terminal_id", ""),
+                "item_count": len(hold_items),
+            },
+        )
+        self._persist()
+        return self._normalize_pos_hold(hold)
+
+    def list_pos_holds(self, store_code: str, *, status: str = "", limit: int = 20) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_status = str(status or "").strip().lower()
+        normalized_limit = max(1, min(int(limit or 20), 100))
+        rows = []
+        for hold in self.pos_holds.values():
+            if str(hold.get("store_code") or "").strip().upper() != store["code"]:
+                continue
+            hold_status = str(hold.get("status") or "").strip().lower()
+            if normalized_status == "active" and hold_status not in self._active_pos_hold_statuses():
+                continue
+            if normalized_status and normalized_status != "active" and hold_status != normalized_status:
+                continue
+            rows.append(hold)
+        rows.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
+        return {"store_code": store["code"], "holds": [self._normalize_pos_hold(row) for row in rows[:normalized_limit]]}
+
+    def get_pos_hold(self, store_code: str, hold_no: str) -> dict[str, Any]:
+        return self._normalize_pos_hold(self._get_pos_hold_for_store(store_code, hold_no))
+
+    def resume_pos_hold(self, store_code: str, hold_no: str, resumed_by: str = "") -> dict[str, Any]:
+        hold = self._get_pos_hold_for_store(store_code, hold_no)
+        if str(hold.get("status") or "").strip().lower() not in self._active_pos_hold_statuses():
+            raise HTTPException(status_code=400, detail="该挂单已完成或已取消，不能继续收款。")
+        resumed_at = now_iso()
+        actor = str(resumed_by or hold.get("cashier_id") or "").strip()
+        hold["status"] = "resumed"
+        hold["resumed_at"] = resumed_at
+        hold["resumed_by"] = actor
+        self._log_event(
+            event_type="pos.hold.resumed",
+            entity_type="pos_hold",
+            entity_id=str(hold.get("hold_no") or "").strip(),
+            actor=actor,
+            summary=f"POS hold {hold.get('hold_no')} resumed",
+            details={"store_code": str(hold.get("store_code") or "").strip().upper()},
+        )
+        self._persist()
+        return self._normalize_pos_hold(hold)
+
+    def cancel_pos_hold(self, store_code: str, hold_no: str, payload: dict[str, Any], cancelled_by: str = "") -> dict[str, Any]:
+        hold = self._get_pos_hold_for_store(store_code, hold_no)
+        if str(hold.get("status") or "").strip().lower() not in self._active_pos_hold_statuses():
+            raise HTTPException(status_code=400, detail="该挂单已完成或已取消，不能取消。")
+        cancelled_at = now_iso()
+        actor = str(cancelled_by or hold.get("cashier_id") or "").strip()
+        self._restore_pos_hold_item_statuses(hold, actor, cancelled_at)
+        hold["status"] = "cancelled"
+        hold["cancelled_at"] = cancelled_at
+        hold["cancelled_by"] = actor
+        hold["cancel_reason"] = str(payload.get("cancel_reason") or "").strip()
+        for item in hold.get("items") or []:
+            item["hold_status"] = "cancelled"
+        self._log_event(
+            event_type="pos.hold.cancelled",
+            entity_type="pos_hold",
+            entity_id=str(hold.get("hold_no") or "").strip(),
+            actor=actor,
+            summary=f"POS hold {hold.get('hold_no')} cancelled",
+            details={
+                "store_code": str(hold.get("store_code") or "").strip().upper(),
+                "cancel_reason": hold["cancel_reason"],
+            },
+        )
+        self._persist()
+        return self._normalize_pos_hold(hold)
+
     def create_pos_sale(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
         store = self._ensure_store_exists(store_code)
         normalized_store = store["code"]
@@ -17507,15 +17815,23 @@ class InMemoryState:
         items = payload.get("items") or []
         if not items:
             raise HTTPException(status_code=400, detail="POS sale requires at least one STORE_ITEM.")
+        hold_no = str(payload.get("hold_no") or "").strip().upper()
+        hold = None
+        if hold_no:
+            hold = self._get_pos_hold_for_store(normalized_store, hold_no)
+            if str(hold.get("status") or "").strip().lower() not in self._active_pos_hold_statuses():
+                raise HTTPException(status_code=400, detail=f"{hold_no} 挂单已完成或已取消，不能继续收款。")
 
         validated_items: list[dict[str, Any]] = []
         seen_store_item_ids: set[str] = set()
         for index, item in enumerate(items, start=1):
-            validated = self._validate_pos_sale_item(normalized_store, item, index)
+            validated = self._validate_pos_sale_item(normalized_store, item, index, allow_hold_no=hold_no)
             if validated["store_item_id"] in seen_store_item_ids:
                 raise HTTPException(status_code=400, detail=f"{validated['display_code']} 已在本单中，不能重复销售。")
             seen_store_item_ids.add(validated["store_item_id"])
             validated_items.append(validated)
+        if hold:
+            self._ensure_pos_hold_matches_sale_items(hold, validated_items)
 
         subtotal = round(sum(row["original_price"] for row in validated_items), 2)
         line_discount_total = round(sum(row["discount_amount"] for row in validated_items), 2)
@@ -17551,6 +17867,10 @@ class InMemoryState:
                 row["sold_by"] = cashier_id
                 row["sale_id"] = sale_no
                 row["sale_no"] = sale_no
+                if hold_no:
+                    row["last_hold_no"] = hold_no
+                    row["hold_id"] = ""
+                    row["hold_no"] = ""
                 row["updated_at"] = sale_time
                 row["updated_by"] = actor
             response_item = {
@@ -17677,12 +17997,32 @@ class InMemoryState:
             "refunded_at": None,
             "refunded_by": "",
             "refund_reason": "",
+            "hold_no": hold_no,
             "identity_ids": [row["display_code"] for row in response_items],
             "items": legacy_items,
             "sale_items": response_items,
             "payments": normalized_payments,
         }
         self.sales_transactions.append(transaction)
+        if hold:
+            hold["status"] = "completed"
+            hold["completed_sale_id"] = sale_no
+            hold["completed_at"] = sale_time
+            hold["completed_by"] = actor
+            for item in hold.get("items") or []:
+                item["hold_status"] = "completed"
+            self._log_event(
+                event_type="pos.hold.completed",
+                entity_type="pos_hold",
+                entity_id=hold_no,
+                actor=actor,
+                summary=f"POS hold {hold_no} completed by sale {sale_no}",
+                details={
+                    "store_code": normalized_store,
+                    "sale_id": sale_no,
+                    "item_count": len(response_items),
+                },
+            )
         self._log_event(
             event_type="pos.sale.completed",
             entity_type="sale",
@@ -17716,6 +18056,7 @@ class InMemoryState:
             "mpesa_reference": mpesa_reference,
             "change_amount": change_amount,
             "status": "completed",
+            "hold_no": hold_no,
             "items": response_items,
         }
 
@@ -17732,6 +18073,7 @@ class InMemoryState:
             "cashier_id": str(row.get("cashier_id") or row.get("cashier_name") or "").strip(),
             "shift_id": str(row.get("shift_id") or row.get("shift_no") or "").strip(),
             "terminal_id": str(row.get("terminal_id") or "").strip(),
+            "hold_no": str(row.get("hold_no") or "").strip(),
             "sale_time": str(row.get("sale_time") or row.get("sold_at") or row.get("created_at") or "").strip(),
             "subtotal": round(float(row.get("subtotal") or row.get("total_amount") or 0), 2),
             "discount_amount": round(float(row.get("discount_amount") or 0), 2),
@@ -18387,7 +18729,7 @@ class InMemoryState:
             str(row.get("sale_status") or "").strip().lower(),
             str(row.get("store_item_status") or "").strip().lower(),
         }
-        blocked_statuses = {"sold", "void", "voided", "cancelled", "canceled", "deleted"}
+        blocked_statuses = {"sold", "held", "reserved", "void", "voided", "cancelled", "canceled", "deleted"}
         return not any(status in blocked_statuses for status in status_values if status)
 
     def _store_inventory_category_name(self, row: dict[str, Any], location: dict[str, Any] | None = None) -> str:

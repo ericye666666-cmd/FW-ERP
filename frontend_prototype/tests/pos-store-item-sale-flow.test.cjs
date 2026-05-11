@@ -401,6 +401,53 @@ test("POS shift close uses real API, records variance, and clears closed shift",
   assert.match(actionSource, /await closeCashierTerminalShiftBackend\(\)/);
 });
 
+test("POS hold flow uses real hold APIs and blocks empty cart or missing shift", () => {
+  const createSource = extractAsyncFunctionSource(appJs, "createCashierTerminalHold");
+  const listSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalHoldList");
+  const resumeSource = extractAsyncFunctionSource(appJs, "resumeCashierTerminalHold");
+  const cancelSource = extractAsyncFunctionSource(appJs, "cancelCashierTerminalHold");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+
+  assert.match(createSource, /if \(!totals\.totalItems\)/);
+  assert.match(createSource, /购物车为空，不能挂单/);
+  assert.match(createSource, /if \(!cashierTerminalState\.currentShift\?\.shift_id\)/);
+  assert.match(createSource, /请先开班后再挂单/);
+  assert.match(createSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-holds`/);
+  assert.match(createSource, /method:\s*"POST"/);
+  assert.match(createSource, /cashierTerminalState\.cartItems\s*=\s*\[\]/);
+  assert.match(createSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
+  assert.match(listSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-holds\?status=held&limit=\$\{encodeURIComponent\(String\(limit\)\)\}`\)/);
+  assert.match(listSource, /cashierTerminalState\.holdOrders\s*=/);
+  assert.match(resumeSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-holds\/\$\{encodeURIComponent\(holdNo\)\}\/resume`/);
+  assert.match(resumeSource, /method:\s*"POST"/);
+  assert.match(resumeSource, /cashierTerminalState\.activeHoldNo\s*=\s*hold\.hold_no/);
+  assert.match(cancelSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-holds\/\$\{encodeURIComponent\(holdNo\)\}\/cancel`/);
+  assert.match(cancelSource, /cancel_reason/);
+  assert.match(actionSource, /case "confirm-hold":[\s\S]*await createCashierTerminalHold\(\)/);
+  assert.match(actionSource, /case "resume-hold":[\s\S]*await resumeCashierTerminalHold\(target\.dataset\.terminalHoldNo\)/);
+  assert.match(actionSource, /case "cancel-hold":[\s\S]*await cancelCashierTerminalHold\(target\.dataset\.terminalHoldNo\)/);
+});
+
+test("POS sale from hold sends hold_no and resets active hold only after sale", () => {
+  const payloadSource = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  const resetSource = extractAssignedAnyFunctionSource(appJs, "resetCashierTerminalForNextSale");
+
+  assert.match(payloadSource, /hold_no:\s*cashierTerminalState\.activeHoldNo \|\| ""/);
+  assert.match(resetSource, /cashierTerminalState\.activeHoldNo\s*=\s*""/);
+});
+
+test("POS hold drawer renders real hold rows without source-chain fields and shift shows active hold warning", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const summarySource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftSummary");
+
+  assert.match(drawerSource, /drawer === "hold-list"/);
+  assert.match(drawerSource, /data-terminal-hold-no/);
+  assert.doesNotMatch(drawerSource, /data-terminal-hold-index/);
+  assert.doesNotMatch(drawerSource, /来源链/);
+  assert.match(summarySource, /cashierTerminalState\.shiftSummary\s*=\s*summary/);
+  assert.match(drawerSource, /当前还有 \$\{escapeHtml\(activeHoldCount\)\} 笔挂单未处理，请完成收款或取消挂单。/);
+});
+
 test("POS cashier UX strongly guides no-shift state and returns focus after shift or drawer actions", () => {
   const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
   const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");

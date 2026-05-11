@@ -80,6 +80,10 @@ from app.schemas.pos import (
     CashierHandoverReviewRequest,
     CashierShiftCloseRequest,
     CashierShiftOpenRequest,
+    PosHoldCancelRequest,
+    PosHoldCreateRequest,
+    PosHoldListResponse,
+    PosHoldResponse,
     PosShiftCloseRequest,
     PosShiftOpenRequest,
     PosShiftResponse,
@@ -4883,6 +4887,58 @@ def get_store_pos_sale(
 ) -> PosSaleResponse:
     _require_current_user(authorization=authorization)
     return PosSaleResponse(**state.get_pos_sale(store_code, sale_no))
+
+
+@router.post("/stores/{store_code}/pos-holds", response_model=PosHoldResponse, tags=["pos"])
+def create_store_pos_hold(
+    store_code: str,
+    payload: PosHoldCreateRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> PosHoldResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return PosHoldResponse(**state.create_pos_hold(store_code, payload.model_dump(), created_by=current_user["username"]))
+
+
+@router.get("/stores/{store_code}/pos-holds", response_model=PosHoldListResponse, tags=["pos"])
+def list_store_pos_holds(
+    store_code: str,
+    status: Optional[str] = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    authorization: Optional[str] = Header(default=None),
+) -> PosHoldListResponse:
+    _require_current_user(authorization=authorization)
+    return PosHoldListResponse(**state.list_pos_holds(store_code, status=status or "", limit=limit))
+
+
+@router.get("/stores/{store_code}/pos-holds/{hold_no}", response_model=PosHoldResponse, tags=["pos"])
+def get_store_pos_hold(
+    store_code: str,
+    hold_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PosHoldResponse:
+    _require_current_user(authorization=authorization)
+    return PosHoldResponse(**state.get_pos_hold(store_code, hold_no))
+
+
+@router.post("/stores/{store_code}/pos-holds/{hold_no}/resume", response_model=PosHoldResponse, tags=["pos"])
+def resume_store_pos_hold(
+    store_code: str,
+    hold_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PosHoldResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return PosHoldResponse(**state.resume_pos_hold(store_code, hold_no, resumed_by=current_user["username"]))
+
+
+@router.post("/stores/{store_code}/pos-holds/{hold_no}/cancel", response_model=PosHoldResponse, tags=["pos"])
+def cancel_store_pos_hold(
+    store_code: str,
+    hold_no: str,
+    payload: PosHoldCancelRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> PosHoldResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return PosHoldResponse(**state.cancel_pos_hold(store_code, hold_no, payload.model_dump(), cancelled_by=current_user["username"]))
 
 
 @router.post("/stores/{store_code}/pos-shifts/open", response_model=PosShiftResponse, tags=["pos"])

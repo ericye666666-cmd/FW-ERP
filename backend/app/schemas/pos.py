@@ -100,6 +100,79 @@ class PosShiftSummaryResponse(BaseModel):
     note: str = ""
 
 
+class PosHoldItemCreate(BaseModel):
+    machine_code: str = Field(min_length=1)
+    display_code: str = ""
+    final_price: float = Field(ge=0)
+    discount_amount: float = Field(default=0, ge=0)
+
+
+class PosHoldCreateRequest(BaseModel):
+    cashier_id: str = Field(min_length=1)
+    shift_id: str = Field(min_length=1)
+    terminal_id: str = ""
+    reason: str = ""
+    customer_name: str = ""
+    customer_phone: str = ""
+    note: str = ""
+    items: List[PosHoldItemCreate]
+
+
+class PosHoldCancelRequest(BaseModel):
+    cancel_reason: str = ""
+
+
+class PosHoldItemResponse(BaseModel):
+    hold_id: str
+    hold_no: str = ""
+    line_no: int
+    store_item_id: str
+    display_code: str
+    machine_code: str
+    category: str = ""
+    shelf_location: str = ""
+    original_price: float
+    final_price: float
+    discount_amount: float = 0
+    previous_status: str = ""
+    previous_sale_status: str = ""
+    previous_store_item_status: str = ""
+    hold_status: str = "held"
+    store_code: str
+
+
+class PosHoldResponse(BaseModel):
+    hold_id: str
+    hold_no: str
+    store_code: str
+    cashier_id: str
+    shift_id: str
+    terminal_id: str = ""
+    reason: str = ""
+    customer_name: str = ""
+    customer_phone: str = ""
+    note: str = ""
+    status: str = "held"
+    created_at: str
+    created_by: str = ""
+    resumed_at: Optional[str] = None
+    resumed_by: str = ""
+    completed_sale_id: str = ""
+    completed_at: Optional[str] = None
+    completed_by: str = ""
+    cancelled_at: Optional[str] = None
+    cancelled_by: str = ""
+    cancel_reason: str = ""
+    item_count: int = 0
+    total_amount: float = 0
+    items: List[PosHoldItemResponse] = Field(default_factory=list)
+
+
+class PosHoldListResponse(BaseModel):
+    store_code: str
+    holds: List[PosHoldResponse]
+
+
 class CashierHandoverLogResponse(BaseModel):
     handover_no: str
     shift_no: str
