@@ -59,10 +59,10 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-raw-cpcl-formal-batch";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-raw-cpcl-formal-batch";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#257";
-const DIRECT_LOOP_ANDROID_PR_VERSION = "#34";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-template-d-adjustment-batch";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-template-d-adjustment-batch";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#258";
+const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -86,6 +86,7 @@ const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "printK300CpclCode128QuietZoneTest",
   "printK300CpclCode128CompactTopTest",
   "printK300CpclRawPreview",
+  "printK300CpclRawBatch",
   "printK300CpclStoreItemPreview",
   "printK300TsplMinText",
   "printK300TsplBlackBox",
@@ -4275,6 +4276,20 @@ function getClerkS1PreviewProtocolDiagnostics() {
       ]
     },
     {
+      key: "k300_cpcl_template_d_adjustment_batch",
+      label: "连续打印 5 张 D 微调版",
+      method: "printK300CpclRawBatch",
+      expectedProtocol: "K300_CPCL_RAW_BATCH",
+      expectedTransport: "K300_BLUETOOTH_SPP",
+      requiresPayload: true,
+      requiresSelectedPrinter: true,
+      requiresK300SppAvailable: true,
+      preferredPrinterPattern: /K300|ZTO688/i,
+      group: "k300_bluetooth",
+      alwaysVisible: false,
+      rawCpclBatch: true
+    },
+    {
       key: "k300_cpcl_code128_wide_test",
       label: "测试 Code128 宽条码",
       method: "printK300CpclCode128WideTest",
@@ -4329,11 +4344,11 @@ function getClerkS1PreviewProtocolDiagnostics() {
     {
       key: "k300_cpcl_store_item_preview",
       label: "测试 K300 CPCL STORE_ITEM 预览",
-      method: "printK300CpclStoreItemPreview",
-      expectedProtocol: "K300_CPCL_STORE_ITEM_PREVIEW",
+      method: "printK300CpclRawPreview",
+      expectedProtocol: "K300_CPCL_RAW_PREVIEW",
       expectedTransport: "K300_BLUETOOTH_SPP",
       requiresPayload: true,
-      payloadPrinterProfile: "UROVO_K300",
+      rawCpclStoreItemPreview: true,
       requiresSelectedPrinter: true,
       requiresK300SppAvailable: true,
       preferredPrinterPattern: /K300/i,
@@ -4377,6 +4392,20 @@ function getClerkS1PreviewProtocolDiagnostic(protocolKey = "") {
   return getClerkS1PreviewProtocolDiagnostics().find((protocol) => protocol.key === key) || null;
 }
 function buildClerkS1PreviewProtocolDiagnosticPayload(protocol = {}) {
+  if (protocol.rawCpclStoreItemPreview) {
+    return {
+      label_template_size: "40x30",
+      protocol: "CPCL",
+      test_name: "k300_store_item_preview_d2_default",
+      cpcl_command: buildClerkK300StoreItemPreviewCpclCommand({
+        machine_code: "5261300000038",
+        barcode_value: "5261300000038",
+        price_kes: 410,
+        category_short: "CARGO PANT",
+        grade: "P"
+      })
+    };
+  }
   const printerProfile = String(protocol.payloadPrinterProfile || "CHITENG_S1_OFFICIAL").trim() || "CHITENG_S1_OFFICIAL";
   return {
     printer_profile: printerProfile,
@@ -4393,14 +4422,62 @@ function buildClerkS1PreviewProtocolDiagnosticPayload(protocol = {}) {
     ]
   };
 }
+function sanitizeClerkK300CpclText(value = "", maxLength = 32) {
+  return String(value || "").replace(/[\r\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+function buildClerkK300StoreItemPreviewCpclCommand(label = {}) {
+  const machineCode = String(label.barcode_value || label.machine_code || "").replace(/[^0-9]/g, "").trim();
+  const priceKes = Math.max(0, Number(label.price_kes || label.sale_price_kes || 0));
+  const categoryShort = sanitizeClerkK300CpclText(label.category_short || "STORE ITEM", 24);
+  const grade = sanitizeClerkK300CpclText(label.grade || label.pricing_type || "", 8);
+  const categoryGrade = [categoryShort, grade].filter(Boolean).join(" / ");
+  return [
+    "! 0 200 200 240 1",
+    `TEXT 7 0 14 8 KES ${priceKes}`,
+    `TEXT 4 0 14 45 ${categoryGrade}`,
+    `BARCODE 128 1 1 85 35 76 ${machineCode}`,
+    `TEXT 4 0 60 186 ${machineCode}`,
+    "PRINT"
+  ].join("\r\n") + "\r\n";
+}
+function buildClerkK300TemplateDAdjustmentBatchPayload() {
+  return {
+    label_template_size: "40x30",
+    protocol: "CPCL",
+    batch_name: "k300_template_d_adjustment_batch",
+    labels: [
+      {
+        test_name: "template_d_01",
+        cpcl_command: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 45 CARGO PANT / P\r\nBARCODE 128 1 1 85 35 79 5261300000038\r\nTEXT 4 0 60 186 5261300000038\r\nPRINT\r\n"
+      },
+      {
+        test_name: "template_d_02",
+        cpcl_command: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 45 CARGO PANT / P\r\nBARCODE 128 1 1 85 35 76 5261300000038\r\nTEXT 4 0 60 186 5261300000038\r\nPRINT\r\n"
+      },
+      {
+        test_name: "template_d_03",
+        cpcl_command: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 45 CARGO PANT / P\r\nBARCODE 128 1 1 78 35 76 5261300000038\r\nTEXT 4 0 60 180 5261300000038\r\nPRINT\r\n"
+      },
+      {
+        test_name: "template_d_04",
+        cpcl_command: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 45 CARGO PANT / P\r\nBARCODE 128 1 1 82 45 76 5261300000038\r\nTEXT 4 0 70 184 5261300000038\r\nPRINT\r\n"
+      },
+      {
+        test_name: "template_d_05",
+        cpcl_command: "! 0 200 200 240 1\r\nTEXT 7 0 14 8 KES 410\r\nTEXT 4 0 14 45 CARGO PANT / P\r\nBARCODE 128 1 1 85 35 74 5261300000038\r\nTEXT 4 0 68 188 5261300000038\r\nPRINT\r\n"
+      }
+    ]
+  };
+}
 function canRunClerkS1PreviewProtocolDiagnostic(status = storeMobilePricingPreviewState.bluetoothPrinterStatus, protocolKey = "") {
   const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
   const bridge = getDirectLoopPdaPrinterBridge();
   const protocol = getClerkS1PreviewProtocolDiagnostic(protocolKey);
   const requiresSelectedPrinter = protocol ? protocol.requiresSelectedPrinter !== false : true;
   const requiresK300SppAvailable = protocol ? protocol.requiresK300SppAvailable === true : false;
+  const preferredPrinterMatches = !(protocol == null ? void 0 : protocol.preferredPrinterPattern) || !normalizedStatus.selected_printer_name || protocol.preferredPrinterPattern.test(String(normalizedStatus.selected_printer_name || ""));
   return Boolean(
-    protocol && (!requiresSelectedPrinter || normalizedStatus.selected_printer_address) && (!requiresK300SppAvailable || normalizedStatus.k300_spp_available === true) && bridge && typeof bridge[protocol.method] === "function" && (!Array.isArray(protocol.batchMethods) || protocol.batchMethods.every((variant) => typeof bridge[variant.method] === "function"))
+    protocol && (!requiresSelectedPrinter || normalizedStatus.selected_printer_address) && preferredPrinterMatches && (!requiresK300SppAvailable || normalizedStatus.k300_spp_available === true) && bridge && typeof bridge[protocol.method] === "function" && (!Array.isArray(protocol.batchMethods) || protocol.batchMethods.every((variant) => typeof bridge[variant.method] === "function"))
   );
 }
 function waitForClerkPrinterDiagnosticDelay(durationMs = CLERK_K300_CODE128_BATCH_STEP_DELAY_MS) {
@@ -4575,6 +4652,72 @@ async function sendClerkK300RawCpclFormalBatchDiagnostic({
     renderClerkBluetoothPrinterStatusIfActive();
   }
 }
+async function sendClerkK300TemplateDAdjustmentBatchDiagnostic({
+  state = storeMobilePricingPreviewState,
+  bridge,
+  protocol,
+  currentStatus
+} = {}) {
+  if (!bridge || typeof bridge[protocol.method] !== "function") {
+    throw new Error("当前 Android 版本不支持 K300 CPCL 批量预览，请升级 Direct Loop PDA Android App。");
+  }
+  const payload = buildClerkK300TemplateDAdjustmentBatchPayload();
+  pauseClerkBluetoothPrinterDiagnostics({ durationMs: CLERK_K300_RAW_CPCL_FORMAL_BATCH_DIAGNOSTIC_PAUSE_MS });
+  state.bluetoothPrinterError = "";
+  state.bluetoothPrinterDiagnosticsOpen = true;
+  state.bluetoothPrinterDiagnosticMessage = "正在一次性打印 5 张 D 微调模板，请不要重复点击。";
+  clerkBluetoothPrinterActionInFlight = true;
+  renderClerkBluetoothPrinterStatusIfActive();
+  reportPdaDiagnosticEvent({
+    event_type: "s1_printer_diagnostic_click",
+    method: protocol.method,
+    protocol_key: "k300_template_d_adjustment_batch",
+    payload: clonePdaDiagnosticValue(payload),
+    before_status: clonePdaDiagnosticValue(currentStatus)
+  });
+  try {
+    const printStatusRaw = await bridge[protocol.method](JSON.stringify(payload));
+    const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
+      rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
+      keepError: true
+    });
+    reportPdaDiagnosticEvent({
+      event_type: "s1_printer_diagnostic_result",
+      method: protocol.method,
+      protocol_key: "k300_template_d_adjustment_batch",
+      payload: clonePdaDiagnosticValue(payload),
+      before_status: clonePdaDiagnosticValue(currentStatus),
+      after_status: clonePdaDiagnosticValue(printStatus),
+      android_result: clonePdaDiagnosticValue(printStatus)
+    });
+    if (printStatus.last_print_result === "success") {
+      state.bluetoothPrinterError = "";
+      state.bluetoothPrinterDiagnosticMessage = "5 张 D 微调模板已发送，请检查扫码和文字重叠情况。";
+    } else {
+      const errorMessage = printStatus.k300_batch_last_error || printStatus.last_error || "D 微调模板发送失败。";
+      state.bluetoothPrinterDiagnosticMessage = "";
+      setClerkBluetoothPrinterError(errorMessage);
+    }
+    renderClerkBluetoothPrinterStatusIfActive();
+    return printStatus;
+  } catch (error) {
+    reportPdaDiagnosticEvent({
+      event_type: "s1_printer_diagnostic_error",
+      method: protocol.method,
+      protocol_key: "k300_template_d_adjustment_batch",
+      payload: clonePdaDiagnosticValue(payload),
+      before_status: clonePdaDiagnosticValue(currentStatus),
+      error_message: formatErrorMessage(error)
+    });
+    state.bluetoothPrinterDiagnosticMessage = "";
+    setClerkBluetoothPrinterError(formatErrorMessage(error));
+    renderClerkBluetoothPrinterStatusIfActive();
+    throw error;
+  } finally {
+    clerkBluetoothPrinterActionInFlight = false;
+    renderClerkBluetoothPrinterStatusIfActive();
+  }
+}
 async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPreviewState, protocolKey = "") {
   if (clerkBluetoothPrinterActionInFlight) {
     throw new Error("打印机正在执行上一条操作，请稍后再试。");
@@ -4609,6 +4752,14 @@ async function sendClerkS1PreviewProtocolDiagnostic(state = storeMobilePricingPr
     }
     if (Array.isArray(protocol.rawCpclTemplates) && protocol.rawCpclTemplates.length) {
       return await sendClerkK300RawCpclFormalBatchDiagnostic({
+        state,
+        bridge,
+        protocol,
+        currentStatus
+      });
+    }
+    if (protocol.rawCpclBatch) {
+      return await sendClerkK300TemplateDAdjustmentBatchDiagnostic({
         state,
         bridge,
         protocol,
