@@ -51,6 +51,22 @@ class StoreRackAssignmentResponse(BaseModel):
     updated_at: str
 
 
+class StoreItemStockInConfirmRequest(BaseModel):
+    location_code: str = Field(min_length=1)
+    confirmed_by: str = ""
+
+
+class StoreItemStockInConfirmResponse(BaseModel):
+    store_code: str
+    machine_code: str
+    current_location_code: str
+    location_type: str
+    stock_in_confirmed: bool
+    stock_in_confirmed_at: str
+    stock_in_confirmed_by: str
+    status: str
+
+
 class StoreRackInitializationResponse(BaseModel):
     store_code: str
     total_racks: int

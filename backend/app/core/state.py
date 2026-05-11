@@ -18119,6 +18119,137 @@ class InMemoryState:
         self._persist()
         return response
 
+    def _find_store_item_stock_in_rows(self, machine_code: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None, bool]:
+        normalized_machine_code = str(machine_code or "").strip().upper()
+        item_row = next(
+            (
+                row
+                for row in self.store_items.values()
+                if str(row.get("machine_code") or row.get("barcode_value") or "").strip().upper() == normalized_machine_code
+            ),
+            None,
+        )
+        token_row = next(
+            (
+                row
+                for row in self.item_barcode_tokens.values()
+                if str(row.get("machine_code") or row.get("barcode_value") or row.get("barcode") or "").strip().upper() == normalized_machine_code
+            ),
+            None,
+        )
+        matched_non_store_item = any(
+            str(row.get("machine_code") or row.get("barcode_value") or "").strip().upper() == normalized_machine_code
+            and str(row.get("entity_type") or "").strip().upper() not in {"", "STORE_ITEM"}
+            for row in [item_row, token_row]
+            if row
+        )
+        return item_row, token_row, matched_non_store_item
+
+    def confirm_store_item_stock_in(self, store_code: str, machine_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_machine_code = str(machine_code or "").strip().upper()
+        if not normalized_machine_code:
+            raise HTTPException(status_code=400, detail="machine_code is required")
+        location_code = str(payload.get("location_code") or "").strip().upper()
+        if not location_code:
+            raise HTTPException(status_code=400, detail="location_code is required")
+        actor_name = str(payload.get("confirmed_by") or "").strip()
+        actor = self._require_user_role(actor_name, {"store_clerk", "store_manager", "area_supervisor"}, store_code=store["code"])
+
+        item_row, token_row, matched_non_store_item = self._find_store_item_stock_in_rows(normalized_machine_code)
+        if matched_non_store_item:
+            raise HTTPException(status_code=400, detail="Only STORE_ITEM machine_code can be confirmed into store inventory")
+        if not item_row and not token_row:
+            raise HTTPException(status_code=404, detail=f"Unknown STORE_ITEM machine_code {normalized_machine_code}")
+
+        candidate_rows = [row for row in [item_row, token_row] if row]
+        if not any(str(row.get("entity_type") or "STORE_ITEM").strip().upper() == "STORE_ITEM" for row in candidate_rows):
+            raise HTTPException(status_code=400, detail="Only STORE_ITEM machine_code can be confirmed into store inventory")
+        for row in candidate_rows:
+            row_store = str(row.get("store_code") or "").strip().upper()
+            if row_store and row_store != store["code"]:
+                raise HTTPException(status_code=409, detail=f"STORE_ITEM belongs to {row_store}, not {store['code']}")
+            if not self._store_inventory_row_is_base_eligible(row):
+                raise HTTPException(status_code=409, detail="STORE_ITEM is sold, void, cancelled, or deleted and cannot be confirmed")
+
+        _, active_locations = self._store_inventory_location_maps(store["code"])
+        location = active_locations.get(location_code)
+        if not location:
+            known_location = next(
+                (
+                    row
+                    for row in self.list_store_racks(store["code"])
+                    if str(row.get("location_code") or row.get("rack_code") or "").strip().upper() == location_code
+                ),
+                None,
+            )
+            if known_location:
+                raise HTTPException(status_code=409, detail=f"Location {location_code} is inactive")
+            raise HTTPException(status_code=404, detail=f"Unknown active location {location_code} for store {store['code']}")
+        location_type = str(location.get("location_type") or "SHELF").strip().upper()
+        if location_type not in {"SHELF", "BACKROOM"}:
+            raise HTTPException(status_code=400, detail="location_type must be SHELF or BACKROOM")
+        if location_type == "BACKROOM":
+            active_backrooms = [
+                row
+                for row in active_locations.values()
+                if str(row.get("location_type") or "").strip().upper() == "BACKROOM"
+            ]
+            if len(active_backrooms) != 1:
+                raise HTTPException(status_code=409, detail="Store must have exactly one active BACKROOM location")
+
+        primary_row = item_row or token_row or {}
+        was_confirmed = any(row.get("stock_in_confirmed") is True for row in candidate_rows)
+        previous_location = str(
+            primary_row.get("current_location_code")
+            or primary_row.get("store_rack_code")
+            or primary_row.get("rack_code")
+            or ""
+        ).strip().upper()
+        if was_confirmed and previous_location == location_code:
+            result_status = "already_confirmed"
+        elif was_confirmed:
+            result_status = "location_updated"
+        else:
+            result_status = "confirmed"
+
+        timestamp = str(primary_row.get("stock_in_confirmed_at") or "").strip() if result_status == "already_confirmed" else now_iso()
+        for row in candidate_rows:
+            row["store_code"] = store["code"]
+            row["current_location_code"] = location_code
+            row["store_rack_code"] = location_code
+            row["rack_code"] = location_code
+            row["stock_in_confirmed"] = True
+            row["stock_in_confirmed_at"] = timestamp
+            row["stock_in_confirmed_by"] = actor["username"]
+            row["updated_at"] = timestamp
+
+        self._log_event(
+            event_type="store_item.stock_in_confirmed",
+            entity_type="STORE_ITEM",
+            entity_id=normalized_machine_code,
+            actor=actor["username"],
+            summary=f"STORE_ITEM {normalized_machine_code} stock-in {result_status} at {location_code}",
+            details={
+                "store_code": store["code"],
+                "machine_code": normalized_machine_code,
+                "current_location_code": location_code,
+                "location_type": location_type,
+                "status": result_status,
+            },
+        )
+        self._persist()
+        return {
+            "store_code": store["code"],
+            "machine_code": normalized_machine_code,
+            "current_location_code": location_code,
+            "location_type": location_type,
+            "stock_in_confirmed": True,
+            "stock_in_confirmed_at": timestamp,
+            "stock_in_confirmed_by": actor["username"],
+            "status": result_status,
+        }
+
     def _reserve_transfer_inventory(self, order: dict[str, Any], actor: str) -> None:
         for item in order["items"]:
             stock_key = f"{order['from_warehouse_code']}||{item['barcode']}"
