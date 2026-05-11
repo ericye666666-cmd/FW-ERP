@@ -81,7 +81,7 @@
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
           <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#263</span></div>
+            <div><strong>FW-ERP 主线 PR:</strong><span>#264</span></div>
             <div><strong>Android PR:</strong><span>#35</span></div>
           </section>
           <pre id="authOutput" class="output hidden-output"></pre>
@@ -3084,9 +3084,27 @@
         <div class="panel-head">
           <h2>库存总览</h2>
         </div>
-        <div class="candidate-summary empty-state">
-          库存总览会在下一步接入 stock_in_confirmed 后按门店、品类和货架统计。当前 PR 只新增菜单入口，先不统计未确认 STORE_ITEM。
+        <form id="storeInventoryOverviewForm" class="form-grid compact">
+          <label>
+            当前门店
+            <select name="store_code">
+              <option value="UTAWALA">UTAWALA</option>
+              <option value="PAIPLINE">PAIPLINE</option>
+              <option value="KINNO">KINNO</option>
+            </select>
+          </label>
+          <button type="submit">刷新库存总览</button>
+        </form>
+        <div id="storeInventoryOverviewSummary" class="candidate-summary empty-state">
+          请选择门店查看 STORE_ITEM 库存总览：门店总库存 / 已上货架 / 后仓 / 未关联货架 / 今日新增入库。
         </div>
+        <div class="segmented-control" role="tablist" aria-label="库存总览视角">
+          <button type="button" class="secondary-button" data-store-inventory-tab="category">按品类</button>
+          <button type="button" class="secondary-button" data-store-inventory-tab="location">按货架</button>
+        </div>
+        <div id="storeInventoryOverviewTables" class="candidate-list"></div>
+        <div id="storeInventoryOverviewDetail" class="candidate-summary empty-state">点击品类或货架位查看商品明细。</div>
+        <pre id="storeInventoryOverviewOutput" class="output hidden-output"></pre>
       </section>
 
       <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
@@ -4296,16 +4314,16 @@
           (document.body || document.documentElement).appendChild(script);
         }
 
-        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-store-shelf-locations-pr1";
-        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "store-shelf-locations-pr1";
+        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-store-inventory-overview-pr2";
+        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "store-inventory-overview-pr2";
 
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=store-shelf-locations-pr1", "modern");
+          loadPdaRuntimeScript("./app.js?v=store-inventory-overview-pr2", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=store-shelf-locations-pr1", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=store-inventory-overview-pr2", "legacy");
       })();
     </script>
   </body>

@@ -3379,6 +3379,44 @@ def assign_store_rack(
     )
 
 
+@router.get(
+    "/stores/{store_code}/inventory-overview",
+    tags=["stores"],
+)
+def get_store_inventory_overview(
+    store_code: str,
+    authorization: Optional[str] = Header(default=None),
+) -> dict[str, Any]:
+    _require_current_user(authorization=authorization)
+    return state.get_store_inventory_overview(store_code)
+
+
+@router.get(
+    "/stores/{store_code}/inventory-overview/locations/{location_code}/items",
+    tags=["stores"],
+)
+def get_store_inventory_location_items(
+    store_code: str,
+    location_code: str,
+    authorization: Optional[str] = Header(default=None),
+) -> list[dict[str, Any]]:
+    _require_current_user(authorization=authorization)
+    return state.list_store_inventory_location_items(store_code, location_code)
+
+
+@router.get(
+    "/stores/{store_code}/inventory-overview/categories/{category_name}/items",
+    tags=["stores"],
+)
+def get_store_inventory_category_items(
+    store_code: str,
+    category_name: str,
+    authorization: Optional[str] = Header(default=None),
+) -> list[dict[str, Any]]:
+    _require_current_user(authorization=authorization)
+    return state.list_store_inventory_category_items(store_code, category_name)
+
+
 @router.post(
     "/print-jobs/bale-label",
     response_model=BaleLabelPrintJobResponse,
