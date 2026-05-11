@@ -175,6 +175,7 @@ from app.schemas.store_racks import (
     StoreRackAssignmentResponse,
     StoreRackInitializationResponse,
     StoreRackLocationResponse,
+    StoreRackLocationUpsertRequest,
     StoreRackTemplateResponse,
 )
 from app.schemas.stores import (
@@ -3321,6 +3322,40 @@ def list_store_rack_locations(
 ) -> list[StoreRackLocationResponse]:
     _require_current_user(authorization=authorization)
     return [StoreRackLocationResponse(**row) for row in state.list_store_racks(store_code)]
+
+
+@router.post(
+    "/stores/{store_code}/rack-locations",
+    response_model=StoreRackLocationResponse,
+    tags=["stores"],
+)
+def create_store_rack_location(
+    store_code: str,
+    payload: StoreRackLocationUpsertRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreRackLocationResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["updated_by"] = current_user["username"]
+    return StoreRackLocationResponse(**state.upsert_store_location(store_code, data))
+
+
+@router.patch(
+    "/stores/{store_code}/rack-locations/{location_code}",
+    response_model=StoreRackLocationResponse,
+    tags=["stores"],
+)
+def update_store_rack_location(
+    store_code: str,
+    location_code: str,
+    payload: StoreRackLocationUpsertRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreRackLocationResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump()
+    data["location_code"] = location_code
+    data["updated_by"] = current_user["username"]
+    return StoreRackLocationResponse(**state.upsert_store_location(store_code, data))
 
 
 @router.post(

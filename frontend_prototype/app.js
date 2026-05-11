@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-store-item-batch-print";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-store-item-batch-print";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#262";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-store-shelf-locations-pr1";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "store-shelf-locations-pr1";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#263";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -2301,6 +2301,22 @@ const STORE_PANEL_NAV_META = [
     icon: "PDA",
     navTitle: "店长 PDA 工作台",
     navTitleEn: "Store Manager PDA Workbench",
+  },
+  {
+    match: "库存总览",
+    section: "manager",
+    order: 2,
+    icon: "库",
+    navTitle: "库存总览",
+    navTitleEn: "Store Inventory Overview",
+  },
+  {
+    match: "货架位编辑",
+    section: "manager",
+    order: 3,
+    icon: "架",
+    navTitle: "货架位编辑",
+    navTitleEn: "Shelf Location Editor",
   },
   {
     match: "5. 门店收货主控台",
@@ -25076,6 +25092,117 @@ function renderRackResultSummary(kind, data) {
   target.innerHTML = `<div class="alert-banner">货架位动作已完成。</div>`;
 }
 
+function getStoreShelfLocationStatusLabel(row = {}) {
+  return row.active === false || String(row.status || "").trim().toLowerCase() === "inactive" ? "停用" : "启用";
+}
+
+function hydrateStoreShelfLocationForm(row = {}) {
+  setInputValue("#storeShelfLocationForm [name='store_code']", row.store_code || getCurrentStoreCodeFallback() || "UTAWALA");
+  setInputValue("#storeShelfLocationForm [name='location_code']", row.location_code || row.rack_code || "");
+  setInputValue("#storeShelfLocationForm [name='location_name']", row.location_name || "");
+  setInputValue("#storeShelfLocationForm [name='location_type']", row.location_type || "SHELF");
+  setInputValue("#storeShelfLocationForm [name='category_name']", row.category_name || row.category_hint || "");
+  setInputValue("#storeShelfLocationForm [name='active']", row.active === false ? "false" : "true");
+  setInputValue("#storeShelfLocationForm [name='sort_order']", String(row.sort_order ?? 0));
+}
+
+function renderStoreShelfLocationSummary(rows = [], message = "") {
+  const summaryTarget = document.querySelector("#storeShelfLocationSummary");
+  const listTarget = document.querySelector("#storeShelfLocationList");
+  if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
+    return;
+  }
+  const locationRows = Array.isArray(rows) ? rows : [];
+  const shelfCount = locationRows.filter((row) => row.location_type === "SHELF").length;
+  const backroomCount = locationRows.filter((row) => row.location_type === "BACKROOM").length;
+  const activeCount = locationRows.filter((row) => row.active !== false && String(row.status || "active").toLowerCase() !== "inactive").length;
+  const totalItems = locationRows.reduce((sum, row) => sum + Number(row.item_count || 0), 0);
+  summaryTarget.className = "report-summary";
+  summaryTarget.innerHTML = `
+    <div class="flow-summary-note">${escapeHtml(message || "维护门店货架位：一类商品一个货架位，另有一个默认后仓。")}</div>
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>货架位</strong><span>${shelfCount}</span></article>
+      <article class="store-metric"><strong>后仓</strong><span>${backroomCount}</span></article>
+      <article class="store-metric"><strong>启用</strong><span>${activeCount}</span></article>
+      <article class="store-metric"><strong>当前商品数</strong><span>${totalItems}</span></article>
+    </div>
+  `;
+  if (!locationRows.length) {
+    listTarget.innerHTML = `<div class="empty-state">当前门店还没有货架位。请先点击“初始化默认货架位”。</div>`;
+    return;
+  }
+  listTarget.innerHTML = locationRows
+    .map((row) => `
+      <article class="candidate-row">
+        <div class="candidate-main">
+          <strong>${escapeHtml(row.location_code || row.rack_code || "-")} · ${escapeHtml(row.location_name || "-")}</strong>
+          <div class="subtle small">${escapeHtml(row.location_type || "SHELF")} · 绑定品类：${escapeHtml(row.category_name || row.category_hint || "-")}</div>
+          <div class="chip-row">
+            <span class="meta-pill">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
+            <span class="meta-pill">排序 ${escapeHtml(row.sort_order ?? 0)}</span>
+            <span class="meta-pill">商品 ${escapeHtml(row.item_count ?? 0)}</span>
+          </div>
+        </div>
+        <button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button>
+      </article>
+    `)
+    .join("");
+}
+
+async function loadStoreShelfLocations(storeCode = "") {
+  const normalizedStoreCode = String(storeCode || document.querySelector("#storeShelfLocationLoadForm [name='store_code']")?.value || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+  const rows = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/rack-locations`);
+  writeOutput("#storeShelfLocationOutput", rows);
+  setInputValue("#storeShelfLocationLoadForm [name='store_code']", normalizedStoreCode);
+  setInputValue("#storeShelfLocationForm [name='store_code']", normalizedStoreCode);
+  renderStoreShelfLocationSummary(rows);
+  return rows;
+}
+
+async function submitStoreShelfLocationLoad(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  return loadStoreShelfLocations(payload.store_code);
+}
+
+async function initializeStoreShelfLocations(storeCode = "") {
+  const normalizedStoreCode = String(storeCode || document.querySelector("#storeShelfLocationLoadForm [name='store_code']")?.value || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+  const result = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/rack-locations/initialize`, {
+    method: "POST",
+  });
+  writeOutput("#storeShelfLocationOutput", result);
+  renderStoreShelfLocationSummary(result.racks || [], "默认货架位已初始化。");
+  return result;
+}
+
+async function submitStoreShelfLocationSave(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  const storeCode = String(payload.store_code || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+  const locationCode = String(payload.location_code || "").trim().toUpperCase();
+  if (!locationCode) {
+    throw new Error("请先填写货架位代码。");
+  }
+  const body = {
+    location_code: locationCode,
+    location_name: String(payload.location_name || "").trim(),
+    location_type: String(payload.location_type || "SHELF").trim().toUpperCase(),
+    category_name: String(payload.category_name || "").trim(),
+    active: String(payload.active || "true") === "true",
+    sort_order: Number(payload.sort_order || 0),
+  };
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/rack-locations/${encodeURIComponent(locationCode)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  writeOutput("#storeShelfLocationOutput", result);
+  const rows = await loadStoreShelfLocations(storeCode);
+  renderStoreShelfLocationSummary(rows, `货架位 ${locationCode} 已保存。`);
+  return result;
+}
+
 function renderConfigSummary(stores, barcode, labels, suppliers = []) {
   const target = document.querySelector("#configSummary");
   if (!target) {
@@ -40602,6 +40729,8 @@ const FORM_SUMMARY_SELECTORS = {
   "#loginForm": "#authResultSummary",
   "#devTaskForm": "#devTrackerSummary",
   "#storeManagerConsoleForm": "#storeManagerConsoleSummary",
+  "#storeShelfLocationLoadForm": "#storeShelfLocationSummary",
+  "#storeShelfLocationForm": "#storeShelfLocationSummary",
   "#storeRetailSeedForm": "#storeRetailSeedSummary",
   "#storeRecentSalesSimulationForm": "#storeRecentSalesSimulationSummary",
   "#barcodeResolverTestForm": "#barcodeResolverTestSummary",
@@ -40728,6 +40857,8 @@ bindForm("#loginForm", submitLogin, "#authOutput");
 bindLoginSubmitFallback();
 bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
+bindForm("#storeShelfLocationLoadForm", submitStoreShelfLocationLoad, "#storeShelfLocationOutput");
+bindForm("#storeShelfLocationForm", submitStoreShelfLocationSave, "#storeShelfLocationOutput");
 bindForm("#storeRetailSeedForm", submitStoreRetailSeed, "#storeRetailSeedOutput");
 bindForm("#storeRecentSalesSimulationForm", submitStoreRecentSalesSimulation, "#storeRecentSalesSimulationOutput");
 bindForm("#barcodeResolverTestForm", submitBarcodeResolverTest, "#barcodeResolverTestOutput");
@@ -44771,6 +44902,31 @@ document.addEventListener("click", (event) => {
   }
   hydrateOpsDataTopicForm(row);
   focusElement("#opsDataTopicForm");
+});
+
+document.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-store-shelf-initialize], [data-store-shelf-edit]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  if (target.hasAttribute("data-store-shelf-initialize")) {
+    try {
+      await initializeStoreShelfLocations();
+    } catch (error) {
+      renderErrorSummary("#storeShelfLocationSummary", formatErrorMessage(error));
+    }
+    return;
+  }
+  const locationCode = String(target.dataset.storeShelfEdit || "").trim().toUpperCase();
+  const rows = readOutput("#storeShelfLocationOutput");
+  const locationRows = Array.isArray(rows) ? rows : Array.isArray(rows?.racks) ? rows.racks : [];
+  const row = locationRows.find((item) => String(item?.location_code || item?.rack_code || "").trim().toUpperCase() === locationCode);
+  if (row) {
+    hydrateStoreShelfLocationForm(row);
+    focusElement("#storeShelfLocationForm");
+  }
 });
 
 document.addEventListener("click", (event) => {
