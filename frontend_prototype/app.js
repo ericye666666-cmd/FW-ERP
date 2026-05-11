@@ -29959,6 +29959,9 @@ async function handleCashierTerminalAction(action, target) {
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
       renderCashierTerminal();
+      if (cashierTerminalState.activeDrawer === "recent-sales") {
+        await loadCashierTerminalRecentSales(20);
+      }
       return;
     case "close-drawer":
       cashierTerminalState.activeDrawer = "";
@@ -30213,6 +30216,11 @@ function ensureCashierTerminalPreviewState() {
   if (!Array.isArray(cashierTerminalState.holdOrders)) {
     cashierTerminalState.holdOrders = [];
   }
+  if (!Array.isArray(cashierTerminalState.recentSales)) {
+    cashierTerminalState.recentSales = [];
+  }
+  cashierTerminalState.selectedSaleDetail = cashierTerminalState.selectedSaleDetail || null;
+  cashierTerminalState.saleLookupFeedback = cashierTerminalState.saleLookupFeedback || "";
   if (!cashierTerminalState.activePaymentMode) {
     cashierTerminalState.activePaymentMode = "cash";
   }
@@ -30353,6 +30361,7 @@ renderCashierTerminalStatusBar = function () {
   cashierTerminalStatusBar.innerHTML = `
     <span>${escapeHtml(statusText)}</span>
     <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">挂单列表</button>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
   `;
 }
 
@@ -30505,6 +30514,8 @@ function renderCashierTerminalReceiptPanel() {
   ensureCashierTerminalPreviewState();
   const sale = cashierTerminalState.latestCompletedSale;
   const items = Array.isArray(sale?.items) ? sale.items : [];
+  const isReprint = Boolean(sale?.is_reprint);
+  const storeCode = sale?.store_code || getCashierTerminalStoreCode();
   receiptPanel.innerHTML = `
     <div class="panel-head cashier-terminal-card-head">
       <div>
@@ -30517,9 +30528,13 @@ function renderCashierTerminalReceiptPanel() {
         <strong>DIRECT LOOP</strong>
         <span>UTAWALA STORE</span>
       </div>
+      ${isReprint ? `<div class="receipt-center receipt-reprint-label">REPRINT COPY</div>` : ""}
       <div class="receipt-divider"></div>
       <div class="receipt-line"><span>Sale No.</span><strong>${escapeHtml(sale?.sale_no || "-")}</strong></div>
-      <div class="receipt-line"><span>Cashier</span><span>${escapeHtml(getCashierTerminalCashierName())}</span></div>
+      <div class="receipt-line"><span>Store</span><span>${escapeHtml(storeCode)}</span></div>
+      <div class="receipt-line"><span>Cashier</span><span>${escapeHtml(sale?.cashier || getCashierTerminalCashierName())}</span></div>
+      <div class="receipt-line"><span>Shift</span><span>${escapeHtml(sale?.shift_id || getCashierTerminalShiftNo())}</span></div>
+      <div class="receipt-line"><span>Terminal</span><span>${escapeHtml(sale?.terminal_id || `POS-${storeCode.slice(0, 3).toUpperCase()}-01`)}</span></div>
       <div class="receipt-line"><span>Time</span><span>${escapeHtml(sale?.time || cashierTerminalState.currentTime || "-")}</span></div>
       <div class="receipt-divider"></div>
       ${items.length ? items.map((item) => `
@@ -30538,6 +30553,7 @@ function renderCashierTerminalReceiptPanel() {
       <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.mpesa_amount || 0))}</span></div>
       <div class="receipt-line"><span>Ref</span><span>${escapeHtml(sale?.mpesa_reference || "-")}</span></div>
       <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.change || 0))}</span></div>
+      <div class="receipt-line"><span>Status</span><span>${escapeHtml(sale?.status || "-")}</span></div>
       <div class="receipt-divider"></div>
       <div class="receipt-center receipt-thanks">Thank you. Karibu tena.</div>
     </div>
@@ -30562,6 +30578,7 @@ renderCashierTerminalQuickActions = function () {
       <span><strong>打印机状态</strong>已连接 / mock</span>
       <span><strong>同步状态</strong>${escapeHtml(cashierTerminalState.syncStatus)}</span>
       <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales"><span>销售记录</span><strong>最近销售</strong></button>
     </div>
   `;
 }
@@ -30618,6 +30635,67 @@ renderCashierTerminalDrawer = function () {
         `).join("") : `<div class="cashier-terminal-empty-card">当前没有挂单。</div>`}
       </div>
       <div class="drawer-foot"><button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">创建挂单</button></div>
+    `;
+    return;
+  }
+  if (drawer === "recent-sales") {
+    const sales = cashierTerminalState.recentSales || [];
+    const detail = cashierTerminalState.selectedSaleDetail;
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">SALES</p><h3>最近销售</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body recent-sales-body">
+        ${cashierTerminalState.saleLookupFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.saleLookupFeedback)}</div>` : ""}
+        <div class="recent-sales-list">
+          ${sales.length ? sales.map((sale) => `
+            <article class="hold-card status-${escapeHtml(sale.status || "completed")}">
+              <div><strong>${escapeHtml(sale.sale_no || "-")}</strong><span>${escapeHtml(sale.sale_time || "-")} · ${escapeHtml(sale.cashier_id || "-")}</span></div>
+              <div class="hold-meta">
+                <span>${escapeHtml(sale.total_items || 0)} 件</span>
+                <span>${escapeHtml(formatCashierPreviewMoney(sale.total_amount || 0))}</span>
+                <span>${escapeHtml(sale.payment_method || "-")}</span>
+                <span>${escapeHtml(sale.status || "-")}</span>
+              </div>
+              <div class="hold-actions">
+                <button type="button" class="secondary-inline" data-terminal-action="view-sale-detail" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">查看详情</button>
+                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">重打收据</button>
+              </div>
+            </article>
+          `).join("") : `<div class="cashier-terminal-empty-card">暂无可重打销售单。</div>`}
+        </div>
+        ${detail ? `
+          <div class="recent-sale-detail">
+            <h4>${escapeHtml(detail.sale_no || "-")}</h4>
+            <div class="shift-info-grid">
+              <span><strong>Store</strong>${escapeHtml(detail.store_code || getCashierTerminalStoreCode())}</span>
+              <span><strong>Cashier</strong>${escapeHtml(detail.cashier || "-")}</span>
+              <span><strong>Shift</strong>${escapeHtml(detail.shift_id || "-")}</span>
+              <span><strong>Terminal</strong>${escapeHtml(detail.terminal_id || "-")}</span>
+              <span><strong>Time</strong>${escapeHtml(detail.time || "-")}</span>
+              <span><strong>Status</strong>${escapeHtml(detail.status || "-")}</span>
+            </div>
+            <div class="receipt-divider"></div>
+            ${(detail.items || []).map((item) => `
+              <div class="receipt-item">
+                <strong>${escapeHtml(item.display_code || item.machine_code || "-")}</strong>
+                <span>${escapeHtml(item.category || "-")} · ${escapeHtml(formatCashierPreviewMoney(item.price || 0))}</span>
+              </div>
+            `).join("")}
+            <div class="receipt-divider"></div>
+            <div class="receipt-line"><span>Subtotal</span><span>${escapeHtml(formatCashierPreviewMoney(detail.subtotal || 0))}</span></div>
+            <div class="receipt-line"><span>Discount</span><span>${escapeHtml(formatCashierPreviewMoney(detail.discount || 0))}</span></div>
+            <div class="receipt-line receipt-total"><span>Total</span><strong>${escapeHtml(formatCashierPreviewMoney(detail.total || 0))}</strong></div>
+            <div class="receipt-line"><span>Payment</span><span>${escapeHtml(detail.payment_method || "-")}</span></div>
+            <div class="receipt-line"><span>Cash</span><span>${escapeHtml(formatCashierPreviewMoney(detail.cash_amount || 0))}</span></div>
+            <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney(detail.mpesa_amount || 0))}</span></div>
+            <div class="receipt-line"><span>Ref</span><span>${escapeHtml(detail.mpesa_reference || "-")}</span></div>
+            <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney(detail.change || 0))}</span></div>
+          </div>
+        ` : ""}
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">刷新最近销售</button>
+        <button type="button" class="primary-inline" data-terminal-action="reprint-receipt">重新打印最近一单</button>
+      </div>
     `;
     return;
   }
@@ -31048,7 +31126,7 @@ function buildCashierTerminalPosSalePayload(payment) {
   };
 }
 
-function normalizeCashierTerminalBackendSale(sale = {}) {
+function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
   const items = Array.isArray(sale.items) ? sale.items : [];
   return {
     sale_id: sale.sale_id || sale.sale_no || "",
@@ -31057,8 +31135,10 @@ function normalizeCashierTerminalBackendSale(sale = {}) {
     store_code: sale.store_code || getCashierTerminalStoreCode(),
     cashier: sale.cashier_id || getCashierTerminalCashierName(),
     shift_id: sale.shift_id || getCashierTerminalShiftNo(),
+    terminal_id: sale.terminal_id || `POS-${getCashierTerminalStoreCode().slice(0, 3).toUpperCase()}-01`,
     time: sale.sale_time || cashierTerminalState.currentTime || new Date().toLocaleString("zh-CN", { hour12: false }),
     items: items.map((item) => ({
+      line_no: item.line_no || 0,
       display_code: item.display_code || item.machine_code || "",
       machine_code: item.machine_code || "",
       barcode: item.machine_code || "",
@@ -31078,7 +31158,125 @@ function normalizeCashierTerminalBackendSale(sale = {}) {
     mpesa_reference: sale.mpesa_reference || "",
     change: normalizeCashierTerminalNumber(sale.change_amount),
     status: sale.status || "completed",
+    is_reprint: Boolean(options.reprint),
   };
+}
+
+function isCashierTerminalSaleLookupApiUnavailableError(error) {
+  const status = Number(error?.status || 0);
+  if (!status || status >= 500) {
+    return true;
+  }
+  if (status !== 404) {
+    return false;
+  }
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (/^not found$/i.test(message)) {
+    return true;
+  }
+  return /cannot\s+get\s+.*\/stores\/[^/]+\/pos-sales/i.test(message);
+}
+
+function formatCashierTerminalSaleLookupError(error) {
+  const status = Number(error?.status || 0);
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (isCashierTerminalSaleLookupApiUnavailableError(error)) {
+    return "销售记录接口不可用，请稍后重试。";
+  }
+  if (status === 404 && /不属于|门店|store/i.test(message)) {
+    return "该销售单不属于当前门店。";
+  }
+  if (status === 404) {
+    return "未找到该销售单。";
+  }
+  return message || "销售记录接口不可用，请稍后重试。";
+}
+
+async function fetchCashierTerminalRecentSales(limit = 20) {
+  const storeCode = getCashierTerminalStoreCode();
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales?limit=${encodeURIComponent(String(limit))}`);
+}
+
+async function fetchCashierTerminalSaleDetail(saleNo) {
+  const storeCode = getCashierTerminalStoreCode();
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales/${encodeURIComponent(saleNo)}`);
+}
+
+async function loadCashierTerminalRecentSales(limit = 20) {
+  ensureCashierTerminalPreviewState();
+  try {
+    const response = await fetchCashierTerminalRecentSales(limit);
+    cashierTerminalState.recentSales = Array.isArray(response?.sales) ? response.sales : [];
+    cashierTerminalState.saleLookupFeedback = cashierTerminalState.recentSales.length
+      ? `已加载最近销售：${cashierTerminalState.recentSales.length} 单`
+      : "暂无可重打销售单。";
+    renderCashierTerminalDrawer();
+    return cashierTerminalState.recentSales;
+  } catch (error) {
+    const message = formatCashierTerminalSaleLookupError(error);
+    cashierTerminalState.saleLookupFeedback = message;
+    renderCashierTerminalDrawer();
+    throw new Error(message);
+  }
+}
+
+async function loadCashierTerminalSaleReceiptForReprint(saleNo, { reprint = true } = {}) {
+  ensureCashierTerminalPreviewState();
+  if (!String(saleNo || "").trim()) {
+    throw new Error("未找到该销售单。");
+  }
+  try {
+    const sale = await fetchCashierTerminalSaleDetail(saleNo);
+    const normalized = normalizeCashierTerminalBackendSale(sale, { reprint: true });
+    normalized.is_reprint = Boolean(reprint);
+    cashierTerminalState.latestCompletedSale = normalized;
+    cashierTerminalState.selectedSaleDetail = normalized;
+    cashierTerminalState.saleLookupFeedback = reprint
+      ? `收据已准备重打：${normalized.sale_no}`
+      : `已加载销售单：${normalized.sale_no}`;
+    cashierTerminalState.printFeedback = cashierTerminalState.saleLookupFeedback;
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    renderCashierTerminalQuickActions();
+    renderCashierTerminalStatusBar();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.saleLookupFeedback, "success", 1800);
+    return normalized;
+  } catch (error) {
+    const message = formatCashierTerminalSaleLookupError(error);
+    cashierTerminalState.saleLookupFeedback = message;
+    cashierTerminalState.printFeedback = message;
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    throw new Error(message);
+  }
+}
+
+async function loadCashierTerminalLatestReceiptForReprint() {
+  ensureCashierTerminalPreviewState();
+  const latestSaleNo = String(cashierTerminalState.latestCompletedSale?.sale_no || "").trim();
+  if (latestSaleNo) {
+    return await loadCashierTerminalSaleReceiptForReprint(latestSaleNo);
+  }
+  let response;
+  try {
+    response = await fetchCashierTerminalRecentSales(1);
+  } catch (error) {
+    const message = formatCashierTerminalSaleLookupError(error);
+    cashierTerminalState.saleLookupFeedback = message;
+    cashierTerminalState.printFeedback = message;
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    throw new Error(message);
+  }
+  const latest = Array.isArray(response?.sales) ? response.sales[0] : null;
+  if (!latest?.sale_no) {
+    cashierTerminalState.saleLookupFeedback = "暂无可重打销售单。";
+    cashierTerminalState.printFeedback = "暂无可重打销售单。";
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    throw new Error("暂无可重打销售单。");
+  }
+  return await loadCashierTerminalSaleReceiptForReprint(latest.sale_no);
 }
 
 function isCashierTerminalSaleApiUnavailableError(error) {
@@ -31320,6 +31518,9 @@ handleCashierTerminalAction = async function (action, target) {
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
       renderCashierTerminal();
+      if (cashierTerminalState.activeDrawer === "recent-sales") {
+        await loadCashierTerminalRecentSales(20);
+      }
       return;
     case "close-drawer":
       cashierTerminalState.activeDrawer = "";
@@ -31383,10 +31584,13 @@ handleCashierTerminalAction = async function (action, target) {
       renderCashierTerminalReceiptPanel();
       return;
     case "reprint-receipt":
-      cashierTerminalState.printFeedback = cashierTerminalState.latestCompletedSale
-        ? `mock：已重新打印最近一单 ${cashierTerminalState.latestCompletedSale.sale_no}`
-        : "还没有最近一单可重新打印。";
-      renderCashierTerminalReceiptPanel();
+      await loadCashierTerminalLatestReceiptForReprint();
+      return;
+    case "view-sale-detail":
+      await loadCashierTerminalSaleReceiptForReprint(target.dataset.terminalSaleNo, { reprint: false });
+      return;
+    case "reprint-sale":
+      await loadCashierTerminalSaleReceiptForReprint(target.dataset.terminalSaleNo, { reprint: true });
       return;
     case "select-store":
       cashierTerminalState.switchStoreFeedback = target.dataset.storeCode === "UTAWALA"

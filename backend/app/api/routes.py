@@ -112,6 +112,7 @@ from app.schemas.refunds import (
 )
 from app.schemas.sales import (
     PosSaleCreate,
+    PosSaleListResponse,
     PosSaleResponse,
     RecentStoreSalesSimulationRequest,
     RecentStoreSalesSimulationResponse,
@@ -4846,6 +4847,26 @@ def create_store_pos_sale(
         created_by=current_user["username"],
     )
     return PosSaleResponse(**sale)
+
+
+@router.get("/stores/{store_code}/pos-sales", response_model=PosSaleListResponse, tags=["sales", "pos"])
+def list_store_pos_sales(
+    store_code: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    authorization: Optional[str] = Header(default=None),
+) -> PosSaleListResponse:
+    _require_current_user(authorization=authorization)
+    return PosSaleListResponse(**state.list_pos_sales(store_code, limit=limit))
+
+
+@router.get("/stores/{store_code}/pos-sales/{sale_no}", response_model=PosSaleResponse, tags=["sales", "pos"])
+def get_store_pos_sale(
+    store_code: str,
+    sale_no: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PosSaleResponse:
+    _require_current_user(authorization=authorization)
+    return PosSaleResponse(**state.get_pos_sale(store_code, sale_no))
 
 
 @router.get("/sales", response_model=list[SaleResponse], tags=["sales"])

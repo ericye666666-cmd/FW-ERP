@@ -70,6 +70,28 @@ function extractAssignedFunctionSource(source, functionName) {
   throw new Error(`could not extract assigned ${functionName}`);
 }
 
+function extractAssignedAnyFunctionSource(source, functionName) {
+  const asyncStart = source.indexOf(`${functionName} = async function`);
+  const syncStart = source.indexOf(`${functionName} = function`);
+  const start = asyncStart === -1 ? syncStart : asyncStart;
+  assert.notEqual(start, -1, `missing assigned function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `missing assigned function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract assigned ${functionName}`);
+}
+
 test("POS scans use the typed resolver with POS context before cart insert", () => {
   assert.match(appJs, /posStoreItemSaleRecords/);
   const resolverSource = extractFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
@@ -282,6 +304,49 @@ test("POS sale API unavailable detection does not hide backend business errors",
   assert.equal(fn({ status: 404, message: "Store UTAWALA not found" }), false);
   assert.equal(fn({ status: 400, message: "该商品已售出，不能重复销售。" }), false);
   assert.equal(fn({ status: 400, message: "Mixed payment amount must cover POS sale total." }), false);
+});
+
+test("POS real receipt reprint loads sale detail/list without creating a sale", () => {
+  const latestSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalLatestReceiptForReprint");
+  const detailSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalSaleReceiptForReprint");
+  const fetchDetailSource = extractAsyncFunctionSource(appJs, "fetchCashierTerminalSaleDetail");
+  const fetchListSource = extractAsyncFunctionSource(appJs, "fetchCashierTerminalRecentSales");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  const receiptSource = extractFunctionSource(appJs, "renderCashierTerminalReceiptPanel");
+
+  assert.match(fetchDetailSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-sales\/\$\{encodeURIComponent\(saleNo\)\}`\)/);
+  assert.match(fetchListSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-sales\?limit=\$\{encodeURIComponent\(String\(limit\)\)\}`\)/);
+  assert.match(latestSource, /cashierTerminalState\.latestCompletedSale\?\.sale_no/);
+  assert.match(latestSource, /fetchCashierTerminalRecentSales\(1\)/);
+  assert.match(latestSource, /暂无可重打销售单。/);
+  assert.match(detailSource, /fetchCashierTerminalSaleDetail\(saleNo\)/);
+  assert.match(detailSource, /normalizeCashierTerminalBackendSale\(sale,\s*\{\s*reprint:\s*true\s*\}\)/);
+  assert.match(detailSource, /cashierTerminalState\.latestCompletedSale\s*=\s*normalized/);
+  assert.match(detailSource, /已加载销售单：/);
+  assert.match(detailSource, /收据已准备重打：/);
+  assert.match(actionSource, /case "reprint-receipt":/);
+  assert.match(actionSource, /await loadCashierTerminalLatestReceiptForReprint\(\)/);
+  assert.doesNotMatch(detailSource, /submitCashierTerminalBackendSale/);
+  assert.doesNotMatch(detailSource, /resetCashierTerminalForNextSale/);
+  assert.doesNotMatch(detailSource, /create_pos_sale/);
+  assert.match(receiptSource, /REPRINT COPY/);
+});
+
+test("POS recent sales drawer can list, view, and reprint real sales", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  const loadListSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalRecentSales");
+  assert.match(appJs, /data-terminal-drawer="recent-sales"/);
+  assert.match(drawerSource, /drawer === "recent-sales"/);
+  assert.match(drawerSource, /最近销售/);
+  assert.match(drawerSource, /data-terminal-action="view-sale-detail"/);
+  assert.match(drawerSource, /data-terminal-action="reprint-sale"/);
+  assert.match(loadListSource, /fetchCashierTerminalRecentSales\(limit\)/);
+  assert.match(loadListSource, /cashierTerminalState\.recentSales\s*=/);
+  assert.match(actionSource, /case "view-sale-detail":/);
+  assert.match(actionSource, /await loadCashierTerminalSaleReceiptForReprint\(target\.dataset\.terminalSaleNo,\s*\{\s*reprint:\s*false\s*\}\)/);
+  assert.match(actionSource, /case "reprint-sale":/);
+  assert.match(actionSource, /await loadCashierTerminalSaleReceiptForReprint\(target\.dataset\.terminalSaleNo,\s*\{\s*reprint:\s*true\s*\}\)/);
 });
 
 test("cashier terminal shell only activates on the POS sales panel", () => {
