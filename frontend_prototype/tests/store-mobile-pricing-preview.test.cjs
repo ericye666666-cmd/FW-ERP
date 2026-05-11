@@ -2333,6 +2333,7 @@ test("shelf stock-in defaults by item category and falls back to backroom", () =
 test("confirm stock-in calls the 301 API per STORE_ITEM and treats idempotent statuses as success", () => {
   const confirmSource = extractFunctionSource(appJs, "confirmStoreMobileStoreItemStockIn");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const statusLabelSource = extractFunctionSource(appJs, "getStoreMobileStockInStatusLabel");
 
   assert.match(confirmSource, /\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/store-items\/\$\{encodeURIComponent\(machineCode\)\}\/confirm-stock-in/);
   assert.match(confirmSource, /location_code/);
@@ -2340,6 +2341,12 @@ test("confirm stock-in calls the 301 API per STORE_ITEM and treats idempotent st
   assert.match(confirmSource, /already_confirmed/);
   assert.match(confirmSource, /location_updated/);
   assert.match(confirmSource, /stock_in_status/);
+  assert.match(confirmSource, /已入库/);
+  assert.match(confirmSource, /已确认入库/);
+  assert.match(confirmSource, /已换货架/);
+  assert.match(statusLabelSource, /confirmed[\s\S]*?已入库/);
+  assert.match(statusLabelSource, /already_confirmed[\s\S]*?已确认/);
+  assert.match(statusLabelSource, /location_updated[\s\S]*?已换货架/);
   assert.match(actionSource, /confirmStoreMobileStoreItemStockIn/);
   assert.match(appJs, /data-mobile-pricing-confirm-stock-in/);
 });
@@ -2352,6 +2359,17 @@ test("failed print does not expose stock-in confirmation or call stock-in API", 
   assert.match(printPanelSource, /renderStoreMobileStockInConfirmationPanel/);
   assert.doesNotMatch(directPrintSource, /stock_in_confirmed\s*=\s*true/);
   assert.doesNotMatch(directPrintSource, /confirm-stock-in/);
+});
+
+test("stock-in API failure keeps the PDA confirmation retryable per STORE_ITEM", () => {
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+  const panelSource = extractFunctionSource(appJs, "renderStoreMobileStockInConfirmationPanel");
+
+  assert.match(actionSource, /stock_in_status = "failed"/);
+  assert.match(actionSource, /stock_in_error = formatErrorMessage\(error\)/);
+  assert.match(panelSource, /data-mobile-pricing-confirm-stock-in/);
+  assert.match(panelSource, /确认完成入库/);
+  assert.doesNotMatch(actionSource, /disabled.*failed|failed.*disabled/);
 });
 
 test("legacy PDA bundle contains shelf confirmation without cashier terminal preview changes", () => {
