@@ -69,10 +69,12 @@ test("admin user list groups accounts by organization and exposes protected test
   assert.match(stylesCss, /\.user-management-stats/);
 });
 
-test("cashier terminal top-right always exposes session identity and logout", () => {
+test("cashier terminal top-right exits POS while global shell keeps logout", () => {
   assert.match(cashierHeaderHtml, /id="cashierTerminalSessionStrip"/);
-  assert.match(cashierHeaderHtml, /data-action="logout"/);
+  assert.match(cashierHeaderHtml, /data-terminal-action="exit-pos"/);
+  assert.doesNotMatch(cashierHeaderHtml, /data-action="logout"/);
   assert.doesNotMatch(cashierHeaderHtml, /data-terminal-action="logout"/);
+  assert.match(indexHtml, /id="logoutButton"[^>]+data-action="logout"/);
   assert.match(appJs, /function renderCashierTerminalSessionStrip/);
   assert.match(appJs, /function handleGlobalLogoutClick/);
   assert.match(appJs, /closest\(['"]\[data-action="logout"\]['"]\)/);

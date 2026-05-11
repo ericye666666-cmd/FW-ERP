@@ -269,6 +269,21 @@ test("POS complete sale posts to the real backend sale API and never fabricates 
   assert.doesNotMatch(backendSource, /resolveCashierTerminalLocalDemoItem/);
 });
 
+test("POS sale API unavailable detection does not hide backend business errors", () => {
+  const source = extractFunctionSource(appJs, "isCashierTerminalSaleApiUnavailableError");
+  const fn = vm.runInNewContext(`${source}\nisCashierTerminalSaleApiUnavailableError;`, {
+    formatErrorMessage: (error) => error?.message || error?.payload?.detail || "",
+  });
+
+  assert.equal(fn(new Error("fetch failed")), true);
+  assert.equal(fn({ status: 503, message: "service unavailable" }), true);
+  assert.equal(fn({ status: 404, message: "Not Found" }), true);
+  assert.equal(fn({ status: 404, message: "Cannot POST /api/v1/stores/UTAWALA/pos-sales" }), true);
+  assert.equal(fn({ status: 404, message: "Store UTAWALA not found" }), false);
+  assert.equal(fn({ status: 400, message: "该商品已售出，不能重复销售。" }), false);
+  assert.equal(fn({ status: 400, message: "Mixed payment amount must cover POS sale total." }), false);
+});
+
 test("cashier terminal shell only activates on the POS sales panel", () => {
   const terminalModeSource = extractFunctionSource(appJs, "syncCashierTerminalMode");
   assert.match(terminalModeSource, /isCashierTerminalRole\(\)/);

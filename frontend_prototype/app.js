@@ -31083,7 +31083,17 @@ function normalizeCashierTerminalBackendSale(sale = {}) {
 
 function isCashierTerminalSaleApiUnavailableError(error) {
   const status = Number(error?.status || 0);
-  return !status || status === 404 || status >= 500;
+  if (!status || status >= 500) {
+    return true;
+  }
+  if (status !== 404) {
+    return false;
+  }
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (/^not found$/i.test(message)) {
+    return true;
+  }
+  return /cannot\s+(get|post)\s+.*\/stores\/[^/]+\/pos-sales/i.test(message);
 }
 
 function markCashierTerminalSoldItemsLocally(sale) {
