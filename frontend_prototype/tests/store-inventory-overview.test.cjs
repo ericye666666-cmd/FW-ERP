@@ -37,6 +37,8 @@ test("inventory overview page has store switcher, tabs, metrics, and detail targ
   assert.match(section, /后仓/);
   assert.match(section, /未关联货架/);
   assert.match(section, /今日新增入库/);
+  assert.match(section, /今日已售/);
+  assert.match(section, /销售出库摘要/);
   assert.match(section, /待完成入库/);
   assert.match(section, /按品类/);
   assert.match(section, /按货架/);
@@ -49,6 +51,9 @@ test("inventory overview frontend calls overview and detail APIs", () => {
   assert.match(appJs, /renderStoreInventoryOverview/);
   assert.match(appJs, /renderStoreInventoryOverviewDetail/);
   assert.match(appJs, /待完成入库/);
+  assert.match(appJs, /sold_today_items/);
+  assert.match(appJs, /sold_by_category/);
+  assert.match(appJs, /sold_by_location/);
   assert.match(appJs, /已点击确认完成入库/);
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview"));
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview/locations/${encodeURIComponent(locationCode)}/items"));
@@ -79,6 +84,7 @@ test("inventory overview copy keeps sold items outside active store inventory", 
 
   assert.match(metricSource, /主库存只统计已点击确认完成入库的 STORE_ITEM/);
   assert.match(metricSource, /待完成入库单独处理/);
+  assert.match(metricSource, /POS 销售成功后从库存扣减/);
   assert.match(detailSource, /STORE_ITEM machine_code \/ barcode/);
   assert.match(detailSource, /当前货架位/);
   assert.doesNotMatch(detailSource, /sale_no|sold_at|sold_by/);
@@ -118,6 +124,8 @@ test("inventory overview problem cards and table labels use store-manager wordin
   assert.ok(metricSource.indexOf("未关联货架") < metricSource.indexOf("后仓"));
   assert.ok(metricSource.indexOf("后仓") < metricSource.indexOf("已上货架"));
   assert.ok(metricSource.indexOf("已上货架") < metricSource.indexOf("门店总库存"));
+  assert.ok(metricSource.indexOf("门店总库存") < metricSource.indexOf("今日新增入库"));
+  assert.ok(metricSource.indexOf("今日新增入库") < metricSource.indexOf("今日已售"));
   assert.match(metricSource, /store-metric problem-card/);
   assert.match(categoryRowsSource, /货架上/);
   assert.match(categoryRowsSource, /查看/);
@@ -125,6 +133,19 @@ test("inventory overview problem cards and table labels use store-manager wordin
   assert.match(locationRowsSource, /location_type/);
   assert.match(locationRowsSource, /BACKROOM/);
   assert.match(locationRowsSource, /UNASSIGNED/);
+});
+
+test("inventory overview renders read-only sold summary by category and location", () => {
+  assert.match(appJs, /renderStoreInventorySoldSummary/);
+  const soldSummarySource = extractFunctionSource(appJs, "renderStoreInventorySoldSummary");
+
+  assert.match(soldSummarySource, /销售出库摘要/);
+  assert.match(soldSummarySource, /按品类售出/);
+  assert.match(soldSummarySource, /按货架售出/);
+  assert.match(soldSummarySource, /今日已售件数/);
+  assert.match(soldSummarySource, /今日销售额/);
+  assert.match(soldSummarySource, /今天还没有 POS 销售出库/);
+  assert.match(appJs, /renderStoreInventorySoldSummary\(overview\)/);
 });
 
 test("legacy bundle includes inventory overview page logic and cache key", () => {

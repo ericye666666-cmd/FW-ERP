@@ -18390,6 +18390,16 @@ class InMemoryState:
         blocked_statuses = {"sold", "void", "voided", "cancelled", "canceled", "deleted"}
         return not any(status in blocked_statuses for status in status_values if status)
 
+    def _store_inventory_row_is_sold(self, row: dict[str, Any]) -> bool:
+        if row.get("sold") is True:
+            return True
+        status_values = {
+            str(row.get("status") or "").strip().lower(),
+            str(row.get("sale_status") or "").strip().lower(),
+            str(row.get("store_item_status") or "").strip().lower(),
+        }
+        return "sold" in status_values
+
     def _store_inventory_category_name(self, row: dict[str, Any], location: dict[str, Any] | None = None) -> str:
         for key in ("category_name", "category_hint", "category_sub", "category_short", "product_name"):
             value = str(row.get(key) or "").strip()
@@ -18551,15 +18561,66 @@ class InMemoryState:
         ]
         return sorted(items, key=lambda item: (item.get("last_inbound_at") or "", item.get("machine_code") or ""), reverse=True)
 
+    def _store_inventory_sold_amount(self, row: dict[str, Any]) -> float:
+        for key in ("final_price", "selling_price", "sale_price_kes", "selling_price_kes", "selected_price", "price"):
+            try:
+                return round(float(row.get(key) or 0), 2)
+            except (TypeError, ValueError):
+                continue
+        return 0.0
+
+    def _collect_store_inventory_sold_today_items(self, store_code: str) -> list[dict[str, Any]]:
+        store = self._ensure_store_exists(store_code)
+        locations, active_locations = self._store_inventory_location_maps(store["code"])
+        today_key = self._nairobi_day_key()
+        rows_by_key: dict[str, dict[str, Any]] = {}
+
+        def add_row(row: dict[str, Any]) -> None:
+            if str(row.get("store_code") or "").strip().upper() != store["code"]:
+                return
+            if str(row.get("entity_type") or "STORE_ITEM").strip().upper() != "STORE_ITEM":
+                return
+            if not self._store_inventory_row_is_sold(row):
+                return
+            if self._nairobi_day_key(str(row.get("sold_at") or "")) != today_key:
+                return
+            key = str(
+                row.get("store_item_id")
+                or row.get("item_id")
+                or row.get("entity_id")
+                or row.get("display_code")
+                or row.get("machine_code")
+                or row.get("barcode_value")
+                or row.get("barcode")
+                or ""
+            ).strip().upper()
+            if not key or key in rows_by_key:
+                return
+            normalized = self._normalize_store_inventory_item_row(row, store["code"], locations, active_locations)
+            normalized["sold_at"] = str(row.get("sold_at") or "").strip()
+            normalized["sold_by"] = str(row.get("sold_by") or "").strip()
+            normalized["sale_no"] = str(row.get("sale_no") or row.get("sale_id") or "").strip()
+            normalized["sold_amount"] = self._store_inventory_sold_amount(row)
+            rows_by_key[key] = normalized
+
+        for row in self.store_items.values():
+            add_row(row)
+        for row in self.item_barcode_tokens.values():
+            add_row(row)
+        return sorted(rows_by_key.values(), key=lambda item: (item.get("sold_at") or "", item.get("machine_code") or ""), reverse=True)
+
     def get_store_inventory_overview(self, store_code: str) -> dict[str, Any]:
         store = self._ensure_store_exists(store_code)
         locations, active_locations = self._store_inventory_location_maps(store["code"])
         items = self._collect_store_inventory_items(store["code"])
         unconfirmed_items = self._collect_store_inventory_items(store["code"], inventory_scope="unconfirmed")
+        sold_today_items = self._collect_store_inventory_sold_today_items(store["code"])
         today = datetime.now(NAIROBI_TZ).date()
 
         by_category: dict[str, dict[str, Any]] = {}
         by_location: dict[str, dict[str, Any]] = {}
+        sold_by_category: dict[str, dict[str, Any]] = {}
+        sold_by_location: dict[str, dict[str, Any]] = {}
 
         for code, location in active_locations.items():
             by_location[code] = {
@@ -18631,6 +18692,30 @@ class InMemoryState:
             if str(item.get("last_inbound_at") or "") > str(location_row.get("last_inbound_at") or ""):
                 location_row["last_inbound_at"] = str(item.get("last_inbound_at") or "")
 
+        for sold_item in sold_today_items:
+            sold_amount = round(float(sold_item.get("sold_amount") or 0), 2)
+            category_name = str(sold_item.get("category_name") or "unknown").strip() or "unknown"
+            category_row = sold_by_category.setdefault(
+                category_name,
+                {"category_name": category_name, "sold_items": 0, "sold_amount": 0.0},
+            )
+            category_row["sold_items"] += 1
+            category_row["sold_amount"] = round(float(category_row["sold_amount"]) + sold_amount, 2)
+
+            location_code = str(sold_item.get("location_code") or sold_item.get("current_location_code") or "UNASSIGNED").strip().upper() or "UNASSIGNED"
+            location = active_locations.get(location_code) or locations.get(location_code) or {}
+            location_row = sold_by_location.setdefault(
+                location_code,
+                {
+                    "location_code": location_code,
+                    "location_name": str(location.get("location_name") or sold_item.get("location_name") or location_code).strip(),
+                    "sold_items": 0,
+                    "sold_amount": 0.0,
+                },
+            )
+            location_row["sold_items"] += 1
+            location_row["sold_amount"] = round(float(location_row["sold_amount"]) + sold_amount, 2)
+
         return {
             "store_code": store["code"],
             "store_name": store.get("name", ""),
@@ -18640,11 +18725,15 @@ class InMemoryState:
             "unassigned_location_items": unassigned_items,
             "today_new_items": today_new_items,
             "unconfirmed_items": len(unconfirmed_items),
+            "sold_today_items": len(sold_today_items),
+            "sold_today_amount": round(sum(float(item.get("sold_amount") or 0) for item in sold_today_items), 2),
             "stock_in_confirmed_filter": "required_true",
             "unconfirmed_scope": "stock_in_confirmed_false_or_missing",
             "data_sources": ["store_items", "item_barcode_tokens", "store_stock_fallback"],
             "by_category": sorted(by_category.values(), key=lambda row: (-int(row.get("total_items") or 0), row.get("category_name") or "")),
             "by_location": sorted(by_location.values(), key=lambda row: (row["location_type"] == "UNASSIGNED", row.get("location_type") or "", row.get("location_code") or "")),
+            "sold_by_category": sorted(sold_by_category.values(), key=lambda row: (-int(row.get("sold_items") or 0), row.get("category_name") or "")),
+            "sold_by_location": sorted(sold_by_location.values(), key=lambda row: (-int(row.get("sold_items") or 0), row.get("location_code") or "")),
         }
 
     def list_store_inventory_location_items(self, store_code: str, location_code: str) -> list[dict[str, Any]]:
