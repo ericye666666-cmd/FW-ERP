@@ -55,6 +55,15 @@ test("inventory overview rows can open location and category details", () => {
   assert.match(appJs, /source_sdp_display_code/);
 });
 
+test("inventory overview detail table is wired for confirmed STORE_ITEM stock-in trace", () => {
+  assert.match(appJs, /machine_code/);
+  assert.match(appJs, /stock_in_confirmed_by/);
+  assert.match(appJs, /stock_in_confirmed_at/);
+  assert.match(appJs, /source_sdp_display_code/);
+  assert.match(appJs, /parent_sdo_display_code/);
+  assert.match(appJs, /unconfirmed_items/);
+});
+
 test("legacy bundle includes inventory overview page logic and cache key", () => {
   assert.match(appLegacyJs, /loadStoreInventoryOverview/);
   assert.match(appLegacyJs, /data-store-inventory-location-detail/);
