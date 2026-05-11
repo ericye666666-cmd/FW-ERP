@@ -59,10 +59,12 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-template-d-adjustment-batch";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-template-d-adjustment-batch";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#258";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-k300-final-40x30-retail-clothing-template";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "k300-final-40x30-retail-clothing-template";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#259";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
+const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
+const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
 const DIRECT_LOOP_ANDROID_PRINTER_METHODS = [
   "getPrinterStatus",
   "connectPrinter",
@@ -4342,16 +4344,18 @@ function getClerkS1PreviewProtocolDiagnostics() {
       alwaysVisible: false
     },
     {
-      key: "k300_cpcl_store_item_preview",
-      label: "测试 K300 CPCL STORE_ITEM 预览",
+      key: "k300_40x30_retail_clothing_store_item",
+      label: "K300 正式服装标签预览",
       method: "printK300CpclRawPreview",
       expectedProtocol: "K300_CPCL_RAW_PREVIEW",
       expectedTransport: "K300_BLUETOOTH_SPP",
       requiresPayload: true,
       rawCpclStoreItemPreview: true,
+      templateName: "K300_40X30_RETAIL_CLOTHING_STORE_ITEM",
+      businessTemplate: "retail_clothing_store_item",
       requiresSelectedPrinter: true,
       requiresK300SppAvailable: true,
-      preferredPrinterPattern: /K300/i,
+      preferredPrinterPattern: /K300|ZTO688/i,
       group: "k300_bluetooth",
       alwaysVisible: false
     },
@@ -4393,18 +4397,13 @@ function getClerkS1PreviewProtocolDiagnostic(protocolKey = "") {
 }
 function buildClerkS1PreviewProtocolDiagnosticPayload(protocol = {}) {
   if (protocol.rawCpclStoreItemPreview) {
-    return {
-      label_template_size: "40x30",
-      protocol: "CPCL",
-      test_name: "k300_store_item_preview_d2_default",
-      cpcl_command: buildClerkK300StoreItemPreviewCpclCommand({
-        machine_code: "5261300000038",
-        barcode_value: "5261300000038",
-        price_kes: 410,
-        category_short: "CARGO PANT",
-        grade: "P"
-      })
-    };
+    return buildClerkK300RetailClothingStoreItemPreviewPayload({
+      machine_code: "5261300000038",
+      barcode_value: "5261300000038",
+      price_kes: 410,
+      category_short: "CARGO PANT",
+      grade: "P"
+    });
   }
   const printerProfile = String(protocol.payloadPrinterProfile || "CHITENG_S1_OFFICIAL").trim() || "CHITENG_S1_OFFICIAL";
   return {
@@ -4425,9 +4424,78 @@ function buildClerkS1PreviewProtocolDiagnosticPayload(protocol = {}) {
 function sanitizeClerkK300CpclText(value = "", maxLength = 32) {
   return String(value || "").replace(/[\r\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
+function getClerkK300RetailClothingStoreItemTemplateMapping({
+  printer_profile = "",
+  printer_name = "",
+  label_template_size = "",
+  business_template = "retail_clothing_store_item"
+} = {}) {
+  const profile = getClerkBluetoothPrinterProfileValue(printer_profile, printer_name);
+  const printerName = String(printer_name || "").trim().toUpperCase();
+  const size = String(label_template_size || "").trim().toLowerCase();
+  const businessTemplate = String(business_template || "").trim().toLowerCase();
+  const profileIsK300 = profile === "UROVO_K300" || String(printer_profile || "").trim().toUpperCase() === "UROVO_K300";
+  const printerLooksLikeK300 = /K300|ZTO688/.test(printerName);
+  if ((profileIsK300 || printerLooksLikeK300) && size === "40x30" && businessTemplate === "retail_clothing_store_item") {
+    return {
+      printer_profile: "UROVO_K300",
+      label_template_size: "40x30",
+      business_template: RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE,
+      template_name: K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME,
+      protocol: "CPCL"
+    };
+  }
+  return null;
+}
+function buildClerkK300RetailClothingStoreItemPreviewPayload(label = {}, options = {}) {
+  var _a;
+  const templateMapping = getClerkK300RetailClothingStoreItemTemplateMapping({
+    printer_profile: options.printer_profile || "UROVO_K300",
+    printer_name: options.printer_name || "K300",
+    label_template_size: "40x30",
+    business_template: RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE
+  });
+  if (!templateMapping) {
+    throw new Error("当前打印机不支持 K300 40x30 正式服装标签模板。");
+  }
+  const machineCode = String(label.machine_code || "").replace(/[^0-9]/g, "").trim();
+  const barcodeValue2 = String(label.barcode_value || "").replace(/[^0-9]/g, "").trim();
+  const priceKes = Number((_a = label.price_kes) != null ? _a : label.sale_price_kes);
+  if (!/^5[0-9]{7,31}$/.test(machineCode)) {
+    throw new Error("K300 正式标签只支持以 5 开头的 STORE_ITEM machine_code。");
+  }
+  if (barcodeValue2 !== machineCode) {
+    throw new Error("K300 正式标签 barcode_value 必须等于 machine_code。");
+  }
+  if (!Number.isFinite(priceKes) || priceKes < 0) {
+    throw new Error("K300 正式标签价格异常。");
+  }
+  return {
+    label_template_size: "40x30",
+    protocol: "CPCL",
+    test_name: "k300_40x30_retail_clothing_store_item",
+    template_name: K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME,
+    business_template: RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE,
+    cpcl_command: buildClerkK300StoreItemPreviewCpclCommand({
+      ...label,
+      machine_code: machineCode,
+      barcode_value: barcodeValue2,
+      price_kes: priceKes
+    })
+  };
+}
 function buildClerkK300StoreItemPreviewCpclCommand(label = {}) {
+  var _a, _b;
   const machineCode = String(label.barcode_value || label.machine_code || "").replace(/[^0-9]/g, "").trim();
-  const priceKes = Math.max(0, Number(label.price_kes || label.sale_price_kes || 0));
+  if (!/^5[0-9]{7,31}$/.test(machineCode)) {
+    throw new Error("K300 CPCL STORE_ITEM machine_code 必须是以 5 开头的数字。");
+  }
+  const expectedMachineCode = String(label.machine_code || "").replace(/[^0-9]/g, "").trim();
+  if (expectedMachineCode && expectedMachineCode !== machineCode) {
+    throw new Error("K300 CPCL STORE_ITEM barcode_value 必须等于 machine_code。");
+  }
+  const rawPriceKes = Number((_b = (_a = label.price_kes) != null ? _a : label.sale_price_kes) != null ? _b : 0);
+  const priceKes = Math.max(0, Number.isFinite(rawPriceKes) ? rawPriceKes : 0);
   const categoryShort = sanitizeClerkK300CpclText(label.category_short || "STORE ITEM", 24);
   const grade = sanitizeClerkK300CpclText(label.grade || label.pricing_type || "", 8);
   const categoryGrade = [categoryShort, grade].filter(Boolean).join(" / ");
@@ -4435,8 +4503,8 @@ function buildClerkK300StoreItemPreviewCpclCommand(label = {}) {
     "! 0 200 200 240 1",
     `TEXT 7 0 14 8 KES ${priceKes}`,
     `TEXT 4 0 14 45 ${categoryGrade}`,
-    `BARCODE 128 1 1 85 35 76 ${machineCode}`,
-    `TEXT 4 0 60 186 ${machineCode}`,
+    `BARCODE 128 1 1 78 35 76 ${machineCode}`,
+    `TEXT 4 0 60 180 ${machineCode}`,
     "PRINT"
   ].join("\r\n") + "\r\n";
 }
@@ -31632,7 +31700,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
   const payload = buildStoreItemLabelPreviewPrintPayload(labelConfig.label_template_size, generatedItems, group);
   const statusText = getStoreMobilePriceGroupStatus(state, group);
-  const printerReady = canRunClerkBluetoothPrinterPreviewPrint(state.bluetoothPrinterStatus);
+  const printerReady = canRunClerkStoreItemLabelPreviewPrint(state.bluetoothPrinterStatus, labelConfig.label_template_size);
   const previewPrintStatus = String(group.preview_print_status || "").trim();
   const previewPrintMessage = String(group.preview_print_message || "").trim();
   const previewPrintError = String(group.preview_print_error || "").trim();
@@ -31670,7 +31738,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
       <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${payload.labels.length ? "" : "disabled"}>打印一张预览标签</button>
-      ${printerReady ? "" : '<div class="subtle small">请先连接并确认打印机在线。</div>'}
+      ${printerReady ? "" : '<div class="subtle small">请先连接并确认打印机在线，K300 请先确认蓝牙 SPP 可用。</div>'}
       ${previewPrintStatus ? `<div class="subtle small">预览打印状态：${escapeHtml(previewPrintStatus)}</div>` : ""}
       ${previewPrintMessage ? `<div class="success-banner">${escapeHtml(previewPrintMessage)}</div>` : ""}
       ${previewPrintError ? `<div class="mobile-error">${escapeHtml(previewPrintError)}</div>` : ""}
@@ -31882,7 +31950,7 @@ function getClerkBluetoothPrinterProfileValue(profile = "", printerName = "") {
   if (/(^|[^A-Z0-9])S1([^A-Z0-9]|$)|CHITENG|CTAIOT|驰腾/.test(normalizedName)) {
     return "CHITENG_S1_OFFICIAL";
   }
-  if (/UROVO|K300/.test(normalizedName)) {
+  if (/UROVO|K300|ZTO688/.test(normalizedName)) {
     return "UROVO_K300";
   }
   return "GENERIC";
@@ -31902,6 +31970,21 @@ function canRunClerkBluetoothPrinterTestPrint(status = {}) {
 }
 function canRunClerkBluetoothPrinterPreviewPrint(status = {}) {
   return isClerkOfficialChitengPrinterOnlineReady(status);
+}
+function canRunClerkK300RetailClothingStoreItemPreviewPrint(status = {}, labelTemplateSize = "40x30") {
+  const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
+  return getClerkK300RetailClothingStoreItemTemplateMapping({
+    printer_profile: normalizedStatus.selected_profile,
+    printer_name: normalizedStatus.selected_printer_name,
+    label_template_size: labelTemplateSize,
+    business_template: RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE
+  }) !== null && Boolean(normalizedStatus.selected_printer_address) && normalizedStatus.k300_spp_available === true;
+}
+function canRunClerkStoreItemLabelPreviewPrint(status = {}, labelTemplateSize = "60x40") {
+  if (canRunClerkK300RetailClothingStoreItemPreviewPrint(status, labelTemplateSize)) {
+    return true;
+  }
+  return canRunClerkBluetoothPrinterPreviewPrint(status);
 }
 function getClerkBluetoothPrinterStateLabel(status = {}) {
   const normalizedStatus = normalizeClerkBluetoothPrinterStatus(status);
@@ -32516,10 +32599,50 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
   if (!payload.labels.length) {
     throw new Error("请先生成 STORE_ITEM 商品码。");
   }
-  if (!canRunClerkBluetoothPrinterPreviewPrint(state.bluetoothPrinterStatus)) {
+  const bridge = getDirectLoopPdaPrinterBridge();
+  const currentPrinterStatus = normalizeClerkBluetoothPrinterStatus(state.bluetoothPrinterStatus);
+  const k300TemplateMapping = getClerkK300RetailClothingStoreItemTemplateMapping({
+    printer_profile: currentPrinterStatus.selected_profile,
+    printer_name: currentPrinterStatus.selected_printer_name,
+    label_template_size: labelConfig.label_template_size,
+    business_template: RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE
+  });
+  if (k300TemplateMapping) {
+    if (!canRunClerkK300RetailClothingStoreItemPreviewPrint(currentPrinterStatus, labelConfig.label_template_size)) {
+      throw new Error("请先测试 K300 蓝牙连接，确认 K300 SPP 可用。");
+    }
+    if (!bridge || typeof bridge.printK300CpclRawPreview !== "function") {
+      throw new Error("当前 Android 版本不支持 K300 正式服装标签预览，请升级 Direct Loop PDA Android App。");
+    }
+    const k300Payload = buildClerkK300RetailClothingStoreItemPreviewPayload(payload.labels[0], {
+      printer_profile: currentPrinterStatus.selected_profile,
+      printer_name: currentPrinterStatus.selected_printer_name
+    });
+    group.preview_print_status = "printing";
+    group.preview_print_error = "";
+    group.preview_print_message = "";
+    const k300ActionStarted = await runClerkBluetoothPrinterAction(async () => {
+      const printStatusRaw = await bridge.printK300CpclRawPreview(JSON.stringify(k300Payload));
+      const printStatus = updateClerkBluetoothPrinterStatus(printStatusRaw, {
+        rawStatusJson: formatClerkBluetoothPrinterRawStatusJson(printStatusRaw),
+        keepError: true
+      });
+      if (printStatus.last_print_result !== "success") {
+        throw new Error(printStatus.last_error || "K300 STORE_ITEM 正式标签预览发送失败。");
+      }
+    });
+    if (!k300ActionStarted) {
+      throw new Error("打印机正在执行上一条操作，请稍后再试。");
+    }
+    group.preview_print_status = "sent_to_printer";
+    group.preview_print_message = "已发送 1 张 K300 正式 STORE_ITEM 预览标签到打印机。";
+    group.preview_print_error = "";
+    renderStoreMobilePricingPreview();
+    return group;
+  }
+  if (!canRunClerkBluetoothPrinterPreviewPrint(currentPrinterStatus)) {
     throw new Error("请先连接并确认打印机在线。");
   }
-  const bridge = getDirectLoopPdaPrinterBridge();
   if (!bridge || typeof bridge.printStoreItemLabelPreview !== "function") {
     throw new Error("当前 Android 版本不支持 STORE_ITEM 预览打印，请升级 Direct Loop PDA Android App。");
   }
