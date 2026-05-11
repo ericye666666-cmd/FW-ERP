@@ -52,6 +52,7 @@ class PosSaleCreate(BaseModel):
     cashier_id: str = Field(min_length=1)
     shift_id: str = ""
     terminal_id: str = ""
+    hold_no: str = ""
     payment_method: str = Field(min_length=1)
     cash_amount: float = Field(default=0, ge=0)
     mpesa_amount: float = Field(default=0, ge=0)
@@ -81,6 +82,7 @@ class PosSaleResponse(BaseModel):
     cashier_id: str
     shift_id: str = ""
     terminal_id: str = ""
+    hold_no: str = ""
     sale_time: str
     subtotal: float
     discount_amount: float

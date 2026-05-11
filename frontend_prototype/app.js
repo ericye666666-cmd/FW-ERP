@@ -30166,6 +30166,8 @@ async function handleCashierTerminalAction(action, target) {
       renderCashierTerminal();
       if (cashierTerminalState.activeDrawer === "recent-sales") {
         await loadCashierTerminalRecentSales(20);
+      } else if (cashierTerminalState.activeDrawer === "hold-list") {
+        await loadCashierTerminalHoldList(20);
       } else if (cashierTerminalState.activeDrawer === "shift" && cashierTerminalState.currentShift?.shift_id) {
         await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
       }
@@ -30458,6 +30460,9 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.holdCustomerName = cashierTerminalState.holdCustomerName || "";
   cashierTerminalState.holdCustomerPhone = cashierTerminalState.holdCustomerPhone || "";
   cashierTerminalState.holdNote = cashierTerminalState.holdNote || "";
+  cashierTerminalState.holdFeedback = cashierTerminalState.holdFeedback || "";
+  cashierTerminalState.activeHoldNo = cashierTerminalState.activeHoldNo || "";
+  cashierTerminalState.holdCancelReason = cashierTerminalState.holdCancelReason || "顾客不要了";
   cashierTerminalState.networkStatus = cashierTerminalState.networkStatus || "online";
   cashierTerminalState.syncStatus = cashierTerminalState.syncStatus || "已同步";
   cashierTerminalState.pendingSaleCount = Number(cashierTerminalState.pendingSaleCount || 0);
@@ -30472,7 +30477,6 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.countedCash = String(cashierTerminalState.countedCash ?? "");
   cashierTerminalState.shiftCloseNote = cashierTerminalState.shiftCloseNote || "";
   cashierTerminalState.managerConfirmedBy = cashierTerminalState.managerConfirmedBy || "";
-  cashierTerminalState.managerTransferConfirmed = Boolean(cashierTerminalState.managerTransferConfirmed);
   cashierTerminalState.todaySalesAmount = Number(cashierTerminalState.todaySalesAmount || 48620);
   cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 126);
   cashierTerminalState.shiftSalesAmount = Number(cashierTerminalState.shiftSalesAmount || 18450);
@@ -30903,14 +30907,15 @@ renderCashierTerminalDrawer = function () {
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">HOLDS</p><h3>挂单列表</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body hold-list-body">
-        ${holds.length ? holds.map((hold, index) => `
+        ${cashierTerminalState.holdFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.holdFeedback)}</div>` : ""}
+        ${holds.length ? holds.map((hold) => `
           <article class="hold-card status-${escapeHtml(hold.status)}">
-            <div><strong>${escapeHtml(hold.hold_no)}</strong><span>${escapeHtml(hold.time)} · ${escapeHtml(hold.cashier)}</span></div>
-            <div class="hold-meta"><span>${escapeHtml(hold.item_count)} 件</span><span>${escapeHtml(formatCashierPreviewMoney(hold.total))}</span><span>${escapeHtml(hold.reason)}</span><span>${escapeHtml(hold.status)}</span></div>
+            <div><strong>${escapeHtml(hold.hold_no)}</strong><span>${escapeHtml(hold.time || hold.created_at || "-")} · ${escapeHtml(hold.cashier || hold.cashier_id || "-")}</span></div>
+            <div class="hold-meta"><span>${escapeHtml(hold.item_count || 0)} 件</span><span>${escapeHtml(formatCashierPreviewMoney(hold.total ?? hold.total_amount))}</span><span>${escapeHtml(hold.reason || "-")}</span><span>${escapeHtml(hold.status || "-")}</span></div>
+            <div class="hold-meta"><span>${escapeHtml(hold.customer_name || "-")}</span><span>${escapeHtml(hold.customer_phone || "-")}</span></div>
             <div class="hold-actions">
-              <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-index="${index}"${hold.status !== "held" ? " disabled" : ""}>继续收款</button>
-              <button type="button" class="secondary-inline danger" data-terminal-action="cancel-hold" data-terminal-hold-index="${index}"${hold.status !== "held" ? " disabled" : ""}>取消挂单</button>
-              <button type="button" class="secondary-inline" data-terminal-action="transfer-hold" data-terminal-hold-index="${index}"${hold.status !== "held" ? " disabled" : ""}>转交下一班</button>
+              <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>继续收款</button>
+              <button type="button" class="secondary-inline danger" data-terminal-action="cancel-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>取消挂单</button>
             </div>
           </article>
         `).join("") : `<div class="cashier-terminal-empty-card">当前没有挂单。</div>`}
@@ -31038,7 +31043,7 @@ renderCashierTerminalDrawer = function () {
           <div class="drawer-hint cashier-shift-variance-warning${variance === 0 ? " is-hidden" : ""}" id="cashierTerminalCashVarianceHint">现金有差异，请填写原因并让店长确认。</div>
           <label class="field"><span>店长确认</span><input type="text" value="${escapeHtml(cashierTerminalState.managerConfirmedBy || "")}" data-terminal-drawer-field="managerConfirmedBy" placeholder="store_manager_1" /></label>
           <label class="field"><span>备注</span><textarea rows="3" data-terminal-drawer-field="shiftCloseNote">${escapeHtml(cashierTerminalState.shiftCloseNote || "")}</textarea></label>
-          <div class="drawer-hint" id="cashierTerminalShiftCloseHint">${activeHoldCount ? "当前还有挂单未处理，请完成收款、取消挂单，或由店长确认转交下一班。" : "当前没有未处理挂单，可以结班。"}</div>
+          <div class="drawer-hint" id="cashierTerminalShiftCloseHint">${activeHoldCount ? `当前还有 ${escapeHtml(activeHoldCount)} 笔挂单未处理，请完成收款或取消挂单。` : "当前没有未处理挂单，可以结班。"}</div>
         ` : `
           <label class="field"><span>Opening float</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.openingFloatCash || "2000")}" data-terminal-drawer-field="openingFloatCash" placeholder="2000" /></label>
           <label class="field"><span>开班备注</span><textarea rows="3" data-terminal-drawer-field="openingNote">${escapeHtml(cashierTerminalState.openingNote || "")}</textarea></label>
@@ -31381,6 +31386,7 @@ upsertCashierTerminalCartItem = function (result) {
 resetCashierTerminalForNextSale = function () {
   cashierTerminalState.cartItems = [];
   cashierTerminalState.currentLookupResult = null;
+  cashierTerminalState.activeHoldNo = "";
   cashierTerminalState.discountAmount = "";
   cashierTerminalState.cashReceived = "";
   cashierTerminalState.mpesaAmount = "";
@@ -31468,6 +31474,7 @@ function buildCashierTerminalPosSalePayload(payment) {
     cashier_id: getCashierTerminalCashierName(),
     shift_id: cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo,
     terminal_id: getCashierTerminalTerminalId(),
+    hold_no: cashierTerminalState.activeHoldNo || "",
     payment_method: cashierTerminalState.activePaymentMode,
     cash_amount: payment.cashAmount,
     mpesa_amount: payment.mpesaAmount,
@@ -31911,82 +31918,156 @@ updateCashierTerminalCartField = function (index, field, value) {
   renderCashierTerminal();
 }
 
-function createCashierTerminalHold() {
+function normalizeCashierTerminalBackendHold(hold = {}) {
+  const items = Array.isArray(hold.items) ? hold.items : [];
+  return {
+    hold_id: hold.hold_id || hold.hold_no || "",
+    hold_no: hold.hold_no || hold.hold_id || "",
+    time: hold.created_at || "",
+    created_at: hold.created_at || "",
+    cashier: hold.cashier_id || getCashierTerminalCashierName(),
+    cashier_id: hold.cashier_id || getCashierTerminalCashierName(),
+    shift_id: hold.shift_id || "",
+    terminal_id: hold.terminal_id || getCashierTerminalTerminalId(),
+    item_count: Number(hold.item_count || items.length || 0),
+    total: normalizeCashierTerminalNumber(hold.total_amount),
+    total_amount: normalizeCashierTerminalNumber(hold.total_amount),
+    reason: hold.reason || "顾客继续挑选",
+    customer_name: hold.customer_name || "",
+    customer_phone: hold.customer_phone || "",
+    note: hold.note || "",
+    status: String(hold.status || "held").trim().toLowerCase(),
+    cancel_reason: hold.cancel_reason || "",
+    items: items.map((item) => ({
+      display_code: item.display_code || item.machine_code || "",
+      machine_code: item.machine_code || "",
+      store_item_machine_code: item.machine_code || "",
+      barcode: item.machine_code || "",
+      type: "STORE_ITEM",
+      category: item.category || "未分类",
+      shelf_location: item.shelf_location || "",
+      price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
+      selling_price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
+      qty: 1,
+      status: "held",
+      hold_no: hold.hold_no || hold.hold_id || "",
+    })),
+  };
+}
+
+async function loadCashierTerminalHoldList(limit = 20) {
+  ensureCashierTerminalPreviewState();
+  const storeCode = getCashierTerminalStoreCode();
+  const response = await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds?status=held&limit=${encodeURIComponent(String(limit))}`);
+  cashierTerminalState.holdOrders = (Array.isArray(response?.holds) ? response.holds : []).map(normalizeCashierTerminalBackendHold);
+  cashierTerminalState.pendingHoldCount = cashierTerminalState.holdOrders.length;
+  renderCashierTerminalDrawer();
+  return cashierTerminalState.holdOrders;
+}
+
+async function createCashierTerminalHold() {
   ensureCashierTerminalPreviewState();
   const totals = getCashierTerminalTotals();
   if (!totals.totalItems) {
-    throw new Error("购物车为空，不能创建挂单。");
+    throw new Error("购物车为空，不能挂单");
   }
-  cashierTerminalState.holdSequence += 1;
-  const holdNo = `HOLD-UTW-250511-${String(cashierTerminalState.holdSequence).padStart(4, "0")}`;
-  const hold = {
-    hold_no: holdNo,
-    time: new Date().toLocaleString("zh-CN", { hour12: false }),
-    cashier: getCashierTerminalCashierName(),
-    item_count: totals.totalItems,
-    total: totals.totalAmount,
-    reason: cashierTerminalState.holdReason || "顾客继续挑选",
-    customer_name: cashierTerminalState.holdCustomerName || "",
-    customer_phone: cashierTerminalState.holdCustomerPhone || "",
-    note: cashierTerminalState.holdNote || "",
-    status: "held",
-    items: cashierTerminalState.cartItems.map((row) => ({ ...row, status: "held" })),
-  };
-  const holdCodes = new Set(hold.items.map((item) => String(item.machine_code || "")));
-  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
-    holdCodes.has(String(item.machine_code || "")) ? { ...item, status: "held" } : item,
-  );
-  cashierTerminalState.holdOrders = [hold, ...cashierTerminalState.holdOrders];
-  cashierTerminalState.pendingHoldCount += cashierTerminalState.networkStatus === "online" ? 0 : 1;
+  if (!cashierTerminalState.currentShift?.shift_id) {
+    throw new Error("请先开班后再挂单");
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const cartItems = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  const hold = await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds`, {
+    method: "POST",
+    body: JSON.stringify({
+      cashier_id: getCashierTerminalCashierName(),
+      shift_id: cashierTerminalState.currentShift.shift_id,
+      terminal_id: getCashierTerminalTerminalId(),
+      reason: cashierTerminalState.holdReason || "顾客继续挑选",
+      customer_name: cashierTerminalState.holdCustomerName || "",
+      customer_phone: cashierTerminalState.holdCustomerPhone || "",
+      note: cashierTerminalState.holdNote || "",
+      items: cartItems.map((row) => ({
+        machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
+        display_code: String(row.store_item_display_code || row.display_code || "").trim(),
+        final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
+        discount_amount: 0,
+      })),
+    }),
+  });
+  const normalized = normalizeCashierTerminalBackendHold(hold);
+  cashierTerminalState.holdOrders = [normalized, ...(cashierTerminalState.holdOrders || []).filter((row) => row.hold_no !== normalized.hold_no)];
+  cashierTerminalState.pendingHoldCount = cashierTerminalState.holdOrders.filter((row) => row.status === "held").length;
   cashierTerminalState.cartItems = [];
+  cashierTerminalState.activeHoldNo = "";
   cashierTerminalState.activeDrawer = "hold-list";
-  renderCashierTerminal();
-  showTransientInlineNotice("#cashierTerminalInlineNotice", `挂单已创建：${holdNo}`, "success", 1800);
-}
-
-function resumeCashierTerminalHold(index) {
-  const hold = cashierTerminalState.holdOrders[index];
-  if (!hold || hold.status !== "held") {
-    return;
+  cashierTerminalState.holdFeedback = `挂单已创建：${normalized.hold_no}`;
+  if (cashierTerminalState.currentShift?.shift_id) {
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
   }
-  cashierTerminalState.cartItems = hold.items.map((item) => ({ ...item, status: "on_shelf" }));
-  cashierTerminalState.holdOrders[index] = { ...hold, status: "resumed" };
-  const resumeCodes = new Set(hold.items.map((item) => String(item.machine_code || "")));
-  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
-    resumeCodes.has(String(item.machine_code || "")) ? { ...item, status: "on_shelf" } : item,
-  );
-  cashierTerminalState.activeDrawer = "";
   renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.holdFeedback, "success", 1800);
   focusCashierTerminalScanInput({ select: false });
+  return normalized;
 }
 
-function cancelCashierTerminalHold(index) {
-  const hold = cashierTerminalState.holdOrders[index];
-  if (!hold || hold.status !== "held") {
-    return;
+async function resumeCashierTerminalHold(holdNo) {
+  const normalizedHoldNo = String(holdNo || "").trim();
+  if (!normalizedHoldNo) {
+    return null;
   }
-  cashierTerminalState.holdOrders[index] = { ...hold, status: "cancelled" };
-  const cancelCodes = new Set(hold.items.map((item) => String(item.machine_code || "")));
-  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
-    cancelCodes.has(String(item.machine_code || "")) ? { ...item, status: "on_shelf" } : item,
-  );
-  cashierTerminalState.cancelledOrderCount += 1;
+  holdNo = normalizedHoldNo;
+  const storeCode = getCashierTerminalStoreCode();
+  const hold = normalizeCashierTerminalBackendHold(await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds/${encodeURIComponent(holdNo)}/resume`, {
+    method: "POST",
+  }));
+  cashierTerminalState.cartItems = hold.items.map((item) => ({ ...item, status: "held", hold_no: hold.hold_no }));
+  cashierTerminalState.activeHoldNo = hold.hold_no;
+  cashierTerminalState.holdOrders = (cashierTerminalState.holdOrders || []).map((row) => row.hold_no === hold.hold_no ? hold : row);
+  cashierTerminalState.activeDrawer = "";
+  cashierTerminalState.holdFeedback = `已恢复挂单：${hold.hold_no}`;
   renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.holdFeedback, "success", 1800);
+  focusCashierTerminalScanInput({ select: false });
+  return hold;
 }
 
-function transferCashierTerminalHold(index) {
-  const hold = cashierTerminalState.holdOrders[index];
-  if (!hold || hold.status !== "held") {
-    return;
+async function cancelCashierTerminalHold(holdNo) {
+  const normalizedHoldNo = String(holdNo || "").trim();
+  if (!normalizedHoldNo) {
+    return null;
   }
-  cashierTerminalState.holdOrders[index] = { ...hold, status: "manager_confirmed_transfer" };
+  holdNo = normalizedHoldNo;
+  const cancelReason = typeof window.prompt === "function"
+    ? window.prompt("取消挂单原因", cashierTerminalState.holdCancelReason || "顾客不要了")
+    : (cashierTerminalState.holdCancelReason || "顾客不要了");
+  if (cancelReason === null) {
+    return null;
+  }
+  cashierTerminalState.holdCancelReason = String(cancelReason || "").trim() || "顾客不要了";
+  const storeCode = getCashierTerminalStoreCode();
+  const hold = normalizeCashierTerminalBackendHold(await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds/${encodeURIComponent(holdNo)}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ cancel_reason: cashierTerminalState.holdCancelReason }),
+  }));
+  cashierTerminalState.holdOrders = (cashierTerminalState.holdOrders || []).map((row) => row.hold_no === hold.hold_no ? hold : row);
+  cashierTerminalState.pendingHoldCount = cashierTerminalState.holdOrders.filter((row) => row.status === "held").length;
+  if (cashierTerminalState.activeHoldNo === hold.hold_no) {
+    cashierTerminalState.activeHoldNo = "";
+  }
+  cashierTerminalState.holdFeedback = "挂单已取消，商品已释放";
+  if (cashierTerminalState.currentShift?.shift_id) {
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+  }
   renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.holdFeedback, "success", 1800);
+  focusCashierTerminalScanInput({ select: false });
+  return hold;
 }
 
 function closeCashierTerminalShift() {
   const activeHoldCount = (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length;
-  if (activeHoldCount && !cashierTerminalState.managerTransferConfirmed) {
-    throw new Error("当前还有挂单未处理，请完成收款、取消挂单，或由店长确认转交下一班。");
+  if (activeHoldCount) {
+    throw new Error("当前还有挂单未处理，请完成收款或取消挂单。");
   }
   cashierTerminalState.shiftStatus = "closed";
   showTransientInlineNotice("#cashierTerminalInlineNotice", "本地预览：班次已关闭。下一位收银员需要重新开班。", "success", 2200);
@@ -32043,21 +32124,13 @@ handleCashierTerminalAction = async function (action, target) {
       await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo);
       return;
     case "confirm-hold":
-      createCashierTerminalHold();
+      await createCashierTerminalHold();
       return;
     case "resume-hold":
-      resumeCashierTerminalHold(Number(target.dataset.terminalHoldIndex || -1));
+      await resumeCashierTerminalHold(target.dataset.terminalHoldNo);
       return;
     case "cancel-hold":
-      cancelCashierTerminalHold(Number(target.dataset.terminalHoldIndex || -1));
-      return;
-    case "transfer-hold":
-      transferCashierTerminalHold(Number(target.dataset.terminalHoldIndex || -1));
-      return;
-    case "manager-confirm-transfer":
-      cashierTerminalState.managerTransferConfirmed = true;
-      showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认挂单可转交下一班。", "success", 1800);
-      renderCashierTerminal();
+      await cancelCashierTerminalHold(target.dataset.terminalHoldNo);
       return;
     case "manager-confirm-shift":
       showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认本班现金差异记录。", "success", 1800);
