@@ -1249,6 +1249,7 @@ let baleBarcodeFilters = {
 let latestShiftReport = null;
 let activeWorkspace = localStorage.getItem("retail_ops_active_workspace") || "overview";
 let activePanelKey = "";
+let cashierTerminalReturnPanelKey = "";
 let workspacePageFilterQuery = "";
 const jsonBuilderState = {};
 let recommendationCandidatesState = [];
@@ -7115,6 +7116,10 @@ function setActivePanel(panelKey, options = {}) {
     if (workspaceHint) {
       workspaceHint.textContent = getWorkspaceHintText(activeWorkspace);
     }
+  }
+  const cashierSalesPanelKey = getPanelKeyByTitle("store", "9. 收银销售");
+  if (cashierSalesPanelKey && panelKey === cashierSalesPanelKey && activePanelKey && activePanelKey !== panelKey) {
+    cashierTerminalReturnPanelKey = activePanelKey;
   }
   activePanelKey = panelKey;
   localStorage.setItem(`retail_ops_active_panel_${activeWorkspace}`, activePanelKey);
@@ -29877,6 +29882,1116 @@ function handleCashierTerminalHotkeys(event) {
     event.preventDefault();
     cashierTerminalState.activeDrawer = "refund";
     renderCashierTerminal();
+    return;
+  }
+  if (event.key === "Escape" && cashierTerminalState.activeDrawer) {
+    event.preventDefault();
+    cashierTerminalState.activeDrawer = "";
+    renderCashierTerminal();
+    focusCashierTerminalScanInput({ select: false });
+  }
+}
+
+const CASHIER_TERMINAL_PREVIEW_STORE = "UTAWALA";
+const CASHIER_TERMINAL_PREVIEW_CASHIER = "Clerk A";
+const CASHIER_TERMINAL_PREVIEW_SHIFT = "SHIFT-UTW-250511-A";
+const CASHIER_TERMINAL_PREVIEW_ITEMS = Object.freeze([
+  {
+    display_code: "SI-UTW-000123",
+    machine_code: "5250511000123",
+    type: "STORE_ITEM",
+    category: "连衣裙 / Dresses",
+    price: 250,
+    shelf_location: "RACK-A01",
+    status: "on_shelf",
+    store: "UTAWALA",
+  },
+  {
+    display_code: "SI-UTW-000122",
+    machine_code: "5250511000122",
+    type: "STORE_ITEM",
+    category: "男鞋 / Men Shoes",
+    price: 800,
+    shelf_location: "RACK-B02",
+    status: "on_shelf",
+    store: "UTAWALA",
+  },
+  {
+    display_code: "SI-UTW-000121",
+    machine_code: "5250511000121",
+    type: "STORE_ITEM",
+    category: "T-Shirts / T恤",
+    price: 150,
+    shelf_location: "RACK-C03",
+    status: "on_shelf",
+    store: "UTAWALA",
+  },
+  {
+    display_code: "SI-UTW-000120",
+    machine_code: "5250511000120",
+    type: "STORE_ITEM",
+    category: "女牛仔裤 / Ladies Jeans",
+    price: 300,
+    shelf_location: "RACK-D01",
+    status: "on_shelf",
+    store: "UTAWALA",
+  },
+  {
+    display_code: "SDO-UTW-250528-001",
+    machine_code: "4250528001",
+    type: "SDO",
+  },
+  {
+    display_code: "SDB-250527-045",
+    machine_code: "2250527045",
+    type: "SDB",
+  },
+  {
+    display_code: "LPK-250527-008",
+    machine_code: "3250527008",
+    type: "LPK",
+  },
+  {
+    display_code: "RAW-2505-0012",
+    machine_code: "125050012",
+    type: "RAW_BALE",
+  },
+  {
+    display_code: "SI-UTW-000119",
+    machine_code: "5250511000119",
+    type: "STORE_ITEM",
+    category: "夹克 / Jacket",
+    price: 500,
+    shelf_location: "RACK-E01",
+    status: "sold",
+    store: "UTAWALA",
+  },
+]);
+
+const CASHIER_TERMINAL_REJECT_MESSAGES = Object.freeze({
+  SDO: "SDO 是门店送货执行单，不能在 POS 销售，请扫描 STORE_ITEM 商品码。",
+  SDB: "SDB 是仓库待送店包，不能在 POS 销售。",
+  LPK: "LPK 是补差拣货工单，不能在 POS 销售。",
+  RAW_BALE: "RAW_BALE 是仓库原始包码，不能在 POS 销售。",
+  SDP: "SDP 是门店配送包裹，不能在 POS 销售，请扫描 STORE_ITEM 商品码。",
+});
+
+function formatCashierPreviewMoney(value) {
+  return `KSh ${Number(value || 0).toLocaleString("en-KE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function normalizeCashierPreviewScan(value = "") {
+  return String(value || "").trim().toUpperCase();
+}
+
+getCashierTerminalStoreCode = function () {
+  return CASHIER_TERMINAL_PREVIEW_STORE;
+}
+
+function getCashierTerminalCashierName() {
+  return CASHIER_TERMINAL_PREVIEW_CASHIER;
+}
+
+function getCashierTerminalShiftNo() {
+  return CASHIER_TERMINAL_PREVIEW_SHIFT;
+}
+
+function getCashierTerminalReceiptPanel() {
+  return document.querySelector("#cashierTerminalReceiptPanel");
+}
+
+function getCashierTerminalMockItems() {
+  ensureCashierTerminalPreviewState();
+  return cashierTerminalState.mockItems || [];
+}
+
+function ensureCashierTerminalPreviewCopy() {
+  Object.assign(CASHIER_TERMINAL_LOCALE_COPY.zh, {
+    brandTitle: "FW-ERP POS 收银台",
+    scanTitle: "扫描 STORE_ITEM",
+    addToBasket: "加入购物车",
+    basketTitle: "购物车",
+    cartEmpty: "购物车为空，请扫描 STORE_ITEM 商品码",
+    lookupEmpty: "仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。",
+    completeTrade: "完成收款",
+    grossAmount: "应收金额",
+    paidAmount: "实收",
+    balanceAmount: "余额",
+    clearBasket: "清空购物车",
+  });
+}
+
+function ensureCashierTerminalPreviewState() {
+  ensureCashierTerminalPreviewCopy();
+  if (!Array.isArray(cashierTerminalState.cartItems)) {
+    cashierTerminalState.cartItems = [];
+  }
+  if (!Array.isArray(cashierTerminalState.mockItems)) {
+    cashierTerminalState.mockItems = CASHIER_TERMINAL_PREVIEW_ITEMS.map((item) => ({ ...item }));
+  }
+  if (!Array.isArray(cashierTerminalState.holdOrders)) {
+    cashierTerminalState.holdOrders = [];
+  }
+  if (!cashierTerminalState.activePaymentMode) {
+    cashierTerminalState.activePaymentMode = "cash";
+  }
+  cashierTerminalState.discountAmount = String(cashierTerminalState.discountAmount ?? "");
+  cashierTerminalState.cashReceived = String(cashierTerminalState.cashReceived ?? "");
+  cashierTerminalState.mpesaAmount = String(cashierTerminalState.mpesaAmount ?? "");
+  cashierTerminalState.mpesaReference = String(cashierTerminalState.mpesaReference ?? "");
+  cashierTerminalState.mixedCashAmount = String(cashierTerminalState.mixedCashAmount ?? "");
+  cashierTerminalState.mixedMpesaAmount = String(cashierTerminalState.mixedMpesaAmount ?? "");
+  cashierTerminalState.mixedMpesaReference = String(cashierTerminalState.mixedMpesaReference ?? "");
+  cashierTerminalState.holdReason = cashierTerminalState.holdReason || "顾客继续挑选";
+  cashierTerminalState.holdCustomerName = cashierTerminalState.holdCustomerName || "";
+  cashierTerminalState.holdCustomerPhone = cashierTerminalState.holdCustomerPhone || "";
+  cashierTerminalState.holdNote = cashierTerminalState.holdNote || "";
+  cashierTerminalState.networkStatus = cashierTerminalState.networkStatus || "online";
+  cashierTerminalState.syncStatus = cashierTerminalState.syncStatus || "已同步";
+  cashierTerminalState.pendingSaleCount = Number(cashierTerminalState.pendingSaleCount || 0);
+  cashierTerminalState.pendingHoldCount = Number(cashierTerminalState.pendingHoldCount || 0);
+  cashierTerminalState.lastSyncAt = cashierTerminalState.lastSyncAt || new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  cashierTerminalState.shiftNo = getCashierTerminalShiftNo();
+  cashierTerminalState.shiftStatus = "open";
+  cashierTerminalState.shiftOpen = true;
+  cashierTerminalState.shiftOpenedAt = cashierTerminalState.shiftOpenedAt || "2026-05-11 08:30";
+  cashierTerminalState.openingFloatCash = "2000";
+  cashierTerminalState.countedCash = String(cashierTerminalState.countedCash ?? "");
+  cashierTerminalState.shiftCloseNote = cashierTerminalState.shiftCloseNote || "";
+  cashierTerminalState.managerTransferConfirmed = Boolean(cashierTerminalState.managerTransferConfirmed);
+  cashierTerminalState.todaySalesAmount = Number(cashierTerminalState.todaySalesAmount || 48620);
+  cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 126);
+  cashierTerminalState.shiftSalesAmount = Number(cashierTerminalState.shiftSalesAmount || 18450);
+  cashierTerminalState.shiftOrderCount = Number(cashierTerminalState.shiftOrderCount || 42);
+  cashierTerminalState.cashSalesAmount = Number(cashierTerminalState.cashSalesAmount || 8200);
+  cashierTerminalState.mpesaSalesAmount = Number(cashierTerminalState.mpesaSalesAmount || 7350);
+  cashierTerminalState.mixedCashAmountTotal = Number(cashierTerminalState.mixedCashAmountTotal || 1500);
+  cashierTerminalState.mixedMpesaAmountTotal = Number(cashierTerminalState.mixedMpesaAmountTotal || 1400);
+  cashierTerminalState.cancelledOrderCount = Number(cashierTerminalState.cancelledOrderCount || 0);
+  cashierTerminalState.saleSequence = Number(cashierTerminalState.saleSequence || 12);
+  cashierTerminalState.holdSequence = Number(cashierTerminalState.holdSequence || 8);
+  cashierTerminalState.printFeedback = cashierTerminalState.printFeedback || "";
+  cashierTerminalState.switchStoreFeedback = cashierTerminalState.switchStoreFeedback || "";
+}
+
+syncCashierTerminalMode = function () {
+  const enabled = Boolean(currentSession.user) && isCashierTerminalPanelActive();
+  document.body.classList.toggle("cashier-terminal-mode", enabled);
+  appShell?.classList.toggle("cashier-terminal-mode", enabled);
+  if (!enabled) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  ensureCashierTerminalClock();
+  renderCashierTerminal();
+  focusCashierTerminalScanInput({ select: false });
+}
+
+focusCashierTerminalScanInput = function ({ select = true } = {}) {
+  if (!isCashierTerminalPanelActive() || !(cashierTerminalBarcodeInput instanceof HTMLInputElement)) {
+    return;
+  }
+  window.setTimeout(() => {
+    cashierTerminalBarcodeInput.focus();
+    if (select) {
+      cashierTerminalBarcodeInput.select();
+    }
+  }, 0);
+}
+
+getCashierTerminalTotals = function () {
+  ensureCashierTerminalPreviewState();
+  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  const subtotal = rows.reduce((sum, row) => sum + Number(row.price || row.selling_price || 0), 0);
+  const discount = Math.min(normalizeCashierTerminalNumber(cashierTerminalState.discountAmount), subtotal);
+  return {
+    totalItems: rows.length,
+    subtotal,
+    discount,
+    totalAmount: Math.max(subtotal - discount, 0),
+  };
+}
+
+getCashierTerminalPaymentAssignedTotal = function () {
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  if (cashierTerminalState.activePaymentMode === "cash") {
+    return normalizeCashierTerminalNumber(cashierTerminalState.cashReceived);
+  }
+  if (cashierTerminalState.activePaymentMode === "mpesa") {
+    return normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
+  }
+  return normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount)
+    + normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
+}
+
+getCashierTerminalChangeDue = function () {
+  const totals = getCashierTerminalTotals();
+  return Math.max(getCashierTerminalPaymentAssignedTotal() - totals.totalAmount, 0);
+}
+
+function getCashierTerminalNetworkLabel() {
+  const status = String(cashierTerminalState.networkStatus || "online");
+  return {
+    online: "在线",
+    weak: "弱网",
+    offline: "离线",
+    syncing: "同步中",
+    synced: "已同步",
+    failed: "同步失败",
+  }[status] || "在线";
+}
+
+renderCashierTerminalSessionStrip = function () {
+  if (!(cashierTerminalSessionStrip instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalSessionStrip.innerHTML = `
+    <span>当前门店：${escapeHtml(getCashierTerminalStoreCode())}</span>
+    <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
+    <span>当前收银员：${escapeHtml(getCashierTerminalCashierName())}</span>
+    <span>当前班次：${escapeHtml(getCashierTerminalShiftNo())}</span>
+    <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
+      网络状态：${escapeHtml(getCashierTerminalNetworkLabel())}
+    </button>
+    <span>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
+  `;
+}
+
+renderCashierTerminalStatusBar = function () {
+  if (!(cashierTerminalStatusBar instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const statusText = cashierTerminalState.latestCompletedSale
+    ? `销售完成：${cashierTerminalState.latestCompletedSale.sale_no}`
+    : "扫码框在购物车上方。POS 主屏只显示收银员完成收款需要的信息。";
+  cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
+  cashierTerminalStatusBar.innerHTML = `
+    <span>${escapeHtml(statusText)}</span>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">挂单列表</button>
+  `;
+}
+
+renderCashierTerminalLookupPanel = function () {
+  if (!(cashierTerminalLookupCard instanceof HTMLElement)) {
+    return;
+  }
+  cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
+  cashierTerminalLookupCard.innerHTML = `
+    <strong>仅支持 STORE_ITEM 商品码</strong>
+    <span>可试扫：5250511000123、5250511000122、5250511000121、5250511000120</span>
+  `;
+}
+
+renderCashierTerminalCart = function () {
+  if (!(cashierTerminalCart instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const rows = cashierTerminalState.cartItems || [];
+  if (!rows.length) {
+    cashierTerminalCart.className = "basket-list cashier-terminal-cart empty-state";
+    cashierTerminalCart.innerHTML = `<div class="cashier-terminal-empty-card">购物车为空，请扫描 STORE_ITEM 商品码</div>`;
+    return;
+  }
+  cashierTerminalCart.className = "basket-list cashier-terminal-cart";
+  cashierTerminalCart.innerHTML = `
+    <div class="cashier-cart-header">
+      <span>STORE_ITEM 商品码</span>
+      <span>品类</span>
+      <span>货架位</span>
+      <span>价格</span>
+      <span>数量</span>
+      <span>折扣</span>
+      <span>小计</span>
+      <span></span>
+    </div>
+    ${rows.map((row, index) => {
+      const price = Number(row.price || 0);
+      return `
+        <article class="cashier-cart-row">
+          <div class="cart-code">
+            <strong>${escapeHtml(row.display_code || "-")}</strong>
+            <small>${escapeHtml(row.machine_code || "-")}</small>
+          </div>
+          <div>${escapeHtml(row.category || "-")}</div>
+          <div>${escapeHtml(row.shelf_location || "-")}</div>
+          <div>${escapeHtml(formatCashierPreviewMoney(price))}</div>
+          <div>1</div>
+          <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
+          <div><strong>${escapeHtml(formatCashierPreviewMoney(price))}</strong></div>
+          <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
+        </article>
+      `;
+    }).join("")}
+  `;
+}
+
+renderCashierTerminalPaymentPanel = function () {
+  if (!(cashierTerminalPaymentPanel instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  const paid = getCashierTerminalPaymentAssignedTotal();
+  const changeDue = getCashierTerminalChangeDue();
+  const balance = Math.max(totals.totalAmount - paid, 0);
+  const mpesaOfflineNotice = cashierTerminalState.networkStatus === "offline"
+    ? `<div class="cashier-payment-warning">离线状态下 M-Pesa reference 仅暂存，待同步核验</div>`
+    : "";
+  cashierTerminalPaymentPanel.innerHTML = `
+    <div class="panel-head payment-head cashier-terminal-card-head">
+      <div>
+        <p class="panel-kicker">CHECKOUT</p>
+        <h3>结算区</h3>
+      </div>
+    </div>
+    <div class="cashier-terminal-grand-total">
+      <span>应收金额</span>
+      <strong data-terminal-live="receivable">${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</strong>
+    </div>
+    <div class="summary-grid cashier-terminal-total-grid">
+      <article class="summary-box"><span>商品数量</span><strong data-terminal-live="itemCount">${escapeHtml(totals.totalItems)}</strong></article>
+      <article class="summary-box"><span>小计</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
+      <article class="summary-box"><span>折扣</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
+      <article class="summary-box"><span>实收</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" ? changeDue : balance))}</strong></article>
+    </div>
+    <label class="field cashier-discount-field">
+      <span>整单折扣</span>
+      <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.discountAmount || "")}" data-terminal-payment-field="discountAmount" placeholder="0" />
+    </label>
+    <div class="payment-methods" role="tablist" aria-label="Payment methods">
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>Cash</span><small>现金收款</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>手动 reference</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>Mixed</span><small>现金 + M-Pesa</small></button>
+    </div>
+    <div class="payment-body cashier-terminal-payment-editor">
+      ${cashierTerminalState.activePaymentMode === "cash" ? `
+        <label class="field">
+          <span>实收金额</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
+        </label>
+      ` : cashierTerminalState.activePaymentMode === "mpesa" ? `
+        ${mpesaOfflineNotice}
+        <label class="field">
+          <span>M-Pesa Amount</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="默认等于应收金额" />
+        </label>
+        <label class="field">
+          <span>M-Pesa Reference</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa reference" />
+        </label>
+      ` : `
+        ${mpesaOfflineNotice}
+        <label class="field">
+          <span>Cash Amount</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="现金金额" />
+        </label>
+        <label class="field">
+          <span>M-Pesa Amount</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="M-Pesa 金额" />
+        </label>
+        <label class="field">
+          <span>M-Pesa Reference No.</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="输入 M-Pesa reference" />
+        </label>
+      `}
+    </div>
+    <div class="payment-actions cashier-terminal-payment-actions">
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"><span>完成收款</span><strong>Complete Sale</strong></button>
+      <div class="secondary-actions">
+        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">挂单 Hold</button>
+        <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCashierTerminalReceiptPanel() {
+  const receiptPanel = getCashierTerminalReceiptPanel();
+  if (!(receiptPanel instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const sale = cashierTerminalState.latestCompletedSale;
+  const items = Array.isArray(sale?.items) ? sale.items : [];
+  receiptPanel.innerHTML = `
+    <div class="panel-head cashier-terminal-card-head">
+      <div>
+        <p class="panel-kicker">RECEIPT</p>
+        <h3>收据预览</h3>
+      </div>
+    </div>
+    <div class="receipt-preview-paper">
+      <div class="receipt-center">
+        <strong>DIRECT LOOP</strong>
+        <span>UTAWALA STORE</span>
+      </div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-line"><span>Sale No.</span><strong>${escapeHtml(sale?.sale_no || "-")}</strong></div>
+      <div class="receipt-line"><span>Cashier</span><span>${escapeHtml(getCashierTerminalCashierName())}</span></div>
+      <div class="receipt-line"><span>Time</span><span>${escapeHtml(sale?.time || cashierTerminalState.currentTime || "-")}</span></div>
+      <div class="receipt-divider"></div>
+      ${items.length ? items.map((item) => `
+        <div class="receipt-item">
+          <strong>${escapeHtml(item.display_code)}</strong>
+          <span>${escapeHtml(item.category)} · ${escapeHtml(formatCashierPreviewMoney(item.price))}</span>
+        </div>
+      `).join("") : `<div class="receipt-empty">完成收款后显示小票内容</div>`}
+      <div class="receipt-divider"></div>
+      <div class="receipt-line"><span>Total Items</span><strong>${escapeHtml(sale?.total_items || 0)}</strong></div>
+      <div class="receipt-line"><span>Subtotal</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.subtotal || 0))}</span></div>
+      <div class="receipt-line"><span>Discount</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.discount || 0))}</span></div>
+      <div class="receipt-line receipt-total"><span>Total</span><strong>${escapeHtml(formatCashierPreviewMoney(sale?.total || 0))}</strong></div>
+      <div class="receipt-line"><span>Payment</span><span>${escapeHtml(sale?.payment_method || "-")}</span></div>
+      <div class="receipt-line"><span>Cash</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.cash_amount || 0))}</span></div>
+      <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.mpesa_amount || 0))}</span></div>
+      <div class="receipt-line"><span>Ref</span><span>${escapeHtml(sale?.mpesa_reference || "-")}</span></div>
+      <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.change || 0))}</span></div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-center receipt-thanks">Thank you. Karibu tena.</div>
+    </div>
+    <div class="receipt-actions">
+      <button type="button" class="secondary-inline" data-terminal-action="print-receipt">打印收据 Print Receipt</button>
+      <button type="button" class="secondary-inline" data-terminal-action="reprint-receipt">重新打印最近一单</button>
+    </div>
+    <div class="cashier-print-feedback">${escapeHtml(cashierTerminalState.printFeedback || "")}</div>
+  `;
+}
+
+renderCashierTerminalQuickActions = function () {
+  if (!(cashierTerminalQuickActions instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalQuickActions.innerHTML = `
+    <div class="cashier-terminal-status-metrics">
+      <span><strong>今日销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
+      <span><strong>本班销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
+      <span><strong>本班订单数</strong>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
+      <span><strong>打印机状态</strong>已连接 / mock</span>
+      <span><strong>同步状态</strong>${escapeHtml(cashierTerminalState.syncStatus)}</span>
+      <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
+    </div>
+  `;
+}
+
+renderCashierTerminalDrawer = function () {
+  if (!(cashierTerminalDrawer instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const drawer = cashierTerminalState.activeDrawer;
+  if (!drawer) {
+    cashierTerminalDrawer.hidden = true;
+    if (cashierTerminalDrawerBackdrop instanceof HTMLElement) {
+      cashierTerminalDrawerBackdrop.hidden = true;
+    }
+    cashierTerminalDrawer.innerHTML = "";
+    return;
+  }
+  cashierTerminalDrawer.hidden = false;
+  if (cashierTerminalDrawerBackdrop instanceof HTMLElement) {
+    cashierTerminalDrawerBackdrop.hidden = false;
+  }
+  if (drawer === "hold-create") {
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">HOLD</p><h3>创建挂单</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <label class="field"><span>挂单原因</span><select data-terminal-drawer-field="holdReason">
+          ${["顾客继续挑选", "等 M-Pesa 确认", "顾客去取钱", "收银中断", "其他"].map((reason) => `<option value="${escapeHtml(reason)}"${cashierTerminalState.holdReason === reason ? " selected" : ""}>${escapeHtml(reason)}</option>`).join("")}
+        </select></label>
+        <label class="field"><span>顾客姓名，可选</span><input type="text" value="${escapeHtml(cashierTerminalState.holdCustomerName || "")}" data-terminal-drawer-field="holdCustomerName" /></label>
+        <label class="field"><span>顾客电话，可选</span><input type="text" value="${escapeHtml(cashierTerminalState.holdCustomerPhone || "")}" data-terminal-drawer-field="holdCustomerPhone" /></label>
+        <label class="field"><span>备注，可选</span><textarea rows="3" data-terminal-drawer-field="holdNote">${escapeHtml(cashierTerminalState.holdNote || "")}</textarea></label>
+        <div class="drawer-hint">挂单只用于临时保留购物车，不是赊账。挂单商品在本地预览中会标记为 held / reserved。</div>
+      </div>
+      <div class="drawer-foot split-actions"><button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button><button type="button" class="primary-inline" data-terminal-action="confirm-hold">确认挂单</button></div>
+    `;
+    return;
+  }
+  if (drawer === "hold-list") {
+    const holds = cashierTerminalState.holdOrders || [];
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">HOLDS</p><h3>挂单列表</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body hold-list-body">
+        ${holds.length ? holds.map((hold, index) => `
+          <article class="hold-card status-${escapeHtml(hold.status)}">
+            <div><strong>${escapeHtml(hold.hold_no)}</strong><span>${escapeHtml(hold.time)} · ${escapeHtml(hold.cashier)}</span></div>
+            <div class="hold-meta"><span>${escapeHtml(hold.item_count)} 件</span><span>${escapeHtml(formatCashierPreviewMoney(hold.total))}</span><span>${escapeHtml(hold.reason)}</span><span>${escapeHtml(hold.status)}</span></div>
+            <div class="hold-actions">
+              <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-index="${index}"${hold.status !== "held" ? " disabled" : ""}>继续收款</button>
+              <button type="button" class="secondary-inline danger" data-terminal-action="cancel-hold" data-terminal-hold-index="${index}"${hold.status !== "held" ? " disabled" : ""}>取消挂单</button>
+              <button type="button" class="secondary-inline" data-terminal-action="transfer-hold" data-terminal-hold-index="${index}"${hold.status !== "held" ? " disabled" : ""}>转交下一班</button>
+            </div>
+          </article>
+        `).join("") : `<div class="cashier-terminal-empty-card">当前没有挂单。</div>`}
+      </div>
+      <div class="drawer-foot"><button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">创建挂单</button></div>
+    `;
+    return;
+  }
+  if (drawer === "shift") {
+    const expectedCash = Number(cashierTerminalState.openingFloatCash || 0) + Number(cashierTerminalState.cashSalesAmount || 0) + Number(cashierTerminalState.mixedCashAmountTotal || 0);
+    const countedCash = normalizeCashierTerminalNumber(cashierTerminalState.countedCash);
+    const variance = cashierTerminalState.countedCash === "" ? 0 : countedCash - expectedCash;
+    const activeHoldCount = (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length;
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">SHIFT</p><h3>班次 / 交接班</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <div class="shift-info-grid">
+          <span><strong>门店</strong>${escapeHtml(getCashierTerminalStoreCode())}</span>
+          <span><strong>收银员</strong>${escapeHtml(getCashierTerminalCashierName())}</span>
+          <span><strong>班次号</strong>${escapeHtml(getCashierTerminalShiftNo())}</span>
+          <span><strong>开班时间</strong>${escapeHtml(cashierTerminalState.shiftOpenedAt)}</span>
+          <span><strong>Opening float</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.openingFloatCash))}</span>
+        </div>
+        <div class="shift-stats-grid">
+          <span><strong>本班销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
+          <span><strong>订单数</strong>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
+          <span><strong>Cash 销售</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.cashSalesAmount))}</span>
+          <span><strong>M-Pesa 销售</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.mpesaSalesAmount))}</span>
+          <span><strong>Mixed Cash</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.mixedCashAmountTotal))}</span>
+          <span><strong>Mixed M-Pesa</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.mixedMpesaAmountTotal))}</span>
+          <span><strong>挂单数量</strong>${escapeHtml(activeHoldCount)}</span>
+          <span><strong>取消订单数</strong>${escapeHtml(cashierTerminalState.cancelledOrderCount)}</span>
+        </div>
+        <label class="field"><span>应有现金</span><input type="text" value="${escapeHtml(formatCashierPreviewMoney(expectedCash))}" disabled /></label>
+        <label class="field"><span>实点现金</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.countedCash || "")}" data-terminal-drawer-field="countedCash" placeholder="输入实点现金" /></label>
+        <div class="cashier-shift-variance ${variance === 0 ? "neutral" : variance > 0 ? "success" : "danger"}">差异：<strong id="cashierTerminalCashVariance">${escapeHtml(formatCashierPreviewMoney(variance))}</strong></div>
+        <label class="field"><span>备注</span><textarea rows="3" data-terminal-drawer-field="shiftCloseNote">${escapeHtml(cashierTerminalState.shiftCloseNote || "")}</textarea></label>
+        <div class="drawer-hint" id="cashierTerminalShiftCloseHint">${activeHoldCount ? "当前还有挂单未处理，请完成收款、取消挂单，或由店长确认转交下一班。" : "当前没有未处理挂单，可以模拟结班。"}</div>
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="manager-confirm-transfer">店长确认转交下一班</button>
+        <button type="button" class="secondary-inline" data-terminal-action="manager-confirm-shift">店长确认</button>
+        <button type="button" class="primary-inline" data-terminal-action="close-shift">关闭班次</button>
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "sync") {
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">SYNC</p><h3>网络 / 同步状态</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <div class="shift-info-grid">
+          <span><strong>当前状态</strong>${escapeHtml(getCashierTerminalNetworkLabel())}</span>
+          <span><strong>待同步销售单</strong>${escapeHtml(cashierTerminalState.pendingSaleCount)}</span>
+          <span><strong>待同步挂单</strong>${escapeHtml(cashierTerminalState.pendingHoldCount)}</span>
+          <span><strong>最近同步</strong>${escapeHtml(cashierTerminalState.lastSyncAt)}</span>
+        </div>
+        <div class="drawer-hint">第一版只做前端 mock，不做真实离线数据库。一个门店先按一台主 POS 设计。</div>
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="manual-sync">手动同步</button>
+        <button type="button" class="secondary-inline warning" data-terminal-action="simulate-weak">模拟弱网</button>
+        <button type="button" class="secondary-inline danger" data-terminal-action="simulate-offline">模拟离线</button>
+        <button type="button" class="primary-inline" data-terminal-action="restore-online">模拟恢复在线</button>
+      </div>
+    `;
+    return;
+  }
+  cashierTerminalDrawer.innerHTML = `
+    <div class="drawer-head"><div><p class="panel-kicker">STORE</p><h3>切换店铺</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+    <div class="drawer-body">
+      <button type="button" class="store-switch-row is-active" data-terminal-action="select-store" data-store-code="UTAWALA">UTAWALA · 当前门店</button>
+      <button type="button" class="store-switch-row" data-terminal-action="select-store" data-store-code="CBD-DEMO">CBD-DEMO · mock 暂不可切换</button>
+      <div class="drawer-hint">${escapeHtml(cashierTerminalState.switchStoreFeedback || "本地预览固定使用 UTAWALA，不切换真实门店上下文。")}</div>
+    </div>
+  `;
+}
+
+renderCashierTerminal = function () {
+  if (!(cashierTerminalShell instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  applyCashierTerminalChromeCopy();
+  renderCashierTerminalSessionStrip();
+  renderCashierTerminalStatusBar();
+  renderCashierTerminalLookupPanel();
+  renderCashierTerminalCart();
+  renderCashierTerminalPaymentPanel();
+  renderCashierTerminalReceiptPanel();
+  renderCashierTerminalQuickActions();
+  renderCashierTerminalDrawer();
+  applyGlobalI18n(cashierTerminalShell, currentLanguage);
+}
+
+setCashierTerminalPaymentMode = function (mode) {
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.activePaymentMode = ["cash", "mpesa", "mixed"].includes(mode) ? mode : "cash";
+  renderCashierTerminal();
+}
+
+function findCashierTerminalPreviewItem(query) {
+  const normalized = normalizeCashierPreviewScan(query);
+  const digits = normalized.replace(/[^0-9]/g, "");
+  return getCashierTerminalMockItems().find((item) => {
+    const displayCode = String(item.display_code || "").toUpperCase();
+    const machineCode = String(item.machine_code || "");
+    return normalized === displayCode || normalized === machineCode || (digits && digits === machineCode);
+  });
+}
+
+function inferCashierTerminalRejectedType(query) {
+  const normalized = normalizeCashierPreviewScan(query);
+  if (normalized.startsWith("SDO")) return "SDO";
+  if (normalized.startsWith("SDB")) return "SDB";
+  if (normalized.startsWith("LPK")) return "LPK";
+  if (normalized.startsWith("RAW")) return "RAW_BALE";
+  if (normalized.startsWith("SDP")) return "SDP";
+  return "";
+}
+
+function resolveCashierTerminalPreviewScan(query) {
+  const item = findCashierTerminalPreviewItem(query);
+  const rejectedType = item?.type !== "STORE_ITEM" ? item?.type : inferCashierTerminalRejectedType(query);
+  if (rejectedType && rejectedType !== "STORE_ITEM") {
+    throw new Error(CASHIER_TERMINAL_REJECT_MESSAGES[rejectedType] || "只能扫描 STORE_ITEM 商品码。");
+  }
+  if (!item) {
+    try {
+      return resolvePosStoreItemTokenByMachineCode(query);
+    } catch {
+      throw new Error("未识别条码，请确认是否为 STORE_ITEM 商品码。");
+    }
+  }
+  if (String(item.store || "").toUpperCase() !== getCashierTerminalStoreCode()) {
+    throw new Error("其他门店商品不能在当前 POS 销售。");
+  }
+  const status = String(item.status || "").toLowerCase();
+  if (status === "sold" || status === "sold_pending_sync") {
+    throw new Error("该商品已售出，不能重复销售。");
+  }
+  if (status === "held" || status === "reserved") {
+    throw new Error("该商品正在挂单保留中，不能重复销售。");
+  }
+  if (status === "pending_print" || status === "pending_putaway" || status !== "on_shelf") {
+    throw new Error("该商品还未上架，不可销售。");
+  }
+  return { ...item, barcode: item.machine_code, selling_price: Number(item.price || 0), expected_price: Number(item.price || 0) };
+}
+
+upsertCashierTerminalCartItem = function (result) {
+  ensureCashierTerminalPreviewState();
+  const machineCode = String(result?.machine_code || result?.store_item_machine_code || result?.barcode || "").trim();
+  if (!machineCode) {
+    return;
+  }
+  if (cashierTerminalState.cartItems.some((row) => String(row.machine_code || row.barcode || "") === machineCode)) {
+    throw new Error("该商品已在购物车中，不能重复加入。");
+  }
+  cashierTerminalState.cartItems = [
+    ...cashierTerminalState.cartItems,
+    {
+      display_code: result.display_code || result.store_item_display_code || machineCode,
+      machine_code: machineCode,
+      type: "STORE_ITEM",
+      category: result.category || result.category_summary || "未分类",
+      shelf_location: result.shelf_location || result.store_rack_code || "",
+      price: Number(result.price || result.selling_price || result.expected_price || 0),
+      qty: 1,
+      store: result.store || getCashierTerminalStoreCode(),
+    },
+  ];
+  renderCashierTerminal();
+}
+
+resetCashierTerminalForNextSale = function () {
+  cashierTerminalState.cartItems = [];
+  cashierTerminalState.currentLookupResult = null;
+  cashierTerminalState.discountAmount = "";
+  cashierTerminalState.cashReceived = "";
+  cashierTerminalState.mpesaAmount = "";
+  cashierTerminalState.mpesaReference = "";
+  cashierTerminalState.mixedCashAmount = "";
+  cashierTerminalState.mixedMpesaAmount = "";
+  cashierTerminalState.mixedMpesaReference = "";
+  cashierTerminalState.activeDrawer = "";
+  clearCashierTerminalLookupInputs();
+  renderCashierTerminal();
+  focusCashierTerminalScanInput();
+}
+
+submitCashierTerminalLookup = async function ({ addToCart = false } = {}) {
+  const query = String(cashierTerminalBarcodeInput?.value || cashierTerminalManualInput?.value || "").trim();
+  if (!query) {
+    throw new Error("请先扫描 STORE_ITEM 商品码。");
+  }
+  const result = resolveCashierTerminalPreviewScan(query);
+  cashierTerminalState.currentLookupResult = result;
+  if (addToCart) {
+    upsertCashierTerminalCartItem(result);
+    showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物车：${result.display_code || result.barcode}`, "success", 1600);
+    clearCashierTerminalLookupInputs();
+  }
+  renderCashierTerminal();
+  focusCashierTerminalScanInput();
+  return result;
+}
+
+function validateCashierTerminalPayment() {
+  const totals = getCashierTerminalTotals();
+  if (!totals.totalItems) {
+    throw new Error("购物车为空，请先扫描 STORE_ITEM 商品码。");
+  }
+  if (cashierTerminalState.activePaymentMode === "cash") {
+    const cash = normalizeCashierTerminalNumber(cashierTerminalState.cashReceived);
+    if (cash < totals.totalAmount) {
+      throw new Error("Cash 实收金额必须大于或等于应收金额。");
+    }
+    return { cashAmount: cash, mpesaAmount: 0, reference: "", paid: cash };
+  }
+  if (cashierTerminalState.activePaymentMode === "mpesa") {
+    const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
+    if (mpesaAmount < totals.totalAmount) {
+      throw new Error("M-Pesa 金额必须覆盖应收金额。");
+    }
+    if (!String(cashierTerminalState.mpesaReference || "").trim()) {
+      throw new Error("M-Pesa Reference 是必填项。");
+    }
+    return { cashAmount: 0, mpesaAmount, reference: String(cashierTerminalState.mpesaReference || "").trim(), paid: mpesaAmount };
+  }
+  const cashAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount);
+  const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
+  if (cashAmount + mpesaAmount < totals.totalAmount) {
+    throw new Error("Mixed 支付中 Cash + M-Pesa 必须大于或等于应收金额。");
+  }
+  if (mpesaAmount > 0 && !String(cashierTerminalState.mixedMpesaReference || "").trim()) {
+    throw new Error("Mixed 支付中有 M-Pesa 金额时必须填写 Reference。");
+  }
+  return { cashAmount, mpesaAmount, reference: String(cashierTerminalState.mixedMpesaReference || "").trim(), paid: cashAmount + mpesaAmount };
+}
+
+submitCashierTerminalSale = async function () {
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  const payment = validateCashierTerminalPayment();
+  cashierTerminalState.saleSequence += 1;
+  const saleNo = `SALE-UTW-250511-${String(cashierTerminalState.saleSequence).padStart(4, "0")}`;
+  const nowText = new Date().toLocaleString("zh-CN", { hour12: false });
+  const pending = ["weak", "offline", "failed"].includes(cashierTerminalState.networkStatus);
+  const sale = {
+    sale_no: saleNo,
+    order_no: saleNo,
+    store_code: getCashierTerminalStoreCode(),
+    cashier: getCashierTerminalCashierName(),
+    shift_id: getCashierTerminalShiftNo(),
+    time: nowText,
+    items: cashierTerminalState.cartItems.map((row) => ({ ...row })),
+    total_items: totals.totalItems,
+    subtotal: totals.subtotal,
+    discount: totals.discount,
+    total: totals.totalAmount,
+    payment_method: cashierTerminalState.activePaymentMode,
+    cash_amount: payment.cashAmount,
+    mpesa_amount: payment.mpesaAmount,
+    mpesa_reference: payment.reference,
+    change: Math.max(payment.paid - totals.totalAmount, 0),
+    status: pending ? "completed_pending_sync" : "completed",
+  };
+  const soldStatus = pending ? "sold_pending_sync" : "sold";
+  const soldCodes = new Set(sale.items.map((item) => String(item.machine_code || "")));
+  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
+    soldCodes.has(String(item.machine_code || "")) ? { ...item, status: soldStatus } : item,
+  );
+  cashierTerminalState.latestCompletedSale = sale;
+  cashierTerminalState.todaySalesAmount += totals.totalAmount;
+  cashierTerminalState.todayOrderCount += 1;
+  cashierTerminalState.shiftSalesAmount += totals.totalAmount;
+  cashierTerminalState.shiftOrderCount += 1;
+  if (sale.payment_method === "cash") {
+    cashierTerminalState.cashSalesAmount += payment.cashAmount;
+  } else if (sale.payment_method === "mpesa") {
+    cashierTerminalState.mpesaSalesAmount += payment.mpesaAmount;
+  } else {
+    cashierTerminalState.mixedCashAmountTotal += payment.cashAmount;
+    cashierTerminalState.mixedMpesaAmountTotal += payment.mpesaAmount;
+  }
+  if (pending) {
+    cashierTerminalState.pendingSaleCount += 1;
+    cashierTerminalState.syncStatus = "同步待处理";
+  }
+  resetCashierTerminalForNextSale();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", `销售完成：${saleNo}${pending ? " · completed_pending_sync" : ""}`, "success", 2200);
+  return sale;
+}
+
+updateCashierTerminalPaymentField = function (field, value, index = null) {
+  if (index != null && Array.isArray(cashierTerminalState.paymentLines) && cashierTerminalState.paymentLines[index]) {
+    cashierTerminalState.paymentLines[index][field] = String(value || "");
+  } else {
+    cashierTerminalState[field] = String(value || "");
+  }
+  syncCashierTerminalPaymentPreview();
+}
+
+updateCashierTerminalDrawerField = function (field, value) {
+  cashierTerminalState[field] = String(value || "");
+  if (field === "countedCash") {
+    const expectedCash = Number(cashierTerminalState.openingFloatCash || 0) + Number(cashierTerminalState.cashSalesAmount || 0) + Number(cashierTerminalState.mixedCashAmountTotal || 0);
+    const variance = normalizeCashierTerminalNumber(value) - expectedCash;
+    const target = document.querySelector("#cashierTerminalCashVariance");
+    if (target) {
+      target.textContent = formatCashierPreviewMoney(variance);
+    }
+  }
+}
+
+function syncCashierTerminalPaymentPreview() {
+  const totals = getCashierTerminalTotals();
+  const paid = getCashierTerminalPaymentAssignedTotal();
+  const change = cashierTerminalState.activePaymentMode === "cash"
+    ? getCashierTerminalChangeDue()
+    : Math.max(totals.totalAmount - paid, 0);
+  const pairs = {
+    itemCount: totals.totalItems,
+    subtotal: formatCashierPreviewMoney(totals.subtotal),
+    discount: formatCashierPreviewMoney(totals.discount),
+    receivable: formatCashierPreviewMoney(totals.totalAmount),
+    paid: formatCashierPreviewMoney(paid),
+    change: formatCashierPreviewMoney(change),
+  };
+  Object.entries(pairs).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-terminal-live="${key}"]`).forEach((node) => {
+      node.textContent = String(value);
+    });
+  });
+}
+
+updateCashierTerminalCartField = function (index, field, value) {
+  const row = cashierTerminalState.cartItems[index];
+  if (!row) {
+    return;
+  }
+  if (field === "qty") {
+    row.qty = 1;
+  } else {
+    row[field] = String(value || "");
+  }
+  renderCashierTerminal();
+}
+
+function createCashierTerminalHold() {
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  if (!totals.totalItems) {
+    throw new Error("购物车为空，不能创建挂单。");
+  }
+  cashierTerminalState.holdSequence += 1;
+  const holdNo = `HOLD-UTW-250511-${String(cashierTerminalState.holdSequence).padStart(4, "0")}`;
+  const hold = {
+    hold_no: holdNo,
+    time: new Date().toLocaleString("zh-CN", { hour12: false }),
+    cashier: getCashierTerminalCashierName(),
+    item_count: totals.totalItems,
+    total: totals.totalAmount,
+    reason: cashierTerminalState.holdReason || "顾客继续挑选",
+    customer_name: cashierTerminalState.holdCustomerName || "",
+    customer_phone: cashierTerminalState.holdCustomerPhone || "",
+    note: cashierTerminalState.holdNote || "",
+    status: "held",
+    items: cashierTerminalState.cartItems.map((row) => ({ ...row, status: "held" })),
+  };
+  const holdCodes = new Set(hold.items.map((item) => String(item.machine_code || "")));
+  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
+    holdCodes.has(String(item.machine_code || "")) ? { ...item, status: "held" } : item,
+  );
+  cashierTerminalState.holdOrders = [hold, ...cashierTerminalState.holdOrders];
+  cashierTerminalState.pendingHoldCount += cashierTerminalState.networkStatus === "online" ? 0 : 1;
+  cashierTerminalState.cartItems = [];
+  cashierTerminalState.activeDrawer = "hold-list";
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", `挂单已创建：${holdNo}`, "success", 1800);
+}
+
+function resumeCashierTerminalHold(index) {
+  const hold = cashierTerminalState.holdOrders[index];
+  if (!hold || hold.status !== "held") {
+    return;
+  }
+  cashierTerminalState.cartItems = hold.items.map((item) => ({ ...item, status: "on_shelf" }));
+  cashierTerminalState.holdOrders[index] = { ...hold, status: "resumed" };
+  const resumeCodes = new Set(hold.items.map((item) => String(item.machine_code || "")));
+  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
+    resumeCodes.has(String(item.machine_code || "")) ? { ...item, status: "on_shelf" } : item,
+  );
+  cashierTerminalState.activeDrawer = "";
+  renderCashierTerminal();
+  focusCashierTerminalScanInput({ select: false });
+}
+
+function cancelCashierTerminalHold(index) {
+  const hold = cashierTerminalState.holdOrders[index];
+  if (!hold || hold.status !== "held") {
+    return;
+  }
+  cashierTerminalState.holdOrders[index] = { ...hold, status: "cancelled" };
+  const cancelCodes = new Set(hold.items.map((item) => String(item.machine_code || "")));
+  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
+    cancelCodes.has(String(item.machine_code || "")) ? { ...item, status: "on_shelf" } : item,
+  );
+  cashierTerminalState.cancelledOrderCount += 1;
+  renderCashierTerminal();
+}
+
+function transferCashierTerminalHold(index) {
+  const hold = cashierTerminalState.holdOrders[index];
+  if (!hold || hold.status !== "held") {
+    return;
+  }
+  cashierTerminalState.holdOrders[index] = { ...hold, status: "manager_confirmed_transfer" };
+  renderCashierTerminal();
+}
+
+function closeCashierTerminalShift() {
+  const activeHoldCount = (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length;
+  if (activeHoldCount && !cashierTerminalState.managerTransferConfirmed) {
+    throw new Error("当前还有挂单未处理，请完成收款、取消挂单，或由店长确认转交下一班。");
+  }
+  cashierTerminalState.shiftStatus = "closed";
+  showTransientInlineNotice("#cashierTerminalInlineNotice", "本地预览：班次已关闭。下一位收银员需要重新开班。", "success", 2200);
+  renderCashierTerminal();
+}
+
+function exitCashierTerminalPreview() {
+  const fallbackPanel = getOrderedPanelsForWorkspace("store").find((panel) => panel.dataset.panelKey !== getCashierTerminalSalesPanelKey());
+  const targetPanelKey = cashierTerminalReturnPanelKey || fallbackPanel?.dataset?.panelKey || "";
+  if (targetPanelKey) {
+    setActivePanel(targetPanelKey);
+  } else {
+    setActiveWorkspace("store");
+  }
+  document.body.classList.remove("cashier-terminal-mode");
+  appShell?.classList.remove("cashier-terminal-mode");
+}
+
+handleCashierTerminalAction = async function (action, target) {
+  switch (action) {
+    case "logout":
+      await submitLogout();
+      return;
+    case "exit-pos":
+      exitCashierTerminalPreview();
+      return;
+    case "clear-cart":
+      cashierTerminalState.cartItems = [];
+      renderCashierTerminal();
+      focusCashierTerminalScanInput();
+      return;
+    case "open-drawer":
+      cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
+      renderCashierTerminal();
+      return;
+    case "close-drawer":
+      cashierTerminalState.activeDrawer = "";
+      renderCashierTerminal();
+      focusCashierTerminalScanInput({ select: false });
+      return;
+    case "complete-sale":
+      await submitCashierTerminalSale();
+      return;
+    case "confirm-hold":
+      createCashierTerminalHold();
+      return;
+    case "resume-hold":
+      resumeCashierTerminalHold(Number(target.dataset.terminalHoldIndex || -1));
+      return;
+    case "cancel-hold":
+      cancelCashierTerminalHold(Number(target.dataset.terminalHoldIndex || -1));
+      return;
+    case "transfer-hold":
+      transferCashierTerminalHold(Number(target.dataset.terminalHoldIndex || -1));
+      return;
+    case "manager-confirm-transfer":
+      cashierTerminalState.managerTransferConfirmed = true;
+      showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认挂单可转交下一班。", "success", 1800);
+      renderCashierTerminal();
+      return;
+    case "manager-confirm-shift":
+      showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认本班现金差异记录。", "success", 1800);
+      return;
+    case "close-shift":
+      closeCashierTerminalShift();
+      return;
+    case "manual-sync":
+    case "restore-online":
+      cashierTerminalState.networkStatus = "syncing";
+      cashierTerminalState.syncStatus = "同步中";
+      renderCashierTerminal();
+      window.setTimeout(() => {
+        cashierTerminalState.networkStatus = "synced";
+        cashierTerminalState.syncStatus = "已同步";
+        cashierTerminalState.pendingSaleCount = 0;
+        cashierTerminalState.pendingHoldCount = 0;
+        cashierTerminalState.lastSyncAt = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+        renderCashierTerminal();
+      }, 900);
+      return;
+    case "simulate-weak":
+      cashierTerminalState.networkStatus = "weak";
+      cashierTerminalState.syncStatus = "弱网，销售将待同步";
+      renderCashierTerminal();
+      return;
+    case "simulate-offline":
+      cashierTerminalState.networkStatus = "offline";
+      cashierTerminalState.syncStatus = "离线，销售将待同步";
+      renderCashierTerminal();
+      return;
+    case "print-receipt":
+      cashierTerminalState.printFeedback = cashierTerminalState.latestCompletedSale
+        ? `mock：已发送打印 ${cashierTerminalState.latestCompletedSale.sale_no}`
+        : "还没有最近一单可打印。";
+      renderCashierTerminalReceiptPanel();
+      return;
+    case "reprint-receipt":
+      cashierTerminalState.printFeedback = cashierTerminalState.latestCompletedSale
+        ? `mock：已重新打印最近一单 ${cashierTerminalState.latestCompletedSale.sale_no}`
+        : "还没有最近一单可重新打印。";
+      renderCashierTerminalReceiptPanel();
+      return;
+    case "select-store":
+      cashierTerminalState.switchStoreFeedback = target.dataset.storeCode === "UTAWALA"
+        ? "当前已经是 UTAWALA。"
+        : "本地预览暂不切换真实门店上下文。";
+      renderCashierTerminalDrawer();
+      return;
+    default:
+      return;
+  }
+}
+
+handleCashierTerminalHotkeys = function (event) {
+  if (!isCashierTerminalPanelActive() || event.altKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+  if (event.key === "F2") {
+    event.preventDefault();
+    setCashierTerminalPaymentMode("cash");
+    return;
+  }
+  if (event.key === "F3") {
+    event.preventDefault();
+    setCashierTerminalPaymentMode("mpesa");
+    return;
+  }
+  if (event.key === "F4") {
+    event.preventDefault();
+    setCashierTerminalPaymentMode("mixed");
+    return;
+  }
+  if (event.key === "F8") {
+    event.preventDefault();
+    submitCashierTerminalSale().catch((error) => {
+      showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
+    });
     return;
   }
   if (event.key === "Escape" && cashierTerminalState.activeDrawer) {
