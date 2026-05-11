@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#260/);
+  assert.match(loginVersionSection, /#262/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=clean-clerk-printer-test-panel/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clean-clerk-printer-test-panel/);
+  assert.match(indexHtml, /app\.js\?v=k300-store-item-batch-print/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-store-item-batch-print/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -175,7 +175,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-clean-clerk-printer-test-panel/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-k300-store-item-batch-print/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -402,8 +402,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clean-clerk-printer-test-panel/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clean-clerk-printer-test-panel/);
+  assert.match(indexHtml, /app\.js\?v=k300-store-item-batch-print/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=k300-store-item-batch-print/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -1140,9 +1140,9 @@ test("K300 40x30 retail clothing STORE_ITEM template is locked to the successful
   assert.match(readySource, /k300_spp_available === true/);
   assert.match(readySource, /selected_printer_address/);
   assert.match(readySource, /getClerkK300RetailClothingStoreItemTemplateMapping/);
-  assert.match(directPrintSource, /printK300CpclRawPreview/);
+  assert.match(directPrintSource, /printK300CpclRawBatch/);
   assert.match(directPrintSource, /JSON\.stringify\(k300Payload\)/);
-  assert.match(directPrintSource, /buildClerkK300RetailClothingStoreItemPreviewPayload/);
+  assert.match(directPrintSource, /buildClerkK300RetailClothingStoreItemBatchPayload/);
   assert.match(directPrintSource, /请先测试 K300 蓝牙连接，确认 K300 SPP 可用。/);
   assert.match(payloadBuilderSource, /label_template_size:\s*"40x30"/);
   assert.match(payloadBuilderSource, /protocol:\s*"CPCL"/);
@@ -2205,7 +2205,7 @@ test("price group editor uses PDA-friendly quick controls", () => {
   assert.match(editorSource, /A-01/);
 });
 
-test("STORE_ITEM label preview supports 60x40 and 40x30 with one-label preview print action", () => {
+test("STORE_ITEM label preview supports 60x40 and 40x30 with batch print action", () => {
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const queueSource = extractFunctionSource(appJs, "renderPriceGroupPrintQueue");
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
@@ -2225,11 +2225,13 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 with one-label preview p
   assert.match(payloadSource, /printer_profile:\s*"CHITENG_S1_OFFICIAL"/);
   assert.match(printPayloadSource, /print_mode:\s*"preview_one"/);
   assert.match(printPayloadSource, /slice\(0,\s*1\)/);
-  assert.match(printPanelSource, /打印一张预览标签/);
+  assert.match(printPanelSource, /打印本批标签/);
+  assert.match(printPanelSource, /本批共/);
   assert.match(printPanelSource, /data-mobile-pricing-print-labels/);
   assert.match(printPanelSource, /请先连接并确认打印机在线/);
   assert.match(printPanelSource, /payload\.labels\.length\s*\?\s*""\s*:\s*"disabled"/);
   assert.doesNotMatch(printPanelSource, /printerReady\s*&&\s*payload\.labels\.length\s*\?\s*""\s*:\s*"disabled"/);
+  assert.doesNotMatch(printPanelSource, /打印一张预览标签/);
   assert.doesNotMatch(printPanelSource, /已贴完本组|已贴完本批|data-mobile-pricing-confirm-stickers/);
   assert.match(printPanelSource, /group\.tier/);
   assert.match(printPanelSource, /group\.quantity/);
@@ -2246,13 +2248,14 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 with one-label preview p
   assert.doesNotMatch(queueSource, /混合总任务|全部价格组|all groups/i);
 });
 
-test("label preview one-label print action uses Android bridge without creating print jobs or sticker confirmation", () => {
+test("K300 40x30 label preview batch print uses raw CPCL batch without printed state changes", () => {
   const stateSource = extractFunctionSource(appJs, "createStoreMobilePricingPreviewState");
   const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
   const directPrintSource = extractFunctionSource(appJs, "printStoreMobileStoreItemLabelPreview");
   const printPayloadSource = extractFunctionSource(appJs, "buildStoreItemLabelPreviewPrintPayload");
   const advanceSource = extractFunctionSource(appJs, "advanceStoreMobileGroupWorkflow");
+  const batchPayloadSource = extractFunctionSource(appJs, "buildClerkK300RetailClothingStoreItemBatchPayload");
 
   assert.match(stateSource, /createdPrintJobs:\s*\[\]/);
   assert.doesNotMatch(printPanelSource, /state\.createdPrintJobs/);
@@ -2260,23 +2263,30 @@ test("label preview one-label print action uses Android bridge without creating 
   assert.match(printPanelSource, /renderStoreItemLabelPreview/);
   assert.match(printPanelSource, /JSON preview payload/);
   assert.doesNotMatch(printPanelSource, /if \(!job\)/);
-  assert.match(printPanelSource, /打印一张预览标签/);
+  assert.match(printPanelSource, /打印本批标签/);
   assert.match(actionSource, /printStoreMobileStoreItemLabelPreview/);
   assert.match(actionSource, /mobilePricingPrintLabels/);
   assert.match(appJs, /printStoreItemLabelPreview/);
   assert.match(appJs, /buildStoreItemLabelPreviewPrintPayload/);
   assert.match(appJs, /canRunClerkStoreItemLabelPreviewPrint/);
-  assert.match(directPrintSource, /slice\(0,\s*1\)/);
+  assert.match(directPrintSource, /buildClerkK300RetailClothingStoreItemBatchPayload/);
   assert.match(directPrintSource, /buildStoreItemLabelPreviewPrintPayload/);
   assert.match(printPayloadSource, /print_mode:\s*"preview_one"/);
   assert.match(printPayloadSource, /slice\(0,\s*1\)/);
   assert.match(directPrintSource, /printStoreItemLabelPreview/);
-  assert.match(directPrintSource, /printK300CpclRawPreview/);
-  assert.match(directPrintSource, /buildClerkK300RetailClothingStoreItemPreviewPayload/);
+  assert.match(directPrintSource, /printK300CpclRawBatch/);
+  assert.doesNotMatch(directPrintSource, /printK300CpclRawPreview/);
+  assert.doesNotMatch(directPrintSource, /buildClerkK300RetailClothingStoreItemPreviewPayload\(payload\.labels\[0\]/);
   assert.match(directPrintSource, /getClerkK300RetailClothingStoreItemTemplateMapping/);
   assert.match(directPrintSource, /当前 Android 版本不支持 STORE_ITEM 预览打印，请升级 Direct Loop PDA Android App。/);
   assert.match(directPrintSource, /updateClerkBluetoothPrinterStatus/);
   assert.match(directPrintSource, /last_print_result !== "success"/);
+  assert.match(batchPayloadSource, /batch_name:\s*"k300_store_item_batch"/);
+  assert.match(batchPayloadSource, /label_template_size:\s*"40x30"/);
+  assert.match(batchPayloadSource, /protocol:\s*"CPCL"/);
+  assert.match(batchPayloadSource, /template_name:\s*K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME/);
+  assert.match(batchPayloadSource, /business_template:\s*RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE/);
+  assert.match(batchPayloadSource, /buildClerkK300StoreItemPreviewCpclCommand/);
   assert.doesNotMatch(directPrintSource, /printStoreItemLabels|direct_print/);
   assert.doesNotMatch(actionSource, /printTestLabel\([^)]*STORE_ITEM|printTestLabel\([^)]*label/i);
   assert.doesNotMatch(printPanelSource, /已贴完本组|data-mobile-pricing-confirm-stickers/);
@@ -2286,6 +2296,49 @@ test("label preview one-label print action uses Android bridge without creating 
   assert.doesNotMatch(actionSource, /\/print-jobs\/item-tokens|\/print-jobs\/\$\{[^}]+\}\/complete|sticker_confirmed|marked.*printed/i);
   assert.match(actionSource, /prepareStoreMobileBatchLabelPreview\(state, previewLabels\)/);
   assert.doesNotMatch(advanceSource, /createdPrintJobs|status:\s*"queued"|待贴标确认|已完成/);
+});
+
+test("K300 batch payload contains every generated STORE_ITEM label with locked template metadata", () => {
+  const batchBuilder = getExecutableBundle(
+    [
+      "sanitizeClerkK300CpclText",
+      "getClerkK300RetailClothingStoreItemTemplateMapping",
+      "buildClerkK300StoreItemPreviewCpclCommand",
+      "buildClerkK300RetailClothingStoreItemBatchPayload",
+    ],
+    `
+      const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
+      const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
+      function getClerkBluetoothPrinterProfileValue(profile = "", printerName = "") {
+        const normalized = String(profile || "GENERIC").trim().toUpperCase();
+        if (normalized === "UROVO_K300") return "UROVO_K300";
+        const normalizedName = String(printerName || "").trim().toUpperCase();
+        if (/UROVO|K300|ZTO688/.test(normalizedName)) return "UROVO_K300";
+        return "GENERIC";
+      }
+    `,
+    "({ buildClerkK300RetailClothingStoreItemBatchPayload })",
+  );
+  const payload = batchBuilder.buildClerkK300RetailClothingStoreItemBatchPayload(
+    [
+      { machine_code: "5261300000038", barcode_value: "5261300000038", price_kes: 410, category_short: "CARGO PANT", grade: "P" },
+      { machine_code: "5261300000052", barcode_value: "5261300000052", price_kes: 410, category_short: "CARGO PANT", pricing_type: "S" },
+    ],
+    { printer_profile: "UROVO_K300", printer_name: "ZTO688_001" },
+  );
+
+  assert.equal(payload.label_template_size, "40x30");
+  assert.equal(payload.protocol, "CPCL");
+  assert.equal(payload.batch_name, "k300_store_item_batch");
+  assert.equal(payload.template_name, "K300_40X30_RETAIL_CLOTHING_STORE_ITEM");
+  assert.equal(payload.business_template, "retail_clothing_store_item");
+  assert.equal(payload.labels.length, 2);
+  assert.deepEqual(payload.labels.map((label) => label.test_name), ["store_item_1", "store_item_2"]);
+  assert.match(payload.labels[0].cpcl_command, /BARCODE 128 1 1 78 35 76 5261300000038/);
+  assert.match(payload.labels[1].cpcl_command, /BARCODE 128 1 1 78 35 76 5261300000052/);
+  assert.match(payload.labels[0].cpcl_command, /TEXT 7 0 14 8 KES 410/);
+  assert.match(payload.labels[0].cpcl_command, /TEXT 4 0 14 45 CARGO PANT \/ P/);
+  assert.match(payload.labels[1].cpcl_command, /TEXT 4 0 14 45 CARGO PANT \/ S/);
 });
 
 test("print payload preview has field summary and keeps every price group separate", () => {
