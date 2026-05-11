@@ -34991,6 +34991,8 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     bluetoothPrinterPairedPrinters: [],
     bluetoothPrinterPairedPrintersLoaded: false,
     bluetoothPrinterPairedPrintersLastRefreshAt: "",
+    storeMobileStockInLocations: [],
+    storeMobileStockInLocationError: "",
   };
   return {
     ...baseState,
@@ -35004,6 +35006,9 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     pdaPageStack: Array.isArray(overrides.pdaPageStack) ? overrides.pdaPageStack : baseState.pdaPageStack,
     assignedBackendTasks: Array.isArray(overrides.assignedBackendTasks) ? overrides.assignedBackendTasks : baseState.assignedBackendTasks,
     pricingSourceLines: Array.isArray(overrides.pricingSourceLines) ? overrides.pricingSourceLines : baseState.pricingSourceLines,
+    storeMobileStockInLocations: Array.isArray(overrides.storeMobileStockInLocations)
+      ? overrides.storeMobileStockInLocations
+      : baseState.storeMobileStockInLocations,
     bluetoothPrinterStatus: normalizeClerkBluetoothPrinterStatus(overrides.bluetoothPrinterStatus || baseState.bluetoothPrinterStatus),
     bluetoothPrinterPairedPrinters: Array.isArray(overrides.bluetoothPrinterPairedPrinters)
       ? overrides.bluetoothPrinterPairedPrinters
@@ -36004,10 +36009,18 @@ function normalizeStoreItemForLabelPreview(item = {}, group = {}) {
     barcode_value: machineCode,
     price_kes: Number.isFinite(priceKes) ? priceKes : 0,
     category_short: categoryShort,
+    category_name: item.category_name || item.category_main || group.category_name || group.category_main || categoryShort,
+    category_hint: item.category_hint || item.category_sub || group.category_hint || group.category_sub || categoryShort,
     grade,
     pricing_type: String(item.pricing_type || group.pricing_type || "").trim().toUpperCase(),
     print_status: String(item.print_status || item.status || "pending_print").trim(),
     sticker_status: String(item.sticker_status || "pending").trim(),
+    preview_print_status: String(item.preview_print_status || "").trim(),
+    current_location_code: String(item.current_location_code || item.store_rack_code || item.rack_code || "").trim(),
+    stock_in_confirmed: item.stock_in_confirmed === true,
+    stock_in_status: String(item.stock_in_status || "").trim(),
+    stock_in_message: String(item.stock_in_message || "").trim(),
+    stock_in_error: String(item.stock_in_error || "").trim(),
   };
 }
 
@@ -36048,6 +36061,134 @@ function renderStoreMobileGeneratedStoreItemList(group = {}) {
         `).join("")}
       </div>
     </div>
+  `;
+}
+
+function getStoreMobileStoreCode(state = storeMobilePricingPreviewState) {
+  return String(
+    state.selectedSdp?.store_code
+      || state.selectedSdp?.store_name
+      || currentSession.user?.store_code
+      || getCurrentStoreCodeFallback()
+      || "UTAWALA",
+  ).trim().toUpperCase();
+}
+
+function getStoreMobileActiveStockInLocations(state = storeMobilePricingPreviewState) {
+  const rows = Array.isArray(state.storeMobileStockInLocations) ? state.storeMobileStockInLocations : [];
+  return rows
+    .map((row) => ({
+      ...row,
+      location_code: String(row.location_code || row.rack_code || "").trim().toUpperCase(),
+      location_name: String(row.location_name || row.rack_name || row.location_code || row.rack_code || "").trim(),
+      location_type: String(row.location_type || "SHELF").trim().toUpperCase(),
+      category_name: String(row.category_name || row.category_hint || "").trim(),
+      category_hint: String(row.category_hint || row.category_name || "").trim(),
+      active: row.active !== false,
+    }))
+    .filter((row) => row.location_code && row.active !== false && (row.location_type === "SHELF" || row.location_type === "BACKROOM"));
+}
+
+async function loadStoreMobileStockInLocations(state = storeMobilePricingPreviewState) {
+  const storeCode = getStoreMobileStoreCode(state);
+  const rows = await request(`/stores/${encodeURIComponent(storeCode)}/rack-locations`);
+  state.storeMobileStockInLocations = Array.isArray(rows) ? rows : [];
+  state.storeMobileStockInLocationError = "";
+  return state.storeMobileStockInLocations;
+}
+
+function normalizeStoreMobileCategoryText(value = "") {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function getDefaultStoreMobileStockInLocationCode(item = {}, locations = []) {
+  const categoryCandidates = [
+    item.category_name,
+    item.category_short,
+    item.category_hint,
+    item.category_sub,
+  ].map(normalizeStoreMobileCategoryText).filter(Boolean);
+  const shelf = (Array.isArray(locations) ? locations : []).find((location) => {
+    if (String(location.location_type || "").trim().toUpperCase() !== "SHELF") {
+      return false;
+    }
+    const locationCategories = [
+      location.category_name,
+      location.category_hint,
+      location.location_name,
+    ].map(normalizeStoreMobileCategoryText).filter(Boolean);
+    return locationCategories.some((locationCategory) => categoryCandidates.includes(locationCategory));
+  });
+  if (shelf?.location_code) {
+    return shelf.location_code;
+  }
+  const backroom = (Array.isArray(locations) ? locations : []).find((location) => String(location.location_type || "").trim().toUpperCase() === "BACKROOM");
+  return String(backroom?.location_code || "").trim().toUpperCase();
+}
+
+function getStoreMobilePrintedStoreItemsForStockIn(group = {}) {
+  return getStoreMobileGeneratedStoreItems(group)
+    .filter((item) => String(item.preview_print_status || "").trim() === "sent_to_printer")
+    .map((item) => normalizeStoreItemForLabelPreview(item, group))
+    .filter((item) => item.machine_code);
+}
+
+function getStoreMobileStockInStatusLabel(status = "") {
+  const normalized = String(status || "").trim();
+  if (normalized === "confirmed") return "已入库";
+  if (normalized === "already_confirmed") return "已确认";
+  if (normalized === "location_updated") return "已换货架";
+  if (normalized === "confirming") return "确认中";
+  if (normalized === "failed" || normalized === "error") return "失败";
+  return "待确认";
+}
+
+function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPreviewState, group = {}) {
+  const locations = getStoreMobileActiveStockInLocations(state);
+  const printedItems = getStoreMobilePrintedStoreItemsForStockIn(group);
+  const locationError = String(state.storeMobileStockInLocationError || group.stock_in_location_error || "").trim();
+  if (!printedItems.length) {
+    return '<div class="empty-state">标签打印成功后显示入库确认。</div>';
+  }
+  return `
+    <section class="mobile-stock-in-panel" data-mobile-stock-in-confirmation-panel="true">
+      <div class="mobile-section-head">
+        <strong>确认完成入库</strong>
+        ${renderStoreMobilePricingBadge(`${printedItems.length} 件`)}
+      </div>
+      ${locationError ? `<div class="mobile-error">${escapeHtml(locationError)}</div>` : ""}
+      ${locations.length ? "" : '<div class="subtle small">未读取到可用货架位，请刷新后再确认。</div>'}
+      <div class="mobile-stock-in-list">
+        ${printedItems.map((item) => {
+          const selectedLocationCode = item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations);
+          const statusText = getStoreMobileStockInStatusLabel(item.stock_in_status || (item.stock_in_confirmed ? "confirmed" : ""));
+          const message = item.stock_in_message || item.stock_in_error || "";
+          return `
+            <article class="mobile-stock-in-row">
+              <div>
+                <strong>STORE_ITEM ${escapeHtml(item.machine_code)}</strong>
+                <span>${escapeHtml(item.category_short || "-")} · KES ${escapeHtml(item.price_kes || 0)}</span>
+              </div>
+              <label class="mobile-field">
+                <span>货架位 / 后仓</span>
+                <select data-mobile-stock-in-location="${escapeHtml(item.machine_code)}" ${locations.length ? "" : "disabled"}>
+                  ${locations.map((location) => `
+                    <option value="${escapeHtml(location.location_code)}" ${location.location_code === selectedLocationCode ? "selected" : ""}>
+                      ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                    </option>
+                  `).join("")}
+                </select>
+              </label>
+              <div class="mobile-stock-in-actions">
+                ${renderStoreMobilePricingBadge(statusText)}
+                <button type="button" class="primary-button" data-mobile-pricing-confirm-stock-in="${escapeHtml(item.machine_code)}" data-mobile-pricing-confirm-stock-in-group="${escapeHtml(group.group_id || "")}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+              </div>
+              ${message ? `<div class="${item.stock_in_error ? "mobile-error" : "success-banner"}">${escapeHtml(message)}</div>` : ""}
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -36195,6 +36336,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const previewPrintStatus = String(group.preview_print_status || "").trim();
   const previewPrintMessage = String(group.preview_print_message || "").trim();
   const previewPrintError = String(group.preview_print_error || "").trim();
+  const shouldShowStockInConfirmation = previewPrintStatus === "sent_to_printer";
   const summaryHtml = `
     <div class="mobile-print-summary">
       <span><b>档位</b><strong>${escapeHtml(group.tier || "-")}</strong></span>
@@ -36234,6 +36376,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       ${previewPrintStatus ? `<div class="subtle small">预览打印状态：${escapeHtml(previewPrintStatus)}</div>` : ""}
       ${previewPrintMessage ? `<div class="success-banner">${escapeHtml(previewPrintMessage)}</div>` : ""}
       ${previewPrintError ? `<div class="mobile-error">${escapeHtml(previewPrintError)}</div>` : ""}
+      ${shouldShowStockInConfirmation ? renderStoreMobileStockInConfirmationPanel(state, group) : ""}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-page="pricing_split">返回分批定价</button>
       ${renderNextPriceGroupHint(state, group)}
     </section>
@@ -37196,6 +37339,12 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
     group.preview_print_status = "sent_to_printer";
     group.preview_print_message = `本批 ${k300Payload.labels.length} 张标签已发送`;
     group.preview_print_error = "";
+    generatedItems.forEach((item) => {
+      item.preview_print_status = "sent_to_printer";
+    });
+    await loadStoreMobileStockInLocations(state).catch((error) => {
+      state.storeMobileStockInLocationError = formatErrorMessage(error);
+    });
     renderStoreMobilePricingPreview();
     return group;
   }
@@ -37224,8 +37373,67 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
   group.preview_print_status = "sent_to_printer";
   group.preview_print_message = "已发送 1 张 STORE_ITEM 预览标签到打印机。";
   group.preview_print_error = "";
+  previewItems.forEach((item) => {
+    item.preview_print_status = "sent_to_printer";
+  });
+  await loadStoreMobileStockInLocations(state).catch((error) => {
+    state.storeMobileStockInLocationError = formatErrorMessage(error);
+  });
   setStoreMobileActivePage(state, "label_preview", { groupId: group.group_id, source: "preview_print", recordHistory: false });
   return syncStoreMobileTaskCounters(state);
+}
+
+async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPreviewState, groupId = "", machineCode = "") {
+  const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || state.activeGroupId || ""));
+  if (!group) {
+    throw new Error("找不到当前价格组。");
+  }
+  const rawItem = getStoreMobileGeneratedStoreItems(group).find((item) => {
+    const normalized = normalizeStoreItemForLabelPreview(item, group);
+    return String(normalized.machine_code || "") === String(machineCode || "");
+  });
+  if (!rawItem) {
+    throw new Error("找不到当前 STORE_ITEM。");
+  }
+  const normalizedItem = normalizeStoreItemForLabelPreview(rawItem, group);
+  const locations = getStoreMobileActiveStockInLocations(state);
+  const selectedElement = document.querySelector(`[data-mobile-stock-in-location="${normalizedItem.machine_code}"]`);
+  const selectedLocation = String(
+    (selectedElement instanceof HTMLSelectElement ? selectedElement.value : "")
+      || normalizedItem.current_location_code
+      || getDefaultStoreMobileStockInLocationCode(normalizedItem, locations)
+      || "",
+  ).trim().toUpperCase();
+  if (!selectedLocation) {
+    throw new Error("请选择货架位或后仓。");
+  }
+  const storeCode = getStoreMobileStoreCode(state);
+  machineCode = normalizedItem.machine_code;
+  rawItem.stock_in_status = "confirming";
+  rawItem.stock_in_error = "";
+  rawItem.stock_in_message = "正在确认入库...";
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/confirm-stock-in`, {
+    method: "POST",
+    body: JSON.stringify({
+      location_code: selectedLocation,
+      confirmed_by: String(currentSession.user?.username || getCurrentStoreWorkerFallback() || "").trim(),
+    }),
+  });
+  const status = String(result.status || "confirmed").trim();
+  rawItem.current_location_code = result.current_location_code || selectedLocation;
+  rawItem.stock_in_confirmed = true;
+  rawItem.stock_in_confirmed_at = result.stock_in_confirmed_at || new Date().toISOString();
+  rawItem.stock_in_confirmed_by = result.stock_in_confirmed_by || currentSession.user?.username || getCurrentStoreWorkerFallback() || "";
+  rawItem.stock_in_status = status;
+  rawItem.stock_in_error = "";
+  if (status === "already_confirmed") {
+    rawItem.stock_in_message = "已确认入库。";
+  } else if (status === "location_updated") {
+    rawItem.stock_in_message = "已换货架。";
+  } else {
+    rawItem.stock_in_message = "已入库。";
+  }
+  return result;
 }
 
 function advanceStoreMobileGroupWorkflow(state = storeMobilePricingPreviewState, groupId = "", action = "") {
@@ -37296,6 +37504,8 @@ function handleStoreMobilePricingPreviewAction(button) {
   const generateGroup = button.dataset.mobilePricingGenerateGroup;
   const previewLabels = button.dataset.mobilePricingPreviewLabels;
   const printLabels = button.dataset.mobilePricingPrintLabels;
+  const confirmStockIn = button.dataset.mobilePricingConfirmStockIn;
+  const confirmStockInGroup = button.dataset.mobilePricingConfirmStockInGroup;
   const labelSize = button.dataset.mobilePricingLabelSize;
   const priceChoice = button.dataset.mobilePricingPriceChoice;
   const gradeChoice = button.dataset.mobilePricingGradeChoice;
@@ -37478,6 +37688,26 @@ function handleStoreMobilePricingPreviewAction(button) {
         if (group) {
           group.preview_print_status = "error";
           group.preview_print_error = formatErrorMessage(error);
+        }
+        renderStoreMobilePricingPreview();
+      });
+  }
+  if (confirmStockIn) {
+    confirmStoreMobileStoreItemStockIn(state, confirmStockInGroup || state.activeGroupId, confirmStockIn)
+      .then(() => {
+        storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+        renderStoreMobilePricingPreview();
+      })
+      .catch((error) => {
+        const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(confirmStockInGroup || state.activeGroupId || ""));
+        const rawItem = getStoreMobileGeneratedStoreItems(group).find((item) => {
+          const normalized = normalizeStoreItemForLabelPreview(item, group);
+          return String(normalized.machine_code || "") === String(confirmStockIn || "");
+        });
+        if (rawItem) {
+          rawItem.stock_in_status = "failed";
+          rawItem.stock_in_error = formatErrorMessage(error);
+          rawItem.stock_in_message = "";
         }
         renderStoreMobilePricingPreview();
       });
@@ -43850,7 +44080,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-printer-json-clear], [data-clerk-printer-json-copy], [data-clerk-printer-report-current], [data-clerk-bluetooth-printer-preview-protocol], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-confirm-stock-in], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-printer-json-clear], [data-clerk-printer-json-copy], [data-clerk-printer-report-current], [data-clerk-bluetooth-printer-preview-protocol], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
