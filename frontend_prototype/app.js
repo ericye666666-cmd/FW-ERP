@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-store-inventory-overview-pr2";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "store-inventory-overview-pr2";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#264";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-unconfirmed-stock-in-304";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "unconfirmed-store-item-stock-in-list-304";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#272";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -25101,6 +25101,9 @@ let storeInventoryOverviewState = {
   storeCode: "UTAWALA",
   activeTab: "category",
   overview: null,
+  stockInLocations: [],
+  unconfirmedItems: [],
+  unconfirmedMessage: "",
 };
 
 function getStoreInventoryOverviewStoreCode() {
@@ -25131,7 +25134,11 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
       <article class="store-metric"><strong>后仓</strong><span>${escapeHtml(overview.backroom_items ?? 0)}</span></article>
       <article class="store-metric"><strong>未关联货架</strong><span>${escapeHtml(overview.unassigned_location_items ?? 0)}</span></article>
       <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml(overview.today_new_items ?? 0)}</span></article>
-      <article class="store-metric"><strong>未确认 / 历史未确认</strong><span>${escapeHtml(overview.unconfirmed_items ?? 0)}</span></article>
+      <article class="store-metric">
+        <strong>未确认 / 历史未确认</strong>
+        <span>${escapeHtml(overview.unconfirmed_items ?? 0)}</span>
+        <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看待完成</button>
+      </article>
     </div>
   `;
 }
@@ -25268,6 +25275,96 @@ function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") 
   `;
 }
 
+function getStoreInventoryActiveStockInLocations(rows = storeInventoryOverviewState.stockInLocations) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => ({
+      ...row,
+      location_code: String(row.location_code || row.rack_code || "").trim().toUpperCase(),
+      location_name: String(row.location_name || row.rack_name || row.location_code || row.rack_code || "").trim(),
+      location_type: String(row.location_type || "SHELF").trim().toUpperCase(),
+      category_name: String(row.category_name || row.category_hint || "").trim(),
+      category_hint: String(row.category_hint || row.category_name || "").trim(),
+      active: row.active !== false,
+    }))
+    .filter((row) => row.location_code && row.active !== false && (row.location_type === "SHELF" || row.location_type === "BACKROOM"));
+}
+
+async function loadStoreInventoryStockInLocations(storeCode = "") {
+  const normalizedStoreCode = String(storeCode || storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode()).trim().toUpperCase() || "UTAWALA";
+  const rows = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/rack-locations`);
+  storeInventoryOverviewState.stockInLocations = Array.isArray(rows) ? rows : [];
+  return storeInventoryOverviewState.stockInLocations;
+}
+
+function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
+  const target = document.querySelector("#storeInventoryOverviewDetail");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const rows = Array.isArray(items) ? items : [];
+  const locations = getStoreInventoryActiveStockInLocations();
+  target.className = "report-summary";
+  if (!rows.length) {
+    target.innerHTML = `
+      <div class="flow-summary-note">未确认 / 待完成入库 · 0 件</div>
+      ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
+      <div class="empty-state">当前门店没有待完成入库的 STORE_ITEM。</div>
+    `;
+    return;
+  }
+  target.innerHTML = `
+    <div class="flow-summary-note">未确认 / 待完成入库 · ${rows.length} 件。打印完成不等于入库，点击确认完成入库后才进入主库存。</div>
+    ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
+    <div class="table-scroll">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>STORE_ITEM 码</th>
+            <th>品类</th>
+            <th>价格</th>
+            <th>建议货架</th>
+            <th>来源 SDP</th>
+            <th>来源 SDO</th>
+            <th>打印人</th>
+            <th>打印 / 创建时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((item) => {
+            const machineCode = String(item.machine_code || item.barcode_value || "").trim();
+            const suggestedLocationCode = String(item.suggested_location_code || item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations) || "").trim().toUpperCase();
+            return `
+              <tr>
+                <td>${escapeHtml(machineCode || "-")}</td>
+                <td>${escapeHtml(item.category_name || item.category_short || "-")}</td>
+                <td>${escapeHtml(item.price_kes ?? item.sale_price_kes ?? "-")}</td>
+                <td>${escapeHtml(item.suggested_location_name || suggestedLocationCode || "-")}</td>
+                <td>${escapeHtml(item.source_sdp_display_code || "-")}</td>
+                <td>${escapeHtml(item.parent_sdo_display_code || "-")}</td>
+                <td>${escapeHtml(item.printed_by || "-")}</td>
+                <td>${escapeHtml(item.printed_at || item.created_at || item.updated_at || item.last_inbound_at || "-")}</td>
+                <td>
+                  <div class="inline-actions">
+                    <select data-store-inventory-unconfirmed-location="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>
+                      ${locations.map((location) => `
+                        <option value="${escapeHtml(location.location_code)}" ${location.location_code === suggestedLocationCode ? "selected" : ""}>
+                          ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                        </option>
+                      `).join("")}
+                    </select>
+                    <button type="button" class="primary-button mini-button" data-store-inventory-unconfirmed-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 async function loadStoreInventoryOverview(storeCode = "") {
   const normalizedStoreCode = String(storeCode || getStoreInventoryOverviewStoreCode()).trim().toUpperCase() || "UTAWALA";
   const overview = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/inventory-overview`);
@@ -25276,6 +25373,44 @@ async function loadStoreInventoryOverview(storeCode = "") {
   renderStoreInventoryOverview(overview);
   renderStoreInventoryOverviewDetail([], "点击品类或货架位查看商品明细");
   return overview;
+}
+
+async function loadStoreInventoryUnconfirmedItems(message = "") {
+  const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  await loadStoreInventoryStockInLocations(storeCode);
+  const items = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/unconfirmed-items`);
+  storeInventoryOverviewState.unconfirmedItems = Array.isArray(items) ? items : [];
+  storeInventoryOverviewState.unconfirmedMessage = message || "";
+  renderStoreInventoryUnconfirmedItems(storeInventoryOverviewState.unconfirmedItems, message);
+  return storeInventoryOverviewState.unconfirmedItems;
+}
+
+async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
+  const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  const selectedElement = document.querySelector(`[data-store-inventory-unconfirmed-location="${machineCode}"]`);
+  const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
+  if (!machineCode) {
+    throw new Error("缺少 STORE_ITEM 码。");
+  }
+  if (!selectedLocation) {
+    throw new Error("请选择货架位或后仓。");
+  }
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/confirm-stock-in`, {
+    method: "POST",
+    body: JSON.stringify({
+      location_code: selectedLocation,
+      confirmed_by: String(currentSession.user?.username || getCurrentStoreWorkerFallback() || "").trim(),
+    }),
+  });
+  const status = String(result.status || "confirmed").trim();
+  const message = status === "already_confirmed"
+    ? "已确认入库。"
+    : status === "location_updated"
+      ? "已换货架。"
+      : "确认完成入库。";
+  await loadStoreInventoryOverview(storeCode);
+  await loadStoreInventoryUnconfirmedItems(message);
+  return result;
 }
 
 async function submitStoreInventoryOverview(event) {
@@ -35250,6 +35385,9 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     bluetoothPrinterPairedPrintersLastRefreshAt: "",
     storeMobileStockInLocations: [],
     storeMobileStockInLocationError: "",
+    storeMobileUnconfirmedStockInItems: [],
+    storeMobileUnconfirmedStockInMessage: "",
+    storeMobileUnconfirmedStockInError: "",
   };
   return {
     ...baseState,
@@ -35266,6 +35404,9 @@ function createStoreMobilePricingPreviewState(overrides = {}) {
     storeMobileStockInLocations: Array.isArray(overrides.storeMobileStockInLocations)
       ? overrides.storeMobileStockInLocations
       : baseState.storeMobileStockInLocations,
+    storeMobileUnconfirmedStockInItems: Array.isArray(overrides.storeMobileUnconfirmedStockInItems)
+      ? overrides.storeMobileUnconfirmedStockInItems
+      : baseState.storeMobileUnconfirmedStockInItems,
     bluetoothPrinterStatus: normalizeClerkBluetoothPrinterStatus(overrides.bluetoothPrinterStatus || baseState.bluetoothPrinterStatus),
     bluetoothPrinterPairedPrinters: Array.isArray(overrides.bluetoothPrinterPairedPrinters)
       ? overrides.bluetoothPrinterPairedPrinters
@@ -36449,6 +36590,89 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
   `;
 }
 
+async function loadStoreMobileUnconfirmedStockInItems(state = storeMobilePricingPreviewState) {
+  const storeCode = getStoreMobileStoreCode(state);
+  await loadStoreMobileStockInLocations(state);
+  const rows = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/unconfirmed-items`);
+  state.storeMobileUnconfirmedStockInItems = Array.isArray(rows) ? rows : [];
+  state.storeMobileUnconfirmedStockInError = "";
+  return state.storeMobileUnconfirmedStockInItems;
+}
+
+function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPreviewState) {
+  const rows = Array.isArray(state.storeMobileUnconfirmedStockInItems) ? state.storeMobileUnconfirmedStockInItems : [];
+  const locations = getStoreMobileActiveStockInLocations(state);
+  const message = String(state.storeMobileUnconfirmedStockInMessage || "").trim();
+  const error = String(state.storeMobileUnconfirmedStockInError || "").trim();
+  return `
+    <section class="mobile-stock-in-panel">
+      <div class="mobile-section-head">
+        <strong>未完成入库</strong>
+        ${renderStoreMobilePricingBadge(`${rows.length} 件`)}
+      </div>
+      ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
+      ${error ? `<div class="mobile-error">${escapeHtml(error)}</div>` : ""}
+      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-load-unconfirmed-stock-in="true">刷新未完成入库</button>
+      ${rows.length ? `
+        <div class="mobile-stock-in-list">
+          ${rows.map((item) => {
+            const machineCode = String(item.machine_code || item.barcode_value || "").trim();
+            const selectedLocationCode = String(item.suggested_location_code || item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations) || "").trim().toUpperCase();
+            return `
+              <article class="mobile-stock-in-row">
+                <div>
+                  <strong>STORE_ITEM ${escapeHtml(machineCode || "-")}</strong>
+                  <span>${escapeHtml(item.category_name || item.category_short || "-")} · KES ${escapeHtml(item.price_kes || item.sale_price_kes || 0)}</span>
+                </div>
+                <label class="mobile-field">
+                  <span>货架位 / 后仓</span>
+                  <select data-mobile-unconfirmed-stock-in-location="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>
+                    ${locations.map((location) => `
+                      <option value="${escapeHtml(location.location_code)}" ${location.location_code === selectedLocationCode ? "selected" : ""}>
+                        ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                      </option>
+                    `).join("")}
+                  </select>
+                </label>
+                <button type="button" class="primary-button mobile-wide-action" data-mobile-unconfirmed-stock-in-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      ` : '<div class="empty-state">当前没有未完成入库的 STORE_ITEM。</div>'}
+    </section>
+  `;
+}
+
+async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePricingPreviewState, machineCode = "") {
+  const normalizedMachineCode = String(machineCode || "").trim();
+  const selectedElement = document.querySelector(`[data-mobile-unconfirmed-stock-in-location="${normalizedMachineCode}"]`);
+  const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
+  if (!normalizedMachineCode) {
+    throw new Error("缺少 STORE_ITEM 码。");
+  }
+  if (!selectedLocation) {
+    throw new Error("请选择货架位或后仓。");
+  }
+  const storeCode = getStoreMobileStoreCode(state);
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(normalizedMachineCode)}/confirm-stock-in`, {
+    method: "POST",
+    body: JSON.stringify({
+      location_code: selectedLocation,
+      confirmed_by: String(currentSession.user?.username || getCurrentStoreWorkerFallback() || "").trim(),
+    }),
+  });
+  const status = String(result.status || "confirmed").trim();
+  state.storeMobileUnconfirmedStockInMessage = status === "already_confirmed"
+    ? "已确认入库。"
+    : status === "location_updated"
+      ? "已换货架。"
+      : "已入库。";
+  state.storeMobileUnconfirmedStockInError = "";
+  await loadStoreMobileUnconfirmedStockInItems(state);
+  return result;
+}
+
 function buildStoreItemLabelPreviewPayload(labelTemplateSize = "60x40", storeItems = [], group = {}) {
   const config = getStoreItemLabelSizeConfig(labelTemplateSize);
   const labels = (Array.isArray(storeItems) ? storeItems : [])
@@ -37241,6 +37465,8 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
       </div>
       ${renderDirectLoopVersionInfoBlock("clerk_my")}
       ${renderClerkPrinterConnectionEntryCard(state)}
+      <div class="mobile-section-head"><strong>未完成入库</strong></div>
+      ${renderStoreMobileUnconfirmedStockInList(state)}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-reset-task="true">重置演示任务状态</button>
       <button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button>
     </section>
@@ -37763,6 +37989,8 @@ function handleStoreMobilePricingPreviewAction(button) {
   const printLabels = button.dataset.mobilePricingPrintLabels;
   const confirmStockIn = button.dataset.mobilePricingConfirmStockIn;
   const confirmStockInGroup = button.dataset.mobilePricingConfirmStockInGroup;
+  const loadUnconfirmedStockIn = button.dataset.mobilePricingLoadUnconfirmedStockIn;
+  const confirmUnconfirmedStockIn = button.dataset.mobileUnconfirmedStockInConfirm;
   const labelSize = button.dataset.mobilePricingLabelSize;
   const priceChoice = button.dataset.mobilePricingPriceChoice;
   const gradeChoice = button.dataset.mobilePricingGradeChoice;
@@ -37966,6 +38194,28 @@ function handleStoreMobilePricingPreviewAction(button) {
           rawItem.stock_in_error = formatErrorMessage(error);
           rawItem.stock_in_message = "";
         }
+        renderStoreMobilePricingPreview();
+      });
+  }
+  if (loadUnconfirmedStockIn) {
+    loadStoreMobileUnconfirmedStockInItems(state)
+      .then(() => {
+        storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+        renderStoreMobilePricingPreview();
+      })
+      .catch((error) => {
+        state.storeMobileUnconfirmedStockInError = formatErrorMessage(error);
+        renderStoreMobilePricingPreview();
+      });
+  }
+  if (confirmUnconfirmedStockIn) {
+    confirmStoreMobileUnconfirmedStockInItem(state, confirmUnconfirmedStockIn)
+      .then(() => {
+        storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
+        renderStoreMobilePricingPreview();
+      })
+      .catch((error) => {
+        state.storeMobileUnconfirmedStockInError = formatErrorMessage(error);
         renderStoreMobilePricingPreview();
       });
   }
@@ -44337,7 +44587,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement
-    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-confirm-stock-in], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-printer-json-clear], [data-clerk-printer-json-copy], [data-clerk-printer-report-current], [data-clerk-bluetooth-printer-preview-protocol], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
+    ? event.target.closest("[data-mobile-pricing-page], [data-mobile-pricing-start-task], [data-mobile-pricing-select-backend-task], [data-mobile-pricing-confirm-scan], [data-mobile-pricing-select-group], [data-mobile-pricing-create-batch], [data-mobile-pricing-delete-group], [data-mobile-pricing-generate-group], [data-mobile-pricing-preview-labels], [data-mobile-pricing-print-labels], [data-mobile-pricing-confirm-stock-in], [data-mobile-pricing-load-unconfirmed-stock-in], [data-mobile-unconfirmed-stock-in-confirm], [data-mobile-pricing-label-size], [data-mobile-pricing-price-choice], [data-mobile-pricing-grade-choice], [data-mobile-pricing-category-choice], [data-mobile-pricing-qty-step], [data-mobile-pricing-reset-task], [data-clerk-bluetooth-printer-search], [data-clerk-bluetooth-printer-refresh], [data-clerk-bluetooth-printer-diagnostic-refresh], [data-clerk-printer-json-clear], [data-clerk-printer-json-copy], [data-clerk-printer-report-current], [data-clerk-bluetooth-printer-preview-protocol], [data-clerk-bluetooth-printer-select], [data-clerk-bluetooth-printer-connect], [data-clerk-bluetooth-printer-disconnect], [data-clerk-bluetooth-printer-test]")
     : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -46915,7 +47165,7 @@ document.addEventListener("click", async (event) => {
 
 document.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-inventory-tab], [data-store-inventory-location-detail], [data-store-inventory-category-detail]")
+    ? event.target.closest("[data-store-inventory-tab], [data-store-inventory-location-detail], [data-store-inventory-category-detail], [data-store-inventory-unconfirmed-detail], [data-store-inventory-unconfirmed-confirm]")
     : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -46932,6 +47182,14 @@ document.addEventListener("click", async (event) => {
     }
     if (target.dataset.storeInventoryCategoryDetail) {
       await loadStoreInventoryCategoryDetail(target.dataset.storeInventoryCategoryDetail);
+      return;
+    }
+    if (target.dataset.storeInventoryUnconfirmedDetail) {
+      await loadStoreInventoryUnconfirmedItems();
+      return;
+    }
+    if (target.dataset.storeInventoryUnconfirmedConfirm) {
+      await confirmStoreInventoryUnconfirmedItemStockIn(target.dataset.storeInventoryUnconfirmedConfirm);
     }
   } catch (error) {
     renderErrorSummary("#storeInventoryOverviewDetail", formatErrorMessage(error));

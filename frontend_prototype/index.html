@@ -81,7 +81,7 @@
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
           <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#264</span></div>
+            <div><strong>FW-ERP 主线 PR:</strong><span>#272</span></div>
             <div><strong>Android PR:</strong><span>#35</span></div>
           </section>
           <pre id="authOutput" class="output hidden-output"></pre>
@@ -4292,16 +4292,16 @@
           (document.body || document.documentElement).appendChild(script);
         }
 
-        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-store-inventory-overview-pr2";
-        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "store-inventory-overview-pr2";
+        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-unconfirmed-stock-in-304";
+        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "unconfirmed-store-item-stock-in-list-304";
 
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=store-inventory-overview-pr2", "modern");
+          loadPdaRuntimeScript("./app.js?v=unconfirmed-store-item-stock-in-list-304", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=store-inventory-overview-pr2", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=unconfirmed-store-item-stock-in-list-304", "legacy");
       })();
     </script>
   </body>

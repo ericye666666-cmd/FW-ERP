@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#264/);
+  assert.match(loginVersionSection, /#272/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=store-inventory-overview-pr2/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-inventory-overview-pr2/);
+  assert.match(indexHtml, /app\.js\?v=unconfirmed-store-item-stock-in-list-304/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=unconfirmed-store-item-stock-in-list-304/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -175,7 +175,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-store-inventory-overview-pr2/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-unconfirmed-stock-in-304/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -402,8 +402,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-inventory-overview-pr2/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-inventory-overview-pr2/);
+  assert.match(indexHtml, /app\.js\?v=unconfirmed-store-item-stock-in-list-304/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=unconfirmed-store-item-stock-in-list-304/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -2372,9 +2372,31 @@ test("stock-in API failure keeps the PDA confirmation retryable per STORE_ITEM",
   assert.doesNotMatch(actionSource, /disabled.*failed|failed.*disabled/);
 });
 
+test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", () => {
+  const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
+  const listSource = extractFunctionSource(appJs, "renderStoreMobileUnconfirmedStockInList");
+  const loadSource = extractFunctionSource(appJs, "loadStoreMobileUnconfirmedStockInItems");
+  const confirmSource = extractFunctionSource(appJs, "confirmStoreMobileUnconfirmedStockInItem");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.match(mySource, /未完成入库/);
+  assert.match(listSource, /data-mobile-pricing-load-unconfirmed-stock-in/);
+  assert.match(listSource, /STORE_ITEM/);
+  assert.match(listSource, /suggested_location_code/);
+  assert.match(listSource, /data-mobile-unconfirmed-stock-in-location/);
+  assert.match(listSource, /data-mobile-unconfirmed-stock-in-confirm/);
+  assert.match(loadSource, /inventory-overview\/unconfirmed-items/);
+  assert.match(confirmSource, /confirm-stock-in/);
+  assert.match(confirmSource, /confirmed|already_confirmed|location_updated/);
+  assert.match(actionSource, /loadStoreMobileUnconfirmedStockInItems/);
+  assert.match(actionSource, /confirmStoreMobileUnconfirmedStockInItem/);
+});
+
 test("legacy PDA bundle contains shelf confirmation without cashier terminal preview changes", () => {
   assert.match(appLegacyJs, /renderStoreMobileStockInConfirmationPanel/);
+  assert.match(appLegacyJs, /renderStoreMobileUnconfirmedStockInList/);
   assert.match(appLegacyJs, /data-mobile-pricing-confirm-stock-in/);
+  assert.match(appLegacyJs, /data-mobile-unconfirmed-stock-in-confirm/);
   assert.match(appLegacyJs, /confirm-stock-in/);
   assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_STORE/);
   assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_ITEMS/);
