@@ -160,9 +160,13 @@ What must not be copied:
 - Keep FW-ERP's own barcode and sale rules.
 - Keep POS full-screen.
 - Keep scan-first layout.
+- Put the scan input above the cart as the cart's main entry point.
 - Keep cart and checkout always visible.
 - Keep payment state clear.
 - Keep error states close to scan input.
+- Keep the POS main screen cashier-facing, not ERP traceability-facing.
+- Do not show source chains on the POS main screen.
+- Do not show recent scan history on the POS main screen.
 - Do not import or vendor external code.
 - Treat external references as evidence for cashier-facing density, large actions, and persistent totals, not as implementation templates.
 - Preserve Store workspace / 收银功能区 / 9. 收银销售 as the POS entry.

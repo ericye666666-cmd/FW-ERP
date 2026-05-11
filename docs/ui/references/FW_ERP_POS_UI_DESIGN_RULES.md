@@ -8,6 +8,8 @@ FW-ERP POS must behave like a real cashier terminal, not a backend ERP page.
 
 It must be fast, touch-friendly, scan-first, and suitable for Kenyan retail store cashiers. The cashier should be able to scan, see the basket, collect payment, confirm coverage, complete the sale, and reprint when needed without navigating through ordinary ERP controls.
 
+The POS main screen should show only cashier-needed information: scan entry, cart, payment, shift, printer, and sync state. It must not become an ERP traceability page.
+
 ## Entry and navigation rules
 
 - Entry remains Store workspace / 收银功能区 / 9. 收银销售.
@@ -30,61 +32,79 @@ Target layout:
 Top bar:
 
 - FW-ERP POS 收银台
-- store
-- cashier
-- shift
-- network
-- time
+- current store
+- current cashier
+- current shift
+- network status
+- current time
 - exit cashier action
 
-Left column:
+Left / center main area:
 
-- large STORE_ITEM scan input
-- recent scans
-- scan rule hint
-- scan error block near input
+- large STORE_ITEM scan input above the cart
+- placeholder: 扫描 STORE_ITEM 商品码
+- scan error block directly below the scan input
+- cart item list
 
-Center column:
+Cart item rows display only:
 
-- 商品篮 / cart
-- item rows
-- item name/category/STORE_ITEM
-- short source summary: SDO / SDP only
-- price, quantity, discount, subtotal, remove
+- STORE_ITEM 商品码
+- category
+- price
+- quantity
+- discount
+- subtotal
+- rack location, if already known
+- remove button
+
+Cart item rows must not display:
+
+- SDO
+- SDB
+- LPK
+- RAW_BALE
+- source chain
+- recent scan history
+
+Cart empty state:
+
 - empty state: 商品篮为空，请扫描 STORE_ITEM 商品码
 
 Right column:
 
 - checkout panel
-- dominant total amount
 - total items
 - subtotal
 - discount
-- receivable
+- receivable amount, displayed large
 - paid
 - balance / change
 - Cash / M-Pesa / Mixed buttons
 - complete sale button
+- hold order
+- clear cart
 - current payment status
 - latest sale summary
 
 Bottom bar:
 
 - today sales
-- today order count
 - shift sales
 - shift order count
 - print status
 - sync status
-- latest sync
-- reprint shortcut
+- reprint latest sale shortcut
 
 Layout behavior:
 
 - The scan input, cart, and checkout panel must remain visible during normal cashier work.
+- The scan input is the cart's main entry point and must sit directly above the cart.
 - Payment mode should not hide the cart total.
 - Error and payment status should stay close to the control that caused the state.
 - Avoid page-length ERP forms inside the main cashier surface.
+- Do not show source-chain or lineage details on the POS main screen.
+- Do not show a recent scan list on the POS main screen.
+- Keep SDO / SDP / SDB / LPK / RAW_BALE context out of the cashier checkout view unless it is part of an error message saying the code cannot be sold.
 
 ## Touch density rules
 
@@ -134,6 +154,52 @@ General payment rules:
 - Complete sale should stay disabled or blocked until payment rules are satisfied.
 - M-Pesa reference fields are transaction evidence, not marketing consent.
 
+## Hold order rules
+
+- Hold order is only for temporarily preserving the current cart.
+- Hold order is not credit sale / 赊账.
+- Clicking hold generates a HOLD order.
+- Items in a held order become held / reserved and cannot be sold again while held.
+- A held order can continue to payment, be cancelled, or be transferred to the next shift with store-manager confirmation.
+- Cancelling a held order releases items back to on_shelf / in_stock.
+- Before shift handover, all held orders must be completed, cancelled, or explicitly transferred by store-manager confirmation.
+- Hold order UI must make the temporary nature clear to cashiers.
+
+## Shift rules
+
+- A cashier must open a shift before entering POS.
+- Every sale must bind to a shift_id.
+- One shift belongs to one cashier. Multiple cashiers must not share one shift.
+- After the current cashier closes a shift, the next cashier must open a new shift.
+- Shift close must show:
+  - shift sales amount;
+  - order count;
+  - cash amount;
+  - M-Pesa amount;
+  - Mixed amount;
+  - expected cash;
+  - counted cash;
+  - variance.
+- Cash variance must be recorded and must not be overwritten.
+- Shift handover must not hide unresolved held orders.
+
+## Weak-network rules
+
+- POS top bar must show network status:
+  - online;
+  - syncing;
+  - weak network;
+  - offline;
+  - sync failed.
+- In weak-network mode, POS may sell locally cached STORE_ITEM records.
+- Weak-network sales are completed_pending_sync.
+- Items sold on this device immediately become sold_pending_sync to prevent duplicate sale on the same POS.
+- When network recovers, POS syncs sale records and inventory status.
+- Version 1 does not solve conflicts across multiple POS terminals.
+- Version 1 assumes one primary POS terminal per store.
+- POS still only sells STORE_ITEM in weak-network mode.
+- Weak-network mode must not allow RAW_BALE / SDB / LPK / SDO / SDP sales.
+
 ## Customer phone rules
 
 - Customer phone is collected during M-Pesa or Mixed payment flow.
@@ -163,17 +229,21 @@ General payment rules:
 Use FW-ERP status accent logic:
 
 - Info: active scan / next action
-- Success: paid / covered / connected / recognized STORE_ITEM
-- Warning: pending payment / sync pending / amount not fully covered
-- Danger: scan error / cannot sell / wrong barcode
+- Success: paid / covered / connected / recognized STORE_ITEM / synced
+- Warning: pending payment / sync pending / weak network / amount not fully covered
+- Danger: scan error / cannot sell / wrong barcode / offline sync failed
 - Neutral: empty cart / default state
 
 Scan errors must appear near the scan input:
 
 - 只能扫描 STORE_ITEM 商品码
+- RAW_BALE 不能在 POS 销售
+- SDB 不能在 POS 销售
+- LPK 不能在 POS 销售
 - SDO 不能在 POS 销售
 - SDP 不能在 POS 销售
 - 该商品还未上架，不可销售
+- 该商品已挂单保留，不能重复销售
 - 该商品已售出，不能重复销售
 
 Error behavior:
@@ -193,6 +263,7 @@ Error behavior:
 - SDP / STORE_DELIVERY_PACKAGE cannot be sold in POS.
 - pending_print cannot be sold.
 - pending_putaway cannot be sold.
+- held / reserved STORE_ITEM cannot be sold in a new sale until released or completed through the held order flow.
 - sold STORE_ITEM cannot be sold again.
 - Frontend/POS must not generate STORE_ITEM machine_code.
 - POS UI must not weaken barcode resolver rules.
@@ -204,18 +275,20 @@ Error behavior:
 1. POS-FS-1 full-screen POS entry and browser Back behavior.
 2. POS-UI-2 field-ready cashier terminal visual polish.
 3. POS-PAY-1 Cash / M-Pesa / Mixed local validation and customer phone sale record.
-4. POS-MPESA-1 Safaricom Daraja sandbox STK Push backend integration.
-5. POS-MPESA-2 STK Push callback and payment status update.
-6. POS-MPESA-3 C2B callback for customer-initiated payments.
-7. POS-SHIFT-1 open shift / close shift / Z-report.
-8. POS-AUDIT-1 void/refund permission and audit.
-9. POS-OFFLINE-1 weak network / offline sync.
+4. POS-HOLD-1 HOLD cart reservation, release, and manager-confirmed shift transfer.
+5. POS-MPESA-1 Safaricom Daraja sandbox STK Push backend integration.
+6. POS-MPESA-2 STK Push callback and payment status update.
+7. POS-MPESA-3 C2B callback for customer-initiated payments.
+8. POS-SHIFT-1 open shift / close shift / Z-report.
+9. POS-AUDIT-1 void/refund permission and audit.
+10. POS-OFFLINE-1 weak network / offline sync.
 
 Sequence rules:
 
 - UI polish can improve cashier speed before payment integration is live.
 - Daraja work must be backend-led and sandbox-first.
 - C2B and STK Push are separate payment paths.
+- HOLD order work must reserve and release STORE_ITEM status consistently before production use.
 - Shift close, refund, void, and offline sync need audit rules before production use.
 - None of these future steps should import external POS template code.
 
