@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -9,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.api import routes as routes_module
 from app.core.config import settings
 from app.core.seed_data import STORE_RACK_TEMPLATE
-from app.core.state import InMemoryState
+from app.core.state import InMemoryState, NAIROBI_TZ
 
 
 def _store_item(
@@ -122,6 +123,50 @@ class StoreInventoryOverviewStateTest(unittest.TestCase):
         self.assertEqual(location_counts["PT-CR"], 1)
         self.assertEqual(location_counts["UT-BACKROOM"], 1)
         self.assertEqual(location_counts["UNASSIGNED"], 1)
+
+    def test_inventory_overview_sold_today_summary_excludes_active_inventory(self):
+        today = datetime.now(NAIROBI_TZ).replace(hour=11, minute=20, second=0, microsecond=0)
+        yesterday = today - timedelta(days=1)
+        self._add_item(_store_item(store_item_id="STOREITEM-ACTIVE", machine_code="5260511000011", location_code="PT-CR", stock_in_confirmed=True))
+        self._add_item(dict(
+            _store_item(store_item_id="STOREITEM-SOLD-TODAY", machine_code="5260511000045", location_code="PT-CR", status="sold", stock_in_confirmed=True),
+            sold=True,
+            sold_at=today.isoformat(),
+            final_price=390,
+        ))
+        self._add_item(dict(
+            _store_item(store_item_id="STOREITEM-SOLD-BACK", machine_code="5260511000052", location_code="UT-BACKROOM", category_short="LADY TOP", status="sold", stock_in_confirmed=True),
+            sold=True,
+            sold_at=today.isoformat(),
+            final_price=520,
+        ))
+        self._add_item(dict(
+            _store_item(store_item_id="STOREITEM-SOLD-YESTERDAY", machine_code="5260511000060", location_code="PT-CR", status="sold", stock_in_confirmed=True),
+            sold=True,
+            sold_at=yesterday.isoformat(),
+            final_price=410,
+        ))
+        self._add_item(dict(
+            _store_item(store_code="KINNO", store_item_id="STOREITEM-SOLD-KINNO", machine_code="5260511000078", location_code="PT-CR", status="sold", stock_in_confirmed=True),
+            sold=True,
+            sold_at=today.isoformat(),
+            final_price=410,
+        ))
+
+        overview = self.state.get_store_inventory_overview("UTAWALA")
+
+        self.assertEqual(overview["total_items"], 1)
+        self.assertEqual(overview["shelf_items"], 1)
+        self.assertEqual(overview["sold_today_items"], 2)
+        self.assertEqual(overview["sold_today_amount"], 910)
+        self.assertEqual(
+            {row["category_name"]: (row["sold_items"], row["sold_amount"]) for row in overview["sold_by_category"]},
+            {"CARGO PANT": (1, 390), "LADY TOP": (1, 520)},
+        )
+        self.assertEqual(
+            {row["location_code"]: (row["sold_items"], row["sold_amount"]) for row in overview["sold_by_location"]},
+            {"PT-CR": (1, 390), "UT-BACKROOM": (1, 520)},
+        )
 
     def test_inventory_overview_detail_filters_by_category_and_location(self):
         self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR", stock_in_confirmed=True))

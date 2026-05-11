@@ -25140,6 +25140,7 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
       <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml(overview.shelf_items ?? 0)}</span></article>
       <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml(overview.total_items ?? 0)}</span></article>
       <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml(overview.today_new_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>今日已售</strong><span>${escapeHtml(overview.sold_today_items ?? 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
     </div>
   `;
 }
@@ -25218,6 +25219,7 @@ function renderStoreInventoryOverview(overview = {}) {
   storeInventoryOverviewState.overview = overview;
   storeInventoryOverviewState.storeCode = String(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA").trim().toUpperCase();
   renderStoreInventoryOverviewMetrics(overview);
+  renderStoreInventorySoldSummary(overview);
   const target = document.querySelector("#storeInventoryOverviewTables");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -25228,6 +25230,70 @@ function renderStoreInventoryOverview(overview = {}) {
     ${activeTab === "location"
       ? renderStoreInventoryOverviewLocationRows(overview.by_location || [])
       : renderStoreInventoryOverviewCategoryRows(overview.by_category || [])}
+  `;
+}
+
+function renderStoreInventorySoldSummary(overview = {}) {
+  const target = document.querySelector("#storeInventorySoldSummary");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const categoryRows = Array.isArray(overview.sold_by_category) ? overview.sold_by_category : [];
+  const locationRows = Array.isArray(overview.sold_by_location) ? overview.sold_by_location : [];
+  const soldCount = Number(overview.sold_today_items || 0);
+  const soldAmount = Number(overview.sold_today_amount || 0);
+  target.className = "report-summary";
+  if (!soldCount && !categoryRows.length && !locationRows.length) {
+    target.innerHTML = `
+      <div class="flow-summary-note">销售出库摘要</div>
+      <div class="empty-state">今天还没有 POS 销售出库。</div>
+    `;
+    return;
+  }
+  const renderSoldCategoryRows = () => categoryRows.length ? categoryRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.category_name || "unknown")}</td>
+      <td>${escapeHtml(row.sold_items ?? 0)}</td>
+      <td>${escapeHtml(formatKesAmount(row.sold_amount || 0, "KES 0.00"))}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="3">今天还没有 POS 销售出库。</td></tr>`;
+  const renderSoldLocationRows = () => locationRows.length ? locationRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.location_code || "-")}</td>
+      <td>${escapeHtml(row.location_name || "-")}</td>
+      <td>${escapeHtml(row.sold_items ?? 0)}</td>
+      <td>${escapeHtml(formatKesAmount(row.sold_amount || 0, "KES 0.00"))}</td>
+    </tr>
+  `).join("") : `<tr><td colspan="4">今天还没有 POS 销售出库。</td></tr>`;
+  target.innerHTML = `
+    <div class="flow-summary-note">销售出库摘要 · 今日已售 ${escapeHtml(soldCount)} 件 · ${escapeHtml(formatKesAmount(soldAmount, "KES 0.00"))}</div>
+    <div class="two-column-grid">
+      <div class="table-scroll">
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>按品类售出</th>
+              <th>今日已售件数</th>
+              <th>今日销售额</th>
+            </tr>
+          </thead>
+          <tbody>${renderSoldCategoryRows()}</tbody>
+        </table>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>货架位</th>
+              <th>按货架售出</th>
+              <th>今日已售件数</th>
+              <th>今日销售额</th>
+            </tr>
+          </thead>
+          <tbody>${renderSoldLocationRows()}</tbody>
+        </table>
+      </div>
+    </div>
   `;
 }
 
