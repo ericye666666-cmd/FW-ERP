@@ -58,6 +58,6 @@ test("legacy PDA bundle includes the store shelf editor menu and handlers", () =
   assert.match(appLegacyJs, /货架位编辑/);
   assert.match(appLegacyJs, /submitStoreShelfLocationLoad/);
   assert.match(appLegacyJs, /submitStoreShelfLocationSave/);
-  assert.match(indexHtml, /app\.js\?v=store-shelf-locations-pr1/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-locations-pr1/);
+  assert.match(indexHtml, /app\.js\?v=store-inventory-overview-pr2/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-inventory-overview-pr2/);
 });

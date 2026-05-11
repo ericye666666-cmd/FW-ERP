@@ -17613,6 +17613,293 @@ class InMemoryState:
                 total += 1
         return total
 
+    def _store_inventory_row_is_countable(self, row: dict[str, Any]) -> bool:
+        if not self._store_inventory_row_is_base_eligible(row):
+            return False
+        return row.get("stock_in_confirmed") is True
+
+    def _store_inventory_row_is_base_eligible(self, row: dict[str, Any]) -> bool:
+        if row.get("sold") is True:
+            return False
+        status_values = {
+            str(row.get("status") or "").strip().lower(),
+            str(row.get("sale_status") or "").strip().lower(),
+            str(row.get("store_item_status") or "").strip().lower(),
+        }
+        blocked_statuses = {"sold", "void", "voided", "cancelled", "canceled", "deleted"}
+        return not any(status in blocked_statuses for status in status_values if status)
+
+    def _store_inventory_category_name(self, row: dict[str, Any], location: dict[str, Any] | None = None) -> str:
+        for key in ("category_name", "category_hint", "category_sub", "category_short", "product_name"):
+            value = str(row.get(key) or "").strip()
+            if value:
+                return value
+        if location:
+            value = str(location.get("category_name") or location.get("category_hint") or "").strip()
+            if value:
+                return value
+        return "unknown"
+
+    def _store_inventory_last_time(self, row: dict[str, Any]) -> str:
+        for key in (
+            "stock_in_confirmed_at",
+            "shelved_at",
+            "printed_at",
+            "updated_at",
+            "created_at",
+            "generated_at",
+        ):
+            value = str(row.get(key) or "").strip()
+            if value:
+                return value
+        return ""
+
+    def _store_inventory_location_maps(self, store_code: str) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+        locations = {
+            str(row.get("location_code") or row.get("rack_code") or "").strip().upper(): row
+            for row in self.list_store_racks(store_code)
+            if str(row.get("location_code") or row.get("rack_code") or "").strip()
+        }
+        active_locations = {
+            code: row
+            for code, row in locations.items()
+            if row.get("active") is not False and str(row.get("status") or "active").strip().lower() != "inactive"
+        }
+        return locations, active_locations
+
+    def _normalize_store_inventory_item_row(
+        self,
+        row: dict[str, Any],
+        store_code: str,
+        locations: dict[str, dict[str, Any]],
+        active_locations: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        location_code = str(
+            row.get("current_location_code")
+            or row.get("store_rack_code")
+            or row.get("rack_code")
+            or ""
+        ).strip().upper()
+        matched_location = active_locations.get(location_code)
+        if not matched_location:
+            location_bucket = "UNASSIGNED"
+            location_type = "UNASSIGNED"
+            location_name = "未关联货架"
+            location_code = ""
+        else:
+            location_bucket = str(matched_location.get("location_code") or matched_location.get("rack_code") or location_code).strip().upper()
+            location_type = str(matched_location.get("location_type") or "SHELF").strip().upper()
+            location_name = str(matched_location.get("location_name") or location_bucket).strip()
+        category_name = self._store_inventory_category_name(row, matched_location or locations.get(location_code))
+        machine_code = str(row.get("machine_code") or row.get("barcode_value") or row.get("barcode") or "").strip().upper()
+        barcode_value = str(row.get("barcode_value") or row.get("machine_code") or row.get("barcode") or "").strip().upper()
+        price_value = row.get("sale_price_kes", row.get("selling_price_kes", row.get("selected_price", row.get("launch_price", row.get("price")))))
+        try:
+            price_kes = round(float(price_value or 0), 2)
+        except (TypeError, ValueError):
+            price_kes = 0.0
+        last_time = self._store_inventory_last_time(row)
+        return {
+            "store_code": store_code,
+            "store_item_id": str(row.get("store_item_id") or row.get("item_id") or row.get("entity_id") or row.get("display_code") or machine_code).strip().upper(),
+            "display_code": str(row.get("display_code") or row.get("token_no") or "").strip().upper(),
+            "machine_code": machine_code,
+            "barcode_value": barcode_value,
+            "category_name": category_name,
+            "category_short": str(row.get("category_short") or "").strip(),
+            "grade": str(row.get("grade") or row.get("pricing_type") or "").strip().upper(),
+            "pricing_type": str(row.get("pricing_type") or "").strip().upper(),
+            "price_kes": price_kes,
+            "sale_price_kes": price_kes,
+            "current_location_code": location_bucket if location_bucket != "UNASSIGNED" else "",
+            "location_code": location_bucket,
+            "location_name": location_name,
+            "location_type": location_type,
+            "source_sdp_display_code": str(row.get("source_sdp_display_code") or row.get("sdo_package_display_code") or row.get("source_package") or "").strip().upper(),
+            "parent_sdo_display_code": str(row.get("parent_sdo_display_code") or row.get("task_no") or "").strip().upper(),
+            "printed_by": str(row.get("printed_by") or row.get("generated_by") or row.get("created_by") or "").strip(),
+            "stock_in_confirmed_by": str(row.get("stock_in_confirmed_by") or row.get("shelved_by") or "").strip(),
+            "stock_in_confirmed_at": str(row.get("stock_in_confirmed_at") or row.get("shelved_at") or "").strip(),
+            "updated_at": last_time,
+            "last_inbound_at": last_time,
+        }
+
+    def _collect_store_inventory_items(self, store_code: str, *, inventory_scope: str = "confirmed") -> list[dict[str, Any]]:
+        store = self._ensure_store_exists(store_code)
+        locations, active_locations = self._store_inventory_location_maps(store["code"])
+        rows_by_key: dict[str, dict[str, dict[str, Any] | None]] = {}
+
+        def add_row(row: dict[str, Any], *, prefer_existing: bool = False) -> None:
+            if str(row.get("store_code") or "").strip().upper() != store["code"]:
+                return
+            if str(row.get("entity_type") or "STORE_ITEM").strip().upper() != "STORE_ITEM":
+                return
+            if not self._store_inventory_row_is_base_eligible(row):
+                return
+            key = str(
+                row.get("store_item_id")
+                or row.get("item_id")
+                or row.get("entity_id")
+                or row.get("display_code")
+                or row.get("machine_code")
+                or row.get("barcode_value")
+                or row.get("barcode")
+                or ""
+            ).strip().upper()
+            if not key:
+                return
+            normalized = self._normalize_store_inventory_item_row(row, store["code"], locations, active_locations)
+            bucket = rows_by_key.setdefault(key, {"confirmed": None, "unconfirmed": None})
+            if row.get("stock_in_confirmed") is True:
+                if prefer_existing and bucket.get("confirmed"):
+                    return
+                bucket["confirmed"] = normalized
+                return
+            if prefer_existing and bucket.get("unconfirmed"):
+                return
+            bucket["unconfirmed"] = normalized
+
+        for row in self.item_barcode_tokens.values():
+            add_row(row)
+        for row in self.store_items.values():
+            add_row(row)
+        seen_barcodes = {
+            str((bucket.get("confirmed") or bucket.get("unconfirmed") or {}).get("machine_code") or (bucket.get("confirmed") or bucket.get("unconfirmed") or {}).get("barcode_value") or "").strip().upper()
+            for bucket in rows_by_key.values()
+        }
+        for row in self.store_stock.values():
+            barcode = str(row.get("barcode") or row.get("machine_code") or row.get("barcode_value") or "").strip().upper()
+            if barcode and barcode in seen_barcodes:
+                continue
+            fallback_row = {
+                **row,
+                "entity_type": "STORE_ITEM",
+                "machine_code": barcode,
+                "barcode_value": barcode,
+                "sale_price_kes": row.get("launch_price") or row.get("expected_price") or row.get("price") or 0,
+            }
+            add_row(fallback_row, prefer_existing=True)
+        selected_key = "unconfirmed" if inventory_scope == "unconfirmed" else "confirmed"
+        items = [
+            bucket[selected_key]
+            for bucket in rows_by_key.values()
+            if bucket.get(selected_key) and not (inventory_scope == "unconfirmed" and bucket.get("confirmed"))
+        ]
+        return sorted(items, key=lambda item: (item.get("last_inbound_at") or "", item.get("machine_code") or ""), reverse=True)
+
+    def get_store_inventory_overview(self, store_code: str) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        locations, active_locations = self._store_inventory_location_maps(store["code"])
+        items = self._collect_store_inventory_items(store["code"])
+        unconfirmed_items = self._collect_store_inventory_items(store["code"], inventory_scope="unconfirmed")
+        today = datetime.now(NAIROBI_TZ).date()
+
+        by_category: dict[str, dict[str, Any]] = {}
+        by_location: dict[str, dict[str, Any]] = {}
+
+        for code, location in active_locations.items():
+            by_location[code] = {
+                "location_code": code,
+                "location_name": str(location.get("location_name") or code).strip(),
+                "location_type": str(location.get("location_type") or "SHELF").strip().upper(),
+                "category_name": str(location.get("category_name") or location.get("category_hint") or "").strip(),
+                "item_count": 0,
+                "last_inbound_at": "",
+            }
+        by_location["UNASSIGNED"] = {
+            "location_code": "UNASSIGNED",
+            "location_name": "未关联货架",
+            "location_type": "UNASSIGNED",
+            "category_name": "",
+            "item_count": 0,
+            "last_inbound_at": "",
+        }
+
+        total_items = shelf_items = backroom_items = unassigned_items = today_new_items = 0
+        for item in items:
+            total_items += 1
+            location_type = str(item.get("location_type") or "UNASSIGNED").strip().upper()
+            if location_type == "BACKROOM":
+                backroom_items += 1
+            elif location_type == "SHELF":
+                shelf_items += 1
+            else:
+                unassigned_items += 1
+            parsed_time = self._datetime_from_barcode_seed(item.get("last_inbound_at"))
+            if parsed_time and parsed_time.date() == today:
+                today_new_items += 1
+
+            category_name = str(item.get("category_name") or "unknown").strip() or "unknown"
+            category_row = by_category.setdefault(
+                category_name,
+                {
+                    "category_name": category_name,
+                    "total_items": 0,
+                    "shelf_items": 0,
+                    "backroom_items": 0,
+                    "unassigned_location_items": 0,
+                    "last_inbound_at": "",
+                },
+            )
+            category_row["total_items"] += 1
+            if location_type == "BACKROOM":
+                category_row["backroom_items"] += 1
+            elif location_type == "SHELF":
+                category_row["shelf_items"] += 1
+            else:
+                category_row["unassigned_location_items"] += 1
+            if str(item.get("last_inbound_at") or "") > str(category_row.get("last_inbound_at") or ""):
+                category_row["last_inbound_at"] = str(item.get("last_inbound_at") or "")
+
+            location_code = str(item.get("location_code") or "UNASSIGNED").strip().upper() or "UNASSIGNED"
+            location_row = by_location.setdefault(
+                location_code,
+                {
+                    "location_code": location_code,
+                    "location_name": str((locations.get(location_code) or {}).get("location_name") or location_code).strip(),
+                    "location_type": str((locations.get(location_code) or {}).get("location_type") or "UNASSIGNED").strip().upper(),
+                    "category_name": str((locations.get(location_code) or {}).get("category_name") or "").strip(),
+                    "item_count": 0,
+                    "last_inbound_at": "",
+                },
+            )
+            location_row["item_count"] += 1
+            if str(item.get("last_inbound_at") or "") > str(location_row.get("last_inbound_at") or ""):
+                location_row["last_inbound_at"] = str(item.get("last_inbound_at") or "")
+
+        return {
+            "store_code": store["code"],
+            "store_name": store.get("name", ""),
+            "total_items": total_items,
+            "shelf_items": shelf_items,
+            "backroom_items": backroom_items,
+            "unassigned_location_items": unassigned_items,
+            "today_new_items": today_new_items,
+            "unconfirmed_items": len(unconfirmed_items),
+            "stock_in_confirmed_filter": "required_true",
+            "unconfirmed_scope": "stock_in_confirmed_false_or_missing",
+            "data_sources": ["store_items", "item_barcode_tokens", "store_stock_fallback"],
+            "by_category": sorted(by_category.values(), key=lambda row: (-int(row.get("total_items") or 0), row.get("category_name") or "")),
+            "by_location": sorted(by_location.values(), key=lambda row: (row["location_type"] == "UNASSIGNED", row.get("location_type") or "", row.get("location_code") or "")),
+        }
+
+    def list_store_inventory_location_items(self, store_code: str, location_code: str) -> list[dict[str, Any]]:
+        normalized_location = str(location_code or "").strip().upper()
+        items = self._collect_store_inventory_items(store_code)
+        if normalized_location in {"", "UNASSIGNED", "未关联货架"}:
+            return [row for row in items if str(row.get("location_type") or "").strip().upper() == "UNASSIGNED"]
+        return [
+            row for row in items
+            if str(row.get("location_code") or row.get("current_location_code") or "").strip().upper() == normalized_location
+        ]
+
+    def list_store_inventory_category_items(self, store_code: str, category_name: str) -> list[dict[str, Any]]:
+        normalized_category = str(category_name or "").strip().casefold()
+        return [
+            row for row in self._collect_store_inventory_items(store_code)
+            if str(row.get("category_name") or "").strip().casefold() == normalized_category
+        ]
+
     def _normalize_store_location_row(self, row: dict[str, Any], sort_order: int = 0) -> dict[str, Any]:
         store_code = str(row.get("store_code") or "").strip().upper()
         location_code = str(row.get("location_code") or row.get("rack_code") or "").strip().upper()

@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-store-shelf-locations-pr1";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "store-shelf-locations-pr1";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#263";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-store-inventory-overview-pr2";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "store-inventory-overview-pr2";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#264";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -25097,6 +25097,208 @@ function renderRackResultSummary(kind, data) {
   target.innerHTML = `<div class="alert-banner">货架位动作已完成。</div>`;
 }
 
+let storeInventoryOverviewState = {
+  storeCode: "UTAWALA",
+  activeTab: "category",
+  overview: null,
+};
+
+function getStoreInventoryOverviewStoreCode() {
+  return String(
+    document.querySelector("#storeInventoryOverviewForm [name='store_code']")?.value
+      || storeInventoryOverviewState.storeCode
+      || getCurrentStoreCodeFallback()
+      || "UTAWALA",
+  ).trim().toUpperCase();
+}
+
+function formatInventoryDate(value) {
+  const text = String(value || "").trim();
+  return text || "-";
+}
+
+function renderStoreInventoryOverviewMetrics(overview = {}) {
+  const target = document.querySelector("#storeInventoryOverviewSummary");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  target.className = "report-summary";
+  target.innerHTML = `
+    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计 stock_in_confirmed=true 的 STORE_ITEM；未确认 / 历史未确认单独展示。</div>
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml(overview.total_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml(overview.shelf_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml(overview.backroom_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>未关联货架</strong><span>${escapeHtml(overview.unassigned_location_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml(overview.today_new_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>未确认 / 历史未确认</strong><span>${escapeHtml(overview.unconfirmed_items ?? 0)}</span></article>
+    </div>
+  `;
+}
+
+function renderStoreInventoryOverviewCategoryRows(rows = []) {
+  if (!rows.length) {
+    return `<div class="empty-state">当前门店还没有可统计的 STORE_ITEM 库存。</div>`;
+  }
+  return `
+    <div class="table-scroll">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>品类</th>
+            <th>总库存</th>
+            <th>已上货架</th>
+            <th>后仓</th>
+            <th>未关联货架</th>
+            <th>最后入库时间</th>
+            <th>明细</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.category_name || "unknown")}</td>
+              <td>${escapeHtml(row.total_items ?? 0)}</td>
+              <td>${escapeHtml(row.shelf_items ?? 0)}</td>
+              <td>${escapeHtml(row.backroom_items ?? 0)}</td>
+              <td>${escapeHtml(row.unassigned_location_items ?? 0)}</td>
+              <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
+              <td><button type="button" class="ghost-button mini-button" data-store-inventory-category-detail="${escapeHtml(row.category_name || "unknown")}">查看商品</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderStoreInventoryOverviewLocationRows(rows = []) {
+  if (!rows.length) {
+    return `<div class="empty-state">当前门店还没有货架位库存。</div>`;
+  }
+  return `
+    <div class="table-scroll">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>货架位</th>
+            <th>货架名称</th>
+            <th>绑定品类</th>
+            <th>商品数量</th>
+            <th>最后入库时间</th>
+            <th>明细</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.location_code || "-")}</td>
+              <td>${escapeHtml(row.location_name || "-")}</td>
+              <td>${escapeHtml(row.category_name || "-")}</td>
+              <td>${escapeHtml(row.item_count ?? 0)}</td>
+              <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
+              <td><button type="button" class="ghost-button mini-button" data-store-inventory-location-detail="${escapeHtml(row.location_code || "UNASSIGNED")}">查看商品</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderStoreInventoryOverview(overview = {}) {
+  storeInventoryOverviewState.overview = overview;
+  storeInventoryOverviewState.storeCode = String(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA").trim().toUpperCase();
+  renderStoreInventoryOverviewMetrics(overview);
+  const target = document.querySelector("#storeInventoryOverviewTables");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const activeTab = storeInventoryOverviewState.activeTab === "location" ? "location" : "category";
+  target.innerHTML = `
+    <div class="flow-summary-note">${activeTab === "location" ? "按货架分类" : "按品类分类"}</div>
+    ${activeTab === "location"
+      ? renderStoreInventoryOverviewLocationRows(overview.by_location || [])
+      : renderStoreInventoryOverviewCategoryRows(overview.by_category || [])}
+  `;
+}
+
+function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") {
+  const target = document.querySelector("#storeInventoryOverviewDetail");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  target.className = "report-summary";
+  if (!items.length) {
+    target.innerHTML = `<div class="empty-state">${escapeHtml(title)}：没有商品。</div>`;
+    return;
+  }
+  target.innerHTML = `
+    <div class="flow-summary-note">${escapeHtml(title)} · ${items.length} 件</div>
+    <div class="table-scroll">
+      <table class="data-table compact-table">
+        <thead>
+          <tr>
+            <th>STORE_ITEM machine_code / barcode</th>
+            <th>品类</th>
+            <th>价格</th>
+            <th>当前货架位</th>
+            <th>来源 SDP</th>
+            <th>来源 SDO</th>
+            <th>打印人 / 确认人</th>
+            <th>入库 / 更新时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map((item) => `
+            <tr>
+              <td>${escapeHtml(item.machine_code || item.barcode_value || "-")}</td>
+              <td>${escapeHtml(item.category_name || item.category_short || "-")}</td>
+              <td>${escapeHtml(item.price_kes ?? item.sale_price_kes ?? "-")}</td>
+              <td>${escapeHtml(item.current_location_code || item.location_code || "-")}</td>
+              <td>${escapeHtml(item.source_sdp_display_code || "-")}</td>
+              <td>${escapeHtml(item.parent_sdo_display_code || "-")}</td>
+              <td>${escapeHtml([item.printed_by, item.stock_in_confirmed_by].filter(Boolean).join(" / ") || "-")}</td>
+              <td>${escapeHtml(item.stock_in_confirmed_at || item.updated_at || item.last_inbound_at || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadStoreInventoryOverview(storeCode = "") {
+  const normalizedStoreCode = String(storeCode || getStoreInventoryOverviewStoreCode()).trim().toUpperCase() || "UTAWALA";
+  const overview = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/inventory-overview`);
+  writeOutput("#storeInventoryOverviewOutput", overview);
+  setInputValue("#storeInventoryOverviewForm [name='store_code']", normalizedStoreCode);
+  renderStoreInventoryOverview(overview);
+  renderStoreInventoryOverviewDetail([], "点击品类或货架位查看商品明细");
+  return overview;
+}
+
+async function submitStoreInventoryOverview(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  return loadStoreInventoryOverview(payload.store_code);
+}
+
+async function loadStoreInventoryLocationDetail(locationCode = "") {
+  const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  const items = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/locations/${encodeURIComponent(locationCode)}/items`);
+  renderStoreInventoryOverviewDetail(items, `货架位 ${locationCode || "未关联货架"} 商品明细`);
+  return items;
+}
+
+async function loadStoreInventoryCategoryDetail(categoryName = "") {
+  const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  const items = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/categories/${encodeURIComponent(categoryName)}/items`);
+  renderStoreInventoryOverviewDetail(items, `品类 ${categoryName || "unknown"} 商品明细`);
+  return items;
+}
+
 function getStoreShelfLocationStatusLabel(row = {}) {
   return row.active === false || String(row.status || "").trim().toLowerCase() === "inactive" ? "停用" : "启用";
 }
@@ -41846,6 +42048,7 @@ const FORM_SUMMARY_SELECTORS = {
   "#loginForm": "#authResultSummary",
   "#devTaskForm": "#devTrackerSummary",
   "#storeManagerConsoleForm": "#storeManagerConsoleSummary",
+  "#storeInventoryOverviewForm": "#storeInventoryOverviewSummary",
   "#storeShelfLocationLoadForm": "#storeShelfLocationSummary",
   "#storeShelfLocationForm": "#storeShelfLocationSummary",
   "#storeRetailSeedForm": "#storeRetailSeedSummary",
@@ -41974,6 +42177,7 @@ bindForm("#loginForm", submitLogin, "#authOutput");
 bindLoginSubmitFallback();
 bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
+bindForm("#storeInventoryOverviewForm", submitStoreInventoryOverview, "#storeInventoryOverviewOutput");
 bindForm("#storeShelfLocationLoadForm", submitStoreShelfLocationLoad, "#storeShelfLocationOutput");
 bindForm("#storeShelfLocationForm", submitStoreShelfLocationSave, "#storeShelfLocationOutput");
 bindForm("#storeRetailSeedForm", submitStoreRetailSeed, "#storeRetailSeedOutput");
@@ -46043,6 +46247,31 @@ document.addEventListener("click", async (event) => {
   if (row) {
     hydrateStoreShelfLocationForm(row);
     focusElement("#storeShelfLocationForm");
+  }
+});
+
+document.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-store-inventory-tab], [data-store-inventory-location-detail], [data-store-inventory-category-detail]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    if (target.dataset.storeInventoryTab) {
+      storeInventoryOverviewState.activeTab = target.dataset.storeInventoryTab === "location" ? "location" : "category";
+      renderStoreInventoryOverview(storeInventoryOverviewState.overview || {});
+      return;
+    }
+    if (target.dataset.storeInventoryLocationDetail) {
+      await loadStoreInventoryLocationDetail(target.dataset.storeInventoryLocationDetail);
+      return;
+    }
+    if (target.dataset.storeInventoryCategoryDetail) {
+      await loadStoreInventoryCategoryDetail(target.dataset.storeInventoryCategoryDetail);
+    }
+  } catch (error) {
+    renderErrorSummary("#storeInventoryOverviewDetail", formatErrorMessage(error));
   }
 });
 
