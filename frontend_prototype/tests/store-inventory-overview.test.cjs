@@ -39,11 +39,32 @@ test("inventory overview page has store switcher, tabs, metrics, and detail targ
   assert.match(section, /今日新增入库/);
   assert.match(section, /今日已售/);
   assert.match(section, /销售出库摘要/);
+  assert.match(section, /STORE_ITEM 查询/);
+  assert.match(section, /请输入 \/ 扫描 STORE_ITEM 码/);
   assert.match(section, /待完成入库/);
   assert.match(section, /按品类/);
   assert.match(section, /按货架/);
   assert.match(section, /storeInventoryOverviewDetail/);
   assert.doesNotMatch(section, /placeholder|下一步接入/i);
+});
+
+test("inventory overview STORE_ITEM trace lookup is wired as read-only", () => {
+  const section = extractSectionByHeading("库存总览");
+  const lookupSource = extractFunctionSource(appJs, "lookupStoreItemTrace");
+  const renderSource = extractFunctionSource(appJs, "renderStoreItemTraceLookupResult");
+
+  assert.match(section, /storeItemTraceLookupForm/);
+  assert.match(section, /storeItemTraceLookupResult/);
+  assert.match(appJs, /lookupStoreItemTrace/);
+  assert.match(appJs, /renderStoreItemTraceLookupResult/);
+  assert.ok(lookupSource.includes("/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/trace"));
+  assert.match(renderSource, /在库/);
+  assert.match(renderSource, /待完成入库/);
+  assert.match(renderSource, /已售/);
+  assert.match(renderSource, /未关联货架/);
+  assert.match(renderSource, /不是门店商品码/);
+  assert.match(renderSource, /未找到/);
+  assert.doesNotMatch(lookupSource, /confirm-stock-in|method:\s*"POST"/);
 });
 
 test("inventory overview frontend calls overview and detail APIs", () => {
@@ -154,6 +175,6 @@ test("legacy bundle includes inventory overview page logic and cache key", () =>
   assert.match(appLegacyJs, /data-store-inventory-category-detail/);
   assert.match(appLegacyJs, /loadStoreInventoryUnconfirmedItems/);
   assert.match(appLegacyJs, /data-store-inventory-unconfirmed-confirm/);
-  assert.match(indexHtml, /app\.js\?v=inventory-overview-ui-polish-305/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=inventory-overview-ui-polish-305/);
+  assert.match(indexHtml, /app\.js\?v=store-item-trace-lookup-308/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-trace-lookup-308/);
 });

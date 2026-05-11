@@ -33,9 +33,9 @@ const STORAGE_KEYS = {
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection",
 };
 
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-inventory-overview-ui-polish-305";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "inventory-overview-ui-polish-305";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#274";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-store-item-trace-lookup-308";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "store-item-trace-lookup-308";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#279";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -25502,6 +25502,73 @@ async function loadStoreInventoryCategoryDetail(categoryName = "") {
   return items;
 }
 
+function renderStoreItemTraceLookupResult(trace = {}) {
+  const target = document.querySelector("#storeItemTraceLookupResult");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const status = String(trace.trace_status || "unknown").trim();
+  const label = trace.status_label || {
+    in_stock: "在库",
+    pending_stock_in: "待完成入库",
+    sold: "已售",
+    unassigned_location: "未关联货架",
+    invalid: "不是门店商品码",
+    unknown: "未找到",
+  }[status] || "未找到";
+  const toneClass = status === "in_stock"
+    ? "success-banner"
+    : status === "sold" || status === "pending_stock_in" || status === "unassigned_location"
+      ? "warning-banner"
+      : "error-banner";
+  const locationText = [trace.current_location_name, trace.current_location_code].filter(Boolean).join(" / ") || "-";
+  const sourceText = [trace.source_sdp_display_code, trace.parent_sdo_display_code].filter(Boolean).join(" / ") || "-";
+  const saleText = trace.sale_no || trace.sale_id || trace.sold_at || trace.sold_by
+    ? [trace.sale_no || trace.sale_id, trace.sold_at, trace.sold_by].filter(Boolean).join(" / ")
+    : "-";
+  const operationHint = status === "pending_stock_in"
+    ? "该商品已生成或已打印，但还没有点击确认完成入库。建议去“待完成入库”列表处理。"
+    : status === "unassigned_location"
+      ? "该商品已入库，但货架位置为空或失效。请在待完成入库或货架处理流程中修正。"
+      : status === "invalid"
+        ? "POS 和库存查询只处理 STORE_ITEM，RAW_BALE / SDB / SDP / LPK / SDO 不是商品码。"
+        : status === "unknown"
+          ? "没有找到这个 STORE_ITEM。"
+          : trace.message || "";
+  target.className = "report-summary";
+  target.innerHTML = `
+    <div class="${toneClass}">状态：${escapeHtml(label)}</div>
+    ${operationHint ? `<div class="flow-summary-note">${escapeHtml(operationHint)}</div>` : ""}
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>STORE_ITEM</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
+      <article class="store-metric"><strong>品类</strong><span>${escapeHtml(trace.category_name || trace.category_short || "-")}</span><small>KES ${escapeHtml(trace.price_kes ?? 0)}</small></article>
+      <article class="store-metric"><strong>当前货架</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(trace.location_type || "")}</small></article>
+      <article class="store-metric"><strong>来源</strong><span>${escapeHtml(sourceText)}</span><small>SDP / SDO</small></article>
+      <article class="store-metric"><strong>确认入库</strong><span>${escapeHtml(trace.stock_in_confirmed ? "已确认" : "未确认")}</span><small>${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
+      <article class="store-metric"><strong>销售</strong><span>${escapeHtml(trace.sold ? "已售" : "未售")}</span><small>${escapeHtml(saleText)}</small></article>
+    </div>
+  `;
+}
+
+async function lookupStoreItemTrace(machineCode = "") {
+  const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  machineCode = String(machineCode || "").trim().toUpperCase();
+  if (!machineCode) {
+    throw new Error("请输入 STORE_ITEM 码。");
+  }
+  const trace = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/trace`);
+  writeOutput("#storeInventoryOverviewOutput", trace);
+  renderStoreItemTraceLookupResult(trace);
+  return trace;
+}
+
+async function submitStoreItemTraceLookup(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  return lookupStoreItemTrace(payload.machine_code);
+}
+
 function getStoreShelfLocationStatusLabel(row = {}) {
   return row.active === false || String(row.status || "").trim().toLowerCase() === "inactive" ? "停用" : "启用";
 }
@@ -43422,6 +43489,7 @@ const FORM_SUMMARY_SELECTORS = {
   "#devTaskForm": "#devTrackerSummary",
   "#storeManagerConsoleForm": "#storeManagerConsoleSummary",
   "#storeInventoryOverviewForm": "#storeInventoryOverviewSummary",
+  "#storeItemTraceLookupForm": "#storeItemTraceLookupResult",
   "#storeShelfLocationLoadForm": "#storeShelfLocationSummary",
   "#storeShelfLocationForm": "#storeShelfLocationSummary",
   "#storeRetailSeedForm": "#storeRetailSeedSummary",
@@ -43551,6 +43619,7 @@ bindLoginSubmitFallback();
 bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
 bindForm("#storeInventoryOverviewForm", submitStoreInventoryOverview, "#storeInventoryOverviewOutput");
+bindForm("#storeItemTraceLookupForm", submitStoreItemTraceLookup, "#storeInventoryOverviewOutput");
 bindForm("#storeShelfLocationLoadForm", submitStoreShelfLocationLoad, "#storeShelfLocationOutput");
 bindForm("#storeShelfLocationForm", submitStoreShelfLocationSave, "#storeShelfLocationOutput");
 bindForm("#storeRetailSeedForm", submitStoreRetailSeed, "#storeRetailSeedOutput");

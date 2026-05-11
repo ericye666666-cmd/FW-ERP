@@ -18951,6 +18951,165 @@ class InMemoryState:
             add_row(row)
         return sorted(rows_by_key.values(), key=lambda item: (item.get("sold_at") or "", item.get("machine_code") or ""), reverse=True)
 
+    def _find_store_item_trace_rows(self, machine_code: str) -> list[dict[str, Any]]:
+        normalized_code = str(machine_code or "").strip().upper()
+        if not normalized_code:
+            return []
+        matches: list[dict[str, Any]] = []
+
+        def row_matches(row: dict[str, Any]) -> bool:
+            candidates = {
+                str(row.get("machine_code") or "").strip().upper(),
+                str(row.get("barcode_value") or "").strip().upper(),
+                str(row.get("barcode") or "").strip().upper(),
+                str(row.get("display_code") or "").strip().upper(),
+                str(row.get("token_no") or "").strip().upper(),
+                str(row.get("token_id") or "").strip().upper(),
+            }
+            return normalized_code in candidates
+
+        for row in self.store_items.values():
+            if row_matches(row):
+                matches.append(row)
+        for row in self.item_barcode_tokens.values():
+            if row_matches(row):
+                matches.append(row)
+        return matches
+
+    def _store_item_trace_base(self, store_code: str, machine_code: str, trace_status: str, status_label: str, message: str = "") -> dict[str, Any]:
+        return {
+            "store_code": str(store_code or "").strip().upper(),
+            "machine_code": str(machine_code or "").strip().upper(),
+            "display_code": "",
+            "entity_type": "",
+            "trace_status": trace_status,
+            "status_label": status_label,
+            "category_name": "",
+            "category_short": "",
+            "price_kes": 0,
+            "stock_in_confirmed": False,
+            "stock_in_confirmed_at": "",
+            "stock_in_confirmed_by": "",
+            "current_location_code": "",
+            "current_location_name": "",
+            "location_type": "",
+            "source_sdp_display_code": "",
+            "parent_sdo_display_code": "",
+            "printed_by": "",
+            "printed_at": "",
+            "sold": False,
+            "sold_at": "",
+            "sold_by": "",
+            "sale_no": "",
+            "sale_id": "",
+            "message": message,
+        }
+
+    def get_store_item_trace(self, store_code: str, machine_code: str) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_store = store["code"]
+        normalized_code = str(machine_code or "").strip().upper()
+        if not normalized_code:
+            return self._store_item_trace_base(normalized_store, normalized_code, "unknown", "未找到", "请输入 STORE_ITEM machine_code。")
+
+        rows = self._find_store_item_trace_rows(normalized_code)
+        if not rows:
+            return self._store_item_trace_base(normalized_store, normalized_code, "unknown", "未找到", "没有找到这个 STORE_ITEM。")
+
+        current_store_rows = [
+            row
+            for row in rows
+            if str(row.get("store_code") or "").strip().upper() == normalized_store
+        ]
+        if not current_store_rows:
+            result = self._store_item_trace_base(normalized_store, normalized_code, "invalid", "不是门店商品码", "该 STORE_ITEM 属于其他门店，不能在当前门店查询。")
+            first = rows[0]
+            result["entity_type"] = str(first.get("entity_type") or "").strip().upper()
+            result["display_code"] = str(first.get("display_code") or first.get("token_no") or "").strip().upper()
+            return result
+
+        def row_priority(row: dict[str, Any]) -> tuple[int, int]:
+            entity_ok = str(row.get("entity_type") or "STORE_ITEM").strip().upper() == "STORE_ITEM"
+            is_item = bool(row.get("store_item_id") or row.get("item_id"))
+            return (0 if entity_ok else 1, 0 if is_item else 1)
+
+        row = sorted(current_store_rows, key=row_priority)[0]
+        entity_type = str(row.get("entity_type") or "STORE_ITEM").strip().upper()
+        if entity_type != "STORE_ITEM":
+            result = self._store_item_trace_base(normalized_store, normalized_code, "invalid", "不是门店商品码", "该码不能作为 STORE_ITEM 查询或销售。")
+            result["entity_type"] = entity_type
+            result["display_code"] = str(row.get("display_code") or row.get("token_no") or "").strip().upper()
+            return result
+
+        locations, active_locations = self._store_inventory_location_maps(normalized_store)
+        raw_location_code = str(
+            row.get("current_location_code")
+            or row.get("store_rack_code")
+            or row.get("rack_code")
+            or ""
+        ).strip().upper()
+        matched_location = active_locations.get(raw_location_code)
+        price_value = row.get("sale_price_kes", row.get("selling_price_kes", row.get("selected_price", row.get("launch_price", row.get("price")))))
+        try:
+            price_kes = round(float(price_value or 0), 2)
+        except (TypeError, ValueError):
+            price_kes = 0.0
+        sold = self._store_inventory_row_is_sold(row)
+        stock_in_confirmed = row.get("stock_in_confirmed") is True
+        blocked_statuses = {"void", "voided", "cancelled", "canceled", "deleted"}
+        status_values = {
+            str(row.get("status") or "").strip().lower(),
+            str(row.get("sale_status") or "").strip().lower(),
+            str(row.get("store_item_status") or "").strip().lower(),
+        }
+        if sold:
+            trace_status = "sold"
+            status_label = "已售"
+            message = "该 STORE_ITEM 已通过 POS 销售。"
+        elif any(status in blocked_statuses for status in status_values if status):
+            trace_status = "invalid"
+            status_label = "不可识别"
+            message = "该 STORE_ITEM 已作废或取消，不能作为在库商品。"
+        elif not stock_in_confirmed:
+            trace_status = "pending_stock_in"
+            status_label = "待完成入库"
+            message = "该商品已生成或已打印，但还没有点击确认完成入库。"
+        elif matched_location:
+            trace_status = "in_stock"
+            status_label = "在库"
+            message = "该 STORE_ITEM 当前在门店库存中。"
+        else:
+            trace_status = "unassigned_location"
+            status_label = "未关联货架"
+            message = "该商品已入库，但货架位置为空或失效。"
+
+        result = self._store_item_trace_base(normalized_store, normalized_code, trace_status, status_label, message)
+        result.update(
+            {
+                "display_code": str(row.get("display_code") or row.get("token_no") or row.get("store_item_id") or "").strip().upper(),
+                "entity_type": "STORE_ITEM",
+                "category_name": self._store_inventory_category_name(row, matched_location or locations.get(raw_location_code)),
+                "category_short": str(row.get("category_short") or "").strip(),
+                "price_kes": price_kes,
+                "stock_in_confirmed": stock_in_confirmed,
+                "stock_in_confirmed_at": str(row.get("stock_in_confirmed_at") or row.get("shelved_at") or "").strip(),
+                "stock_in_confirmed_by": str(row.get("stock_in_confirmed_by") or row.get("shelved_by") or "").strip(),
+                "current_location_code": raw_location_code,
+                "current_location_name": str((matched_location or {}).get("location_name") or "").strip(),
+                "location_type": str((matched_location or {}).get("location_type") or "").strip().upper(),
+                "source_sdp_display_code": str(row.get("source_sdp_display_code") or row.get("sdo_package_display_code") or row.get("source_package") or "").strip().upper(),
+                "parent_sdo_display_code": str(row.get("parent_sdo_display_code") or row.get("task_no") or "").strip().upper(),
+                "printed_by": str(row.get("printed_by") or row.get("generated_by") or row.get("created_by") or "").strip(),
+                "printed_at": str(row.get("printed_at") or "").strip(),
+                "sold": sold,
+                "sold_at": str(row.get("sold_at") or "").strip(),
+                "sold_by": str(row.get("sold_by") or "").strip(),
+                "sale_no": str(row.get("sale_no") or row.get("sale_id") or "").strip(),
+                "sale_id": str(row.get("sale_id") or row.get("sale_no") or "").strip(),
+            }
+        )
+        return result
+
     def get_store_inventory_overview(self, store_code: str) -> dict[str, Any]:
         store = self._ensure_store_exists(store_code)
         locations, active_locations = self._store_inventory_location_maps(store["code"])
