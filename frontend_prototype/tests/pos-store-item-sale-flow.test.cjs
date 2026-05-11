@@ -27,19 +27,37 @@ function extractFunctionSource(source, functionName) {
   throw new Error(`could not extract ${functionName}`);
 }
 
-test("POS scans only STORE_ITEM machine codes from clerk-generated tokens", () => {
+function extractAssignedFunctionSource(source, functionName) {
+  const start = source.indexOf(`${functionName} = async function`);
+  assert.notEqual(start, -1, `missing assigned function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", start);
+  assert.notEqual(signatureEnd, -1, `missing assigned function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract assigned ${functionName}`);
+}
+
+test("POS scans use the typed resolver with POS context before cart insert", () => {
   assert.match(appJs, /posStoreItemSaleRecords/);
-  const lookupSource = extractFunctionSource(appJs, "resolvePosStoreItemTokenByMachineCode");
-  const terminalLookupSource = extractFunctionSource(appJs, "submitCashierTerminalLookup");
-  assert.match(lookupSource, /^function resolvePosStoreItemTokenByMachineCode/);
-  assert.match(appJs, /function computeStoreItemEan13CheckDigit/);
-  assert.match(appJs, /function isValidStoreItemMachineCodeForPos/);
-  assert.match(lookupSource, /\!isValidStoreItemMachineCodeForPos\(machineCode\)/);
-  assert.match(appJs, /computeStoreItemEan13CheckDigit\(machineCode\.slice\(0,\s*12\)\) === machineCode\.slice\(12\)/);
-  assert.match(lookupSource, /此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。/);
-  assert.match(lookupSource, /sale_status[\s\S]*sold[\s\S]*该商品已售出，不能重复销售/);
-  assert.match(lookupSource, /sale_status[\s\S]*ready_for_sale/);
-  assert.match(terminalLookupSource, /resolvePosStoreItemTokenByMachineCode\(query\)/);
+  const resolverSource = extractFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
+  const guardSource = extractFunctionSource(appJs, "ensureCashierTerminalResolvedItemCanEnterCart");
+  const terminalLookupSource = extractAssignedFunctionSource(appJs, "submitCashierTerminalLookup");
+  assert.match(resolverSource, /resolveBarcodeForContext\(normalizedQuery,\s*"pos",\s*\[\],\s*\{\s*rejectOnContextReject:\s*false\s*\}\)/);
+  assert.match(resolverSource, /ensureCashierTerminalResolvedItemCanEnterCart\(resolved,\s*normalizedQuery\)/);
+  assert.match(guardSource, /resolved\?\.reject_reason/);
+  assert.match(terminalLookupSource, /await resolveCashierTerminalStoreItemForPos\(query\)/);
+  assert.doesNotMatch(terminalLookupSource, /resolveCashierTerminalPreviewScan\(query\)/);
+  assert.doesNotMatch(terminalLookupSource, /resolvePosStoreItemTokenByMachineCode\(query\)/);
   assert.doesNotMatch(terminalLookupSource, /submitLookup\(\{ preventDefault\(\) \{\}, currentTarget: form \}\)/);
 });
 
@@ -65,21 +83,27 @@ test("POS cashier terminal renders cashier touch layout without changing barcode
   assert.match(appJs, /grossAmount:\s*"总金额"/);
   assert.match(appJs, /receiptStatus:\s*"小票打印"/);
   assert.match(appJs, /syncStatus:\s*"同步状态"/);
-  assert.match(appJs, /resolvePosStoreItemTokenByMachineCode\(query\)/);
+  assert.match(appJs, /resolveCashierTerminalStoreItemForPos\(query\)/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"RAW_BALE"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_PREP_BALE"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"LOOSE_PICK_TASK"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
 });
 
-test("POS cashier terminal keeps non-STORE_ITEM codes out of sales", () => {
-  const lookupSource = extractFunctionSource(appJs, "resolvePosStoreItemTokenByMachineCode");
-  assert.match(lookupSource, /const machineCode = String\(value \|\| ""\)\.replace\(\s*\/\[\^0-9\]\/g,\s*""\)/, "lookup should normalize machine code from numeric barcode input");
-  assert.match(lookupSource, /\!isValidStoreItemMachineCodeForPos\(machineCode\)/);
-  assert.match(appJs, /return \/\^5\\d\{9\}\$\/\.test\(machineCode\)/);
-  assert.match(lookupSource, /throw new Error\("此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。"\)/);
-  ["RAW_BALE", "STORE_PREP_BALE", "LOOSE_PICK_TASK", "STORE_DELIVERY_EXECUTION"].forEach((barcodeType) => {
-    assert.doesNotMatch(lookupSource, new RegExp(`allowedBarcodeTypes[\\s\\S]*${barcodeType}`));
+test("POS cashier terminal gates resolver results before adding items", () => {
+  const guardSource = extractFunctionSource(appJs, "ensureCashierTerminalResolvedItemCanEnterCart");
+  assert.match(guardSource, /barcode_type/);
+  assert.match(guardSource, /"STORE_ITEM"/);
+  assert.match(guardSource, /pos_allowed/);
+  assert.match(guardSource, /reject_reason/);
+  assert.match(guardSource, /store_code/);
+  assert.match(guardSource, /!storeCode/);
+  assert.match(guardSource, /getCashierTerminalStoreCode\(\)/);
+  ["on_shelf", "in_stock", "available", "printed_in_store"].forEach((status) => {
+    assert.match(appJs, new RegExp(`"${status}"`));
+  });
+  ["sold", "held", "reserved", "transferred_out", "voided", "pending_print", "pending_putaway"].forEach((status) => {
+    assert.match(guardSource, new RegExp(`"${status}"`));
   });
   assert.doesNotMatch(appJs, /function buildPrototypeStoreItemMachineCodeV2/);
   assert.doesNotMatch(appJs, /function buildStoreItemTokenSerial/);
@@ -87,6 +111,22 @@ test("POS cashier terminal keeps non-STORE_ITEM codes out of sales", () => {
   assert.match(appJs, /store_item_machine_code:\s*token\.machine_code/);
   assert.match(appJs, /barcode:\s*token\.machine_code/);
   assert.doesNotMatch(appJs, /barcode:\s*token\.display_code/);
+});
+
+test("POS fallback is backend-unavailable demo data only and does not prefix-allow sales", () => {
+  const resolverSource = extractFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
+  const fallbackSource = extractFunctionSource(appJs, "resolveCashierTerminalLocalDemoItem");
+  assert.match(resolverSource, /isCashierTerminalResolverUnavailableError\(error\)/);
+  assert.match(resolverSource, /throw error/);
+  assert.match(resolverSource, /resolveCashierTerminalLocalDemoItem\(normalizedQuery\)/);
+  assert.match(appJs, /当前使用本地演示数据，真实扫码接口不可用。/);
+  assert.match(fallbackSource, /findCashierTerminalPreviewItem\(normalizedQuery\)/);
+  assert.match(fallbackSource, /item\?\.type !== "STORE_ITEM"/);
+  assert.doesNotMatch(appJs, /inferCashierTerminalRejectedType/);
+  assert.doesNotMatch(fallbackSource, /\.startsWith\("SDO"\)/);
+  assert.doesNotMatch(fallbackSource, /\.startsWith\("SDB"\)/);
+  assert.doesNotMatch(fallbackSource, /\.startsWith\("LPK"\)/);
+  assert.doesNotMatch(fallbackSource, /\.startsWith\("RAW"\)/);
 });
 
 test("POS sale completion records source chain and marks only scanned STORE_ITEM tokens sold", () => {
