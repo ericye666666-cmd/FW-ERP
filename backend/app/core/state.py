@@ -17583,6 +17583,73 @@ class InMemoryState:
             )
         return True
 
+    def _store_backroom_location_code(self, store_code: str) -> str:
+        prefix = str(store_code or "").strip().upper()[:2] or "ST"
+        return f"{prefix}-BACKROOM"
+
+    def _count_store_location_items(self, store_code: str, location_code: str) -> int:
+        normalized_store_code = str(store_code or "").strip().upper()
+        normalized_location_code = str(location_code or "").strip().upper()
+        if not normalized_store_code or not normalized_location_code:
+            return 0
+        total = 0
+        for row in self.store_stock.values():
+            if str(row.get("store_code") or "").strip().upper() != normalized_store_code:
+                continue
+            row_location = str(row.get("store_rack_code") or row.get("rack_code") or "").strip().upper()
+            if row_location == normalized_location_code:
+                qty = row.get("qty_on_hand", row.get("quantity", 1))
+                total += int(qty or 0) if str(qty or "").strip() else 1
+        for token in self.item_barcode_tokens.values():
+            if str(token.get("store_code") or "").strip().upper() != normalized_store_code:
+                continue
+            row_location = str(
+                token.get("current_location_code")
+                or token.get("store_rack_code")
+                or token.get("rack_code")
+                or ""
+            ).strip().upper()
+            if row_location == normalized_location_code and str(token.get("status") or "").strip().lower() != "sold":
+                total += 1
+        return total
+
+    def _normalize_store_location_row(self, row: dict[str, Any], sort_order: int = 0) -> dict[str, Any]:
+        store_code = str(row.get("store_code") or "").strip().upper()
+        location_code = str(row.get("location_code") or row.get("rack_code") or "").strip().upper()
+        location_type = str(row.get("location_type") or "").strip().upper()
+        if location_type not in {"SHELF", "BACKROOM"}:
+            location_type = "BACKROOM" if location_code.endswith("BACKROOM") else "SHELF"
+        category_name = str(row.get("category_name") or row.get("category_hint") or "").strip()
+        if location_type == "BACKROOM":
+            category_name = ""
+        active = row.get("active")
+        if active is None:
+            active = str(row.get("status") or "active").strip().lower() != "inactive"
+        active = bool(active)
+        location_name = str(row.get("location_name") or "").strip()
+        if not location_name:
+            location_name = "后仓" if location_type == "BACKROOM" else f"{category_name or location_code}货架"
+        normalized_sort_order = int(row.get("sort_order") or sort_order or 0)
+        normalized = {
+            **row,
+            "id": str(row.get("id") or f"{store_code}||{location_code}").strip(),
+            "store_code": store_code,
+            "location_code": location_code,
+            "rack_code": location_code,
+            "location_name": location_name,
+            "location_type": location_type,
+            "category_code": str(row.get("category_code") or category_name).strip().upper(),
+            "category_name": category_name,
+            "category_hint": category_name,
+            "active": active,
+            "status": "active" if active else "inactive",
+            "sort_order": normalized_sort_order,
+            "created_at": str(row.get("created_at") or now_iso()),
+            "updated_at": str(row.get("updated_at") or now_iso()),
+        }
+        normalized["item_count"] = self._count_store_location_items(store_code, location_code)
+        return normalized
+
     def initialize_store_racks(
         self,
         store_code: str,
@@ -17592,18 +17659,53 @@ class InMemoryState:
         store = self._ensure_store_exists(store_code)
         actor = self._require_user_role(initialized_by, {"store_manager", "area_supervisor"}, store_code=store["code"])
         created: list[dict[str, Any]] = []
-        for template in template_rows:
-            key = f"{store['code']}||{template['rack_code']}"
+        for index, template in enumerate(template_rows, start=1):
+            location_code = str(template["rack_code"]).strip().upper()
+            category_name = str(template.get("category_hint") or "").strip()
+            key = f"{store['code']}||{location_code}"
             if key not in self.store_rack_locations:
+                timestamp = now_iso()
                 self.store_rack_locations[key] = {
                     "store_code": store["code"],
-                    "rack_code": template["rack_code"],
-                    "category_hint": template["category_hint"],
+                    "rack_code": location_code,
+                    "location_code": location_code,
+                    "location_name": f"{category_name or location_code}货架",
+                    "location_type": "SHELF",
+                    "category_code": category_name.upper(),
+                    "category_name": category_name,
+                    "category_hint": category_name,
+                    "active": True,
                     "status": "active",
-                    "created_at": now_iso(),
-                    "updated_at": now_iso(),
+                    "sort_order": index,
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
                 }
+            self.store_rack_locations[key] = self._normalize_store_location_row(self.store_rack_locations[key], index)
             created.append(self.store_rack_locations[key])
+        backroom_code = self._store_backroom_location_code(store["code"])
+        backroom_key = f"{store['code']}||{backroom_code}"
+        if backroom_key not in self.store_rack_locations:
+            timestamp = now_iso()
+            self.store_rack_locations[backroom_key] = {
+                "store_code": store["code"],
+                "rack_code": backroom_code,
+                "location_code": backroom_code,
+                "location_name": "后仓",
+                "location_type": "BACKROOM",
+                "category_code": "",
+                "category_name": "",
+                "category_hint": "",
+                "active": True,
+                "status": "active",
+                "sort_order": len(template_rows) + 1,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        self.store_rack_locations[backroom_key] = self._normalize_store_location_row(
+            self.store_rack_locations[backroom_key],
+            len(template_rows) + 1,
+        )
+        created.append(self.store_rack_locations[backroom_key])
         self._log_event(
             event_type="store.racks_initialized",
             entity_type="store",
@@ -17617,10 +17719,83 @@ class InMemoryState:
 
     def list_store_racks(self, store_code: str) -> list[dict[str, Any]]:
         store = self._ensure_store_exists(store_code)
-        return [
-            row for row in self.store_rack_locations.values()
-            if row["store_code"] == store["code"]
-        ]
+        rows: list[dict[str, Any]] = []
+        for index, row in enumerate(self.store_rack_locations.values(), start=1):
+            if str(row.get("store_code") or "").strip().upper() != store["code"]:
+                continue
+            normalized = self._normalize_store_location_row(row, index)
+            self.store_rack_locations[f"{store['code']}||{normalized['location_code']}"] = normalized
+            rows.append(normalized)
+        return sorted(rows, key=lambda item: (int(item.get("sort_order") or 0), item["location_type"], item["location_code"]))
+
+    def upsert_store_location(self, store_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        actor = self._require_user_role(
+            payload.get("updated_by") or "store_manager_1",
+            {"store_manager", "area_supervisor"},
+            store_code=store["code"],
+        )
+        location_code = str(payload.get("location_code") or "").strip().upper()
+        if not location_code:
+            raise HTTPException(status_code=400, detail="location_code is required")
+        location_type = str(payload.get("location_type") or "SHELF").strip().upper()
+        if location_type not in {"SHELF", "BACKROOM"}:
+            raise HTTPException(status_code=400, detail="location_type must be SHELF or BACKROOM")
+        default_backroom_code = self._store_backroom_location_code(store["code"])
+        if location_type == "BACKROOM" and location_code != default_backroom_code:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Each store has only one backroom in this version; use {default_backroom_code}.",
+            )
+        if location_type == "BACKROOM":
+            active_backrooms = [
+                row for row in self.store_rack_locations.values()
+                if str(row.get("store_code") or "").strip().upper() == store["code"]
+                and str(row.get("location_type") or "").strip().upper() == "BACKROOM"
+                and str(row.get("location_code") or row.get("rack_code") or "").strip().upper() != default_backroom_code
+                and row.get("active") is not False
+                and str(row.get("status") or "active").strip().lower() != "inactive"
+            ]
+            if active_backrooms:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Each store can only have one active backroom in this version.",
+                )
+        key = f"{store['code']}||{location_code}"
+        previous = self.store_rack_locations.get(key, {})
+        timestamp = now_iso()
+        row = {
+            **previous,
+            "store_code": store["code"],
+            "rack_code": location_code,
+            "location_code": location_code,
+            "location_name": str(payload.get("location_name") or previous.get("location_name") or "").strip(),
+            "location_type": location_type,
+            "category_code": str(payload.get("category_code") or "").strip().upper(),
+            "category_name": str(payload.get("category_name") or "").strip(),
+            "active": bool(payload.get("active", True)),
+            "sort_order": int(payload.get("sort_order") or previous.get("sort_order") or 0),
+            "created_at": str(previous.get("created_at") or timestamp),
+            "updated_at": timestamp,
+        }
+        row = self._normalize_store_location_row(row)
+        self.store_rack_locations[key] = row
+        self._log_event(
+            event_type="store.location_saved",
+            entity_type="store_location",
+            entity_id=key,
+            actor=actor["username"],
+            summary=f"Store location {location_code} saved for {store['code']}",
+            details={
+                "location_code": location_code,
+                "location_type": row["location_type"],
+                "category_name": row["category_name"],
+                "active": row["active"],
+                "sort_order": row["sort_order"],
+            },
+        )
+        self._persist()
+        return row
 
     def assign_store_rack(self, store_code: str, barcode: str, rack_code: str, updated_by: str) -> dict[str, Any]:
         store = self._ensure_store_exists(store_code)

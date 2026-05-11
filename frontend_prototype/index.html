@@ -81,7 +81,7 @@
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
           <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#262</span></div>
+            <div><strong>FW-ERP 主线 PR:</strong><span>#263</span></div>
             <div><strong>Android PR:</strong><span>#35</span></div>
           </section>
           <pre id="authOutput" class="output hidden-output"></pre>
@@ -3080,6 +3080,46 @@
         <div id="storeManagerPdaPreview" class="store-manager-pda-preview" aria-live="polite"></div>
       </section>
 
+      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>库存总览</h2>
+        </div>
+        <div class="candidate-summary empty-state">
+          库存总览会在下一步接入 stock_in_confirmed 后按门店、品类和货架统计。当前 PR 只新增菜单入口，先不统计未确认 STORE_ITEM。
+        </div>
+      </section>
+
+      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+        <div class="panel-head">
+          <h2>货架位编辑</h2>
+        </div>
+        <form id="storeShelfLocationLoadForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <button type="submit">查看当前门店货架位</button>
+          <button type="button" data-store-shelf-initialize="true">初始化默认货架位</button>
+        </form>
+        <form id="storeShelfLocationForm" class="form-grid compact">
+          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          <input name="location_code" placeholder="货架位代码，例如 PT-CR" />
+          <input name="location_name" placeholder="货架位名称，例如 cargo pant货架" />
+          <select name="location_type">
+            <option value="SHELF">SHELF 货架位</option>
+          </select>
+          <input name="category_name" placeholder="绑定品类，例如 cargo pant" />
+          <select name="active">
+            <option value="true">启用</option>
+            <option value="false">停用</option>
+          </select>
+          <input name="sort_order" type="number" min="0" step="1" placeholder="排序" value="0" />
+          <button type="submit">保存货架位</button>
+        </form>
+        <div id="storeShelfLocationSummary" class="candidate-summary empty-state">
+          当前门店会有一个默认后仓；后仓由系统固定为 UT-BACKROOM，不做后仓分区。每个现有品类模板会生成一个货架位。这里只维护货架位，不做货架码打印。
+        </div>
+        <div id="storeShelfLocationList" class="candidate-list"></div>
+        <pre id="storeShelfLocationOutput" class="output hidden-output"></pre>
+      </section>
+
       <section class="panel store-role-panel store-role-panel-manager store-dev-debug-panel hidden-screen" data-workspace-panel="store">
         <div class="panel-head">
           <h2>5. 门店收货主控台</h2>
@@ -4256,16 +4296,16 @@
           (document.body || document.documentElement).appendChild(script);
         }
 
-        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-k300-store-item-batch-print";
-        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "k300-store-item-batch-print";
+        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-store-shelf-locations-pr1";
+        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "store-shelf-locations-pr1";
 
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=k300-store-item-batch-print", "modern");
+          loadPdaRuntimeScript("./app.js?v=store-shelf-locations-pr1", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=k300-store-item-batch-print", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=store-shelf-locations-pr1", "legacy");
       })();
     </script>
   </body>

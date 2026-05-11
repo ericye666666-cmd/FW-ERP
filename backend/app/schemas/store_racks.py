@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,26 @@ class StoreRackLocationResponse(BaseModel):
     status: str
     created_at: str
     updated_at: str
+    id: Optional[str] = ""
+    location_code: Optional[str] = ""
+    location_name: Optional[str] = ""
+    location_type: Optional[str] = "SHELF"
+    category_code: Optional[str] = ""
+    category_name: Optional[str] = ""
+    active: Optional[bool] = True
+    sort_order: Optional[int] = 0
+    item_count: Optional[int] = 0
+
+
+class StoreRackLocationUpsertRequest(BaseModel):
+    location_code: str = Field(min_length=1)
+    location_name: str = Field(min_length=1)
+    location_type: str = Field(default="SHELF")
+    category_code: str = ""
+    category_name: str = ""
+    active: bool = True
+    sort_order: int = 0
+    updated_by: str = Field(min_length=1, default="store_manager_1")
 
 
 class StoreRackAssignmentRequest(BaseModel):
