@@ -12,7 +12,7 @@ from app.api import routes as routes_module
 from app.core.config import settings
 from app.core.seed_data import STORE_RACK_TEMPLATE
 from app.core.state import InMemoryState
-from test_pos_sale_write_flow import _add_store_item, _sale_payload, _store_item
+from test_pos_sale_write_flow import _add_store_item, _open_shift, _sale_payload, _store_item
 
 
 @pytest.fixture()
@@ -43,9 +43,21 @@ def _create_sale(state, machine_code, store_item_id, *, price=250, store_code="U
             price=price,
         ),
     )
+    shift = next(
+        (
+            row
+            for row in state.cashier_shifts.values()
+            if row.get("store_code") == store_code and row.get("cashier_id") == "Clerk A" and row.get("status") == "open"
+        ),
+        None,
+    )
+    if not shift:
+        terminal_prefix = "UTW" if store_code == "UTAWALA" else store_code[:3].upper()
+        shift = _open_shift(state, store_code=store_code, terminal_id=f"POS-{terminal_prefix}-01")
+    terminal_id = shift.get("terminal_id") or "POS-UTW-01"
     return state.create_pos_sale(
         store_code,
-        _sale_payload(machine_code, cash_amount=price + 100, final_price=price),
+        _sale_payload(machine_code, cash_amount=price + 100, final_price=price, shift_id=shift["shift_id"], terminal_id=terminal_id),
         created_by="store_manager_1",
     )
 

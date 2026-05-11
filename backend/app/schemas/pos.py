@@ -44,6 +44,62 @@ class CashierShiftSummary(BaseModel):
     note: str = ""
 
 
+class PosShiftOpenRequest(BaseModel):
+    cashier_id: str = Field(min_length=1)
+    terminal_id: str = ""
+    opening_float: float = Field(ge=0)
+    note: str = ""
+
+
+class PosShiftCloseRequest(BaseModel):
+    counted_cash: float = Field(ge=0)
+    note: str = ""
+    manager_confirmed_by: str = ""
+
+
+class PosShiftResponse(BaseModel):
+    shift_id: str
+    store_code: str
+    cashier_id: str
+    terminal_id: str = ""
+    opening_float: float
+    opened_at: str
+    opened_by: str
+    status: str
+    closed_at: Optional[str] = None
+    closed_by: Optional[str] = None
+    manager_confirmed_by: str = ""
+    counted_cash: Optional[float] = None
+    expected_cash: Optional[float] = None
+    cash_variance: Optional[float] = None
+    note: str = ""
+
+
+class PosShiftSummaryResponse(BaseModel):
+    shift_id: str
+    store_code: str
+    cashier_id: str
+    terminal_id: str = ""
+    status: str
+    opening_float: float
+    opened_at: str
+    total_sales: float
+    order_count: int
+    cash_sales: float
+    mpesa_sales: float
+    mixed_cash: float
+    mixed_mpesa: float
+    expected_cash: float
+    hold_count: int = 0
+    cancelled_order_count: int = 0
+    counted_cash: Optional[float] = None
+    cash_variance: Optional[float] = None
+    closed_at: Optional[str] = None
+    closed_by: Optional[str] = None
+    manager_confirmed_by: str = ""
+    note: str = ""
+
+
 class CashierHandoverLogResponse(BaseModel):
     handover_no: str
     shift_no: str

@@ -349,6 +349,46 @@ test("POS recent sales drawer can list, view, and reprint real sales", () => {
   assert.match(actionSource, /await loadCashierTerminalSaleReceiptForReprint\(target\.dataset\.terminalSaleNo,\s*\{\s*reprint:\s*true\s*\}\)/);
 });
 
+test("POS shift flow blocks sale until open shift and sends shift_id", () => {
+  const submitSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
+  const payloadSource = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");
+  const currentSource = extractAsyncFunctionSource(appJs, "fetchCashierTerminalCurrentShift");
+  const summarySource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftSummary");
+
+  assert.match(submitSource, /if \(!cashierTerminalState\.currentShift\?\.shift_id\)/);
+  assert.match(submitSource, /请先开班后再收银。/);
+  assert.match(submitSource, /await loadCashierTerminalShiftSummary\(sale\.shift_id \|\| payload\.shift_id\)/);
+  assert.match(payloadSource, /shift_id:\s*cashierTerminalState\.currentShift\?\.shift_id \|\| cashierTerminalState\.shiftNo/);
+  assert.match(openSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/open`/);
+  assert.match(openSource, /cashierTerminalState\.currentShift\s*=\s*normalizeCashierTerminalShift\(shift\)/);
+  assert.match(currentSource, /\/pos-shifts\/current\?cashier_id=/);
+  assert.match(summarySource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/\$\{encodeURIComponent\(shiftId\)\}\/summary`\)/);
+});
+
+test("POS shift close uses real API, records variance, and clears closed shift", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const closeSource = extractAsyncFunctionSource(appJs, "closeCashierTerminalShiftBackend");
+  const updateFieldSource = extractAssignedAnyFunctionSource(appJs, "updateCashierTerminalDrawerField");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+
+  assert.match(drawerSource, /当前班次/);
+  assert.match(drawerSource, /本班统计/);
+  assert.match(drawerSource, /开班/);
+  assert.match(drawerSource, /关闭班次/);
+  assert.match(drawerSource, /cashierTerminalState\.shiftSummary/);
+  assert.match(updateFieldSource, /field === "countedCash"/);
+  assert.match(updateFieldSource, /cashierTerminalState\.shiftSummary\?\.expected_cash/);
+  assert.match(closeSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/\$\{encodeURIComponent\(shiftId\)\}\/close`/);
+  assert.match(closeSource, /cashierTerminalState\.currentShift\s*=\s*null/);
+  assert.match(closeSource, /cashierTerminalState\.shiftOpen\s*=\s*false/);
+  assert.match(closeSource, /请先开班/);
+  assert.match(actionSource, /case "open-shift":/);
+  assert.match(actionSource, /await openCashierTerminalShift\(\)/);
+  assert.match(actionSource, /case "close-shift":/);
+  assert.match(actionSource, /await closeCashierTerminalShiftBackend\(\)/);
+});
+
 test("cashier terminal shell only activates on the POS sales panel", () => {
   const terminalModeSource = extractFunctionSource(appJs, "syncCashierTerminalMode");
   assert.match(terminalModeSource, /isCashierTerminalRole\(\)/);

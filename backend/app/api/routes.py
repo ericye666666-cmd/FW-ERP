@@ -80,6 +80,10 @@ from app.schemas.pos import (
     CashierHandoverReviewRequest,
     CashierShiftCloseRequest,
     CashierShiftOpenRequest,
+    PosShiftCloseRequest,
+    PosShiftOpenRequest,
+    PosShiftResponse,
+    PosShiftSummaryResponse,
     StoreClosingChecklistResponse,
     CashierShiftSummary,
     PosReportResponse,
@@ -4879,6 +4883,50 @@ def get_store_pos_sale(
 ) -> PosSaleResponse:
     _require_current_user(authorization=authorization)
     return PosSaleResponse(**state.get_pos_sale(store_code, sale_no))
+
+
+@router.post("/stores/{store_code}/pos-shifts/open", response_model=PosShiftResponse, tags=["pos"])
+def open_store_pos_shift(
+    store_code: str,
+    payload: PosShiftOpenRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> PosShiftResponse:
+    current_user = _require_current_user(authorization=authorization)
+    shift = state.open_pos_shift(store_code, payload.model_dump(), opened_by=current_user["username"])
+    return PosShiftResponse(**shift)
+
+
+@router.get("/stores/{store_code}/pos-shifts/current", response_model=PosShiftResponse, tags=["pos"])
+def get_current_store_pos_shift(
+    store_code: str,
+    cashier_id: str = Query(..., min_length=1),
+    terminal_id: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> PosShiftResponse:
+    _require_current_user(authorization=authorization)
+    shift = state.get_current_pos_shift(store_code, cashier_id=cashier_id, terminal_id=terminal_id or "")
+    return PosShiftResponse(**shift)
+
+
+@router.get("/stores/{store_code}/pos-shifts/{shift_id}/summary", response_model=PosShiftSummaryResponse, tags=["pos"])
+def get_store_pos_shift_summary(
+    store_code: str,
+    shift_id: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PosShiftSummaryResponse:
+    _require_current_user(authorization=authorization)
+    return PosShiftSummaryResponse(**state.get_pos_shift_summary(store_code, shift_id))
+
+
+@router.post("/stores/{store_code}/pos-shifts/{shift_id}/close", response_model=PosShiftSummaryResponse, tags=["pos"])
+def close_store_pos_shift(
+    store_code: str,
+    shift_id: str,
+    payload: PosShiftCloseRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> PosShiftSummaryResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return PosShiftSummaryResponse(**state.close_pos_shift(store_code, shift_id, payload.model_dump(), closed_by=current_user["username"]))
 
 
 @router.get("/sales", response_model=list[SaleResponse], tags=["sales"])

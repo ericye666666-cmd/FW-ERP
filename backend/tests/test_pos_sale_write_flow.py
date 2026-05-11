@@ -97,11 +97,24 @@ def _add_store_item(state, row):
     )
 
 
-def _sale_payload(*machine_codes, payment_method="cash", cash_amount=1000, mpesa_amount=0, mpesa_reference="", final_price=250):
+def _open_shift(state, *, store_code="UTAWALA", cashier_id="Clerk A", terminal_id="POS-UTW-01"):
+    return state.open_pos_shift(
+        store_code,
+        {
+            "cashier_id": cashier_id,
+            "terminal_id": terminal_id,
+            "opening_float": 2000,
+            "note": "test shift",
+        },
+        opened_by="store_manager_1",
+    )
+
+
+def _sale_payload(*machine_codes, payment_method="cash", cash_amount=1000, mpesa_amount=0, mpesa_reference="", final_price=250, shift_id="", terminal_id="POS-UTW-01"):
     return {
         "cashier_id": "Clerk A",
-        "shift_id": "SHIFT-UTW-250511-A",
-        "terminal_id": "POS-UTW-01",
+        "shift_id": shift_id,
+        "terminal_id": terminal_id,
         "payment_method": payment_method,
         "cash_amount": cash_amount,
         "mpesa_amount": mpesa_amount,
@@ -121,8 +134,9 @@ def _sale_payload(*machine_codes, payment_method="cash", cash_amount=1000, mpesa
 
 def test_pos_sale_success_single_store_item(state):
     _add_store_item(state, _store_item())
+    shift = _open_shift(state)
 
-    sale = state.create_pos_sale("UTAWALA", _sale_payload("5261240000013"), created_by="store_manager_1")
+    sale = state.create_pos_sale("UTAWALA", _sale_payload("5261240000013", shift_id=shift["shift_id"]), created_by="store_manager_1")
 
     assert sale["sale_id"] == sale["sale_no"]
     assert sale["store_code"] == "UTAWALA"
@@ -145,11 +159,12 @@ def test_pos_sale_success_single_store_item(state):
 def test_pos_sale_success_multiple_items_reduces_inventory_overview(state):
     _add_store_item(state, _store_item(store_item_id="STOREITEM-POS-001", machine_code="5261240000013", location_code="PT-CR", price=250))
     _add_store_item(state, _store_item(store_item_id="STOREITEM-POS-002", machine_code="5261240000020", location_code="UT-BACKROOM", price=800))
+    shift = _open_shift(state)
     before = state.get_store_inventory_overview("UTAWALA")
 
     sale = state.create_pos_sale(
         "UTAWALA",
-        _sale_payload("5261240000013", "5261240000020", cash_amount=1200, final_price=250),
+        _sale_payload("5261240000013", "5261240000020", cash_amount=1200, final_price=250, shift_id=shift["shift_id"]),
         created_by="store_manager_1",
     )
     after = state.get_store_inventory_overview("UTAWALA")
@@ -166,9 +181,10 @@ def test_pos_sale_success_multiple_items_reduces_inventory_overview(state):
 
 def test_sold_store_item_cannot_be_sold_again(state):
     _add_store_item(state, _store_item(status="sold", sale_status="sold"))
+    shift = _open_shift(state)
 
     with pytest.raises(HTTPException) as exc:
-        state.create_pos_sale("UTAWALA", _sale_payload("5261240000013"), created_by="store_manager_1")
+        state.create_pos_sale("UTAWALA", _sale_payload("5261240000013", shift_id=shift["shift_id"]), created_by="store_manager_1")
 
     assert exc.value.status_code == 400
     assert "已售" in str(exc.value.detail) or "sold" in str(exc.value.detail).lower()
@@ -184,33 +200,36 @@ def test_pos_sale_rejects_non_store_item_barcodes(state):
     state.store_delivery_packages["SDP260511001"] = state._normalize_store_delivery_package(
         {"display_code": "SDP260511001", "package_id": "SDP260511001", "machine_code": "6260511001", "store_code": "UTAWALA"}
     )
+    shift = _open_shift(state)
 
     for barcode in ["1260511001", "2260511001", "3260428001", "4260511001", "6260511001"]:
         with pytest.raises(HTTPException):
-            state.create_pos_sale("UTAWALA", _sale_payload(barcode), created_by="store_manager_1")
+            state.create_pos_sale("UTAWALA", _sale_payload(barcode, shift_id=shift["shift_id"]), created_by="store_manager_1")
     assert not state.sales_transactions
 
 
 def test_pos_sale_rejects_other_store_and_unconfirmed_items(state):
     _add_store_item(state, _store_item(store_item_id="STOREITEM-OTHER", machine_code="5261240000037", store_code="KINNO"))
     _add_store_item(state, _store_item(store_item_id="STOREITEM-UNCONFIRMED", machine_code="5261240000044", stock_in_confirmed=False))
+    shift = _open_shift(state)
 
     with pytest.raises(HTTPException):
-        state.create_pos_sale("UTAWALA", _sale_payload("5261240000037"), created_by="store_manager_1")
+        state.create_pos_sale("UTAWALA", _sale_payload("5261240000037", shift_id=shift["shift_id"]), created_by="store_manager_1")
     with pytest.raises(HTTPException):
-        state.create_pos_sale("UTAWALA", _sale_payload("5261240000044"), created_by="store_manager_1")
+        state.create_pos_sale("UTAWALA", _sale_payload("5261240000044", shift_id=shift["shift_id"]), created_by="store_manager_1")
     assert not state.sales_transactions
 
 
 def test_pos_sale_payment_validation(state):
     _add_store_item(state, _store_item())
+    shift = _open_shift(state)
 
     with pytest.raises(HTTPException):
-        state.create_pos_sale("UTAWALA", _sale_payload("5261240000013", payment_method="mpesa", cash_amount=0, mpesa_amount=250), created_by="store_manager_1")
+        state.create_pos_sale("UTAWALA", _sale_payload("5261240000013", payment_method="mpesa", cash_amount=0, mpesa_amount=250, shift_id=shift["shift_id"]), created_by="store_manager_1")
     with pytest.raises(HTTPException):
         state.create_pos_sale(
             "UTAWALA",
-            _sale_payload("5261240000013", payment_method="mixed", cash_amount=50, mpesa_amount=50, mpesa_reference="MPESA123"),
+            _sale_payload("5261240000013", payment_method="mixed", cash_amount=50, mpesa_amount=50, mpesa_reference="MPESA123", shift_id=shift["shift_id"]),
             created_by="store_manager_1",
         )
 
@@ -218,9 +237,10 @@ def test_pos_sale_payment_validation(state):
 def test_pos_sale_is_atomic_when_any_item_fails(state):
     _add_store_item(state, _store_item(store_item_id="STOREITEM-VALID", machine_code="5261240000013"))
     _add_store_item(state, _store_item(store_item_id="STOREITEM-SOLD", machine_code="5261240000051", status="sold", sale_status="sold"))
+    shift = _open_shift(state)
 
     with pytest.raises(HTTPException):
-        state.create_pos_sale("UTAWALA", _sale_payload("5261240000013", "5261240000051", cash_amount=1000), created_by="store_manager_1")
+        state.create_pos_sale("UTAWALA", _sale_payload("5261240000013", "5261240000051", cash_amount=1000, shift_id=shift["shift_id"]), created_by="store_manager_1")
 
     assert state.store_items["STOREITEM-VALID"]["status"] == "printed_in_store"
     assert state.item_barcode_tokens["STOREITEM-VALID"]["status"] == "printed_in_store"

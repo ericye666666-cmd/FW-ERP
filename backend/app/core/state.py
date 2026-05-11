@@ -4667,13 +4667,21 @@ class InMemoryState:
             if shift.get("shift_no") != shift_no:
                 shift["shift_no"] = shift_no
                 updated = True
+            shift.setdefault("shift_id", shift.get("shift_no", shift_no))
             shift.setdefault("status", "open")
             shift.setdefault("opened_by", shift.get("cashier_name", ""))
+            shift.setdefault("cashier_id", shift.get("cashier_name", shift.get("opened_by", "")))
+            shift.setdefault("cashier_name", shift.get("cashier_id", shift.get("opened_by", "")))
+            shift.setdefault("terminal_id", "")
             shift.setdefault("opening_float_cash", 0.0)
+            shift.setdefault("opening_float", shift.get("opening_float_cash", 0.0))
             shift.setdefault("closed_at", None)
             shift.setdefault("closed_by", None)
             shift.setdefault("closing_cash_counted", None)
+            shift.setdefault("counted_cash", shift.get("closing_cash_counted"))
+            shift.setdefault("expected_cash", None)
             shift.setdefault("cash_variance", None)
+            shift.setdefault("manager_confirmed_by", "")
             shift.setdefault("handover_status", "not_requested")
             shift.setdefault("handover_requested_at", None)
             shift.setdefault("handover_requested_by", None)
@@ -11453,6 +11461,230 @@ class InMemoryState:
         self._persist()
         return shift
 
+    def _normalize_pos_shift(self, shift: dict[str, Any]) -> dict[str, Any]:
+        opening_float = round(float(shift.get("opening_float") if shift.get("opening_float") not in (None, "") else shift.get("opening_float_cash") or 0), 2)
+        counted_cash_value = shift.get("counted_cash", shift.get("closing_cash_counted"))
+        expected_cash_value = shift.get("expected_cash")
+        cash_variance_value = shift.get("cash_variance")
+        return {
+            "shift_id": str(shift.get("shift_id") or shift.get("shift_no") or "").strip(),
+            "shift_no": str(shift.get("shift_no") or shift.get("shift_id") or "").strip(),
+            "store_code": str(shift.get("store_code") or "").strip().upper(),
+            "cashier_id": str(shift.get("cashier_id") or shift.get("cashier_name") or "").strip(),
+            "cashier_name": str(shift.get("cashier_name") or shift.get("cashier_id") or "").strip(),
+            "terminal_id": str(shift.get("terminal_id") or "").strip(),
+            "opening_float": opening_float,
+            "opening_float_cash": opening_float,
+            "opened_at": str(shift.get("opened_at") or "").strip(),
+            "opened_by": str(shift.get("opened_by") or "").strip(),
+            "status": str(shift.get("status") or "open").strip().lower(),
+            "closed_at": shift.get("closed_at"),
+            "closed_by": shift.get("closed_by"),
+            "manager_confirmed_by": str(shift.get("manager_confirmed_by") or "").strip(),
+            "counted_cash": None if counted_cash_value is None else round(float(counted_cash_value or 0), 2),
+            "closing_cash_counted": None if counted_cash_value is None else round(float(counted_cash_value or 0), 2),
+            "expected_cash": None if expected_cash_value is None else round(float(expected_cash_value or 0), 2),
+            "cash_variance": None if cash_variance_value is None else round(float(cash_variance_value or 0), 2),
+            "note": str(shift.get("note") or "").strip(),
+        }
+
+    def _get_pos_shift_for_store(self, store_code: str, shift_id: str) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_shift_id = str(shift_id or "").strip()
+        if not normalized_shift_id:
+            raise HTTPException(status_code=400, detail="shift_id is required")
+        shift = self.cashier_shifts.get(normalized_shift_id)
+        if not shift:
+            raise HTTPException(status_code=404, detail=f"Unknown POS shift {normalized_shift_id}")
+        if str(shift.get("store_code") or "").strip().upper() != store["code"]:
+            raise HTTPException(status_code=404, detail=f"POS shift {normalized_shift_id} does not belong to store {store['code']}")
+        return shift
+
+    def _find_open_pos_shift(
+        self,
+        store_code: str,
+        *,
+        cashier_id: str = "",
+        terminal_id: str = "",
+    ) -> Optional[dict[str, Any]]:
+        normalized_store = str(store_code or "").strip().upper()
+        normalized_cashier = str(cashier_id or "").strip()
+        normalized_terminal = str(terminal_id or "").strip()
+        for shift in self.cashier_shifts.values():
+            if str(shift.get("store_code") or "").strip().upper() != normalized_store:
+                continue
+            if str(shift.get("status") or "").strip().lower() != "open":
+                continue
+            if normalized_cashier and str(shift.get("cashier_id") or shift.get("cashier_name") or "").strip() != normalized_cashier:
+                continue
+            if normalized_terminal and str(shift.get("terminal_id") or "").strip() != normalized_terminal:
+                continue
+            return shift
+        return None
+
+    def open_pos_shift(self, store_code: str, payload: dict[str, Any], opened_by: str = "") -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        cashier_id = str(payload.get("cashier_id") or "").strip()
+        if not cashier_id:
+            raise HTTPException(status_code=400, detail="cashier_id is required")
+        terminal_id = str(payload.get("terminal_id") or "").strip()
+        opening_float = self._pos_sale_money(payload.get("opening_float", 0), "opening_float")
+        if self._find_open_pos_shift(store["code"], cashier_id=cashier_id):
+            raise HTTPException(status_code=400, detail=f"Cashier {cashier_id} already has an open POS shift in {store['code']}.")
+        if terminal_id and self._find_open_pos_shift(store["code"], terminal_id=terminal_id):
+            raise HTTPException(status_code=400, detail=f"Terminal {terminal_id} already has an open POS shift in {store['code']}.")
+
+        sequence = next(self._cashier_shift_ids)
+        shift_id = f"SHIFT-{self._pos_sale_store_prefix(store['code'])}-{datetime.now(NAIROBI_TZ).strftime('%y%m%d')}-{sequence:04d}"
+        opened_at = now_iso()
+        shift = {
+            "shift_id": shift_id,
+            "shift_no": shift_id,
+            "store_code": store["code"],
+            "cashier_id": cashier_id,
+            "cashier_name": cashier_id,
+            "terminal_id": terminal_id,
+            "opening_float": opening_float,
+            "opening_float_cash": opening_float,
+            "opened_at": opened_at,
+            "opened_by": str(opened_by or cashier_id).strip(),
+            "status": "open",
+            "closed_at": None,
+            "closed_by": None,
+            "manager_confirmed_by": "",
+            "counted_cash": None,
+            "closing_cash_counted": None,
+            "expected_cash": None,
+            "cash_variance": None,
+            "note": str(payload.get("note") or "").strip(),
+            "handover_status": "not_requested",
+        }
+        self.cashier_shifts[shift_id] = shift
+        self._log_event(
+            event_type="pos.shift_opened",
+            entity_type="cashier_shift",
+            entity_id=shift_id,
+            actor=shift["opened_by"],
+            summary=f"POS shift {shift_id} opened at {store['code']}",
+            details={
+                "store_code": store["code"],
+                "cashier_id": cashier_id,
+                "terminal_id": terminal_id,
+                "opening_float": opening_float,
+            },
+        )
+        self._persist()
+        return self._normalize_pos_shift(shift)
+
+    def get_current_pos_shift(self, store_code: str, *, cashier_id: str, terminal_id: str = "") -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        cashier = str(cashier_id or "").strip()
+        if not cashier:
+            raise HTTPException(status_code=400, detail="cashier_id is required")
+        shift = self._find_open_pos_shift(store["code"], cashier_id=cashier, terminal_id=terminal_id)
+        if not shift:
+            raise HTTPException(status_code=404, detail="No open POS shift for this cashier and terminal.")
+        return self._normalize_pos_shift(shift)
+
+    def get_pos_shift_summary(self, store_code: str, shift_id: str) -> dict[str, Any]:
+        shift = self._get_pos_shift_for_store(store_code, shift_id)
+        normalized_shift = self._normalize_pos_shift(shift)
+        cash_sales = 0.0
+        mpesa_sales = 0.0
+        mixed_cash = 0.0
+        mixed_mpesa = 0.0
+        total_sales = 0.0
+        order_count = 0
+        cancelled_order_count = 0
+        for sale in self.sales_transactions:
+            if str(sale.get("store_code") or "").strip().upper() != normalized_shift["store_code"]:
+                continue
+            if str(sale.get("shift_id") or sale.get("shift_no") or "").strip() != normalized_shift["shift_id"]:
+                continue
+            sale_status = str(sale.get("sale_status") or sale.get("status") or "").strip().lower()
+            if sale_status in {"voided", "cancelled", "canceled"}:
+                cancelled_order_count += 1
+                continue
+            total_amount = round(float(sale.get("total_amount") or 0), 2)
+            payment_method = str(sale.get("payment_method") or "").strip().lower()
+            total_sales += total_amount
+            order_count += 1
+            if payment_method == "cash":
+                cash_sales += total_amount
+            elif payment_method == "mpesa":
+                mpesa_sales += total_amount
+            elif payment_method == "mixed":
+                mixed_cash += round(float(sale.get("cash_amount") or 0), 2)
+                mixed_mpesa += round(float(sale.get("mpesa_amount") or 0), 2)
+        expected_cash = round(normalized_shift["opening_float"] + cash_sales + mixed_cash, 2)
+        return {
+            **normalized_shift,
+            "total_sales": round(total_sales, 2),
+            "order_count": order_count,
+            "cash_sales": round(cash_sales, 2),
+            "mpesa_sales": round(mpesa_sales, 2),
+            "mixed_cash": round(mixed_cash, 2),
+            "mixed_mpesa": round(mixed_mpesa, 2),
+            "expected_cash": expected_cash,
+            "hold_count": 0,
+            "cancelled_order_count": cancelled_order_count,
+        }
+
+    def close_pos_shift(self, store_code: str, shift_id: str, payload: dict[str, Any], closed_by: str = "") -> dict[str, Any]:
+        shift = self._get_pos_shift_for_store(store_code, shift_id)
+        if str(shift.get("status") or "").strip().lower() != "open":
+            raise HTTPException(status_code=400, detail="POS shift is not open")
+        counted_cash = self._pos_sale_money(payload.get("counted_cash"), "counted_cash")
+        summary = self.get_pos_shift_summary(store_code, shift_id)
+        expected_cash = summary["expected_cash"]
+        cash_variance = round(counted_cash - expected_cash, 2)
+        closed_at = now_iso()
+        shift["status"] = "closed"
+        shift["closed_at"] = closed_at
+        shift["closed_by"] = str(closed_by or "").strip()
+        shift["manager_confirmed_by"] = str(payload.get("manager_confirmed_by") or "").strip()
+        shift["counted_cash"] = counted_cash
+        shift["closing_cash_counted"] = counted_cash
+        shift["expected_cash"] = expected_cash
+        shift["cash_variance"] = cash_variance
+        if payload.get("note") is not None:
+            shift["note"] = str(payload.get("note") or "").strip()
+        self._log_event(
+            event_type="pos.shift_closed",
+            entity_type="cashier_shift",
+            entity_id=summary["shift_id"],
+            actor=shift["closed_by"],
+            summary=f"POS shift {summary['shift_id']} closed at {summary['store_code']}",
+            details={
+                "expected_cash": expected_cash,
+                "counted_cash": counted_cash,
+                "cash_variance": cash_variance,
+                "manager_confirmed_by": shift["manager_confirmed_by"],
+            },
+        )
+        self._persist()
+        return self.get_pos_shift_summary(store_code, shift_id)
+
+    def _validate_pos_sale_shift(
+        self,
+        store_code: str,
+        shift_id: str,
+        cashier_id: str,
+        terminal_id: str,
+    ) -> dict[str, Any]:
+        if not str(shift_id or "").strip():
+            raise HTTPException(status_code=400, detail="请先开班后再收银。")
+        shift = self._get_pos_shift_for_store(store_code, shift_id)
+        normalized = self._normalize_pos_shift(shift)
+        if normalized["status"] != "open":
+            raise HTTPException(status_code=400, detail=f"POS shift {normalized['shift_id']} is not open.")
+        if normalized["cashier_id"] != str(cashier_id or "").strip():
+            raise HTTPException(status_code=400, detail=f"POS shift {normalized['shift_id']} belongs to cashier {normalized['cashier_id']}.")
+        requested_terminal = str(terminal_id or "").strip()
+        if normalized["terminal_id"] and requested_terminal and normalized["terminal_id"] != requested_terminal:
+            raise HTTPException(status_code=400, detail=f"POS shift {normalized['shift_id']} belongs to terminal {normalized['terminal_id']}.")
+        return normalized
+
     def _pick_store_simulation_sales_actor(
         self,
         store_code: str,
@@ -17265,6 +17497,13 @@ class InMemoryState:
         cashier_id = str(payload.get("cashier_id") or created_by or "").strip()
         if not cashier_id:
             raise HTTPException(status_code=400, detail="cashier_id is required")
+        terminal_id = str(payload.get("terminal_id") or "").strip()
+        shift = self._validate_pos_sale_shift(
+            normalized_store,
+            str(payload.get("shift_id") or "").strip(),
+            cashier_id,
+            terminal_id,
+        )
         items = payload.get("items") or []
         if not items:
             raise HTTPException(status_code=400, detail="POS sale requires at least one STORE_ITEM.")
@@ -17395,9 +17634,9 @@ class InMemoryState:
             "store_code": normalized_store,
             "cashier_name": cashier_id,
             "cashier_id": cashier_id,
-            "shift_no": str(payload.get("shift_id") or "").strip(),
-            "shift_id": str(payload.get("shift_id") or "").strip(),
-            "terminal_id": str(payload.get("terminal_id") or "").strip(),
+            "shift_no": shift["shift_id"],
+            "shift_id": shift["shift_id"],
+            "terminal_id": terminal_id or shift.get("terminal_id", ""),
             "sold_at": sale_time,
             "sale_time": sale_time,
             "created_at": sale_time,
