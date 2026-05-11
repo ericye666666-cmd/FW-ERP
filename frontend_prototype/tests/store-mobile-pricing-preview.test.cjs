@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#279/);
+  assert.match(loginVersionSection, /#281/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=store-item-trace-lookup-308/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-trace-lookup-308/);
+  assert.match(indexHtml, /app\.js\?v=clerk-pda-daily-workbench-309/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-pda-daily-workbench-309/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -175,7 +175,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-inventory-overview-ui-polish-305/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-clerk-pda-daily-workbench-309/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -285,7 +285,7 @@ test("PDA pricing preview keeps #195 page components but runtime bottom nav only
   const bottomTabsSource = extractFunctionSource(appJs, "renderStoreMobileBottomTabs");
   const frameSource = extractFunctionSource(appJs, "renderStoreMobileDeviceFrame");
 
-  assert.match(pageOptionsSource, /我的 SDP 任务/);
+  assert.match(pageOptionsSource, /我的今日工作|我的任务/);
   assert.match(pageOptionsSource, /SDP 详情/);
   assert.match(pageOptionsSource, /分批定价/);
   assert.doesNotMatch(pageOptionsSource, /当前 source line|价格组列表/);
@@ -299,6 +299,43 @@ test("PDA pricing preview keeps #195 page components but runtime bottom nav only
   assert.match(stylesCss, /\.mobile-pricing-tabbar\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(frameSource, /renderStoreMobileDeviceScreen\(state\)/);
   assert.doesNotMatch(frameSource, /pending_print|pending_putaway|resolver projection|source_token_refs|lineage payload|transfer projection/);
+});
+
+test("clerk PDA task home is a daily workbench, not an SDP-only homepage", () => {
+  const taskListSource = extractFunctionSource(appJs, "renderStoreMobileTaskList");
+  const pageOptionsSource = extractFunctionSource(appJs, "getStoreMobilePageOptions");
+  const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
+
+  assert.match(taskListSource, /我的今日工作|我的任务/);
+  assert.doesNotMatch(taskListSource, /SDP 分拣首页/);
+  assert.match(taskListSource, /当前店员|Austin/);
+  assert.match(taskListSource, /当前门店|UTAWALA/);
+  assert.match(taskListSource, /今日待办/);
+  assert.match(taskListSource, /进行中/);
+  assert.match(taskListSource, /待完成入库/);
+  assert.match(taskListSource, /已完成/);
+  assert.match(taskListSource, /紧急待办/);
+  assert.match(taskListSource, /已打印但还没有确认货架，库存暂未计入。/);
+  assert.match(taskListSource, /立即处理/);
+  assert.match(taskListSource, /我的任务/);
+  assert.match(taskListSource, /SDP 分拣 \/ 打标签任务|SDP 分拣/);
+  assert.match(taskListSource, /补货任务/);
+  assert.match(taskListSource, /清洁任务/);
+  assert.match(taskListSource, /日报填写/);
+  assert.match(taskListSource, /快捷入口/);
+  assert.match(taskListSource, /扫 SDP/);
+  assert.match(taskListSource, /未完成入库/);
+  assert.match(taskListSource, /补货/);
+  assert.match(taskListSource, /打印机/);
+  assert.match(taskListSource, /mobile-task-card/);
+  assert.doesNotMatch(taskListSource, /<table|form-grid|stock_in_confirmed|legacy|entity_type/);
+  assert.match(pageOptionsSource, /我的今日工作|我的任务/);
+  assert.match(mySource, /未完成入库/);
+  assert.match(appLegacyJs, /我的今日工作/);
+  assert.match(appLegacyJs, /补货任务/);
+  assert.match(appLegacyJs, /清洁任务/);
+  assert.match(appLegacyJs, /日报填写/);
+  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_STORE|CASHIER_TERMINAL_PREVIEW_ITEMS|CASHIER_TERMINAL_REJECT_MESSAGES/);
 });
 
 test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without resetting workflow state", () => {
@@ -402,8 +439,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-item-trace-lookup-308/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-item-trace-lookup-308/);
+  assert.match(indexHtml, /app\.js\?v=clerk-pda-daily-workbench-309/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-pda-daily-workbench-309/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });

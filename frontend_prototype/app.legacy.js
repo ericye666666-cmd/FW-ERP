@@ -59,9 +59,9 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-inventory-overview-ui-polish-305";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "inventory-overview-ui-polish-305";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#274";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-clerk-pda-daily-workbench-309";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "clerk-pda-daily-workbench-309";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#281";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -32504,14 +32504,112 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
 function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
   var _a, _b, _c2;
   const backendTasks = getStoreMobileAssignedBackendTasks(state);
+  const sdp = state.selectedSdp || {};
+  const assignedEmployee = String(sdp.assigned_clerk || sdp.assigned_employee || getCurrentUsername() || "Austin").trim();
+  const storeName = String(sdp.store_name || sdp.store_code || state.store_code || "UTAWALA").trim().toUpperCase();
+  const unconfirmedRows = Array.isArray(state.storeMobileUnconfirmedStockInItems) ? state.storeMobileUnconfirmedStockInItems : [];
+  const unconfirmedCount = unconfirmedRows.length;
+  const taskStatus = getStoreMobileTaskStatus(state) || "待核对";
+  const totals = getStoreMobileTaskTotals(state);
+  const activeTaskCount = backendTasks.length || (sdp.display_code || sdp.sdp_code ? 1 : 0);
+  const completedCount = Number(totals.completeGroups || 0);
+  const inProgressCount = taskStatus === "已完成" ? 0 : activeTaskCount;
+  const todoCount = activeTaskCount + unconfirmedCount + 3;
+  const renderDailyWorkbenchShell = (bodyHtml = "") => `
+    <section class="mobile-task-list mobile-daily-workbench">
+      <div class="mobile-daily-hero">
+        <div>
+          <span class="eyebrow">我的今日工作</span>
+          <h3>我的任务</h3>
+          <p>${escapeHtml(assignedEmployee)} / ${escapeHtml(storeName)} 店员</p>
+        </div>
+        ${renderStoreMobilePricingBadge("今日")}
+      </div>
+      <div class="mobile-daily-metrics">
+        <span><b>今日待办</b><strong>${escapeHtml(todoCount)}</strong></span>
+        <span><b>进行中</b><strong>${escapeHtml(inProgressCount)}</strong></span>
+        <span><b>待完成入库</b><strong>${escapeHtml(unconfirmedCount)}</strong></span>
+        <span><b>已完成</b><strong>${escapeHtml(completedCount)}</strong></span>
+      </div>
+      <section class="mobile-urgent-list">
+        <div class="mobile-section-head"><strong>紧急待办</strong></div>
+        <article class="mobile-task-card mobile-task-card-warning">
+          <div class="mobile-task-card-head">
+            <div>
+              <span>STOCK_IN_PENDING · 待完成入库</span>
+              <strong>待完成入库 ${escapeHtml(unconfirmedCount)} 件</strong>
+              <small>已打印但还没有确认货架，库存暂未计入。</small>
+            </div>
+            ${renderStoreMobilePricingBadge(unconfirmedCount ? "待处理" : "已清空")}
+          </div>
+          <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="my">立即处理</button>
+        </article>
+        <article class="mobile-task-card mobile-task-card-muted">
+          <div class="mobile-task-card-head">
+            <div>
+              <span>DAILY_REPORT · 日报填写</span>
+              <strong>今日日报填写</strong>
+              <small>顾客反馈 / 缺货反馈 / 门店情况</small>
+            </div>
+            ${renderStoreMobilePricingBadge("待填写")}
+          </div>
+          <button type="button" class="ghost-button mobile-wide-action" disabled>填写日报</button>
+        </article>
+      </section>
+      <section class="mobile-task-list-inner">
+        <div class="mobile-section-head"><strong>我的任务</strong></div>
+        ${bodyHtml}
+        <article class="mobile-task-card mobile-task-card-placeholder">
+          <div class="mobile-task-card-head">
+            <div>
+              <span>RESTOCK · 补货任务</span>
+              <strong>CARGO PANT 主货架库存偏低</strong>
+              <small>建议从后仓补货 30 件</small>
+            </div>
+            ${renderStoreMobilePricingBadge("高优先级")}
+          </div>
+          <button type="button" class="ghost-button mobile-wide-action" disabled>查看任务</button>
+        </article>
+        <article class="mobile-task-card mobile-task-card-placeholder">
+          <div class="mobile-task-card-head">
+            <div>
+              <span>CLEANING · 清洁任务</span>
+              <strong>上午门店清洁</strong>
+              <small>门店地面 / 试衣区 / 收银台</small>
+            </div>
+            ${renderStoreMobilePricingBadge("未完成")}
+          </div>
+          <button type="button" class="ghost-button mobile-wide-action" disabled>确认完成</button>
+        </article>
+        <article class="mobile-task-card mobile-task-card-placeholder">
+          <div class="mobile-task-card-head">
+            <div>
+              <span>SHELF_PUTAWAY · 上架任务</span>
+              <strong>上架任务</strong>
+              <small>后续接入店长分配的前店上架任务</small>
+            </div>
+            ${renderStoreMobilePricingBadge("预留")}
+          </div>
+          <button type="button" class="ghost-button mobile-wide-action" disabled>查看任务</button>
+        </article>
+      </section>
+      <section class="mobile-quick-actions">
+        <div class="mobile-section-head"><strong>快捷入口</strong></div>
+        <div class="mobile-quick-action-grid">
+          <button type="button" class="primary-button" data-mobile-pricing-page="verify">扫 SDP</button>
+          <button type="button" class="ghost-button" data-mobile-pricing-page="my">未完成入库</button>
+          <button type="button" class="ghost-button" disabled>补货</button>
+          <button type="button" class="ghost-button" data-mobile-pricing-page="printer_connection">打印机</button>
+        </div>
+      </section>
+    </section>
+  `;
   if (backendTasks.length) {
     const selectedCode = String(
       state.selectedBackendTaskCode || (((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) ? ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c2 = state.selectedSdp) == null ? void 0 : _c2.sdp_code) : "") || ""
     ).trim().toUpperCase();
-    return `
-      <section class="mobile-task-list">
-        <h3>我的 SDP 任务</h3>
-        <div class="subtle small">后台 assigned SDP 任务 · 最新 assigned_at 优先。</div>
+    return renderDailyWorkbenchShell(`
+        <div class="subtle small">SDP 分拣只是今日任务之一；后台 assigned SDP 任务按最新 assigned_at 优先。</div>
         ${backendTasks.map((task) => {
       var _a2;
       const displayCode2 = getStoreMobileAssignedTaskCode(task);
@@ -32531,32 +32629,28 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
             <article class="mobile-task-card ${isSelected ? "is-active" : ""}">
               <div class="mobile-task-card-head">
                 <div>
-                  <span>后台任务 / Backend assigned</span>
+                  <span>SDP_SORTING · SDP 分拣 / 打标签任务</span>
                   <strong>${escapeHtml(displayCode2 || machineCode || "-")}</strong>
                   <small>${escapeHtml(`${contentSummary} · ${itemCount} · ${storeCode} · 来源 ${parentSdoDisplayCode}`)}</small>
                 </div>
                 ${renderStoreMobilePricingBadge(status)}
               </div>
               <div class="mobile-task-facts">
-                <span><b>machine_code</b>${escapeHtml(machineCode || "-")}</span>
-                <span><b>parent SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
+                <span><b>商品包码</b>${escapeHtml(machineCode || "-")}</span>
+                <span><b>来源 SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
                 <span><b>来源</b>${escapeHtml(`${sourceType} ${sourceCode}`.trim())}</span>
-                <span><b>assigned_at</b>${escapeHtml(assignedAt)}</span>
-                <span><b>status</b>${escapeHtml(status || "-")}</span>
-                <span><b>received_status</b>${escapeHtml(receivedStatus || "-")}</span>
-                <span><b>assignment_status</b>${escapeHtml(assignmentStatus || "-")}</span>
+                <span><b>分配时间</b>${escapeHtml(assignedAt)}</span>
+                <span><b>收货状态</b>${escapeHtml(receivedStatus || "-")}</span>
+                <span><b>任务状态</b>${escapeHtml(assignmentStatus || status || "-")}</span>
               </div>
-              <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-select-backend-task="${escapeHtml(displayCode2 || machineCode || "")}">开始核对</button>
+              <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-select-backend-task="${escapeHtml(displayCode2 || machineCode || "")}">继续处理</button>
             </article>
           `;
     }).join("")}
-      </section>
-    `;
+      `);
   }
   if (isPdaRuntimeMode() && !state.assignedBackendTasksLoaded) {
-    return `
-      <section class="mobile-task-list">
-        <h3>我的 SDP 任务</h3>
+    return renderDailyWorkbenchShell(`
         <div class="mobile-task-card">
           <div class="mobile-task-card-head">
             <div>
@@ -32567,26 +32661,19 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
             ${renderStoreMobilePricingBadge("读取中")}
           </div>
         </div>
-      </section>
-    `;
+      `);
   }
-  const sdp = state.selectedSdp || {};
-  const taskStatus = getStoreMobileTaskStatus(state) || "待核对";
-  const totals = getStoreMobileTaskTotals(state);
   const displayCode = String(sdp.display_code || "SDP261250002");
   const defaultCategoryLine = "牛仔裤 / 210 件";
   const categoryLine = sdp.category || sdp.total_count ? `${sdp.category || "牛仔裤"} / ${sdp.total_count || 210} 件` : defaultCategoryLine;
-  const storeName = String(sdp.store_name || "UTAWALA");
   const sdoCode = String(sdp.sdo_code || "SDO260504008");
   const completed = taskStatus === "已完成";
-  return `
-    <section class="mobile-task-list">
-      <h3>我的 SDP 任务</h3>
-      <div class="subtle small">没有后台 assigned SDP 时才显示演示任务；真实 PDA 优先使用 backend assigned SDP。</div>
+  return renderDailyWorkbenchShell(`
+      <div class="subtle small">暂无新分拣任务时，可以处理未完成入库，或等待店长分配任务。我的 SDP 任务会显示为 SDP 分拣 / 打标签任务。</div>
       <article class="mobile-task-card ${completed ? "is-complete" : ""}">
         <div class="mobile-task-card-head">
           <div>
-            <span>演示任务 / Demo only</span>
+            <span>SDP_SORTING · SDP 分拣 / 打标签任务 · 演示任务 / Demo only</span>
             <strong>${escapeHtml(displayCode)}</strong>
             <small>${escapeHtml(`${categoryLine} · ${storeName} · 来源 ${sdoCode}`)}</small>
           </div>
@@ -32600,8 +32687,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
         </div>
         ${completed ? '<div class="mobile-task-complete-note">已完成：总数 210，价格组 4/4 已完成。</div>' : '<button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-start-task="true">开始任务</button>'}
       </article>
-    </section>
-  `;
+    `);
 }
 function renderStoreMobileScanStep(state = storeMobilePricingPreviewState) {
   const sdp = state.selectedSdp || {};
@@ -33075,7 +33161,7 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
 }
 function getStoreMobilePageOptions() {
   return [
-    { key: "tasks", label: "我的 SDP 任务" },
+    { key: "tasks", label: "我的今日工作" },
     { key: "detail", label: "SDP 详情" },
     { key: "pricing_split", label: "分批定价" },
     { key: "group_generated", label: "本批 STORE_ITEM 生成结果" },
