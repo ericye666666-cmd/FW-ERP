@@ -30929,12 +30929,9 @@ async function resolveCashierTerminalStoreItemForPos(query) {
   if (!normalizedQuery) {
     throw new Error("请先扫描 STORE_ITEM 商品码。");
   }
+  let resolved = null;
   try {
-    const resolved = await resolveBarcodeForContext(normalizedQuery, "pos", [], { rejectOnContextReject: false });
-    ensureCashierTerminalPreviewState();
-    cashierTerminalState.scanFallbackNotice = "";
-    ensureCashierTerminalResolvedItemCanEnterCart(resolved, normalizedQuery);
-    return mapCashierTerminalResolvedStoreItem(resolved, normalizedQuery);
+    resolved = await resolveBarcodeForContext(normalizedQuery, "pos", [], { rejectOnContextReject: false });
   } catch (error) {
     if (!isCashierTerminalResolverUnavailableError(error)) {
       throw error;
@@ -30945,6 +30942,10 @@ async function resolveCashierTerminalStoreItemForPos(query) {
     fallback.local_demo_notice = CASHIER_TERMINAL_LOCAL_DEMO_NOTICE;
     return fallback;
   }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.scanFallbackNotice = "";
+  ensureCashierTerminalResolvedItemCanEnterCart(resolved, normalizedQuery);
+  return mapCashierTerminalResolvedStoreItem(resolved, normalizedQuery);
 }
 
 function resolveCashierTerminalPreviewScan(query) {
