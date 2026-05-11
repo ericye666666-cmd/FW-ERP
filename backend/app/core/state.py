@@ -17614,9 +17614,12 @@ class InMemoryState:
         return total
 
     def _store_inventory_row_is_countable(self, row: dict[str, Any]) -> bool:
-        if row.get("sold") is True:
+        if not self._store_inventory_row_is_base_eligible(row):
             return False
-        if row.get("stock_in_confirmed") is False:
+        return row.get("stock_in_confirmed") is True
+
+    def _store_inventory_row_is_base_eligible(self, row: dict[str, Any]) -> bool:
+        if row.get("sold") is True:
             return False
         status_values = {
             str(row.get("status") or "").strip().lower(),
@@ -17721,17 +17724,17 @@ class InMemoryState:
             "last_inbound_at": last_time,
         }
 
-    def _collect_store_inventory_items(self, store_code: str) -> list[dict[str, Any]]:
+    def _collect_store_inventory_items(self, store_code: str, *, inventory_scope: str = "confirmed") -> list[dict[str, Any]]:
         store = self._ensure_store_exists(store_code)
         locations, active_locations = self._store_inventory_location_maps(store["code"])
-        rows_by_key: dict[str, dict[str, Any]] = {}
+        rows_by_key: dict[str, dict[str, dict[str, Any] | None]] = {}
 
         def add_row(row: dict[str, Any], *, prefer_existing: bool = False) -> None:
             if str(row.get("store_code") or "").strip().upper() != store["code"]:
                 return
             if str(row.get("entity_type") or "STORE_ITEM").strip().upper() != "STORE_ITEM":
                 return
-            if not self._store_inventory_row_is_countable(row):
+            if not self._store_inventory_row_is_base_eligible(row):
                 return
             key = str(
                 row.get("store_item_id")
@@ -17746,17 +17749,23 @@ class InMemoryState:
             if not key:
                 return
             normalized = self._normalize_store_inventory_item_row(row, store["code"], locations, active_locations)
-            if prefer_existing and key in rows_by_key:
+            bucket = rows_by_key.setdefault(key, {"confirmed": None, "unconfirmed": None})
+            if row.get("stock_in_confirmed") is True:
+                if prefer_existing and bucket.get("confirmed"):
+                    return
+                bucket["confirmed"] = normalized
                 return
-            rows_by_key[key] = normalized
+            if prefer_existing and bucket.get("unconfirmed"):
+                return
+            bucket["unconfirmed"] = normalized
 
         for row in self.item_barcode_tokens.values():
             add_row(row)
         for row in self.store_items.values():
             add_row(row)
         seen_barcodes = {
-            str(row.get("machine_code") or row.get("barcode_value") or "").strip().upper()
-            for row in rows_by_key.values()
+            str((bucket.get("confirmed") or bucket.get("unconfirmed") or {}).get("machine_code") or (bucket.get("confirmed") or bucket.get("unconfirmed") or {}).get("barcode_value") or "").strip().upper()
+            for bucket in rows_by_key.values()
         }
         for row in self.store_stock.values():
             barcode = str(row.get("barcode") or row.get("machine_code") or row.get("barcode_value") or "").strip().upper()
@@ -17770,12 +17779,19 @@ class InMemoryState:
                 "sale_price_kes": row.get("launch_price") or row.get("expected_price") or row.get("price") or 0,
             }
             add_row(fallback_row, prefer_existing=True)
-        return sorted(rows_by_key.values(), key=lambda item: (item.get("last_inbound_at") or "", item.get("machine_code") or ""), reverse=True)
+        selected_key = "unconfirmed" if inventory_scope == "unconfirmed" else "confirmed"
+        items = [
+            bucket[selected_key]
+            for bucket in rows_by_key.values()
+            if bucket.get(selected_key) and not (inventory_scope == "unconfirmed" and bucket.get("confirmed"))
+        ]
+        return sorted(items, key=lambda item: (item.get("last_inbound_at") or "", item.get("machine_code") or ""), reverse=True)
 
     def get_store_inventory_overview(self, store_code: str) -> dict[str, Any]:
         store = self._ensure_store_exists(store_code)
         locations, active_locations = self._store_inventory_location_maps(store["code"])
         items = self._collect_store_inventory_items(store["code"])
+        unconfirmed_items = self._collect_store_inventory_items(store["code"], inventory_scope="unconfirmed")
         today = datetime.now(NAIROBI_TZ).date()
 
         by_category: dict[str, dict[str, Any]] = {}
@@ -17859,7 +17875,9 @@ class InMemoryState:
             "backroom_items": backroom_items,
             "unassigned_location_items": unassigned_items,
             "today_new_items": today_new_items,
-            "stock_in_confirmed_filter": "used_when_present",
+            "unconfirmed_items": len(unconfirmed_items),
+            "stock_in_confirmed_filter": "required_true",
+            "unconfirmed_scope": "stock_in_confirmed_false_or_missing",
             "data_sources": ["store_items", "item_barcode_tokens", "store_stock_fallback"],
             "by_category": sorted(by_category.values(), key=lambda row: (-int(row.get("total_items") or 0), row.get("category_name") or "")),
             "by_location": sorted(by_location.values(), key=lambda row: (row["location_type"] == "UNASSIGNED", row.get("location_type") or "", row.get("location_code") or "")),

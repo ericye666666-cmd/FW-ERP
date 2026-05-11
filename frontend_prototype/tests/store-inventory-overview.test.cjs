@@ -30,6 +30,7 @@ test("inventory overview page has store switcher, tabs, metrics, and detail targ
   assert.match(section, /后仓/);
   assert.match(section, /未关联货架/);
   assert.match(section, /今日新增入库/);
+  assert.match(section, /未确认/);
   assert.match(section, /按品类/);
   assert.match(section, /按货架/);
   assert.match(section, /storeInventoryOverviewDetail/);
@@ -40,6 +41,8 @@ test("inventory overview frontend calls overview and detail APIs", () => {
   assert.match(appJs, /loadStoreInventoryOverview/);
   assert.match(appJs, /renderStoreInventoryOverview/);
   assert.match(appJs, /renderStoreInventoryOverviewDetail/);
+  assert.match(appJs, /未确认 \/ 历史未确认/);
+  assert.match(appJs, /stock_in_confirmed=true/);
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview"));
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview/locations/${encodeURIComponent(locationCode)}/items"));
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview/categories/${encodeURIComponent(categoryName)}/items"));

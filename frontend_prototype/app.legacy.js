@@ -23036,20 +23036,21 @@ function formatInventoryDate(value) {
   return text || "-";
 }
 function renderStoreInventoryOverviewMetrics(overview = {}) {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c2, _d2, _e2, _f2;
   const target = document.querySelector("#storeInventoryOverviewSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。仅统计 STORE_ITEM 级别门店库存，sold / void / cancelled / deleted 不计入；如果记录已有 stock_in_confirmed=false，则暂不计入。</div>
+    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计 stock_in_confirmed=true 的 STORE_ITEM；未确认 / 历史未确认单独展示。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml((_a = overview.total_items) != null ? _a : 0)}</span></article>
       <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml((_b = overview.shelf_items) != null ? _b : 0)}</span></article>
       <article class="store-metric"><strong>后仓</strong><span>${escapeHtml((_c2 = overview.backroom_items) != null ? _c2 : 0)}</span></article>
       <article class="store-metric"><strong>未关联货架</strong><span>${escapeHtml((_d2 = overview.unassigned_location_items) != null ? _d2 : 0)}</span></article>
       <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml((_e2 = overview.today_new_items) != null ? _e2 : 0)}</span></article>
+      <article class="store-metric"><strong>未确认 / 历史未确认</strong><span>${escapeHtml((_f2 = overview.unconfirmed_items) != null ? _f2 : 0)}</span></article>
     </div>
   `;
 }

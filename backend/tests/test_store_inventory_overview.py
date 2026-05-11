@@ -93,12 +93,13 @@ class StoreInventoryOverviewStateTest(unittest.TestCase):
         )
 
     def test_inventory_overview_counts_category_location_backroom_and_unassigned_items(self):
-        self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR"))
-        self._add_item(_store_item(store_item_id="STOREITEM-BACK", machine_code="5260511000029", location_code="UT-BACKROOM"))
-        self._add_item(_store_item(store_item_id="STOREITEM-UNASSIGNED", machine_code="5260511000037", location_code=""))
+        self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR", stock_in_confirmed=True))
+        self._add_item(_store_item(store_item_id="STOREITEM-BACK", machine_code="5260511000029", location_code="UT-BACKROOM", stock_in_confirmed=True))
+        self._add_item(_store_item(store_item_id="STOREITEM-UNASSIGNED", machine_code="5260511000037", location_code="", stock_in_confirmed=True))
         self._add_item(_store_item(store_item_id="STOREITEM-SOLD", machine_code="5260511000045", location_code="PT-CR", status="sold"))
         self._add_item(_store_item(store_code="KINNO", store_item_id="STOREITEM-KINNO", machine_code="5260511000052", location_code="PT-CR"))
         self._add_item(_store_item(store_item_id="STOREITEM-PENDING", machine_code="5260511000060", location_code="PT-CR", stock_in_confirmed=False))
+        self._add_item(_store_item(store_item_id="STOREITEM-LEGACY", machine_code="5260511000078", location_code="PT-CR"))
 
         overview = self.state.get_store_inventory_overview("UTAWALA")
 
@@ -108,6 +109,8 @@ class StoreInventoryOverviewStateTest(unittest.TestCase):
         self.assertEqual(overview["backroom_items"], 1)
         self.assertEqual(overview["unassigned_location_items"], 1)
         self.assertEqual(overview["today_new_items"], 3)
+        self.assertEqual(overview["unconfirmed_items"], 2)
+        self.assertEqual(overview["stock_in_confirmed_filter"], "required_true")
 
         category = next(row for row in overview["by_category"] if row["category_name"] == "CARGO PANT")
         self.assertEqual(category["total_items"], 3)
@@ -121,8 +124,9 @@ class StoreInventoryOverviewStateTest(unittest.TestCase):
         self.assertEqual(location_counts["UNASSIGNED"], 1)
 
     def test_inventory_overview_detail_filters_by_category_and_location(self):
-        self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR"))
-        self._add_item(_store_item(store_item_id="STOREITEM-BACK", machine_code="5260511000029", location_code="UT-BACKROOM"))
+        self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR", stock_in_confirmed=True))
+        self._add_item(_store_item(store_item_id="STOREITEM-BACK", machine_code="5260511000029", location_code="UT-BACKROOM", stock_in_confirmed=True))
+        self._add_item(_store_item(store_item_id="STOREITEM-LEGACY", machine_code="5260511000078", location_code="PT-CR"))
 
         category_items = self.state.list_store_inventory_category_items("UTAWALA", "CARGO PANT")
         location_items = self.state.list_store_inventory_location_items("UTAWALA", "PT-CR")
@@ -150,7 +154,7 @@ class StoreInventoryOverviewRoutesTest(unittest.TestCase):
 
     def test_inventory_overview_routes_require_auth_and_return_rows(self):
         self.state.initialize_store_racks("UTAWALA", STORE_RACK_TEMPLATE, initialized_by="store_manager_1")
-        row = _store_item(location_code="UT-BACKROOM")
+        row = _store_item(location_code="UT-BACKROOM", stock_in_confirmed=True)
         self.state.store_items[row["store_item_id"]] = row
 
         overview = routes_module.get_store_inventory_overview("UTAWALA", authorization=f"Bearer {self.token}")
@@ -162,4 +166,3 @@ class StoreInventoryOverviewRoutesTest(unittest.TestCase):
             authorization=f"Bearer {self.token}",
         )
         self.assertEqual(items[0]["machine_code"], row["machine_code"])
-
