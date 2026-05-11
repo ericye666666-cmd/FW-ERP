@@ -18240,6 +18240,9 @@ class InMemoryState:
             "source_sdp_display_code": str(row.get("source_sdp_display_code") or row.get("sdo_package_display_code") or row.get("source_package") or "").strip().upper(),
             "parent_sdo_display_code": str(row.get("parent_sdo_display_code") or row.get("task_no") or "").strip().upper(),
             "printed_by": str(row.get("printed_by") or row.get("generated_by") or row.get("created_by") or "").strip(),
+            "printed_at": str(row.get("printed_at") or "").strip(),
+            "created_at": str(row.get("created_at") or "").strip(),
+            "stock_in_confirmed": row.get("stock_in_confirmed") is True,
             "stock_in_confirmed_by": str(row.get("stock_in_confirmed_by") or row.get("shelved_by") or "").strip(),
             "stock_in_confirmed_at": str(row.get("stock_in_confirmed_at") or row.get("shelved_at") or "").strip(),
             "updated_at": last_time,
@@ -18420,6 +18423,55 @@ class InMemoryState:
         return [
             row for row in self._collect_store_inventory_items(store_code)
             if str(row.get("category_name") or "").strip().casefold() == normalized_category
+        ]
+
+    def _suggest_store_inventory_location(
+        self,
+        item: dict[str, Any],
+        active_locations: dict[str, dict[str, Any]],
+    ) -> dict[str, str]:
+        category_candidates = {
+            str(item.get(key) or "").strip().casefold()
+            for key in ("category_name", "category_short", "category_hint", "category_sub")
+            if str(item.get(key) or "").strip()
+        }
+        for location in active_locations.values():
+            if str(location.get("location_type") or "").strip().upper() != "SHELF":
+                continue
+            location_candidates = {
+                str(location.get(key) or "").strip().casefold()
+                for key in ("category_name", "category_hint", "location_name")
+                if str(location.get(key) or "").strip()
+            }
+            if category_candidates and category_candidates.intersection(location_candidates):
+                return {
+                    "suggested_location_code": str(location.get("location_code") or location.get("rack_code") or "").strip().upper(),
+                    "suggested_location_name": str(location.get("location_name") or location.get("location_code") or location.get("rack_code") or "").strip(),
+                }
+        backroom = next(
+            (
+                location for location in active_locations.values()
+                if str(location.get("location_type") or "").strip().upper() == "BACKROOM"
+            ),
+            None,
+        )
+        if backroom:
+            return {
+                "suggested_location_code": str(backroom.get("location_code") or backroom.get("rack_code") or "").strip().upper(),
+                "suggested_location_name": str(backroom.get("location_name") or "后仓").strip(),
+            }
+        return {"suggested_location_code": "", "suggested_location_name": ""}
+
+    def list_store_inventory_unconfirmed_items(self, store_code: str) -> list[dict[str, Any]]:
+        store = self._ensure_store_exists(store_code)
+        _, active_locations = self._store_inventory_location_maps(store["code"])
+        rows = self._collect_store_inventory_items(store["code"], inventory_scope="unconfirmed")
+        return [
+            {
+                **row,
+                **self._suggest_store_inventory_location(row, active_locations),
+            }
+            for row in rows
         ]
 
     def _normalize_store_location_row(self, row: dict[str, Any], sort_order: int = 0) -> dict[str, Any]:

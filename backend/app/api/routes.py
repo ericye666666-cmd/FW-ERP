@@ -3420,6 +3420,18 @@ def get_store_inventory_overview(
 
 
 @router.get(
+    "/stores/{store_code}/inventory-overview/unconfirmed-items",
+    tags=["stores"],
+)
+def get_store_inventory_unconfirmed_items(
+    store_code: str,
+    authorization: Optional[str] = Header(default=None),
+) -> list[dict[str, Any]]:
+    _require_current_user(authorization=authorization)
+    return state.list_store_inventory_unconfirmed_items(store_code)
+
+
+@router.get(
     "/stores/{store_code}/inventory-overview/locations/{location_code}/items",
     tags=["stores"],
 )

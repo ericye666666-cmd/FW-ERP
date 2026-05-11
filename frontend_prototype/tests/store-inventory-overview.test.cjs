@@ -17,6 +17,13 @@ function extractSectionByHeading(heading) {
   return indexHtml.slice(sectionStart, sectionEnd + "</section>".length);
 }
 
+function extractFunctionSource(source, name) {
+  const start = source.indexOf(`function ${name}`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const nextFunction = source.indexOf("\nfunction ", start + 1);
+  return source.slice(start, nextFunction === -1 ? undefined : nextFunction);
+}
+
 test("inventory overview page has store switcher, tabs, metrics, and detail targets", () => {
   const section = extractSectionByHeading("库存总览");
 
@@ -46,6 +53,8 @@ test("inventory overview frontend calls overview and detail APIs", () => {
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview"));
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview/locations/${encodeURIComponent(locationCode)}/items"));
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview/categories/${encodeURIComponent(categoryName)}/items"));
+  assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/inventory-overview/unconfirmed-items"));
+  assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/confirm-stock-in"));
 });
 
 test("inventory overview rows can open location and category details", () => {
@@ -64,10 +73,32 @@ test("inventory overview detail table is wired for confirmed STORE_ITEM stock-in
   assert.match(appJs, /unconfirmed_items/);
 });
 
+test("inventory overview unconfirmed metric opens a recoverable stock-in list", () => {
+  const metricSource = extractFunctionSource(appJs, "renderStoreInventoryOverviewMetrics");
+  const listSource = extractFunctionSource(appJs, "renderStoreInventoryUnconfirmedItems");
+  const confirmSource = extractFunctionSource(appJs, "confirmStoreInventoryUnconfirmedItemStockIn");
+
+  assert.match(metricSource, /data-store-inventory-unconfirmed-detail/);
+  assert.match(metricSource, /未确认 \/ 历史未确认/);
+  assert.match(listSource, /未确认 \/ 待完成入库/);
+  assert.match(listSource, /suggested_location_code/);
+  assert.match(listSource, /source_sdp_display_code/);
+  assert.match(listSource, /parent_sdo_display_code/);
+  assert.match(listSource, /printed_by/);
+  assert.match(listSource, /data-store-inventory-unconfirmed-location/);
+  assert.match(listSource, /data-store-inventory-unconfirmed-confirm/);
+  assert.match(confirmSource, /confirm-stock-in/);
+  assert.match(confirmSource, /loadStoreInventoryUnconfirmedItems/);
+  assert.match(confirmSource, /loadStoreInventoryOverview/);
+  assert.match(confirmSource, /确认完成入库/);
+});
+
 test("legacy bundle includes inventory overview page logic and cache key", () => {
   assert.match(appLegacyJs, /loadStoreInventoryOverview/);
   assert.match(appLegacyJs, /data-store-inventory-location-detail/);
   assert.match(appLegacyJs, /data-store-inventory-category-detail/);
-  assert.match(indexHtml, /app\.js\?v=store-inventory-overview-pr2/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-inventory-overview-pr2/);
+  assert.match(appLegacyJs, /loadStoreInventoryUnconfirmedItems/);
+  assert.match(appLegacyJs, /data-store-inventory-unconfirmed-confirm/);
+  assert.match(indexHtml, /app\.js\?v=unconfirmed-store-item-stock-in-list-304/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=unconfirmed-store-item-stock-in-list-304/);
 });
