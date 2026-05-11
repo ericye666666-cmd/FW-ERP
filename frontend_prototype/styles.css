@@ -8794,6 +8794,85 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   background: #f0fdf4;
 }
 
+.mobile-daily-workbench {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.mobile-daily-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #155e75 0%, #2563eb 100%);
+  color: #ffffff;
+}
+
+.mobile-daily-hero h3,
+.mobile-daily-hero p {
+  margin: 0;
+}
+
+.mobile-daily-hero h3 {
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.mobile-daily-hero p,
+.mobile-daily-hero .eyebrow {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.mobile-daily-metrics,
+.mobile-quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-daily-metrics span {
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.mobile-daily-metrics b {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.mobile-daily-metrics strong {
+  color: #0f172a;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.mobile-urgent-list,
+.mobile-task-list-inner,
+.mobile-quick-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.mobile-task-card-warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.mobile-task-card-muted,
+.mobile-task-card-placeholder {
+  background: #f8fafc;
+}
+
 .mobile-task-card-head {
   display: flex;
   justify-content: space-between;
