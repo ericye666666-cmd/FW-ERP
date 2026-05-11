@@ -17480,6 +17480,96 @@ class InMemoryState:
             "items": response_items,
         }
 
+    def _is_pos_sale_transaction(self, row: dict[str, Any]) -> bool:
+        return bool(row.get("sale_items")) and bool(row.get("sale_no") or row.get("sale_id") or row.get("order_no"))
+
+    def _normalize_pos_sale_detail(self, row: dict[str, Any]) -> dict[str, Any]:
+        sale_no = str(row.get("sale_no") or row.get("sale_id") or row.get("order_no") or "").strip()
+        sale_items = row.get("sale_items") or []
+        return {
+            "sale_id": str(row.get("sale_id") or sale_no).strip(),
+            "sale_no": sale_no,
+            "store_code": str(row.get("store_code") or "").strip().upper(),
+            "cashier_id": str(row.get("cashier_id") or row.get("cashier_name") or "").strip(),
+            "shift_id": str(row.get("shift_id") or row.get("shift_no") or "").strip(),
+            "terminal_id": str(row.get("terminal_id") or "").strip(),
+            "sale_time": str(row.get("sale_time") or row.get("sold_at") or row.get("created_at") or "").strip(),
+            "subtotal": round(float(row.get("subtotal") or row.get("total_amount") or 0), 2),
+            "discount_amount": round(float(row.get("discount_amount") or 0), 2),
+            "total_amount": round(float(row.get("total_amount") or 0), 2),
+            "payment_method": str(row.get("payment_method") or "").strip().lower(),
+            "cash_amount": round(float(row.get("cash_amount") or 0), 2),
+            "mpesa_amount": round(float(row.get("mpesa_amount") or 0), 2),
+            "mpesa_reference": str(row.get("mpesa_reference") or "").strip().upper(),
+            "change_amount": round(float(row.get("change_amount") or row.get("change_due") or 0), 2),
+            "status": str(row.get("status") or row.get("sale_status") or "completed").strip().lower(),
+            "items": [
+                {
+                    "sale_id": str(item.get("sale_id") or sale_no).strip(),
+                    "line_no": int(item.get("line_no") or index),
+                    "store_item_id": str(item.get("store_item_id") or "").strip(),
+                    "display_code": str(item.get("display_code") or "").strip(),
+                    "machine_code": str(item.get("machine_code") or "").strip(),
+                    "category": str(item.get("category") or "").strip(),
+                    "shelf_location": str(item.get("shelf_location") or "").strip(),
+                    "original_price": round(float(item.get("original_price") or 0), 2),
+                    "final_price": round(float(item.get("final_price") or 0), 2),
+                    "discount_amount": round(float(item.get("discount_amount") or 0), 2),
+                    "store_code": str(item.get("store_code") or row.get("store_code") or "").strip().upper(),
+                }
+                for index, item in enumerate(sale_items, start=1)
+            ],
+        }
+
+    def _normalize_pos_sale_summary(self, row: dict[str, Any]) -> dict[str, Any]:
+        detail = self._normalize_pos_sale_detail(row)
+        return {
+            "sale_id": detail["sale_id"],
+            "sale_no": detail["sale_no"],
+            "sale_time": detail["sale_time"],
+            "cashier_id": detail["cashier_id"],
+            "shift_id": detail["shift_id"],
+            "terminal_id": detail["terminal_id"],
+            "total_items": len(detail["items"]),
+            "total_amount": detail["total_amount"],
+            "payment_method": detail["payment_method"],
+            "status": detail["status"],
+        }
+
+    def list_pos_sales(self, store_code: str, limit: int = 20) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_limit = max(1, min(int(limit or 20), 100))
+        rows = [
+            row
+            for row in self.sales_transactions
+            if self._is_pos_sale_transaction(row)
+            and str(row.get("store_code") or "").strip().upper() == store["code"]
+        ]
+        rows.sort(
+            key=lambda row: str(row.get("sale_time") or row.get("created_at") or row.get("sold_at") or ""),
+            reverse=True,
+        )
+        return {
+            "store_code": store["code"],
+            "sales": [self._normalize_pos_sale_summary(row) for row in rows[:normalized_limit]],
+        }
+
+    def get_pos_sale(self, store_code: str, sale_no: str) -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_sale_no = str(sale_no or "").strip().upper()
+        if not normalized_sale_no:
+            raise HTTPException(status_code=404, detail="未找到该销售单。")
+        for row in self.sales_transactions:
+            if not self._is_pos_sale_transaction(row):
+                continue
+            row_sale_no = str(row.get("sale_no") or row.get("sale_id") or row.get("order_no") or "").strip().upper()
+            if row_sale_no != normalized_sale_no:
+                continue
+            if str(row.get("store_code") or "").strip().upper() != store["code"]:
+                raise HTTPException(status_code=404, detail="该销售单不属于当前门店。")
+            return self._normalize_pos_sale_detail(row)
+        raise HTTPException(status_code=404, detail="未找到该销售单。")
+
     def get_dashboard_summary(self) -> list[dict[str, Any]]:
         today_key = self._nairobi_day_key()
         open_transfer_count = sum(

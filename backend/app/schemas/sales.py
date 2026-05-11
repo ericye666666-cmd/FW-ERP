@@ -94,6 +94,24 @@ class PosSaleResponse(BaseModel):
     items: List[PosSaleItemResponse]
 
 
+class PosSaleSummaryResponse(BaseModel):
+    sale_id: str
+    sale_no: str
+    sale_time: str
+    cashier_id: str
+    shift_id: str = ""
+    terminal_id: str = ""
+    total_items: int
+    total_amount: float
+    payment_method: str
+    status: str = "completed"
+
+
+class PosSaleListResponse(BaseModel):
+    store_code: str
+    sales: List[PosSaleSummaryResponse]
+
+
 class SaleItemResponse(BaseModel):
     identity_id: str = ""
     barcode: str
