@@ -41,6 +41,59 @@ class SaleCreate(BaseModel):
     payments: List[SalePayment]
 
 
+class PosSaleItemCreate(BaseModel):
+    machine_code: str = Field(min_length=1)
+    display_code: str = ""
+    final_price: float = Field(ge=0)
+    discount_amount: float = Field(default=0, ge=0)
+
+
+class PosSaleCreate(BaseModel):
+    cashier_id: str = Field(min_length=1)
+    shift_id: str = ""
+    terminal_id: str = ""
+    payment_method: str = Field(min_length=1)
+    cash_amount: float = Field(default=0, ge=0)
+    mpesa_amount: float = Field(default=0, ge=0)
+    mpesa_reference: str = ""
+    discount_amount: float = Field(default=0, ge=0)
+    items: List[PosSaleItemCreate]
+
+
+class PosSaleItemResponse(BaseModel):
+    sale_id: str
+    line_no: int
+    store_item_id: str
+    display_code: str
+    machine_code: str
+    category: str = ""
+    shelf_location: str = ""
+    original_price: float
+    final_price: float
+    discount_amount: float
+    store_code: str
+
+
+class PosSaleResponse(BaseModel):
+    sale_id: str
+    sale_no: str
+    store_code: str
+    cashier_id: str
+    shift_id: str = ""
+    terminal_id: str = ""
+    sale_time: str
+    subtotal: float
+    discount_amount: float
+    total_amount: float
+    payment_method: str
+    cash_amount: float
+    mpesa_amount: float
+    mpesa_reference: str = ""
+    change_amount: float
+    status: str = "completed"
+    items: List[PosSaleItemResponse]
+
+
 class SaleItemResponse(BaseModel):
     identity_id: str = ""
     barcode: str

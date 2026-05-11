@@ -17048,6 +17048,438 @@ class InMemoryState:
         self._persist()
         return transaction
 
+    def _pos_sale_money(self, value: Any, field_name: str) -> float:
+        try:
+            amount = float(value or 0)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=f"{field_name} must be a valid amount") from exc
+        if amount < 0:
+            raise HTTPException(status_code=400, detail=f"{field_name} must be greater than or equal to 0")
+        return round(amount, 2)
+
+    def _pos_sale_store_prefix(self, store_code: str) -> str:
+        normalized = re.sub(r"[^A-Z0-9]", "", str(store_code or "").strip().upper())
+        if normalized == "UTAWALA":
+            return "UTW"
+        return (normalized[:3] or "POS").upper()
+
+    def _pos_sale_row_is_truthy(self, value: Any) -> bool:
+        return value is True or str(value or "").strip().lower() in {"true", "1", "yes", "y"}
+
+    def _find_pos_sale_store_item(
+        self,
+        resolved: dict[str, Any],
+        barcode: str,
+        display_code: str = "",
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        normalized_values = {
+            str(value or "").strip().upper()
+            for value in (
+                barcode,
+                display_code,
+                resolved.get("barcode_value"),
+                resolved.get("object_id"),
+                resolved.get("identity_id"),
+            )
+            if str(value or "").strip()
+        }
+        token = None
+        for value in normalized_values:
+            token = self._find_item_token_by_barcode_value(value)
+            if token:
+                break
+        candidate_ids = {
+            str(value or "").strip().upper()
+            for value in (
+                resolved.get("object_id"),
+                (token or {}).get("store_item_id"),
+                (token or {}).get("entity_id"),
+                (token or {}).get("item_id"),
+            )
+            if str(value or "").strip()
+        }
+        for candidate_id in candidate_ids:
+            store_item = self.store_items.get(candidate_id)
+            if store_item:
+                return store_item, token
+        for store_item in self.store_items.values():
+            haystack = {
+                str(store_item.get(key) or "").strip().upper()
+                for key in (
+                    "store_item_id",
+                    "item_id",
+                    "display_code",
+                    "machine_code",
+                    "barcode_value",
+                    "token_no",
+                    "identity_no",
+                )
+            }
+            if normalized_values & haystack:
+                return store_item, token
+        raise HTTPException(status_code=400, detail=f"找不到 STORE_ITEM 商品记录：{barcode}")
+
+    def _pos_sale_item_price(self, store_item: dict[str, Any], token: Optional[dict[str, Any]]) -> float:
+        for row in (store_item, token or {}):
+            for field_name in ("sale_price_kes", "selling_price_kes", "selected_price", "price"):
+                value = row.get(field_name)
+                if value not in (None, ""):
+                    return self._pos_sale_money(value, field_name)
+        raise HTTPException(
+            status_code=400,
+            detail=f"{store_item.get('display_code') or store_item.get('machine_code') or 'STORE_ITEM'} 缺少后端销售价格，不能 POS 销售。",
+        )
+
+    def _validate_pos_sale_item(
+        self,
+        store_code: str,
+        item: dict[str, Any],
+        line_no: int,
+    ) -> dict[str, Any]:
+        barcode = str(item.get("machine_code") or item.get("barcode_value") or item.get("display_code") or "").strip().upper()
+        display_code = str(item.get("display_code") or "").strip().upper()
+        if not barcode:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行缺少 STORE_ITEM machine_code。")
+
+        resolved = self.resolve_barcode(barcode, context="pos")
+        if resolved.get("reject_reason"):
+            raise HTTPException(status_code=400, detail=resolved["reject_reason"])
+        if str(resolved.get("barcode_type") or "").strip().upper() != "STORE_ITEM":
+            raise HTTPException(status_code=400, detail=f"{barcode} 不是 STORE_ITEM 商品码，不能 POS 销售。")
+        if resolved.get("pos_allowed") is not True:
+            raise HTTPException(status_code=400, detail=f"{barcode} 未被 resolver 允许在 POS 销售。")
+
+        store_item, token = self._find_pos_sale_store_item(resolved, barcode, display_code)
+        row_store_codes = {
+            str(value or "").strip().upper()
+            for value in (
+                resolved.get("store_code"),
+                store_item.get("store_code"),
+                (token or {}).get("store_code"),
+            )
+            if str(value or "").strip()
+        }
+        if not row_store_codes or store_code not in row_store_codes:
+            actual = ", ".join(sorted(row_store_codes)) or "UNKNOWN"
+            raise HTTPException(status_code=400, detail=f"{barcode} 属于门店 {actual}，不能在 {store_code} POS 销售。")
+
+        statuses = {
+            str(row.get(field_name) or "").strip().lower()
+            for row in (store_item, token or {})
+            for field_name in ("status", "sale_status", "store_item_status")
+            if str(row.get(field_name) or "").strip()
+        }
+        blocked_statuses = {
+            "sold",
+            "held",
+            "reserved",
+            "transferred_out",
+            "void",
+            "voided",
+            "cancelled",
+            "canceled",
+            "deleted",
+            "pending_print",
+            "pending_putaway",
+        }
+        blocked = sorted(statuses & blocked_statuses)
+        if blocked:
+            blocked_label = blocked[0]
+            if blocked_label == "sold":
+                raise HTTPException(status_code=400, detail=f"{barcode} 已售出，不能重复销售。")
+            raise HTTPException(status_code=400, detail=f"{barcode} 当前状态为 {blocked_label}，不能 POS 销售。")
+        allowed_statuses = {"on_shelf", "in_stock", "available", "printed_in_store", "shelved", "ready_for_sale", "active"}
+        if statuses and not (statuses & allowed_statuses):
+            raise HTTPException(status_code=400, detail=f"{barcode} 当前状态不可销售。")
+
+        stock_confirmed = any(
+            self._pos_sale_row_is_truthy(row.get("stock_in_confirmed"))
+            for row in (store_item, token or {})
+        )
+        if not stock_confirmed:
+            raise HTTPException(status_code=400, detail=f"{barcode} 尚未完成门店库存确认，不能 POS 销售。")
+
+        original_price = self._pos_sale_item_price(store_item, token)
+        final_price = self._pos_sale_money(item.get("final_price", original_price), "final_price")
+        if final_price > original_price:
+            raise HTTPException(status_code=400, detail=f"{barcode} 前端价格高于后端 STORE_ITEM 价格，不能完成销售。")
+
+        return {
+            "line_no": line_no,
+            "resolved": resolved,
+            "store_item": store_item,
+            "token": token,
+            "store_item_id": str(store_item.get("store_item_id") or store_item.get("item_id") or resolved.get("object_id") or "").strip().upper(),
+            "display_code": str(store_item.get("display_code") or display_code or resolved.get("identity_id") or barcode).strip().upper(),
+            "machine_code": str(store_item.get("machine_code") or store_item.get("barcode_value") or barcode).strip().upper(),
+            "category": str(
+                store_item.get("category_name")
+                or store_item.get("category_sub")
+                or store_item.get("category_main")
+                or (token or {}).get("category_name")
+                or ""
+            ).strip(),
+            "shelf_location": str(
+                store_item.get("store_rack_code")
+                or store_item.get("rack_code")
+                or store_item.get("current_location_code")
+                or (token or {}).get("store_rack_code")
+                or ""
+            ).strip().upper(),
+            "original_price": original_price,
+            "final_price": final_price,
+            "discount_amount": round(original_price - final_price, 2),
+            "from_status": next((status for status in statuses if status in allowed_statuses), ""),
+        }
+
+    def _validate_pos_sale_payment(
+        self,
+        payment_method: str,
+        total_amount: float,
+        cash_amount: float,
+        mpesa_amount: float,
+        mpesa_reference: str,
+    ) -> tuple[str, float]:
+        normalized_method = str(payment_method or "").strip().lower().replace("-", "")
+        if normalized_method == "mpesa":
+            normalized_method = "mpesa"
+        if normalized_method not in {"cash", "mpesa", "mixed"}:
+            raise HTTPException(status_code=400, detail="payment_method must be cash, mpesa, or mixed")
+        if normalized_method == "cash" and cash_amount < total_amount:
+            raise HTTPException(status_code=400, detail="Cash amount must cover POS sale total.")
+        if normalized_method == "mpesa":
+            if mpesa_amount < total_amount:
+                raise HTTPException(status_code=400, detail="M-Pesa amount must cover POS sale total.")
+            if not mpesa_reference:
+                raise HTTPException(status_code=400, detail="M-Pesa reference is required.")
+        if normalized_method == "mixed":
+            if cash_amount + mpesa_amount < total_amount:
+                raise HTTPException(status_code=400, detail="Mixed payment amount must cover POS sale total.")
+            if not mpesa_reference:
+                raise HTTPException(status_code=400, detail="M-Pesa reference is required for mixed payment.")
+        return normalized_method, round(max(cash_amount + mpesa_amount - total_amount, 0), 2)
+
+    def create_pos_sale(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        normalized_store = store["code"]
+        cashier_id = str(payload.get("cashier_id") or created_by or "").strip()
+        if not cashier_id:
+            raise HTTPException(status_code=400, detail="cashier_id is required")
+        items = payload.get("items") or []
+        if not items:
+            raise HTTPException(status_code=400, detail="POS sale requires at least one STORE_ITEM.")
+
+        validated_items: list[dict[str, Any]] = []
+        seen_store_item_ids: set[str] = set()
+        for index, item in enumerate(items, start=1):
+            validated = self._validate_pos_sale_item(normalized_store, item, index)
+            if validated["store_item_id"] in seen_store_item_ids:
+                raise HTTPException(status_code=400, detail=f"{validated['display_code']} 已在本单中，不能重复销售。")
+            seen_store_item_ids.add(validated["store_item_id"])
+            validated_items.append(validated)
+
+        subtotal = round(sum(row["original_price"] for row in validated_items), 2)
+        line_discount_total = round(sum(row["discount_amount"] for row in validated_items), 2)
+        sale_discount = self._pos_sale_money(payload.get("discount_amount", 0), "discount_amount")
+        total_amount = round(max(subtotal - line_discount_total - sale_discount, 0), 2)
+        cash_amount = self._pos_sale_money(payload.get("cash_amount", 0), "cash_amount")
+        mpesa_amount = self._pos_sale_money(payload.get("mpesa_amount", 0), "mpesa_amount")
+        mpesa_reference = str(payload.get("mpesa_reference") or "").strip().upper()
+        payment_method, change_amount = self._validate_pos_sale_payment(
+            payload.get("payment_method", ""),
+            total_amount,
+            cash_amount,
+            mpesa_amount,
+            mpesa_reference,
+        )
+
+        sale_sequence = next(self._sale_ids)
+        sale_no = f"SALE-{self._pos_sale_store_prefix(normalized_store)}-{datetime.now(NAIROBI_TZ).strftime('%y%m%d')}-{sale_sequence:04d}"
+        sale_time = now_iso()
+        actor = created_by or cashier_id
+        response_items: list[dict[str, Any]] = []
+        legacy_items: list[dict[str, Any]] = []
+
+        for validated in validated_items:
+            for row in (validated["store_item"], validated.get("token")):
+                if not row:
+                    continue
+                row["status"] = "sold"
+                row["sale_status"] = "sold"
+                row["store_item_status"] = "sold"
+                row["sold"] = True
+                row["sold_at"] = sale_time
+                row["sold_by"] = cashier_id
+                row["sale_id"] = sale_no
+                row["sale_no"] = sale_no
+                row["updated_at"] = sale_time
+                row["updated_by"] = actor
+            response_item = {
+                "sale_id": sale_no,
+                "line_no": validated["line_no"],
+                "store_item_id": validated["store_item_id"],
+                "display_code": validated["display_code"],
+                "machine_code": validated["machine_code"],
+                "category": validated["category"],
+                "shelf_location": validated["shelf_location"],
+                "original_price": validated["original_price"],
+                "final_price": validated["final_price"],
+                "discount_amount": validated["discount_amount"],
+                "store_code": normalized_store,
+            }
+            response_items.append(response_item)
+            legacy_items.append(
+                {
+                    "identity_id": validated["display_code"],
+                    "barcode": validated["machine_code"],
+                    "product_name": validated["category"] or validated["display_code"],
+                    "qty": 1,
+                    "launch_price": validated["original_price"],
+                    "expected_price": validated["original_price"],
+                    "price_cap": None,
+                    "price_rule_no": "",
+                    "cost_price": 0.0,
+                    "average_cost_price": 0.0,
+                    "selling_price": validated["final_price"],
+                    "line_total": validated["final_price"],
+                    "line_profit": validated["final_price"],
+                    "price_override": validated["final_price"] != validated["original_price"],
+                    "override_reason": "",
+                    "customer_id": "",
+                    "price_policy_breach": False,
+                    "returned_qty": 0,
+                    "returned_amount_total": 0.0,
+                    "lot_allocations": [],
+                    "returned_lot_allocations": [],
+                }
+            )
+            self._record_inventory_movement(
+                movement_type="POS_SALE_OUT",
+                barcode=validated["machine_code"],
+                product_name=validated["category"] or validated["display_code"],
+                quantity_delta=-1,
+                location_type="store",
+                location_code=normalized_store,
+                reference_type="pos_sale",
+                reference_no=sale_no,
+                actor=actor,
+                note=f"POS sale in {normalized_store}",
+                details={
+                    "movement_id": "",
+                    "store_code": normalized_store,
+                    "store_item_id": validated["store_item_id"],
+                    "display_code": validated["display_code"],
+                    "machine_code": validated["machine_code"],
+                    "from_status": validated["from_status"],
+                    "to_status": "sold",
+                    "reference_sale_id": sale_no,
+                    "created_by": actor,
+                },
+            )
+            if self.inventory_movements:
+                self.inventory_movements[-1]["details"]["movement_id"] = self.inventory_movements[-1]["id"]
+
+        normalized_payments = []
+        if cash_amount:
+            normalized_payments.append({"method": "cash", "amount": cash_amount, "reference": "", "customer_id": ""})
+        if mpesa_amount:
+            normalized_payments.append({"method": "mpesa", "amount": mpesa_amount, "reference": mpesa_reference, "customer_id": ""})
+        payment_total = round(cash_amount + mpesa_amount, 2)
+        transaction = {
+            "id": sale_sequence,
+            "sale_id": sale_no,
+            "sale_no": sale_no,
+            "client_sale_id": "",
+            "sync_batch_no": "",
+            "order_no": sale_no,
+            "store_code": normalized_store,
+            "cashier_name": cashier_id,
+            "cashier_id": cashier_id,
+            "shift_no": str(payload.get("shift_id") or "").strip(),
+            "shift_id": str(payload.get("shift_id") or "").strip(),
+            "terminal_id": str(payload.get("terminal_id") or "").strip(),
+            "sold_at": sale_time,
+            "sale_time": sale_time,
+            "created_at": sale_time,
+            "created_by": actor,
+            "total_qty": len(response_items),
+            "subtotal": subtotal,
+            "discount_amount": round(line_discount_total + sale_discount, 2),
+            "total_amount": total_amount,
+            "payment_total": payment_total,
+            "payment_method": payment_method,
+            "cash_amount": cash_amount,
+            "mpesa_amount": mpesa_amount,
+            "mpesa_reference": mpesa_reference,
+            "sale_status": "completed",
+            "status": "completed",
+            "void_no": "",
+            "void_request_count": 0,
+            "refund_no": "",
+            "refund_request_count": 0,
+            "refund_amount_total": 0.0,
+            "refund_qty_total": 0,
+            "payment_status": "paid",
+            "amount_due": 0.0,
+            "amount_overpaid": round(max(payment_total - total_amount - change_amount, 0), 2),
+            "payment_anomaly_count": 0,
+            "payment_anomaly_nos": [],
+            "change_due": change_amount,
+            "change_amount": change_amount,
+            "total_cost": 0.0,
+            "total_profit": round(total_amount, 2),
+            "power_mode": "online",
+            "note": "POS sale",
+            "override_alert_count": 0,
+            "policy_breach_count": 0,
+            "voided_at": None,
+            "voided_by": "",
+            "void_reason": "",
+            "refunded_at": None,
+            "refunded_by": "",
+            "refund_reason": "",
+            "identity_ids": [row["display_code"] for row in response_items],
+            "items": legacy_items,
+            "sale_items": response_items,
+            "payments": normalized_payments,
+        }
+        self.sales_transactions.append(transaction)
+        self._log_event(
+            event_type="pos.sale.completed",
+            entity_type="sale",
+            entity_id=sale_no,
+            actor=actor,
+            summary=f"POS sale {sale_no} completed in {normalized_store}",
+            details={
+                "store_code": normalized_store,
+                "cashier_id": cashier_id,
+                "shift_id": transaction["shift_id"],
+                "terminal_id": transaction["terminal_id"],
+                "total_amount": total_amount,
+                "item_count": len(response_items),
+            },
+        )
+        self._persist()
+        return {
+            "sale_id": sale_no,
+            "sale_no": sale_no,
+            "store_code": normalized_store,
+            "cashier_id": cashier_id,
+            "shift_id": transaction["shift_id"],
+            "terminal_id": transaction["terminal_id"],
+            "sale_time": sale_time,
+            "subtotal": subtotal,
+            "discount_amount": transaction["discount_amount"],
+            "total_amount": total_amount,
+            "payment_method": payment_method,
+            "cash_amount": cash_amount,
+            "mpesa_amount": mpesa_amount,
+            "mpesa_reference": mpesa_reference,
+            "change_amount": change_amount,
+            "status": "completed",
+            "items": response_items,
+        }
+
     def get_dashboard_summary(self) -> list[dict[str, Any]]:
         today_key = self._nairobi_day_key()
         open_transfer_count = sum(
