@@ -11655,6 +11655,8 @@ class InMemoryState:
         total_sales = 0.0
         order_count = 0
         item_count = 0
+        manual_item_count = 0
+        manual_sales_amount = 0.0
         cancelled_order_count = 0
         payment_breakdown: dict[str, dict[str, Any]] = {}
         category_breakdown: dict[str, dict[str, Any]] = {}
@@ -11689,12 +11691,24 @@ class InMemoryState:
                 mixed_mpesa += round(float(sale.get("mpesa_amount") or 0), 2)
 
             for item in sale.get("sale_items") or []:
-                item_count += 1
+                line_type = str(item.get("line_type") or "STORE_ITEM").strip().upper()
+                qty = int(item.get("qty") or 1)
                 category = str(item.get("category") or item.get("category_name") or "未分类").strip() or "未分类"
                 amount = round(float(item.get("final_price") if item.get("final_price") not in (None, "") else item.get("line_total") or 0), 2)
-                category_row = category_breakdown.setdefault(category, {"category": category, "qty": 0, "amount": 0.0})
-                category_row["qty"] += 1
+                item_count += qty
+                if line_type == "MANUAL_LEGACY_ITEM":
+                    manual_item_count += qty
+                    manual_sales_amount = round(manual_sales_amount + amount, 2)
+                category_row = category_breakdown.setdefault(
+                    category,
+                    {"category": category, "qty": 0, "amount": 0.0, "store_item_qty": 0, "manual_qty": 0},
+                )
+                category_row["qty"] += qty
                 category_row["amount"] = round(category_row["amount"] + amount, 2)
+                if line_type == "MANUAL_LEGACY_ITEM":
+                    category_row["manual_qty"] += qty
+                else:
+                    category_row["store_item_qty"] += qty
 
         hold_count = 0
         active_hold_count = 0
@@ -11729,6 +11743,8 @@ class InMemoryState:
             "total_sales": round(total_sales, 2),
             "order_count": order_count,
             "item_count": item_count,
+            "manual_item_count": manual_item_count,
+            "manual_sales_amount": round(manual_sales_amount, 2),
             "cash_sales": round(cash_sales, 2),
             "mpesa_sales": round(mpesa_sales, 2),
             "mixed_cash": round(mixed_cash, 2),
@@ -17487,6 +17503,48 @@ class InMemoryState:
             detail=f"{store_item.get('display_code') or store_item.get('machine_code') or 'STORE_ITEM'} 缺少后端销售价格，不能 POS 销售。",
         )
 
+    def _normalize_pos_sale_line_type(self, item: dict[str, Any]) -> str:
+        normalized = str(item.get("line_type") or "STORE_ITEM").strip().upper()
+        if normalized in {"", "STORE_ITEM"}:
+            return "STORE_ITEM"
+        if normalized == "MANUAL_LEGACY_ITEM":
+            return "MANUAL_LEGACY_ITEM"
+        raise HTTPException(status_code=400, detail=f"Unsupported POS sale line_type: {normalized}")
+
+    def _validate_pos_manual_legacy_item(self, store_code: str, item: dict[str, Any], line_no: int) -> dict[str, Any]:
+        category = str(item.get("category") or "").strip()
+        if not category:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 MANUAL_LEGACY_ITEM category is required.")
+        try:
+            qty = int(item.get("qty") or 0)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 MANUAL_LEGACY_ITEM qty must be greater than 0.") from exc
+        if qty <= 0:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 MANUAL_LEGACY_ITEM qty must be greater than 0.")
+        unit_price = self._pos_sale_money(item.get("unit_price"), "unit_price")
+        if unit_price <= 0:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 MANUAL_LEGACY_ITEM unit_price must be greater than 0.")
+        final_price = round(qty * unit_price, 2)
+        return {
+            "line_no": line_no,
+            "line_type": "MANUAL_LEGACY_ITEM",
+            "store_item": None,
+            "token": None,
+            "store_item_id": "",
+            "display_code": f"MANUAL - {category}",
+            "machine_code": "",
+            "category": category,
+            "shelf_location": "",
+            "qty": qty,
+            "unit_price": unit_price,
+            "original_price": final_price,
+            "final_price": final_price,
+            "discount_amount": 0.0,
+            "from_status": "",
+            "inventory_tracked": False,
+            "store_code": store_code,
+        }
+
     def _validate_pos_sale_item(
         self,
         store_code: str,
@@ -17575,6 +17633,7 @@ class InMemoryState:
 
         return {
             "line_no": line_no,
+            "line_type": "STORE_ITEM",
             "resolved": resolved,
             "store_item": store_item,
             "token": token,
@@ -17595,10 +17654,14 @@ class InMemoryState:
                 or (token or {}).get("store_rack_code")
                 or ""
             ).strip().upper(),
+            "qty": 1,
+            "unit_price": final_price,
             "original_price": original_price,
             "final_price": final_price,
             "discount_amount": round(original_price - final_price, 2),
             "from_status": next((status for status in statuses if status in allowed_statuses), "") or ("held" if hold_item_matches else ""),
+            "inventory_tracked": True,
+            "store_code": store_code,
         }
 
     def _validate_pos_sale_payment(
@@ -17939,13 +18002,21 @@ class InMemoryState:
         validated_items: list[dict[str, Any]] = []
         seen_store_item_ids: set[str] = set()
         for index, item in enumerate(items, start=1):
+            line_type = self._normalize_pos_sale_line_type(item)
+            if line_type == "MANUAL_LEGACY_ITEM":
+                validated = self._validate_pos_manual_legacy_item(normalized_store, item, index)
+                validated_items.append(validated)
+                continue
             validated = self._validate_pos_sale_item(normalized_store, item, index, allow_hold_no=hold_no)
             if validated["store_item_id"] in seen_store_item_ids:
                 raise HTTPException(status_code=400, detail=f"{validated['display_code']} 已在本单中，不能重复销售。")
             seen_store_item_ids.add(validated["store_item_id"])
             validated_items.append(validated)
         if hold:
-            self._ensure_pos_hold_matches_sale_items(hold, validated_items)
+            self._ensure_pos_hold_matches_sale_items(
+                hold,
+                [row for row in validated_items if row.get("line_type") == "STORE_ITEM"],
+            )
 
         subtotal = round(sum(row["original_price"] for row in validated_items), 2)
         line_discount_total = round(sum(row["discount_amount"] for row in validated_items), 2)
@@ -17970,35 +18041,41 @@ class InMemoryState:
         legacy_items: list[dict[str, Any]] = []
 
         for validated in validated_items:
-            for row in (validated["store_item"], validated.get("token")):
-                if not row:
-                    continue
-                row["status"] = "sold"
-                row["sale_status"] = "sold"
-                row["store_item_status"] = "sold"
-                row["sold"] = True
-                row["sold_at"] = sale_time
-                row["sold_by"] = cashier_id
-                row["sale_id"] = sale_no
-                row["sale_no"] = sale_no
-                if hold_no:
-                    row["last_hold_no"] = hold_no
-                    row["hold_id"] = ""
-                    row["hold_no"] = ""
-                row["updated_at"] = sale_time
-                row["updated_by"] = actor
+            is_store_item = validated["line_type"] == "STORE_ITEM"
+            if is_store_item:
+                for row in (validated["store_item"], validated.get("token")):
+                    if not row:
+                        continue
+                    row["status"] = "sold"
+                    row["sale_status"] = "sold"
+                    row["store_item_status"] = "sold"
+                    row["sold"] = True
+                    row["sold_at"] = sale_time
+                    row["sold_by"] = cashier_id
+                    row["sale_id"] = sale_no
+                    row["sale_no"] = sale_no
+                    if hold_no:
+                        row["last_hold_no"] = hold_no
+                        row["hold_id"] = ""
+                        row["hold_no"] = ""
+                    row["updated_at"] = sale_time
+                    row["updated_by"] = actor
             response_item = {
                 "sale_id": sale_no,
                 "line_no": validated["line_no"],
+                "line_type": validated["line_type"],
                 "store_item_id": validated["store_item_id"],
                 "display_code": validated["display_code"],
                 "machine_code": validated["machine_code"],
                 "category": validated["category"],
                 "shelf_location": validated["shelf_location"],
+                "qty": validated["qty"],
+                "unit_price": validated["unit_price"],
                 "original_price": validated["original_price"],
                 "final_price": validated["final_price"],
                 "discount_amount": validated["discount_amount"],
                 "store_code": normalized_store,
+                "inventory_tracked": validated["inventory_tracked"],
             }
             response_items.append(response_item)
             legacy_items.append(
@@ -18006,14 +18083,14 @@ class InMemoryState:
                     "identity_id": validated["display_code"],
                     "barcode": validated["machine_code"],
                     "product_name": validated["category"] or validated["display_code"],
-                    "qty": 1,
+                    "qty": validated["qty"],
                     "launch_price": validated["original_price"],
                     "expected_price": validated["original_price"],
                     "price_cap": None,
                     "price_rule_no": "",
                     "cost_price": 0.0,
                     "average_cost_price": 0.0,
-                    "selling_price": validated["final_price"],
+                    "selling_price": validated["unit_price"],
                     "line_total": validated["final_price"],
                     "line_profit": validated["final_price"],
                     "price_override": validated["final_price"] != validated["original_price"],
@@ -18026,31 +18103,32 @@ class InMemoryState:
                     "returned_lot_allocations": [],
                 }
             )
-            self._record_inventory_movement(
-                movement_type="POS_SALE_OUT",
-                barcode=validated["machine_code"],
-                product_name=validated["category"] or validated["display_code"],
-                quantity_delta=-1,
-                location_type="store",
-                location_code=normalized_store,
-                reference_type="pos_sale",
-                reference_no=sale_no,
-                actor=actor,
-                note=f"POS sale in {normalized_store}",
-                details={
-                    "movement_id": "",
-                    "store_code": normalized_store,
-                    "store_item_id": validated["store_item_id"],
-                    "display_code": validated["display_code"],
-                    "machine_code": validated["machine_code"],
-                    "from_status": validated["from_status"],
-                    "to_status": "sold",
-                    "reference_sale_id": sale_no,
-                    "created_by": actor,
-                },
-            )
-            if self.inventory_movements:
-                self.inventory_movements[-1]["details"]["movement_id"] = self.inventory_movements[-1]["id"]
+            if is_store_item:
+                self._record_inventory_movement(
+                    movement_type="POS_SALE_OUT",
+                    barcode=validated["machine_code"],
+                    product_name=validated["category"] or validated["display_code"],
+                    quantity_delta=-1,
+                    location_type="store",
+                    location_code=normalized_store,
+                    reference_type="pos_sale",
+                    reference_no=sale_no,
+                    actor=actor,
+                    note=f"POS sale in {normalized_store}",
+                    details={
+                        "movement_id": "",
+                        "store_code": normalized_store,
+                        "store_item_id": validated["store_item_id"],
+                        "display_code": validated["display_code"],
+                        "machine_code": validated["machine_code"],
+                        "from_status": validated["from_status"],
+                        "to_status": "sold",
+                        "reference_sale_id": sale_no,
+                        "created_by": actor,
+                    },
+                )
+                if self.inventory_movements:
+                    self.inventory_movements[-1]["details"]["movement_id"] = self.inventory_movements[-1]["id"]
 
         normalized_payments = []
         if cash_amount:
@@ -18075,7 +18153,7 @@ class InMemoryState:
             "sale_time": sale_time,
             "created_at": sale_time,
             "created_by": actor,
-            "total_qty": len(response_items),
+            "total_qty": sum(int(row.get("qty") or 1) for row in response_items),
             "subtotal": subtotal,
             "discount_amount": round(line_discount_total + sale_discount, 2),
             "total_amount": total_amount,
@@ -18112,7 +18190,7 @@ class InMemoryState:
             "refunded_by": "",
             "refund_reason": "",
             "hold_no": hold_no,
-            "identity_ids": [row["display_code"] for row in response_items],
+            "identity_ids": [row["display_code"] for row in response_items if row.get("inventory_tracked")],
             "items": legacy_items,
             "sale_items": response_items,
             "payments": normalized_payments,
@@ -18149,7 +18227,7 @@ class InMemoryState:
                 "shift_id": transaction["shift_id"],
                 "terminal_id": transaction["terminal_id"],
                 "total_amount": total_amount,
-                "item_count": len(response_items),
+                "item_count": sum(int(row.get("qty") or 1) for row in response_items),
             },
         )
         self._persist()
@@ -18202,15 +18280,19 @@ class InMemoryState:
                 {
                     "sale_id": str(item.get("sale_id") or sale_no).strip(),
                     "line_no": int(item.get("line_no") or index),
+                    "line_type": str(item.get("line_type") or "STORE_ITEM").strip().upper(),
                     "store_item_id": str(item.get("store_item_id") or "").strip(),
                     "display_code": str(item.get("display_code") or "").strip(),
                     "machine_code": str(item.get("machine_code") or "").strip(),
                     "category": str(item.get("category") or "").strip(),
                     "shelf_location": str(item.get("shelf_location") or "").strip(),
+                    "qty": int(item.get("qty") or 1),
+                    "unit_price": round(float(item.get("unit_price") or item.get("final_price") or 0), 2),
                     "original_price": round(float(item.get("original_price") or 0), 2),
                     "final_price": round(float(item.get("final_price") or 0), 2),
                     "discount_amount": round(float(item.get("discount_amount") or 0), 2),
                     "store_code": str(item.get("store_code") or row.get("store_code") or "").strip().upper(),
+                    "inventory_tracked": item.get("inventory_tracked") is not False,
                 }
                 for index, item in enumerate(sale_items, start=1)
             ],
@@ -18225,7 +18307,7 @@ class InMemoryState:
             "cashier_id": detail["cashier_id"],
             "shift_id": detail["shift_id"],
             "terminal_id": detail["terminal_id"],
-            "total_items": len(detail["items"]),
+            "total_items": sum(int(item.get("qty") or 1) for item in detail["items"]),
             "total_amount": detail["total_amount"],
             "payment_method": detail["payment_method"],
             "status": detail["status"],

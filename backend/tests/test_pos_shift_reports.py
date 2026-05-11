@@ -142,11 +142,15 @@ def test_open_shift_x_report_summarizes_sales_payments_holds_and_is_read_only(st
         "category": "CARGO PANT",
         "qty": 2,
         "amount": 550,
+        "store_item_qty": 2,
+        "manual_qty": 0,
     }
     assert categories["DRESSES"] == {
         "category": "DRESSES",
         "qty": 2,
         "amount": 950,
+        "store_item_qty": 2,
+        "manual_qty": 0,
     }
 
     assert state.pos_holds[active_hold["hold_no"]]["status"] == "held"

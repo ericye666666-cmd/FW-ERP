@@ -30439,6 +30439,19 @@ const CASHIER_TERMINAL_REJECT_MESSAGES = Object.freeze({
 });
 const CASHIER_TERMINAL_LOCAL_DEMO_NOTICE = "当前使用本地演示数据，真实扫码接口不可用。";
 const CASHIER_TERMINAL_SALEABLE_STORE_ITEM_STATUSES = new Set(["on_shelf", "in_stock", "available", "printed_in_store", "shelved"]);
+const CASHIER_TERMINAL_MANUAL_CATEGORY_OPTIONS = Object.freeze([
+  "T-Shirts / T恤",
+  "Dresses / 连衣裙",
+  "Ladies Tops / 女上衣",
+  "Jeans / 牛仔裤",
+  "Jackets / 外套",
+  "Men Shoes / 男鞋",
+  "Ladies Shoes / 女鞋",
+  "Kids Wear / 童装",
+  "Bedsheets / 床单",
+  "Bags / 包",
+  "Others / 其他",
+]);
 
 function formatCashierPreviewMoney(value) {
   return `KSh ${Number(value || 0).toLocaleString("en-KE", {
@@ -30563,6 +30576,11 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.scanErrorTitle = cashierTerminalState.scanErrorTitle || "";
   cashierTerminalState.scanErrorDetail = cashierTerminalState.scanErrorDetail || "";
   cashierTerminalState.pendingReprintSaleNo = cashierTerminalState.pendingReprintSaleNo || "";
+  cashierTerminalState.manualSaleCategory = cashierTerminalState.manualSaleCategory || CASHIER_TERMINAL_MANUAL_CATEGORY_OPTIONS[0];
+  cashierTerminalState.manualSaleUnitPrice = String(cashierTerminalState.manualSaleUnitPrice ?? "");
+  cashierTerminalState.manualSaleQty = String(cashierTerminalState.manualSaleQty ?? "1");
+  cashierTerminalState.manualSaleError = cashierTerminalState.manualSaleError || "";
+  cashierTerminalState.manualSaleSequence = Number(cashierTerminalState.manualSaleSequence || 0);
 }
 
 syncCashierTerminalMode = function () {
@@ -30593,10 +30611,18 @@ focusCashierTerminalScanInput = function ({ select = true } = {}) {
 getCashierTerminalTotals = function () {
   ensureCashierTerminalPreviewState();
   const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
-  const subtotal = rows.reduce((sum, row) => sum + Number(row.price || row.selling_price || 0), 0);
+  const subtotal = rows.reduce((sum, row) => {
+    if (row.line_type === "MANUAL_LEGACY_ITEM") {
+      const qty = Math.max(1, Number(row.qty || 1));
+      const unitPrice = normalizeCashierTerminalNumber(row.unit_price);
+      return sum + qty * unitPrice;
+    }
+    return sum + Number(row.price || row.selling_price || 0);
+  }, 0);
+  const totalItems = rows.reduce((sum, row) => sum + Math.max(1, Number(row.qty || 1)), 0);
   const discount = Math.min(normalizeCashierTerminalNumber(cashierTerminalState.discountAmount), subtotal);
   return {
-    totalItems: rows.length,
+    totalItems,
     subtotal,
     discount,
     totalAmount: Math.max(subtotal - discount, 0),
@@ -30716,6 +30742,7 @@ renderCashierTerminalLookupPanel = function () {
   cashierTerminalLookupCard.innerHTML = `
     <strong>仅支持 STORE_ITEM 商品码</strong>
     <span>真实扫码接口优先；本地演示备用码：5250511000123、5250511000122、5250511000121、5250511000120</span>
+    <button type="button" class="secondary-inline cashier-manual-sale-entry" data-terminal-action="open-drawer" data-terminal-drawer="manual-sale">+ 无码销售</button>
     ${fallbackNotice}
     ${scanError}
   `;
@@ -30745,19 +30772,22 @@ renderCashierTerminalCart = function () {
       <span></span>
     </div>
     ${rows.map((row, index) => {
-      const price = Number(row.price || 0);
+      const isManual = row.line_type === "MANUAL_LEGACY_ITEM";
+      const qty = Math.max(1, Number(row.qty || 1));
+      const unitPrice = isManual ? normalizeCashierTerminalNumber(row.unit_price) : Number(row.price || row.selling_price || 0);
+      const subtotal = isManual ? qty * unitPrice : unitPrice;
       return `
         <article class="cashier-cart-row">
           <div class="cart-code">
-            <strong>${escapeHtml(row.display_code || "-")}</strong>
-            <small>${escapeHtml(row.machine_code || "-")}</small>
+            <strong>${escapeHtml(isManual ? `MANUAL - ${row.category || "-"}` : row.display_code || "-")}</strong>
+            <small>${escapeHtml(isManual ? "Manual Item" : row.machine_code || "-")}</small>
           </div>
           <div>${escapeHtml(row.category || "-")}</div>
           <div>${escapeHtml(row.shelf_location || "-")}</div>
-          <div>${escapeHtml(formatCashierPreviewMoney(price))}</div>
-          <div>1</div>
+          <div>${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
+          <div>${escapeHtml(qty)}</div>
           <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
-          <div><strong>${escapeHtml(formatCashierPreviewMoney(price))}</strong></div>
+          <div><strong>${escapeHtml(formatCashierPreviewMoney(subtotal))}</strong></div>
           <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
         </article>
       `;
@@ -30893,8 +30923,10 @@ function renderCashierTerminalReceiptPanel() {
       <div class="receipt-divider"></div>
       ${items.length ? items.map((item) => `
         <div class="receipt-item">
-          <strong>${escapeHtml(item.display_code)}</strong>
-          <span>${escapeHtml(item.category)} · ${escapeHtml(formatCashierPreviewMoney(item.price))}</span>
+          <strong>${escapeHtml(item.line_type === "MANUAL_LEGACY_ITEM" ? item.display_code || `MANUAL - ${item.category}` : item.display_code)}</strong>
+          ${item.line_type === "MANUAL_LEGACY_ITEM"
+            ? `<span>Manual Item · Qty ${escapeHtml(item.qty)} x ${escapeHtml(formatCashierPreviewMoney(item.unit_price))} · ${escapeHtml(formatCashierPreviewMoney(item.price))}</span>`
+            : `<span>${escapeHtml(item.category)} · ${escapeHtml(formatCashierPreviewMoney(item.price))}</span>`}
         </div>
       `).join("") : `<div class="receipt-empty">完成收款后显示小票内容</div>`}
       <div class="receipt-divider"></div>
@@ -30937,6 +30969,13 @@ renderCashierTerminalQuickActions = function () {
   `;
 }
 
+function getCashierTerminalManualSaleSubtotal() {
+  ensureCashierTerminalPreviewState();
+  const qty = Math.max(0, Number(cashierTerminalState.manualSaleQty || 0));
+  const unitPrice = normalizeCashierTerminalNumber(cashierTerminalState.manualSaleUnitPrice);
+  return qty * unitPrice;
+}
+
 renderCashierTerminalDrawer = function () {
   if (!(cashierTerminalDrawer instanceof HTMLElement)) {
     return;
@@ -30954,6 +30993,27 @@ renderCashierTerminalDrawer = function () {
   cashierTerminalDrawer.hidden = false;
   if (cashierTerminalDrawerBackdrop instanceof HTMLElement) {
     cashierTerminalDrawerBackdrop.hidden = false;
+  }
+  if (drawer === "manual-sale") {
+    const manualSubtotal = getCashierTerminalManualSaleSubtotal();
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">MANUAL SALE</p><h3>无码销售</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        ${cashierTerminalState.manualSaleError ? `<div class="drawer-hint danger">${escapeHtml(cashierTerminalState.manualSaleError)}</div>` : ""}
+        <label class="field"><span>服装种类 / category</span><select data-terminal-drawer-field="manualSaleCategory">
+          ${CASHIER_TERMINAL_MANUAL_CATEGORY_OPTIONS.map((category) => `<option value="${escapeHtml(category)}"${cashierTerminalState.manualSaleCategory === category ? " selected" : ""}>${escapeHtml(category)}</option>`).join("")}
+        </select></label>
+        <label class="field"><span>单价 / unit_price</span><input type="number" min="1" step="1" value="${escapeHtml(cashierTerminalState.manualSaleUnitPrice || "")}" data-terminal-drawer-field="manualSaleUnitPrice" placeholder="例如 150" /></label>
+        <label class="field"><span>数量 / qty</span><input type="number" min="1" step="1" value="${escapeHtml(cashierTerminalState.manualSaleQty || "1")}" data-terminal-drawer-field="manualSaleQty" placeholder="1" /></label>
+        <div class="cashier-terminal-grand-total manual-sale-subtotal">
+          <span>小计</span>
+          <strong>${escapeHtml(formatCashierPreviewMoney(manualSubtotal))}</strong>
+        </div>
+        <div class="drawer-hint">无码销售只用于没有条码的过渡期商品；不会生成 STORE_ITEM，也不会扣库存。</div>
+      </div>
+      <div class="drawer-foot split-actions"><button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button><button type="button" class="primary-inline" data-terminal-action="add-manual-sale">加入购物车</button></div>
+    `;
+    return;
   }
   if (drawer === "hold-create") {
     cashierTerminalDrawer.innerHTML = `
@@ -31163,6 +31223,8 @@ renderCashierTerminalDrawer = function () {
           <span><strong>Total Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.total_sales || 0))}</span>
           <span><strong>Orders</strong>${escapeHtml(report.order_count || 0)}</span>
           <span><strong>Items</strong>${escapeHtml(report.item_count || 0)}</span>
+          <span><strong>Manual Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.manual_sales_amount || 0))}</span>
+          <span><strong>Manual Items</strong>${escapeHtml(report.manual_item_count || 0)}</span>
           <span><strong>Cash Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.cash_sales || 0))}</span>
           <span><strong>M-Pesa Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.mpesa_sales || 0))}</span>
           <span><strong>Mixed Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_cash || 0))}</span>
@@ -31191,7 +31253,7 @@ renderCashierTerminalDrawer = function () {
         <h4>Category Breakdown</h4>
         <div class="report-breakdown-list">
           ${(report.category_breakdown || []).length ? report.category_breakdown.map((row) => `
-            <div class="receipt-line"><span>${escapeHtml(row.category || "-")} · ${escapeHtml(row.qty || 0)} pcs</span><strong>${escapeHtml(formatCashierPreviewMoney(row.amount || 0))}</strong></div>
+            <div class="receipt-line"><span>${escapeHtml(row.category || "-")} · ${escapeHtml(row.qty || 0)} pcs · store ${escapeHtml(row.store_item_qty || 0)} / manual ${escapeHtml(row.manual_qty || 0)}</span><strong>${escapeHtml(formatCashierPreviewMoney(row.amount || 0))}</strong></div>
           `).join("") : `<div class="cashier-terminal-empty-card">暂无品类数据。</div>`}
         </div>
       </div>
@@ -31572,6 +31634,45 @@ submitCashierTerminalLookup = async function ({ addToCart = false } = {}) {
   }
 }
 
+function addCashierTerminalManualSaleLine() {
+  ensureCashierTerminalPreviewState();
+  if (!cashierTerminalState.currentShift?.shift_id) {
+    cashierTerminalState.manualSaleError = "请先开班后再加入无码商品。";
+    renderCashierTerminalDrawer();
+    throw new Error("请先开班后再加入无码商品。");
+  }
+  const category = String(cashierTerminalState.manualSaleCategory || "").trim();
+  const qty = Number(cashierTerminalState.manualSaleQty || 0);
+  const unitPrice = normalizeCashierTerminalNumber(cashierTerminalState.manualSaleUnitPrice);
+  if (!category || qty <= 0 || unitPrice <= 0) {
+    cashierTerminalState.manualSaleError = "请填写单价和数量";
+    renderCashierTerminalDrawer();
+    throw new Error("请填写单价和数量");
+  }
+  cashierTerminalState.manualSaleSequence += 1;
+  cashierTerminalState.cartItems = [
+    ...(cashierTerminalState.cartItems || []),
+    {
+      line_type: "MANUAL_LEGACY_ITEM",
+      manual_item_id: `MANUAL-LOCAL-${cashierTerminalState.manualSaleSequence}`,
+      display_code: `MANUAL - ${category}`,
+      category,
+      qty,
+      unit_price: unitPrice,
+      price: qty * unitPrice,
+      selling_price: qty * unitPrice,
+      inventory_tracked: false,
+      barcode_required: false,
+    },
+  ];
+  cashierTerminalState.manualSaleUnitPrice = "";
+  cashierTerminalState.manualSaleQty = "1";
+  cashierTerminalState.manualSaleError = "";
+  cashierTerminalState.activeDrawer = "";
+  renderCashierTerminal();
+  focusCashierTerminalScanInput({ select: false });
+}
+
 function validateCashierTerminalPayment() {
   const totals = getCashierTerminalTotals();
   if (!totals.totalItems) {
@@ -31623,12 +31724,23 @@ function buildCashierTerminalPosSalePayload(payment) {
     mpesa_amount: payment.mpesaAmount,
     mpesa_reference: payment.reference,
     discount_amount: totals.discount,
-    items: cartItems.map((row) => ({
-      machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
-      display_code: String(row.store_item_display_code || row.display_code || "").trim(),
-      final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
-      discount_amount: 0,
-    })),
+    items: cartItems.map((row) => {
+      if (row.line_type === "MANUAL_LEGACY_ITEM") {
+        return {
+          line_type: "MANUAL_LEGACY_ITEM",
+          category: String(row.category || "").trim(),
+          qty: Number(row.qty || 1),
+          unit_price: normalizeCashierTerminalNumber(row.unit_price),
+        };
+      }
+      return {
+        line_type: "STORE_ITEM",
+        machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
+        display_code: String(row.store_item_display_code || row.display_code || "").trim(),
+        final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
+        discount_amount: 0,
+      };
+    }),
   };
 }
 
@@ -31645,6 +31757,7 @@ function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
     time: sale.sale_time || cashierTerminalState.currentTime || new Date().toLocaleString("zh-CN", { hour12: false }),
     items: items.map((item) => ({
       line_no: item.line_no || 0,
+      line_type: item.line_type || "STORE_ITEM",
       display_code: item.display_code || item.machine_code || "",
       machine_code: item.machine_code || "",
       barcode: item.machine_code || "",
@@ -31652,9 +31765,11 @@ function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
       shelf_location: item.shelf_location || "",
       price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
       selling_price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
-      qty: 1,
+      qty: Number(item.qty || 1),
+      unit_price: normalizeCashierTerminalNumber(item.unit_price ?? item.final_price ?? item.original_price),
+      inventory_tracked: item.inventory_tracked !== false,
     })),
-    total_items: items.length,
+    total_items: items.reduce((sum, item) => sum + Number(item.qty || 1), 0),
     subtotal: normalizeCashierTerminalNumber(sale.subtotal),
     discount: normalizeCashierTerminalNumber(sale.discount_amount),
     total: normalizeCashierTerminalNumber(sale.total_amount),
@@ -31908,6 +32023,8 @@ function normalizeCashierTerminalShiftReport(report = {}) {
     total_sales: normalizeCashierTerminalNumber(report.total_sales),
     order_count: Number(report.order_count || 0),
     item_count: Number(report.item_count || 0),
+    manual_item_count: Number(report.manual_item_count || 0),
+    manual_sales_amount: normalizeCashierTerminalNumber(report.manual_sales_amount),
     cash_sales: normalizeCashierTerminalNumber(report.cash_sales),
     mpesa_sales: normalizeCashierTerminalNumber(report.mpesa_sales),
     mixed_cash: normalizeCashierTerminalNumber(report.mixed_cash),
@@ -31928,6 +32045,8 @@ function normalizeCashierTerminalShiftReport(report = {}) {
     category_breakdown: categoryBreakdown.map((row) => ({
       category: String(row.category || "未分类").trim() || "未分类",
       qty: Number(row.qty || 0),
+      store_item_qty: Number(row.store_item_qty || 0),
+      manual_qty: Number(row.manual_qty || 0),
       amount: normalizeCashierTerminalNumber(row.amount),
     })),
   };
@@ -32106,6 +32225,10 @@ updateCashierTerminalDrawerField = function (field, value) {
     if (hint instanceof HTMLElement) {
       hint.classList.toggle("is-hidden", variance === 0);
     }
+  }
+  if (field === "manualSaleCategory" || field === "manualSaleUnitPrice" || field === "manualSaleQty") {
+    cashierTerminalState.manualSaleError = "";
+    renderCashierTerminalDrawer();
   }
 }
 
@@ -32358,6 +32481,9 @@ handleCashierTerminalAction = async function (action, target) {
       return;
     case "print-shift-report":
       printCashierTerminalShiftReport();
+      return;
+    case "add-manual-sale":
+      addCashierTerminalManualSaleLine();
       return;
     case "confirm-hold":
       await createCashierTerminalHold();

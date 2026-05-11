@@ -291,6 +291,68 @@ test("POS complete sale posts to the real backend sale API and never fabricates 
   assert.doesNotMatch(backendSource, /resolveCashierTerminalLocalDemoItem/);
 });
 
+test("POS manual unbarcoded sale drawer adds manual cart lines and preserves scan-first flow", () => {
+  const lookupSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalLookupPanel");
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  const addSource = extractFunctionSource(appJs, "addCashierTerminalManualSaleLine");
+
+  assert.match(appJs, /CASHIER_TERMINAL_MANUAL_CATEGORY_OPTIONS/);
+  assert.match(lookupSource, /data-terminal-action="open-drawer" data-terminal-drawer="manual-sale"/);
+  assert.match(lookupSource, /\+ 无码销售/);
+  assert.match(drawerSource, /drawer === "manual-sale"/);
+  assert.match(drawerSource, /服装种类 \/ category/);
+  assert.match(drawerSource, /data-terminal-drawer-field="manualSaleCategory"/);
+  assert.match(drawerSource, /data-terminal-drawer-field="manualSaleUnitPrice"/);
+  assert.match(drawerSource, /data-terminal-drawer-field="manualSaleQty"/);
+  assert.match(drawerSource, /小计/);
+  assert.match(addSource, /line_type:\s*"MANUAL_LEGACY_ITEM"/);
+  assert.match(addSource, /manual_item_id:\s*`MANUAL-LOCAL-/);
+  assert.match(addSource, /inventory_tracked:\s*false/);
+  assert.match(addSource, /barcode_required:\s*false/);
+  assert.match(addSource, /请填写单价和数量/);
+  assert.match(addSource, /请先开班后再加入无码商品。/);
+  assert.match(addSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
+  assert.match(actionSource, /case "add-manual-sale":[\s\S]*addCashierTerminalManualSaleLine\(\)/);
+});
+
+test("POS manual lines participate in checkout payload, totals, cart display, and receipt without inventory codes", () => {
+  const totalsSource = extractAssignedAnyFunctionSource(appJs, "getCashierTerminalTotals");
+  const cartSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalCart");
+  const payloadSource = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  const receiptSource = extractFunctionSource(appJs, "renderCashierTerminalReceiptPanel");
+  const normalizeSaleSource = extractFunctionSource(appJs, "normalizeCashierTerminalBackendSale");
+
+  assert.match(totalsSource, /row\.line_type === "MANUAL_LEGACY_ITEM"/);
+  assert.match(totalsSource, /qty \* unitPrice/);
+  assert.match(cartSource, /Manual Item/);
+  assert.match(cartSource, /MANUAL -/);
+  assert.match(payloadSource, /line_type:\s*"MANUAL_LEGACY_ITEM"/);
+  assert.match(payloadSource, /category:\s*String\(row\.category/);
+  assert.match(payloadSource, /qty:\s*Number\(row\.qty/);
+  assert.match(payloadSource, /unit_price:\s*normalizeCashierTerminalNumber\(row\.unit_price/);
+  assert.match(payloadSource, /line_type:\s*"STORE_ITEM"/);
+  assert.match(normalizeSaleSource, /line_type:\s*item\.line_type/);
+  assert.match(normalizeSaleSource, /qty:\s*Number\(item\.qty/);
+  assert.match(normalizeSaleSource, /unit_price:/);
+  assert.match(receiptSource, /Manual Item/);
+  assert.match(receiptSource, /Qty \$\{escapeHtml\(item\.qty/);
+  assert.doesNotMatch(cartSource, /来源链|SDO|SDB|LPK|RAW_BALE/);
+});
+
+test("POS shift reports render manual sale totals from X/Z report APIs", () => {
+  const normalizeSource = extractFunctionSource(appJs, "normalizeCashierTerminalShiftReport");
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+
+  assert.match(normalizeSource, /manual_item_count:\s*Number\(report\.manual_item_count/);
+  assert.match(normalizeSource, /manual_sales_amount:\s*normalizeCashierTerminalNumber\(report\.manual_sales_amount\)/);
+  assert.match(normalizeSource, /manual_qty:\s*Number\(row\.manual_qty/);
+  assert.match(normalizeSource, /store_item_qty:\s*Number\(row\.store_item_qty/);
+  assert.match(drawerSource, /Manual Sales/);
+  assert.match(drawerSource, /Manual Items/);
+  assert.match(drawerSource, /manual_qty/);
+});
+
 test("POS sale completion depends on backend sale_no for inventory sale-out reconciliation", () => {
   const backendSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
   const receiptSource = extractFunctionSource(appJs, "normalizeCashierTerminalBackendSale");
