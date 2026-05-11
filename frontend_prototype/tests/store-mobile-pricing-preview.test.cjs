@@ -2298,6 +2298,71 @@ test("K300 40x30 label preview batch print uses raw CPCL batch without printed s
   assert.doesNotMatch(advanceSource, /createdPrintJobs|status:\s*"queued"|待贴标确认|已完成/);
 });
 
+test("shelf stock-in selector appears only after STORE_ITEM print success", () => {
+  const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
+
+  assert.match(printPanelSource, /renderStoreMobileStockInConfirmationPanel/);
+  assert.match(printPanelSource, /previewPrintStatus === "sent_to_printer"/);
+  assert.match(appJs, /确认完成入库/);
+  assert.match(appJs, /data-mobile-pricing-confirm-stock-in/);
+  assert.match(appJs, /data-mobile-stock-in-location/);
+});
+
+test("print success does not auto-confirm stock-in", () => {
+  const directPrintSource = extractFunctionSource(appJs, "printStoreMobileStoreItemLabelPreview");
+
+  assert.match(directPrintSource, /preview_print_status = "sent_to_printer"/);
+  assert.doesNotMatch(directPrintSource, /confirmStoreMobileStoreItemStockIn/);
+  assert.doesNotMatch(directPrintSource, /confirm-stock-in/);
+});
+
+test("shelf stock-in defaults by item category and falls back to backroom", () => {
+  const defaultSource = extractFunctionSource(appJs, "getDefaultStoreMobileStockInLocationCode");
+  const optionsSource = extractFunctionSource(appJs, "getStoreMobileActiveStockInLocations");
+
+  assert.match(defaultSource, /category_name/);
+  assert.match(defaultSource, /category_short/);
+  assert.match(defaultSource, /category_hint/);
+  assert.match(defaultSource, /location_type[\s\S]*?SHELF/);
+  assert.match(defaultSource, /location_type[\s\S]*?BACKROOM/);
+  assert.match(optionsSource, /active !== false/);
+  assert.match(optionsSource, /location_type[\s\S]*?SHELF/);
+  assert.match(optionsSource, /location_type[\s\S]*?BACKROOM/);
+});
+
+test("confirm stock-in calls the 301 API per STORE_ITEM and treats idempotent statuses as success", () => {
+  const confirmSource = extractFunctionSource(appJs, "confirmStoreMobileStoreItemStockIn");
+  const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
+
+  assert.match(confirmSource, /\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/store-items\/\$\{encodeURIComponent\(machineCode\)\}\/confirm-stock-in/);
+  assert.match(confirmSource, /location_code/);
+  assert.match(confirmSource, /confirmed_by/);
+  assert.match(confirmSource, /already_confirmed/);
+  assert.match(confirmSource, /location_updated/);
+  assert.match(confirmSource, /stock_in_status/);
+  assert.match(actionSource, /confirmStoreMobileStoreItemStockIn/);
+  assert.match(appJs, /data-mobile-pricing-confirm-stock-in/);
+});
+
+test("failed print does not expose stock-in confirmation or call stock-in API", () => {
+  const printPanelSource = extractFunctionSource(appJs, "renderPriceGroupPrintPanel");
+  const directPrintSource = extractFunctionSource(appJs, "printStoreMobileStoreItemLabelPreview");
+
+  assert.match(printPanelSource, /previewPrintStatus === "sent_to_printer"/);
+  assert.match(printPanelSource, /renderStoreMobileStockInConfirmationPanel/);
+  assert.doesNotMatch(directPrintSource, /stock_in_confirmed\s*=\s*true/);
+  assert.doesNotMatch(directPrintSource, /confirm-stock-in/);
+});
+
+test("legacy PDA bundle contains shelf confirmation without cashier terminal preview changes", () => {
+  assert.match(appLegacyJs, /renderStoreMobileStockInConfirmationPanel/);
+  assert.match(appLegacyJs, /data-mobile-pricing-confirm-stock-in/);
+  assert.match(appLegacyJs, /confirm-stock-in/);
+  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_STORE/);
+  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_ITEMS/);
+  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_REJECT_MESSAGES/);
+});
+
 test("K300 batch payload contains every generated STORE_ITEM label with locked template metadata", () => {
   const batchBuilder = getExecutableBundle(
     [
