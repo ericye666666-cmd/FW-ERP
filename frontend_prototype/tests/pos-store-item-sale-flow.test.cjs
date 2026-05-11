@@ -240,41 +240,48 @@ test("POS local demo fallback only runs when resolver API is unavailable", async
   assert.equal(result.local_demo_notice, context.CASHIER_TERMINAL_LOCAL_DEMO_NOTICE);
 });
 
-test("POS sale completion records source chain and marks only scanned STORE_ITEM tokens sold", () => {
-  const recordSource = extractFunctionSource(appJs, "buildPosStoreItemSaleRecord");
-  const completeSource = extractFunctionSource(appJs, "completeCashierTerminalStoreItemSale");
-  assert.match(recordSource, /sale_no:\s*saleNo/);
-  assert.match(appJs, /function buildPosStoreItemSaleNo[\s\S]*?`SALE-\$\{storeCode\}-/);
-  [
-    "store_item_display_code",
-    "store_item_machine_code",
-    "source_sdo",
-    "source_package",
-    "source_type",
-    "assigned_employee",
-    "store_rack_code",
-    "category_summary",
-    "selected_price",
-    "cost_price",
-    "cost_status",
-    "gross_margin",
-    "gross_margin_pct",
-    "payment_method",
-    "sold_at",
-  ].forEach((field) => assert.match(recordSource, new RegExp(`${field}:`)));
-  assert.match(appJs, /function buildPosStoreItemMargin/);
-  const marginSource = extractFunctionSource(appJs, "buildPosStoreItemMargin");
-  assert.match(marginSource, /cost_status[\s\S]*unknown/);
-  assert.match(marginSource, /gross_margin:\s*null/);
-  assert.match(marginSource, /gross_margin_pct:\s*null/);
-  assert.match(marginSource, /selectedPrice - costPrice/);
-  assert.match(marginSource, /grossMargin \/ selectedPrice/);
-  assert.match(completeSource, /sale_status:\s*"sold"/);
-  assert.match(completeSource, /sold_at:/);
-  assert.match(completeSource, /cashier:/);
-  assert.match(completeSource, /persistStoreSdoPackageItemTokenState\(\)/);
-  assert.match(completeSource, /persistPosStoreItemSaleRecordState\(\)/);
-  assert.match(completeSource, /cashierTerminalState\.latestCompletedSale/);
+test("POS complete sale posts to the real backend sale API and never fabricates success", () => {
+  const submitSource = extractAssignedFunctionSource(appJs, "submitCashierTerminalSale");
+  const backendSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
+  const payloadSource = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  const receiptSource = extractFunctionSource(appJs, "normalizeCashierTerminalBackendSale");
+  assert.match(submitSource, /await submitCashierTerminalBackendSale\(\)/);
+  assert.match(backendSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-sales`/);
+  assert.match(backendSource, /method:\s*"POST"/);
+  assert.match(backendSource, /JSON\.stringify\(payload\)/);
+  assert.match(backendSource, /cashierTerminalState\.latestCompletedSale\s*=\s*sale/);
+  assert.match(backendSource, /resetCashierTerminalForNextSale\(\)/);
+  assert.match(backendSource, /markCashierTerminalSoldItemsLocally\(sale\)/);
+  assert.match(backendSource, /真实销售接口不可用，本单未完成。请恢复系统后重试。/);
+  assert.match(payloadSource, /payment_method:\s*cashierTerminalState\.activePaymentMode/);
+  assert.match(payloadSource, /items:\s*cartItems\.map/);
+  assert.match(payloadSource, /machine_code:/);
+  assert.match(payloadSource, /display_code:/);
+  assert.match(payloadSource, /final_price:/);
+  assert.match(receiptSource, /sale_no:\s*sale\.sale_no/);
+  const catchStart = backendSource.indexOf("} catch");
+  const catchEnd = backendSource.indexOf("const sale =", catchStart);
+  assert.doesNotMatch(backendSource.slice(catchStart, catchEnd), /resetCashierTerminalForNextSale/);
+  assert.doesNotMatch(backendSource.slice(catchStart, catchEnd), /latestCompletedSale\s*=/);
+  assert.doesNotMatch(backendSource, /SALE-UTW-250511/);
+  assert.doesNotMatch(backendSource, /saleSequence\s*\+=/);
+  assert.doesNotMatch(backendSource, /completed_pending_sync/);
+  assert.doesNotMatch(backendSource, /resolveCashierTerminalLocalDemoItem/);
+});
+
+test("POS sale API unavailable detection does not hide backend business errors", () => {
+  const source = extractFunctionSource(appJs, "isCashierTerminalSaleApiUnavailableError");
+  const fn = vm.runInNewContext(`${source}\nisCashierTerminalSaleApiUnavailableError;`, {
+    formatErrorMessage: (error) => error?.message || error?.payload?.detail || "",
+  });
+
+  assert.equal(fn(new Error("fetch failed")), true);
+  assert.equal(fn({ status: 503, message: "service unavailable" }), true);
+  assert.equal(fn({ status: 404, message: "Not Found" }), true);
+  assert.equal(fn({ status: 404, message: "Cannot POST /api/v1/stores/UTAWALA/pos-sales" }), true);
+  assert.equal(fn({ status: 404, message: "Store UTAWALA not found" }), false);
+  assert.equal(fn({ status: 400, message: "该商品已售出，不能重复销售。" }), false);
+  assert.equal(fn({ status: 400, message: "Mixed payment amount must cover POS sale total." }), false);
 });
 
 test("cashier terminal shell only activates on the POS sales panel", () => {
@@ -325,7 +332,6 @@ test("operations analytics renders POS store summaries and source-chain sale rec
     "毛利待确认",
   ].forEach((field) => assert.match(renderSource, new RegExp(field)));
   assert.match(appJs, /renderPosSalesAnalyticsSummary\(posStoreItemSaleRecordState\)/);
-  assert.match(extractFunctionSource(appJs, "submitCashierTerminalSale"), /renderPosSalesAnalyticsSummary\(posStoreItemSaleRecordState\)/);
 });
 
 test("operations center exposes all POS sales data with brief analysis", () => {

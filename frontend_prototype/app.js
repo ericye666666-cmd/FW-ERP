@@ -29847,33 +29847,7 @@ async function submitCashierTerminalOpenShift() {
 }
 
 async function submitCashierTerminalSale() {
-  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
-  const isStoreItemOnlyCart = rows.length && rows.every((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim().startsWith("5"));
-  if (isStoreItemOnlyCart) {
-    const result = completeCashierTerminalStoreItemSale();
-    cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
-    cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
-    cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
-    resetCashierTerminalForNextSale();
-    renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
-    renderOperationsAllSalesData(posStoreItemSaleRecordState);
-    showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
-    return result;
-  }
-  syncCashierTerminalSaleForm();
-  const form = document.querySelector("#saleForm");
-  if (!(form instanceof HTMLFormElement)) {
-    throw new Error("saleForm 不存在，无法提交销售。");
-  }
-  const result = await submitSale({ preventDefault() {}, currentTarget: form });
-  cashierTerminalState.latestCompletedSale = result;
-  cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
-  cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
-  cashierTerminalState.refundBarcode = result.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
-  resetCashierTerminalForNextSale();
-  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
-  showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
-  return result;
+  return submitCashierTerminalBackendSale();
 }
 
 async function submitCashierTerminalVoidRequest() {
@@ -31048,58 +31022,137 @@ function validateCashierTerminalPayment() {
   return { cashAmount, mpesaAmount, reference: String(cashierTerminalState.mixedMpesaReference || "").trim(), paid: cashAmount + mpesaAmount };
 }
 
-submitCashierTerminalSale = async function () {
+function buildCashierTerminalPosSalePayload(payment) {
   ensureCashierTerminalPreviewState();
   const totals = getCashierTerminalTotals();
-  const payment = validateCashierTerminalPayment();
-  cashierTerminalState.saleSequence += 1;
-  const saleNo = `SALE-UTW-250511-${String(cashierTerminalState.saleSequence).padStart(4, "0")}`;
-  const nowText = new Date().toLocaleString("zh-CN", { hour12: false });
-  const pending = ["weak", "offline", "failed"].includes(cashierTerminalState.networkStatus);
-  const sale = {
-    sale_no: saleNo,
-    order_no: saleNo,
-    store_code: getCashierTerminalStoreCode(),
-    cashier: getCashierTerminalCashierName(),
+  const cartItems = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  if (!cartItems.length) {
+    throw new Error("购物车为空，请先扫描 STORE_ITEM 商品码。");
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  return {
+    cashier_id: getCashierTerminalCashierName(),
     shift_id: getCashierTerminalShiftNo(),
-    time: nowText,
-    items: cashierTerminalState.cartItems.map((row) => ({ ...row })),
-    total_items: totals.totalItems,
-    subtotal: totals.subtotal,
-    discount: totals.discount,
-    total: totals.totalAmount,
+    terminal_id: `POS-${storeCode.slice(0, 3).toUpperCase()}-01`,
     payment_method: cashierTerminalState.activePaymentMode,
     cash_amount: payment.cashAmount,
     mpesa_amount: payment.mpesaAmount,
     mpesa_reference: payment.reference,
-    change: Math.max(payment.paid - totals.totalAmount, 0),
-    status: pending ? "completed_pending_sync" : "completed",
+    discount_amount: totals.discount,
+    items: cartItems.map((row) => ({
+      machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
+      display_code: String(row.store_item_display_code || row.display_code || "").trim(),
+      final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
+      discount_amount: 0,
+    })),
   };
-  const soldStatus = pending ? "sold_pending_sync" : "sold";
-  const soldCodes = new Set(sale.items.map((item) => String(item.machine_code || "")));
-  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
-    soldCodes.has(String(item.machine_code || "")) ? { ...item, status: soldStatus } : item,
+}
+
+function normalizeCashierTerminalBackendSale(sale = {}) {
+  const items = Array.isArray(sale.items) ? sale.items : [];
+  return {
+    sale_id: sale.sale_id || sale.sale_no || "",
+    sale_no: sale.sale_no,
+    order_no: sale.sale_no,
+    store_code: sale.store_code || getCashierTerminalStoreCode(),
+    cashier: sale.cashier_id || getCashierTerminalCashierName(),
+    shift_id: sale.shift_id || getCashierTerminalShiftNo(),
+    time: sale.sale_time || cashierTerminalState.currentTime || new Date().toLocaleString("zh-CN", { hour12: false }),
+    items: items.map((item) => ({
+      display_code: item.display_code || item.machine_code || "",
+      machine_code: item.machine_code || "",
+      barcode: item.machine_code || "",
+      category: item.category || "未分类",
+      shelf_location: item.shelf_location || "",
+      price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
+      selling_price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
+      qty: 1,
+    })),
+    total_items: items.length,
+    subtotal: normalizeCashierTerminalNumber(sale.subtotal),
+    discount: normalizeCashierTerminalNumber(sale.discount_amount),
+    total: normalizeCashierTerminalNumber(sale.total_amount),
+    payment_method: sale.payment_method || cashierTerminalState.activePaymentMode,
+    cash_amount: normalizeCashierTerminalNumber(sale.cash_amount),
+    mpesa_amount: normalizeCashierTerminalNumber(sale.mpesa_amount),
+    mpesa_reference: sale.mpesa_reference || "",
+    change: normalizeCashierTerminalNumber(sale.change_amount),
+    status: sale.status || "completed",
+  };
+}
+
+function isCashierTerminalSaleApiUnavailableError(error) {
+  const status = Number(error?.status || 0);
+  if (!status || status >= 500) {
+    return true;
+  }
+  if (status !== 404) {
+    return false;
+  }
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (/^not found$/i.test(message)) {
+    return true;
+  }
+  return /cannot\s+(get|post)\s+.*\/stores\/[^/]+\/pos-sales/i.test(message);
+}
+
+function markCashierTerminalSoldItemsLocally(sale) {
+  const soldCodes = new Set(
+    (sale?.items || [])
+      .map((item) => String(item.machine_code || item.barcode || "").trim())
+      .filter(Boolean),
   );
+  if (!soldCodes.size) {
+    return;
+  }
+  cashierTerminalState.mockItems = getCashierTerminalMockItems().map((item) =>
+    soldCodes.has(String(item.machine_code || "").trim()) ? { ...item, status: "sold" } : item,
+  );
+}
+
+async function submitCashierTerminalBackendSale() {
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  const payment = validateCashierTerminalPayment();
+  const payload = buildCashierTerminalPosSalePayload(payment);
+  const storeCode = getCashierTerminalStoreCode();
+  let backendSale;
+  try {
+    backendSale = await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    if (isCashierTerminalSaleApiUnavailableError(error)) {
+      throw new Error("真实销售接口不可用，本单未完成。请恢复系统后重试。");
+    }
+    throw error;
+  }
+  const sale = normalizeCashierTerminalBackendSale(backendSale);
   cashierTerminalState.latestCompletedSale = sale;
-  cashierTerminalState.todaySalesAmount += totals.totalAmount;
+  cashierTerminalState.voidOrderNo = sale.order_no || cashierTerminalState.voidOrderNo;
+  cashierTerminalState.refundOrderNo = sale.order_no || cashierTerminalState.refundOrderNo;
+  cashierTerminalState.refundBarcode = sale.items?.[0]?.barcode || cashierTerminalState.refundBarcode;
+  markCashierTerminalSoldItemsLocally(sale);
+  cashierTerminalState.todaySalesAmount += sale.total || totals.totalAmount;
   cashierTerminalState.todayOrderCount += 1;
-  cashierTerminalState.shiftSalesAmount += totals.totalAmount;
+  cashierTerminalState.shiftSalesAmount += sale.total || totals.totalAmount;
   cashierTerminalState.shiftOrderCount += 1;
   if (sale.payment_method === "cash") {
-    cashierTerminalState.cashSalesAmount += payment.cashAmount;
+    cashierTerminalState.cashSalesAmount += sale.cash_amount || payment.cashAmount;
   } else if (sale.payment_method === "mpesa") {
-    cashierTerminalState.mpesaSalesAmount += payment.mpesaAmount;
+    cashierTerminalState.mpesaSalesAmount += sale.mpesa_amount || payment.mpesaAmount;
   } else {
-    cashierTerminalState.mixedCashAmountTotal += payment.cashAmount;
-    cashierTerminalState.mixedMpesaAmountTotal += payment.mpesaAmount;
-  }
-  if (pending) {
-    cashierTerminalState.pendingSaleCount += 1;
-    cashierTerminalState.syncStatus = "同步待处理";
+    cashierTerminalState.mixedCashAmountTotal += sale.cash_amount || payment.cashAmount;
+    cashierTerminalState.mixedMpesaAmountTotal += sale.mpesa_amount || payment.mpesaAmount;
   }
   resetCashierTerminalForNextSale();
-  showTransientInlineNotice("#cashierTerminalInlineNotice", `销售完成：${saleNo}${pending ? " · completed_pending_sync" : ""}`, "success", 2200);
+  showTransientInlineNotice("#cashierTerminalInlineNotice", `销售完成：${sale.sale_no}`, "success", 2200);
   return sale;
+}
+
+submitCashierTerminalSale = async function () {
+  return await submitCashierTerminalBackendSale();
 }
 
 updateCashierTerminalPaymentField = function (field, value, index = null) {
