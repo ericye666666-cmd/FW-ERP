@@ -3434,19 +3434,14 @@
           <header class="topbar">
             <div class="brand-group">
               <div>
-                <p class="eyebrow">BEYOND ERP</p>
-                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">POS 收银台</h3>
-                <p class="cashier-terminal-subcopy" data-terminal-copy="brandSubtitle">扫码、收款、打印小票和异常恢复集中在一个触控工作台。</p>
+                <p class="eyebrow">DIRECT LOOP RETAIL</p>
+                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">FW-ERP POS 收银台</h3>
               </div>
             </div>
             <div class="topbar-actions">
               <div id="cashierTerminalSessionStrip" class="cashier-terminal-session-strip"></div>
-              <div class="lang-toggle" role="group" aria-label="Language toggle">
-                <button type="button" class="lang-btn is-active" data-terminal-locale="zh">中文</button>
-                <button type="button" class="lang-btn" data-terminal-locale="en">EN</button>
-              </div>
-              <button type="button" class="secondary-ghost" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer" data-terminal-copy="openShiftCenter">班次中心</button>
-              <button type="button" class="secondary-ghost cashier-terminal-logout" data-action="logout">退出登录</button>
+              <button type="button" class="secondary-ghost" data-terminal-action="open-drawer" data-terminal-drawer="shift">班次 / 交接班</button>
+              <button type="button" class="secondary-ghost cashier-terminal-exit" data-terminal-action="exit-pos">退出收银台</button>
             </div>
           </header>
 
@@ -3458,12 +3453,9 @@
                 <div class="panel-head cashier-terminal-card-head">
                   <div>
                     <p class="panel-kicker">SCAN</p>
-                    <h3 data-terminal-copy="scanTitle">扫码收银</h3>
+                    <h3 data-terminal-copy="scanTitle">扫描 STORE_ITEM</h3>
                   </div>
-                  <div class="shortcut-pills">
-                    <span class="pill"><kbd>Enter</kbd> <span data-terminal-copy="enterToAdd">直接加入商品篮</span></span>
-                    <span class="pill"><kbd>ESC</kbd> <span data-terminal-copy="escToClose">关闭抽屉</span></span>
-                  </div>
+                  <span class="cashier-terminal-scan-rule">仅支持 STORE_ITEM 商品码</span>
                 </div>
                 <form id="cashierTerminalScanForm" class="scan-grid cashier-terminal-scan-form">
                   <label class="field scan-field main-field">
@@ -3478,21 +3470,10 @@
                         data-scan-input="true"
                         placeholder="扫描 STORE_ITEM 商品码"
                       />
-                      <button type="submit" class="primary-inline" data-terminal-submit="add" data-terminal-copy="addToBasket">加入商品篮</button>
-                    </div>
-                  </label>
-                  <label class="field search-field">
-                    <span data-terminal-copy="lookupField">手动查价</span>
-                    <div class="field-row">
-                      <input
-                        id="cashierTerminalManualInput"
-                        name="manual_query"
-                        type="text"
-                        inputmode="text"
-                        autocomplete="off"
-                        placeholder="输入 STORE_ITEM 码查价"
-                      />
-                      <button type="submit" class="secondary-inline" data-terminal-submit="lookup" data-terminal-copy="lookupOnly">只查价</button>
+                      <button type="submit" class="primary-inline scan-submit-button" data-terminal-submit="add" aria-label="扫描加入购物车">
+                        <span class="scan-icon" aria-hidden="true"></span>
+                        <span data-terminal-copy="addToBasket">加入购物车</span>
+                      </button>
                     </div>
                   </label>
                 </form>
@@ -3502,21 +3483,17 @@
                   data-empty-text=""
                 ></div>
                 <div id="cashierTerminalLookupCard" class="lookup-preview cashier-terminal-lookup empty-state">
-                  等待扫码。扫到非 STORE_ITEM 会在这里提示下一步。
+                  仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。
                 </div>
               </article>
 
               <article class="panel panel-basket cashier-terminal-card cashier-terminal-cart-card">
                 <div class="panel-head basket-head cashier-terminal-card-head">
                   <div>
-                    <p class="panel-kicker">商品篮</p>
-                    <h3 data-terminal-copy="basketTitle">商品篮</h3>
+                    <p class="panel-kicker">CART</p>
+                    <h3 data-terminal-copy="basketTitle">购物车</h3>
                   </div>
                   <div class="basket-tools">
-                    <label class="field compact-field note-field cashier-terminal-note-field" for="cashierTerminalSaleNote">
-                      <span data-terminal-copy="noteLabel">交易备注</span>
-                      <input id="cashierTerminalSaleNote" type="text" placeholder="正常销售 / 顾客备注 / 交接说明" />
-                    </label>
                     <button type="button" class="secondary-ghost" data-terminal-action="clear-cart" data-terminal-copy="clearBasket">清空商品篮</button>
                   </div>
                 </div>
@@ -3527,15 +3504,16 @@
             <aside class="payment-column cashier-terminal-side">
               <section id="cashierTerminalPaymentPanel" class="panel panel-payment cashier-terminal-card cashier-terminal-payment-panel"></section>
             </aside>
+
+            <aside class="receipt-column cashier-terminal-receipt-side">
+              <section id="cashierTerminalReceiptPanel" class="panel cashier-terminal-card cashier-terminal-receipt-panel"></section>
+            </aside>
           </main>
 
           <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions cashier-terminal-status-footer">
-            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift" data-drawer="shiftDrawer"><span>班次</span><strong>-</strong></button>
-            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>作废</span><strong>-</strong></button>
-            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="refund" data-drawer="refundDrawer"><span>退款</span><strong>-</strong></button>
-            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>异常</span><strong>-</strong></button>
-            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline" data-drawer="offlineDrawer"><span>离线</span><strong>-</strong></button>
-            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>小票</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift"><span>本班销售额</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="sync"><span>同步状态</span><strong>-</strong></button>
+            <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>-</strong></button>
           </section>
           <div id="cashierTerminalDrawerBackdrop" class="drawer-backdrop" data-terminal-action="close-drawer" hidden></div>
           <aside id="cashierTerminalDrawer" class="side-drawer cashier-terminal-drawer" hidden></aside>
