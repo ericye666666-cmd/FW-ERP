@@ -59,9 +59,9 @@ const STORAGE_KEYS = {
   localPrintAgentUrl: "retail_ops_local_print_agent_url",
   pdaBluetoothPrinterSelection: "retail_ops_pda_bluetooth_printer_selection"
 };
-const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-unconfirmed-stock-in-304";
-const DIRECT_LOOP_PDA_BUNDLE_VERSION = "unconfirmed-store-item-stock-in-list-304";
-const DIRECT_LOOP_MAIN_PR_VERSION = "#272";
+const DIRECT_LOOP_WEB_VERSION = "fw-erp-web-20260511-inventory-overview-ui-polish-305";
+const DIRECT_LOOP_PDA_BUNDLE_VERSION = "inventory-overview-ui-polish-305";
+const DIRECT_LOOP_MAIN_PR_VERSION = "#274";
 const DIRECT_LOOP_ANDROID_PR_VERSION = "#35";
 const K300_40X30_RETAIL_CLOTHING_STORE_ITEM_TEMPLATE_NAME = "K300_40X30_RETAIL_CLOTHING_STORE_ITEM";
 const RETAIL_CLOTHING_STORE_ITEM_BUSINESS_TEMPLATE = "retail_clothing_store_item";
@@ -23046,18 +23046,19 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
   }
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计 stock_in_confirmed=true 的 STORE_ITEM；未确认 / 历史未确认单独展示。</div>
+    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计已点击确认完成入库的 STORE_ITEM；待完成入库单独处理。</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml((_a = overview.total_items) != null ? _a : 0)}</span></article>
-      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml((_b = overview.shelf_items) != null ? _b : 0)}</span></article>
-      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml((_c2 = overview.backroom_items) != null ? _c2 : 0)}</span></article>
-      <article class="store-metric"><strong>未关联货架</strong><span>${escapeHtml((_d2 = overview.unassigned_location_items) != null ? _d2 : 0)}</span></article>
-      <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml((_e2 = overview.today_new_items) != null ? _e2 : 0)}</span></article>
-      <article class="store-metric">
-        <strong>未确认 / 历史未确认</strong>
+      <article class="store-metric problem-card">
+        <strong>待完成入库</strong>
         <span>${escapeHtml((_f2 = overview.unconfirmed_items) != null ? _f2 : 0)}</span>
+        <small>已生成或已打印 STORE_ITEM，但还没有点击确认完成入库。</small>
         <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看待完成</button>
       </article>
+      <article class="store-metric problem-card"><strong>未关联货架</strong><span>${escapeHtml((_d2 = overview.unassigned_location_items) != null ? _d2 : 0)}</span><small>已入库但没有有效货架。</small></article>
+      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml((_c2 = overview.backroom_items) != null ? _c2 : 0)}</span></article>
+      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml((_b = overview.shelf_items) != null ? _b : 0)}</span></article>
+      <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml((_a = overview.total_items) != null ? _a : 0)}</span></article>
+      <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml((_e2 = overview.today_new_items) != null ? _e2 : 0)}</span></article>
     </div>
   `;
 }
@@ -23072,18 +23073,18 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
           <tr>
             <th>品类</th>
             <th>总库存</th>
-            <th>已上货架</th>
+            <th>货架上</th>
             <th>后仓</th>
             <th>未关联货架</th>
             <th>最后入库时间</th>
-            <th>明细</th>
+            <th>查看</th>
           </tr>
         </thead>
         <tbody>
           ${rows.map((row) => {
     var _a, _b, _c2, _d2;
     return `
-            <tr>
+            <tr class="${row.location_type === "BACKROOM" ? "inventory-location-special" : row.location_code === "UNASSIGNED" ? "inventory-location-warning" : ""}">
               <td>${escapeHtml(row.category_name || "unknown")}</td>
               <td>${escapeHtml((_a = row.total_items) != null ? _a : 0)}</td>
               <td>${escapeHtml((_b = row.shelf_items) != null ? _b : 0)}</td>
@@ -23223,14 +23224,14 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
   target.className = "report-summary";
   if (!rows.length) {
     target.innerHTML = `
-      <div class="flow-summary-note">未确认 / 待完成入库 · 0 件</div>
+      <div class="flow-summary-note">待完成入库 · 0 件</div>
       ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
       <div class="empty-state">当前门店没有待完成入库的 STORE_ITEM。</div>
     `;
     return;
   }
   target.innerHTML = `
-    <div class="flow-summary-note">未确认 / 待完成入库 · ${rows.length} 件。打印完成不等于入库，点击确认完成入库后才进入主库存。</div>
+    <div class="flow-summary-note">待完成入库 · ${rows.length} 件。这些商品不会进入主库存，点击确认完成入库后才计入库存。</div>
     ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
     <div class="table-scroll">
       <table class="data-table compact-table">
@@ -23239,11 +23240,10 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
             <th>STORE_ITEM 码</th>
             <th>品类</th>
             <th>价格</th>
-            <th>建议货架</th>
+            <th>建议货架 / 后仓</th>
             <th>来源 SDP</th>
-            <th>来源 SDO</th>
             <th>打印人</th>
-            <th>打印 / 创建时间</th>
+            <th>时间</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -23257,9 +23257,11 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
                 <td>${escapeHtml(machineCode || "-")}</td>
                 <td>${escapeHtml(item.category_name || item.category_short || "-")}</td>
                 <td>${escapeHtml((_b = (_a = item.price_kes) != null ? _a : item.sale_price_kes) != null ? _b : "-")}</td>
-                <td>${escapeHtml(item.suggested_location_name || suggestedLocationCode || "-")}</td>
+                <td>
+                  <strong>${escapeHtml(item.suggested_location_name || suggestedLocationCode || "-")}</strong>
+                  ${item.parent_sdo_display_code ? `<div class="subtle small">SDO ${escapeHtml(item.parent_sdo_display_code)}</div>` : ""}
+                </td>
                 <td>${escapeHtml(item.source_sdp_display_code || "-")}</td>
-                <td>${escapeHtml(item.parent_sdo_display_code || "-")}</td>
                 <td>${escapeHtml(item.printed_by || "-")}</td>
                 <td>${escapeHtml(item.printed_at || item.created_at || item.updated_at || item.last_inbound_at || "-")}</td>
                 <td>
@@ -32217,13 +32219,15 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
   const error = String(state.storeMobileUnconfirmedStockInError || "").trim();
   return `
     <section class="mobile-stock-in-panel">
-      <div class="mobile-section-head">
-        <strong>未完成入库</strong>
-        ${renderStoreMobilePricingBadge(`${rows.length} 件`)}
+      <div class="mobile-stock-in-entry-card">
+        <div>
+          <strong>未完成入库：${escapeHtml(rows.length)} 件</strong>
+          <span>打印后还没有确认货架的商品。</span>
+        </div>
+        <button type="button" class="ghost-button mini-button" data-mobile-pricing-load-unconfirmed-stock-in="true">刷新 / 立即处理</button>
       </div>
       ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
       ${error ? `<div class="mobile-error">${escapeHtml(error)}</div>` : ""}
-      <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-load-unconfirmed-stock-in="true">刷新未完成入库</button>
       ${rows.length ? `
         <div class="mobile-stock-in-list">
           ${rows.map((item) => {
@@ -32231,10 +32235,11 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
     const machineCode = String(item.machine_code || item.barcode_value || "").trim();
     const selectedLocationCode = String(item.suggested_location_code || item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations) || "").trim().toUpperCase();
     return `
-              <article class="mobile-stock-in-row">
+              <article class="mobile-stock-in-card">
                 <div>
                   <strong>STORE_ITEM ${escapeHtml(machineCode || "-")}</strong>
                   <span>${escapeHtml(item.category_name || item.category_short || "-")} · KES ${escapeHtml((_a = item.price_kes) != null ? _a : item.sale_price_kes || 0)}</span>
+                  <span>建议货架 / 后仓：${escapeHtml(item.suggested_location_name || selectedLocationCode || "-")}</span>
                 </div>
                 <label class="mobile-field">
                   <span>货架位 / 后仓</span>
@@ -33729,7 +33734,7 @@ function handleStoreMobilePricingPreviewAction(button) {
       storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
       renderStoreMobilePricingPreview();
     }).catch((error) => {
-      state.storeMobileUnconfirmedStockInError = formatErrorMessage(error);
+      state.storeMobileUnconfirmedStockInError = `失败，请重试：${formatErrorMessage(error)}`;
       renderStoreMobilePricingPreview();
     });
   }
