@@ -10775,6 +10775,79 @@ body.cashier-terminal-mode .cashier-terminal-grand-total {
   background: linear-gradient(180deg, #f5f3ff 0%, #ffffff 100%);
 }
 
+body.cashier-terminal-mode .cashier-no-shift-card,
+body.cashier-terminal-mode .cashier-scan-error,
+body.cashier-terminal-mode .cashier-payment-guidance,
+body.cashier-terminal-mode .cashier-payment-warning,
+body.cashier-terminal-mode .cashier-reprint-confirm-card,
+body.cashier-terminal-mode .cashier-shift-variance-warning {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  font-weight: 800;
+}
+
+body.cashier-terminal-mode .cashier-no-shift-card {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+body.cashier-terminal-mode .cashier-no-shift-card strong {
+  color: #7c2d12;
+  font-size: 18px;
+}
+
+body.cashier-terminal-mode .cashier-no-shift-card .primary-inline {
+  width: fit-content;
+  margin-top: 4px;
+}
+
+body.cashier-terminal-mode .cashier-payment-warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+body.cashier-terminal-mode .cashier-reprint-confirm-card {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #4c1d95;
+}
+
+body.cashier-terminal-mode .cashier-shift-variance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-weight: 900;
+}
+
+body.cashier-terminal-mode .cashier-shift-variance.danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+body.cashier-terminal-mode .cashier-shift-variance.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+body.cashier-terminal-mode .cashier-shift-variance-warning.is-hidden {
+  display: none;
+}
+
 body.cashier-terminal-mode .cashier-terminal-grand-total strong {
   color: #111827;
   font-size: 46px;
