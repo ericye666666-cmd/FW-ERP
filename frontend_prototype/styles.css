@@ -9189,6 +9189,179 @@ body.pda-runtime-mode .store-mobile-runtime-screen .mobile-pricing-tabbar {
   background: #f6f8f5;
 }
 
+.store-manager-daily-control-panel {
+  background: #f7f8fb;
+}
+
+.store-manager-daily-control-root {
+  display: grid;
+  gap: 16px;
+}
+
+.store-manager-daily-hero,
+.store-manager-daily-section {
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+}
+
+.store-manager-daily-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+}
+
+.store-manager-daily-hero h3,
+.store-manager-daily-section-head h3 {
+  margin: 0;
+  color: #111827;
+  line-height: 1.15;
+}
+
+.store-manager-daily-hero p {
+  max-width: 720px;
+  margin: 7px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.store-manager-daily-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.store-manager-daily-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.store-manager-daily-section-head span {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-daily-task-grid,
+.store-manager-daily-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.store-manager-daily-card {
+  min-height: 88px;
+  display: grid;
+  align-content: space-between;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+
+.store-manager-daily-card span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-daily-card strong {
+  color: #111827;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.store-manager-daily-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.store-manager-daily-flow-node {
+  min-height: 98px;
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.store-manager-daily-flow-node span,
+.store-manager-daily-inventory-note {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-daily-flow-node strong {
+  color: #1d4ed8;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.store-manager-daily-inventory-note {
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.store-manager-daily-table {
+  display: grid;
+  gap: 8px;
+}
+
+.store-manager-daily-table-head,
+.store-manager-daily-table-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.4fr) repeat(4, minmax(98px, 1fr)) minmax(110px, auto);
+  gap: 10px;
+  align-items: center;
+}
+
+.store-manager-daily-table-head {
+  padding: 0 12px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.store-manager-daily-table-row {
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.store-manager-daily-table-row strong,
+.store-manager-daily-table-row span {
+  color: #111827;
+  font-size: 13px;
+}
+
+.store-manager-market-feedback-form {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.store-manager-daily-feedback-list .candidate-row {
+  border-radius: 12px;
+}
+
 .store-manager-pda-preview {
   display: grid;
   justify-items: center;
@@ -9239,7 +9412,7 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
   position: sticky;
   bottom: 0;
   z-index: 24;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
@@ -9320,7 +9493,8 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
 .store-manager-pda-metrics,
 .store-manager-pda-status-grid,
 .store-manager-pda-action-grid,
-.store-manager-pda-operation-grid {
+.store-manager-pda-operation-grid,
+.store-manager-pda-daily-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
@@ -9328,6 +9502,7 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
 
 .store-manager-pda-metric,
 .store-manager-pda-status,
+.store-manager-pda-daily-card,
 .store-manager-pda-action,
 .store-manager-pda-operation,
 .store-manager-pda-setting,
@@ -9342,7 +9517,8 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
 }
 
 .store-manager-pda-metric,
-.store-manager-pda-status {
+.store-manager-pda-status,
+.store-manager-pda-daily-card {
   min-height: 76px;
   display: grid;
   align-content: space-between;
@@ -9351,10 +9527,17 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
 }
 
 .store-manager-pda-metric strong,
-.store-manager-pda-status strong {
+.store-manager-pda-status strong,
+.store-manager-pda-daily-card strong {
   color: #172017;
   font-size: 21px;
   line-height: 1.1;
+}
+
+.store-manager-pda-daily-card span {
+  color: #657164;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .store-manager-pda-card {
@@ -9560,6 +9743,97 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
   font-weight: 800;
 }
 
+.store-manager-pda-secondary-action.compact-action {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.store-manager-pda-daily-entry {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.store-manager-pda-daily-flow {
+  display: grid;
+  gap: 8px;
+}
+
+.store-manager-pda-daily-flow article {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #dde5da;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.store-manager-pda-daily-flow span {
+  color: #657164;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.store-manager-pda-daily-flow strong {
+  color: #172017;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.store-manager-pda-action-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.store-manager-pda-action-tabs button {
+  min-height: 42px;
+  border: 1px solid #cfd8ca;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172017;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.store-manager-pda-action-tabs button.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.store-manager-pda-daily-feedback-form,
+.store-manager-pda-chip-group {
+  display: grid;
+  gap: 8px;
+}
+
+.store-manager-pda-chip-group {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.store-manager-pda-chip-group label {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #dde5da;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172017;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.store-manager-pda-daily-feedback-form textarea {
+  min-height: 62px;
+  resize: vertical;
+}
+
 .store-manager-pda-log {
   grid-template-columns: 46px minmax(0, 1fr);
   align-items: start;
@@ -9700,7 +9974,7 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
 
 .store-manager-pda-bottom-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   padding: 8px;
   background: #ffffff;

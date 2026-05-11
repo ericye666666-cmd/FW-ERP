@@ -263,6 +263,7 @@ class InMemoryState:
         self.sale_void_requests: dict[str, dict[str, Any]] = {}
         self.sale_refund_requests: dict[str, dict[str, Any]] = {}
         self.pos_holds: dict[str, dict[str, Any]] = {}
+        self.manager_market_feedback: dict[str, dict[str, Any]] = {}
         self.store_rack_locations: dict[str, dict[str, Any]] = {}
         self.inventory_adjustments: list[dict[str, Any]] = []
         self.inventory_movements: list[dict[str, Any]] = []
@@ -353,6 +354,7 @@ class InMemoryState:
         self._sale_void_request_ids = count(len(self.sale_void_requests) + 1)
         self._sale_refund_request_ids = count(len(self.sale_refund_requests) + 1)
         self._pos_hold_ids = count(len(self.pos_holds) + 1)
+        self._manager_market_feedback_ids = count(len(self.manager_market_feedback) + 1)
         self._adjustment_ids = count(max((row["id"] for row in self.inventory_adjustments), default=0) + 1)
         self._movement_ids = count(max((row["id"] for row in self.inventory_movements), default=0) + 1)
         self._audit_ids = count(max((row["id"] for row in self.audit_events), default=0) + 1)
@@ -406,6 +408,7 @@ class InMemoryState:
             "sale_void_requests": self.sale_void_requests,
             "sale_refund_requests": self.sale_refund_requests,
             "pos_holds": self.pos_holds,
+            "manager_market_feedback": self.manager_market_feedback,
             "store_rack_locations": self.store_rack_locations,
             "inventory_adjustments": self.inventory_adjustments,
             "inventory_movements": self.inventory_movements,
@@ -474,6 +477,7 @@ class InMemoryState:
         self.sale_void_requests = payload.get("sale_void_requests", {})
         self.sale_refund_requests = payload.get("sale_refund_requests", {})
         self.pos_holds = payload.get("pos_holds", {})
+        self.manager_market_feedback = payload.get("manager_market_feedback", {})
         self.store_rack_locations = payload.get("store_rack_locations", {})
         self.inventory_adjustments = payload.get("inventory_adjustments", [])
         self.inventory_movements = payload.get("inventory_movements", [])
@@ -11754,6 +11758,242 @@ class InMemoryState:
 
     def get_pos_shift_z_report(self, store_code: str, shift_id: str) -> dict[str, Any]:
         return self._build_pos_shift_report(store_code, shift_id, "Z_REPORT")
+
+    def _manager_control_date(self, date_value: str = "") -> str:
+        normalized = str(date_value or "").strip()
+        return normalized[:10] if normalized else datetime.now(NAIROBI_TZ).date().isoformat()
+
+    def _is_manager_control_date(self, value: Any, date_value: str) -> bool:
+        if not value:
+            return False
+        return str(value).strip()[:10] == date_value
+
+    def _manager_store_item_category(self, row: dict[str, Any]) -> str:
+        return str(row.get("category_name") or row.get("category") or row.get("category_sub") or row.get("category_short") or "未分类").strip() or "未分类"
+
+    def _manager_store_item_store(self, row: dict[str, Any]) -> str:
+        return str(row.get("store_code") or row.get("store") or "").strip().upper()
+
+    def _manager_store_item_statuses(self, row: dict[str, Any]) -> set[str]:
+        return {
+            str(row.get("status") or "").strip().lower(),
+            str(row.get("sale_status") or "").strip().lower(),
+            str(row.get("store_item_status") or "").strip().lower(),
+        } - {""}
+
+    def _is_manager_store_item_sellable(self, row: dict[str, Any]) -> bool:
+        if row.get("stock_in_confirmed") is not True:
+            return False
+        statuses = self._manager_store_item_statuses(row)
+        blocked = {"sold", "sold_pending_sync", "held", "reserved", "transferred_out", "voided", "cancelled", "canceled", "deleted", "pending_print", "pending_putaway"}
+        if statuses.intersection(blocked):
+            return False
+        return bool(statuses.intersection({"on_shelf", "in_stock", "available", "printed_in_store", "shelved", "ready_for_sale", "active"}))
+
+    def _manager_feedback_prefix(self, store_code: str) -> str:
+        return self._pos_sale_store_prefix(store_code)
+
+    def create_manager_market_feedback(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        category = str(payload.get("category") or "").strip()
+        if not category:
+            raise HTTPException(status_code=400, detail="category is required")
+        feedback_type = str(payload.get("feedback_type") or "other").strip()
+        suggested_action = str(payload.get("suggested_action") or "keep_observing").strip()
+        allowed_feedback_types = {
+            "customer_asked_many",
+            "customer_said_expensive",
+            "size_missing",
+            "color_missing",
+            "style_not_good",
+            "quality_issue",
+            "display_issue",
+            "weather_not_match",
+            "competitor_better",
+            "other",
+        }
+        allowed_actions = {
+            "replenish",
+            "promotion",
+            "change_display",
+            "reduce_price",
+            "return_to_warehouse",
+            "keep_observing",
+        }
+        if feedback_type not in allowed_feedback_types:
+            raise HTTPException(status_code=400, detail=f"Unsupported feedback_type {feedback_type}")
+        if suggested_action not in allowed_actions:
+            raise HTTPException(status_code=400, detail=f"Unsupported suggested_action {suggested_action}")
+        sequence = next(self._manager_market_feedback_ids)
+        created_at = now_iso()
+        feedback_id = f"FB-{self._manager_feedback_prefix(store['code'])}-{datetime.now(NAIROBI_TZ).strftime('%y%m%d')}-{sequence:04d}"
+        row = {
+            "feedback_id": feedback_id,
+            "store_code": store["code"],
+            "category": category,
+            "feedback_type": feedback_type,
+            "suggested_action": suggested_action,
+            "note": str(payload.get("note") or "").strip(),
+            "created_by": str(created_by or "").strip(),
+            "created_at": created_at,
+        }
+        self.manager_market_feedback[feedback_id] = row
+        self._log_event(
+            event_type="store.manager_market_feedback.created",
+            entity_type="manager_market_feedback",
+            entity_id=feedback_id,
+            actor=row["created_by"],
+            summary=f"Store manager feedback {feedback_id} created for {store['code']}",
+            details={"store_code": store["code"], "category": category, "feedback_type": feedback_type, "suggested_action": suggested_action},
+        )
+        self._persist()
+        return dict(row)
+
+    def list_manager_market_feedback(self, store_code: str, *, date: str = "") -> list[dict[str, Any]]:
+        store = self._ensure_store_exists(store_code)
+        date_value = self._manager_control_date(date)
+        rows = [
+            dict(row)
+            for row in self.manager_market_feedback.values()
+            if str(row.get("store_code") or "").strip().upper() == store["code"]
+            and self._is_manager_control_date(row.get("created_at"), date_value)
+        ]
+        rows.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
+        return rows
+
+    def get_store_manager_daily_control(self, store_code: str, *, date: str = "") -> dict[str, Any]:
+        store = self._ensure_store_exists(store_code)
+        date_value = self._manager_control_date(date)
+        normalized_store = store["code"]
+
+        sales_today = [
+            sale
+            for sale in self.sales_transactions
+            if str(sale.get("store_code") or "").strip().upper() == normalized_store
+            and self._is_pos_sale_transaction(sale)
+            and str(sale.get("sale_status") or sale.get("status") or "").strip().lower() not in {"voided", "cancelled", "canceled"}
+            and self._is_manager_control_date(sale.get("sale_time") or sale.get("sold_at") or sale.get("created_at"), date_value)
+        ]
+        store_items = [
+            row
+            for row in self.store_items.values()
+            if self._manager_store_item_store(row) == normalized_store
+        ]
+        sellable_items = [row for row in store_items if self._is_manager_store_item_sellable(row)]
+        active_holds = [
+            hold
+            for hold in self.pos_holds.values()
+            if str(hold.get("store_code") or "").strip().upper() == normalized_store
+            and str(hold.get("status") or "").strip().lower() in self._active_pos_hold_statuses()
+        ]
+        open_shifts = [
+            shift
+            for shift in self.cashier_shifts.values()
+            if str(shift.get("store_code") or "").strip().upper() == normalized_store
+            and str(shift.get("status") or "").strip().lower() == "open"
+        ]
+        variance_shifts = [
+            shift
+            for shift in self.cashier_shifts.values()
+            if str(shift.get("store_code") or "").strip().upper() == normalized_store
+            and self._is_manager_control_date(shift.get("closed_at") or shift.get("opened_at"), date_value)
+            and round(float(shift.get("cash_variance") or 0), 2) != 0
+        ]
+
+        sold_by_category: dict[str, int] = defaultdict(int)
+        stock_by_category: dict[str, int] = defaultdict(int)
+        sold_items = 0
+        for sale in sales_today:
+            for item in sale.get("sale_items") or []:
+                category = str(item.get("category") or item.get("category_name") or "未分类").strip() or "未分类"
+                sold_by_category[category] += 1
+                sold_items += 1
+        for item in sellable_items:
+            stock_by_category[self._manager_store_item_category(item)] += 1
+
+        hot_categories = [
+            {
+                "category": category,
+                "sold_qty": sold_qty,
+                "current_stock": stock_by_category.get(category, 0),
+                "signal": "fast_selling",
+                "suggested_action": "replenish",
+            }
+            for category, sold_qty in sold_by_category.items()
+            if sold_qty >= 5 and stock_by_category.get(category, 0) <= 20
+        ]
+        hot_categories.sort(key=lambda row: (-row["sold_qty"], row["current_stock"], row["category"]))
+
+        slow_categories = [
+            {
+                "category": category,
+                "sold_qty": sold_by_category.get(category, 0),
+                "current_stock": current_stock,
+                "signal": "slow_moving",
+                "suggested_action": "promotion",
+            }
+            for category, current_stock in stock_by_category.items()
+            if current_stock >= 50 and sold_by_category.get(category, 0) <= 2
+        ]
+        slow_categories.sort(key=lambda row: (-row["current_stock"], row["sold_qty"], row["category"]))
+
+        pending_sdo = sum(
+            1
+            for row in self.store_delivery_execution_orders.values()
+            if str(row.get("store_code") or row.get("to_store_code") or "").strip().upper() == normalized_store
+            and str(row.get("status") or row.get("store_receipt_status") or "").strip().lower() not in {"received", "completed", "closed", "cancelled", "canceled"}
+        )
+        pending_assignment_packages = sum(
+            1
+            for row in self.store_delivery_packages.values()
+            if str(row.get("store_code") or row.get("to_store_code") or "").strip().upper() == normalized_store
+            and not str(row.get("assigned_clerk") or "").strip()
+            and str(row.get("status") or row.get("assignment_status") or "").strip().lower() not in {"assigned", "completed", "cancelled", "canceled"}
+        )
+        pending_putaway_items = sum(
+            1
+            for row in store_items
+            if self._manager_store_item_statuses(row).intersection({"pending_putaway"})
+        )
+        unconfirmed_stock_in_items = sum(1 for row in store_items if row.get("stock_in_confirmed") is not True)
+        cash_sales = sum(round(float(sale.get("total_amount") or 0), 2) for sale in sales_today if str(sale.get("payment_method") or "").lower() == "cash")
+        mpesa_sales = sum(round(float(sale.get("total_amount") or 0), 2) for sale in sales_today if str(sale.get("payment_method") or "").lower() == "mpesa")
+        mixed_sales = sum(round(float(sale.get("total_amount") or 0), 2) for sale in sales_today if str(sale.get("payment_method") or "").lower() == "mixed")
+
+        return {
+            "store_code": normalized_store,
+            "date": date_value,
+            "tasks": {
+                "pending_sdo": pending_sdo,
+                "pending_assignment_packages": pending_assignment_packages,
+                "pending_putaway_items": pending_putaway_items,
+                "unconfirmed_stock_in_items": unconfirmed_stock_in_items,
+                "active_holds": len(active_holds),
+                "open_shifts": len(open_shifts),
+                "cash_variance_amount": round(sum(float(shift.get("cash_variance") or 0) for shift in variance_shifts), 2),
+            },
+            "flow": {
+                "received_items": sum(1 for row in store_items if row.get("stock_in_confirmed") is True),
+                "assigned_items": sum(1 for row in store_items if str(row.get("assigned_clerk") or row.get("assigned_to") or "").strip()),
+                "putaway_items": len(sellable_items),
+                "sold_items": sold_items,
+                "unprocessed_items": sum(1 for row in store_items if row.get("stock_in_confirmed") is not True or self._manager_store_item_statuses(row).intersection({"pending_putaway", "pending_print"})),
+                "current_sellable_inventory": len(sellable_items),
+            },
+            "hot_categories": hot_categories[:5],
+            "slow_categories": slow_categories[:5],
+            "cashier_risk": {
+                "today_sales": round(sum(float(sale.get("total_amount") or 0) for sale in sales_today), 2),
+                "orders": len(sales_today),
+                "cash_amount": round(cash_sales, 2),
+                "mpesa_amount": round(mpesa_sales, 2),
+                "mixed_amount": round(mixed_sales, 2),
+                "open_shift_count": len(open_shifts),
+                "cash_variance_shift_count": len(variance_shifts),
+                "active_hold_count": len(active_holds),
+            },
+            "market_feedback": self.list_manager_market_feedback(normalized_store, date=date_value),
+        }
 
     def close_pos_shift(self, store_code: str, shift_id: str, payload: dict[str, Any], closed_by: str = "") -> dict[str, Any]:
         shift = self._get_pos_shift_for_store(store_code, shift_id)

@@ -3080,6 +3080,59 @@
         <div id="storeManagerPdaPreview" class="store-manager-pda-preview" aria-live="polite"></div>
       </section>
 
+      <section class="panel store-role-panel store-role-panel-manager store-manager-daily-control-panel" data-workspace-panel="store">
+        <div class="panel-head">
+          <div>
+            <h2>今日执行台</h2>
+            <p>Store Manager Daily Control：今日任务、货物流转、热卖补货、滞销促销、市场反馈和收银风险。</p>
+          </div>
+          <form id="storeManagerDailyControlForm" class="inline-actions">
+            <label>
+              日期
+              <input name="date" type="date" />
+            </label>
+            <button type="submit">刷新</button>
+          </form>
+        </div>
+        <div id="storeManagerDailyControlSummary" class="candidate-summary empty-state">
+          读取当前门店今日执行数据，网页端显示完整 dashboard，PDA 端使用同一 API 渲染轻量执行视图。
+        </div>
+        <div id="storeManagerDailyControlRoot" class="store-manager-daily-control-root" aria-live="polite"></div>
+        <form id="storeManagerMarketFeedbackForm" class="form-grid compact store-manager-market-feedback-form">
+          <select name="category" aria-label="category">
+            <option value="Men Shoes">Men Shoes</option>
+            <option value="Ladies Dresses">Ladies Dresses</option>
+            <option value="Cargo Pants">Cargo Pants</option>
+            <option value="Jackets">Jackets</option>
+            <option value="T-Shirts">T-Shirts</option>
+            <option value="Kids">Kids</option>
+          </select>
+          <select name="feedback_type" aria-label="feedback type">
+            <option value="customer_asked_many">顾客问得多</option>
+            <option value="customer_said_expensive">顾客嫌贵</option>
+            <option value="size_missing">缺尺码</option>
+            <option value="color_missing">缺颜色</option>
+            <option value="style_not_good">款式不好</option>
+            <option value="quality_issue">质量问题</option>
+            <option value="display_issue">陈列问题</option>
+            <option value="weather_not_match">天气不匹配</option>
+            <option value="competitor_better">竞品更好</option>
+            <option value="other">其他</option>
+          </select>
+          <select name="suggested_action" aria-label="suggested action">
+            <option value="replenish">补货</option>
+            <option value="promotion">促销</option>
+            <option value="change_display">换陈列</option>
+            <option value="reduce_price">降价</option>
+            <option value="return_to_warehouse">退回仓库</option>
+            <option value="keep_observing">继续观察</option>
+          </select>
+          <input name="note" placeholder="市场反馈备注，例如 Customers asked for big sizes" />
+          <button type="submit">提交反馈</button>
+        </form>
+        <pre id="storeManagerDailyControlOutput" class="output hidden-output"></pre>
+      </section>
+
       <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
         <div class="panel-head">
           <h2>库存总览</h2>

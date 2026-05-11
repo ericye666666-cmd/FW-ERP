@@ -24,7 +24,7 @@
   }
 })();
 
-var _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa;
+var _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua;
 const STORAGE_KEYS = {
   apiBase: "retail_ops_api_base",
   loginUsername: "retail_ops_login_username",
@@ -1237,6 +1237,7 @@ let baleBarcodeFilters = {
 let latestShiftReport = null;
 let activeWorkspace = localStorage.getItem("retail_ops_active_workspace") || "overview";
 let activePanelKey = "";
+let cashierTerminalReturnPanelKey = "";
 let workspacePageFilterQuery = "";
 const jsonBuilderState = {};
 let recommendationCandidatesState = [];
@@ -2257,9 +2258,17 @@ const STORE_PANEL_NAV_META = [
     navTitleEn: "Store Manager PDA Workbench"
   },
   {
-    match: "库存总览",
+    match: "今日执行台",
     section: "manager",
     order: 2,
+    icon: "今",
+    navTitle: "今日执行台",
+    navTitleEn: "Store Manager Daily Control"
+  },
+  {
+    match: "库存总览",
+    section: "manager",
+    order: 3,
     icon: "库",
     navTitle: "库存总览",
     navTitleEn: "Store Inventory Overview"
@@ -2267,7 +2276,7 @@ const STORE_PANEL_NAV_META = [
   {
     match: "货架位编辑",
     section: "manager",
-    order: 3,
+    order: 4,
     icon: "架",
     navTitle: "货架位编辑",
     navTitleEn: "Shelf Location Editor"
@@ -2523,6 +2532,7 @@ const storeCommandCenterState = {
   selected_clerk_by_sdo: {}
 };
 const STORE_MANAGER_PDA_TABS = [
+  { id: "daily", label: "今日执行", title: "今日执行台" },
   { id: "overview", label: "经营总览", title: "经营总览" },
   { id: "receiving", label: "收退货", title: "SDO 收退货" },
   { id: "logs", label: "经营日志", title: "经营日志" },
@@ -2658,6 +2668,14 @@ let activeStoreManagerPdaTab = "overview";
 let activeStoreManagerPdaReturnCode = "";
 let storeManagerPdaReturnSubmitted = false;
 let storeManagerPdaTaskState = null;
+let storeManagerDailyControlState = {
+  data: null,
+  date: "",
+  loading: false,
+  error: "",
+  notice: "",
+  selectedSuggestionTab: "hot"
+};
 const PDA_RUNTIME_POLL_INTERVAL_MS = 3e3;
 const CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS = 3e3;
 const CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS = 15e3;
@@ -3156,9 +3174,9 @@ function getCurrentStoreWorkerFallback() {
   return "";
 }
 function getCurrentWarehouseCodeFallback() {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   return String(
-    ((_a = currentSession.user) == null ? void 0 : _a.warehouse_code) || ((_b = document.querySelector("#sortingTaskForm [name='warehouse_code']")) == null ? void 0 : _b.value) || ((_c2 = document.querySelector("#sortingRackUpdateForm [name='warehouse_code']")) == null ? void 0 : _c2.value) || ((_d2 = document.querySelector("#apparelSortingRackForm [name='warehouse_code']")) == null ? void 0 : _d2.value) || "WH1"
+    ((_a = currentSession.user) == null ? void 0 : _a.warehouse_code) || ((_b = document.querySelector("#sortingTaskForm [name='warehouse_code']")) == null ? void 0 : _b.value) || ((_c = document.querySelector("#sortingRackUpdateForm [name='warehouse_code']")) == null ? void 0 : _c.value) || ((_d2 = document.querySelector("#apparelSortingRackForm [name='warehouse_code']")) == null ? void 0 : _d2.value) || "WH1"
   ).trim().toUpperCase();
 }
 function getAssignableUserRows() {
@@ -3464,7 +3482,7 @@ function isPdaRuntimeInputFocused() {
   return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement || Boolean((_a = active == null ? void 0 : active.closest) == null ? void 0 : _a.call(active, "[data-scan-input], [data-store-manager-pda-sdo-search-form]"));
 }
 function getPdaRuntimeScrollPageKey() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const roleCode = getNormalizedRoleCode(currentSession.user);
   if (roleCode === "store_manager") {
     const state = ensureStoreManagerPdaTaskState();
@@ -3481,7 +3499,7 @@ function getPdaRuntimeScrollPageKey() {
     return [
       roleCode,
       state.activePage || "tasks",
-      ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c2 = state.selectedSdp) == null ? void 0 : _c2.sdp_code) || ""
+      ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c = state.selectedSdp) == null ? void 0 : _c.sdp_code) || ""
     ].join("|");
   }
   return [roleCode, activeWorkspace, activePanelKey].join("|");
@@ -3749,7 +3767,7 @@ function getClerkBluetoothPrinterOnlineStatusValue(value = "") {
   return "unknown";
 }
 function normalizeClerkBluetoothPrinterStatus(raw = {}) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const status = getClerkBluetoothPrinterStatusObject(raw);
   const printers = Array.isArray(status.paired_printers) ? status.paired_printers : [];
   const discoveredPrinters = Array.isArray(status.discovered_printers) ? status.discovered_printers : [];
@@ -3762,7 +3780,7 @@ function normalizeClerkBluetoothPrinterStatus(raw = {}) {
     discovery_status: String(status.discovery_status || "idle").trim() || "idle",
     discovered_printer_count: Number((_b = (_a = status.discovered_printer_count) != null ? _a : discoveredPrinters.length) != null ? _b : 0),
     discovered_printers: normalizeClerkBluetoothPrinterRows(discoveredPrinters),
-    paired_printer_count: Number((_d2 = (_c2 = status.paired_printer_count) != null ? _c2 : printers.length) != null ? _d2 : 0),
+    paired_printer_count: Number((_d2 = (_c = status.paired_printer_count) != null ? _c : printers.length) != null ? _d2 : 0),
     paired_printers: normalizeClerkBluetoothPrinterRows(printers),
     selected_printer_name: selectedPrinterName,
     selected_printer_address: String(status.selected_printer_address || "").trim(),
@@ -5378,7 +5396,7 @@ function normalizeStoreManagerPdaPackage(row = {}) {
   return packageRow;
 }
 function normalizeStoreManagerPdaSdoTask(row = {}) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   if (!row || typeof row !== "object") {
     return null;
   }
@@ -5405,7 +5423,7 @@ function normalizeStoreManagerPdaSdoTask(row = {}) {
     display_code: displayCode || String(((_b = packages[0]) == null ? void 0 : _b.parent_sdo_display_code) || "").trim().toUpperCase(),
     machine_code: machineCode,
     store_code: storeCode,
-    dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(row) || ((_c2 = packages[0]) == null ? void 0 : _c2.dispatch_status) || "",
+    dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(row) || ((_c = packages[0]) == null ? void 0 : _c.dispatch_status) || "",
     source_code: uniqueSourceCodes.join(" / "),
     package_count: Number(row.package_count || packages.length || 0),
     total_item_count: Number(row.total_item_count || totalItemCount || 0),
@@ -5598,9 +5616,361 @@ function renderStoreManagerPdaSummaryCard(card = {}) {
     </article>
   `;
 }
+function getManagerDailyControlDefaultData(dateValue = getTodayInputValue()) {
+  return {
+    store_code: getCurrentStoreCodeFallback(),
+    date: dateValue,
+    tasks: {
+      pending_sdo: 0,
+      pending_assignment_packages: 0,
+      pending_putaway_items: 0,
+      unconfirmed_stock_in_items: 0,
+      active_holds: 0,
+      open_shifts: 0,
+      cash_variance_amount: 0
+    },
+    flow: {
+      received_items: 0,
+      assigned_items: 0,
+      putaway_items: 0,
+      sold_items: 0,
+      unprocessed_items: 0,
+      current_sellable_inventory: 0
+    },
+    hot_categories: [],
+    slow_categories: [],
+    cashier_risk: {
+      today_sales: 0,
+      orders: 0,
+      cash_amount: 0,
+      mpesa_amount: 0,
+      mixed_amount: 0,
+      open_shift_count: 0,
+      cash_variance_shift_count: 0,
+      active_hold_count: 0
+    },
+    market_feedback: [],
+    placeholder_fields: []
+  };
+}
+function getManagerDailyControlData() {
+  return storeManagerDailyControlState.data || getManagerDailyControlDefaultData(storeManagerDailyControlState.date || getTodayInputValue());
+}
+function formatManagerDailyControlNumber(value = 0) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0
+  }).format(Number(value || 0));
+}
+function formatManagerDailyControlMoney(value = 0) {
+  return `KSh ${formatCurrency(value)}`;
+}
+function getManagerDailyControlActionLabel(value = "") {
+  const action = String(value || "").trim();
+  const labels = {
+    replenish: "补货",
+    promotion: "促销",
+    change_display: "换陈列",
+    reduce_price: "降价",
+    return_to_warehouse: "退回仓库",
+    keep_observing: "继续观察"
+  };
+  return labels[action] || action || "-";
+}
+function getManagerMarketFeedbackTypeLabel(value = "") {
+  const type = String(value || "").trim();
+  const labels = {
+    customer_asked_many: "顾客问得多",
+    customer_said_expensive: "顾客嫌贵",
+    size_missing: "缺尺码",
+    color_missing: "缺颜色",
+    style_not_good: "款式不好",
+    quality_issue: "质量问题",
+    display_issue: "陈列问题",
+    weather_not_match: "天气不匹配",
+    competitor_better: "竞品更好",
+    other: "其他"
+  };
+  return labels[type] || type || "-";
+}
+function renderManagerDailyControlMetric({ label, value, tone = "neutral", money = false }) {
+  return `
+    <article class="store-manager-daily-card ${getStatusCardClass(tone)}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(money ? formatManagerDailyControlMoney(value) : formatManagerDailyControlNumber(value))}</strong>
+    </article>
+  `;
+}
+function renderManagerDailyCategoryRows(rows = [], emptyText = "当前没有达到建议阈值的品类。") {
+  if (!rows.length) {
+    return `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+  }
+  return `
+    <div class="store-manager-daily-table">
+      <div class="store-manager-daily-table-head">
+        <span>category</span>
+        <span>sold_qty</span>
+        <span>current_stock</span>
+        <span>signal</span>
+        <span>suggested_action</span>
+        <span>操作</span>
+      </div>
+      ${rows.map((row) => `
+        <article class="store-manager-daily-table-row">
+          <strong>${escapeHtml(row.category || "-")}</strong>
+          <span>${escapeHtml(formatManagerDailyControlNumber(row.sold_qty || 0))}</span>
+          <span>${escapeHtml(formatManagerDailyControlNumber(row.current_stock || 0))}</span>
+          <span>${renderStatusBadge(row.signal || "-", row.signal || "info")}</span>
+          <span>${escapeHtml(getManagerDailyControlActionLabel(row.suggested_action))}</span>
+          <button type="button" class="ghost-button mini-button" data-manager-feedback-category="${escapeHtml(row.category || "")}" data-manager-feedback-action="${escapeHtml(row.suggested_action || "")}">提交反馈</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+function renderManagerDailyFeedbackList(rows = []) {
+  if (!rows.length) {
+    return '<div class="empty-state">今日还没有市场反馈。</div>';
+  }
+  return `
+    <div class="candidate-list store-manager-daily-feedback-list">
+      ${rows.map((row) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(row.category || "-")}</strong>
+            <div class="subtle small">${escapeHtml(`${getManagerMarketFeedbackTypeLabel(row.feedback_type)} · ${getManagerDailyControlActionLabel(row.suggested_action)}`)}</div>
+            <div class="subtle small">${escapeHtml(row.note || "无备注")}</div>
+          </div>
+          <div class="candidate-side">
+            <span class="meta-pill">${escapeHtml(formatLocalDateTime(row.created_at) || row.created_at || "-")}</span>
+            <span class="meta-pill">${escapeHtml(row.created_by || "-")}</span>
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+function renderStoreManagerDailyControl(data = getManagerDailyControlData()) {
+  const sectionLabels = {
+    tasks: "今日任务",
+    pendingSdo: "待收货 SDO",
+    flow: "货物流转",
+    hot: "热卖 / 需补货",
+    slow: "滞销 / 需促销",
+    feedback: "市场反馈",
+    cashier: "收银风险摘要"
+  };
+  const tasks = data.tasks || {};
+  const flow = data.flow || {};
+  const cashierRisk = data.cashier_risk || {};
+  const placeholderFields = Array.isArray(data.placeholder_fields) ? data.placeholder_fields : [];
+  const flowNodes = [
+    ["到货 received", flow.received_items],
+    ["已分配 assigned", flow.assigned_items],
+    ["已上架 putaway", flow.putaway_items],
+    ["已售 sold", flow.sold_items],
+    ["未处理 unprocessed", flow.unprocessed_items]
+  ];
+  const taskCards = [
+    { label: sectionLabels.pendingSdo, value: tasks.pending_sdo, tone: Number(tasks.pending_sdo || 0) > 0 ? "warning" : "success" },
+    { label: "待分配包", value: tasks.pending_assignment_packages, tone: Number(tasks.pending_assignment_packages || 0) > 0 ? "warning" : "success" },
+    { label: "未确认入库商品", value: tasks.unconfirmed_stock_in_items, tone: Number(tasks.unconfirmed_stock_in_items || 0) > 0 ? "danger" : "success" },
+    { label: "未处理挂单", value: tasks.active_holds, tone: Number(tasks.active_holds || 0) > 0 ? "warning" : "success" },
+    { label: "未结班班次", value: tasks.open_shifts, tone: Number(tasks.open_shifts || 0) > 0 ? "info" : "neutral" },
+    { label: "现金差异", value: tasks.cash_variance_amount, tone: Number(tasks.cash_variance_amount || 0) !== 0 ? "danger" : "success", money: true }
+  ];
+  const cashierCards = [
+    { label: "今日销售额", value: cashierRisk.today_sales, tone: "success", money: true },
+    { label: "订单数", value: cashierRisk.orders, tone: "info" },
+    { label: "Cash", value: cashierRisk.cash_amount, tone: "neutral", money: true },
+    { label: "M-Pesa", value: cashierRisk.mpesa_amount, tone: "success", money: true },
+    { label: "Mixed", value: cashierRisk.mixed_amount, tone: "info", money: true },
+    { label: "open shifts", value: cashierRisk.open_shift_count, tone: Number(cashierRisk.open_shift_count || 0) > 0 ? "info" : "neutral" },
+    { label: "active holds", value: cashierRisk.active_hold_count, tone: Number(cashierRisk.active_hold_count || 0) > 0 ? "warning" : "success" },
+    { label: "cash variance shifts", value: cashierRisk.cash_variance_shift_count, tone: Number(cashierRisk.cash_variance_shift_count || 0) > 0 ? "danger" : "success" }
+  ];
+  return `
+    <section class="store-manager-daily-hero">
+      <div>
+        <span class="eyebrow">Store Manager Daily Control</span>
+        <h3>${escapeHtml(data.store_code || getCurrentStoreCodeFallback())} · ${escapeHtml(data.date || getTodayInputValue())}</h3>
+        <p>店长每日执行台聚合门店任务、货物流转、品类信号、市场反馈和收银风险，不进入收银员 POS 主屏。</p>
+      </div>
+      <button type="button" class="ghost-button" data-manager-daily-refresh="true">刷新</button>
+    </section>
+    ${storeManagerDailyControlState.notice ? `<div class="success-banner">${escapeHtml(storeManagerDailyControlState.notice)}</div>` : ""}
+    ${storeManagerDailyControlState.error ? `<div class="alert-banner">${escapeHtml(storeManagerDailyControlState.error)}</div>` : ""}
+    ${placeholderFields.length ? `<div class="subtle small">当前字段按现有数据可用范围计算：${escapeHtml(placeholderFields.join(", "))}</div>` : ""}
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.tasks}</h3>
+        <span>今日必须处理</span>
+      </div>
+      <div class="store-manager-daily-task-grid">
+        ${taskCards.map((card) => renderManagerDailyControlMetric(card)).join("")}
+      </div>
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.flow}</h3>
+        <span>received → assigned → putaway → sold</span>
+      </div>
+      <div class="store-manager-daily-flow">
+        ${flowNodes.map(([label, value]) => `
+          <article class="store-manager-daily-flow-node">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(formatManagerDailyControlNumber(value || 0))}</strong>
+          </article>
+        `).join("")}
+      </div>
+      <div class="store-manager-daily-inventory-note">
+        当前可售库存：<strong>${escapeHtml(formatManagerDailyControlNumber(flow.current_sellable_inventory || 0))}</strong>
+      </div>
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.hot}</h3>
+        <span>卖得快且库存低</span>
+      </div>
+      ${renderManagerDailyCategoryRows(data.hot_categories || [], "当前没有达到补货建议阈值的品类。")}
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.slow}</h3>
+        <span>库存高且动销慢</span>
+      </div>
+      ${renderManagerDailyCategoryRows(data.slow_categories || [], "当前没有达到促销建议阈值的品类。")}
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.feedback}</h3>
+        <span>一线市场信号</span>
+      </div>
+      ${renderManagerDailyFeedbackList(data.market_feedback || [])}
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.cashier}</h3>
+        <span>只做摘要，不复制收银台</span>
+      </div>
+      <div class="store-manager-daily-risk-grid">
+        ${cashierCards.map((card) => renderManagerDailyControlMetric(card)).join("")}
+      </div>
+    </section>
+  `;
+}
+function renderStoreManagerDailyControlRoot() {
+  var _a, _b;
+  const root = document.querySelector("#storeManagerDailyControlRoot");
+  const summary = document.querySelector("#storeManagerDailyControlSummary");
+  const dateInput = document.querySelector("#storeManagerDailyControlForm [name='date']");
+  if (dateInput instanceof HTMLInputElement && !dateInput.value) {
+    dateInput.value = storeManagerDailyControlState.date || getTodayInputValue();
+  }
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  if (storeManagerDailyControlState.loading) {
+    root.innerHTML = '<div class="empty-state">正在读取店长今日执行数据...</div>';
+  } else {
+    root.innerHTML = renderStoreManagerDailyControl();
+  }
+  if (summary instanceof HTMLElement) {
+    const data = getManagerDailyControlData();
+    summary.className = "candidate-summary";
+    summary.innerHTML = `
+      <div class="report-summary-grid compact-metrics">
+        <article class="store-metric"><strong>门店</strong><span>${escapeHtml(data.store_code || getCurrentStoreCodeFallback())}</span></article>
+        <article class="store-metric"><strong>日期</strong><span>${escapeHtml(data.date || getTodayInputValue())}</span></article>
+        <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatManagerDailyControlMoney(((_a = data.cashier_risk) == null ? void 0 : _a.today_sales) || 0))}</span></article>
+        <article class="store-metric"><strong>未处理挂单</strong><span>${escapeHtml(formatManagerDailyControlNumber(((_b = data.tasks) == null ? void 0 : _b.active_holds) || 0))}</span></article>
+      </div>
+    `;
+  }
+}
+async function loadStoreManagerDailyControl(dateValue = "") {
+  var _a;
+  const storeCode = getCurrentStoreCodeFallback();
+  const normalizedDate = String(dateValue || ((_a = document.querySelector("#storeManagerDailyControlForm [name='date']")) == null ? void 0 : _a.value) || storeManagerDailyControlState.date || getTodayInputValue()).trim() || getTodayInputValue();
+  dateValue = normalizedDate;
+  storeManagerDailyControlState = {
+    ...storeManagerDailyControlState,
+    date: dateValue,
+    loading: true,
+    error: "",
+    notice: ""
+  };
+  renderStoreManagerDailyControlRoot();
+  try {
+    const result = await request(`/stores/${encodeURIComponent(storeCode)}/manager-daily-control?date=${encodeURIComponent(dateValue)}`);
+    storeManagerDailyControlState = {
+      ...storeManagerDailyControlState,
+      data: result,
+      date: result.date || dateValue,
+      loading: false,
+      error: ""
+    };
+    renderStoreManagerDailyControlRoot();
+    renderStoreManagerPdaPreviewPreservingScroll();
+    return result;
+  } catch (error) {
+    storeManagerDailyControlState = {
+      ...storeManagerDailyControlState,
+      loading: false,
+      error: formatErrorMessage(error)
+    };
+    renderStoreManagerDailyControlRoot();
+    renderStoreManagerPdaPreviewPreservingScroll();
+    throw error;
+  }
+}
+async function submitStoreManagerDailyControlRefresh(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const dateValue = String(form.get("date") || getTodayInputValue()).trim() || getTodayInputValue();
+  const result = await loadStoreManagerDailyControl(dateValue);
+  writeOutput("#storeManagerDailyControlOutput", result);
+}
+async function submitStoreManagerMarketFeedback(event) {
+  var _a;
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const storeCode = getCurrentStoreCodeFallback();
+  const dateValue = String(((_a = document.querySelector("#storeManagerDailyControlForm [name='date']")) == null ? void 0 : _a.value) || storeManagerDailyControlState.date || getTodayInputValue()).trim() || getTodayInputValue();
+  const payload = {
+    category: String(form.get("category") || "").trim(),
+    feedback_type: String(form.get("feedback_type") || "other").trim(),
+    suggested_action: String(form.get("suggested_action") || "keep_observing").trim(),
+    note: String(form.get("note") || "").trim()
+  };
+  if (!payload.category) {
+    throw new Error("请选择反馈品类。");
+  }
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/manager-market-feedback`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+  storeManagerDailyControlState.notice = `已提交市场反馈：${result.feedback_id || payload.category}`;
+  event.currentTarget.reset();
+  await loadStoreManagerDailyControl(dateValue);
+  storeManagerDailyControlState.notice = `已提交市场反馈：${result.feedback_id || payload.category}`;
+  renderStoreManagerDailyControlRoot();
+  writeOutput("#storeManagerDailyControlOutput", result);
+  return result;
+}
 function renderStoreManagerPdaOverview() {
   const data = STORE_MANAGER_PDA_MOCK;
   return `
+    <section class="store-manager-pda-card store-manager-pda-daily-entry">
+      <div class="store-manager-pda-card-head">
+        <div>
+          <strong>今日执行台</strong>
+          <span>查看今日任务、货物流转、热卖补货、滞销促销、市场反馈</span>
+        </div>
+        ${renderStatusBadge("Today", "info")}
+      </div>
+      <button type="button" class="store-manager-pda-primary-action" data-store-manager-pda-tab="daily">进入今日执行台</button>
+    </section>
+
     <section class="store-manager-pda-metrics">
       ${data.summaryCards.map((card) => renderStoreManagerPdaSummaryCard(card)).join("")}
     </section>
@@ -6053,8 +6423,116 @@ function renderStoreManagerPdaTaskFlow(state = ensureStoreManagerPdaTaskState())
   }
   return renderStoreManagerPdaTaskList(state);
 }
+function renderStoreManagerPdaDailyControl(state = ensureStoreManagerPdaTaskState()) {
+  const data = getManagerDailyControlData();
+  const tasks = data.tasks || {};
+  const flow = data.flow || {};
+  const hotRows = Array.isArray(data.hot_categories) ? data.hot_categories : [];
+  const slowRows = Array.isArray(data.slow_categories) ? data.slow_categories : [];
+  const selectedTab = storeManagerDailyControlState.selectedSuggestionTab === "slow" ? "slow" : "hot";
+  const actionRows = selectedTab === "slow" ? slowRows : hotRows;
+  const taskCards = [
+    ["待收货 SDO", tasks.pending_sdo, "warning"],
+    ["待分配", tasks.pending_assignment_packages, "warning"],
+    ["未确认入库", tasks.unconfirmed_stock_in_items, "danger"],
+    ["未处理挂单", tasks.active_holds, "warning"],
+    ["未结班", tasks.open_shifts, "info"],
+    ["现金差异", tasks.cash_variance_amount, Number(tasks.cash_variance_amount || 0) !== 0 ? "danger" : "success", true]
+  ];
+  const flowRows = [
+    ["到货", flow.received_items],
+    ["已分配", flow.assigned_items],
+    ["已上架", flow.putaway_items],
+    ["已售", flow.sold_items],
+    ["未处理", flow.unprocessed_items]
+  ];
+  const quickCategories = selectedTab === "slow" ? ["Jackets", "Kids", "外套", "童装"] : ["Men Shoes", "Ladies Dresses", "女裙", "T-Shirts"];
+  return `
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <div>
+          <strong>今日必须处理</strong>
+          <span>${escapeHtml(data.store_code || getCurrentStoreCodeFallback())} · ${escapeHtml(data.date || getTodayInputValue())}</span>
+        </div>
+        <button type="button" class="store-manager-pda-secondary-action compact-action" data-manager-daily-refresh="true">刷新</button>
+      </div>
+      ${storeManagerDailyControlState.error ? `<div class="alert-banner">${escapeHtml(storeManagerDailyControlState.error)}</div>` : ""}
+      ${storeManagerDailyControlState.notice ? `<div class="store-manager-pda-push-note">${escapeHtml(storeManagerDailyControlState.notice)}</div>` : ""}
+    </section>
+
+    <section class="store-manager-pda-daily-grid">
+      ${taskCards.map(([label, value, tone, money]) => `
+        <article class="store-manager-pda-daily-card ${getStatusCardClass(tone)}">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(money ? formatManagerDailyControlMoney(value) : formatManagerDailyControlNumber(value))}</strong>
+        </article>
+      `).join("")}
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>货物流转</strong>
+        <span>现场简版</span>
+      </div>
+      <div class="store-manager-pda-daily-flow">
+        ${flowRows.map(([label, value]) => `
+          <article>
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(formatManagerDailyControlNumber(value || 0))}</strong>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>动作建议</strong>
+        <span>${selectedTab === "slow" ? "要促销" : "要补货"}</span>
+      </div>
+      <div class="store-manager-pda-action-tabs" role="group" aria-label="动作建议">
+        <button type="button" class="${selectedTab === "hot" ? "is-active" : ""}" data-manager-daily-suggestion-tab="hot">要补货</button>
+        <button type="button" class="${selectedTab === "slow" ? "is-active" : ""}" data-manager-daily-suggestion-tab="slow">要促销</button>
+      </div>
+      <div class="store-manager-pda-list">
+        ${actionRows.length ? actionRows.map((row) => `
+          <article class="store-manager-pda-row">
+            <div>
+              <strong>${escapeHtml(row.category || "-")}</strong>
+              <span>卖 ${escapeHtml(formatManagerDailyControlNumber(row.sold_qty || 0))} · 库存 ${escapeHtml(formatManagerDailyControlNumber(row.current_stock || 0))}</span>
+            </div>
+            <b>${escapeHtml(getManagerDailyControlActionLabel(row.suggested_action))}</b>
+          </article>
+        `).join("") : '<div class="empty-state">当前没有达到动作建议阈值的品类。</div>'}
+      </div>
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>快速反馈</strong>
+        <span>店长现场市场信号</span>
+      </div>
+      <form id="storeManagerPdaDailyFeedbackForm" class="store-manager-pda-daily-feedback-form">
+        <input type="hidden" name="feedback_type" value="${selectedTab === "slow" ? "customer_said_expensive" : "customer_asked_many"}" />
+        <input type="hidden" name="suggested_action" value="${selectedTab === "slow" ? "promotion" : "replenish"}" />
+        <div class="store-manager-pda-chip-group" role="group" aria-label="品类">
+          ${quickCategories.map((category, index) => `
+            <label>
+              <input type="radio" name="category" value="${escapeHtml(category)}" ${index === 0 ? "checked" : ""} />
+              <span>${escapeHtml(category)}</span>
+            </label>
+          `).join("")}
+        </div>
+        <textarea name="note" rows="2" placeholder="备注：例如顾客问大码，或觉得价格偏高"></textarea>
+        <button type="submit" class="store-manager-pda-primary-action">提交反馈</button>
+      </form>
+    </section>
+  `;
+}
 function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState()) {
   const activeTab = String(state.activeTab || "receiving");
+  if (activeTab === "daily") {
+    return renderStoreManagerPdaDailyControl(state);
+  }
   if (activeTab === "receiving") {
     return renderStoreManagerPdaTaskFlow(state);
   }
@@ -6068,6 +6546,7 @@ function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState
 }
 function getStoreManagerPdaRuntimeTitle(state = ensureStoreManagerPdaTaskState()) {
   const activeTab = String(state.activeTab || "receiving");
+  if (activeTab === "daily") return "今日执行台";
   if (activeTab === "overview") return "经营总览";
   if (activeTab === "logs") return "经营日志";
   if (activeTab === "other") return "其他";
@@ -6134,7 +6613,7 @@ function renderStoreManagerPdaPreview(tabId = "") {
   }
   const activeTab = getStoreManagerPdaTab(tabId);
   activeStoreManagerPdaTab = activeTab.id;
-  const bodyHtml = activeTab.id === "receiving" ? renderStoreManagerPdaReceiving() : activeTab.id === "logs" ? renderStoreManagerPdaLogs() : activeTab.id === "other" ? renderStoreManagerPdaOther() : renderStoreManagerPdaOverview();
+  const bodyHtml = activeTab.id === "receiving" ? renderStoreManagerPdaReceiving() : activeTab.id === "daily" ? renderStoreManagerPdaDailyControl(ensureStoreManagerPdaTaskState()) : activeTab.id === "logs" ? renderStoreManagerPdaLogs() : activeTab.id === "other" ? renderStoreManagerPdaOther() : renderStoreManagerPdaOverview();
   target.innerHTML = `
     <div class="store-manager-pda-shell" data-pda-runtime-surface="store-manager">
       <div class="store-manager-pda-device-bar">
@@ -6257,9 +6736,15 @@ async function handleStoreManagerPdaTaskAction(button) {
   try {
     if (button.dataset.storeManagerPdaTab) {
       state.activeTab = button.dataset.storeManagerPdaTab;
+      activeStoreManagerPdaTab = state.activeTab;
       state.notice = "";
       if (button.dataset.storeManagerPdaTab === "receiving") {
         shouldRefreshAfterAction = true;
+      }
+      if (button.dataset.storeManagerPdaTab === "daily") {
+        await loadStoreManagerDailyControl(storeManagerDailyControlState.date || getTodayInputValue()).catch((error) => {
+          state.notice = formatErrorMessage(error);
+        });
       }
     }
     if (button.dataset.storeManagerPdaPage) {
@@ -6282,6 +6767,12 @@ async function handleStoreManagerPdaTaskAction(button) {
       state.loading = false;
       state.loadError = "";
       await loadStoreManagerPdaBackendState({ force: true });
+    }
+    if (button.dataset.managerDailyRefresh) {
+      await loadStoreManagerDailyControl(storeManagerDailyControlState.date || getTodayInputValue());
+    }
+    if (button.dataset.managerDailySuggestionTab) {
+      storeManagerDailyControlState.selectedSuggestionTab = button.dataset.managerDailySuggestionTab === "slow" ? "slow" : "hot";
     }
     if (button.dataset.storeManagerPdaReceivePackage) {
       state.activeTab = "receiving";
@@ -6446,10 +6937,10 @@ function applyHashRoute() {
   return true;
 }
 function ensureWorkspaceVisibleForElement(target) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const panel = (_a = target == null ? void 0 : target.closest) == null ? void 0 : _a.call(target, "[data-workspace-panel]");
   const workspace = (_b = panel == null ? void 0 : panel.dataset) == null ? void 0 : _b.workspacePanel;
-  const panelKey = (_c2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _c2.panelKey;
+  const panelKey = (_c = panel == null ? void 0 : panel.dataset) == null ? void 0 : _c.panelKey;
   if (workspace) {
     if (workspace !== activeWorkspace) {
       setActiveWorkspace(workspace);
@@ -6485,12 +6976,12 @@ function getPanelsForWorkspace(workspace) {
   return workspacePanelsList.filter((panel) => panel.dataset.workspacePanel === workspace);
 }
 function getWorkspacePanelNavMeta(panel) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const workspace = ((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.workspacePanel) || "";
   const title = String(((_b = panel == null ? void 0 : panel.dataset) == null ? void 0 : _b.panelTitle) || "");
   const metaList = WORKSPACE_PANEL_NAV_META_MAP[workspace];
   if (metaList == null ? void 0 : metaList.length) {
-    const firstSectionId = ((_c2 = getWorkspaceNavSections(workspace)[0]) == null ? void 0 : _c2.id) || "default";
+    const firstSectionId = ((_c = getWorkspaceNavSections(workspace)[0]) == null ? void 0 : _c.id) || "default";
     return metaList.find((item) => title.startsWith(item.match)) || {
       section: firstSectionId,
       order: 999,
@@ -6730,6 +7221,10 @@ function setActivePanel(panelKey, options = {}) {
       workspaceHint.textContent = getWorkspaceHintText(activeWorkspace);
     }
   }
+  const cashierSalesPanelKey = getPanelKeyByTitle("store", "9. 收银销售");
+  if (cashierSalesPanelKey && panelKey === cashierSalesPanelKey && activePanelKey && activePanelKey !== panelKey) {
+    cashierTerminalReturnPanelKey = activePanelKey;
+  }
   activePanelKey = panelKey;
   localStorage.setItem(`retail_ops_active_panel_${activeWorkspace}`, activePanelKey);
   ensureWorkspaceSectionVisibleForPanel(targetPanel);
@@ -6769,6 +7264,10 @@ function setActivePanel(panelKey, options = {}) {
   }
   if ((currentSession == null ? void 0 : currentSession.token) && panelKey === getPanelKeyByTitle("warehouse", "Bales销售｜真实出库")) {
     loadBaleSalesOutboundWorkbench().catch(() => {
+    });
+  }
+  if ((currentSession == null ? void 0 : currentSession.token) && panelKey === getPanelKeyByTitle("store", "今日执行台")) {
+    loadStoreManagerDailyControl().catch(() => {
     });
   }
   if ((currentSession == null ? void 0 : currentSession.token) && [
@@ -7413,7 +7912,7 @@ const JSON_BUILDERS = {
       };
     }),
     fromOutputValue: (value) => Array.isArray(value) ? value.map((sale) => {
-      var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2;
+      var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2;
       return {
         client_sale_id: sale.client_sale_id || "",
         order_no: sale.order_no || "",
@@ -7421,7 +7920,7 @@ const JSON_BUILDERS = {
         cashier_name: sale.cashier_name || "",
         shift_no: sale.shift_no || "",
         power_mode: sale.power_mode || "offline",
-        barcode: ((_c2 = (_b = sale.items) == null ? void 0 : _b[0]) == null ? void 0 : _c2.barcode) || "",
+        barcode: ((_c = (_b = sale.items) == null ? void 0 : _b[0]) == null ? void 0 : _c.barcode) || "",
         qty: Number(((_e2 = (_d2 = sale.items) == null ? void 0 : _d2[0]) == null ? void 0 : _e2.qty) || 1),
         selling_price: Number(((_g2 = (_f2 = sale.items) == null ? void 0 : _f2[0]) == null ? void 0 : _g2.selling_price) || 0),
         override_reason: ((_i2 = (_h2 = sale.items) == null ? void 0 : _h2[0]) == null ? void 0 : _i2.override_reason) || "",
@@ -7670,7 +8169,7 @@ function humanizeFieldLabel(fieldName) {
   return ERROR_FIELD_LABELS[fieldName] || fieldName.replace(/_/g, " ");
 }
 function formatValidationDetail(detail) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   if (!detail || typeof detail !== "object") {
     return "";
   }
@@ -7690,7 +8189,7 @@ function formatValidationDetail(detail) {
     case "greater_than_equal":
       return `${label}不能小于 ${(_b = (_a = detail.ctx) == null ? void 0 : _a.ge) != null ? _b : 0}。`;
     case "less_than_equal":
-      return `${label}不能大于 ${(_d2 = (_c2 = detail.ctx) == null ? void 0 : _c2.le) != null ? _d2 : 0}。`;
+      return `${label}不能大于 ${(_d2 = (_c = detail.ctx) == null ? void 0 : _c.le) != null ? _d2 : 0}。`;
     case "literal_error":
       return `请选择有效的${label}。`;
     default:
@@ -9802,9 +10301,9 @@ function syncChinaSourceContainerRowsFromDom() {
     return [];
   }
   const rows = [...container.querySelectorAll("[data-china-source-row-index]")].map((rowNode) => {
-    var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2, _z2, _A2;
+    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2, _z2, _A2;
     return {
-      package_code: ((_c2 = (_b = (_a = rowNode.querySelector("[data-china-source-field='package_code']")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim) == null ? void 0 : _c2.call(_b)) || "",
+      package_code: ((_c = (_b = (_a = rowNode.querySelector("[data-china-source-field='package_code']")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim) == null ? void 0 : _c.call(_b)) || "",
       supplier_name: ((_f2 = (_e2 = (_d2 = rowNode.querySelector("[data-china-source-field='supplier_name']")) == null ? void 0 : _d2.value) == null ? void 0 : _e2.trim) == null ? void 0 : _f2.call(_e2)) || "",
       supplier_name_zh: ((_i2 = (_h2 = (_g2 = rowNode.querySelector("[data-china-source-field='supplier_name_zh']")) == null ? void 0 : _g2.value) == null ? void 0 : _h2.trim) == null ? void 0 : _i2.call(_h2)) || "",
       category_main: ((_l2 = (_k2 = (_j2 = rowNode.querySelector("[data-china-source-field='category_main']")) == null ? void 0 : _j2.value) == null ? void 0 : _k2.trim) == null ? void 0 : _l2.call(_k2)) || "",
@@ -9926,7 +10425,7 @@ function renderChinaSourceContainerRows() {
   ).join("");
 }
 function applySupplierSelectionToChinaSourceRows(supplierName) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   syncChinaSourceContainerRowsFromDom();
   const targetRow = chinaSourceContainerRowState.find((row) => !row.supplier_name || row.supplier_name === "__new__");
   if (targetRow) {
@@ -9945,7 +10444,7 @@ function applySupplierSelectionToChinaSourceRows(supplierName) {
     chinaSourceContainerRowState[chinaSourceContainerRowState.length - 1].category_sub_zh = "";
   }
   renderChinaSourceContainerRows();
-  (_c2 = document.querySelector("#chinaSourceSupplierInline")) == null ? void 0 : _c2.classList.add("hidden-screen");
+  (_c = document.querySelector("#chinaSourceSupplierInline")) == null ? void 0 : _c.classList.add("hidden-screen");
   renderChinaSourceBalePreview();
 }
 function toggleChinaSourceCategoryInlineEditor(selectElement) {
@@ -10552,7 +11051,7 @@ function renderDirectHangUnpackSummary(record = null) {
   `;
 }
 function hydrateChinaSourceCostForm(record) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2;
   if (!record) {
     return;
   }
@@ -10560,7 +11059,7 @@ function hydrateChinaSourceCostForm(record) {
   setInputValue("#chinaSourceCostForm [name='source_pool_token']", record.source_pool_token || "");
   setInputValue("#chinaSourceCostForm [name='head_transport_amount']", ((_a = costEntries.head_transport) == null ? void 0 : _a.amount) || "");
   setInputValue("#chinaSourceCostForm [name='head_transport_currency']", ((_b = costEntries.head_transport) == null ? void 0 : _b.currency) || "CNY");
-  setInputValue("#chinaSourceCostForm [name='head_transport_payment_method']", ((_c2 = costEntries.head_transport) == null ? void 0 : _c2.payment_method) || "");
+  setInputValue("#chinaSourceCostForm [name='head_transport_payment_method']", ((_c = costEntries.head_transport) == null ? void 0 : _c.payment_method) || "");
   setInputValue("#chinaSourceCostForm [name='head_transport_payer']", ((_d2 = costEntries.head_transport) == null ? void 0 : _d2.payer) || "");
   setInputValue("#chinaSourceCostForm [name='head_transport_reference']", ((_e2 = costEntries.head_transport) == null ? void 0 : _e2.payment_reference) || "");
   setInputValue("#chinaSourceCostForm [name='customs_clearance_amount']", ((_f2 = costEntries.customs_clearance) == null ? void 0 : _f2.amount) || "");
@@ -11071,7 +11570,7 @@ function renderIdentityLedgerLocationRows(rows = []) {
   `;
 }
 function renderItemIdentityLedgerSummary(result) {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const target = document.querySelector("#itemIdentityLedgerSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -11095,7 +11594,7 @@ function renderItemIdentityLedgerSummary(result) {
       <article class="store-metric"><strong>身份证 ID</strong><span>${escapeHtml(result.identity_no || "-")}</span></article>
       <article class="store-metric"><strong>当前状态</strong><span>${escapeHtml(((_a = result.location) == null ? void 0 : _a.current_stage) || "-")}</span></article>
       <article class="store-metric"><strong>当前门店</strong><span>${escapeHtml(result.store_code || ((_b = result.location) == null ? void 0 : _b.latest_location_code) || "待分配")}</span></article>
-      <article class="store-metric"><strong>当前货架位</strong><span>${escapeHtml(result.store_rack_code || ((_c2 = result.location) == null ? void 0 : _c2.latest_rack_code) || "待上架")}</span></article>
+      <article class="store-metric"><strong>当前货架位</strong><span>${escapeHtml(result.store_rack_code || ((_c = result.location) == null ? void 0 : _c.latest_rack_code) || "待上架")}</span></article>
       <article class="store-metric"><strong>成本价</strong><span>${escapeHtml(formatKesAmount(result.unit_cost_kes, "待分摊"))}</span></article>
       <article class="store-metric"><strong>当前售价</strong><span>${escapeHtml(formatKesAmount(result.selling_price_kes || result.suggested_price_kes, "待定价"))}</span></article>
       <article class="store-metric"><strong>来源供应商</strong><span>${escapeHtml((result.supplier_names || []).join(" / ") || "-")}</span></article>
@@ -12055,8 +12554,8 @@ function normalizeShipmentNo(value = "") {
   return String(value || "").trim();
 }
 function resolveCurrentInboundShipmentNo(preferredShipmentNo = "") {
-  var _a, _b, _c2, _d2, _e2, _f2;
-  return normalizeShipmentNo(preferredShipmentNo) || normalizeShipmentNo(currentInboundShipmentNo) || normalizeShipmentNo((_a = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a.value) || normalizeShipmentNo((_b = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _b.value) || normalizeShipmentNo((_c2 = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _c2.value) || normalizeShipmentNo((_d2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _d2.value) || normalizeShipmentNo((_e2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _e2.value) || normalizeShipmentNo((_f2 = inboundShipmentState[0]) == null ? void 0 : _f2.shipment_no);
+  var _a, _b, _c, _d2, _e2, _f2;
+  return normalizeShipmentNo(preferredShipmentNo) || normalizeShipmentNo(currentInboundShipmentNo) || normalizeShipmentNo((_a = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a.value) || normalizeShipmentNo((_b = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _b.value) || normalizeShipmentNo((_c = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _c.value) || normalizeShipmentNo((_d2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _d2.value) || normalizeShipmentNo((_e2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _e2.value) || normalizeShipmentNo((_f2 = inboundShipmentState[0]) == null ? void 0 : _f2.shipment_no);
 }
 function getInboundFlowSteps(shipmentNo = "") {
   const normalizedShipmentNo = normalizeShipmentNo(shipmentNo);
@@ -12093,12 +12592,12 @@ function getInboundFlowSteps(shipmentNo = "") {
   ];
 }
 function getInboundPanelStepKey(target) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const directStep = String(((_a = target == null ? void 0 : target.dataset) == null ? void 0 : _a.inboundStep) || "").trim();
   if (directStep) {
     return directStep;
   }
-  const panelTitle = String(((_c2 = (_b = target == null ? void 0 : target.closest("[data-workspace-panel]")) == null ? void 0 : _b.querySelector(".panel-head h2")) == null ? void 0 : _c2.textContent) || "").trim();
+  const panelTitle = String(((_c = (_b = target == null ? void 0 : target.closest("[data-workspace-panel]")) == null ? void 0 : _b.querySelector(".panel-head h2")) == null ? void 0 : _c.textContent) || "").trim();
   if (panelTitle === "0. 运输 / 关单主档") {
     return "create";
   }
@@ -12196,8 +12695,8 @@ function renderInboundFlowContext(preferredShipmentNo = "") {
   const steps = getInboundFlowSteps(normalizedShipmentNo);
   const nextHint = bales.length ? printedCount === bales.length ? "这张船单的条码已全部打印，可以直接去建分拣任务。" : "这张船单已经出条码了，建议直接继续看条码和打印。" : String((shipment == null ? void 0 : shipment.intake_status) || "").trim().toLowerCase() === "confirmed" ? "包裹总确认已经完成，现在直接生成 bale barcode。" : recorded.totalPackages > 0 ? "当前重点是做总确认，然后一包一码生成 bale barcode。" : "当前重点是继续录包裹，不要切散到别的辅助页面。";
   targets.forEach((target) => {
-    var _a, _b, _c2;
-    const currentStepKey = getInboundPanelStepKey(target) || ((_a = steps.find((step) => step.status === "active")) == null ? void 0 : _a.key) || ((_b = [...steps].reverse().find((step) => step.status === "completed")) == null ? void 0 : _b.key) || ((_c2 = steps[0]) == null ? void 0 : _c2.key) || "create";
+    var _a, _b, _c;
+    const currentStepKey = getInboundPanelStepKey(target) || ((_a = steps.find((step) => step.status === "active")) == null ? void 0 : _a.key) || ((_b = [...steps].reverse().find((step) => step.status === "completed")) == null ? void 0 : _b.key) || ((_c = steps[0]) == null ? void 0 : _c.key) || "create";
     const currentStep = steps.find((step) => step.key === currentStepKey) || steps.find((step) => step.status === "active") || [...steps].reverse().find((step) => step.status === "completed") || steps[0];
     const stepsHtml = steps.map(
       (step, index) => `
@@ -12345,13 +12844,13 @@ function openInboundFlowStep(step = "", shipmentNo = "") {
   }
 }
 function populateInboundShipmentSelects(shipments, selectedValue = "") {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const rows = Array.isArray(shipments) ? shipments : [];
   const preferredShipmentNo = resolveCurrentInboundShipmentNo(selectedValue);
   document.querySelectorAll("select[data-shipment-select]").forEach((select) => {
-    var _a2, _b2, _c3, _d2;
+    var _a2, _b2, _c2, _d2;
     const parentForm = select.closest("form");
-    const intakeType = ((_b2 = (_a2 = parentForm == null ? void 0 : parentForm.querySelector("[name='intake_type']")) == null ? void 0 : _a2.value) == null ? void 0 : _b2.trim()) || ((_d2 = (_c3 = parentForm == null ? void 0 : parentForm.querySelector("[name='shipment_type']")) == null ? void 0 : _c3.value) == null ? void 0 : _d2.trim()) || "";
+    const intakeType = ((_b2 = (_a2 = parentForm == null ? void 0 : parentForm.querySelector("[name='intake_type']")) == null ? void 0 : _a2.value) == null ? void 0 : _b2.trim()) || ((_d2 = (_c2 = parentForm == null ? void 0 : parentForm.querySelector("[name='shipment_type']")) == null ? void 0 : _c2.value) == null ? void 0 : _d2.trim()) || "";
     const filteredRows = intakeType ? rows.filter((row) => String(row.shipment_type || "").trim() === intakeType) : rows;
     const preferredValue = preferredShipmentNo || select.value || "";
     const options = ['<option value="">请选择入库主档</option>'].concat(
@@ -12368,7 +12867,7 @@ function populateInboundShipmentSelects(shipments, selectedValue = "") {
     }
   });
   applySortingShipmentSelectState(preferredShipmentNo);
-  const confirmShipmentNo = normalizeShipmentNo((_a = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _a.value) || normalizeShipmentNo((_b = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _b.value) || preferredShipmentNo || normalizeShipmentNo((_c2 = rows[0]) == null ? void 0 : _c2.shipment_no);
+  const confirmShipmentNo = normalizeShipmentNo((_a = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _a.value) || normalizeShipmentNo((_b = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _b.value) || preferredShipmentNo || normalizeShipmentNo((_c = rows[0]) == null ? void 0 : _c.shipment_no);
   if (confirmShipmentNo) {
     currentInboundShipmentNo = confirmShipmentNo;
     syncInboundShipmentFormValues(confirmShipmentNo);
@@ -13062,14 +13561,14 @@ function getSortingSellableWeightKg(totalSourceWeightKg = 0, lossRecord = null) 
   return Math.max(0, roundToTwo(Number(totalSourceWeightKg || 0) - Number(normalizedLoss.loss_weight_kg || 0)));
 }
 function getSortingLossRecordFromDom() {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const form = document.querySelector("#sortingResultForm");
   if (!(form instanceof HTMLFormElement)) {
     return getNormalizedSortingLossRecord();
   }
   const lossQty = ((_a = form.querySelector("[name='loss_qty']")) == null ? void 0 : _a.value) || 0;
   const lossWeightKg = ((_b = form.querySelector("[name='loss_weight_kg']")) == null ? void 0 : _b.value) || 0;
-  const lossNote = ((_c2 = form.querySelector("[name='loss_note']")) == null ? void 0 : _c2.value) || "";
+  const lossNote = ((_c = form.querySelector("[name='loss_note']")) == null ? void 0 : _c.value) || "";
   const hasLossInput = Number(lossQty || 0) > 0 || Number(lossWeightKg || 0) > 0 || String(lossNote || "").trim().length > 0 || sortingLossPhotoState.length > 0;
   return getNormalizedSortingLossRecord({
     has_loss: String(((_d2 = form.querySelector("[name='has_loss_record']")) == null ? void 0 : _d2.value) || "").trim() === "true" || hasLossInput,
@@ -13111,10 +13610,10 @@ function hydrateSortingLossRecord(record = null) {
   renderSortingLossRecordSummary(normalized);
 }
 async function buildSortingLossRecordPayload(form) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const lossQty = ((_a = form.querySelector("[name='loss_qty']")) == null ? void 0 : _a.value) || 0;
   const lossWeightKg = ((_b = form.querySelector("[name='loss_weight_kg']")) == null ? void 0 : _b.value) || 0;
-  const lossNote = ((_c2 = form.querySelector("[name='loss_note']")) == null ? void 0 : _c2.value) || "";
+  const lossNote = ((_c = form.querySelector("[name='loss_note']")) == null ? void 0 : _c.value) || "";
   const hasLoss = String(((_d2 = form.querySelector("[name='has_loss_record']")) == null ? void 0 : _d2.value) || "").trim() === "true" || Number(lossQty || 0) > 0 || Number(lossWeightKg || 0) > 0 || String(lossNote || "").trim().length > 0 || sortingLossPhotoState.length > 0;
   if (!hasLoss) {
     sortingLossPhotoState = [];
@@ -13557,12 +14056,12 @@ function syncManualReplenishmentContextFromForm() {
   });
 }
 function getManualReplenishmentFormMeta() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   syncManualReplenishmentContextToForm();
   return {
     fromWarehouseCode: String(((_a = getManualReplenishmentFormInput("from_warehouse_code")) == null ? void 0 : _a.value) || "WH1").trim() || "WH1",
     toStoreCode: String(((_b = getManualReplenishmentFormInput("to_store_code")) == null ? void 0 : _b.value) || "UTAWALA").trim() || "UTAWALA",
-    requiredArrivalDate: String(((_c2 = getManualReplenishmentFormInput("required_arrival_date")) == null ? void 0 : _c2.value) || "2026-05-03").trim() || "2026-05-03"
+    requiredArrivalDate: String(((_c = getManualReplenishmentFormInput("required_arrival_date")) == null ? void 0 : _c.value) || "2026-05-03").trim() || "2026-05-03"
   };
 }
 function renderManualReplenishmentContext(statusLabel = "草稿") {
@@ -13713,10 +14212,10 @@ function formatLoosePickSheetPackingLinesForTask(task = {}) {
     return [];
   }
   return task.lines.map((line) => {
-    var _a, _b, _c2, _d2, _e2, _f2, _g2;
+    var _a, _b, _c, _d2, _e2, _f2, _g2;
     const categoryMain = String((line == null ? void 0 : line.categoryMain) || "").trim();
     const categorySub = String((line == null ? void 0 : line.categorySub) || "").trim();
-    const qty = Number((_c2 = (_b = (_a = line == null ? void 0 : line.pickedQty) != null ? _a : line == null ? void 0 : line.picked_qty) != null ? _b : line == null ? void 0 : line.qty) != null ? _c2 : 0);
+    const qty = Number((_c = (_b = (_a = line == null ? void 0 : line.pickedQty) != null ? _a : line == null ? void 0 : line.picked_qty) != null ? _b : line == null ? void 0 : line.qty) != null ? _c : 0);
     const requestedQty = Math.max(qty, Number((_e2 = (_d2 = line == null ? void 0 : line.requestedQty) != null ? _d2 : line == null ? void 0 : line.requested_qty) != null ? _e2 : qty));
     const shortageQty = Math.max(0, Number((_g2 = (_f2 = line == null ? void 0 : line.shortageQty) != null ? _f2 : line == null ? void 0 : line.shortage_qty) != null ? _g2 : 0));
     if (!categoryMain && !categorySub && qty <= 0) {
@@ -13726,8 +14225,8 @@ function formatLoosePickSheetPackingLinesForTask(task = {}) {
   }).filter(Boolean);
 }
 function getLoosePickLineStatusLabel(line = {}) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2;
-  const requestedQty = Math.max(0, Number((_c2 = (_b = (_a = line.requestedQty) != null ? _a : line.requested_qty) != null ? _b : line.qty) != null ? _c2 : 0));
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2;
+  const requestedQty = Math.max(0, Number((_c = (_b = (_a = line.requestedQty) != null ? _a : line.requested_qty) != null ? _b : line.qty) != null ? _c : 0));
   const pickedQty = Math.max(0, Number((_f2 = (_e2 = (_d2 = line.pickedQty) != null ? _d2 : line.picked_qty) != null ? _e2 : line.qty) != null ? _f2 : 0));
   const shortageQty = Math.max(0, Number((_h2 = (_g2 = line.shortageQty) != null ? _g2 : line.shortage_qty) != null ? _h2 : 0));
   if (String(line.statusLabel || "").trim()) {
@@ -13748,8 +14247,8 @@ function getLoosePickLineStatusLabel(line = {}) {
   return "待处理";
 }
 function getLoosePickTaskPickedQty(task = {}) {
-  var _a, _b, _c2, _d2;
-  return Number((_d2 = (_c2 = (_b = (_a = task.pickedQty) != null ? _a : task.picked_qty) != null ? _b : task.totalQty) != null ? _c2 : task.qty) != null ? _d2 : 0);
+  var _a, _b, _c, _d2;
+  return Number((_d2 = (_c = (_b = (_a = task.pickedQty) != null ? _a : task.picked_qty) != null ? _b : task.totalQty) != null ? _c : task.qty) != null ? _d2 : 0);
 }
 function getLoosePickTaskShortageQty(task = {}) {
   var _a, _b;
@@ -13920,7 +14419,7 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
   rowIndex = 0,
   totalRows = 0
 } = {}) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const sourceBales = Array.isArray(row.source_bales) ? row.source_bales.filter(Boolean) : [];
   const packageIndex = Math.max(1, Number(row.package_index || row.packageIndex || rowIndex + 1) || 1);
   const packageCount = Math.max(packageIndex, Number(row.package_total || row.package_count || row.packageCount || totalRows || 1) || 1);
@@ -13930,7 +14429,7 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
     row.parent_sdo_display_code || row.parent_sdo_order_no || (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || ((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.official_delivery_barcode) || (transfer == null ? void 0 : transfer.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
   ).trim().toUpperCase();
   const parentSdoMachineCode = String(
-    row.parent_sdo_machine_code || ((_c2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _c2.machine_code) || (transfer == null ? void 0 : transfer.machine_code) || ""
+    row.parent_sdo_machine_code || ((_c = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _c.machine_code) || (transfer == null ? void 0 : transfer.machine_code) || ""
   ).replace(/[^0-9]/g, "").trim();
   const displayCode = String(
     isSdoPackage ? row.display_code || row.package_id || row.sdo_package_code || "" : row.store_delivery_execution_order_no || row.execution_order_no || row.official_delivery_barcode || row.display_code || ""
@@ -14010,7 +14509,7 @@ function buildSDOPrintJobs({
   transfer = {},
   displayRows = []
 } = {}) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2;
   const packageRows = Array.isArray((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.packages) && transfer.store_delivery_execution_order.packages.length ? transfer.store_delivery_execution_order.packages : Array.isArray(displayRows) ? displayRows : [];
   const sourceDisplayRows = Array.isArray(displayRows) ? displayRows : [];
   const rows = packageRows;
@@ -14019,7 +14518,7 @@ function buildSDOPrintJobs({
   }
   const templateCode = getTransferDispatchTemplateCode();
   const sdoDisplayCode = String(
-    (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.execution_order_no) || ((_c2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _c2.official_delivery_barcode) || (transfer == null ? void 0 : transfer.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
+    (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.execution_order_no) || ((_c = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _c.official_delivery_barcode) || (transfer == null ? void 0 : transfer.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
   ).trim().toUpperCase();
   const sdoMachineCodeFromTransfer = String(
     (transfer == null ? void 0 : transfer.machine_code) || ((_d2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _d2.machine_code) || ((_f2 = (_e2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _e2.print_payload) == null ? void 0 : _f2.machine_code) || ((_h2 = (_g2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _g2.print_payload) == null ? void 0 : _h2.barcode_value) || ""
@@ -14150,10 +14649,10 @@ function openTransferDispatchPrintTemplateModal({
   transfer = {},
   displayRows = []
 } = {}) {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const rows = Array.isArray(displayRows) ? displayRows : [];
   const jobs = buildSDOPrintJobs({ transferNo, transfer, displayRows: rows });
-  const sdoDisplayCode = String(((_b = (_a = jobs[0]) == null ? void 0 : _a.print_payload) == null ? void 0 : _b.parent_sdo_display_code) || ((_d2 = (_c2 = jobs[0]) == null ? void 0 : _c2.print_payload) == null ? void 0 : _d2.store_delivery_execution_order_no) || "").trim().toUpperCase();
+  const sdoDisplayCode = String(((_b = (_a = jobs[0]) == null ? void 0 : _a.print_payload) == null ? void 0 : _b.parent_sdo_display_code) || ((_d2 = (_c = jobs[0]) == null ? void 0 : _c.print_payload) == null ? void 0 : _d2.store_delivery_execution_order_no) || "").trim().toUpperCase();
   const templateCode = getTransferDispatchTemplateCode();
   balePrinterConsoleNotice = {
     type: "success",
@@ -14211,7 +14710,7 @@ function buildLoosePackingTasksForTransfer(transferNo = "", plan = null, { packa
   return [];
 }
 function getTransferExecutionRecord(transferNo = "", { create = false, plan = null } = {}) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
   if (!normalizedTransferNo) {
     return {
@@ -14245,7 +14744,7 @@ function getTransferExecutionRecord(transferNo = "", { create = false, plan = nu
     nextRecord.looseTasks = buildLoosePackingTasksForTransfer(normalizedTransferNo, effectivePlan, {
       packageLimitQty: nextRecord.packageLimitQty
     });
-    if (wasCompleted && typeof operationsFulfillmentFlow.updateLoosePackingTaskStatus === "function" && ((_c2 = nextRecord.looseTasks[0]) == null ? void 0 : _c2.taskNo)) {
+    if (wasCompleted && typeof operationsFulfillmentFlow.updateLoosePackingTaskStatus === "function" && ((_c = nextRecord.looseTasks[0]) == null ? void 0 : _c.taskNo)) {
       nextRecord.looseTasks = operationsFulfillmentFlow.updateLoosePackingTaskStatus({
         tasks: nextRecord.looseTasks,
         taskNo: nextRecord.looseTasks[0].taskNo,
@@ -14383,7 +14882,7 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
   `;
 }
 function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparationNo) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2;
   const summaryTarget = document.querySelector("#loosePackingTaskPlanSummary");
   const listTarget = document.querySelector("#loosePackingTaskList");
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
@@ -14402,7 +14901,7 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
   const tasks = Array.isArray(executionRecord.looseTasks) ? executionRecord.looseTasks : [];
   const readiness = summarizeTransferExecutionState(transfer.transfer_no, plan);
   const packageLimitQty = ((_a = tasks[0]) == null ? void 0 : _a.packageLimitQty) || getLoosePackingPackageLimitQty(executionRecord.packageLimitQty);
-  const plannedPackageCount = ((_b = tasks[0]) == null ? void 0 : _b.plannedPackageCount) || (((_c2 = plan.summary) == null ? void 0 : _c2.looseQtyToPick) ? Math.max(1, Math.ceil(Number(plan.summary.looseQtyToPick || 0) / packageLimitQty)) : 0);
+  const plannedPackageCount = ((_b = tasks[0]) == null ? void 0 : _b.plannedPackageCount) || (((_c = plan.summary) == null ? void 0 : _c.looseQtyToPick) ? Math.max(1, Math.ceil(Number(plan.summary.looseQtyToPick || 0) / packageLimitQty)) : 0);
   const unresolvedShortageQty = Number(readiness.unresolvedShortageQty || ((_d2 = plan.summary) == null ? void 0 : _d2.shortageQty) || 0);
   const looseTaskStatusLabel = unresolvedShortageQty > 0 ? "库存不足" : readiness.pendingLooseTaskCount ? "待完成" : "已完成";
   summaryTarget.className = "report-summary";
@@ -14499,8 +14998,8 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
                 </thead>
                 <tbody>
                   ${taskLines.map((line) => {
-      var _a2, _b2, _c3, _d3, _e3, _f3, _g3;
-      const pickedQty = Number((_c3 = (_b2 = (_a2 = line.pickedQty) != null ? _a2 : line.picked_qty) != null ? _b2 : line.qty) != null ? _c3 : 0);
+      var _a2, _b2, _c2, _d3, _e3, _f3, _g3;
+      const pickedQty = Number((_c2 = (_b2 = (_a2 = line.pickedQty) != null ? _a2 : line.picked_qty) != null ? _b2 : line.qty) != null ? _c2 : 0);
       const requestedQty = Number((_e3 = (_d3 = line.requestedQty) != null ? _d3 : line.requested_qty) != null ? _e3 : pickedQty);
       const shortageQty = Number((_g3 = (_f3 = line.shortageQty) != null ? _f3 : line.shortage_qty) != null ? _g3 : 0);
       const sourceLabel = Array.isArray(line.rackCodes) && line.rackCodes.length ? line.rackCodes.join("、") : line.baleLabel || "待定位库位";
@@ -14575,7 +15074,7 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
   `;
 }
 function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparationNo) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const summaryTarget = document.querySelector("#transferWorkbenchSummary");
   const preparedProgressTarget = document.querySelector("#transferPreparedBaleProgressSummary");
   const preparedTarget = document.querySelector("#transferPreparedBaleQueue");
@@ -14758,7 +15257,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>最终送店 bale</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", `${dispatchRows.length || 0} 个`)}</span></article>
       <article class="store-metric"><strong>现成包裹直转</strong><span>${renderBarcodeEntityBadge("SDB", `${summary.selectedPreparedBaleCount || 0} 个`)}</span></article>
       <article class="store-metric"><strong>补差拣货单</strong><span>${renderBarcodeEntityBadge("LPK", `${looseDispatchRows.length || 0} 张`)}</span></article>
-      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(((_c2 = normalized.dispatch_bales) == null ? void 0 : _c2.length) || 0, ((_d2 = normalized.dispatch_bales) == null ? void 0 : _d2.length) ? "success" : "warning")}</span></article>
+      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(((_c = normalized.dispatch_bales) == null ? void 0 : _c.length) || 0, ((_d2 = normalized.dispatch_bales) == null ? void 0 : _d2.length) ? "success" : "warning")}</span></article>
     </div>
     ${renderStatusBlock(verificationHint, verificationPending ? "warning" : "success")}
     <div class="candidate-list transfer-draft-list">
@@ -15270,10 +15769,10 @@ function productImportCategorySubOptionsHtml(mainCategory = "", selectedValue = 
 }
 function syncProductImportRowsFromDom() {
   const rows = [...document.querySelectorAll("#productImportRowsBuilder [data-product-import-row]")].map((rowNode, index) => {
-    var _a, _b, _c2;
+    var _a, _b, _c;
     const supplierName = String(((_a = rowNode.querySelector("[data-product-import-field='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
     const categoryMain = String(((_b = rowNode.querySelector("[data-product-import-field='category_main']")) == null ? void 0 : _b.value) || "").trim();
-    const categorySub = String(((_c2 = rowNode.querySelector("[data-product-import-field='category_sub']")) == null ? void 0 : _c2.value) || "").trim();
+    const categorySub = String(((_c = rowNode.querySelector("[data-product-import-field='category_sub']")) == null ? void 0 : _c.value) || "").trim();
     const issues = [];
     if (!supplierName) issues.push("缺少供应商");
     if (!categoryMain) issues.push("缺少商品大类");
@@ -15614,7 +16113,7 @@ function renderParcelBatchStepSummary(shipmentNo = "", overrideMessage = "") {
   `;
 }
 function renderParcelBatchResultSummary(kind, data) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const target = document.querySelector("#parcelBatchResultSummary");
   if (!target) {
     return;
@@ -15635,7 +16134,7 @@ function renderParcelBatchResultSummary(kind, data) {
         <article class="store-metric"><strong>批次数量</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>待分拣</strong><span>${pendingCount}</span></article>
         <article class="store-metric"><strong>示例批次</strong><span>${escapeHtml(((_b = rows[0]) == null ? void 0 : _b.batch_no) || "-")}</span></article>
-        <article class="store-metric"><strong>关联主档</strong><span>${escapeHtml(((_c2 = rows[0]) == null ? void 0 : _c2.inbound_shipment_no) || "-")}</span></article>
+        <article class="store-metric"><strong>关联主档</strong><span>${escapeHtml(((_c = rows[0]) == null ? void 0 : _c.inbound_shipment_no) || "-")}</span></article>
         <article class="store-metric"><strong>主档状态</strong><span>${escapeHtml(getShipmentWorkflowStatus(latestShipment))}</span></article>
       </div>
       <div class="subtle small">包裹录完以后，直接进入总确认，不需要在这一步再分流到别的辅助页。</div>
@@ -16608,7 +17107,7 @@ function updateInlineSaleCompressionEstimate(form) {
   summaryTarget.textContent = estimate.targetQty ? `预估 ${estimate.targetQty} 件 · ${estimate.gradeRequirements.map((row) => `${row.grade} ${row.qty} 件`).join(" / ")}` : "先补 4.7/4.8 关联的小类标准克重，再生成待售卖 bale。";
 }
 function updateInlineStoreDispatchCompressionRatio(form) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   if (!(form instanceof HTMLFormElement) || !form.matches("[data-store-dispatch-ratio-form]")) {
     return;
   }
@@ -16619,7 +17118,7 @@ function updateInlineStoreDispatchCompressionRatio(form) {
   const estimate = buildStoreDispatchCompressionGradeRequirements({
     piecesPerBale: Number(((_a = form.querySelector("[name='pieces_per_bale']")) == null ? void 0 : _a.value) || 0),
     baleCount: Number(((_b = form.querySelector("[name='bale_count']")) == null ? void 0 : _b.value) || 1),
-    ratioLabel: String(((_c2 = form.querySelector("[name='store_dispatch_ratio_label']")) == null ? void 0 : _c2.value) || "").trim()
+    ratioLabel: String(((_c = form.querySelector("[name='store_dispatch_ratio_label']")) == null ? void 0 : _c.value) || "").trim()
   });
   const pTotal = Number((estimate.totalRequirements.find((row) => row.grade === "P") || {}).qty || 0);
   const sTotal = Number((estimate.totalRequirements.find((row) => row.grade === "S") || {}).qty || 0);
@@ -19089,7 +19588,7 @@ function renderStoreReceivingPackageDetail(rowOrCode = "", context = {}) {
   `;
 }
 function renderStoreReceiptTransferPackageList(transferNo = "", rows = null) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const target = document.querySelector("#storeDispatchBaleSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -19119,7 +19618,7 @@ function renderStoreReceiptTransferPackageList(transferNo = "", rows = null) {
       <article class="store-metric"><strong>SDO 显示码</strong><span>${renderBarcodeEntityBadge("SDO", normalizedSdoCode)}</span></article>
       <article class="store-metric"><strong>SDO 机报码</strong><span>${renderBarcodeEntityBadge("SDO", ((_a = packageRows[0]) == null ? void 0 : _a.parent_sdo_machine_code) || "-")}</span></article>
       <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(((_b = packageRows[0]) == null ? void 0 : _b.transfer_no) || "-")}</span></article>
-      <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(((_c2 = packageRows[0]) == null ? void 0 : _c2.store_code) || getCurrentStoreCodeFallback() || "-")}</span></article>
+      <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(((_c = packageRows[0]) == null ? void 0 : _c.store_code) || getCurrentStoreCodeFallback() || "-")}</span></article>
       <article class="store-metric"><strong>SDP 包数</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", packageRows.length)}</span></article>
       <article class="store-metric"><strong>已收货</strong><span>${renderStatusBadge(receivedCount, receivedCount ? "success" : "warning")}</span></article>
       <article class="store-metric"><strong>已分配</strong><span>${renderStatusBadge(assignedCount, assignedCount ? "success" : "neutral")}</span></article>
@@ -19771,9 +20270,9 @@ function buildStoreDispatchBaleQuery(payload = {}) {
   return params.toString();
 }
 function getCurrentStoreCodeFallback() {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   return String(
-    ((_a = currentSession.user) == null ? void 0 : _a.store_code) || ((_b = document.querySelector("#storeDispatchBaleForm [name='store_code']")) == null ? void 0 : _b.value) || ((_c2 = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _c2.value) || ((_d2 = document.querySelector("#startReceivingSessionForm [name='store_code']")) == null ? void 0 : _d2.value) || "UTAWALA"
+    ((_a = currentSession.user) == null ? void 0 : _a.store_code) || ((_b = document.querySelector("#storeDispatchBaleForm [name='store_code']")) == null ? void 0 : _b.value) || ((_c = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _c.value) || ((_d2 = document.querySelector("#startReceivingSessionForm [name='store_code']")) == null ? void 0 : _d2.value) || "UTAWALA"
   ).trim().toUpperCase();
 }
 function populateStoreFlowFormsFromContext(context = {}) {
@@ -20562,7 +21061,7 @@ function validateLocalAgentLabelPayload(labelPayload = {}, { templateCode = "" }
   return "";
 }
 function buildLocalAgentLabelPayload(job, directPayload = {}) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
   const payload = (job == null ? void 0 : job.print_payload) || {};
   const machineCode = [
     payload.barcode_value,
@@ -20588,7 +21087,7 @@ function buildLocalAgentLabelPayload(job, directPayload = {}) {
     parent_sdo_display_code: String(directPayload.parent_sdo_display_code || payload.parent_sdo_display_code || "").trim().toUpperCase(),
     parent_sdo_machine_code: String(directPayload.parent_sdo_machine_code || payload.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim(),
     store_code: String(directPayload.store_code || payload.store_code || payload.store_name || "").trim().toUpperCase(),
-    package_no: (_c2 = (_b = (_a = directPayload.package_no) != null ? _a : payload.package_no) != null ? _b : payload.serial_no) != null ? _c2 : "",
+    package_no: (_c = (_b = (_a = directPayload.package_no) != null ? _a : payload.package_no) != null ? _b : payload.serial_no) != null ? _c : "",
     package_total: (_g2 = (_f2 = (_e2 = (_d2 = directPayload.package_total) != null ? _d2 : payload.package_total) != null ? _e2 : payload.total_packages) != null ? _f2 : payload.package_count) != null ? _g2 : "",
     source_type: String(directPayload.source_type || payload.source_type || "").trim().toUpperCase(),
     source_code: String(directPayload.source_code || payload.source_code || "").trim().toUpperCase(),
@@ -20598,7 +21097,7 @@ function buildLocalAgentLabelPayload(job, directPayload = {}) {
   };
 }
 async function printCurrentBaleModalViaLocalAgent() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   const currentIndex = Number(balePrintModalState.currentIndex || 0);
   const currentJob = jobs[currentIndex] || null;
@@ -20613,7 +21112,7 @@ async function printCurrentBaleModalViaLocalAgent() {
     currentIndex,
     totalJobs: jobs.length
   });
-  const selectedTemplateCode = String(((_c2 = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c2.value) || getActiveBaleTemplateCode()).trim() || getActiveBaleTemplateCode();
+  const selectedTemplateCode = String(((_c = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c.value) || getActiveBaleTemplateCode()).trim() || getActiveBaleTemplateCode();
   const selectedTemplate = getSelectedBaleTemplate(selectedTemplateCode, getActiveBaleTemplateScope(), getActiveBaleModalTaskType());
   const templateSize = `${Number(selectedTemplate.width_mm || 60)}x${Number(selectedTemplate.height_mm || 40)}`;
   const labelPayload = {
@@ -20719,7 +21218,7 @@ async function printAllBaleModalPrimaryAction() {
   renderBalePrintModal();
 }
 function renderBalePrintModal() {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2;
   if (!(balePrintModal instanceof HTMLElement)) {
     return;
   }
@@ -20785,7 +21284,7 @@ function renderBalePrintModal() {
     return `<option value="${escapeHtml(name)}" ${normalizePrinterName(name) === normalizePrinterName(selectedPrinterName) ? "selected" : ""}>${escapeHtml(name.replace(/_/g, " "))}</option>`;
   }).join("");
   const currentPackageLabel = String(
-    ((_c2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c2.package_position_label) || ((_d2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d2.package_position) || `第 ${((_e2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _e2.serial_no) || currentIndex + 1} 包 / 共 ${((_f2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _f2.total_packages) || jobs.length || 1} 包`
+    ((_c = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c.package_position_label) || ((_d2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d2.package_position) || `第 ${((_e2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _e2.serial_no) || currentIndex + 1} 包 / 共 ${((_f2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _f2.total_packages) || jobs.length || 1} 包`
   ).trim();
   const displayParts = currentJob ? deriveBaleLabelDisplayParts(
     currentJob.barcode || ((_g2 = currentJob.print_payload) == null ? void 0 : _g2.barcode_value) || "",
@@ -20873,10 +21372,10 @@ function renderBalePrintModal() {
             <article class="candidate-row ${index === currentIndex ? "selected-bale-row" : ""}">
               <div class="selected-bale-body">
                 ${(() => {
-      var _a2, _b2, _c3, _d3, _e3;
+      var _a2, _b2, _c2, _d3, _e3;
       const queueLabel = String(((_a2 = job.print_payload) == null ? void 0 : _a2.package_position_label) || ((_b2 = job.print_payload) == null ? void 0 : _b2.package_position) || `第 ${index + 1} 包 / 共 ${jobs.length} 包`).trim();
       const queueParts = deriveBaleLabelDisplayParts(
-        job.barcode || ((_c3 = job.print_payload) == null ? void 0 : _c3.barcode_value) || "",
+        job.barcode || ((_c2 = job.print_payload) == null ? void 0 : _c2.barcode_value) || "",
         ((_d3 = job.print_payload) == null ? void 0 : _d3.supplier_name) || balePrintModalState.supplierName || "",
         ((_e3 = job.print_payload) == null ? void 0 : _e3.category_display) || balePrintModalState.categoryDisplay || job.product_name || "",
         queueLabel
@@ -20966,7 +21465,7 @@ function renderBalePrintModal() {
   renderBaleLocalPrintAgentStatus();
 }
 async function getBaleModalPrintContext() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const printerName = String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim();
   if (!printerName) {
     throw new Error("请先选择打印机。");
@@ -20977,7 +21476,7 @@ async function getBaleModalPrintContext() {
   setInputValue("#balePrinterConsoleForm [name='printer_name']", printerName);
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
-  const templateCode = String(((_c2 = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c2.value) || getActiveBaleTemplateCode()).trim();
+  const templateCode = String(((_c = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c.value) || getActiveBaleTemplateCode()).trim();
   if (templateCode) {
     setInputValue("#balePrinterConsoleForm [name='template_code']", templateCode);
   }
@@ -20994,14 +21493,14 @@ async function getBaleModalPrintContext() {
   };
 }
 function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = {}) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
   const helper = balePrintFlow && typeof balePrintFlow.buildBaleDirectPrintPayload === "function" ? balePrintFlow.buildBaleDirectPrintPayload : null;
   if (helper && templateScope === "bale") {
     return helper(job, {
       printerName: String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim(),
-      templateCode: String(((_c2 = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c2.value) || getPreferredBaleTemplateCode()).trim() || getPreferredBaleTemplateCode(),
+      templateCode: String(((_c = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c.value) || getPreferredBaleTemplateCode()).trim() || getPreferredBaleTemplateCode(),
       supplierName: balePrintModalState.supplierName,
       categoryDisplay: balePrintModalState.categoryDisplay,
       currentIndex,
@@ -21111,7 +21610,7 @@ async function directPrintCurrentBaleModalJob() {
   });
 }
 async function sendCurrentBaleModalJobToPrintStation() {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   const currentIndex = Number(balePrintModalState.currentIndex || 0);
   const currentJob = jobs[currentIndex] || null;
@@ -21125,7 +21624,7 @@ async function sendCurrentBaleModalJobToPrintStation() {
     shipmentNo: balePrintModalState.shipmentNo
   }) : {
     code: String(
-      ((_a = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _a.machine_code) || ((_b = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _b.barcode_value) || ((_c2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c2.scan_token) || (currentJob == null ? void 0 : currentJob.barcode) || ""
+      ((_a = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _a.machine_code) || ((_b = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _b.barcode_value) || ((_c = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c.scan_token) || (currentJob == null ? void 0 : currentJob.barcode) || ""
     ).replace(/[^0-9]/g, "").trim(),
     supplier: String(((_d2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d2.supplier_name) || balePrintModalState.supplierName || "").trim(),
     category: String(((_e2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _e2.category_main) || "").trim(),
@@ -21286,9 +21785,9 @@ function openBalePrintModal(state = {}) {
   renderBalePrintModal();
 }
 function getBaleModalJobReference(job = {}) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   return String(
-    ((_a = job == null ? void 0 : job.print_payload) == null ? void 0 : _a.bale_barcode) || ((_b = job == null ? void 0 : job.print_payload) == null ? void 0 : _b.display_code) || ((_c2 = job == null ? void 0 : job.print_payload) == null ? void 0 : _c2.legacy_bale_barcode) || (job == null ? void 0 : job.barcode) || ""
+    ((_a = job == null ? void 0 : job.print_payload) == null ? void 0 : _a.bale_barcode) || ((_b = job == null ? void 0 : job.print_payload) == null ? void 0 : _b.display_code) || ((_c = job == null ? void 0 : job.print_payload) == null ? void 0 : _c.legacy_bale_barcode) || (job == null ? void 0 : job.barcode) || ""
   ).trim().toUpperCase();
 }
 async function handleConnectBalePrinter() {
@@ -21617,7 +22116,7 @@ function renderRecommendationCandidates() {
     return;
   }
   target.innerHTML = recommendationCandidatesState.map((item) => {
-    var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2;
+    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2;
     const recommendationKey = getRecommendationRowKey(item);
     const selected = selectedRecommendationKeys.has(recommendationKey);
     const categoryLabel = [item.category_main, item.category_sub].filter(Boolean).join(" / ") || "未命名类目";
@@ -21629,7 +22128,7 @@ function renderRecommendationCandidates() {
               <div class="candidate-qty">建议 ${escapeHtml((_b = (_a = item.requested_qty) != null ? _a : item.suggested_qty) != null ? _b : 0)} 件</div>
             </div>
             <div class="meta-row">
-              <span class="meta-pill">14 天销量: ${escapeHtml((_c2 = item.recent_14d_sales_qty) != null ? _c2 : 0)}</span>
+              <span class="meta-pill">14 天销量: ${escapeHtml((_c = item.recent_14d_sales_qty) != null ? _c : 0)}</span>
               <span class="meta-pill">门店现货: ${escapeHtml((_d2 = item.current_store_qty) != null ? _d2 : 0)}</span>
               <span class="meta-pill">待上架: ${escapeHtml((_e2 = item.pending_shelving_qty) != null ? _e2 : 0)}</span>
               <span class="meta-pill">在途: ${escapeHtml((_f2 = item.in_transit_qty) != null ? _f2 : 0)}</span>
@@ -21713,13 +22212,13 @@ function renderTransferResultSummary(result) {
         </thead>
         <tbody>
           ${detailRows.map((row) => {
-    var _a2, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+    var _a2, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
     return `
             <tr>
               <td>${escapeHtml(row.categoryMain || row.category_main || "-")}</td>
               <td>${escapeHtml(row.categorySub || row.category_sub || "-")}</td>
               <td>${escapeHtml((_b = (_a2 = row.requestedQty) != null ? _a2 : row.requested_qty) != null ? _b : 0)}</td>
-              <td>${escapeHtml((_d2 = (_c2 = row.availableQty) != null ? _c2 : row.available_qty) != null ? _d2 : 0)}</td>
+              <td>${escapeHtml((_d2 = (_c = row.availableQty) != null ? _c : row.available_qty) != null ? _d2 : 0)}</td>
               <td>${escapeHtml((_f2 = (_e2 = row.pickableQty) != null ? _e2 : row.pickable_qty) != null ? _f2 : 0)}</td>
               <td>${escapeHtml((_h2 = (_g2 = row.shortageQty) != null ? _g2 : row.shortage_qty) != null ? _h2 : 0)}</td>
               <td><span class="meta-pill">${escapeHtml(row.suggestedAction || row.stockBadgeLabel || (Number((_j2 = (_i2 = row.shortageQty) != null ? _i2 : row.shortage_qty) != null ? _j2 : 0) > 0 ? "部分拣货" : "可全拣"))}</span></td>
@@ -21735,7 +22234,7 @@ function renderTransferResultSummary(result) {
   `;
 }
 function renderTransferActionResultSummary(result) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const target = document.querySelector("#transferActionResultSummary");
   if (!target) {
     return;
@@ -21760,7 +22259,7 @@ function renderTransferActionResultSummary(result) {
         <article class="store-metric"><strong>调拨单打印任务</strong><span>#${escapeHtml(result.transfer_print_job.id)}</span></article>
         <article class="store-metric"><strong>标签任务数</strong><span>${escapeHtml((result.label_print_jobs || []).length)}</span></article>
         <article class="store-metric"><strong>标签总份数</strong><span>${escapeHtml(result.total_label_copies || 0)}</span></article>
-        <article class="store-metric"><strong>送店来源入口</strong><span>${escapeHtml((_d2 = (_c2 = result.display_generated_bale_count) != null ? _c2 : storeDispatchRows.length) != null ? _d2 : 0)}</span></article>
+        <article class="store-metric"><strong>送店来源入口</strong><span>${escapeHtml((_d2 = (_c = result.display_generated_bale_count) != null ? _c : storeDispatchRows.length) != null ? _d2 : 0)}</span></article>
         <article class="store-metric"><strong>后台生成 bale</strong><span>${escapeHtml(result.generated_bale_count || 0)}</span></article>
         <article class="store-metric"><strong>汇总规则</strong><span>${escapeHtml(storeDispatchRows.length ? groupingLabel : "-")}</span></article>
         <article class="store-metric"><strong>正式送货执行单号</strong><span>${escapeHtml(result.store_delivery_execution_order_no || "-")}</span></article>
@@ -21950,7 +22449,7 @@ function getShipmentBatchProgressLabel(row = {}) {
   return chooseI18nLabel("待发车", "Pending Dispatch");
 }
 function renderTransferTrackingResultSummary(result) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const target = document.querySelector("#transferTrackingResultSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -21967,7 +22466,7 @@ function renderTransferTrackingResultSummary(result) {
   const storeCodes = Array.from(new Set(orders.map((row) => String(row.to_store_code || row.store_code || "").trim().toUpperCase()).filter(Boolean)));
   const driverName = String(result.driver_name || ((_a = orders[0]) == null ? void 0 : _a.driver_name) || "Driver A").trim() || "Driver A";
   const driverPhone = String(result.driver_phone || ((_b = orders[0]) == null ? void 0 : _b.driver_phone) || "").trim();
-  const vehicleNo = String(result.vehicle_no || ((_c2 = orders[0]) == null ? void 0 : _c2.vehicle_no) || "KDM-001A").trim().toUpperCase() || "KDM-001A";
+  const vehicleNo = String(result.vehicle_no || ((_c = orders[0]) == null ? void 0 : _c.vehicle_no) || "KDM-001A").trim().toUpperCase() || "KDM-001A";
   target.className = `store-delivery-task-card ${getStatusCardClass(batchLabel)}`;
   target.innerHTML = `
     <div class="store-delivery-card-main">
@@ -22140,9 +22639,9 @@ function getSelectedTransferShipmentNos(form = document.querySelector("#transfer
   return Array.from(new Set(getTransferShipmentSelectValues(form)));
 }
 function getStoreDeliverySdoMachineCode(row = {}) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   return String(
-    (row == null ? void 0 : row.sdo_machine_code) || ((_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.machine_code) || (row == null ? void 0 : row.machine_code) || ((_c2 = (_b = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _b.print_payload) == null ? void 0 : _c2.barcode_value) || ""
+    (row == null ? void 0 : row.sdo_machine_code) || ((_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.machine_code) || (row == null ? void 0 : row.machine_code) || ((_c = (_b = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _b.print_payload) == null ? void 0 : _c.barcode_value) || ""
   ).trim().toUpperCase();
 }
 function getStoreDeliverySdoDisplayCode(row = {}) {
@@ -22563,11 +23062,11 @@ function renderPickingWaveTaskSummary() {
   const hasRequests = requestNos.length > 0;
   const transfers = requestNos.map((requestNo) => getTransferPreparationOrder(requestNo)).filter(Boolean);
   const totals = transfers.reduce((acc, transfer) => {
-    var _a, _b, _c2;
+    var _a, _b, _c;
     const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer));
     acc.totalQty += Number(((_a = plan.summary) == null ? void 0 : _a.totalRequestedQty) || getTransferRequestedQtyForDisplay(transfer) || 0);
     acc.categoryCount += Number(plan.demandLineCount || ((_b = plan.categoryCards) == null ? void 0 : _b.length) || 0);
-    acc.shortageQty += Number(((_c2 = plan.summary) == null ? void 0 : _c2.shortageQty) || 0);
+    acc.shortageQty += Number(((_c = plan.summary) == null ? void 0 : _c.shortageQty) || 0);
     return acc;
   }, {
     totalQty: 0,
@@ -22615,9 +23114,9 @@ function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
     <div class="subtle small">${escapeHtml(currentLanguage === "en" ? `${waveNo} / ${((wave == null ? void 0 : wave.stores_included) || []).length} stores / ${Number((wave == null ? void 0 : wave.total_requested_qty) || 0)} items` : `${waveNo} / ${((wave == null ? void 0 : wave.stores_included) || []).length} 个门店 / ${Number((wave == null ? void 0 : wave.total_requested_qty) || 0)} 件`)}</div>
     <div class="candidate-list transfer-draft-list">
       ${rows.map((row) => {
-    var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
+    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
     const required = String(((_a = row.transfer) == null ? void 0 : _a.required_arrival_date) || ((_b = row.transfer) == null ? void 0 : _b.required_arrival_on) || "-");
-    const sdo = String(((_c2 = row.transfer) == null ? void 0 : _c2.store_delivery_execution_order_no) || "").trim();
+    const sdo = String(((_c = row.transfer) == null ? void 0 : _c.store_delivery_execution_order_no) || "").trim();
     if (mode === "ship") {
       return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || chooseI18nLabel("SDO 未生成", "SDO Not Generated"))} / ${escapeHtml(((_d2 = row.transfer) == null ? void 0 : _d2.to_store_code) || "-")} / ${escapeHtml(formatI18nCount(((_f2 = (_e2 = row.transfer) == null ? void 0 : _e2.delivery_batch) == null ? void 0 : _f2.bale_count) || 0, "包", "packages"))} / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : chooseI18nLabel("待生成", "Pending"))}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? chooseI18nLabel("可进入发运", "Ready to dispatch") : chooseI18nLabel("SDO 未生成，请先去 6 仓库执行核对", "SDO not generated. Check Warehouse Execution first.")}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">${escapeHtml(chooseI18nLabel("查看 SDO", "View SDO"))}</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${escapeHtml(chooseI18nLabel("进入该申请仓库执行", "Open Warehouse Execution"))}</button>`}</div></article>`;
     }
@@ -22852,7 +23351,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   renderTransferShipTargetHint();
 }
 function renderReceivingResultSummary(result) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const target = document.querySelector("#receivingResultSummary");
   if (!target) {
     return;
@@ -22893,7 +23392,7 @@ function renderReceivingResultSummary(result) {
         <article class="store-metric"><strong>门店</strong><span>${escapeHtml(result.store_code || "-")}</span></article>
         <article class="store-metric"><strong>token 总数</strong><span>${escapeHtml((_a = analysis.token_count) != null ? _a : 0)}</span></article>
         <article class="store-metric"><strong>已上架</strong><span>${escapeHtml((_b = analysis.placed_count) != null ? _b : 0)}</span></article>
-        <article class="store-metric"><strong>待上架</strong><span>${escapeHtml((_c2 = analysis.pending_count) != null ? _c2 : 0)}</span></article>
+        <article class="store-metric"><strong>待上架</strong><span>${escapeHtml((_c = analysis.pending_count) != null ? _c : 0)}</span></article>
         <article class="store-metric"><strong>状态</strong><span>${escapeHtml(result.status || "-")}</span></article>
       </div>
       <div class="subtle small">${escapeHtml(`clerk_shelving_task：${shelvingTask.sessionNo || "-"} · 店员 ${shelvingTask.assignedEmployee || "-"} · 已上架 ${shelvingTask.placedCount || 0} / ${shelvingTask.tokenCount || 0}`)}</div>
@@ -22955,7 +23454,7 @@ function renderReturnResultSummary(result) {
   target.innerHTML = `<div class="alert-banner">${escapeHtml(result.message || "退仓动作已完成。")}</div>`;
 }
 function renderRackResultSummary(kind, data) {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const target = document.querySelector("#rackResultSummary");
   if (!target) {
     return;
@@ -22984,7 +23483,7 @@ function renderRackResultSummary(kind, data) {
     target.innerHTML = `
       <div class="alert-banner">当前门店货架位清单已读取。</div>
       <div class="report-summary-grid">
-        <article class="store-metric"><strong>门店</strong><span>${escapeHtml(((_c2 = rows[0]) == null ? void 0 : _c2.store_code) || "-")}</span></article>
+        <article class="store-metric"><strong>门店</strong><span>${escapeHtml(((_c = rows[0]) == null ? void 0 : _c.store_code) || "-")}</span></article>
         <article class="store-metric"><strong>货架位总数</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>示例架位</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.rack_code) || "-")}</span></article>
         <article class="store-metric"><strong>状态</strong><span>${escapeHtml(((_e2 = rows[0]) == null ? void 0 : _e2.status) || "-")}</span></article>
@@ -23039,7 +23538,7 @@ function formatInventoryDate(value) {
   return text || "-";
 }
 function renderStoreInventoryOverviewMetrics(overview = {}) {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2;
   const target = document.querySelector("#storeInventoryOverviewSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -23050,15 +23549,16 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
     <div class="report-summary-grid">
       <article class="store-metric problem-card">
         <strong>待完成入库</strong>
-        <span>${escapeHtml((_f2 = overview.unconfirmed_items) != null ? _f2 : 0)}</span>
+        <span>${escapeHtml((_a = overview.unconfirmed_items) != null ? _a : 0)}</span>
         <small>已生成或已打印 STORE_ITEM，但还没有点击确认完成入库。</small>
         <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看待完成</button>
       </article>
-      <article class="store-metric problem-card"><strong>未关联货架</strong><span>${escapeHtml((_d2 = overview.unassigned_location_items) != null ? _d2 : 0)}</span><small>已入库但没有有效货架。</small></article>
-      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml((_c2 = overview.backroom_items) != null ? _c2 : 0)}</span></article>
-      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml((_b = overview.shelf_items) != null ? _b : 0)}</span></article>
-      <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml((_a = overview.total_items) != null ? _a : 0)}</span></article>
-      <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml((_e2 = overview.today_new_items) != null ? _e2 : 0)}</span></article>
+      <article class="store-metric problem-card"><strong>未关联货架</strong><span>${escapeHtml((_b = overview.unassigned_location_items) != null ? _b : 0)}</span><small>已入库但没有有效货架。</small></article>
+      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml((_c = overview.backroom_items) != null ? _c : 0)}</span></article>
+      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml((_d2 = overview.shelf_items) != null ? _d2 : 0)}</span></article>
+      <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml((_e2 = overview.total_items) != null ? _e2 : 0)}</span></article>
+      <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml((_f2 = overview.today_new_items) != null ? _f2 : 0)}</span></article>
+      <article class="store-metric"><strong>今日已售</strong><span>${escapeHtml((_g2 = overview.sold_today_items) != null ? _g2 : 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
     </div>
   `;
 }
@@ -23082,13 +23582,13 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
         </thead>
         <tbody>
           ${rows.map((row) => {
-    var _a, _b, _c2, _d2;
+    var _a, _b, _c, _d2;
     return `
-            <tr class="${row.location_type === "BACKROOM" ? "inventory-location-special" : row.location_code === "UNASSIGNED" ? "inventory-location-warning" : ""}">
+            <tr>
               <td>${escapeHtml(row.category_name || "unknown")}</td>
               <td>${escapeHtml((_a = row.total_items) != null ? _a : 0)}</td>
               <td>${escapeHtml((_b = row.shelf_items) != null ? _b : 0)}</td>
-              <td>${escapeHtml((_c2 = row.backroom_items) != null ? _c2 : 0)}</td>
+              <td>${escapeHtml((_c = row.backroom_items) != null ? _c : 0)}</td>
               <td>${escapeHtml((_d2 = row.unassigned_location_items) != null ? _d2 : 0)}</td>
               <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
               <td><button type="button" class="ghost-button mini-button" data-store-inventory-category-detail="${escapeHtml(row.category_name || "unknown")}">查看商品</button></td>
@@ -23121,7 +23621,7 @@ function renderStoreInventoryOverviewLocationRows(rows = []) {
           ${rows.map((row) => {
     var _a;
     return `
-            <tr>
+            <tr class="${row.location_type === "BACKROOM" ? "inventory-location-special" : row.location_code === "UNASSIGNED" ? "inventory-location-warning" : ""}">
               <td>${escapeHtml(row.location_code || "-")}</td>
               <td>${escapeHtml(row.location_name || "-")}</td>
               <td>${escapeHtml(row.category_name || "-")}</td>
@@ -23140,6 +23640,7 @@ function renderStoreInventoryOverview(overview = {}) {
   storeInventoryOverviewState.overview = overview;
   storeInventoryOverviewState.storeCode = String(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA").trim().toUpperCase();
   renderStoreInventoryOverviewMetrics(overview);
+  renderStoreInventorySoldSummary(overview);
   const target = document.querySelector("#storeInventoryOverviewTables");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -23148,6 +23649,75 @@ function renderStoreInventoryOverview(overview = {}) {
   target.innerHTML = `
     <div class="flow-summary-note">${activeTab === "location" ? "按货架分类" : "按品类分类"}</div>
     ${activeTab === "location" ? renderStoreInventoryOverviewLocationRows(overview.by_location || []) : renderStoreInventoryOverviewCategoryRows(overview.by_category || [])}
+  `;
+}
+function renderStoreInventorySoldSummary(overview = {}) {
+  const target = document.querySelector("#storeInventorySoldSummary");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const categoryRows = Array.isArray(overview.sold_by_category) ? overview.sold_by_category : [];
+  const locationRows = Array.isArray(overview.sold_by_location) ? overview.sold_by_location : [];
+  const soldCount = Number(overview.sold_today_items || 0);
+  const soldAmount = Number(overview.sold_today_amount || 0);
+  target.className = "report-summary";
+  if (!soldCount && !categoryRows.length && !locationRows.length) {
+    target.innerHTML = `
+      <div class="flow-summary-note">销售出库摘要</div>
+      <div class="empty-state">今天还没有 POS 销售出库。</div>
+    `;
+    return;
+  }
+  const renderSoldCategoryRows = () => categoryRows.length ? categoryRows.map((row) => {
+    var _a;
+    return `
+    <tr>
+      <td>${escapeHtml(row.category_name || "unknown")}</td>
+      <td>${escapeHtml((_a = row.sold_items) != null ? _a : 0)}</td>
+      <td>${escapeHtml(formatKesAmount(row.sold_amount || 0, "KES 0.00"))}</td>
+    </tr>
+  `;
+  }).join("") : `<tr><td colspan="3">今天还没有 POS 销售出库。</td></tr>`;
+  const renderSoldLocationRows = () => locationRows.length ? locationRows.map((row) => {
+    var _a;
+    return `
+    <tr>
+      <td>${escapeHtml(row.location_code || "-")}</td>
+      <td>${escapeHtml(row.location_name || "-")}</td>
+      <td>${escapeHtml((_a = row.sold_items) != null ? _a : 0)}</td>
+      <td>${escapeHtml(formatKesAmount(row.sold_amount || 0, "KES 0.00"))}</td>
+    </tr>
+  `;
+  }).join("") : `<tr><td colspan="4">今天还没有 POS 销售出库。</td></tr>`;
+  target.innerHTML = `
+    <div class="flow-summary-note">销售出库摘要 · 今日已售 ${escapeHtml(soldCount)} 件 · ${escapeHtml(formatKesAmount(soldAmount, "KES 0.00"))}</div>
+    <div class="two-column-grid">
+      <div class="table-scroll">
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>按品类售出</th>
+              <th>今日已售件数</th>
+              <th>今日销售额</th>
+            </tr>
+          </thead>
+          <tbody>${renderSoldCategoryRows()}</tbody>
+        </table>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table compact-table">
+          <thead>
+            <tr>
+              <th>货架位</th>
+              <th>按货架售出</th>
+              <th>今日已售件数</th>
+              <th>今日销售额</th>
+            </tr>
+          </thead>
+          <tbody>${renderSoldLocationRows()}</tbody>
+        </table>
+      </div>
+    </div>
   `;
 }
 function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") {
@@ -23317,7 +23887,7 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
     method: "POST",
     body: JSON.stringify({
       location_code: selectedLocation,
-      confirmed_by: String((currentSession.user && currentSession.user.username) || getCurrentStoreWorkerFallback() || "").trim()
+      confirmed_by: String(((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback() || "").trim()
     })
   });
   const status = String(result.status || "confirmed").trim();
@@ -23343,6 +23913,57 @@ async function loadStoreInventoryCategoryDetail(categoryName = "") {
   const items = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/categories/${encodeURIComponent(categoryName)}/items`);
   renderStoreInventoryOverviewDetail(items, `品类 ${categoryName || "unknown"} 商品明细`);
   return items;
+}
+function renderStoreItemTraceLookupResult(trace = {}) {
+  var _a;
+  const target = document.querySelector("#storeItemTraceLookupResult");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const status = String(trace.trace_status || "unknown").trim();
+  const label = trace.status_label || {
+    in_stock: "在库",
+    pending_stock_in: "待完成入库",
+    sold: "已售",
+    unassigned_location: "未关联货架",
+    invalid: "不是门店商品码",
+    unknown: "未找到"
+  }[status] || "未找到";
+  const toneClass = status === "in_stock" ? "success-banner" : status === "sold" || status === "pending_stock_in" || status === "unassigned_location" ? "warning-banner" : "error-banner";
+  const locationText = [trace.current_location_name, trace.current_location_code].filter(Boolean).join(" / ") || "-";
+  const sourceText = [trace.source_sdp_display_code, trace.parent_sdo_display_code].filter(Boolean).join(" / ") || "-";
+  const saleText = trace.sale_no || trace.sale_id || trace.sold_at || trace.sold_by ? [trace.sale_no || trace.sale_id, trace.sold_at, trace.sold_by].filter(Boolean).join(" / ") : "-";
+  const operationHint = status === "pending_stock_in" ? "该商品已生成或已打印，但还没有点击确认完成入库。建议去“待完成入库”列表处理。" : status === "unassigned_location" ? "该商品已入库，但货架位置为空或失效。请在待完成入库或货架处理流程中修正。" : status === "invalid" ? "POS 和库存查询只处理 STORE_ITEM，RAW_BALE / SDB / SDP / LPK / SDO 不是商品码。" : status === "unknown" ? "没有找到这个 STORE_ITEM。" : trace.message || "";
+  target.className = "report-summary";
+  target.innerHTML = `
+    <div class="${toneClass}">状态：${escapeHtml(label)}</div>
+    ${operationHint ? `<div class="flow-summary-note">${escapeHtml(operationHint)}</div>` : ""}
+    <div class="report-summary-grid">
+      <article class="store-metric"><strong>STORE_ITEM</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
+      <article class="store-metric"><strong>品类</strong><span>${escapeHtml(trace.category_name || trace.category_short || "-")}</span><small>KES ${escapeHtml((_a = trace.price_kes) != null ? _a : 0)}</small></article>
+      <article class="store-metric"><strong>当前货架</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(trace.location_type || "")}</small></article>
+      <article class="store-metric"><strong>来源</strong><span>${escapeHtml(sourceText)}</span><small>SDP / SDO</small></article>
+      <article class="store-metric"><strong>确认入库</strong><span>${escapeHtml(trace.stock_in_confirmed ? "已确认" : "未确认")}</span><small>${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
+      <article class="store-metric"><strong>销售</strong><span>${escapeHtml(trace.sold ? "已售" : "未售")}</span><small>${escapeHtml(saleText)}</small></article>
+    </div>
+  `;
+}
+async function lookupStoreItemTrace(machineCode = "") {
+  const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  machineCode = String(machineCode || "").trim().toUpperCase();
+  if (!machineCode) {
+    throw new Error("请输入 STORE_ITEM 码。");
+  }
+  const trace = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/trace`);
+  writeOutput("#storeInventoryOverviewOutput", trace);
+  renderStoreItemTraceLookupResult(trace);
+  return trace;
+}
+async function submitStoreItemTraceLookup(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const payload = Object.fromEntries(form.entries());
+  return lookupStoreItemTrace(payload.machine_code);
 }
 function getStoreShelfLocationStatusLabel(row = {}) {
   return row.active === false || String(row.status || "").trim().toLowerCase() === "inactive" ? "停用" : "启用";
@@ -23714,14 +24335,14 @@ function buildBaleTemplateDraft(row = null) {
   };
 }
 function ensureLabelTemplateEditorDraft(row = null) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   if (row || !labelTemplateEditorState.draft) {
     labelTemplateEditorState.draft = buildBaleTemplateDraft(row);
   }
   const selectedId = String(labelTemplateEditorState.selectedComponentId || "").trim();
   const components = Array.isArray((_b = (_a = labelTemplateEditorState.draft) == null ? void 0 : _a.layout) == null ? void 0 : _b.components) ? labelTemplateEditorState.draft.layout.components : [];
   if (!components.some((component) => component.id === selectedId)) {
-    labelTemplateEditorState.selectedComponentId = String(((_c2 = components[0]) == null ? void 0 : _c2.id) || "headline");
+    labelTemplateEditorState.selectedComponentId = String(((_c = components[0]) == null ? void 0 : _c.id) || "headline");
   }
   return labelTemplateEditorState.draft;
 }
@@ -24175,7 +24796,7 @@ function renderLabelTemplateManagerSummary(kind = "", data = labelTemplateState)
         </div>
         <div class="template-card-grid">
           ${group.rows.map((row) => {
-    var _a, _b, _c2;
+    var _a, _b, _c;
     const components = Array.isArray((_a = row.layout) == null ? void 0 : _a.components) ? row.layout.components : [];
     const enabledCount = components.filter((component) => component.enabled !== false).length;
     const detailRows = getLabelTemplateComponentSummaryRows(row);
@@ -24187,7 +24808,7 @@ function renderLabelTemplateManagerSummary(kind = "", data = labelTemplateState)
     const hasFormalLayout = labelTemplateFlow.hasSavedTemplateLayout ? labelTemplateFlow.hasSavedTemplateLayout(row) : components.length > 0;
     const statusTone = String(((_b = demoEntry.status) == null ? void 0 : _b.tone) || "info").trim().toLowerCase();
     const statusMessage = String(
-      ((_c2 = demoEntry.status) == null ? void 0 : _c2.message) || (hasFormalLayout ? "当前查看正式保存版；切换测试数据只替换字段值，不改布局和字号。" : "当前模板还没有保存正式布局，不能在这里直接打印正式版测试。")
+      ((_c = demoEntry.status) == null ? void 0 : _c.message) || (hasFormalLayout ? "当前查看正式保存版；切换测试数据只替换字段值，不改布局和字号。" : "当前模板还没有保存正式布局，不能在这里直接打印正式版测试。")
     ).trim();
     return `
               <article class="template-card" data-template-demo-card="${escapeHtml(templateCode)}">
@@ -24280,7 +24901,7 @@ async function printLabelTemplateDemo(templateCode = "") {
   focusElement("#labelTemplateManagerSummary");
 }
 function syncLabelTemplateDraftFromForm() {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2;
   const form = document.querySelector("#labelTemplateForm");
   if (!(form instanceof HTMLFormElement)) {
     return ensureLabelTemplateEditorDraft();
@@ -24288,7 +24909,7 @@ function syncLabelTemplateDraftFromForm() {
   const draft = ensureLabelTemplateEditorDraft();
   draft.template_code = String(((_a = form.querySelector("[name='template_code']")) == null ? void 0 : _a.value) || draft.template_code || "").trim().toLowerCase();
   draft.name = String(((_b = form.querySelector("[name='name']")) == null ? void 0 : _b.value) || draft.name || "").trim();
-  draft.description = String(((_c2 = form.querySelector("[name='description']")) == null ? void 0 : _c2.value) || draft.description || "").trim();
+  draft.description = String(((_c = form.querySelector("[name='description']")) == null ? void 0 : _c.value) || draft.description || "").trim();
   draft.paper_preset = String(((_d2 = form.querySelector("[name='paper_preset']")) == null ? void 0 : _d2.value) || draft.paper_preset || "60x40").trim().toLowerCase();
   draft.width_mm = Number(((_e2 = form.querySelector("[name='width_mm']")) == null ? void 0 : _e2.value) || draft.width_mm || 60);
   draft.height_mm = Number(((_f2 = form.querySelector("[name='height_mm']")) == null ? void 0 : _f2.value) || draft.height_mm || 40);
@@ -24676,14 +25297,14 @@ function renderSupplierResultSummary(kind, data) {
   `;
 }
 function getInlineSupplierPayload(formElement) {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2;
   if (!(formElement instanceof HTMLFormElement)) {
     throw new Error("当前页面找不到可用的表单。");
   }
   const payload = {
     name: ((_a = formElement.querySelector("[name='supplier_name_new']")) == null ? void 0 : _a.value.trim()) || "",
     name_zh: ((_b = formElement.querySelector("[name='supplier_name_zh_new']")) == null ? void 0 : _b.value.trim()) || "",
-    code: ((_c2 = formElement.querySelector("[name='supplier_code_new']")) == null ? void 0 : _c2.value.trim()) || "",
+    code: ((_c = formElement.querySelector("[name='supplier_code_new']")) == null ? void 0 : _c.value.trim()) || "",
     contact_person: ((_d2 = formElement.querySelector("[name='supplier_contact_person_new']")) == null ? void 0 : _d2.value.trim()) || "",
     phone: ((_e2 = formElement.querySelector("[name='supplier_phone_new']")) == null ? void 0 : _e2.value.trim()) || "",
     note: ((_f2 = formElement.querySelector("[name='supplier_note_new']")) == null ? void 0 : _f2.value.trim()) || "",
@@ -24803,14 +25424,14 @@ function renderCargoTypeResultSummary(kind, data) {
   `;
 }
 function getInlineCargoTypePayload(formElement) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   if (!(formElement instanceof HTMLFormElement)) {
     throw new Error("当前页面找不到可用的表单。");
   }
   const payload = {
     name: ((_a = formElement.querySelector("[name='cargo_type_name_new']")) == null ? void 0 : _a.value.trim()) || "",
     code: ((_b = formElement.querySelector("[name='cargo_type_code_new']")) == null ? void 0 : _b.value.trim()) || "",
-    note: ((_c2 = formElement.querySelector("[name='cargo_type_note_new']")) == null ? void 0 : _c2.value.trim()) || "",
+    note: ((_c = formElement.querySelector("[name='cargo_type_note_new']")) == null ? void 0 : _c.value.trim()) || "",
     status: "active"
   };
   if (!payload.name) {
@@ -24894,8 +25515,8 @@ function syncParcelBatchRowsFromDom() {
   }
   const shipmentNo = normalizeShipmentNo(((_a = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a.value) || currentInboundShipmentNo);
   const rows = [...container.querySelectorAll("[data-parcel-batch-row-index]")].map((rowNode) => {
-    var _a2, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2;
-    const sourceBaleToken = ((_c2 = (_b = (_a2 = rowNode.querySelector("[data-parcel-batch-field='source_bale_token']")) == null ? void 0 : _a2.value) == null ? void 0 : _b.trim) == null ? void 0 : _c2.call(_b)) || "";
+    var _a2, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2;
+    const sourceBaleToken = ((_c = (_b = (_a2 = rowNode.querySelector("[data-parcel-batch-field='source_bale_token']")) == null ? void 0 : _a2.value) == null ? void 0 : _b.trim) == null ? void 0 : _c.call(_b)) || "";
     const sourceLine = getChinaSourceLineForShipment(shipmentNo, sourceBaleToken);
     return {
       source_bale_token: sourceBaleToken,
@@ -25040,7 +25661,7 @@ function applyCargoTypeSelectionToParcelBatchRows(cargoTypeName) {
   renderParcelBatchRows();
 }
 function renderStoreResultSummary(kind, data) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const target = document.querySelector("#storeResultSummary");
   if (!target) {
     return;
@@ -25060,7 +25681,7 @@ function renderStoreResultSummary(kind, data) {
         <article class="store-metric"><strong>总门店数</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>在营门店</strong><span>${activeCount}</span></article>
         <article class="store-metric"><strong>示例门店</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.name) || ((_b = rows[0]) == null ? void 0 : _b.code) || "-")}</span></article>
-        <article class="store-metric"><strong>地图链接</strong><span>${((_c2 = rows[0]) == null ? void 0 : _c2.google_maps_url) ? "已配置" : "待配置"}</span></article>
+        <article class="store-metric"><strong>地图链接</strong><span>${((_c = rows[0]) == null ? void 0 : _c.google_maps_url) ? "已配置" : "待配置"}</span></article>
       </div>
     `;
     return;
@@ -25539,7 +26160,7 @@ async function deleteUserFromList(userId) {
   renderUserResultSummary("delete", { ...user, ...result });
 }
 function renderUserResultSummary(kind, data) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const target = document.querySelector("#userResultSummary");
   if (!target) {
     return;
@@ -25569,7 +26190,7 @@ function renderUserResultSummary(kind, data) {
       <div class="alert-banner">这是当前系统里的账号清单。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>账号数量</strong><span>${rows.length}</span></article>
-        <article class="store-metric"><strong>示例账号</strong><span>${escapeHtml(((_c2 = rows[0]) == null ? void 0 : _c2.username) || "-")}</span></article>
+        <article class="store-metric"><strong>示例账号</strong><span>${escapeHtml(((_c = rows[0]) == null ? void 0 : _c.username) || "-")}</span></article>
         <article class="store-metric"><strong>默认门店</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.store_code) || "全局")}</span></article>
       </div>
     `;
@@ -25588,7 +26209,7 @@ function renderUserResultSummary(kind, data) {
   `;
 }
 function renderPriceRuleResultSummary(kind, data) {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const target = document.querySelector("#priceRuleResultSummary");
   if (!target) {
     return;
@@ -25606,7 +26227,7 @@ function renderPriceRuleResultSummary(kind, data) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>规则数量</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>示例对象</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.target_value) || "-")}</span></article>
-        <article class="store-metric"><strong>最高限价</strong><span>${escapeHtml((_c2 = (_b = rows[0]) == null ? void 0 : _b.max_price) != null ? _c2 : "-")}</span></article>
+        <article class="store-metric"><strong>最高限价</strong><span>${escapeHtml((_c = (_b = rows[0]) == null ? void 0 : _b.max_price) != null ? _c : "-")}</span></article>
         <article class="store-metric"><strong>门店</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.store_code) || "全店通用")}</span></article>
       </div>
     `;
@@ -25624,7 +26245,7 @@ function renderPriceRuleResultSummary(kind, data) {
   `;
 }
 function renderLookupResultSummary(result) {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const target = document.querySelector("#lookupResultSummary");
   if (!target) {
     return;
@@ -25641,7 +26262,7 @@ function renderLookupResultSummary(result) {
       <article class="store-metric"><strong>商品</strong><span>${escapeHtml(result.product_name || result.barcode || "-")}</span></article>
       <article class="store-metric"><strong>门店库存</strong><span>${escapeHtml((_a = result.qty_on_hand) != null ? _a : 0)}</span></article>
       <article class="store-metric"><strong>建议售价</strong><span>${escapeHtml((_b = result.expected_price) != null ? _b : "-")}</span></article>
-      <article class="store-metric"><strong>限价</strong><span>${escapeHtml((_c2 = result.price_cap) != null ? _c2 : "未设置")}</span></article>
+      <article class="store-metric"><strong>限价</strong><span>${escapeHtml((_c = result.price_cap) != null ? _c : "未设置")}</span></article>
       <article class="store-metric"><strong>门店架位</strong><span>${escapeHtml(result.store_rack_code || "未录入")}</span></article>
       <article class="store-metric"><strong>成本价</strong><span>${escapeHtml((_e2 = (_d2 = result.average_cost_price) != null ? _d2 : result.cost_price) != null ? _e2 : "-")}</span></article>
     </div>
@@ -25649,7 +26270,7 @@ function renderLookupResultSummary(result) {
   `;
 }
 function renderMpesaResultSummary(kind, result) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
   const target = document.querySelector("#mpesaResultSummary");
   if (!target) {
     return;
@@ -25667,7 +26288,7 @@ function renderMpesaResultSummary(kind, result) {
         <div class="report-summary-grid">
           <article class="store-metric"><strong>流水数量</strong><span>${rows.length}</span></article>
           <article class="store-metric"><strong>第一笔收据</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.receipt_no) || "-")}</span></article>
-          <article class="store-metric"><strong>第一笔金额</strong><span>${escapeHtml((_c2 = (_b = rows[0]) == null ? void 0 : _b.amount) != null ? _c2 : "-")}</span></article>
+          <article class="store-metric"><strong>第一笔金额</strong><span>${escapeHtml((_c = (_b = rows[0]) == null ? void 0 : _b.amount) != null ? _c : "-")}</span></article>
           <article class="store-metric"><strong>匹配状态</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.match_status) || "-")}</span></article>
         </div>
       ` : "当前还没有 M-Pesa 数据。";
@@ -25685,7 +26306,7 @@ function renderMpesaResultSummary(kind, result) {
   `;
 }
 function renderOfflineSyncResultSummary(result) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const target = document.querySelector("#offlineSyncResultSummary");
   if (!target) {
     return;
@@ -25703,7 +26324,7 @@ function renderOfflineSyncResultSummary(result) {
       <article class="store-metric"><strong>设备号</strong><span>${escapeHtml(result.device_id || "-")}</span></article>
       <article class="store-metric"><strong>成功行</strong><span>${escapeHtml((_a = result.accepted_count) != null ? _a : 0)}</span></article>
       <article class="store-metric"><strong>重复行</strong><span>${escapeHtml((_b = result.duplicate_count) != null ? _b : 0)}</span></article>
-      <article class="store-metric"><strong>失败行</strong><span>${escapeHtml((_c2 = result.failed_count) != null ? _c2 : 0)}</span></article>
+      <article class="store-metric"><strong>失败行</strong><span>${escapeHtml((_c = result.failed_count) != null ? _c : 0)}</span></article>
     </div>
   `;
 }
@@ -26473,10 +27094,10 @@ function clearCashierTerminalLookupInputs() {
   }
 }
 function syncCashierTerminalDraftsFromForms() {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2;
   cashierTerminalState.note = String(((_a = document.querySelector("#saleForm [name='note']")) == null ? void 0 : _a.value) || cashierTerminalState.note || "正常销售").trim() || "正常销售";
   cashierTerminalState.openingFloatCash = String(((_b = document.querySelector("#openShiftForm [name='opening_float_cash']")) == null ? void 0 : _b.value) || cashierTerminalState.openingFloatCash || "1000").trim() || "1000";
-  cashierTerminalState.openingNote = String(((_c2 = document.querySelector("#openShiftForm [name='note']")) == null ? void 0 : _c2.value) || cashierTerminalState.openingNote || "早班开始").trim() || "早班开始";
+  cashierTerminalState.openingNote = String(((_c = document.querySelector("#openShiftForm [name='note']")) == null ? void 0 : _c.value) || cashierTerminalState.openingNote || "早班开始").trim() || "早班开始";
   cashierTerminalState.voidOrderNo = String(((_d2 = document.querySelector("#saleVoidRequestForm [name='order_no']")) == null ? void 0 : _d2.value) || cashierTerminalState.voidOrderNo || ((_e2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _e2.order_no) || "").trim();
   cashierTerminalState.voidReason = String(((_f2 = document.querySelector("#saleVoidRequestForm [name='reason']")) == null ? void 0 : _f2.value) || cashierTerminalState.voidReason || "").trim();
   cashierTerminalState.voidNote = String(((_g2 = document.querySelector("#saleVoidRequestForm [name='note']")) == null ? void 0 : _g2.value) || cashierTerminalState.voidNote || "").trim();
@@ -26506,12 +27127,13 @@ function syncCashierTerminalDraftsFromForms() {
 function syncCashierTerminalShift(shift = null) {
   var _a, _b;
   const shiftNo = String(
-    (shift == null ? void 0 : shift.shift_no) || ((_a = document.querySelector("#saleForm [name='shift_no']")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#shiftReportForm [name='shift_no']")) == null ? void 0 : _b.value) || ""
+    (shift == null ? void 0 : shift.shift_id) || (shift == null ? void 0 : shift.shift_no) || ((_a = document.querySelector("#saleForm [name='shift_no']")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#shiftReportForm [name='shift_no']")) == null ? void 0 : _b.value) || ""
   ).trim();
   const status = String((shift == null ? void 0 : shift.status) || (shiftNo ? "open" : "not_opened")).trim() || "not_opened";
   cashierTerminalState.shiftNo = shiftNo;
   cashierTerminalState.shiftStatus = status;
   cashierTerminalState.shiftOpen = Boolean(shiftNo) && !["closed", "completed"].includes(status.toLowerCase());
+  cashierTerminalState.currentShift = (shift == null ? void 0 : shift.shift_id) ? normalizeCashierTerminalShift(shift) : cashierTerminalState.currentShift;
   syncCashierTerminalDraftsFromForms();
   renderCashierTerminal();
 }
@@ -26525,17 +27147,17 @@ async function primeCashierTerminalSession(force = false) {
   }
   cashierTerminalPrimedStoreCode = storeCode;
   try {
-    const shifts = await request("/pos/shifts");
-    const rows = Array.isArray(shifts) ? shifts : [];
-    const activeShift = rows.find((row) => ["open", "opened", "active", "approved"].includes(String((row == null ? void 0 : row.status) || "").trim().toLowerCase())) || null;
-    if (activeShift == null ? void 0 : activeShift.shift_no) {
-      hydrateShiftForms(activeShift);
-      syncCashierTerminalShift(activeShift);
-    } else {
-      ["#shiftReportForm [name='shift_no']", "#handoverRequestForm [name='shift_no']", "#closeBusinessReportForm [name='shift_no']", "#saleForm [name='shift_no']"].forEach((selector) => setInputValue(selector, ""));
-      syncCashierTerminalShift(null);
-    }
+    const activeShift = await fetchCashierTerminalCurrentShift();
+    applyCashierTerminalShift(activeShift);
+    await loadCashierTerminalShiftSummary(activeShift.shift_id || activeShift.shift_no);
   } catch (error) {
+    cashierTerminalState.currentShift = null;
+    cashierTerminalState.shiftSummary = null;
+    cashierTerminalState.shiftNo = "";
+    cashierTerminalState.shiftStatus = "not_opened";
+    cashierTerminalState.shiftOpen = false;
+    cashierTerminalState.shiftFeedback = "请先开班后再收银。";
+    ["#shiftReportForm [name='shift_no']", "#handoverRequestForm [name='shift_no']", "#closeBusinessReportForm [name='shift_no']", "#saleForm [name='shift_no']"].forEach((selector) => setInputValue(selector, ""));
     renderCashierTerminal();
   }
 }
@@ -26875,7 +27497,7 @@ function renderCashierTerminalPaymentPanel() {
   `;
 }
 function renderCashierTerminalQuickActions() {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   if (!(cashierTerminalQuickActions instanceof HTMLElement)) {
     return;
   }
@@ -26891,7 +27513,7 @@ function renderCashierTerminalQuickActions() {
       <span><strong>${escapeHtml(copy.storeLabel)}</strong>${escapeHtml(getCashierTerminalStoreCode())}</span>
       <span><strong>${escapeHtml(copy.syncStatus)}</strong>${escapeHtml(syncText)}</span>
       <span><strong>${escapeHtml(copy.receiptStatus)}</strong>${escapeHtml(copy.printer)}</span>
-      <span><strong>${escapeHtml(copy.latestSale)}</strong>${escapeHtml(((_c2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _c2.order_no) || "-")}</span>
+      <span><strong>${escapeHtml(copy.latestSale)}</strong>${escapeHtml(((_c = cashierTerminalState.latestCompletedSale) == null ? void 0 : _c.order_no) || "-")}</span>
     </div>
     <div class="cashier-terminal-footer-actions">
       <button type="button" class="quick-action-button" disabled><span>${escapeHtml(copy.holdAction)}</span><strong>-</strong></button>
@@ -26904,7 +27526,7 @@ function renderCashierTerminalQuickActions() {
   `;
 }
 function renderCashierTerminalDrawer() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   if (!(cashierTerminalDrawer instanceof HTMLElement)) {
     return;
   }
@@ -27142,7 +27764,7 @@ function renderCashierTerminalDrawer() {
       <div class="receipt-preview">
         <div class="receipt-line receipt-center"><strong>BEYOND ERP · ${escapeHtml(getCashierTerminalStoreCode())}</strong></div>
         <div class="receipt-line"><span>${escapeHtml(copy.orderNo)}</span><span>${escapeHtml((latestSale == null ? void 0 : latestSale.order_no) || "-")}</span></div>
-        <div class="receipt-line"><span>${escapeHtml(copy.cashierLabel)}</span><span>${escapeHtml(((_c2 = currentSession.user) == null ? void 0 : _c2.username) || "cashier")}</span></div>
+        <div class="receipt-line"><span>${escapeHtml(copy.cashierLabel)}</span><span>${escapeHtml(((_c = currentSession.user) == null ? void 0 : _c.username) || "cashier")}</span></div>
         <div class="receipt-divider"></div>
         ${latestItems.length ? latestItems.map((row) => `<div class="receipt-line"><span>${escapeHtml(row.barcode || "-")}</span><span>${escapeHtml(formatCurrency(row.selling_price || 0))}</span></div>`).join("") : `<div class="receipt-line"><span>${escapeHtml(copy.latestSale)}</span><span>${escapeHtml((latestSale == null ? void 0 : latestSale.order_no) || "-")}</span></div>`}
         <div class="receipt-divider"></div>
@@ -27316,8 +27938,8 @@ function getCashierTerminalPaymentMethodForSale() {
   return "cash";
 }
 function buildPosStoreItemMargin(token = {}) {
-  var _a, _b, _c2;
-  const selectedPrice = Number((_c2 = (_b = (_a = token.selected_price) != null ? _a : token.selling_price) != null ? _b : token.expected_price) != null ? _c2 : 0);
+  var _a, _b, _c;
+  const selectedPrice = Number((_c = (_b = (_a = token.selected_price) != null ? _a : token.selling_price) != null ? _b : token.expected_price) != null ? _c : 0);
   const rawCostPrice = token.cost_price;
   const costPrice = rawCostPrice == null || rawCostPrice === "" ? null : Number(rawCostPrice);
   const costStatus = String(token.cost_status || "").trim().toLowerCase();
@@ -27482,12 +28104,12 @@ function syncCashierTerminalVoidRequestForm() {
   return orderNo;
 }
 function syncCashierTerminalRefundRequestForm() {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const orderNo = String(cashierTerminalState.refundOrderNo || ((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.order_no) || "").trim();
   if (!orderNo) {
     throw new Error("请先填写要退款的订单号。");
   }
-  const barcode = String(cashierTerminalState.refundBarcode || ((_d2 = (_c2 = (_b = cashierTerminalState.latestCompletedSale) == null ? void 0 : _b.items) == null ? void 0 : _c2[0]) == null ? void 0 : _d2.barcode) || "").trim();
+  const barcode = String(cashierTerminalState.refundBarcode || ((_d2 = (_c = (_b = cashierTerminalState.latestCompletedSale) == null ? void 0 : _b.items) == null ? void 0 : _c[0]) == null ? void 0 : _d2.barcode) || "").trim();
   if (!barcode) {
     throw new Error("请先填写要退款的商品 barcode。");
   }
@@ -27550,35 +28172,7 @@ async function submitCashierTerminalOpenShift() {
   return result;
 }
 async function submitCashierTerminalSale() {
-  var _a, _b, _c2, _d2;
-  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
-  const isStoreItemOnlyCart = rows.length && rows.every((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim().startsWith("5"));
-  if (isStoreItemOnlyCart) {
-    const result2 = completeCashierTerminalStoreItemSale();
-    cashierTerminalState.voidOrderNo = result2.order_no || cashierTerminalState.voidOrderNo;
-    cashierTerminalState.refundOrderNo = result2.order_no || cashierTerminalState.refundOrderNo;
-    cashierTerminalState.refundBarcode = ((_b = (_a = result2.items) == null ? void 0 : _a[0]) == null ? void 0 : _b.barcode) || cashierTerminalState.refundBarcode;
-    resetCashierTerminalForNextSale();
-    renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
-    renderOperationsAllSalesData(posStoreItemSaleRecordState);
-    showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result2.order_no}`, "success", 1800);
-    return result2;
-  }
-  syncCashierTerminalSaleForm();
-  const form = document.querySelector("#saleForm");
-  if (!(form instanceof HTMLFormElement)) {
-    throw new Error("saleForm 不存在，无法提交销售。");
-  }
-  const result = await submitSale({ preventDefault() {
-  }, currentTarget: form });
-  cashierTerminalState.latestCompletedSale = result;
-  cashierTerminalState.voidOrderNo = result.order_no || cashierTerminalState.voidOrderNo;
-  cashierTerminalState.refundOrderNo = result.order_no || cashierTerminalState.refundOrderNo;
-  cashierTerminalState.refundBarcode = ((_d2 = (_c2 = result.items) == null ? void 0 : _c2[0]) == null ? void 0 : _d2.barcode) || cashierTerminalState.refundBarcode;
-  resetCashierTerminalForNextSale();
-  renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
-  showTransientInlineNotice("#cashierTerminalInlineNotice", `交易完成：${result.order_no}`, "success", 1800);
-  return result;
+  return submitCashierTerminalBackendSale();
 }
 async function submitCashierTerminalVoidRequest() {
   syncCashierTerminalVoidRequestForm();
@@ -27655,6 +28249,7 @@ function handleCashierTerminalNetworkChange() {
   renderCashierTerminal();
 }
 async function handleCashierTerminalAction(action, target) {
+  var _a, _b;
   switch (action) {
     case "logout":
       await submitLogout();
@@ -27684,6 +28279,13 @@ async function handleCashierTerminalAction(action, target) {
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
       renderCashierTerminal();
+      if (cashierTerminalState.activeDrawer === "recent-sales") {
+        await loadCashierTerminalRecentSales(20);
+      } else if (cashierTerminalState.activeDrawer === "hold-list") {
+        await loadCashierTerminalHoldList(20);
+      } else if (cashierTerminalState.activeDrawer === "shift" && ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id)) {
+        await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+      }
       return;
     case "close-drawer":
       cashierTerminalState.activeDrawer = "";
@@ -27725,6 +28327,13 @@ async function handleCashierTerminalAction(action, target) {
     }
     case "complete-sale":
       await submitCashierTerminalSale();
+      return;
+    case "open-shift":
+    case "submit-open-shift":
+      await openCashierTerminalShift();
+      return;
+    case "load-shift-summary":
+      await loadCashierTerminalShiftSummary(((_b = cashierTerminalState.currentShift) == null ? void 0 : _b.shift_id) || cashierTerminalState.shiftNo);
       return;
     case "submit-void-request":
       await submitCashierTerminalVoidRequest();
@@ -27792,6 +28401,2029 @@ function handleCashierTerminalHotkeys(event) {
     focusCashierTerminalScanInput({ select: false });
   }
 }
+const CASHIER_TERMINAL_PREVIEW_STORE = "UTAWALA";
+const CASHIER_TERMINAL_PREVIEW_CASHIER = "Clerk A";
+const CASHIER_TERMINAL_PREVIEW_SHIFT = "SHIFT-UTW-250511-A";
+const CASHIER_TERMINAL_PREVIEW_ITEMS = Object.freeze([
+  {
+    display_code: "SI-UTW-000123",
+    machine_code: "5250511000123",
+    type: "STORE_ITEM",
+    category: "连衣裙 / Dresses",
+    price: 250,
+    shelf_location: "RACK-A01",
+    status: "on_shelf",
+    store: "UTAWALA"
+  },
+  {
+    display_code: "SI-UTW-000122",
+    machine_code: "5250511000122",
+    type: "STORE_ITEM",
+    category: "男鞋 / Men Shoes",
+    price: 800,
+    shelf_location: "RACK-B02",
+    status: "on_shelf",
+    store: "UTAWALA"
+  },
+  {
+    display_code: "SI-UTW-000121",
+    machine_code: "5250511000121",
+    type: "STORE_ITEM",
+    category: "T-Shirts / T恤",
+    price: 150,
+    shelf_location: "RACK-C03",
+    status: "on_shelf",
+    store: "UTAWALA"
+  },
+  {
+    display_code: "SI-UTW-000120",
+    machine_code: "5250511000120",
+    type: "STORE_ITEM",
+    category: "女牛仔裤 / Ladies Jeans",
+    price: 300,
+    shelf_location: "RACK-D01",
+    status: "on_shelf",
+    store: "UTAWALA"
+  },
+  {
+    display_code: "SDO-UTW-250528-001",
+    machine_code: "4250528001",
+    type: "SDO"
+  },
+  {
+    display_code: "SDB-250527-045",
+    machine_code: "2250527045",
+    type: "SDB"
+  },
+  {
+    display_code: "LPK-250527-008",
+    machine_code: "3250527008",
+    type: "LPK"
+  },
+  {
+    display_code: "RAW-2505-0012",
+    machine_code: "125050012",
+    type: "RAW_BALE"
+  },
+  {
+    display_code: "SI-UTW-000119",
+    machine_code: "5250511000119",
+    type: "STORE_ITEM",
+    category: "夹克 / Jacket",
+    price: 500,
+    shelf_location: "RACK-E01",
+    status: "sold",
+    store: "UTAWALA"
+  }
+]);
+const CASHIER_TERMINAL_REJECT_MESSAGES = Object.freeze({
+  SDO: "SDO 是门店送货执行单，不能在 POS 销售，请扫描 STORE_ITEM 商品码。",
+  SDB: "SDB 是仓库待送店包，不能在 POS 销售。",
+  LPK: "LPK 是补差拣货工单，不能在 POS 销售。",
+  RAW_BALE: "RAW_BALE 是仓库原始包码，不能在 POS 销售。",
+  SDP: "SDP 是门店配送包裹，不能在 POS 销售，请扫描 STORE_ITEM 商品码。"
+});
+const CASHIER_TERMINAL_LOCAL_DEMO_NOTICE = "当前使用本地演示数据，真实扫码接口不可用。";
+const CASHIER_TERMINAL_SALEABLE_STORE_ITEM_STATUSES = /* @__PURE__ */ new Set(["on_shelf", "in_stock", "available", "printed_in_store", "shelved"]);
+function formatCashierPreviewMoney(value) {
+  return `KSh ${Number(value || 0).toLocaleString("en-KE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  })}`;
+}
+function normalizeCashierPreviewScan(value = "") {
+  return String(value || "").trim().toUpperCase();
+}
+getCashierTerminalStoreCode = function() {
+  return CASHIER_TERMINAL_PREVIEW_STORE;
+};
+function getCashierTerminalCashierName() {
+  return CASHIER_TERMINAL_PREVIEW_CASHIER;
+}
+function getCashierTerminalTerminalId() {
+  var _a;
+  const storeCode = getCashierTerminalStoreCode();
+  const prefix = storeCode === "UTAWALA" ? "UTW" : storeCode.slice(0, 3).toUpperCase();
+  return ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.terminal_id) || `POS-${prefix}-01`;
+}
+function getCashierTerminalShiftNo() {
+  var _a;
+  return ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo || "";
+}
+function getCashierTerminalReceiptPanel() {
+  return document.querySelector("#cashierTerminalReceiptPanel");
+}
+function getCashierTerminalMockItems() {
+  ensureCashierTerminalPreviewState();
+  return cashierTerminalState.mockItems || [];
+}
+function ensureCashierTerminalPreviewCopy() {
+  Object.assign(CASHIER_TERMINAL_LOCALE_COPY.zh, {
+    brandTitle: "FW-ERP POS 收银台",
+    scanTitle: "扫描 STORE_ITEM",
+    addToBasket: "加入购物车",
+    basketTitle: "购物车",
+    cartEmpty: "购物车为空，请扫描 STORE_ITEM 商品码",
+    lookupEmpty: "仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。",
+    completeTrade: "完成收款",
+    grossAmount: "应收金额",
+    paidAmount: "实收",
+    balanceAmount: "余额",
+    clearBasket: "清空购物车"
+  });
+}
+function ensureCashierTerminalPreviewState() {
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  ensureCashierTerminalPreviewCopy();
+  if (!Array.isArray(cashierTerminalState.cartItems)) {
+    cashierTerminalState.cartItems = [];
+  }
+  if (!Array.isArray(cashierTerminalState.mockItems)) {
+    cashierTerminalState.mockItems = CASHIER_TERMINAL_PREVIEW_ITEMS.map((item) => ({ ...item }));
+  }
+  if (!Array.isArray(cashierTerminalState.holdOrders)) {
+    cashierTerminalState.holdOrders = [];
+  }
+  if (!Array.isArray(cashierTerminalState.recentSales)) {
+    cashierTerminalState.recentSales = [];
+  }
+  cashierTerminalState.selectedSaleDetail = cashierTerminalState.selectedSaleDetail || null;
+  cashierTerminalState.saleLookupFeedback = cashierTerminalState.saleLookupFeedback || "";
+  cashierTerminalState.currentShift = cashierTerminalState.currentShift || null;
+  cashierTerminalState.shiftSummary = cashierTerminalState.shiftSummary || null;
+  cashierTerminalState.shiftReport = cashierTerminalState.shiftReport || null;
+  cashierTerminalState.shiftReportFeedback = cashierTerminalState.shiftReportFeedback || "";
+  cashierTerminalState.shiftFeedback = cashierTerminalState.shiftFeedback || "";
+  if (!cashierTerminalState.activePaymentMode) {
+    cashierTerminalState.activePaymentMode = "cash";
+  }
+  cashierTerminalState.discountAmount = String((_a = cashierTerminalState.discountAmount) != null ? _a : "");
+  cashierTerminalState.cashReceived = String((_b = cashierTerminalState.cashReceived) != null ? _b : "");
+  cashierTerminalState.mpesaAmount = String((_c = cashierTerminalState.mpesaAmount) != null ? _c : "");
+  cashierTerminalState.mpesaReference = String((_d2 = cashierTerminalState.mpesaReference) != null ? _d2 : "");
+  cashierTerminalState.mixedCashAmount = String((_e2 = cashierTerminalState.mixedCashAmount) != null ? _e2 : "");
+  cashierTerminalState.mixedMpesaAmount = String((_f2 = cashierTerminalState.mixedMpesaAmount) != null ? _f2 : "");
+  cashierTerminalState.mixedMpesaReference = String((_g2 = cashierTerminalState.mixedMpesaReference) != null ? _g2 : "");
+  cashierTerminalState.holdReason = cashierTerminalState.holdReason || "顾客继续挑选";
+  cashierTerminalState.holdCustomerName = cashierTerminalState.holdCustomerName || "";
+  cashierTerminalState.holdCustomerPhone = cashierTerminalState.holdCustomerPhone || "";
+  cashierTerminalState.holdNote = cashierTerminalState.holdNote || "";
+  cashierTerminalState.holdFeedback = cashierTerminalState.holdFeedback || "";
+  cashierTerminalState.activeHoldNo = cashierTerminalState.activeHoldNo || "";
+  cashierTerminalState.holdCancelReason = cashierTerminalState.holdCancelReason || "顾客不要了";
+  cashierTerminalState.networkStatus = cashierTerminalState.networkStatus || "online";
+  cashierTerminalState.syncStatus = cashierTerminalState.syncStatus || "已同步";
+  cashierTerminalState.pendingSaleCount = Number(cashierTerminalState.pendingSaleCount || 0);
+  cashierTerminalState.pendingHoldCount = Number(cashierTerminalState.pendingHoldCount || 0);
+  cashierTerminalState.lastSyncAt = cashierTerminalState.lastSyncAt || (/* @__PURE__ */ new Date()).toLocaleTimeString("zh-CN", { hour12: false });
+  const activeShift = cashierTerminalState.currentShift;
+  cashierTerminalState.shiftNo = (activeShift == null ? void 0 : activeShift.shift_id) || cashierTerminalState.shiftNo || "";
+  cashierTerminalState.shiftStatus = (activeShift == null ? void 0 : activeShift.status) || (cashierTerminalState.shiftNo ? cashierTerminalState.shiftStatus || "open" : "not_opened");
+  cashierTerminalState.shiftOpen = Boolean(activeShift == null ? void 0 : activeShift.shift_id) && String((activeShift == null ? void 0 : activeShift.status) || "").toLowerCase() === "open";
+  cashierTerminalState.shiftOpenedAt = (activeShift == null ? void 0 : activeShift.opened_at) || cashierTerminalState.shiftOpenedAt || "";
+  cashierTerminalState.openingFloatCash = String((_i2 = (_h2 = activeShift == null ? void 0 : activeShift.opening_float) != null ? _h2 : cashierTerminalState.openingFloatCash) != null ? _i2 : "2000");
+  cashierTerminalState.countedCash = String((_j2 = cashierTerminalState.countedCash) != null ? _j2 : "");
+  cashierTerminalState.shiftCloseNote = cashierTerminalState.shiftCloseNote || "";
+  cashierTerminalState.managerConfirmedBy = cashierTerminalState.managerConfirmedBy || "";
+  cashierTerminalState.todaySalesAmount = Number(cashierTerminalState.todaySalesAmount || 48620);
+  cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 126);
+  cashierTerminalState.shiftSalesAmount = Number(cashierTerminalState.shiftSalesAmount || 18450);
+  cashierTerminalState.shiftOrderCount = Number(cashierTerminalState.shiftOrderCount || 42);
+  cashierTerminalState.cashSalesAmount = Number(cashierTerminalState.cashSalesAmount || 8200);
+  cashierTerminalState.mpesaSalesAmount = Number(cashierTerminalState.mpesaSalesAmount || 7350);
+  cashierTerminalState.mixedCashAmountTotal = Number(cashierTerminalState.mixedCashAmountTotal || 1500);
+  cashierTerminalState.mixedMpesaAmountTotal = Number(cashierTerminalState.mixedMpesaAmountTotal || 1400);
+  cashierTerminalState.cancelledOrderCount = Number(cashierTerminalState.cancelledOrderCount || 0);
+  cashierTerminalState.saleSequence = Number(cashierTerminalState.saleSequence || 12);
+  cashierTerminalState.holdSequence = Number(cashierTerminalState.holdSequence || 8);
+  cashierTerminalState.printFeedback = cashierTerminalState.printFeedback || "";
+  cashierTerminalState.switchStoreFeedback = cashierTerminalState.switchStoreFeedback || "";
+  cashierTerminalState.scanFallbackNotice = cashierTerminalState.scanFallbackNotice || "";
+  cashierTerminalState.scanErrorTitle = cashierTerminalState.scanErrorTitle || "";
+  cashierTerminalState.scanErrorDetail = cashierTerminalState.scanErrorDetail || "";
+  cashierTerminalState.pendingReprintSaleNo = cashierTerminalState.pendingReprintSaleNo || "";
+}
+syncCashierTerminalMode = function() {
+  const enabled = Boolean(currentSession.user) && isCashierTerminalPanelActive();
+  document.body.classList.toggle("cashier-terminal-mode", enabled);
+  appShell == null ? void 0 : appShell.classList.toggle("cashier-terminal-mode", enabled);
+  if (!enabled) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  ensureCashierTerminalClock();
+  renderCashierTerminal();
+  focusCashierTerminalScanInput({ select: false });
+};
+focusCashierTerminalScanInput = function({ select = true } = {}) {
+  if (!isCashierTerminalPanelActive() || !(cashierTerminalBarcodeInput instanceof HTMLInputElement)) {
+    return;
+  }
+  window.setTimeout(() => {
+    cashierTerminalBarcodeInput.focus();
+    if (select) {
+      cashierTerminalBarcodeInput.select();
+    }
+  }, 0);
+};
+getCashierTerminalTotals = function() {
+  ensureCashierTerminalPreviewState();
+  const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  const subtotal = rows.reduce((sum, row) => sum + Number(row.price || row.selling_price || 0), 0);
+  const discount = Math.min(normalizeCashierTerminalNumber(cashierTerminalState.discountAmount), subtotal);
+  return {
+    totalItems: rows.length,
+    subtotal,
+    discount,
+    totalAmount: Math.max(subtotal - discount, 0)
+  };
+};
+getCashierTerminalPaymentAssignedTotal = function() {
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  if (cashierTerminalState.activePaymentMode === "cash") {
+    return normalizeCashierTerminalNumber(cashierTerminalState.cashReceived);
+  }
+  if (cashierTerminalState.activePaymentMode === "mpesa") {
+    return normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
+  }
+  return normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount) + normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
+};
+getCashierTerminalChangeDue = function() {
+  const totals = getCashierTerminalTotals();
+  return Math.max(getCashierTerminalPaymentAssignedTotal() - totals.totalAmount, 0);
+};
+function getCashierTerminalPaymentGuidance() {
+  const totals = getCashierTerminalTotals();
+  if (!totals.totalItems) {
+    return "";
+  }
+  if (cashierTerminalState.activePaymentMode === "cash") {
+    const shortage2 = totals.totalAmount - normalizeCashierTerminalNumber(cashierTerminalState.cashReceived);
+    return shortage2 > 0 ? `还差 ${formatCashierPreviewMoney(shortage2)}` : "";
+  }
+  if (cashierTerminalState.activePaymentMode === "mpesa") {
+    const mpesaAmount2 = normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
+    if (mpesaAmount2 < totals.totalAmount) {
+      return `M-Pesa 还差 ${formatCashierPreviewMoney(totals.totalAmount - mpesaAmount2)}`;
+    }
+    return String(cashierTerminalState.mpesaReference || "").trim() ? "" : "请输入 M-Pesa Reference";
+  }
+  const cashAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount);
+  const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
+  const shortage = totals.totalAmount - cashAmount - mpesaAmount;
+  if (shortage > 0) {
+    return `Cash + M-Pesa 还差 ${formatCashierPreviewMoney(shortage)}`;
+  }
+  return mpesaAmount > 0 && !String(cashierTerminalState.mixedMpesaReference || "").trim() ? "请输入 M-Pesa Reference" : "";
+}
+function getCashierTerminalNetworkLabel() {
+  const status = String(cashierTerminalState.networkStatus || "online");
+  return {
+    online: "在线",
+    weak: "弱网",
+    offline: "离线",
+    syncing: "同步中",
+    synced: "已同步",
+    failed: "同步失败"
+  }[status] || "在线";
+}
+renderCashierTerminalSessionStrip = function() {
+  if (!(cashierTerminalSessionStrip instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalSessionStrip.innerHTML = `
+    <span>当前门店：${escapeHtml(getCashierTerminalStoreCode())}</span>
+    <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
+    <span>当前收银员：${escapeHtml(getCashierTerminalCashierName())}</span>
+    <span>当前班次：${escapeHtml(getCashierTerminalShiftNo() || "请先开班")}</span>
+    <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
+      网络状态：${escapeHtml(getCashierTerminalNetworkLabel())}
+    </button>
+    <span>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
+  `;
+};
+renderCashierTerminalStatusBar = function() {
+  var _a;
+  if (!(cashierTerminalStatusBar instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const statusText = cashierTerminalState.latestCompletedSale ? `销售完成：${cashierTerminalState.latestCompletedSale.sale_no}` : !((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) ? "请先开班后再收银。" : "扫码框在购物车上方。POS 主屏只显示收银员完成收款需要的信息。";
+  cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
+  cashierTerminalStatusBar.innerHTML = `
+    <span>${escapeHtml(statusText)}</span>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">挂单列表</button>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">班次 / 交接班</button>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
+  `;
+};
+renderCashierTerminalLookupPanel = function() {
+  if (!(cashierTerminalLookupCard instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const fallbackNotice = cashierTerminalState.scanFallbackNotice ? `<span class="cashier-terminal-fallback-warning">${escapeHtml(cashierTerminalState.scanFallbackNotice)}</span>` : "";
+  const scanError = cashierTerminalState.scanErrorTitle ? `
+      <div class="cashier-scan-error">
+        <strong>${escapeHtml(cashierTerminalState.scanErrorTitle)}</strong>
+        <span>${escapeHtml(cashierTerminalState.scanErrorDetail || "")}</span>
+      </div>
+    ` : "";
+  cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
+  cashierTerminalLookupCard.innerHTML = `
+    <strong>仅支持 STORE_ITEM 商品码</strong>
+    <span>真实扫码接口优先；本地演示备用码：5250511000123、5250511000122、5250511000121、5250511000120</span>
+    ${fallbackNotice}
+    ${scanError}
+  `;
+};
+renderCashierTerminalCart = function() {
+  if (!(cashierTerminalCart instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const rows = cashierTerminalState.cartItems || [];
+  if (!rows.length) {
+    cashierTerminalCart.className = "basket-list cashier-terminal-cart empty-state";
+    cashierTerminalCart.innerHTML = `<div class="cashier-terminal-empty-card">购物车为空，请扫描 STORE_ITEM 商品码</div>`;
+    return;
+  }
+  cashierTerminalCart.className = "basket-list cashier-terminal-cart";
+  cashierTerminalCart.innerHTML = `
+    <div class="cashier-cart-header">
+      <span>STORE_ITEM 商品码</span>
+      <span>品类</span>
+      <span>货架位</span>
+      <span>价格</span>
+      <span>数量</span>
+      <span>折扣</span>
+      <span>小计</span>
+      <span></span>
+    </div>
+    ${rows.map((row, index) => {
+    const price = Number(row.price || 0);
+    return `
+        <article class="cashier-cart-row">
+          <div class="cart-code">
+            <strong>${escapeHtml(row.display_code || "-")}</strong>
+            <small>${escapeHtml(row.machine_code || "-")}</small>
+          </div>
+          <div>${escapeHtml(row.category || "-")}</div>
+          <div>${escapeHtml(row.shelf_location || "-")}</div>
+          <div>${escapeHtml(formatCashierPreviewMoney(price))}</div>
+          <div>1</div>
+          <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
+          <div><strong>${escapeHtml(formatCashierPreviewMoney(price))}</strong></div>
+          <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
+        </article>
+      `;
+  }).join("")}
+  `;
+};
+renderCashierTerminalPaymentPanel = function() {
+  var _a;
+  if (!(cashierTerminalPaymentPanel instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  const paid = getCashierTerminalPaymentAssignedTotal();
+  const changeDue = getCashierTerminalChangeDue();
+  const balance = Math.max(totals.totalAmount - paid, 0);
+  const saleDisabled = !((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id);
+  const paymentGuidance = getCashierTerminalPaymentGuidance();
+  const mpesaOfflineNotice = cashierTerminalState.networkStatus === "offline" ? `<div class="cashier-payment-warning">离线状态下 M-Pesa reference 仅暂存，待同步核验</div>` : "";
+  const mpesaManualNotice = ["mpesa", "mixed"].includes(cashierTerminalState.activePaymentMode) ? `<div class="cashier-payment-warning">请确认 M-Pesa 已到账，再点击完成收款。</div>` : "";
+  cashierTerminalPaymentPanel.innerHTML = `
+    <div class="panel-head payment-head cashier-terminal-card-head">
+      <div>
+        <p class="panel-kicker">CHECKOUT</p>
+        <h3>结算区</h3>
+      </div>
+    </div>
+    ${saleDisabled ? `
+      <div class="cashier-no-shift-card">
+        <strong>POS 暂不可收银</strong>
+        <span>当前没有开班，请先开班后再收银</span>
+        <button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">开班并开始收银</button>
+      </div>
+    ` : ""}
+    <div class="cashier-terminal-grand-total">
+      <span>应收金额</span>
+      <strong data-terminal-live="receivable">${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</strong>
+    </div>
+    <div class="summary-grid cashier-terminal-total-grid">
+      <article class="summary-box"><span>商品数量</span><strong data-terminal-live="itemCount">${escapeHtml(totals.totalItems)}</strong></article>
+      <article class="summary-box"><span>小计</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
+      <article class="summary-box"><span>折扣</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
+      <article class="summary-box"><span>实收</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" ? changeDue : balance))}</strong></article>
+    </div>
+    <label class="field cashier-discount-field">
+      <span>整单折扣</span>
+      <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.discountAmount || "")}" data-terminal-payment-field="discountAmount" placeholder="0" />
+    </label>
+    <div class="payment-methods" role="tablist" aria-label="Payment methods">
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>Cash</span><small>现金收款</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>手动 reference</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>Mixed</span><small>现金 + M-Pesa</small></button>
+    </div>
+    <div class="payment-body cashier-terminal-payment-editor">
+      ${cashierTerminalState.activePaymentMode === "cash" ? `
+        <label class="field">
+          <span>实收金额</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
+        </label>
+      ` : cashierTerminalState.activePaymentMode === "mpesa" ? `
+        ${mpesaOfflineNotice}
+        <label class="field">
+          <span>M-Pesa Amount</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="默认等于应收金额" />
+        </label>
+        <label class="field">
+          <span>M-Pesa Reference</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa reference" />
+        </label>
+      ` : `
+        ${mpesaOfflineNotice}
+        <label class="field">
+          <span>Cash Amount</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="现金金额" />
+        </label>
+        <label class="field">
+          <span>M-Pesa Amount</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="M-Pesa 金额" />
+        </label>
+        <label class="field">
+          <span>M-Pesa Reference No.</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="输入 M-Pesa reference" />
+        </label>
+      `}
+    </div>
+    ${mpesaManualNotice}
+    ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
+    <div class="payment-actions cashier-terminal-payment-actions">
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成收款</span><strong>${saleDisabled ? "请先开班" : "Complete Sale"}</strong></button>
+      <div class="secondary-actions">
+        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">挂单 Hold</button>
+        <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
+      </div>
+    </div>
+  `;
+};
+function renderCashierTerminalReceiptPanel() {
+  const receiptPanel = getCashierTerminalReceiptPanel();
+  if (!(receiptPanel instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const sale = cashierTerminalState.latestCompletedSale;
+  const items = Array.isArray(sale == null ? void 0 : sale.items) ? sale.items : [];
+  const isReprint = Boolean(sale == null ? void 0 : sale.is_reprint);
+  const storeCode = (sale == null ? void 0 : sale.store_code) || getCashierTerminalStoreCode();
+  receiptPanel.innerHTML = `
+    <div class="panel-head cashier-terminal-card-head">
+      <div>
+        <p class="panel-kicker">RECEIPT</p>
+        <h3>收据预览</h3>
+      </div>
+    </div>
+    <div class="receipt-preview-paper">
+      <div class="receipt-center">
+        <strong>DIRECT LOOP</strong>
+        <span>UTAWALA STORE</span>
+      </div>
+      ${isReprint ? `<div class="receipt-center receipt-reprint-label">REPRINT COPY</div>` : ""}
+      <div class="receipt-divider"></div>
+      <div class="receipt-line"><span>Sale No.</span><strong>${escapeHtml((sale == null ? void 0 : sale.sale_no) || "-")}</strong></div>
+      <div class="receipt-line"><span>Store</span><span>${escapeHtml(storeCode)}</span></div>
+      <div class="receipt-line"><span>Cashier</span><span>${escapeHtml((sale == null ? void 0 : sale.cashier) || getCashierTerminalCashierName())}</span></div>
+      <div class="receipt-line"><span>Shift</span><span>${escapeHtml((sale == null ? void 0 : sale.shift_id) || getCashierTerminalShiftNo())}</span></div>
+      <div class="receipt-line"><span>Terminal</span><span>${escapeHtml((sale == null ? void 0 : sale.terminal_id) || `POS-${storeCode.slice(0, 3).toUpperCase()}-01`)}</span></div>
+      <div class="receipt-line"><span>Time</span><span>${escapeHtml((sale == null ? void 0 : sale.time) || cashierTerminalState.currentTime || "-")}</span></div>
+      <div class="receipt-divider"></div>
+      ${items.length ? items.map((item) => `
+        <div class="receipt-item">
+          <strong>${escapeHtml(item.display_code)}</strong>
+          <span>${escapeHtml(item.category)} · ${escapeHtml(formatCashierPreviewMoney(item.price))}</span>
+        </div>
+      `).join("") : `<div class="receipt-empty">完成收款后显示小票内容</div>`}
+      <div class="receipt-divider"></div>
+      <div class="receipt-line"><span>Total Items</span><strong>${escapeHtml((sale == null ? void 0 : sale.total_items) || 0)}</strong></div>
+      <div class="receipt-line"><span>Subtotal</span><span>${escapeHtml(formatCashierPreviewMoney((sale == null ? void 0 : sale.subtotal) || 0))}</span></div>
+      <div class="receipt-line"><span>Discount</span><span>${escapeHtml(formatCashierPreviewMoney((sale == null ? void 0 : sale.discount) || 0))}</span></div>
+      <div class="receipt-line receipt-total"><span>Total</span><strong>${escapeHtml(formatCashierPreviewMoney((sale == null ? void 0 : sale.total) || 0))}</strong></div>
+      <div class="receipt-line"><span>Payment</span><span>${escapeHtml((sale == null ? void 0 : sale.payment_method) || "-")}</span></div>
+      <div class="receipt-line"><span>Cash</span><span>${escapeHtml(formatCashierPreviewMoney((sale == null ? void 0 : sale.cash_amount) || 0))}</span></div>
+      <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney((sale == null ? void 0 : sale.mpesa_amount) || 0))}</span></div>
+      <div class="receipt-line"><span>Ref</span><span>${escapeHtml((sale == null ? void 0 : sale.mpesa_reference) || "-")}</span></div>
+      <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney((sale == null ? void 0 : sale.change) || 0))}</span></div>
+      <div class="receipt-line"><span>Status</span><span>${escapeHtml((sale == null ? void 0 : sale.status) || "-")}</span></div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-center receipt-thanks">Thank you. Karibu tena.</div>
+    </div>
+    <div class="receipt-actions">
+      <button type="button" class="secondary-inline" data-terminal-action="print-receipt">打印收据 Print Receipt</button>
+      <button type="button" class="secondary-inline" data-terminal-action="reprint-receipt">重新打印最近一单</button>
+    </div>
+    <div class="cashier-print-feedback">${escapeHtml(cashierTerminalState.printFeedback || "")}</div>
+  `;
+}
+renderCashierTerminalQuickActions = function() {
+  var _a;
+  if (!(cashierTerminalQuickActions instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalQuickActions.innerHTML = `
+    <div class="cashier-terminal-status-metrics">
+      <span><strong>今日销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
+      <span><strong>本班销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
+      <span><strong>本班订单数</strong>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
+      <span><strong>打印机状态</strong>已连接 / mock</span>
+      <span><strong>同步状态</strong>${escapeHtml(cashierTerminalState.syncStatus)}</span>
+      <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>${escapeHtml(((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.sale_no) || "-")}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales"><span>销售记录</span><strong>最近销售</strong></button>
+    </div>
+  `;
+};
+renderCashierTerminalDrawer = function() {
+  var _a, _b, _c, _d2;
+  if (!(cashierTerminalDrawer instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  const drawer = cashierTerminalState.activeDrawer;
+  if (!drawer) {
+    cashierTerminalDrawer.hidden = true;
+    if (cashierTerminalDrawerBackdrop instanceof HTMLElement) {
+      cashierTerminalDrawerBackdrop.hidden = true;
+    }
+    cashierTerminalDrawer.innerHTML = "";
+    return;
+  }
+  cashierTerminalDrawer.hidden = false;
+  if (cashierTerminalDrawerBackdrop instanceof HTMLElement) {
+    cashierTerminalDrawerBackdrop.hidden = false;
+  }
+  if (drawer === "hold-create") {
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">HOLD</p><h3>创建挂单</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <label class="field"><span>挂单原因</span><select data-terminal-drawer-field="holdReason">
+          ${["顾客继续挑选", "等 M-Pesa 确认", "顾客去取钱", "收银中断", "其他"].map((reason) => `<option value="${escapeHtml(reason)}"${cashierTerminalState.holdReason === reason ? " selected" : ""}>${escapeHtml(reason)}</option>`).join("")}
+        </select></label>
+        <label class="field"><span>顾客姓名，可选</span><input type="text" value="${escapeHtml(cashierTerminalState.holdCustomerName || "")}" data-terminal-drawer-field="holdCustomerName" /></label>
+        <label class="field"><span>顾客电话，可选</span><input type="text" value="${escapeHtml(cashierTerminalState.holdCustomerPhone || "")}" data-terminal-drawer-field="holdCustomerPhone" /></label>
+        <label class="field"><span>备注，可选</span><textarea rows="3" data-terminal-drawer-field="holdNote">${escapeHtml(cashierTerminalState.holdNote || "")}</textarea></label>
+        <div class="drawer-hint">挂单只用于临时保留购物车，不是赊账。挂单商品在本地预览中会标记为 held / reserved。</div>
+      </div>
+      <div class="drawer-foot split-actions"><button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button><button type="button" class="primary-inline" data-terminal-action="confirm-hold">确认挂单</button></div>
+    `;
+    return;
+  }
+  if (drawer === "hold-list") {
+    const holds = cashierTerminalState.holdOrders || [];
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">HOLDS</p><h3>挂单列表</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body hold-list-body">
+        ${cashierTerminalState.holdFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.holdFeedback)}</div>` : ""}
+        ${holds.length ? holds.map((hold) => {
+      var _a2;
+      return `
+          <article class="hold-card status-${escapeHtml(hold.status)}">
+            <div><strong>${escapeHtml(hold.hold_no)}</strong><span>${escapeHtml(hold.time || hold.created_at || "-")} · ${escapeHtml(hold.cashier || hold.cashier_id || "-")}</span></div>
+            <div class="hold-meta"><span>${escapeHtml(hold.item_count || 0)} 件</span><span>${escapeHtml(formatCashierPreviewMoney((_a2 = hold.total) != null ? _a2 : hold.total_amount))}</span><span>${escapeHtml(hold.reason || "-")}</span><span>${escapeHtml(hold.status || "-")}</span></div>
+            <div class="hold-meta"><span>${escapeHtml(hold.customer_name || "-")}</span><span>${escapeHtml(hold.customer_phone || "-")}</span></div>
+            <div class="hold-actions">
+              <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>继续收款</button>
+              <button type="button" class="secondary-inline danger" data-terminal-action="cancel-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>取消挂单</button>
+            </div>
+          </article>
+        `;
+    }).join("") : `<div class="cashier-terminal-empty-card">当前没有挂单。</div>`}
+      </div>
+      <div class="drawer-foot"><button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">创建挂单</button></div>
+    `;
+    return;
+  }
+  if (drawer === "reprint-confirm") {
+    const saleNo = String(cashierTerminalState.pendingReprintSaleNo || ((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.sale_no) || "").trim();
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">REPRINT</p><h3>重打小票确认</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <div class="drawer-card cashier-reprint-confirm-card">
+          <strong>这是重打小票，不会重新销售，也不会扣库存。</strong>
+          <span>${escapeHtml(saleNo ? `销售单：${saleNo}` : "将加载最近一单真实销售记录。")}</span>
+        </div>
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button>
+        <button type="button" class="primary-inline" data-terminal-action="confirm-reprint">确认重打</button>
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "recent-sales") {
+    const sales = cashierTerminalState.recentSales || [];
+    const detail = cashierTerminalState.selectedSaleDetail;
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">SALES</p><h3>最近销售</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body recent-sales-body">
+        ${cashierTerminalState.saleLookupFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.saleLookupFeedback)}</div>` : ""}
+        <div class="recent-sales-list">
+          ${sales.length ? sales.map((sale) => `
+            <article class="hold-card status-${escapeHtml(sale.status || "completed")}">
+              <div><strong>${escapeHtml(sale.sale_no || "-")}</strong><span>${escapeHtml(sale.sale_time || "-")} · ${escapeHtml(sale.cashier_id || "-")}</span></div>
+              <div class="hold-meta">
+                <span>${escapeHtml(sale.total_items || 0)} 件</span>
+                <span>${escapeHtml(formatCashierPreviewMoney(sale.total_amount || 0))}</span>
+                <span>${escapeHtml(sale.payment_method || "-")}</span>
+                <span>${escapeHtml(sale.status || "-")}</span>
+              </div>
+              <div class="hold-actions">
+                <button type="button" class="secondary-inline" data-terminal-action="view-sale-detail" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">查看详情</button>
+                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">重打收据</button>
+              </div>
+            </article>
+          `).join("") : `<div class="cashier-terminal-empty-card">暂无可重打销售单。</div>`}
+        </div>
+        ${detail ? `
+          <div class="recent-sale-detail">
+            <h4>${escapeHtml(detail.sale_no || "-")}</h4>
+            <div class="shift-info-grid">
+              <span><strong>Store</strong>${escapeHtml(detail.store_code || getCashierTerminalStoreCode())}</span>
+              <span><strong>Cashier</strong>${escapeHtml(detail.cashier || "-")}</span>
+              <span><strong>Shift</strong>${escapeHtml(detail.shift_id || "-")}</span>
+              <span><strong>Terminal</strong>${escapeHtml(detail.terminal_id || "-")}</span>
+              <span><strong>Time</strong>${escapeHtml(detail.time || "-")}</span>
+              <span><strong>Status</strong>${escapeHtml(detail.status || "-")}</span>
+            </div>
+            <div class="receipt-divider"></div>
+            ${(detail.items || []).map((item) => `
+              <div class="receipt-item">
+                <strong>${escapeHtml(item.display_code || item.machine_code || "-")}</strong>
+                <span>${escapeHtml(item.category || "-")} · ${escapeHtml(formatCashierPreviewMoney(item.price || 0))}</span>
+              </div>
+            `).join("")}
+            <div class="receipt-divider"></div>
+            <div class="receipt-line"><span>Subtotal</span><span>${escapeHtml(formatCashierPreviewMoney(detail.subtotal || 0))}</span></div>
+            <div class="receipt-line"><span>Discount</span><span>${escapeHtml(formatCashierPreviewMoney(detail.discount || 0))}</span></div>
+            <div class="receipt-line receipt-total"><span>Total</span><strong>${escapeHtml(formatCashierPreviewMoney(detail.total || 0))}</strong></div>
+            <div class="receipt-line"><span>Payment</span><span>${escapeHtml(detail.payment_method || "-")}</span></div>
+            <div class="receipt-line"><span>Cash</span><span>${escapeHtml(formatCashierPreviewMoney(detail.cash_amount || 0))}</span></div>
+            <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney(detail.mpesa_amount || 0))}</span></div>
+            <div class="receipt-line"><span>Ref</span><span>${escapeHtml(detail.mpesa_reference || "-")}</span></div>
+            <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney(detail.change || 0))}</span></div>
+          </div>
+        ` : ""}
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">刷新最近销售</button>
+        <button type="button" class="primary-inline" data-terminal-action="reprint-receipt">重新打印最近一单</button>
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "shift") {
+    const currentShift = cashierTerminalState.currentShift;
+    const summary = cashierTerminalState.shiftSummary || {};
+    const expectedCash = Number((_b = summary.expected_cash) != null ? _b : 0);
+    const countedCash = normalizeCashierTerminalNumber(cashierTerminalState.countedCash);
+    const variance = cashierTerminalState.countedCash === "" ? 0 : countedCash - expectedCash;
+    const activeHoldCount = Number((_c = summary.hold_count) != null ? _c : (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length);
+    const reportShiftId = (currentShift == null ? void 0 : currentShift.shift_id) || summary.shift_id || cashierTerminalState.shiftNo || "";
+    const zReportReady = String(summary.status || cashierTerminalState.shiftStatus || "").toLowerCase() === "closed";
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">SHIFT</p><h3>班次 / 交接班</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        ${cashierTerminalState.shiftFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.shiftFeedback)}</div>` : ""}
+        <h4>当前班次</h4>
+        <div class="shift-info-grid">
+          <span><strong>门店</strong>${escapeHtml(getCashierTerminalStoreCode())}</span>
+          <span><strong>收银员</strong>${escapeHtml(getCashierTerminalCashierName())}</span>
+          <span><strong>Terminal</strong>${escapeHtml(getCashierTerminalTerminalId())}</span>
+          <span><strong>班次号</strong>${escapeHtml((currentShift == null ? void 0 : currentShift.shift_id) || "请先开班")}</span>
+          <span><strong>Status</strong>${escapeHtml((currentShift == null ? void 0 : currentShift.status) || "not_opened")}</span>
+          <span><strong>开班时间</strong>${escapeHtml((currentShift == null ? void 0 : currentShift.opened_at) || "-")}</span>
+          <span><strong>Opening float</strong>${escapeHtml(formatCashierPreviewMoney((_d2 = currentShift == null ? void 0 : currentShift.opening_float) != null ? _d2 : cashierTerminalState.openingFloatCash))}</span>
+        </div>
+        <h4>本班统计</h4>
+        <div class="shift-stats-grid">
+          <span><strong>本班销售额</strong>${escapeHtml(formatCashierPreviewMoney(summary.total_sales || 0))}</span>
+          <span><strong>订单数</strong>${escapeHtml(summary.order_count || 0)}</span>
+          <span><strong>Cash 销售</strong>${escapeHtml(formatCashierPreviewMoney(summary.cash_sales || 0))}</span>
+          <span><strong>M-Pesa 销售</strong>${escapeHtml(formatCashierPreviewMoney(summary.mpesa_sales || 0))}</span>
+          <span><strong>Mixed Cash</strong>${escapeHtml(formatCashierPreviewMoney(summary.mixed_cash || 0))}</span>
+          <span><strong>Mixed M-Pesa</strong>${escapeHtml(formatCashierPreviewMoney(summary.mixed_mpesa || 0))}</span>
+          <span><strong>Expected Cash</strong>${escapeHtml(formatCashierPreviewMoney(expectedCash))}</span>
+          <span><strong>挂单数量</strong>${escapeHtml(activeHoldCount)}</span>
+          <span><strong>取消订单数</strong>${escapeHtml(summary.cancelled_order_count || 0)}</span>
+        </div>
+        <h4>班次报表</h4>
+        <div class="shift-report-actions">
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="x"${!(currentShift == null ? void 0 : currentShift.shift_id) ? " disabled" : ""}>查看 X-report</button>
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="z"${!reportShiftId || !zReportReady ? " disabled" : ""}>查看 Z-report</button>
+          <span class="drawer-hint">${zReportReady ? "Z-report 可查看和打印。" : "结班后可查看 Z-report"}</span>
+        </div>
+        <h4>开班 / 结班</h4>
+        ${(currentShift == null ? void 0 : currentShift.shift_id) ? `
+          <label class="field"><span>应有现金</span><input type="text" value="${escapeHtml(formatCashierPreviewMoney(expectedCash))}" disabled /></label>
+          <label class="field"><span>实点现金</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.countedCash || "")}" data-terminal-drawer-field="countedCash" placeholder="输入实点现金" /></label>
+          <div class="cashier-shift-variance ${variance === 0 ? "neutral" : variance > 0 ? "success" : "danger"}">差异：<strong id="cashierTerminalCashVariance">${escapeHtml(formatCashierPreviewMoney(variance))}</strong></div>
+          <div class="drawer-hint cashier-shift-variance-warning${variance === 0 ? " is-hidden" : ""}" id="cashierTerminalCashVarianceHint">现金有差异，请填写原因并让店长确认。</div>
+          <label class="field"><span>店长确认</span><input type="text" value="${escapeHtml(cashierTerminalState.managerConfirmedBy || "")}" data-terminal-drawer-field="managerConfirmedBy" placeholder="store_manager_1" /></label>
+          <label class="field"><span>备注</span><textarea rows="3" data-terminal-drawer-field="shiftCloseNote">${escapeHtml(cashierTerminalState.shiftCloseNote || "")}</textarea></label>
+          <div class="drawer-hint" id="cashierTerminalShiftCloseHint">${activeHoldCount ? `当前还有 ${escapeHtml(activeHoldCount)} 笔挂单未处理，请完成收款或取消挂单。` : "当前没有未处理挂单，可以结班。"}</div>
+        ` : `
+          <label class="field"><span>Opening float</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.openingFloatCash || "2000")}" data-terminal-drawer-field="openingFloatCash" placeholder="2000" /></label>
+          <label class="field"><span>开班备注</span><textarea rows="3" data-terminal-drawer-field="openingNote">${escapeHtml(cashierTerminalState.openingNote || "")}</textarea></label>
+          <div class="drawer-hint">请先开班后再收银。每笔销售会绑定当前 shift_id。</div>
+        `}
+      </div>
+      <div class="drawer-foot split-actions">
+        ${(currentShift == null ? void 0 : currentShift.shift_id) ? `
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-summary">刷新本班统计</button>
+          <button type="button" class="primary-inline" data-terminal-action="close-shift">关闭班次</button>
+        ` : `<button type="button" class="primary-inline" data-terminal-action="open-shift">开班</button>`}
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "shift-report") {
+    const report = cashierTerminalState.shiftReport || {};
+    const isZReport = report.report_type === "Z_REPORT";
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">REPORT</p><h3>DIRECT LOOP POS ${isZReport ? "Z-REPORT" : "X-REPORT"}</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body shift-report-body">
+        ${cashierTerminalState.shiftReportFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.shiftReportFeedback)}</div>` : ""}
+        <div class="drawer-card cashier-shift-report-title">
+          <strong>${isZReport ? "FINAL SHIFT REPORT / Z-REPORT" : "MID-SHIFT REPORT / X-REPORT"}</strong>
+          <span>${escapeHtml(report.store_code || getCashierTerminalStoreCode())} · ${escapeHtml(report.shift_id || "-")} · ${escapeHtml(report.generated_at || "-")}</span>
+        </div>
+        <h4>Shift</h4>
+        <div class="shift-info-grid">
+          <span><strong>Store</strong>${escapeHtml(report.store_code || getCashierTerminalStoreCode())}</span>
+          <span><strong>Shift</strong>${escapeHtml(report.shift_id || "-")}</span>
+          <span><strong>Cashier</strong>${escapeHtml(report.cashier_id || "-")}</span>
+          <span><strong>Terminal</strong>${escapeHtml(report.terminal_id || "-")}</span>
+          <span><strong>Opened At</strong>${escapeHtml(report.opened_at || "-")}</span>
+          <span><strong>Generated At</strong>${escapeHtml(report.generated_at || "-")}</span>
+          ${isZReport ? `<span><strong>Closed At</strong>${escapeHtml(report.closed_at || "-")}</span>` : ""}
+          <span><strong>Status</strong>${escapeHtml(report.status || "-")}</span>
+        </div>
+        <h4>Sales Summary</h4>
+        <div class="shift-stats-grid">
+          <span><strong>Total Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.total_sales || 0))}</span>
+          <span><strong>Orders</strong>${escapeHtml(report.order_count || 0)}</span>
+          <span><strong>Items</strong>${escapeHtml(report.item_count || 0)}</span>
+          <span><strong>Cash Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.cash_sales || 0))}</span>
+          <span><strong>M-Pesa Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.mpesa_sales || 0))}</span>
+          <span><strong>Mixed Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_cash || 0))}</span>
+          <span><strong>Mixed M-Pesa</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_mpesa || 0))}</span>
+        </div>
+        <h4>Cash Accountability</h4>
+        <div class="shift-stats-grid">
+          <span><strong>Opening Float</strong>${escapeHtml(formatCashierPreviewMoney(report.opening_float || 0))}</span>
+          <span><strong>Expected Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.expected_cash || 0))}</span>
+          <span><strong>Counted Cash</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.counted_cash || 0) : "-")}</span>
+          <span><strong>Cash Variance</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.cash_variance || 0) : "-")}</span>
+        </div>
+        <h4>Hold Summary</h4>
+        <div class="shift-stats-grid">
+          <span><strong>Total Holds</strong>${escapeHtml(report.hold_count || 0)}</span>
+          <span><strong>Active Holds</strong>${escapeHtml(report.active_hold_count || 0)}</span>
+          <span><strong>Completed Holds</strong>${escapeHtml(report.completed_hold_count || 0)}</span>
+          <span><strong>Cancelled Holds</strong>${escapeHtml(report.cancelled_hold_count || 0)}</span>
+        </div>
+        <h4>Payment Breakdown</h4>
+        <div class="report-breakdown-list">
+          ${(report.payment_breakdown || []).length ? report.payment_breakdown.map((row) => `
+            <div class="receipt-line"><span>${escapeHtml(row.method || "-")} · ${escapeHtml(row.orders || 0)} orders</span><strong>${escapeHtml(formatCashierPreviewMoney(row.amount || 0))}</strong></div>
+          `).join("") : `<div class="cashier-terminal-empty-card">暂无支付数据。</div>`}
+        </div>
+        <h4>Category Breakdown</h4>
+        <div class="report-breakdown-list">
+          ${(report.category_breakdown || []).length ? report.category_breakdown.map((row) => `
+            <div class="receipt-line"><span>${escapeHtml(row.category || "-")} · ${escapeHtml(row.qty || 0)} pcs</span><strong>${escapeHtml(formatCashierPreviewMoney(row.amount || 0))}</strong></div>
+          `).join("") : `<div class="cashier-terminal-empty-card">暂无品类数据。</div>`}
+        </div>
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="close-drawer">Close</button>
+        <button type="button" class="primary-inline" data-terminal-action="print-shift-report">Print Report</button>
+      </div>
+    `;
+    return;
+  }
+  if (drawer === "sync") {
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">SYNC</p><h3>网络 / 同步状态</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <div class="shift-info-grid">
+          <span><strong>当前状态</strong>${escapeHtml(getCashierTerminalNetworkLabel())}</span>
+          <span><strong>待同步销售单</strong>${escapeHtml(cashierTerminalState.pendingSaleCount)}</span>
+          <span><strong>待同步挂单</strong>${escapeHtml(cashierTerminalState.pendingHoldCount)}</span>
+          <span><strong>最近同步</strong>${escapeHtml(cashierTerminalState.lastSyncAt)}</span>
+        </div>
+        <div class="drawer-hint">第一版只做前端 mock，不做真实离线数据库。一个门店先按一台主 POS 设计。</div>
+      </div>
+      <div class="drawer-foot split-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="manual-sync">手动同步</button>
+        <button type="button" class="secondary-inline warning" data-terminal-action="simulate-weak">模拟弱网</button>
+        <button type="button" class="secondary-inline danger" data-terminal-action="simulate-offline">模拟离线</button>
+        <button type="button" class="primary-inline" data-terminal-action="restore-online">模拟恢复在线</button>
+      </div>
+    `;
+    return;
+  }
+  cashierTerminalDrawer.innerHTML = `
+    <div class="drawer-head"><div><p class="panel-kicker">STORE</p><h3>切换店铺</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+    <div class="drawer-body">
+      <button type="button" class="store-switch-row is-active" data-terminal-action="select-store" data-store-code="UTAWALA">UTAWALA · 当前门店</button>
+      <button type="button" class="store-switch-row" data-terminal-action="select-store" data-store-code="CBD-DEMO">CBD-DEMO · mock 暂不可切换</button>
+      <div class="drawer-hint">${escapeHtml(cashierTerminalState.switchStoreFeedback || "本地预览固定使用 UTAWALA，不切换真实门店上下文。")}</div>
+    </div>
+  `;
+};
+renderCashierTerminal = function() {
+  if (!(cashierTerminalShell instanceof HTMLElement)) {
+    return;
+  }
+  ensureCashierTerminalPreviewState();
+  applyCashierTerminalChromeCopy();
+  renderCashierTerminalSessionStrip();
+  renderCashierTerminalStatusBar();
+  renderCashierTerminalLookupPanel();
+  renderCashierTerminalCart();
+  renderCashierTerminalPaymentPanel();
+  renderCashierTerminalReceiptPanel();
+  renderCashierTerminalQuickActions();
+  renderCashierTerminalDrawer();
+  applyGlobalI18n(cashierTerminalShell, currentLanguage);
+};
+setCashierTerminalPaymentMode = function(mode) {
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.activePaymentMode = ["cash", "mpesa", "mixed"].includes(mode) ? mode : "cash";
+  renderCashierTerminal();
+};
+function findCashierTerminalPreviewItem(query) {
+  const normalized = normalizeCashierPreviewScan(query);
+  const digits = normalized.replace(/[^0-9]/g, "");
+  return getCashierTerminalMockItems().find((item) => {
+    const displayCode = String(item.display_code || "").toUpperCase();
+    const machineCode = String(item.machine_code || "");
+    return normalized === displayCode || normalized === machineCode || digits && digits === machineCode;
+  });
+}
+function getCashierTerminalResolvedBusinessObject(resolved = {}) {
+  const businessObject = resolved == null ? void 0 : resolved.business_object;
+  return businessObject && typeof businessObject === "object" ? businessObject : {};
+}
+function getFirstCashierTerminalField(...values) {
+  const value = values.find((candidate) => String(candidate != null ? candidate : "").trim());
+  return String(value != null ? value : "").trim();
+}
+function getCashierTerminalResolvedStatuses(resolved = {}) {
+  const businessObject = getCashierTerminalResolvedBusinessObject(resolved);
+  return [
+    resolved.status,
+    resolved.store_item_status,
+    resolved.sale_status,
+    resolved.print_status,
+    businessObject.status,
+    businessObject.store_item_status,
+    businessObject.sale_status
+  ].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean);
+}
+function createCashierTerminalScanRejectError(message, resolved = {}) {
+  const error = new Error(message);
+  error.reject_reason = message;
+  error.barcode_type = (resolved == null ? void 0 : resolved.barcode_type) || (resolved == null ? void 0 : resolved.type) || "";
+  return error;
+}
+function ensureCashierTerminalResolvedItemCanEnterCart(resolved = {}, query = "") {
+  const rejectReason = String((resolved == null ? void 0 : resolved.reject_reason) || (resolved == null ? void 0 : resolved.rejection_message) || "").trim();
+  if (rejectReason) {
+    throw createCashierTerminalScanRejectError(rejectReason, resolved);
+  }
+  const barcodeType = String((resolved == null ? void 0 : resolved.barcode_type) || "").trim().toUpperCase();
+  if (barcodeType !== "STORE_ITEM") {
+    throw createCashierTerminalScanRejectError("只能扫描 STORE_ITEM 商品码。", resolved);
+  }
+  if ((resolved == null ? void 0 : resolved.pos_allowed) !== true) {
+    throw createCashierTerminalScanRejectError("该 STORE_ITEM 暂未被允许在 POS 销售。", resolved);
+  }
+  const businessObject = getCashierTerminalResolvedBusinessObject(resolved);
+  const storeCode = getFirstCashierTerminalField(resolved.store_code, businessObject.store_code).toUpperCase();
+  if (!storeCode) {
+    throw new Error("无法确认商品所属门店，不能在当前 POS 销售。");
+  }
+  if (storeCode !== getCashierTerminalStoreCode()) {
+    throw new Error("其他门店商品不能在当前 POS 销售。");
+  }
+  const statuses = getCashierTerminalResolvedStatuses(resolved);
+  const blockedStatuses = /* @__PURE__ */ new Set(["sold", "sold_pending_sync", "held", "reserved", "transferred_out", "voided", "pending_print", "pending_putaway"]);
+  const blockedStatus = statuses.find((status) => blockedStatuses.has(status));
+  if (blockedStatus === "sold" || blockedStatus === "sold_pending_sync") {
+    throw new Error("该商品已售出，不能重复销售。");
+  }
+  if (blockedStatus === "held" || blockedStatus === "reserved") {
+    throw new Error("该商品正在挂单保留中，不能重复销售。");
+  }
+  if (blockedStatus === "transferred_out") {
+    throw new Error("该商品已转出当前门店，不能销售。");
+  }
+  if (blockedStatus === "voided") {
+    throw new Error("该商品已作废，不能销售。");
+  }
+  if (blockedStatus === "pending_print" || blockedStatus === "pending_putaway") {
+    throw new Error("该商品还未上架，不可销售。");
+  }
+  if (!statuses.some((status) => CASHIER_TERMINAL_SALEABLE_STORE_ITEM_STATUSES.has(status))) {
+    throw new Error("该商品还未上架，不可销售。");
+  }
+  const resolvedCodes = [
+    resolved.display_code,
+    resolved.store_item_display_code,
+    resolved.barcode_value,
+    resolved.machine_code,
+    resolved.store_item_machine_code,
+    resolved.object_id,
+    resolved.identity_id,
+    query
+  ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+  if (cashierTerminalState.cartItems.some((row) => {
+    const rowCodes = [
+      row.display_code,
+      row.machine_code,
+      row.store_item_display_code,
+      row.store_item_machine_code,
+      row.barcode,
+      row.object_id,
+      row.identity_id
+    ].map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+    return resolvedCodes.some((code) => rowCodes.includes(code));
+  })) {
+    throw new Error("该商品已在购物车中，不能重复加入。");
+  }
+}
+function mapCashierTerminalResolvedStoreItem(resolved = {}, query = "") {
+  const businessObject = getCashierTerminalResolvedBusinessObject(resolved);
+  const barcodeValue2 = getFirstCashierTerminalField(resolved.barcode_value, resolved.machine_code, resolved.store_item_machine_code, query);
+  const displayCode = getFirstCashierTerminalField(resolved.display_code, resolved.store_item_display_code, resolved.object_id, barcodeValue2);
+  const category = getFirstCashierTerminalField(
+    resolved.category_name,
+    resolved.category,
+    [resolved.category_main, resolved.category_sub].filter(Boolean).join(" / "),
+    businessObject.category_name,
+    businessObject.category,
+    "未分类"
+  );
+  const price = Number(getFirstCashierTerminalField(
+    resolved.selling_price_kes,
+    resolved.selected_price,
+    resolved.expected_price,
+    resolved.price,
+    businessObject.selling_price_kes,
+    businessObject.selected_price,
+    0
+  ) || 0);
+  return {
+    display_code: displayCode || barcodeValue2,
+    machine_code: barcodeValue2,
+    store_item_machine_code: barcodeValue2,
+    barcode: barcodeValue2,
+    type: "STORE_ITEM",
+    barcode_type: "STORE_ITEM",
+    object_id: getFirstCashierTerminalField(resolved.object_id, businessObject.id),
+    identity_id: getFirstCashierTerminalField(resolved.identity_id, businessObject.identity_id),
+    category,
+    shelf_location: getFirstCashierTerminalField(resolved.store_rack_code, resolved.shelf_location, resolved.rack_code, businessObject.store_rack_code),
+    store_rack_code: getFirstCashierTerminalField(resolved.store_rack_code, resolved.shelf_location, resolved.rack_code, businessObject.store_rack_code),
+    price,
+    selling_price: price,
+    expected_price: price,
+    qty: 1,
+    store: getFirstCashierTerminalField(resolved.store_code, businessObject.store_code, getCashierTerminalStoreCode()),
+    status: getFirstCashierTerminalResolvedStatuses(resolved)[0] || "on_shelf",
+    resolver_result: resolved
+  };
+}
+function resolveCashierTerminalLocalDemoItem(query) {
+  const normalizedQuery = normalizeCashierPreviewScan(query);
+  const item = findCashierTerminalPreviewItem(normalizedQuery);
+  if (item && (item == null ? void 0 : item.type) !== "STORE_ITEM") {
+    throw new Error(CASHIER_TERMINAL_REJECT_MESSAGES[item == null ? void 0 : item.type] || "只能扫描 STORE_ITEM 商品码。");
+  }
+  if (!item) {
+    throw new Error("未识别条码，请确认是否为 STORE_ITEM 商品码。");
+  }
+  ensureCashierTerminalResolvedItemCanEnterCart({
+    ...item,
+    barcode_type: "STORE_ITEM",
+    pos_allowed: true,
+    store_code: item.store,
+    barcode_value: item.machine_code,
+    selling_price_kes: item.price
+  }, normalizedQuery);
+  return {
+    ...item,
+    barcode: item.machine_code,
+    store_item_machine_code: item.machine_code,
+    selling_price: Number(item.price || 0),
+    expected_price: Number(item.price || 0),
+    local_demo_notice: CASHIER_TERMINAL_LOCAL_DEMO_NOTICE
+  };
+}
+function isCashierTerminalResolverUnavailableError(error) {
+  const status = Number((error == null ? void 0 : error.status) || 0);
+  if (!status) {
+    return true;
+  }
+  if (status >= 500) {
+    return true;
+  }
+  const message = formatErrorMessage(error);
+  return status === 404 && /not found|cannot get|barcode\/resolve/i.test(message);
+}
+async function resolveCashierTerminalStoreItemForPos(query) {
+  const normalizedQuery = normalizeCashierPreviewScan(query);
+  if (!normalizedQuery) {
+    throw new Error("请先扫描 STORE_ITEM 商品码。");
+  }
+  let resolved = null;
+  try {
+    resolved = await resolveBarcodeForContext(normalizedQuery, "pos", [], { rejectOnContextReject: false });
+  } catch (error) {
+    if (!isCashierTerminalResolverUnavailableError(error)) {
+      throw error;
+    }
+    ensureCashierTerminalPreviewState();
+    cashierTerminalState.scanFallbackNotice = CASHIER_TERMINAL_LOCAL_DEMO_NOTICE;
+    const fallback = resolveCashierTerminalLocalDemoItem(normalizedQuery);
+    fallback.local_demo_notice = CASHIER_TERMINAL_LOCAL_DEMO_NOTICE;
+    return fallback;
+  }
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.scanFallbackNotice = "";
+  ensureCashierTerminalResolvedItemCanEnterCart(resolved, normalizedQuery);
+  return mapCashierTerminalResolvedStoreItem(resolved, normalizedQuery);
+}
+function resolveCashierTerminalPreviewScan(query) {
+  const fallback = resolveCashierTerminalLocalDemoItem(query);
+  if (!fallback) {
+    throw new Error("该商品还未上架，不可销售。");
+  }
+  return fallback;
+}
+function formatCashierTerminalScanError(error) {
+  var _a, _b;
+  const reject_reason = String((error == null ? void 0 : error.reject_reason) || ((_a = error == null ? void 0 : error.payload) == null ? void 0 : _a.reject_reason) || (error == null ? void 0 : error.detail) || formatErrorMessage(error) || "").trim();
+  const barcodeType = String((error == null ? void 0 : error.barcode_type) || ((_b = error == null ? void 0 : error.payload) == null ? void 0 : _b.barcode_type) || "").trim().toUpperCase();
+  const normalized = `${barcodeType} ${reject_reason}`.toUpperCase();
+  let detail = reject_reason || "未识别条码，请确认是否为 STORE_ITEM 商品码。";
+  if (/STORE_DELIVERY_EXECUTION|SDO/.test(normalized)) {
+    detail = `你扫到的是 SDO 送货单码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+  } else if (/STORE_DELIVERY_PACKAGE|SDP/.test(normalized)) {
+    detail = `你扫到的是 SDP 门店配送包裹码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+  } else if (/DISPATCH_BALE|STORE_PREP_BALE|SDB/.test(normalized)) {
+    detail = `你扫到的是 SDB 仓库待送店包码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+  } else if (/LOOSE_PICK_TASK|LPK/.test(normalized)) {
+    detail = `你扫到的是 LPK 补差拣货工单码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+  } else if (/RAW_BALE|RAW/.test(normalized)) {
+    detail = `你扫到的是 RAW_BALE 仓库原始包码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+  }
+  return {
+    title: "不能销售：请扫描商品码 STORE_ITEM",
+    detail
+  };
+}
+upsertCashierTerminalCartItem = function(result) {
+  ensureCashierTerminalPreviewState();
+  const machineCode = String((result == null ? void 0 : result.machine_code) || (result == null ? void 0 : result.store_item_machine_code) || (result == null ? void 0 : result.barcode) || "").trim();
+  if (!machineCode) {
+    return;
+  }
+  if (cashierTerminalState.cartItems.some((row) => String(row.machine_code || row.barcode || "") === machineCode)) {
+    throw new Error("该商品已在购物车中，不能重复加入。");
+  }
+  cashierTerminalState.cartItems = [
+    ...cashierTerminalState.cartItems,
+    {
+      display_code: result.display_code || result.store_item_display_code || machineCode,
+      machine_code: machineCode,
+      type: "STORE_ITEM",
+      category: result.category || result.category_summary || "未分类",
+      shelf_location: result.shelf_location || result.store_rack_code || "",
+      price: Number(result.price || result.selling_price || result.expected_price || 0),
+      qty: 1,
+      store: result.store || getCashierTerminalStoreCode()
+    }
+  ];
+  renderCashierTerminal();
+};
+resetCashierTerminalForNextSale = function() {
+  cashierTerminalState.cartItems = [];
+  cashierTerminalState.currentLookupResult = null;
+  cashierTerminalState.activeHoldNo = "";
+  cashierTerminalState.discountAmount = "";
+  cashierTerminalState.cashReceived = "";
+  cashierTerminalState.mpesaAmount = "";
+  cashierTerminalState.mpesaReference = "";
+  cashierTerminalState.mixedCashAmount = "";
+  cashierTerminalState.mixedMpesaAmount = "";
+  cashierTerminalState.mixedMpesaReference = "";
+  cashierTerminalState.activeDrawer = "";
+  clearCashierTerminalLookupInputs();
+  renderCashierTerminal();
+  focusCashierTerminalScanInput();
+};
+submitCashierTerminalLookup = async function({ addToCart = false } = {}) {
+  const query = String((cashierTerminalBarcodeInput == null ? void 0 : cashierTerminalBarcodeInput.value) || (cashierTerminalManualInput == null ? void 0 : cashierTerminalManualInput.value) || "").trim();
+  if (!query) {
+    throw new Error("请先扫描 STORE_ITEM 商品码。");
+  }
+  try {
+    const result = await resolveCashierTerminalStoreItemForPos(query);
+    cashierTerminalState.scanErrorTitle = "";
+    cashierTerminalState.scanErrorDetail = "";
+    cashierTerminalState.currentLookupResult = result;
+    if (addToCart) {
+      upsertCashierTerminalCartItem(result);
+      const fallbackNotice = result.local_demo_notice ? ` · ${result.local_demo_notice}` : "";
+      showTransientInlineNotice("#cashierTerminalInlineNotice", `已加入购物车：${result.display_code || result.barcode}${fallbackNotice}`, result.local_demo_notice ? "warning" : "success", 1800);
+      clearCashierTerminalLookupInputs();
+    }
+    renderCashierTerminal();
+    focusCashierTerminalScanInput();
+    return result;
+  } catch (error) {
+    const scanError = formatCashierTerminalScanError(error);
+    cashierTerminalState.scanErrorTitle = scanError.title;
+    cashierTerminalState.scanErrorDetail = scanError.detail;
+    renderCashierTerminalLookupPanel();
+    focusCashierTerminalScanInput({ select: true });
+    throw error;
+  }
+};
+function validateCashierTerminalPayment() {
+  const totals = getCashierTerminalTotals();
+  if (!totals.totalItems) {
+    throw new Error("购物车为空，请先扫描 STORE_ITEM 商品码。");
+  }
+  if (cashierTerminalState.activePaymentMode === "cash") {
+    const cash = normalizeCashierTerminalNumber(cashierTerminalState.cashReceived);
+    if (cash < totals.totalAmount) {
+      throw new Error(`还差 ${formatCashierPreviewMoney(totals.totalAmount - cash)}`);
+    }
+    return { cashAmount: cash, mpesaAmount: 0, reference: "", paid: cash };
+  }
+  if (cashierTerminalState.activePaymentMode === "mpesa") {
+    const mpesaAmount2 = normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
+    if (mpesaAmount2 < totals.totalAmount) {
+      throw new Error(`M-Pesa 还差 ${formatCashierPreviewMoney(totals.totalAmount - mpesaAmount2)}`);
+    }
+    if (!String(cashierTerminalState.mpesaReference || "").trim()) {
+      throw new Error("请输入 M-Pesa Reference");
+    }
+    return { cashAmount: 0, mpesaAmount: mpesaAmount2, reference: String(cashierTerminalState.mpesaReference || "").trim(), paid: mpesaAmount2 };
+  }
+  const cashAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount);
+  const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
+  if (cashAmount + mpesaAmount < totals.totalAmount) {
+    throw new Error(`Cash + M-Pesa 还差 ${formatCashierPreviewMoney(totals.totalAmount - cashAmount - mpesaAmount)}`);
+  }
+  if (mpesaAmount > 0 && !String(cashierTerminalState.mixedMpesaReference || "").trim()) {
+    throw new Error("请输入 M-Pesa Reference");
+  }
+  return { cashAmount, mpesaAmount, reference: String(cashierTerminalState.mixedMpesaReference || "").trim(), paid: cashAmount + mpesaAmount };
+}
+function buildCashierTerminalPosSalePayload(payment) {
+  var _a;
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  const cartItems = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  if (!cartItems.length) {
+    throw new Error("购物车为空，请先扫描 STORE_ITEM 商品码。");
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  return {
+    cashier_id: getCashierTerminalCashierName(),
+    shift_id: ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo,
+    terminal_id: getCashierTerminalTerminalId(),
+    hold_no: cashierTerminalState.activeHoldNo || "",
+    payment_method: cashierTerminalState.activePaymentMode,
+    cash_amount: payment.cashAmount,
+    mpesa_amount: payment.mpesaAmount,
+    mpesa_reference: payment.reference,
+    discount_amount: totals.discount,
+    items: cartItems.map((row) => ({
+      machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
+      display_code: String(row.store_item_display_code || row.display_code || "").trim(),
+      final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
+      discount_amount: 0
+    }))
+  };
+}
+function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
+  const items = Array.isArray(sale.items) ? sale.items : [];
+  return {
+    sale_id: sale.sale_id || sale.sale_no || "",
+    sale_no: sale.sale_no,
+    order_no: sale.sale_no,
+    store_code: sale.store_code || getCashierTerminalStoreCode(),
+    cashier: sale.cashier_id || getCashierTerminalCashierName(),
+    shift_id: sale.shift_id || getCashierTerminalShiftNo(),
+    terminal_id: sale.terminal_id || `POS-${getCashierTerminalStoreCode().slice(0, 3).toUpperCase()}-01`,
+    time: sale.sale_time || cashierTerminalState.currentTime || (/* @__PURE__ */ new Date()).toLocaleString("zh-CN", { hour12: false }),
+    items: items.map((item) => {
+      var _a, _b;
+      return {
+        line_no: item.line_no || 0,
+        display_code: item.display_code || item.machine_code || "",
+        machine_code: item.machine_code || "",
+        barcode: item.machine_code || "",
+        category: item.category || "未分类",
+        shelf_location: item.shelf_location || "",
+        price: normalizeCashierTerminalNumber((_a = item.final_price) != null ? _a : item.original_price),
+        selling_price: normalizeCashierTerminalNumber((_b = item.final_price) != null ? _b : item.original_price),
+        qty: 1
+      };
+    }),
+    total_items: items.length,
+    subtotal: normalizeCashierTerminalNumber(sale.subtotal),
+    discount: normalizeCashierTerminalNumber(sale.discount_amount),
+    total: normalizeCashierTerminalNumber(sale.total_amount),
+    payment_method: sale.payment_method || cashierTerminalState.activePaymentMode,
+    cash_amount: normalizeCashierTerminalNumber(sale.cash_amount),
+    mpesa_amount: normalizeCashierTerminalNumber(sale.mpesa_amount),
+    mpesa_reference: sale.mpesa_reference || "",
+    change: normalizeCashierTerminalNumber(sale.change_amount),
+    status: sale.status || "completed",
+    is_reprint: Boolean(options.reprint)
+  };
+}
+function isCashierTerminalSaleLookupApiUnavailableError(error) {
+  const status = Number((error == null ? void 0 : error.status) || 0);
+  if (!status || status >= 500) {
+    return true;
+  }
+  if (status !== 404) {
+    return false;
+  }
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (/^not found$/i.test(message)) {
+    return true;
+  }
+  return /cannot\s+get\s+.*\/stores\/[^/]+\/pos-sales/i.test(message);
+}
+function formatCashierTerminalSaleLookupError(error) {
+  const status = Number((error == null ? void 0 : error.status) || 0);
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (isCashierTerminalSaleLookupApiUnavailableError(error)) {
+    return "销售记录接口不可用，请稍后重试。";
+  }
+  if (status === 404 && /不属于|门店|store/i.test(message)) {
+    return "该销售单不属于当前门店。";
+  }
+  if (status === 404) {
+    return "未找到该销售单。";
+  }
+  return message || "销售记录接口不可用，请稍后重试。";
+}
+async function fetchCashierTerminalRecentSales(limit = 20) {
+  const storeCode = getCashierTerminalStoreCode();
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales?limit=${encodeURIComponent(String(limit))}`);
+}
+async function fetchCashierTerminalSaleDetail(saleNo) {
+  const storeCode = getCashierTerminalStoreCode();
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales/${encodeURIComponent(saleNo)}`);
+}
+async function loadCashierTerminalRecentSales(limit = 20) {
+  ensureCashierTerminalPreviewState();
+  try {
+    const response = await fetchCashierTerminalRecentSales(limit);
+    cashierTerminalState.recentSales = Array.isArray(response == null ? void 0 : response.sales) ? response.sales : [];
+    cashierTerminalState.saleLookupFeedback = cashierTerminalState.recentSales.length ? `已加载最近销售：${cashierTerminalState.recentSales.length} 单` : "暂无可重打销售单。";
+    renderCashierTerminalDrawer();
+    return cashierTerminalState.recentSales;
+  } catch (error) {
+    const message = formatCashierTerminalSaleLookupError(error);
+    cashierTerminalState.saleLookupFeedback = message;
+    renderCashierTerminalDrawer();
+    throw new Error(message);
+  }
+}
+async function loadCashierTerminalSaleReceiptForReprint(saleNo, { reprint = true } = {}) {
+  ensureCashierTerminalPreviewState();
+  if (!String(saleNo || "").trim()) {
+    throw new Error("未找到该销售单。");
+  }
+  try {
+    const sale = await fetchCashierTerminalSaleDetail(saleNo);
+    const normalized = normalizeCashierTerminalBackendSale(sale, { reprint: true });
+    normalized.is_reprint = Boolean(reprint);
+    cashierTerminalState.latestCompletedSale = normalized;
+    cashierTerminalState.selectedSaleDetail = normalized;
+    cashierTerminalState.saleLookupFeedback = reprint ? `收据已准备重打：${normalized.sale_no}` : `已加载销售单：${normalized.sale_no}`;
+    cashierTerminalState.printFeedback = cashierTerminalState.saleLookupFeedback;
+    if (reprint) {
+      cashierTerminalState.activeDrawer = "";
+      cashierTerminalState.pendingReprintSaleNo = "";
+    }
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    renderCashierTerminalQuickActions();
+    renderCashierTerminalStatusBar();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.saleLookupFeedback, "success", 1800);
+    if (reprint) {
+      focusCashierTerminalScanInput({ select: false });
+    }
+    return normalized;
+  } catch (error) {
+    const message = formatCashierTerminalSaleLookupError(error);
+    cashierTerminalState.saleLookupFeedback = message;
+    cashierTerminalState.printFeedback = message;
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    throw new Error(message);
+  }
+}
+async function loadCashierTerminalLatestReceiptForReprint() {
+  var _a;
+  ensureCashierTerminalPreviewState();
+  const latestSaleNo = String(((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.sale_no) || "").trim();
+  if (latestSaleNo) {
+    return await loadCashierTerminalSaleReceiptForReprint(latestSaleNo);
+  }
+  let response;
+  try {
+    response = await fetchCashierTerminalRecentSales(1);
+  } catch (error) {
+    const message = formatCashierTerminalSaleLookupError(error);
+    cashierTerminalState.saleLookupFeedback = message;
+    cashierTerminalState.printFeedback = message;
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    throw new Error(message);
+  }
+  const latest = Array.isArray(response == null ? void 0 : response.sales) ? response.sales[0] : null;
+  if (!(latest == null ? void 0 : latest.sale_no)) {
+    cashierTerminalState.saleLookupFeedback = "暂无可重打销售单。";
+    cashierTerminalState.printFeedback = "暂无可重打销售单。";
+    renderCashierTerminalReceiptPanel();
+    renderCashierTerminalDrawer();
+    throw new Error("暂无可重打销售单。");
+  }
+  return await loadCashierTerminalSaleReceiptForReprint(latest.sale_no);
+}
+function openCashierTerminalReprintConfirmation(saleNo = "") {
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.pendingReprintSaleNo = String(saleNo || "").trim();
+  cashierTerminalState.activeDrawer = "reprint-confirm";
+  renderCashierTerminalDrawer();
+}
+function normalizeCashierTerminalShift(shift = {}) {
+  var _a, _b, _c, _d2, _e2;
+  const normalized = {
+    shift_id: String(shift.shift_id || shift.shift_no || "").trim(),
+    store_code: String(shift.store_code || getCashierTerminalStoreCode()).trim().toUpperCase(),
+    cashier_id: String(shift.cashier_id || shift.cashier_name || getCashierTerminalCashierName()).trim(),
+    terminal_id: String(shift.terminal_id || getCashierTerminalTerminalId()).trim(),
+    opening_float: normalizeCashierTerminalNumber((_a = shift.opening_float) != null ? _a : shift.opening_float_cash),
+    opened_at: String(shift.opened_at || "").trim(),
+    opened_by: String(shift.opened_by || "").trim(),
+    status: String(shift.status || "open").trim().toLowerCase(),
+    closed_at: shift.closed_at || null,
+    closed_by: shift.closed_by || null,
+    counted_cash: (_c = (_b = shift.counted_cash) != null ? _b : shift.closing_cash_counted) != null ? _c : null,
+    expected_cash: (_d2 = shift.expected_cash) != null ? _d2 : null,
+    cash_variance: (_e2 = shift.cash_variance) != null ? _e2 : null,
+    manager_confirmed_by: String(shift.manager_confirmed_by || "").trim(),
+    note: String(shift.note || "").trim()
+  };
+  return normalized;
+}
+function applyCashierTerminalShift(shift = null) {
+  const normalized = (shift == null ? void 0 : shift.shift_id) ? normalizeCashierTerminalShift(shift) : null;
+  cashierTerminalState.currentShift = normalized;
+  cashierTerminalState.shiftNo = (normalized == null ? void 0 : normalized.shift_id) || "";
+  cashierTerminalState.shiftStatus = (normalized == null ? void 0 : normalized.status) || "not_opened";
+  cashierTerminalState.shiftOpen = Boolean(normalized == null ? void 0 : normalized.shift_id) && normalized.status === "open";
+  cashierTerminalState.shiftOpenedAt = (normalized == null ? void 0 : normalized.opened_at) || "";
+  if ((normalized == null ? void 0 : normalized.opening_float) != null) {
+    cashierTerminalState.openingFloatCash = String(normalized.opening_float);
+  }
+  return normalized;
+}
+async function fetchCashierTerminalCurrentShift() {
+  const storeCode = getCashierTerminalStoreCode();
+  const cashierId = getCashierTerminalCashierName();
+  const terminalId = getCashierTerminalTerminalId();
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/current?cashier_id=${encodeURIComponent(cashierId)}&terminal_id=${encodeURIComponent(terminalId)}`);
+}
+async function openCashierTerminalShift() {
+  ensureCashierTerminalPreviewState();
+  const storeCode = getCashierTerminalStoreCode();
+  const shift = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/open`, {
+    method: "POST",
+    body: JSON.stringify({
+      cashier_id: getCashierTerminalCashierName(),
+      terminal_id: getCashierTerminalTerminalId(),
+      opening_float: normalizeCashierTerminalNumber(cashierTerminalState.openingFloatCash || 0),
+      note: cashierTerminalState.openingNote || ""
+    })
+  });
+  cashierTerminalState.currentShift = normalizeCashierTerminalShift(shift);
+  applyCashierTerminalShift(cashierTerminalState.currentShift);
+  cashierTerminalState.shiftFeedback = `已成功开班：${cashierTerminalState.currentShift.shift_id}`;
+  await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "success", 1800);
+  focusCashierTerminalScanInput({ select: false });
+  return cashierTerminalState.currentShift;
+}
+async function loadCashierTerminalShiftSummary(shiftId = ((_c) => (_c = cashierTerminalState.currentShift) == null ? void 0 : _c.shift_id)() || cashierTerminalState.shiftNo) {
+  ensureCashierTerminalPreviewState();
+  if (!String(shiftId || "").trim()) {
+    cashierTerminalState.shiftSummary = null;
+    return null;
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const summary = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/summary`);
+  cashierTerminalState.shiftSummary = summary;
+  cashierTerminalState.shiftSalesAmount = normalizeCashierTerminalNumber(summary.total_sales);
+  cashierTerminalState.shiftOrderCount = Number(summary.order_count || 0);
+  cashierTerminalState.cashSalesAmount = normalizeCashierTerminalNumber(summary.cash_sales);
+  cashierTerminalState.mpesaSalesAmount = normalizeCashierTerminalNumber(summary.mpesa_sales);
+  cashierTerminalState.mixedCashAmountTotal = normalizeCashierTerminalNumber(summary.mixed_cash);
+  cashierTerminalState.mixedMpesaAmountTotal = normalizeCashierTerminalNumber(summary.mixed_mpesa);
+  cashierTerminalState.cancelledOrderCount = Number(summary.cancelled_order_count || 0);
+  renderCashierTerminalDrawer();
+  renderCashierTerminalQuickActions();
+  return summary;
+}
+function normalizeCashierTerminalSignedNumber(value) {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+function normalizeCashierTerminalShiftReport(report = {}) {
+  const paymentBreakdown = Array.isArray(report.payment_breakdown) ? report.payment_breakdown : [];
+  const categoryBreakdown = Array.isArray(report.category_breakdown) ? report.category_breakdown : [];
+  return {
+    ...report,
+    report_type: String(report.report_type || "").trim().toUpperCase(),
+    store_code: String(report.store_code || getCashierTerminalStoreCode()).trim().toUpperCase(),
+    shift_id: String(report.shift_id || "").trim(),
+    cashier_id: String(report.cashier_id || "").trim(),
+    terminal_id: String(report.terminal_id || "").trim(),
+    status: String(report.status || "").trim(),
+    opened_at: String(report.opened_at || "").trim(),
+    closed_at: report.closed_at || "",
+    closed_by: String(report.closed_by || "").trim(),
+    manager_confirmed_by: String(report.manager_confirmed_by || "").trim(),
+    generated_at: String(report.generated_at || "").trim(),
+    opening_float: normalizeCashierTerminalNumber(report.opening_float),
+    total_sales: normalizeCashierTerminalNumber(report.total_sales),
+    order_count: Number(report.order_count || 0),
+    item_count: Number(report.item_count || 0),
+    cash_sales: normalizeCashierTerminalNumber(report.cash_sales),
+    mpesa_sales: normalizeCashierTerminalNumber(report.mpesa_sales),
+    mixed_cash: normalizeCashierTerminalNumber(report.mixed_cash),
+    mixed_mpesa: normalizeCashierTerminalNumber(report.mixed_mpesa),
+    expected_cash: normalizeCashierTerminalNumber(report.expected_cash),
+    counted_cash: report.counted_cash == null ? null : normalizeCashierTerminalNumber(report.counted_cash),
+    cash_variance: report.cash_variance == null ? null : normalizeCashierTerminalSignedNumber(report.cash_variance),
+    hold_count: Number(report.hold_count || 0),
+    active_hold_count: Number(report.active_hold_count || 0),
+    completed_hold_count: Number(report.completed_hold_count || 0),
+    cancelled_hold_count: Number(report.cancelled_hold_count || 0),
+    cancelled_order_count: Number(report.cancelled_order_count || 0),
+    payment_breakdown: paymentBreakdown.map((row) => ({
+      method: String(row.method || "").trim(),
+      orders: Number(row.orders || 0),
+      amount: normalizeCashierTerminalNumber(row.amount)
+    })),
+    category_breakdown: categoryBreakdown.map((row) => ({
+      category: String(row.category || "未分类").trim() || "未分类",
+      qty: Number(row.qty || 0),
+      amount: normalizeCashierTerminalNumber(row.amount)
+    }))
+  };
+}
+async function loadCashierTerminalShiftReport(reportType = "x") {
+  var _a, _b;
+  ensureCashierTerminalPreviewState();
+  const normalizedReportType = String(reportType || "x").trim().toLowerCase();
+  const reportSlug = normalizedReportType.startsWith("z") ? "z" : "x";
+  const shiftId = String(
+    ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || ((_b = cashierTerminalState.shiftSummary) == null ? void 0 : _b.shift_id) || cashierTerminalState.shiftNo || ""
+  ).trim();
+  if (!shiftId) {
+    cashierTerminalState.shiftReportFeedback = "请先选择班次后再查看报表。";
+    renderCashierTerminalDrawer();
+    throw new Error(cashierTerminalState.shiftReportFeedback);
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const report = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/${reportSlug}-report`);
+  cashierTerminalState.shiftReport = normalizeCashierTerminalShiftReport(report);
+  cashierTerminalState.shiftReportFeedback = `已加载 ${cashierTerminalState.shiftReport.report_type === "Z_REPORT" ? "Z-report" : "X-report"}：${cashierTerminalState.shiftReport.shift_id}`;
+  cashierTerminalState.activeDrawer = "shift-report";
+  renderCashierTerminalDrawer();
+  return cashierTerminalState.shiftReport;
+}
+function printCashierTerminalShiftReport() {
+  ensureCashierTerminalPreviewState();
+  const report = cashierTerminalState.shiftReport;
+  if (!(report == null ? void 0 : report.shift_id)) {
+    throw new Error("请先加载班次报表。");
+  }
+  cashierTerminalState.shiftReportFeedback = `${report.report_type === "Z_REPORT" ? "Z-report" : "X-report"} 已准备打印：${report.shift_id}`;
+  renderCashierTerminalDrawer();
+  if (typeof window.print === "function") {
+    window.print();
+  }
+}
+async function closeCashierTerminalShiftBackend() {
+  var _a;
+  ensureCashierTerminalPreviewState();
+  const shiftId = ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo;
+  if (!shiftId) {
+    throw new Error("请先开班后再结班。");
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/close`, {
+    method: "POST",
+    body: JSON.stringify({
+      counted_cash: normalizeCashierTerminalNumber(cashierTerminalState.countedCash),
+      note: cashierTerminalState.shiftCloseNote || "",
+      manager_confirmed_by: cashierTerminalState.managerConfirmedBy || ""
+    })
+  });
+  cashierTerminalState.shiftSummary = result;
+  cashierTerminalState.currentShift = null;
+  cashierTerminalState.shiftNo = "";
+  cashierTerminalState.shiftStatus = "closed";
+  cashierTerminalState.shiftOpen = false;
+  cashierTerminalState.shiftFeedback = `班次已关闭，现金差异 ${formatCashierPreviewMoney(result.cash_variance || 0)}。请先开班后再收银。`;
+  cashierTerminalState.countedCash = "";
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", "请先开班后再收银。", "warning", 2200);
+  return result;
+}
+function isCashierTerminalSaleApiUnavailableError(error) {
+  const status = Number((error == null ? void 0 : error.status) || 0);
+  if (!status || status >= 500) {
+    return true;
+  }
+  if (status !== 404) {
+    return false;
+  }
+  const message = String(formatErrorMessage(error) || "").trim();
+  if (/^not found$/i.test(message)) {
+    return true;
+  }
+  return /cannot\s+(get|post)\s+.*\/stores\/[^/]+\/pos-sales/i.test(message);
+}
+function markCashierTerminalSoldItemsLocally(sale) {
+  const soldCodes = new Set(
+    ((sale == null ? void 0 : sale.items) || []).map((item) => String(item.machine_code || item.barcode || "").trim()).filter(Boolean)
+  );
+  if (!soldCodes.size) {
+    return;
+  }
+  cashierTerminalState.mockItems = getCashierTerminalMockItems().map(
+    (item) => soldCodes.has(String(item.machine_code || "").trim()) ? { ...item, status: "sold" } : item
+  );
+}
+async function submitCashierTerminalBackendSale() {
+  var _a, _b, _c;
+  ensureCashierTerminalPreviewState();
+  if (!((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id)) {
+    cashierTerminalState.shiftFeedback = "请先开班后再收银。";
+    renderCashierTerminalPaymentPanel();
+    renderCashierTerminalStatusBar();
+    throw new Error("请先开班后再收银。");
+  }
+  const totals = getCashierTerminalTotals();
+  const payment = validateCashierTerminalPayment();
+  const payload = buildCashierTerminalPosSalePayload(payment);
+  const storeCode = getCashierTerminalStoreCode();
+  let backendSale;
+  try {
+    backendSale = await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    if (isCashierTerminalSaleApiUnavailableError(error)) {
+      throw new Error("真实销售接口不可用，本单未完成。请恢复系统后重试。");
+    }
+    throw error;
+  }
+  const sale = normalizeCashierTerminalBackendSale(backendSale);
+  cashierTerminalState.latestCompletedSale = sale;
+  cashierTerminalState.voidOrderNo = sale.order_no || cashierTerminalState.voidOrderNo;
+  cashierTerminalState.refundOrderNo = sale.order_no || cashierTerminalState.refundOrderNo;
+  cashierTerminalState.refundBarcode = ((_c = (_b = sale.items) == null ? void 0 : _b[0]) == null ? void 0 : _c.barcode) || cashierTerminalState.refundBarcode;
+  markCashierTerminalSoldItemsLocally(sale);
+  cashierTerminalState.todaySalesAmount += sale.total || totals.totalAmount;
+  cashierTerminalState.todayOrderCount += 1;
+  cashierTerminalState.shiftSalesAmount += sale.total || totals.totalAmount;
+  cashierTerminalState.shiftOrderCount += 1;
+  if (sale.payment_method === "cash") {
+    cashierTerminalState.cashSalesAmount += sale.cash_amount || payment.cashAmount;
+  } else if (sale.payment_method === "mpesa") {
+    cashierTerminalState.mpesaSalesAmount += sale.mpesa_amount || payment.mpesaAmount;
+  } else {
+    cashierTerminalState.mixedCashAmountTotal += sale.cash_amount || payment.cashAmount;
+    cashierTerminalState.mixedMpesaAmountTotal += sale.mpesa_amount || payment.mpesaAmount;
+  }
+  await loadCashierTerminalShiftSummary(sale.shift_id || payload.shift_id);
+  resetCashierTerminalForNextSale();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", `销售完成：${sale.sale_no}`, "success", 2200);
+  return sale;
+}
+submitCashierTerminalSale = async function() {
+  return await submitCashierTerminalBackendSale();
+};
+updateCashierTerminalPaymentField = function(field, value, index = null) {
+  if (index != null && Array.isArray(cashierTerminalState.paymentLines) && cashierTerminalState.paymentLines[index]) {
+    cashierTerminalState.paymentLines[index][field] = String(value || "");
+  } else {
+    cashierTerminalState[field] = String(value || "");
+  }
+  syncCashierTerminalPaymentPreview();
+};
+updateCashierTerminalDrawerField = function(field, value) {
+  var _a, _b;
+  cashierTerminalState[field] = String(value || "");
+  if (field === "countedCash") {
+    const expectedCash = Number((_b = (_a = cashierTerminalState.shiftSummary) == null ? void 0 : _a.expected_cash) != null ? _b : 0);
+    const variance = normalizeCashierTerminalNumber(value) - expectedCash;
+    const target = document.querySelector("#cashierTerminalCashVariance");
+    if (target) {
+      target.textContent = formatCashierPreviewMoney(variance);
+      const wrapper = target.closest(".cashier-shift-variance");
+      if (wrapper instanceof HTMLElement) {
+        wrapper.classList.toggle("neutral", variance === 0);
+        wrapper.classList.toggle("success", variance > 0);
+        wrapper.classList.toggle("danger", variance < 0);
+      }
+    }
+    const hint = document.querySelector("#cashierTerminalCashVarianceHint");
+    if (hint instanceof HTMLElement) {
+      hint.classList.toggle("is-hidden", variance === 0);
+    }
+  }
+};
+function syncCashierTerminalPaymentPreview() {
+  const totals = getCashierTerminalTotals();
+  const paid = getCashierTerminalPaymentAssignedTotal();
+  const change = cashierTerminalState.activePaymentMode === "cash" ? getCashierTerminalChangeDue() : Math.max(totals.totalAmount - paid, 0);
+  const pairs = {
+    itemCount: totals.totalItems,
+    subtotal: formatCashierPreviewMoney(totals.subtotal),
+    discount: formatCashierPreviewMoney(totals.discount),
+    receivable: formatCashierPreviewMoney(totals.totalAmount),
+    paid: formatCashierPreviewMoney(paid),
+    change: formatCashierPreviewMoney(change)
+  };
+  Object.entries(pairs).forEach(([key, value]) => {
+    document.querySelectorAll(`[data-terminal-live="${key}"]`).forEach((node) => {
+      node.textContent = String(value);
+    });
+  });
+  document.querySelectorAll("[data-terminal-payment-guidance]").forEach((node) => {
+    const guidance = getCashierTerminalPaymentGuidance();
+    node.textContent = guidance;
+    node.hidden = !guidance;
+  });
+}
+updateCashierTerminalCartField = function(index, field, value) {
+  const row = cashierTerminalState.cartItems[index];
+  if (!row) {
+    return;
+  }
+  if (field === "qty") {
+    row.qty = 1;
+  } else {
+    row[field] = String(value || "");
+  }
+  renderCashierTerminal();
+};
+function normalizeCashierTerminalBackendHold(hold = {}) {
+  const items = Array.isArray(hold.items) ? hold.items : [];
+  return {
+    hold_id: hold.hold_id || hold.hold_no || "",
+    hold_no: hold.hold_no || hold.hold_id || "",
+    time: hold.created_at || "",
+    created_at: hold.created_at || "",
+    cashier: hold.cashier_id || getCashierTerminalCashierName(),
+    cashier_id: hold.cashier_id || getCashierTerminalCashierName(),
+    shift_id: hold.shift_id || "",
+    terminal_id: hold.terminal_id || getCashierTerminalTerminalId(),
+    item_count: Number(hold.item_count || items.length || 0),
+    total: normalizeCashierTerminalNumber(hold.total_amount),
+    total_amount: normalizeCashierTerminalNumber(hold.total_amount),
+    reason: hold.reason || "顾客继续挑选",
+    customer_name: hold.customer_name || "",
+    customer_phone: hold.customer_phone || "",
+    note: hold.note || "",
+    status: String(hold.status || "held").trim().toLowerCase(),
+    cancel_reason: hold.cancel_reason || "",
+    items: items.map((item) => {
+      var _a, _b;
+      return {
+        display_code: item.display_code || item.machine_code || "",
+        machine_code: item.machine_code || "",
+        store_item_machine_code: item.machine_code || "",
+        barcode: item.machine_code || "",
+        type: "STORE_ITEM",
+        category: item.category || "未分类",
+        shelf_location: item.shelf_location || "",
+        price: normalizeCashierTerminalNumber((_a = item.final_price) != null ? _a : item.original_price),
+        selling_price: normalizeCashierTerminalNumber((_b = item.final_price) != null ? _b : item.original_price),
+        qty: 1,
+        status: "held",
+        hold_no: hold.hold_no || hold.hold_id || ""
+      };
+    })
+  };
+}
+async function loadCashierTerminalHoldList(limit = 20) {
+  ensureCashierTerminalPreviewState();
+  const storeCode = getCashierTerminalStoreCode();
+  const response = await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds?status=held&limit=${encodeURIComponent(String(limit))}`);
+  cashierTerminalState.holdOrders = (Array.isArray(response == null ? void 0 : response.holds) ? response.holds : []).map(normalizeCashierTerminalBackendHold);
+  cashierTerminalState.pendingHoldCount = cashierTerminalState.holdOrders.length;
+  renderCashierTerminalDrawer();
+  return cashierTerminalState.holdOrders;
+}
+async function createCashierTerminalHold() {
+  var _a, _b;
+  ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  if (!totals.totalItems) {
+    throw new Error("购物车为空，不能挂单");
+  }
+  if (!((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id)) {
+    throw new Error("请先开班后再挂单");
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const cartItems = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
+  const hold = await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds`, {
+    method: "POST",
+    body: JSON.stringify({
+      cashier_id: getCashierTerminalCashierName(),
+      shift_id: cashierTerminalState.currentShift.shift_id,
+      terminal_id: getCashierTerminalTerminalId(),
+      reason: cashierTerminalState.holdReason || "顾客继续挑选",
+      customer_name: cashierTerminalState.holdCustomerName || "",
+      customer_phone: cashierTerminalState.holdCustomerPhone || "",
+      note: cashierTerminalState.holdNote || "",
+      items: cartItems.map((row) => ({
+        machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
+        display_code: String(row.store_item_display_code || row.display_code || "").trim(),
+        final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
+        discount_amount: 0
+      }))
+    })
+  });
+  const normalized = normalizeCashierTerminalBackendHold(hold);
+  cashierTerminalState.holdOrders = [normalized, ...(cashierTerminalState.holdOrders || []).filter((row) => row.hold_no !== normalized.hold_no)];
+  cashierTerminalState.pendingHoldCount = cashierTerminalState.holdOrders.filter((row) => row.status === "held").length;
+  cashierTerminalState.cartItems = [];
+  cashierTerminalState.activeHoldNo = "";
+  cashierTerminalState.activeDrawer = "hold-list";
+  cashierTerminalState.holdFeedback = `挂单已创建：${normalized.hold_no}`;
+  if ((_b = cashierTerminalState.currentShift) == null ? void 0 : _b.shift_id) {
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+  }
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.holdFeedback, "success", 1800);
+  focusCashierTerminalScanInput({ select: false });
+  return normalized;
+}
+async function resumeCashierTerminalHold(holdNo) {
+  const normalizedHoldNo = String(holdNo || "").trim();
+  if (!normalizedHoldNo) {
+    return null;
+  }
+  holdNo = normalizedHoldNo;
+  const storeCode = getCashierTerminalStoreCode();
+  const hold = normalizeCashierTerminalBackendHold(await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds/${encodeURIComponent(holdNo)}/resume`, {
+    method: "POST"
+  }));
+  cashierTerminalState.cartItems = hold.items.map((item) => ({ ...item, status: "held", hold_no: hold.hold_no }));
+  cashierTerminalState.activeHoldNo = hold.hold_no;
+  cashierTerminalState.holdOrders = (cashierTerminalState.holdOrders || []).map((row) => row.hold_no === hold.hold_no ? hold : row);
+  cashierTerminalState.activeDrawer = "";
+  cashierTerminalState.holdFeedback = `已恢复挂单：${hold.hold_no}`;
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.holdFeedback, "success", 1800);
+  focusCashierTerminalScanInput({ select: false });
+  return hold;
+}
+async function cancelCashierTerminalHold(holdNo) {
+  var _a;
+  const normalizedHoldNo = String(holdNo || "").trim();
+  if (!normalizedHoldNo) {
+    return null;
+  }
+  holdNo = normalizedHoldNo;
+  const cancelReason = typeof window.prompt === "function" ? window.prompt("取消挂单原因", cashierTerminalState.holdCancelReason || "顾客不要了") : cashierTerminalState.holdCancelReason || "顾客不要了";
+  if (cancelReason === null) {
+    return null;
+  }
+  cashierTerminalState.holdCancelReason = String(cancelReason || "").trim() || "顾客不要了";
+  const storeCode = getCashierTerminalStoreCode();
+  const hold = normalizeCashierTerminalBackendHold(await request(`/stores/${encodeURIComponent(storeCode)}/pos-holds/${encodeURIComponent(holdNo)}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ cancel_reason: cashierTerminalState.holdCancelReason })
+  }));
+  cashierTerminalState.holdOrders = (cashierTerminalState.holdOrders || []).map((row) => row.hold_no === hold.hold_no ? hold : row);
+  cashierTerminalState.pendingHoldCount = cashierTerminalState.holdOrders.filter((row) => row.status === "held").length;
+  if (cashierTerminalState.activeHoldNo === hold.hold_no) {
+    cashierTerminalState.activeHoldNo = "";
+  }
+  cashierTerminalState.holdFeedback = "挂单已取消，商品已释放";
+  if ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) {
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+  }
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.holdFeedback, "success", 1800);
+  focusCashierTerminalScanInput({ select: false });
+  return hold;
+}
+function closeCashierTerminalShift() {
+  const activeHoldCount = (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length;
+  if (activeHoldCount) {
+    throw new Error("当前还有挂单未处理，请完成收款或取消挂单。");
+  }
+  cashierTerminalState.shiftStatus = "closed";
+  showTransientInlineNotice("#cashierTerminalInlineNotice", "本地预览：班次已关闭。下一位收银员需要重新开班。", "success", 2200);
+  renderCashierTerminal();
+}
+function exitCashierTerminalPreview() {
+  var _a;
+  const fallbackPanel = getOrderedPanelsForWorkspace("store").find((panel) => panel.dataset.panelKey !== getCashierTerminalSalesPanelKey());
+  const targetPanelKey = cashierTerminalReturnPanelKey || ((_a = fallbackPanel == null ? void 0 : fallbackPanel.dataset) == null ? void 0 : _a.panelKey) || "";
+  if (targetPanelKey) {
+    setActivePanel(targetPanelKey);
+  } else {
+    setActiveWorkspace("store");
+  }
+  document.body.classList.remove("cashier-terminal-mode");
+  appShell == null ? void 0 : appShell.classList.remove("cashier-terminal-mode");
+}
+handleCashierTerminalAction = async function(action, target) {
+  var _a, _b;
+  switch (action) {
+    case "logout":
+      await submitLogout();
+      return;
+    case "exit-pos":
+      exitCashierTerminalPreview();
+      return;
+    case "clear-cart":
+      cashierTerminalState.cartItems = [];
+      renderCashierTerminal();
+      focusCashierTerminalScanInput();
+      return;
+    case "open-drawer":
+      cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
+      renderCashierTerminal();
+      if (cashierTerminalState.activeDrawer === "recent-sales") {
+        await loadCashierTerminalRecentSales(20);
+      } else if (cashierTerminalState.activeDrawer === "shift" && ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id)) {
+        await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+      }
+      return;
+    case "close-drawer":
+      cashierTerminalState.activeDrawer = "";
+      renderCashierTerminal();
+      focusCashierTerminalScanInput({ select: false });
+      return;
+    case "complete-sale":
+      await submitCashierTerminalSale();
+      return;
+    case "open-shift":
+    case "submit-open-shift":
+      await openCashierTerminalShift();
+      return;
+    case "load-shift-summary":
+      await loadCashierTerminalShiftSummary(((_b = cashierTerminalState.currentShift) == null ? void 0 : _b.shift_id) || cashierTerminalState.shiftNo);
+      return;
+    case "load-shift-report":
+      await loadCashierTerminalShiftReport(target.dataset.terminalReportType);
+      return;
+    case "print-shift-report":
+      printCashierTerminalShiftReport();
+      return;
+    case "confirm-hold":
+      await createCashierTerminalHold();
+      return;
+    case "resume-hold":
+      await resumeCashierTerminalHold(target.dataset.terminalHoldNo);
+      return;
+    case "cancel-hold":
+      await cancelCashierTerminalHold(target.dataset.terminalHoldNo);
+      return;
+    case "manager-confirm-shift":
+      showTransientInlineNotice("#cashierTerminalInlineNotice", "mock：店长已确认本班现金差异记录。", "success", 1800);
+      return;
+    case "close-shift":
+      await closeCashierTerminalShiftBackend();
+      return;
+    case "manual-sync":
+    case "restore-online":
+      cashierTerminalState.networkStatus = "syncing";
+      cashierTerminalState.syncStatus = "同步中";
+      renderCashierTerminal();
+      window.setTimeout(() => {
+        cashierTerminalState.networkStatus = "synced";
+        cashierTerminalState.syncStatus = "已同步";
+        cashierTerminalState.pendingSaleCount = 0;
+        cashierTerminalState.pendingHoldCount = 0;
+        cashierTerminalState.lastSyncAt = (/* @__PURE__ */ new Date()).toLocaleTimeString("zh-CN", { hour12: false });
+        renderCashierTerminal();
+      }, 900);
+      return;
+    case "simulate-weak":
+      cashierTerminalState.networkStatus = "weak";
+      cashierTerminalState.syncStatus = "弱网，销售将待同步";
+      renderCashierTerminal();
+      return;
+    case "simulate-offline":
+      cashierTerminalState.networkStatus = "offline";
+      cashierTerminalState.syncStatus = "离线，销售将待同步";
+      renderCashierTerminal();
+      return;
+    case "print-receipt":
+      cashierTerminalState.printFeedback = cashierTerminalState.latestCompletedSale ? `mock：已发送打印 ${cashierTerminalState.latestCompletedSale.sale_no}` : "还没有最近一单可打印。";
+      renderCashierTerminalReceiptPanel();
+      return;
+    case "reprint-receipt":
+      openCashierTerminalReprintConfirmation("");
+      return;
+    case "view-sale-detail":
+      await loadCashierTerminalSaleReceiptForReprint(target.dataset.terminalSaleNo, { reprint: false });
+      return;
+    case "reprint-sale":
+      openCashierTerminalReprintConfirmation(target.dataset.terminalSaleNo);
+      return;
+    case "confirm-reprint":
+      if (cashierTerminalState.pendingReprintSaleNo) {
+        await loadCashierTerminalSaleReceiptForReprint(cashierTerminalState.pendingReprintSaleNo, { reprint: true });
+      } else {
+        await loadCashierTerminalLatestReceiptForReprint();
+      }
+      return;
+    case "select-store":
+      cashierTerminalState.switchStoreFeedback = target.dataset.storeCode === "UTAWALA" ? "当前已经是 UTAWALA。" : "本地预览暂不切换真实门店上下文。";
+      renderCashierTerminalDrawer();
+      return;
+    default:
+      return;
+  }
+};
+handleCashierTerminalHotkeys = function(event) {
+  if (!isCashierTerminalPanelActive() || event.altKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+  if (event.key === "F2") {
+    event.preventDefault();
+    setCashierTerminalPaymentMode("cash");
+    return;
+  }
+  if (event.key === "F3") {
+    event.preventDefault();
+    setCashierTerminalPaymentMode("mpesa");
+    return;
+  }
+  if (event.key === "F4") {
+    event.preventDefault();
+    setCashierTerminalPaymentMode("mixed");
+    return;
+  }
+  if (event.key === "F8") {
+    event.preventDefault();
+    submitCashierTerminalSale().catch((error) => {
+      showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
+    });
+    return;
+  }
+  if (event.key === "Escape" && cashierTerminalState.activeDrawer) {
+    event.preventDefault();
+    cashierTerminalState.activeDrawer = "";
+    renderCashierTerminal();
+    focusCashierTerminalScanInput({ select: false });
+  }
+};
 async function request(path, options = {}) {
   const isFormDataBody = options.body instanceof FormData;
   const headers = {
@@ -28140,11 +30772,11 @@ function getOpsExceptionTypeLabel(value = "") {
   return labels[String(value || "").trim()] || value || "-";
 }
 function getOpsExceptionFilters() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   return {
     status: String(((_a = document.querySelector("#opsExceptionStatusFilter")) == null ? void 0 : _a.value) || "").trim(),
     domain: String(((_b = document.querySelector("#opsExceptionDomainFilter")) == null ? void 0 : _b.value) || "").trim(),
-    severity: String(((_c2 = document.querySelector("#opsExceptionSeverityFilter")) == null ? void 0 : _c2.value) || "").trim()
+    severity: String(((_c = document.querySelector("#opsExceptionSeverityFilter")) == null ? void 0 : _c.value) || "").trim()
   };
 }
 function hydrateOpsExceptionDeskForm(record = null) {
@@ -28373,12 +31005,12 @@ function buildBaleSalesOutboundSaleDraftFromRow(row = {}) {
   return resolver(row);
 }
 function getBaleSalesPricingFilters() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const form = document.querySelector("#baleSalesPricingFilterForm");
   return {
     shipment_no: String(((_a = form == null ? void 0 : form.querySelector("[name='shipment_no']")) == null ? void 0 : _a.value) || "").trim(),
     status: String(((_b = form == null ? void 0 : form.querySelector("[name='status']")) == null ? void 0 : _b.value) || "").trim(),
-    source_type: String(((_c2 = form == null ? void 0 : form.querySelector("[name='source_type']")) == null ? void 0 : _c2.value) || "").trim()
+    source_type: String(((_c = form == null ? void 0 : form.querySelector("[name='source_type']")) == null ? void 0 : _c.value) || "").trim()
   };
 }
 function renderBaleSalesPricingFilters(rows = baleSalesPricingCandidateState) {
@@ -29636,7 +32268,7 @@ function getTransferDerivedStoreDispatchRows() {
     (Array.isArray(storeDispatchBaleState) ? storeDispatchBaleState : []).map((row) => String((row == null ? void 0 : row.store_delivery_execution_order_no) || (row == null ? void 0 : row.execution_order_no) || (row == null ? void 0 : row.official_delivery_barcode) || "").trim().toUpperCase()).filter(Boolean)
   );
   (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
-    var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
+    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
     const sdoCode = String(
       (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
     ).trim().toUpperCase();
@@ -29646,7 +32278,7 @@ function getTransferDerivedStoreDispatchRows() {
       ...Array.isArray((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.packages) ? transfer.store_delivery_execution_order.packages : [],
       ...Array.isArray(transfer == null ? void 0 : transfer.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : [],
       ...Array.isArray(transfer == null ? void 0 : transfer.store_dispatch_bales) ? transfer.store_dispatch_bales : [],
-      ...Array.isArray((_c2 = transfer == null ? void 0 : transfer.delivery_batch) == null ? void 0 : _c2.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : [],
+      ...Array.isArray((_c = transfer == null ? void 0 : transfer.delivery_batch) == null ? void 0 : _c.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : [],
       ...Array.isArray((_d2 = transfer == null ? void 0 : transfer.shipment_session) == null ? void 0 : _d2.packages) ? transfer.shipment_session.packages : []
     ];
     const explicitItemCounts = upstreamPackageRows.map((row) => parseKnownDispatchItemCount(row)).filter((count) => count !== null);
@@ -29863,7 +32495,7 @@ function getStoreCommandCenterClerkOptions(storeCode = getCurrentStoreCodeFallba
   return getAssignableStoreClerks(storeCode).map((user) => getAssignableUserValue(user)).filter(Boolean);
 }
 function renderStoreManagerConsoleSummary(context = {}) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const target = document.querySelector("#storeManagerConsoleSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -29889,7 +32521,7 @@ function renderStoreManagerConsoleSummary(context = {}) {
   const commandCenter = buildStoreReceivingCommandCenterViewModel(storeCode, context.selected_sdo_code);
   const hasCommandCenterClerks = commandCenter.clerk_options.length > 0;
   const commandCenterClerkOptionsHtml = hasCommandCenterClerks ? commandCenter.clerk_options.map((name) => `<option value="${escapeHtml(name)}" ${name === commandCenter.selected_clerk ? "selected" : ""}>${escapeHtml(name)}</option>`).join("") : `<option value="" selected disabled>${escapeHtml(getNoActiveStaffLabel())}</option>`;
-  const commandCenterAssignmentDisabled = !((_c2 = (_b = commandCenter.selected) == null ? void 0 : _b.packages) == null ? void 0 : _c2.some((row) => isStoreReceivingPackageAssignable(row))) || !hasCommandCenterClerks;
+  const commandCenterAssignmentDisabled = !((_c = (_b = commandCenter.selected) == null ? void 0 : _b.packages) == null ? void 0 : _c.some((row) => isStoreReceivingPackageAssignable(row))) || !hasCommandCenterClerks;
   const renderArrivalTransferQueue = (groups = []) => {
     if (!groups.length) {
       return `<div class="empty-state">当前没有待验收的 SDO 送货单。</div>`;
@@ -30361,7 +32993,7 @@ function getBarcodeResolverBusinessSummary(barcodeType = "") {
   return "系统暂时无法识别这个码。";
 }
 function renderBarcodeResolverSingleResult(result = {}, context = "") {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const businessObjectKind = ((_a = result == null ? void 0 : result.business_object) == null ? void 0 : _a.kind) || "";
   const businessObjectId = ((_b = result == null ? void 0 : result.business_object) == null ? void 0 : _b.id) || "";
   const allowedContexts = Array.isArray(result == null ? void 0 : result.allowed_contexts) ? result.allowed_contexts.join(", ") : "";
@@ -30378,7 +33010,7 @@ function renderBarcodeResolverSingleResult(result = {}, context = "") {
       <div class="subtle small">object_id: ${escapeHtml((result == null ? void 0 : result.object_id) || "-")}</div>
       <div class="subtle small">identity_id: ${escapeHtml((result == null ? void 0 : result.identity_id) || "-")}</div>
       <div class="subtle small">template_scope: ${escapeHtml((result == null ? void 0 : result.template_scope) || "-")}</div>
-      <div class="subtle small">pos_allowed: ${escapeHtml(String((_c2 = result == null ? void 0 : result.pos_allowed) != null ? _c2 : "-"))}</div>
+      <div class="subtle small">pos_allowed: ${escapeHtml(String((_c = result == null ? void 0 : result.pos_allowed) != null ? _c : "-"))}</div>
       <div class="subtle small">allowed_contexts: ${escapeHtml(allowedContexts || "-")}</div>
       <div class="subtle small">rejected_contexts: ${escapeHtml(rejectedContexts || "-")}</div>
       <div class="subtle small">reject_reason: ${escapeHtml((result == null ? void 0 : result.reject_reason) || "-")}</div>
@@ -31249,10 +33881,10 @@ function getStoreMobileLineGeneratedQty(state = storeMobilePricingPreviewState, 
   }, 0);
 }
 function getStoreMobileSourceLineProgress(state = storeMobilePricingPreviewState, sourceLineKey = "") {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
   const totalQty = Number(
-    (_d2 = (_c2 = (_b = (_a = line == null ? void 0 : line.total_qty) != null ? _a : line == null ? void 0 : line.item_count) != null ? _b : line == null ? void 0 : line.quantity) != null ? _c2 : line == null ? void 0 : line.remaining_qty) != null ? _d2 : 0
+    (_d2 = (_c = (_b = (_a = line == null ? void 0 : line.total_qty) != null ? _a : line == null ? void 0 : line.item_count) != null ? _b : line == null ? void 0 : line.quantity) != null ? _c : line == null ? void 0 : line.remaining_qty) != null ? _d2 : 0
   );
   const allocatedQty = getStoreMobileLineAllocatedQty(state, sourceLineKey);
   const generatedQty = getStoreMobileLineGeneratedQty(state, sourceLineKey);
@@ -31270,8 +33902,8 @@ function getStoreMobileTaskTotals(state = storeMobilePricingPreviewState) {
   const groupedTotal = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
   const sourceLines = getStoreMobilePricingSourceLines(state);
   const sourceTotal = sourceLines.reduce((sum, line) => {
-    var _a2, _b2, _c2, _d2;
-    return sum + Number((_d2 = (_c2 = (_b2 = (_a2 = line.total_qty) != null ? _a2 : line.item_count) != null ? _b2 : line.quantity) != null ? _c2 : line.remaining_qty) != null ? _d2 : 0);
+    var _a2, _b2, _c, _d2;
+    return sum + Number((_d2 = (_c = (_b2 = (_a2 = line.total_qty) != null ? _a2 : line.item_count) != null ? _b2 : line.quantity) != null ? _c : line.remaining_qty) != null ? _d2 : 0);
   }, 0);
   const selectedSdpTotal = Number(((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.total_count) || ((_b = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _b.item_count) || 0);
   const total = selectedSdpTotal || sourceTotal || groupedTotal;
@@ -31363,13 +33995,13 @@ function getStoreMobileAssignedTaskMachineCode(row = {}) {
   return /^SDP\d{9}$/.test(displayCode) && /^\d{9}$/.test(displayDigits) ? `6${displayDigits}` : "";
 }
 function createStoreMobileSelectedSdpFromBackendTask(row = {}, state = storeMobilePricingPreviewState) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
   const displayCode = getStoreMobileAssignedTaskCode(row);
   const machineCode = getStoreMobileAssignedTaskMachineCode(row);
   const parentSdoDisplayCode = String((row == null ? void 0 : row.parent_sdo_display_code) || (row == null ? void 0 : row.parent_sdo_order_no) || (row == null ? void 0 : row.sdo_code) || (row == null ? void 0 : row.source_sdo) || "").trim().toUpperCase();
   const parentSdoMachineCode = String((row == null ? void 0 : row.parent_sdo_machine_code) || (row == null ? void 0 : row.sdo_machine_code) || "").replace(/[^0-9]/g, "").trim();
   const storeCode = String((row == null ? void 0 : row.store_code) || (row == null ? void 0 : row.store_name) || ((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.store_name) || ((_b = currentSession.user) == null ? void 0 : _b.store_code) || getCurrentStoreCodeFallback()).trim().toUpperCase();
-  const packageNo = (row == null ? void 0 : row.package_total) ? `${(row == null ? void 0 : row.package_no) || 1}/${row.package_total}` : String((row == null ? void 0 : row.package_no) || (row == null ? void 0 : row.package_index) || ((_c2 = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _c2.package_no) || "").trim();
+  const packageNo = (row == null ? void 0 : row.package_total) ? `${(row == null ? void 0 : row.package_no) || 1}/${row.package_total}` : String((row == null ? void 0 : row.package_no) || (row == null ? void 0 : row.package_index) || ((_c = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _c.package_no) || "").trim();
   const itemCount = (row == null ? void 0 : row.item_count) === null || (row == null ? void 0 : row.item_count) === void 0 || (row == null ? void 0 : row.item_count) === "" ? Number(((_d2 = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _d2.total_count) || 0) : Number(row.item_count || 0);
   return {
     ...(state == null ? void 0 : state.selectedSdp) || {},
@@ -31476,12 +34108,12 @@ function getStoreMobileSuggestedSalePrice(categoryMain = "", categorySub = "", g
   return Number((record == null ? void 0 : record.default_sale_price_kes) || 0);
 }
 function getStoreMobileLineRemainingQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
   if (!line) {
     return 0;
   }
-  const totalQty = Number((_d2 = (_c2 = (_b = (_a = line.total_qty) != null ? _a : line.item_count) != null ? _b : line.quantity) != null ? _c2 : line.remaining_qty) != null ? _d2 : 0);
+  const totalQty = Number((_d2 = (_c = (_b = (_a = line.total_qty) != null ? _a : line.item_count) != null ? _b : line.quantity) != null ? _c : line.remaining_qty) != null ? _d2 : 0);
   const allocatedQty = getStoreMobileLineAllocatedQty(state, sourceLineKey, currentGroupId);
   return Math.max(0, (Number.isFinite(totalQty) ? totalQty : 0) - allocatedQty);
 }
@@ -31497,7 +34129,7 @@ function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPrevi
   return { ok: true, message: "" };
 }
 function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, value = "") {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const [sourceLineKey = "", rawGrade = ""] = String(value || "").split("||");
   const grade = String(rawGrade || "P").trim().toUpperCase();
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === sourceLineKey);
@@ -31538,7 +34170,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     rack_code: `PDA-${grade === "CUSTOM" ? "CUS" : grade}-001`,
     source_sdp_display_code: line.source_sdp_display_code || ((_a = state.selectedSdp) == null ? void 0 : _a.display_code) || "",
     source_sdp_machine_code: line.source_sdp_machine_code || ((_b = state.selectedSdp) == null ? void 0 : _b.machine_code) || "",
-    source_type: line.source_type || ((_c2 = state.selectedSdp) == null ? void 0 : _c2.source_type) || "",
+    source_type: line.source_type || ((_c = state.selectedSdp) == null ? void 0 : _c.source_type) || "",
     source_code: line.source_code || ((_d2 = state.selectedSdp) == null ? void 0 : _d2.source_code) || "",
     status: "待生成商品码",
     workflow_status: "draft"
@@ -31769,7 +34401,7 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
   const pricingSourceLines = getStoreMobilePricingSourceLines(state);
   const getGroupTierText = (group = {}) => {
@@ -31827,7 +34459,7 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
               </div>
               ${renderStoreMobilePricingBadge("no demo fallback")}
             </div>
-            <div class="mobile-field-group-meta">该 ${escapeHtml(((_c2 = state.selectedSdp) == null ? void 0 : _c2.source_type) || "LPK")} SDP 暂无 category line 明细，不能显示 A/B 80件 demo 分组。</div>
+            <div class="mobile-field-group-meta">该 ${escapeHtml(((_c = state.selectedSdp) == null ? void 0 : _c.source_type) || "LPK")} SDP 暂无 category line 明细，不能显示 A/B 80件 demo 分组。</div>
           </article>
         </div>
       `;
@@ -32029,10 +34661,10 @@ function getStoreMobilePricingTypeForGroup(group = {}) {
   return "CUSTOM";
 }
 function normalizeStoreItemForLabelPreview(item = {}, group = {}) {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2;
   const machineCode = String(item.machine_code || item.barcode_value || "").replace(/[^0-9]/g, "").trim();
   const priceKes = Number(
-    (_f2 = (_e2 = (_d2 = (_c2 = (_b = (_a = item.price_kes) != null ? _a : item.sale_price_kes) != null ? _b : item.selling_price_kes) != null ? _c2 : item.selected_price) != null ? _d2 : group.sale_price_kes) != null ? _e2 : group.price_kes) != null ? _f2 : 0
+    (_f2 = (_e2 = (_d2 = (_c = (_b = (_a = item.price_kes) != null ? _a : item.sale_price_kes) != null ? _b : item.selling_price_kes) != null ? _c : item.selected_price) != null ? _d2 : group.sale_price_kes) != null ? _e2 : group.price_kes) != null ? _f2 : 0
   );
   const categoryShort = String(
     item.category_short || group.category_short || item.category_sub || group.category_sub || item.category_main || group.category_main || group.category || ""
@@ -32095,8 +34727,10 @@ function renderStoreMobileGeneratedStoreItemList(group = {}) {
   `;
 }
 function getStoreMobileStoreCode(state = storeMobilePricingPreviewState) {
-  var _a, _b, _c2;
-  return String(((_a = state.selectedSdp) == null ? void 0 : _a.store_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.store_name) || ((_c2 = currentSession.user) == null ? void 0 : _c2.store_code) || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+  var _a, _b, _c;
+  return String(
+    ((_a = state.selectedSdp) == null ? void 0 : _a.store_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.store_name) || ((_c = currentSession.user) == null ? void 0 : _c.store_code) || getCurrentStoreCodeFallback() || "UTAWALA"
+  ).trim().toUpperCase();
 }
 function getStoreMobileActiveStockInLocations(state = storeMobilePricingPreviewState) {
   const rows = Array.isArray(state.storeMobileStockInLocations) ? state.storeMobileStockInLocations : [];
@@ -32138,11 +34772,11 @@ function getDefaultStoreMobileStockInLocationCode(item = {}, locations = []) {
     ].map(normalizeStoreMobileCategoryText).filter(Boolean);
     return locationCategories.some((locationCategory) => categoryCandidates.includes(locationCategory));
   });
-  if (shelf && shelf.location_code) {
+  if (shelf == null ? void 0 : shelf.location_code) {
     return shelf.location_code;
   }
   const backroom = (Array.isArray(locations) ? locations : []).find((location) => String(location.location_type || "").trim().toUpperCase() === "BACKROOM");
-  return String(backroom && backroom.location_code || "").trim().toUpperCase();
+  return String((backroom == null ? void 0 : backroom.location_code) || "").trim().toUpperCase();
 }
 function getStoreMobilePrintedStoreItemsForStockIn(group = {}) {
   return getStoreMobileGeneratedStoreItems(group).filter((item) => String(item.preview_print_status || "").trim() === "sent_to_printer").map((item) => normalizeStoreItemForLabelPreview(item, group)).filter((item) => item.machine_code);
@@ -32231,14 +34865,13 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
       ${rows.length ? `
         <div class="mobile-stock-in-list">
           ${rows.map((item) => {
-    var _a;
     const machineCode = String(item.machine_code || item.barcode_value || "").trim();
     const selectedLocationCode = String(item.suggested_location_code || item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations) || "").trim().toUpperCase();
     return `
               <article class="mobile-stock-in-card">
                 <div>
                   <strong>STORE_ITEM ${escapeHtml(machineCode || "-")}</strong>
-                  <span>${escapeHtml(item.category_name || item.category_short || "-")} · KES ${escapeHtml((_a = item.price_kes) != null ? _a : item.sale_price_kes || 0)}</span>
+                  <span>${escapeHtml(item.category_name || item.category_short || "-")} · KES ${escapeHtml(item.price_kes || item.sale_price_kes || 0)}</span>
                   <span>建议货架 / 后仓：${escapeHtml(item.suggested_location_name || selectedLocationCode || "-")}</span>
                 </div>
                 <label class="mobile-field">
@@ -32261,6 +34894,7 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
   `;
 }
 async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePricingPreviewState, machineCode = "") {
+  var _a;
   const normalizedMachineCode = String(machineCode || "").trim();
   const selectedElement = document.querySelector(`[data-mobile-unconfirmed-stock-in-location="${normalizedMachineCode}"]`);
   const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
@@ -32275,7 +34909,7 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
     method: "POST",
     body: JSON.stringify({
       location_code: selectedLocation,
-      confirmed_by: String(currentSession.user && currentSession.user.username || getCurrentStoreWorkerFallback() || "").trim()
+      confirmed_by: String(((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback() || "").trim()
     })
   });
   const status = String(result.status || "confirmed").trim();
@@ -32502,7 +35136,7 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const backendTasks = getStoreMobileAssignedBackendTasks(state);
   const sdp = state.selectedSdp || {};
   const assignedEmployee = String(sdp.assigned_clerk || sdp.assigned_employee || getCurrentUsername() || "Austin").trim();
@@ -32606,7 +35240,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
   `;
   if (backendTasks.length) {
     const selectedCode = String(
-      state.selectedBackendTaskCode || (((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) ? ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c2 = state.selectedSdp) == null ? void 0 : _c2.sdp_code) : "") || ""
+      state.selectedBackendTaskCode || (((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) ? ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c = state.selectedSdp) == null ? void 0 : _c.sdp_code) : "") || ""
     ).trim().toUpperCase();
     return renderDailyWorkbenchShell(`
         <div class="subtle small">SDP 分拣只是今日任务之一；后台 assigned SDP 任务按最新 assigned_at 优先。</div>
@@ -33232,7 +35866,7 @@ function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderStoreMobilePricingPreview() {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2;
   const target = document.querySelector("#storeMobilePricingPreviewSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -33274,7 +35908,7 @@ function renderStoreMobilePricingPreview() {
           <strong>当前 mock SDP</strong>
           <div class="mobile-preview-sdp-mini">
             <b>${escapeHtml(((_a = state.selectedSdp) == null ? void 0 : _a.display_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.sdp_code) || "-")}</b>
-            <small>${escapeHtml(((_c2 = state.selectedSdp) == null ? void 0 : _c2.machine_code) ? `machine_code: ${state.selectedSdp.machine_code}` : "")}</small>
+            <small>${escapeHtml(((_c = state.selectedSdp) == null ? void 0 : _c.machine_code) ? `machine_code: ${state.selectedSdp.machine_code}` : "")}</small>
             <span>${escapeHtml(((_d2 = state.selectedSdp) == null ? void 0 : _d2.store_name) || "-")}</span>
             <span>${escapeHtml(`${((_e2 = state.selectedSdp) == null ? void 0 : _e2.category) || "-"} · ${((_f2 = state.selectedSdp) == null ? void 0 : _f2.total_count) || 0} 件`)}</span>
           </div>
@@ -33482,7 +36116,7 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
   return syncStoreMobileTaskCounters(state);
 }
 async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPreviewState, groupId = "", machineCode = "") {
-  var _a;
+  var _a, _b;
   const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || state.activeGroupId || ""));
   if (!group) {
     throw new Error("找不到当前价格组。");
@@ -33497,7 +36131,9 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
   const normalizedItem = normalizeStoreItemForLabelPreview(rawItem, group);
   const locations = getStoreMobileActiveStockInLocations(state);
   const selectedElement = document.querySelector(`[data-mobile-stock-in-location="${normalizedItem.machine_code}"]`);
-  const selectedLocation = String((selectedElement instanceof HTMLSelectElement ? selectedElement.value : "") || normalizedItem.current_location_code || getDefaultStoreMobileStockInLocationCode(normalizedItem, locations) || "").trim().toUpperCase();
+  const selectedLocation = String(
+    (selectedElement instanceof HTMLSelectElement ? selectedElement.value : "") || normalizedItem.current_location_code || getDefaultStoreMobileStockInLocationCode(normalizedItem, locations) || ""
+  ).trim().toUpperCase();
   if (!selectedLocation) {
     throw new Error("请选择货架位或后仓。");
   }
@@ -33517,7 +36153,7 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
   rawItem.current_location_code = result.current_location_code || selectedLocation;
   rawItem.stock_in_confirmed = true;
   rawItem.stock_in_confirmed_at = result.stock_in_confirmed_at || (/* @__PURE__ */ new Date()).toISOString();
-  rawItem.stock_in_confirmed_by = result.stock_in_confirmed_by || currentSession.user && currentSession.user.username || getCurrentStoreWorkerFallback() || "";
+  rawItem.stock_in_confirmed_by = result.stock_in_confirmed_by || ((_b = currentSession.user) == null ? void 0 : _b.username) || getCurrentStoreWorkerFallback() || "";
   rawItem.stock_in_status = status;
   rawItem.stock_in_error = "";
   if (status === "already_confirmed") {
@@ -33811,7 +36447,7 @@ function handleStoreMobilePricingPreviewAction(button) {
       storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
       renderStoreMobilePricingPreview();
     }).catch((error) => {
-      state.storeMobileUnconfirmedStockInError = formatErrorMessage(error);
+      state.storeMobileUnconfirmedStockInError = `失败，请重试：${formatErrorMessage(error)}`;
       renderStoreMobilePricingPreview();
     });
   }
@@ -33820,7 +36456,7 @@ function handleStoreMobilePricingPreviewAction(button) {
       storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
       renderStoreMobilePricingPreview();
     }).catch((error) => {
-      state.storeMobileUnconfirmedStockInError = `失败，请重试：${formatErrorMessage(error)}`;
+      state.storeMobileUnconfirmedStockInError = formatErrorMessage(error);
       renderStoreMobilePricingPreview();
     });
   }
@@ -34291,7 +36927,7 @@ async function loadBaleSalesWorkbench(notice = "") {
   return poolRows;
 }
 async function loadTable(kind) {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
   if (kind === "load-price-alerts") {
     const rows = await request("/audit-events");
     const alerts = rows.filter(
@@ -34353,7 +36989,7 @@ async function loadTable(kind) {
     renderInboundShipmentSummary("list", shipments);
     renderInboundShipmentHistorySummary(shipments);
     renderParcelDirectorySummary(batches);
-    renderBaleBarcodeDirectorySummary(((_c2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _c2.value) || "");
+    renderBaleBarcodeDirectorySummary(((_c = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _c.value) || "");
     focusElement("#parcelDirectorySummary");
     renderTableSummary(kind, { shipments: shipments.length, batches: batches.length });
     return;
@@ -35204,7 +37840,7 @@ async function submitRawBaleStockFilter(event) {
   focusElement("#rawBaleStockSummary");
 }
 async function addSortingLookupBaleToSelection() {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const baleLookupInput = document.querySelector("#sortingTaskForm [name='bale_lookup']");
   const baleCode = String((baleLookupInput == null ? void 0 : baleLookupInput.value) || "").trim();
   await resolveBarcodeForContext(baleCode, "warehouse_sorting_create", ["RAW_BALE"]);
@@ -35264,7 +37900,7 @@ async function addSortingLookupBaleToSelection() {
   }
   setInputValue("#sortingTaskForm [name='bale_lookup']", "");
   refreshSortingShipmentOptions();
-  const successMessage = result.duplicate ? `${((_a = result.matchedRow) == null ? void 0 : _a.bale_barcode) || baleCode} 已经在当前任务里。` : result.approximate ? `${baleCode} 疑似扫码丢字，已按 ${((_b = result.matchedRow) == null ? void 0 : _b.bale_barcode) || baleCode} 加入当前任务。` : `${((_c2 = result.matchedRow) == null ? void 0 : _c2.bale_barcode) || baleCode} 已加入当前任务。`;
+  const successMessage = result.duplicate ? `${((_a = result.matchedRow) == null ? void 0 : _a.bale_barcode) || baleCode} 已经在当前任务里。` : result.approximate ? `${baleCode} 疑似扫码丢字，已按 ${((_b = result.matchedRow) == null ? void 0 : _b.bale_barcode) || baleCode} 加入当前任务。` : `${((_c = result.matchedRow) == null ? void 0 : _c.bale_barcode) || baleCode} 已加入当前任务。`;
   const hasSourceCostWarning = Boolean(result.warning && !result.duplicate);
   showTransientInlineNotice(
     "#sortingTaskNotice",
@@ -35301,7 +37937,7 @@ async function routeRawBaleFromWorkbench(baleBarcode, destination) {
   }
 }
 async function submitSortingTask(event) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   event.preventDefault();
   syncJsonBuilderToField("sorting-handler-names");
   const form = new FormData(event.currentTarget);
@@ -35318,7 +37954,7 @@ async function submitSortingTask(event) {
   payload.bale_barcodes = selectedRows.map((row) => row.bale_barcode).filter(Boolean);
   payload.task_status = "assigned";
   payload.source_raw_bale_display_code = ((_a = selectedRows[0]) == null ? void 0 : _a.bale_barcode) || "";
-  payload.source_raw_bale_machine_code = ((_b = selectedRows[0]) == null ? void 0 : _b.machine_code) || ((_c2 = selectedRows[0]) == null ? void 0 : _c2.barcode_value) || "";
+  payload.source_raw_bale_machine_code = ((_b = selectedRows[0]) == null ? void 0 : _b.machine_code) || ((_c = selectedRows[0]) == null ? void 0 : _c.barcode_value) || "";
   payload.assigned_worker = payload.handler_names[0] || "";
   payload.sorter_name = payload.handler_names[0] || "";
   if (!payload.bale_barcodes.length) {
@@ -35516,7 +38152,7 @@ async function queueCompressionTaskPrintJobs(resultRow = {}) {
   return jobs;
 }
 async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const baleNo = String((row == null ? void 0 : row.bale_no) || "").trim().toUpperCase();
   if (!baleNo) {
     throw new Error("当前这张 SDB bale 缺少 bale_no，不能补打 barcode。");
@@ -35534,7 +38170,7 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
     action: "open_store_prep_bale_barcode_reprint",
     bale_no: baleNo,
     display_code: ((_b = job.print_payload) == null ? void 0 : _b.display_code) || job.barcode || "",
-    barcode: ((_c2 = job.print_payload) == null ? void 0 : _c2.barcode_value) || ((_d2 = job.print_payload) == null ? void 0 : _d2.machine_code) || "",
+    barcode: ((_c = job.print_payload) == null ? void 0 : _c.barcode_value) || ((_d2 = job.print_payload) == null ? void 0 : _d2.machine_code) || "",
     printer_name: printerName,
     template_code: "store_prep_bale_60x40"
   });
@@ -35941,7 +38577,7 @@ async function assignOneStoreDispatchBaleToClerk(row = {}, payload = {}) {
   });
 }
 async function submitStoreTokenEditDirectory(event) {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -35975,7 +38611,7 @@ async function submitStoreTokenEditDirectory(event) {
     bale_no: scanCode || getStoreReceivingPackageCode(assignedRows[0]) || "",
     assigned_employee: assignedEmployee || ((_a = assignedRows[0]) == null ? void 0 : _a.assigned_clerk) || "",
     task_no: ((_b = assignedRows[0]) == null ? void 0 : _b.parent_sdo_display_code) || "",
-    shipment_no: ((_c2 = assignedRows[0]) == null ? void 0 : _c2.transfer_no) || "",
+    shipment_no: ((_c = assignedRows[0]) == null ? void 0 : _c.transfer_no) || "",
     store_code: storeCode
   });
   writeOutput("#storeTokenEditOutput", assignedRows.length ? assignedRows : "当前没有分配给这位店员的 SDP 包任务。");
@@ -36064,7 +38700,7 @@ async function refreshDirectHangWorkbench(context = {}) {
   }
 }
 async function submitItemTokenDirectory(event) {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -36085,7 +38721,7 @@ async function submitItemTokenDirectory(event) {
     bale_no: baleNo,
     assigned_employee: assignedEmployee || ((_a = rows[0]) == null ? void 0 : _a.assigned_employee) || "",
     task_no: ((_b = rows[0]) == null ? void 0 : _b.task_no) || "",
-    shipment_no: ((_c2 = rows[0]) == null ? void 0 : _c2.shipment_no) || "",
+    shipment_no: ((_c = rows[0]) == null ? void 0 : _c.shipment_no) || "",
     store_code: ((_d2 = rows[0]) == null ? void 0 : _d2.store_code) || getCurrentStoreCodeFallback()
   });
   if (String(payload.template_code || "").trim()) {
@@ -36358,9 +38994,9 @@ async function submitChinaSourceCost(event) {
     throw new Error("当前选中的中方来源记录不存在，请重新选择。");
   }
   const buildStageEntry = async (stageKey) => {
-    var _a, _b, _c2;
+    var _a, _b, _c;
     const files = Array.from(((_a = formElement.querySelector(`[name='${stageKey}_files']`)) == null ? void 0 : _a.files) || []);
-    const previousDocs = Array.isArray((_c2 = (_b = current.cost_entries) == null ? void 0 : _b[stageKey]) == null ? void 0 : _c2.documents) ? current.cost_entries[stageKey].documents : [];
+    const previousDocs = Array.isArray((_c = (_b = current.cost_entries) == null ? void 0 : _b[stageKey]) == null ? void 0 : _c.documents) ? current.cost_entries[stageKey].documents : [];
     return {
       currency: String(payload[`${stageKey}_currency`] || "").trim(),
       amount: Number(payload[`${stageKey}_amount`] || 0) || 0,
@@ -37375,7 +40011,7 @@ async function submitTransfer(event) {
   await loadDashboard();
 }
 async function submitPickingWave(event) {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2;
   event.preventDefault();
   const form = event.currentTarget;
   const requestNos = getPickingWaveRequestNos(form);
@@ -37384,7 +40020,7 @@ async function submitPickingWave(event) {
   }
   const defaultWaveName = buildDefaultPickingWaveName(requestNos);
   const defaultWarehouseCode = String(((_a = form.querySelector("[name='warehouse_code']")) == null ? void 0 : _a.value) || ((_b = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _b.warehouse_code) || "WH1").trim() || "WH1";
-  const defaultPlannedDate = String(((_c2 = form.querySelector("[name='planned_picking_date']")) == null ? void 0 : _c2.value) || getTodayInputValue()).trim();
+  const defaultPlannedDate = String(((_c = form.querySelector("[name='planned_picking_date']")) == null ? void 0 : _c.value) || getTodayInputValue()).trim();
   const defaultRequiredArrivalDate = String(((_d2 = form.querySelector("[name='required_arrival_date']")) == null ? void 0 : _d2.value) || getDefaultPickingWaveRequiredArrivalDate(requestNos)).trim();
   const payload = {
     wave_name: String(((_e2 = form.querySelector("[name='wave_name']")) == null ? void 0 : _e2.value) || defaultWaveName).trim(),
@@ -38268,7 +40904,10 @@ const FORM_SUMMARY_SELECTORS = {
   "#loginForm": "#authResultSummary",
   "#devTaskForm": "#devTrackerSummary",
   "#storeManagerConsoleForm": "#storeManagerConsoleSummary",
+  "#storeManagerDailyControlForm": "#storeManagerDailyControlSummary",
+  "#storeManagerMarketFeedbackForm": "#storeManagerDailyControlSummary",
   "#storeInventoryOverviewForm": "#storeInventoryOverviewSummary",
+  "#storeItemTraceLookupForm": "#storeItemTraceLookupResult",
   "#storeShelfLocationLoadForm": "#storeShelfLocationSummary",
   "#storeShelfLocationForm": "#storeShelfLocationSummary",
   "#storeRetailSeedForm": "#storeRetailSeedSummary",
@@ -38395,7 +41034,10 @@ bindForm("#loginForm", submitLogin, "#authOutput");
 bindLoginSubmitFallback();
 bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
+bindForm("#storeManagerDailyControlForm", submitStoreManagerDailyControlRefresh, "#storeManagerDailyControlOutput");
+bindForm("#storeManagerMarketFeedbackForm", submitStoreManagerMarketFeedback, "#storeManagerDailyControlOutput");
 bindForm("#storeInventoryOverviewForm", submitStoreInventoryOverview, "#storeInventoryOverviewOutput");
+bindForm("#storeItemTraceLookupForm", submitStoreItemTraceLookup, "#storeInventoryOverviewOutput");
 bindForm("#storeShelfLocationLoadForm", submitStoreShelfLocationLoad, "#storeShelfLocationOutput");
 bindForm("#storeShelfLocationForm", submitStoreShelfLocationSave, "#storeShelfLocationOutput");
 bindForm("#storeRetailSeedForm", submitStoreRetailSeed, "#storeRetailSeedOutput");
@@ -38469,7 +41111,7 @@ bindForm("#apparelSortingRackForm", submitApparelSortingRack, "#apparelSortingRa
     renderJsonBuilder("sorting-result-items");
   });
 });
-(_c = document.querySelector("#sortingResultForm [name='loss_photo_files']")) == null ? void 0 : _c.addEventListener("change", async (event) => {
+(_d = document.querySelector("#sortingResultForm [name='loss_photo_files']")) == null ? void 0 : _d.addEventListener("change", async (event) => {
   var _a;
   const files = Array.from(((_a = event.currentTarget) == null ? void 0 : _a.files) || []);
   if (files.length) {
@@ -38553,7 +41195,7 @@ bindForm("#receiptForm", submitReceipt, "#receiptOutput");
 bindForm("#recommendationForm", submitTransferRecommendation, "#recommendationOutput");
 bindForm("#transferForm", submitTransfer, "#transferOutput");
 bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
-(_d = document.querySelector("#pickingWaveForm")) == null ? void 0 : _d.addEventListener("change", renderPickingWaveTaskSummary);
+(_e = document.querySelector("#pickingWaveForm")) == null ? void 0 : _e.addEventListener("change", renderPickingWaveTaskSummary);
 ["input", "change"].forEach((eventName) => {
   var _a;
   document.addEventListener(eventName, (event) => {
@@ -38621,6 +41263,8 @@ cashierTerminalScanForm == null ? void 0 : cashierTerminalScanForm.addEventListe
     await submitCashierTerminalLookup({ addToCart: action !== "lookup" });
   } catch (error) {
     showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
+  } finally {
+    focusCashierTerminalScanInput({ select: true });
   }
 });
 cashierTerminalShell == null ? void 0 : cashierTerminalShell.addEventListener("click", async (event) => {
@@ -38653,7 +41297,7 @@ cashierTerminalShell == null ? void 0 : cashierTerminalShell.addEventListener("c
     showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
   }
 });
-(_e = document.querySelector("#userList")) == null ? void 0 : _e.addEventListener("click", async (event) => {
+(_f = document.querySelector("#userList")) == null ? void 0 : _f.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-user-edit-id], [data-user-deactivate-id], [data-user-activate-id], [data-user-delete-id]") : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -38727,14 +41371,14 @@ cashierTerminalShell == null ? void 0 : cashierTerminalShell.addEventListener("c
     renderCashierTerminal();
   }
 });
-(_f = document.querySelector("#chinaSourceImportPreviewButton")) == null ? void 0 : _f.addEventListener("click", async () => {
+(_g = document.querySelector("#chinaSourceImportPreviewButton")) == null ? void 0 : _g.addEventListener("click", async () => {
   try {
     await triggerChinaSourceImportPreview();
   } catch (error) {
     renderErrorSummary("#chinaSourceImportPreviewSummary", formatErrorMessage(error));
   }
 });
-(_g = document.querySelector("#chinaSourceImportFile")) == null ? void 0 : _g.addEventListener("change", (event) => {
+(_h = document.querySelector("#chinaSourceImportFile")) == null ? void 0 : _h.addEventListener("change", (event) => {
   var _a;
   const input = event.currentTarget;
   if (!(input instanceof HTMLInputElement)) {
@@ -38786,41 +41430,41 @@ document.addEventListener("keydown", (event) => {
   }
   closeBalePrintModal();
 });
-(_h = document.querySelector("#balePrintModalPrevButton")) == null ? void 0 : _h.addEventListener("click", () => {
+(_i = document.querySelector("#balePrintModalPrevButton")) == null ? void 0 : _i.addEventListener("click", () => {
   balePrintModalState.currentIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0) - 1);
   renderBalePrintModal();
 });
-(_i = document.querySelector("#balePrintModalNextButton")) == null ? void 0 : _i.addEventListener("click", () => {
+(_j = document.querySelector("#balePrintModalNextButton")) == null ? void 0 : _j.addEventListener("click", () => {
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   balePrintModalState.currentIndex = Math.min(jobs.length - 1, Number(balePrintModalState.currentIndex || 0) + 1);
   renderBalePrintModal();
 });
-(_j = document.querySelector("#balePrintModalRefreshButton")) == null ? void 0 : _j.addEventListener("click", () => {
+(_k = document.querySelector("#balePrintModalRefreshButton")) == null ? void 0 : _k.addEventListener("click", () => {
   renderBalePrintModal();
 });
-(_k = document.querySelector("#balePrintModalCheckLocalAgentButton")) == null ? void 0 : _k.addEventListener("click", () => {
+(_l = document.querySelector("#balePrintModalCheckLocalAgentButton")) == null ? void 0 : _l.addEventListener("click", () => {
   checkLocalPrintAgentHealth().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_l = document.querySelector("#balePrintModalCheckLocalPrintersButton")) == null ? void 0 : _l.addEventListener("click", () => {
+(_m = document.querySelector("#balePrintModalCheckLocalPrintersButton")) == null ? void 0 : _m.addEventListener("click", () => {
   checkLocalPrintAgentPrinters().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_m = document.querySelector("#balePrintModalInstallStepsButton")) == null ? void 0 : _m.addEventListener("click", () => {
+(_n = document.querySelector("#balePrintModalInstallStepsButton")) == null ? void 0 : _n.addEventListener("click", () => {
   localPrintAgentState.installStepsVisible = !localPrintAgentState.installStepsVisible;
   renderBalePrintModal();
 });
-(_n = document.querySelector("#balePrintModalPrimaryPrintButton")) == null ? void 0 : _n.addEventListener("click", () => {
+(_o = document.querySelector("#balePrintModalPrimaryPrintButton")) == null ? void 0 : _o.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_o = document.querySelector("#balePrintModalPrimaryPrintAllButton")) == null ? void 0 : _o.addEventListener("click", () => {
+(_p = document.querySelector("#balePrintModalPrimaryPrintAllButton")) == null ? void 0 : _p.addEventListener("click", () => {
   printAllBaleModalPrimaryAction().catch((error) => {
     balePrintModalState.hasSuccessfulBatchPrint = false;
     baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
@@ -38828,7 +41472,7 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_p = document.querySelector("#balePrintModalLocalAgentPrintButton")) == null ? void 0 : _p.addEventListener("click", () => {
+(_q = document.querySelector("#balePrintModalLocalAgentPrintButton")) == null ? void 0 : _q.addEventListener("click", () => {
   printCurrentBaleModalViaLocalAgent().catch((error) => {
     localPrintAgentState.connected = false;
     localPrintAgentState.lastMessage = "print failed";
@@ -38836,19 +41480,19 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_q = document.querySelector("#balePrintModalConnectButton")) == null ? void 0 : _q.addEventListener("click", () => {
+(_r = document.querySelector("#balePrintModalConnectButton")) == null ? void 0 : _r.addEventListener("click", () => {
   handleConnectBalePrinter().then(() => renderBalePrintModal()).catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_r = document.querySelector("#balePrintModalDirectPrintButton")) == null ? void 0 : _r.addEventListener("click", () => {
+(_s = document.querySelector("#balePrintModalDirectPrintButton")) == null ? void 0 : _s.addEventListener("click", () => {
   directPrintCurrentBaleModalJob().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_s = document.querySelector("#balePrintModalPrintAllButton")) == null ? void 0 : _s.addEventListener("click", () => {
+(_t = document.querySelector("#balePrintModalPrintAllButton")) == null ? void 0 : _t.addEventListener("click", () => {
   directPrintAllBaleModalJobs().catch((error) => {
     balePrintModalState.hasSuccessfulBatchPrint = false;
     baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
@@ -38856,13 +41500,13 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_t = document.querySelector("#balePrintModalSendToStationButton")) == null ? void 0 : _t.addEventListener("click", () => {
+(_u = document.querySelector("#balePrintModalSendToStationButton")) == null ? void 0 : _u.addEventListener("click", () => {
   sendCurrentBaleModalJobToPrintStation().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_u = document.querySelector("#balePrintModalBrowserPrintButton")) == null ? void 0 : _u.addEventListener("click", () => {
+(_v = document.querySelector("#balePrintModalBrowserPrintButton")) == null ? void 0 : _v.addEventListener("click", () => {
   try {
     browserPrintCurrentBaleModalJob();
   } catch (error) {
@@ -38870,14 +41514,14 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   }
 });
-(_v = document.querySelector("#balePrintModalCompleteButton")) == null ? void 0 : _v.addEventListener("click", () => {
+(_w = document.querySelector("#balePrintModalCompleteButton")) == null ? void 0 : _w.addEventListener("click", () => {
   completeCurrentBalePrintModalJob().catch((error) => {
     baleBarcodeDirectoryNotice = { type: "error", message: formatErrorMessage(error) };
     renderBaleBarcodeDirectorySummary(balePrintModalState.shipmentNo || "");
     renderBalePrintModal();
   });
 });
-(_w = document.querySelector("#balePrintModalCloseAndRefreshButton")) == null ? void 0 : _w.addEventListener("click", () => {
+(_x = document.querySelector("#balePrintModalCloseAndRefreshButton")) == null ? void 0 : _x.addEventListener("click", () => {
   const shipmentNo = balePrintModalState.shipmentNo || "";
   const templateScope = getActiveBaleTemplateScope();
   const closed = closeBalePrintModal();
@@ -38987,7 +41631,28 @@ async function handlePanelJumpEvent(event) {
 }
 workspacePageNav == null ? void 0 : workspacePageNav.addEventListener("click", handlePanelJumpEvent);
 appShell == null ? void 0 : appShell.addEventListener("click", handlePanelJumpEvent);
-(_x = document.querySelector("#storeManagerPdaPreview")) == null ? void 0 : _x.addEventListener("click", async (event) => {
+(_y = document.querySelector("#storeManagerDailyControlRoot")) == null ? void 0 : _y.addEventListener("click", (event) => {
+  var _a;
+  if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+  const refreshButton = event.target.closest("[data-manager-daily-refresh]");
+  if (refreshButton instanceof HTMLElement) {
+    loadStoreManagerDailyControl(storeManagerDailyControlState.date || getTodayInputValue()).catch(() => {
+    });
+    return;
+  }
+  const feedbackButton = event.target.closest("[data-manager-feedback-category]");
+  if (!(feedbackButton instanceof HTMLElement)) {
+    return;
+  }
+  setInputValue("#storeManagerMarketFeedbackForm [name='category']", feedbackButton.dataset.managerFeedbackCategory || "");
+  setInputValue("#storeManagerMarketFeedbackForm [name='suggested_action']", feedbackButton.dataset.managerFeedbackAction || "keep_observing");
+  const typeValue = feedbackButton.dataset.managerFeedbackAction === "promotion" ? "customer_said_expensive" : "customer_asked_many";
+  setInputValue("#storeManagerMarketFeedbackForm [name='feedback_type']", typeValue);
+  (_a = document.querySelector("#storeManagerMarketFeedbackForm [name='note']")) == null ? void 0 : _a.focus();
+});
+(_z = document.querySelector("#storeManagerPdaPreview")) == null ? void 0 : _z.addEventListener("click", async (event) => {
   if (!(event.target instanceof HTMLElement)) {
     return;
   }
@@ -39000,7 +41665,9 @@ appShell == null ? void 0 : appShell.addEventListener("click", handlePanelJumpEv
     "[data-store-manager-pda-exception-package]",
     "[data-store-manager-pda-assign-package]",
     "[data-store-manager-pda-reload]",
-    "[data-store-manager-pda-reset-task]"
+    "[data-store-manager-pda-reset-task]",
+    "[data-manager-daily-refresh]",
+    "[data-manager-daily-suggestion-tab]"
   ].join(","));
   if (runtimeButton instanceof HTMLElement) {
     event.preventDefault();
@@ -39045,9 +41712,20 @@ appShell == null ? void 0 : appShell.addEventListener("click", handlePanelJumpEv
   }
   renderStoreManagerPdaPreview(tabButton.dataset.storeManagerPdaTab || "overview");
 });
-(_y = document.querySelector("#storeManagerPdaPreview")) == null ? void 0 : _y.addEventListener("submit", async (event) => {
+(_A = document.querySelector("#storeManagerPdaPreview")) == null ? void 0 : _A.addEventListener("submit", async (event) => {
   if (event.target instanceof HTMLFormElement && event.target.matches("[data-store-manager-pda-sdo-search-form]")) {
     handleStoreManagerPdaSdoQuickSearchSubmit(event);
+    return;
+  }
+  if (event.target instanceof HTMLFormElement && event.target.matches("#storeManagerPdaDailyFeedbackForm")) {
+    try {
+      await submitStoreManagerMarketFeedback(event);
+      renderStoreManagerPdaPreview("daily");
+    } catch (error) {
+      event.preventDefault();
+      storeManagerDailyControlState.error = formatErrorMessage(error);
+      renderStoreManagerPdaPreview("daily");
+    }
     return;
   }
   if (!(event.target instanceof HTMLFormElement) || !event.target.matches("#storeManagerPdaSdoForm")) {
@@ -39214,7 +41892,7 @@ document.addEventListener("change", (event) => {
   }
   storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = String(select.value || "").trim();
 });
-(_z = document.querySelector("#recommendationCandidateList")) == null ? void 0 : _z.addEventListener("click", (event) => {
+(_B = document.querySelector("#recommendationCandidateList")) == null ? void 0 : _B.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-recommendation-toggle]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -39230,7 +41908,7 @@ document.addEventListener("change", (event) => {
   }
   renderRecommendationCandidates();
 });
-(_A = document.querySelector("#loadTransferDispatchButton")) == null ? void 0 : _A.addEventListener("click", async () => {
+(_C = document.querySelector("#loadTransferDispatchButton")) == null ? void 0 : _C.addEventListener("click", async () => {
   try {
     await loadStoreDeliveryShipmentRecords();
     focusElement(document.querySelector("[data-transfer-delivery-panel='history']:not(.hidden-screen)") ? "#transferDeliveryHistoryList" : "#transferShipTargetHint");
@@ -39244,12 +41922,12 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     setTransferDeliveryTab(button.getAttribute("data-transfer-delivery-tab") || "create");
   });
 });
-(_B = document.querySelector("#transferDeliveryHistorySearch")) == null ? void 0 : _B.addEventListener("input", (event) => {
+(_D = document.querySelector("#transferDeliveryHistorySearch")) == null ? void 0 : _D.addEventListener("input", (event) => {
   var _a;
   transferDeliveryHistorySearchQuery = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim().toUpperCase();
   renderTransferDeliveryHistory(transferOrderState);
 });
-(_C = document.querySelector("#transferForm")) == null ? void 0 : _C.addEventListener("input", (event) => {
+(_E = document.querySelector("#transferForm")) == null ? void 0 : _E.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
     return;
@@ -39258,7 +41936,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     renderTransferDraftSummary();
   }
 });
-(_D = document.querySelector("#transferDispatchSummary")) == null ? void 0 : _D.addEventListener("click", (event) => {
+(_F = document.querySelector("#transferDispatchSummary")) == null ? void 0 : _F.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-transfer-dispatch-fill], [data-transfer-ship-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -39292,7 +41970,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     focusElement("#approveTransferForm");
   }
 });
-(_E = document.querySelector("#loosePackingWaveSummary")) == null ? void 0 : _E.addEventListener("click", (event) => {
+(_G = document.querySelector("#loosePackingWaveSummary")) == null ? void 0 : _G.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
@@ -39303,7 +41981,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   renderLoosePackingTaskWorkbench(transferNo);
   renderTransferExecutionWorkbench(transferNo);
 });
-(_F = document.querySelector("#transferWaveSummary")) == null ? void 0 : _F.addEventListener("click", (event) => {
+(_H = document.querySelector("#transferWaveSummary")) == null ? void 0 : _H.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
@@ -39311,7 +41989,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   hydrateTransferForms({ transfer_no: transferNo });
   renderTransferExecutionWorkbench(transferNo);
 });
-(_G = document.querySelector("#transferShipWaveSummary")) == null ? void 0 : _G.addEventListener("click", (event) => {
+(_I = document.querySelector("#transferShipWaveSummary")) == null ? void 0 : _I.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
@@ -39320,7 +41998,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   queueTransferShipTargetHintLoad(transferNo);
   renderWaveExecutionEntrySummary("", "ship");
 });
-(_H = document.querySelector("#transferShipForm")) == null ? void 0 : _H.addEventListener("click", (event) => {
+(_J = document.querySelector("#transferShipForm")) == null ? void 0 : _J.addEventListener("click", (event) => {
   const addButton = event.target instanceof HTMLElement ? event.target.closest("[data-transfer-sdo-add]") : null;
   if (addButton instanceof HTMLElement) {
     addTransferShipmentSdoRow();
@@ -39331,7 +42009,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     removeTransferShipmentSdoRow(removeButton);
   }
 });
-(_I = document.querySelector("#transferShipForm")) == null ? void 0 : _I.addEventListener("change", (event) => {
+(_K = document.querySelector("#transferShipForm")) == null ? void 0 : _K.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement) || target.name !== "transfer_no") {
     return;
@@ -39339,18 +42017,18 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   queueTransferShipTargetHintLoad(target.value || "");
   renderWaveExecutionEntrySummary(target.value || "", "ship");
 });
-(_J = document.querySelector("#transferShipForm")) == null ? void 0 : _J.addEventListener("input", (event) => {
+(_L = document.querySelector("#transferShipForm")) == null ? void 0 : _L.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || !["driver_name", "driver_phone", "vehicle_no"].includes(target.name)) {
     return;
   }
   renderTransferShipTargetHint();
 });
-const initialTransferShipNo = String(((_K = document.querySelector("#transferShipForm [name='transfer_no']")) == null ? void 0 : _K.value) || "").trim();
+const initialTransferShipNo = String(((_M = document.querySelector("#transferShipForm [name='transfer_no']")) == null ? void 0 : _M.value) || "").trim();
 if (initialTransferShipNo) {
   loadTransferShipTargetHint(initialTransferShipNo);
 }
-(_L = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _L.addEventListener("input", async (event) => {
+(_N = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _N.addEventListener("input", async (event) => {
   var _a;
   const transferNo = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim().toUpperCase();
   if (!transferNo) {
@@ -39365,14 +42043,14 @@ if (initialTransferShipNo) {
     renderStoreReceiptTransferBaleList(transferNo);
   }
 });
-(_M = document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")) == null ? void 0 : _M.addEventListener("input", () => {
+(_O = document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")) == null ? void 0 : _O.addEventListener("input", () => {
   var _a;
   const transferNo = String(((_a = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
   if (transferNo) {
     renderStoreReceiptTransferBaleList(transferNo, filteredStoreDispatchBaleState.length ? filteredStoreDispatchBaleState : storeDispatchBaleState);
   }
 });
-(_N = document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")) == null ? void 0 : _N.addEventListener("input", async (event) => {
+(_P = document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")) == null ? void 0 : _P.addEventListener("input", async (event) => {
   var _a;
   const transferNo = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim().toUpperCase();
   if (!transferNo) {
@@ -39412,7 +42090,7 @@ if (initialTransferShipNo) {
     renderTransferExecutionWorkbench(transferNo);
   });
 });
-(_O = document.querySelector("#loosePackingTaskList")) == null ? void 0 : _O.addEventListener("click", async (event) => {
+(_Q = document.querySelector("#loosePackingTaskList")) == null ? void 0 : _Q.addEventListener("click", async (event) => {
   var _a;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-loose-task-action]") : null;
   if (!(button instanceof HTMLElement)) {
@@ -39510,7 +42188,7 @@ document.addEventListener("input", (event) => {
   renderChinaSourceBalePreview();
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const costLoadButton = event.target instanceof HTMLElement ? event.target.closest("[data-china-source-cost-load]") : null;
   if (costLoadButton instanceof HTMLElement) {
     const sourcePoolToken = String(costLoadButton.dataset.chinaSourceCostLoad || "").trim();
@@ -39565,7 +42243,7 @@ document.addEventListener("click", async (event) => {
       }
       const mainCategory = String(((_a = form.querySelector("[name='category_main_new']")) == null ? void 0 : _a.value) || "").trim();
       const subCategory = String(((_b = form.querySelector("[name='category_sub_new']")) == null ? void 0 : _b.value) || "").trim();
-      const mainCategoryZh = String(((_c2 = form.querySelector("[name='category_main_zh_new']")) == null ? void 0 : _c2.value) || "").trim();
+      const mainCategoryZh = String(((_c = form.querySelector("[name='category_main_zh_new']")) == null ? void 0 : _c.value) || "").trim();
       const subCategoryZh = String(((_d2 = form.querySelector("[name='category_sub_zh_new']")) == null ? void 0 : _d2.value) || "").trim();
       if (!mainCategory || !subCategory) {
         showTransientInlineNotice("#chinaSourceBaleNotice", "请先填写商品大类和商品小类。", "error", 1800);
@@ -39690,7 +42368,7 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  var _a, _b, _c2, _d2, _e2, _f2, _g2, _h2;
+  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2;
   const saveButton = event.target instanceof HTMLElement ? event.target.closest("[data-product-category-save]") : null;
   if (saveButton instanceof HTMLElement) {
     const form = document.querySelector("#productForm");
@@ -39703,7 +42381,7 @@ document.addEventListener("click", (event) => {
       return;
     }
     const categoryMain = String(((_b = form.querySelector("[name='product_category_main_new']")) == null ? void 0 : _b.value) || "").trim();
-    const categorySub = String(((_c2 = form.querySelector("[name='product_category_sub_new']")) == null ? void 0 : _c2.value) || "").trim();
+    const categorySub = String(((_c = form.querySelector("[name='product_category_sub_new']")) == null ? void 0 : _c.value) || "").trim();
     const categoryMainZh = String(((_d2 = form.querySelector("[name='product_category_main_zh_new']")) == null ? void 0 : _d2.value) || "").trim();
     const categorySubZh = String(((_e2 = form.querySelector("[name='product_category_sub_zh_new']")) == null ? void 0 : _e2.value) || "").trim();
     const editingKey = String(((_f2 = form.querySelector("[name='product_category_editing_key']")) == null ? void 0 : _f2.value) || "").trim();
@@ -39862,7 +42540,7 @@ document.addEventListener("submit", (event) => {
   handleStoreMobileScanSubmit();
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-store-package-process], [data-store-package-back], [data-store-package-generate-items], [data-store-package-print-generated], [data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -40169,7 +42847,7 @@ document.addEventListener("click", async (event) => {
       const results = await assignStoreReceivingPackagesToClerk(selectedRows, clerkName);
       await loadTransferOrders();
       storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = clerkName;
-      const refreshedRows = ((_c2 = groupStoreReceivingPackagesBySdo(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)) == null ? void 0 : _c2.packages) || [];
+      const refreshedRows = ((_c = groupStoreReceivingPackagesBySdo(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)) == null ? void 0 : _c.packages) || [];
       const receivedNonExceptionRows = refreshedRows.filter((row) => row.received_status === "received" && row.exception_status !== "exception");
       const remainingAssignableRows = receivedNonExceptionRows.filter((row) => isStoreReceivingPackageAssignable(row));
       const totalAssigned = receivedNonExceptionRows.filter((row) => String(row.assigned_clerk || "").trim() || String(row.assignment_status || "").trim().toLowerCase() === "assigned").length;
@@ -40327,7 +43005,7 @@ document.addEventListener("keydown", async (event) => {
   focusElement("#storePdaDefaultRack");
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-pda-scan-focus], [data-pda-skip-current], [data-pda-report-exception], [data-pda-category-select], [data-pda-start-session], [data-pda-apply-default], [data-pda-apply-premium], [data-pda-queue-group], [data-pda-complete-group], [data-pda-finalize-bale]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -40448,7 +43126,7 @@ document.addEventListener("click", async (event) => {
         method: "POST",
         body: JSON.stringify({
           bale_no: baleNo,
-          assigned_employee: String(((_c2 = document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")) == null ? void 0 : _c2.value) || "").trim(),
+          assigned_employee: String(((_c = document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")) == null ? void 0 : _c.value) || "").trim(),
           printer_name: String(matchedPrinter.name || printerName).trim(),
           template_code: templateCode,
           copies: 1,
@@ -40530,7 +43208,7 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c2;
+  var _a, _b, _c;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-direct-hang-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -40539,7 +43217,7 @@ document.addEventListener("click", async (event) => {
     syncDirectHangWorkbenchStateFromDom();
     const baleNo = String(((_a = document.querySelector("#directHangStoreWorkbenchForm [name='bale_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
     const storeCode = String(((_b = document.querySelector("#directHangStoreWorkbenchForm [name='store_code']")) == null ? void 0 : _b.value) || getCurrentStoreCodeFallback()).trim().toUpperCase();
-    const assignedEmployee = String(((_c2 = document.querySelector("#directHangStoreWorkbenchForm [name='assigned_employee']")) == null ? void 0 : _c2.value) || "").trim();
+    const assignedEmployee = String(((_c = document.querySelector("#directHangStoreWorkbenchForm [name='assigned_employee']")) == null ? void 0 : _c.value) || "").trim();
     const bale = ensureDirectHangDispatchBaleState().find(
       (row) => String((row == null ? void 0 : row.bale_no) || "").trim().toUpperCase() === baleNo
     );
@@ -40828,12 +43506,12 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     syncReturnSelectionSummary();
   });
 });
-(_P = document.querySelector("#returnCandidateList")) == null ? void 0 : _P.addEventListener("change", (event) => {
+(_R = document.querySelector("#returnCandidateList")) == null ? void 0 : _R.addEventListener("change", (event) => {
   if (event.target instanceof HTMLInputElement && event.target.matches("[data-return-barcode]")) {
     updateReturnSelectionFromDom();
   }
 });
-(_Q = document.querySelector("#sortingCompressionGroupList")) == null ? void 0 : _Q.addEventListener("click", (event) => {
+(_S = document.querySelector("#sortingCompressionGroupList")) == null ? void 0 : _S.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-sorting-rack-edit]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -40846,26 +43524,26 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     qty_on_hand: button.dataset.sortingRackQty || "0"
   });
 });
-(_R = document.querySelector("#recommendationSelectAllButton")) == null ? void 0 : _R.addEventListener("click", () => {
+(_T = document.querySelector("#recommendationSelectAllButton")) == null ? void 0 : _T.addEventListener("click", () => {
   selectedRecommendationKeys = new Set(recommendationCandidatesState.map((item) => getRecommendationRowKey(item)).filter(Boolean));
   renderRecommendationCandidates();
 });
-(_S = document.querySelector("#recommendationClearSelectionButton")) == null ? void 0 : _S.addEventListener("click", () => {
+(_U = document.querySelector("#recommendationClearSelectionButton")) == null ? void 0 : _U.addEventListener("click", () => {
   selectedRecommendationKeys = /* @__PURE__ */ new Set();
   renderRecommendationCandidates();
 });
-(_T = document.querySelector("#returnSelectAllButton")) == null ? void 0 : _T.addEventListener("click", () => {
+(_V = document.querySelector("#returnSelectAllButton")) == null ? void 0 : _V.addEventListener("click", () => {
   setAllReturnSelections(true);
 });
-(_U = document.querySelector("#returnClearSelectionButton")) == null ? void 0 : _U.addEventListener("click", () => {
+(_W = document.querySelector("#returnClearSelectionButton")) == null ? void 0 : _W.addEventListener("click", () => {
   setAllReturnSelections(false);
 });
-(_V = document.querySelector("#parcelBatchAddRowButton")) == null ? void 0 : _V.addEventListener("click", () => {
+(_X = document.querySelector("#parcelBatchAddRowButton")) == null ? void 0 : _X.addEventListener("click", () => {
   syncParcelBatchRowsFromDom();
   parcelBatchRowState.push(emptyParcelBatchRow());
   renderParcelBatchRows();
 });
-(_W = document.querySelector("#chinaSourceCostListButton")) == null ? void 0 : _W.addEventListener("click", () => {
+(_Y = document.querySelector("#chinaSourceCostListButton")) == null ? void 0 : _Y.addEventListener("click", () => {
   var _a;
   const sourcePoolToken = String(((_a = document.querySelector("#chinaSourceBaleForm [name='source_pool_token']")) == null ? void 0 : _a.value) || "").trim();
   populateChinaSourceCostRecordSelect(sourcePoolToken);
@@ -40881,10 +43559,10 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     setActivePanel(panelKey);
   }
 });
-(_X = document.querySelector("#chinaSourceReceiptSheetPrintButton")) == null ? void 0 : _X.addEventListener("click", () => {
+(_Z = document.querySelector("#chinaSourceReceiptSheetPrintButton")) == null ? void 0 : _Z.addEventListener("click", () => {
   printChinaSourceReceiptSheet();
 });
-(_Y = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _Y.addEventListener("change", (event) => {
+(__ = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : __.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) {
     return;
@@ -40893,23 +43571,23 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
   balePrinterConsoleNotice = null;
   renderBalePrinterConsoleSummary(target.value);
 });
-(_Z = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _Z.addEventListener("change", () => {
+(_$ = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _$.addEventListener("change", () => {
   renderBalePrinterConsoleSummary();
 });
-(__ = document.querySelector("#lockBaleShipmentButton")) == null ? void 0 : __.addEventListener("click", () => {
+(_aa = document.querySelector("#lockBaleShipmentButton")) == null ? void 0 : _aa.addEventListener("click", () => {
   var _a;
   const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim();
   setCurrentInboundShipment(shipmentNo);
   baleBarcodeDirectoryNotice = shipmentNo ? { type: "success", message: `已锁定船单 ${shipmentNo}。现在可以按任意类别顺序开始贴码。` } : { type: "error", message: "请先选择一张船单再锁定。" };
   renderBaleBarcodeDirectorySummary(shipmentNo);
 });
-(_$ = document.querySelector("#balePrintConfirmButton")) == null ? void 0 : _$.addEventListener("click", () => {
+(_ba = document.querySelector("#balePrintConfirmButton")) == null ? void 0 : _ba.addEventListener("click", () => {
   confirmBalePrintFlowAndContinue().catch((error) => {
     baleBarcodeDirectoryNotice = { type: "error", message: formatErrorMessage(error) };
     renderBaleBarcodeDirectorySummary(resolveCurrentInboundShipmentNo());
   });
 });
-(_aa = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _aa.addEventListener("keydown", (event) => {
+(_ca = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ca.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== "Tab") {
     return;
   }
@@ -40931,10 +43609,10 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     setSortingScannerError(formatErrorMessage(error));
   });
 });
-(_ba = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ba.addEventListener("focus", () => {
+(_da = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _da.addEventListener("focus", () => {
   renderSortingScannerHealthSummary();
 });
-(_ca = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ca.addEventListener("blur", () => {
+(_ea = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ea.addEventListener("blur", () => {
   setTimeout(() => renderSortingScannerHealthSummary(), 0);
 });
 document.addEventListener("submit", (event) => {
@@ -41137,7 +43815,7 @@ document.addEventListener("input", (event) => {
   }
 });
 document.addEventListener("change", (event) => {
-  var _a, _b, _c2, _d2;
+  var _a, _b, _c, _d2;
   const target = event.target;
   if (target instanceof HTMLSelectElement && target.matches("#productImportRowsBuilder [data-product-import-field='supplier_name']")) {
     syncProductImportRowsFromDom();
@@ -41238,7 +43916,7 @@ document.addEventListener("change", (event) => {
     syncChinaSourceContainerRowsFromDom();
     const rowNode = target.closest("[data-china-source-row-index]");
     const rowIndex = Number((rowNode == null ? void 0 : rowNode.dataset.chinaSourceRowIndex) || -1);
-    const supplierName = String(((_c2 = rowNode == null ? void 0 : rowNode.querySelector("[data-china-source-field='supplier_name']")) == null ? void 0 : _c2.value) || "").trim();
+    const supplierName = String(((_c = rowNode == null ? void 0 : rowNode.querySelector("[data-china-source-field='supplier_name']")) == null ? void 0 : _c.value) || "").trim();
     const categoryMain = String(((_d2 = rowNode == null ? void 0 : rowNode.querySelector("[data-china-source-field='category_main']")) == null ? void 0 : _d2.value) || "").trim();
     if (rowIndex >= 0 && chinaSourceContainerRowState[rowIndex]) {
       chinaSourceContainerRowState[rowIndex].category_sub_zh = getSupplierScopedCategorySubZh(supplierName, categoryMain, target.value) || "";
@@ -41731,7 +44409,7 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c2, _d2, _e2;
+  var _a, _b, _c, _d2, _e2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-item-token-print-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -41764,7 +44442,7 @@ document.addEventListener("click", async (event) => {
         throw new Error(`找不到打印任务 #${jobId}。`);
       }
       const printerName = String(
-        currentJob.printer_name || ((_c2 = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _c2.value) || ((_d2 = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _d2.value) || "Deli DL-720C"
+        currentJob.printer_name || ((_c = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _c.value) || ((_d2 = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _d2.value) || "Deli DL-720C"
       ).trim();
       const matchedPrinter = findSystemPrinterBySelectedName(printerName);
       if (!matchedPrinter) {
@@ -41858,7 +44536,7 @@ document.addEventListener("click", (event) => {
     toggleSupplierInlineEditor(select);
   });
 });
-(_da = document.querySelector("#refreshOpsAlertsButton")) == null ? void 0 : _da.addEventListener("click", async () => {
+(_fa = document.querySelector("#refreshOpsAlertsButton")) == null ? void 0 : _fa.addEventListener("click", async () => {
   try {
     await refreshIntegrationSummaries();
     focusElement("#opsAlertSummary");
@@ -41866,14 +44544,14 @@ document.addEventListener("click", (event) => {
     writeOutput("#mpesaOutput", formatErrorMessage(error));
   }
 });
-(_ea = document.querySelector("#openShiftPreviewButton")) == null ? void 0 : _ea.addEventListener("click", () => {
+(_ga = document.querySelector("#openShiftPreviewButton")) == null ? void 0 : _ga.addEventListener("click", () => {
   try {
     openShiftReportPreview();
   } catch (error) {
     writeOutput("#shiftOutput", formatErrorMessage(error));
   }
 });
-(_fa = document.querySelector("#storeOperatingSummary")) == null ? void 0 : _fa.addEventListener("click", async (event) => {
+(_ha = document.querySelector("#storeOperatingSummary")) == null ? void 0 : _ha.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-store-summary-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -41898,7 +44576,7 @@ document.addEventListener("click", (event) => {
     writeOutput("#returnOutput", formatErrorMessage(error));
   }
 });
-(_ga = document.querySelector("#paymentAnomalyList")) == null ? void 0 : _ga.addEventListener("click", (event) => {
+(_ia = document.querySelector("#paymentAnomalyList")) == null ? void 0 : _ia.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-payment-anomaly-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -41911,7 +44589,7 @@ document.addEventListener("click", (event) => {
   hydratePaymentAnomalyForm(row);
   focusElement("#paymentAnomalyResolveForm");
 });
-(_ha = document.querySelector("#saleVoidList")) == null ? void 0 : _ha.addEventListener("click", (event) => {
+(_ja = document.querySelector("#saleVoidList")) == null ? void 0 : _ja.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-sale-void-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -41924,7 +44602,7 @@ document.addEventListener("click", (event) => {
   hydrateSaleVoidForms(row);
   focusElement("#saleVoidReviewForm");
 });
-(_ia = document.querySelector("#saleRefundList")) == null ? void 0 : _ia.addEventListener("click", (event) => {
+(_ka = document.querySelector("#saleRefundList")) == null ? void 0 : _ka.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-sale-refund-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -42147,7 +44825,7 @@ document.addEventListener("click", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  var _a, _b, _c2, _d2, _e2, _f2;
+  var _a, _b, _c, _d2, _e2, _f2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-ops-exception-edit], [data-ops-exception-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -42170,7 +44848,7 @@ document.addEventListener("click", (event) => {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (action === "claim") {
     row.owner_name = ((_a = currentSession.user) == null ? void 0 : _a.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || row.owner_name;
-    row.owner_role = ((_c2 = currentSession.user) == null ? void 0 : _c2.role_code) || row.owner_role;
+    row.owner_role = ((_c = currentSession.user) == null ? void 0 : _c.role_code) || row.owner_role;
     row.updated_at = now;
     persistOpsExceptionTicketState();
     renderOpsExceptionDeskSummary(`异常单 ${row.anomaly_no} 已认领。`);
@@ -42423,23 +45101,23 @@ document.addEventListener("change", (event) => {
     renderBalePrintModal();
   }
 });
-(_ja = document.querySelector("#rawBaleStockFilterForm")) == null ? void 0 : _ja.addEventListener("change", () => {
+(_la = document.querySelector("#rawBaleStockFilterForm")) == null ? void 0 : _la.addEventListener("change", () => {
   renderRawBaleStockSummary(rawBaleStockState);
 });
-(_ka = document.querySelector("#rawBaleStockFilterForm [name='search']")) == null ? void 0 : _ka.addEventListener("input", () => {
+(_ma = document.querySelector("#rawBaleStockFilterForm [name='search']")) == null ? void 0 : _ma.addEventListener("input", () => {
   renderRawBaleStockSummary(rawBaleStockState);
 });
-(_la = document.querySelector("#sortingStockFilterForm [name='category_main']")) == null ? void 0 : _la.addEventListener("change", (event) => {
+(_na = document.querySelector("#sortingStockFilterForm [name='category_main']")) == null ? void 0 : _na.addEventListener("change", (event) => {
   var _a;
   sortingStockCategoryMainFilter = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim();
   renderSortingStockSummary(sortingStockState);
 });
-(_ma = document.querySelector("#sortingStockFilterForm [name='search']")) == null ? void 0 : _ma.addEventListener("input", (event) => {
+(_oa = document.querySelector("#sortingStockFilterForm [name='search']")) == null ? void 0 : _oa.addEventListener("input", (event) => {
   var _a;
   sortingStockSearchText = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim();
   renderSortingStockSummary(sortingStockState);
 });
-(_na = document.querySelector("#sortingStockFilterForm [name='min_loose_qty']")) == null ? void 0 : _na.addEventListener("change", (event) => {
+(_pa = document.querySelector("#sortingStockFilterForm [name='min_loose_qty']")) == null ? void 0 : _pa.addEventListener("change", (event) => {
   var _a;
   sortingStockMinLooseQtyFilter = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim();
   renderSortingStockSummary(sortingStockState);
@@ -42460,14 +45138,14 @@ document.addEventListener("change", (event) => {
   }
   updateSelectedBaleSalesPoolButton();
 });
-(_oa = document.querySelector("#openSelectedBaleSalesPoolButton")) == null ? void 0 : _oa.addEventListener("click", () => {
+(_qa = document.querySelector("#openSelectedBaleSalesPoolButton")) == null ? void 0 : _qa.addEventListener("click", () => {
   try {
     openConsignmentBundleFromPoolEntryIds([...selectedBaleSalesPoolEntryIds]);
   } catch (error) {
     renderErrorSummary("#consignmentBundleSummary", formatErrorMessage(error));
   }
 });
-(_pa = document.querySelector("#downloadBaleSalesPricingSheetButton")) == null ? void 0 : _pa.addEventListener("click", async () => {
+(_ra = document.querySelector("#downloadBaleSalesPricingSheetButton")) == null ? void 0 : _ra.addEventListener("click", async () => {
   try {
     await downloadBaleSalesPricingSheet();
   } catch (error) {
@@ -42564,10 +45242,10 @@ document.addEventListener("change", (event) => {
     }
   }
 });
-(_qa = document.querySelector("#devTaskResetButton")) == null ? void 0 : _qa.addEventListener("click", () => {
+(_sa = document.querySelector("#devTaskResetButton")) == null ? void 0 : _sa.addEventListener("click", () => {
   hydrateDevTaskForm(null);
 });
-(_ra = document.querySelector("#labelTemplateManagerSummary")) == null ? void 0 : _ra.addEventListener("click", async (event) => {
+(_ta = document.querySelector("#labelTemplateManagerSummary")) == null ? void 0 : _ta.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-template-demo-refresh], [data-template-demo-print]") : null;
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -42593,7 +45271,7 @@ document.addEventListener("change", (event) => {
     writeOutput("#labelTemplateOutput", formatErrorMessage(error));
   }
 });
-(_sa = document.querySelector("#storeClosingChecklistSummary")) == null ? void 0 : _sa.addEventListener("click", (event) => {
+(_ua = document.querySelector("#storeClosingChecklistSummary")) == null ? void 0 : _ua.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-closing-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -42953,6 +45631,7 @@ populateChinaSourceShipmentSelects();
 populateChinaSourceCostRecordSelect();
 renderChinaSourceBalePreview();
 renderChinaSourceCostSummary();
+renderStoreManagerDailyControlRoot();
 renderStoreManagerPdaPreview();
 initWorkspacePageRegistry();
 syncWorkspacePanelHeadingsToNavTitles();

@@ -2304,9 +2304,17 @@ const STORE_PANEL_NAV_META = [
     navTitleEn: "Store Manager PDA Workbench",
   },
   {
-    match: "库存总览",
+    match: "今日执行台",
     section: "manager",
     order: 2,
+    icon: "今",
+    navTitle: "今日执行台",
+    navTitleEn: "Store Manager Daily Control",
+  },
+  {
+    match: "库存总览",
+    section: "manager",
+    order: 3,
     icon: "库",
     navTitle: "库存总览",
     navTitleEn: "Store Inventory Overview",
@@ -2314,7 +2322,7 @@ const STORE_PANEL_NAV_META = [
   {
     match: "货架位编辑",
     section: "manager",
-    order: 3,
+    order: 4,
     icon: "架",
     navTitle: "货架位编辑",
     navTitleEn: "Shelf Location Editor",
@@ -2574,6 +2582,7 @@ const storeCommandCenterState = {
 };
 
 const STORE_MANAGER_PDA_TABS = [
+  { id: "daily", label: "今日执行", title: "今日执行台" },
   { id: "overview", label: "经营总览", title: "经营总览" },
   { id: "receiving", label: "收退货", title: "SDO 收退货" },
   { id: "logs", label: "经营日志", title: "经营日志" },
@@ -2711,6 +2720,14 @@ let activeStoreManagerPdaTab = "overview";
 let activeStoreManagerPdaReturnCode = "";
 let storeManagerPdaReturnSubmitted = false;
 let storeManagerPdaTaskState = null;
+let storeManagerDailyControlState = {
+  data: null,
+  date: "",
+  loading: false,
+  error: "",
+  notice: "",
+  selectedSuggestionTab: "hot",
+};
 const PDA_RUNTIME_POLL_INTERVAL_MS = 3000;
 const CLERK_BLUETOOTH_PRINTER_STATUS_POLL_INTERVAL_MS = 3000;
 const CLERK_S1_PROTOCOL_DIAGNOSTIC_PAUSE_MS = 15000;
@@ -5924,9 +5941,372 @@ function renderStoreManagerPdaSummaryCard(card = {}) {
   `;
 }
 
+function getManagerDailyControlDefaultData(dateValue = getTodayInputValue()) {
+  return {
+    store_code: getCurrentStoreCodeFallback(),
+    date: dateValue,
+    tasks: {
+      pending_sdo: 0,
+      pending_assignment_packages: 0,
+      pending_putaway_items: 0,
+      unconfirmed_stock_in_items: 0,
+      active_holds: 0,
+      open_shifts: 0,
+      cash_variance_amount: 0,
+    },
+    flow: {
+      received_items: 0,
+      assigned_items: 0,
+      putaway_items: 0,
+      sold_items: 0,
+      unprocessed_items: 0,
+      current_sellable_inventory: 0,
+    },
+    hot_categories: [],
+    slow_categories: [],
+    cashier_risk: {
+      today_sales: 0,
+      orders: 0,
+      cash_amount: 0,
+      mpesa_amount: 0,
+      mixed_amount: 0,
+      open_shift_count: 0,
+      cash_variance_shift_count: 0,
+      active_hold_count: 0,
+    },
+    market_feedback: [],
+    placeholder_fields: [],
+  };
+}
+
+function getManagerDailyControlData() {
+  return storeManagerDailyControlState.data || getManagerDailyControlDefaultData(storeManagerDailyControlState.date || getTodayInputValue());
+}
+
+function formatManagerDailyControlNumber(value = 0) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function formatManagerDailyControlMoney(value = 0) {
+  return `KSh ${formatCurrency(value)}`;
+}
+
+function getManagerDailyControlActionLabel(value = "") {
+  const action = String(value || "").trim();
+  const labels = {
+    replenish: "补货",
+    promotion: "促销",
+    change_display: "换陈列",
+    reduce_price: "降价",
+    return_to_warehouse: "退回仓库",
+    keep_observing: "继续观察",
+  };
+  return labels[action] || action || "-";
+}
+
+function getManagerMarketFeedbackTypeLabel(value = "") {
+  const type = String(value || "").trim();
+  const labels = {
+    customer_asked_many: "顾客问得多",
+    customer_said_expensive: "顾客嫌贵",
+    size_missing: "缺尺码",
+    color_missing: "缺颜色",
+    style_not_good: "款式不好",
+    quality_issue: "质量问题",
+    display_issue: "陈列问题",
+    weather_not_match: "天气不匹配",
+    competitor_better: "竞品更好",
+    other: "其他",
+  };
+  return labels[type] || type || "-";
+}
+
+function renderManagerDailyControlMetric({ label, value, tone = "neutral", money = false }) {
+  return `
+    <article class="store-manager-daily-card ${getStatusCardClass(tone)}">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(money ? formatManagerDailyControlMoney(value) : formatManagerDailyControlNumber(value))}</strong>
+    </article>
+  `;
+}
+
+function renderManagerDailyCategoryRows(rows = [], emptyText = "当前没有达到建议阈值的品类。") {
+  if (!rows.length) {
+    return `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+  }
+  return `
+    <div class="store-manager-daily-table">
+      <div class="store-manager-daily-table-head">
+        <span>category</span>
+        <span>sold_qty</span>
+        <span>current_stock</span>
+        <span>signal</span>
+        <span>suggested_action</span>
+        <span>操作</span>
+      </div>
+      ${rows.map((row) => `
+        <article class="store-manager-daily-table-row">
+          <strong>${escapeHtml(row.category || "-")}</strong>
+          <span>${escapeHtml(formatManagerDailyControlNumber(row.sold_qty || 0))}</span>
+          <span>${escapeHtml(formatManagerDailyControlNumber(row.current_stock || 0))}</span>
+          <span>${renderStatusBadge(row.signal || "-", row.signal || "info")}</span>
+          <span>${escapeHtml(getManagerDailyControlActionLabel(row.suggested_action))}</span>
+          <button type="button" class="ghost-button mini-button" data-manager-feedback-category="${escapeHtml(row.category || "")}" data-manager-feedback-action="${escapeHtml(row.suggested_action || "")}">提交反馈</button>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderManagerDailyFeedbackList(rows = []) {
+  if (!rows.length) {
+    return '<div class="empty-state">今日还没有市场反馈。</div>';
+  }
+  return `
+    <div class="candidate-list store-manager-daily-feedback-list">
+      ${rows.map((row) => `
+        <article class="candidate-row">
+          <div class="candidate-main">
+            <strong>${escapeHtml(row.category || "-")}</strong>
+            <div class="subtle small">${escapeHtml(`${getManagerMarketFeedbackTypeLabel(row.feedback_type)} · ${getManagerDailyControlActionLabel(row.suggested_action)}`)}</div>
+            <div class="subtle small">${escapeHtml(row.note || "无备注")}</div>
+          </div>
+          <div class="candidate-side">
+            <span class="meta-pill">${escapeHtml(formatLocalDateTime(row.created_at) || row.created_at || "-")}</span>
+            <span class="meta-pill">${escapeHtml(row.created_by || "-")}</span>
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderStoreManagerDailyControl(data = getManagerDailyControlData()) {
+  const sectionLabels = {
+    tasks: "今日任务",
+    pendingSdo: "待收货 SDO",
+    flow: "货物流转",
+    hot: "热卖 / 需补货",
+    slow: "滞销 / 需促销",
+    feedback: "市场反馈",
+    cashier: "收银风险摘要",
+  };
+  const tasks = data.tasks || {};
+  const flow = data.flow || {};
+  const cashierRisk = data.cashier_risk || {};
+  const placeholderFields = Array.isArray(data.placeholder_fields) ? data.placeholder_fields : [];
+  const flowNodes = [
+    ["到货 received", flow.received_items],
+    ["已分配 assigned", flow.assigned_items],
+    ["已上架 putaway", flow.putaway_items],
+    ["已售 sold", flow.sold_items],
+    ["未处理 unprocessed", flow.unprocessed_items],
+  ];
+  const taskCards = [
+    { label: sectionLabels.pendingSdo, value: tasks.pending_sdo, tone: Number(tasks.pending_sdo || 0) > 0 ? "warning" : "success" },
+    { label: "待分配包", value: tasks.pending_assignment_packages, tone: Number(tasks.pending_assignment_packages || 0) > 0 ? "warning" : "success" },
+    { label: "未确认入库商品", value: tasks.unconfirmed_stock_in_items, tone: Number(tasks.unconfirmed_stock_in_items || 0) > 0 ? "danger" : "success" },
+    { label: "未处理挂单", value: tasks.active_holds, tone: Number(tasks.active_holds || 0) > 0 ? "warning" : "success" },
+    { label: "未结班班次", value: tasks.open_shifts, tone: Number(tasks.open_shifts || 0) > 0 ? "info" : "neutral" },
+    { label: "现金差异", value: tasks.cash_variance_amount, tone: Number(tasks.cash_variance_amount || 0) !== 0 ? "danger" : "success", money: true },
+  ];
+  const cashierCards = [
+    { label: "今日销售额", value: cashierRisk.today_sales, tone: "success", money: true },
+    { label: "订单数", value: cashierRisk.orders, tone: "info" },
+    { label: "Cash", value: cashierRisk.cash_amount, tone: "neutral", money: true },
+    { label: "M-Pesa", value: cashierRisk.mpesa_amount, tone: "success", money: true },
+    { label: "Mixed", value: cashierRisk.mixed_amount, tone: "info", money: true },
+    { label: "open shifts", value: cashierRisk.open_shift_count, tone: Number(cashierRisk.open_shift_count || 0) > 0 ? "info" : "neutral" },
+    { label: "active holds", value: cashierRisk.active_hold_count, tone: Number(cashierRisk.active_hold_count || 0) > 0 ? "warning" : "success" },
+    { label: "cash variance shifts", value: cashierRisk.cash_variance_shift_count, tone: Number(cashierRisk.cash_variance_shift_count || 0) > 0 ? "danger" : "success" },
+  ];
+  return `
+    <section class="store-manager-daily-hero">
+      <div>
+        <span class="eyebrow">Store Manager Daily Control</span>
+        <h3>${escapeHtml(data.store_code || getCurrentStoreCodeFallback())} · ${escapeHtml(data.date || getTodayInputValue())}</h3>
+        <p>店长每日执行台聚合门店任务、货物流转、品类信号、市场反馈和收银风险，不进入收银员 POS 主屏。</p>
+      </div>
+      <button type="button" class="ghost-button" data-manager-daily-refresh="true">刷新</button>
+    </section>
+    ${storeManagerDailyControlState.notice ? `<div class="success-banner">${escapeHtml(storeManagerDailyControlState.notice)}</div>` : ""}
+    ${storeManagerDailyControlState.error ? `<div class="alert-banner">${escapeHtml(storeManagerDailyControlState.error)}</div>` : ""}
+    ${placeholderFields.length ? `<div class="subtle small">当前字段按现有数据可用范围计算：${escapeHtml(placeholderFields.join(", "))}</div>` : ""}
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.tasks}</h3>
+        <span>今日必须处理</span>
+      </div>
+      <div class="store-manager-daily-task-grid">
+        ${taskCards.map((card) => renderManagerDailyControlMetric(card)).join("")}
+      </div>
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.flow}</h3>
+        <span>received → assigned → putaway → sold</span>
+      </div>
+      <div class="store-manager-daily-flow">
+        ${flowNodes.map(([label, value]) => `
+          <article class="store-manager-daily-flow-node">
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(formatManagerDailyControlNumber(value || 0))}</strong>
+          </article>
+        `).join("")}
+      </div>
+      <div class="store-manager-daily-inventory-note">
+        当前可售库存：<strong>${escapeHtml(formatManagerDailyControlNumber(flow.current_sellable_inventory || 0))}</strong>
+      </div>
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.hot}</h3>
+        <span>卖得快且库存低</span>
+      </div>
+      ${renderManagerDailyCategoryRows(data.hot_categories || [], "当前没有达到补货建议阈值的品类。")}
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.slow}</h3>
+        <span>库存高且动销慢</span>
+      </div>
+      ${renderManagerDailyCategoryRows(data.slow_categories || [], "当前没有达到促销建议阈值的品类。")}
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.feedback}</h3>
+        <span>一线市场信号</span>
+      </div>
+      ${renderManagerDailyFeedbackList(data.market_feedback || [])}
+    </section>
+    <section class="store-manager-daily-section">
+      <div class="store-manager-daily-section-head">
+        <h3>${sectionLabels.cashier}</h3>
+        <span>只做摘要，不复制收银台</span>
+      </div>
+      <div class="store-manager-daily-risk-grid">
+        ${cashierCards.map((card) => renderManagerDailyControlMetric(card)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderStoreManagerDailyControlRoot() {
+  const root = document.querySelector("#storeManagerDailyControlRoot");
+  const summary = document.querySelector("#storeManagerDailyControlSummary");
+  const dateInput = document.querySelector("#storeManagerDailyControlForm [name='date']");
+  if (dateInput instanceof HTMLInputElement && !dateInput.value) {
+    dateInput.value = storeManagerDailyControlState.date || getTodayInputValue();
+  }
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  if (storeManagerDailyControlState.loading) {
+    root.innerHTML = '<div class="empty-state">正在读取店长今日执行数据...</div>';
+  } else {
+    root.innerHTML = renderStoreManagerDailyControl();
+  }
+  if (summary instanceof HTMLElement) {
+    const data = getManagerDailyControlData();
+    summary.className = "candidate-summary";
+    summary.innerHTML = `
+      <div class="report-summary-grid compact-metrics">
+        <article class="store-metric"><strong>门店</strong><span>${escapeHtml(data.store_code || getCurrentStoreCodeFallback())}</span></article>
+        <article class="store-metric"><strong>日期</strong><span>${escapeHtml(data.date || getTodayInputValue())}</span></article>
+        <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatManagerDailyControlMoney(data.cashier_risk?.today_sales || 0))}</span></article>
+        <article class="store-metric"><strong>未处理挂单</strong><span>${escapeHtml(formatManagerDailyControlNumber(data.tasks?.active_holds || 0))}</span></article>
+      </div>
+    `;
+  }
+}
+
+async function loadStoreManagerDailyControl(dateValue = "") {
+  const storeCode = getCurrentStoreCodeFallback();
+  const normalizedDate = String(dateValue || document.querySelector("#storeManagerDailyControlForm [name='date']")?.value || storeManagerDailyControlState.date || getTodayInputValue()).trim() || getTodayInputValue();
+  dateValue = normalizedDate;
+  storeManagerDailyControlState = {
+    ...storeManagerDailyControlState,
+    date: dateValue,
+    loading: true,
+    error: "",
+    notice: "",
+  };
+  renderStoreManagerDailyControlRoot();
+  try {
+    const result = await request(`/stores/${encodeURIComponent(storeCode)}/manager-daily-control?date=${encodeURIComponent(dateValue)}`);
+    storeManagerDailyControlState = {
+      ...storeManagerDailyControlState,
+      data: result,
+      date: result.date || dateValue,
+      loading: false,
+      error: "",
+    };
+    renderStoreManagerDailyControlRoot();
+    renderStoreManagerPdaPreviewPreservingScroll();
+    return result;
+  } catch (error) {
+    storeManagerDailyControlState = {
+      ...storeManagerDailyControlState,
+      loading: false,
+      error: formatErrorMessage(error),
+    };
+    renderStoreManagerDailyControlRoot();
+    renderStoreManagerPdaPreviewPreservingScroll();
+    throw error;
+  }
+}
+
+async function submitStoreManagerDailyControlRefresh(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const dateValue = String(form.get("date") || getTodayInputValue()).trim() || getTodayInputValue();
+  const result = await loadStoreManagerDailyControl(dateValue);
+  writeOutput("#storeManagerDailyControlOutput", result);
+}
+
+async function submitStoreManagerMarketFeedback(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const storeCode = getCurrentStoreCodeFallback();
+  const dateValue = String(document.querySelector("#storeManagerDailyControlForm [name='date']")?.value || storeManagerDailyControlState.date || getTodayInputValue()).trim() || getTodayInputValue();
+  const payload = {
+    category: String(form.get("category") || "").trim(),
+    feedback_type: String(form.get("feedback_type") || "other").trim(),
+    suggested_action: String(form.get("suggested_action") || "keep_observing").trim(),
+    note: String(form.get("note") || "").trim(),
+  };
+  if (!payload.category) {
+    throw new Error("请选择反馈品类。");
+  }
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}/manager-market-feedback`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  storeManagerDailyControlState.notice = `已提交市场反馈：${result.feedback_id || payload.category}`;
+  event.currentTarget.reset();
+  await loadStoreManagerDailyControl(dateValue);
+  storeManagerDailyControlState.notice = `已提交市场反馈：${result.feedback_id || payload.category}`;
+  renderStoreManagerDailyControlRoot();
+  writeOutput("#storeManagerDailyControlOutput", result);
+  return result;
+}
+
 function renderStoreManagerPdaOverview() {
   const data = STORE_MANAGER_PDA_MOCK;
   return `
+    <section class="store-manager-pda-card store-manager-pda-daily-entry">
+      <div class="store-manager-pda-card-head">
+        <div>
+          <strong>今日执行台</strong>
+          <span>查看今日任务、货物流转、热卖补货、滞销促销、市场反馈</span>
+        </div>
+        ${renderStatusBadge("Today", "info")}
+      </div>
+      <button type="button" class="store-manager-pda-primary-action" data-store-manager-pda-tab="daily">进入今日执行台</button>
+    </section>
+
     <section class="store-manager-pda-metrics">
       ${data.summaryCards.map((card) => renderStoreManagerPdaSummaryCard(card)).join("")}
     </section>
@@ -6399,8 +6779,119 @@ function renderStoreManagerPdaTaskFlow(state = ensureStoreManagerPdaTaskState())
   return renderStoreManagerPdaTaskList(state);
 }
 
+function renderStoreManagerPdaDailyControl(state = ensureStoreManagerPdaTaskState()) {
+  const data = getManagerDailyControlData();
+  const tasks = data.tasks || {};
+  const flow = data.flow || {};
+  const hotRows = Array.isArray(data.hot_categories) ? data.hot_categories : [];
+  const slowRows = Array.isArray(data.slow_categories) ? data.slow_categories : [];
+  const selectedTab = storeManagerDailyControlState.selectedSuggestionTab === "slow" ? "slow" : "hot";
+  const actionRows = selectedTab === "slow" ? slowRows : hotRows;
+  const taskCards = [
+    ["待收货 SDO", tasks.pending_sdo, "warning"],
+    ["待分配", tasks.pending_assignment_packages, "warning"],
+    ["未确认入库", tasks.unconfirmed_stock_in_items, "danger"],
+    ["未处理挂单", tasks.active_holds, "warning"],
+    ["未结班", tasks.open_shifts, "info"],
+    ["现金差异", tasks.cash_variance_amount, Number(tasks.cash_variance_amount || 0) !== 0 ? "danger" : "success", true],
+  ];
+  const flowRows = [
+    ["到货", flow.received_items],
+    ["已分配", flow.assigned_items],
+    ["已上架", flow.putaway_items],
+    ["已售", flow.sold_items],
+    ["未处理", flow.unprocessed_items],
+  ];
+  const quickCategories = selectedTab === "slow"
+    ? ["Jackets", "Kids", "外套", "童装"]
+    : ["Men Shoes", "Ladies Dresses", "女裙", "T-Shirts"];
+  return `
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <div>
+          <strong>今日必须处理</strong>
+          <span>${escapeHtml(data.store_code || getCurrentStoreCodeFallback())} · ${escapeHtml(data.date || getTodayInputValue())}</span>
+        </div>
+        <button type="button" class="store-manager-pda-secondary-action compact-action" data-manager-daily-refresh="true">刷新</button>
+      </div>
+      ${storeManagerDailyControlState.error ? `<div class="alert-banner">${escapeHtml(storeManagerDailyControlState.error)}</div>` : ""}
+      ${storeManagerDailyControlState.notice ? `<div class="store-manager-pda-push-note">${escapeHtml(storeManagerDailyControlState.notice)}</div>` : ""}
+    </section>
+
+    <section class="store-manager-pda-daily-grid">
+      ${taskCards.map(([label, value, tone, money]) => `
+        <article class="store-manager-pda-daily-card ${getStatusCardClass(tone)}">
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(money ? formatManagerDailyControlMoney(value) : formatManagerDailyControlNumber(value))}</strong>
+        </article>
+      `).join("")}
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>货物流转</strong>
+        <span>现场简版</span>
+      </div>
+      <div class="store-manager-pda-daily-flow">
+        ${flowRows.map(([label, value]) => `
+          <article>
+            <span>${escapeHtml(label)}</span>
+            <strong>${escapeHtml(formatManagerDailyControlNumber(value || 0))}</strong>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>动作建议</strong>
+        <span>${selectedTab === "slow" ? "要促销" : "要补货"}</span>
+      </div>
+      <div class="store-manager-pda-action-tabs" role="group" aria-label="动作建议">
+        <button type="button" class="${selectedTab === "hot" ? "is-active" : ""}" data-manager-daily-suggestion-tab="hot">要补货</button>
+        <button type="button" class="${selectedTab === "slow" ? "is-active" : ""}" data-manager-daily-suggestion-tab="slow">要促销</button>
+      </div>
+      <div class="store-manager-pda-list">
+        ${actionRows.length ? actionRows.map((row) => `
+          <article class="store-manager-pda-row">
+            <div>
+              <strong>${escapeHtml(row.category || "-")}</strong>
+              <span>卖 ${escapeHtml(formatManagerDailyControlNumber(row.sold_qty || 0))} · 库存 ${escapeHtml(formatManagerDailyControlNumber(row.current_stock || 0))}</span>
+            </div>
+            <b>${escapeHtml(getManagerDailyControlActionLabel(row.suggested_action))}</b>
+          </article>
+        `).join("") : '<div class="empty-state">当前没有达到动作建议阈值的品类。</div>'}
+      </div>
+    </section>
+
+    <section class="store-manager-pda-card">
+      <div class="store-manager-pda-card-head">
+        <strong>快速反馈</strong>
+        <span>店长现场市场信号</span>
+      </div>
+      <form id="storeManagerPdaDailyFeedbackForm" class="store-manager-pda-daily-feedback-form">
+        <input type="hidden" name="feedback_type" value="${selectedTab === "slow" ? "customer_said_expensive" : "customer_asked_many"}" />
+        <input type="hidden" name="suggested_action" value="${selectedTab === "slow" ? "promotion" : "replenish"}" />
+        <div class="store-manager-pda-chip-group" role="group" aria-label="品类">
+          ${quickCategories.map((category, index) => `
+            <label>
+              <input type="radio" name="category" value="${escapeHtml(category)}" ${index === 0 ? "checked" : ""} />
+              <span>${escapeHtml(category)}</span>
+            </label>
+          `).join("")}
+        </div>
+        <textarea name="note" rows="2" placeholder="备注：例如顾客问大码，或觉得价格偏高"></textarea>
+        <button type="submit" class="store-manager-pda-primary-action">提交反馈</button>
+      </form>
+    </section>
+  `;
+}
+
 function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState()) {
   const activeTab = String(state.activeTab || "receiving");
+  if (activeTab === "daily") {
+    return renderStoreManagerPdaDailyControl(state);
+  }
   if (activeTab === "receiving") {
     return renderStoreManagerPdaTaskFlow(state);
   }
@@ -6415,6 +6906,7 @@ function renderStoreManagerPdaRuntimeBody(state = ensureStoreManagerPdaTaskState
 
 function getStoreManagerPdaRuntimeTitle(state = ensureStoreManagerPdaTaskState()) {
   const activeTab = String(state.activeTab || "receiving");
+  if (activeTab === "daily") return "今日执行台";
   if (activeTab === "overview") return "经营总览";
   if (activeTab === "logs") return "经营日志";
   if (activeTab === "other") return "其他";
@@ -6487,11 +6979,13 @@ function renderStoreManagerPdaPreview(tabId = "") {
   activeStoreManagerPdaTab = activeTab.id;
   const bodyHtml = activeTab.id === "receiving"
     ? renderStoreManagerPdaReceiving()
-    : activeTab.id === "logs"
-      ? renderStoreManagerPdaLogs()
-      : activeTab.id === "other"
-        ? renderStoreManagerPdaOther()
-        : renderStoreManagerPdaOverview();
+    : activeTab.id === "daily"
+      ? renderStoreManagerPdaDailyControl(ensureStoreManagerPdaTaskState())
+      : activeTab.id === "logs"
+        ? renderStoreManagerPdaLogs()
+        : activeTab.id === "other"
+          ? renderStoreManagerPdaOther()
+          : renderStoreManagerPdaOverview();
   target.innerHTML = `
     <div class="store-manager-pda-shell" data-pda-runtime-surface="store-manager">
       <div class="store-manager-pda-device-bar">
@@ -6619,9 +7113,15 @@ async function handleStoreManagerPdaTaskAction(button) {
   try {
     if (button.dataset.storeManagerPdaTab) {
       state.activeTab = button.dataset.storeManagerPdaTab;
+      activeStoreManagerPdaTab = state.activeTab;
       state.notice = "";
       if (button.dataset.storeManagerPdaTab === "receiving") {
         shouldRefreshAfterAction = true;
+      }
+      if (button.dataset.storeManagerPdaTab === "daily") {
+        await loadStoreManagerDailyControl(storeManagerDailyControlState.date || getTodayInputValue()).catch((error) => {
+          state.notice = formatErrorMessage(error);
+        });
       }
     }
     if (button.dataset.storeManagerPdaPage) {
@@ -6644,6 +7144,12 @@ async function handleStoreManagerPdaTaskAction(button) {
       state.loading = false;
       state.loadError = "";
       await loadStoreManagerPdaBackendState({ force: true });
+    }
+    if (button.dataset.managerDailyRefresh) {
+      await loadStoreManagerDailyControl(storeManagerDailyControlState.date || getTodayInputValue());
+    }
+    if (button.dataset.managerDailySuggestionTab) {
+      storeManagerDailyControlState.selectedSuggestionTab = button.dataset.managerDailySuggestionTab === "slow" ? "slow" : "hot";
     }
     if (button.dataset.storeManagerPdaReceivePackage) {
       state.activeTab = "receiving";
@@ -7156,6 +7662,9 @@ function setActivePanel(panelKey, options = {}) {
   }
   if (currentSession?.token && panelKey === getPanelKeyByTitle("warehouse", "Bales销售｜真实出库")) {
     loadBaleSalesOutboundWorkbench().catch(() => {});
+  }
+  if (currentSession?.token && panelKey === getPanelKeyByTitle("store", "今日执行台")) {
+    loadStoreManagerDailyControl().catch(() => {});
   }
   if (
     currentSession?.token
@@ -43743,6 +44252,8 @@ const FORM_SUMMARY_SELECTORS = {
   "#loginForm": "#authResultSummary",
   "#devTaskForm": "#devTrackerSummary",
   "#storeManagerConsoleForm": "#storeManagerConsoleSummary",
+  "#storeManagerDailyControlForm": "#storeManagerDailyControlSummary",
+  "#storeManagerMarketFeedbackForm": "#storeManagerDailyControlSummary",
   "#storeInventoryOverviewForm": "#storeInventoryOverviewSummary",
   "#storeItemTraceLookupForm": "#storeItemTraceLookupResult",
   "#storeShelfLocationLoadForm": "#storeShelfLocationSummary",
@@ -43873,6 +44384,8 @@ bindForm("#loginForm", submitLogin, "#authOutput");
 bindLoginSubmitFallback();
 bindForm("#devTaskForm", submitDevTask, "#authOutput");
 bindForm("#storeManagerConsoleForm", submitStoreManagerConsole, "#storeManagerConsoleOutput");
+bindForm("#storeManagerDailyControlForm", submitStoreManagerDailyControlRefresh, "#storeManagerDailyControlOutput");
+bindForm("#storeManagerMarketFeedbackForm", submitStoreManagerMarketFeedback, "#storeManagerDailyControlOutput");
 bindForm("#storeInventoryOverviewForm", submitStoreInventoryOverview, "#storeInventoryOverviewOutput");
 bindForm("#storeItemTraceLookupForm", submitStoreItemTraceLookup, "#storeInventoryOverviewOutput");
 bindForm("#storeShelfLocationLoadForm", submitStoreShelfLocationLoad, "#storeShelfLocationOutput");
@@ -44487,6 +45000,26 @@ async function handlePanelJumpEvent(event) {
 workspacePageNav?.addEventListener("click", handlePanelJumpEvent);
 appShell?.addEventListener("click", handlePanelJumpEvent);
 
+document.querySelector("#storeManagerDailyControlRoot")?.addEventListener("click", (event) => {
+  if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+  const refreshButton = event.target.closest("[data-manager-daily-refresh]");
+  if (refreshButton instanceof HTMLElement) {
+    loadStoreManagerDailyControl(storeManagerDailyControlState.date || getTodayInputValue()).catch(() => {});
+    return;
+  }
+  const feedbackButton = event.target.closest("[data-manager-feedback-category]");
+  if (!(feedbackButton instanceof HTMLElement)) {
+    return;
+  }
+  setInputValue("#storeManagerMarketFeedbackForm [name='category']", feedbackButton.dataset.managerFeedbackCategory || "");
+  setInputValue("#storeManagerMarketFeedbackForm [name='suggested_action']", feedbackButton.dataset.managerFeedbackAction || "keep_observing");
+  const typeValue = feedbackButton.dataset.managerFeedbackAction === "promotion" ? "customer_said_expensive" : "customer_asked_many";
+  setInputValue("#storeManagerMarketFeedbackForm [name='feedback_type']", typeValue);
+  document.querySelector("#storeManagerMarketFeedbackForm [name='note']")?.focus();
+});
+
 document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", async (event) => {
   if (!(event.target instanceof HTMLElement)) {
     return;
@@ -44501,6 +45034,8 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", asy
     "[data-store-manager-pda-assign-package]",
     "[data-store-manager-pda-reload]",
     "[data-store-manager-pda-reset-task]",
+    "[data-manager-daily-refresh]",
+    "[data-manager-daily-suggestion-tab]",
   ].join(","));
   if (runtimeButton instanceof HTMLElement) {
     event.preventDefault();
@@ -44549,6 +45084,17 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", asy
 document.querySelector("#storeManagerPdaPreview")?.addEventListener("submit", async (event) => {
   if (event.target instanceof HTMLFormElement && event.target.matches("[data-store-manager-pda-sdo-search-form]")) {
     handleStoreManagerPdaSdoQuickSearchSubmit(event);
+    return;
+  }
+  if (event.target instanceof HTMLFormElement && event.target.matches("#storeManagerPdaDailyFeedbackForm")) {
+    try {
+      await submitStoreManagerMarketFeedback(event);
+      renderStoreManagerPdaPreview("daily");
+    } catch (error) {
+      event.preventDefault();
+      storeManagerDailyControlState.error = formatErrorMessage(error);
+      renderStoreManagerPdaPreview("daily");
+    }
     return;
   }
   if (!(event.target instanceof HTMLFormElement) || !event.target.matches("#storeManagerPdaSdoForm")) {
@@ -48686,6 +49232,7 @@ populateChinaSourceShipmentSelects();
 populateChinaSourceCostRecordSelect();
 renderChinaSourceBalePreview();
 renderChinaSourceCostSummary();
+renderStoreManagerDailyControlRoot();
 renderStoreManagerPdaPreview();
 initWorkspacePageRegistry();
 syncWorkspacePanelHeadingsToNavTitles();

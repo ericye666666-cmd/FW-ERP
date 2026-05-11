@@ -192,6 +192,12 @@ from app.schemas.store_racks import (
     StoreRackLocationUpsertRequest,
     StoreRackTemplateResponse,
 )
+from app.schemas.store_manager import (
+    ManagerMarketFeedbackCreate,
+    ManagerMarketFeedbackListResponse,
+    ManagerMarketFeedbackResponse,
+    StoreManagerDailyControlResponse,
+)
 from app.schemas.stores import (
     BarcodeSettingsResponse,
     LabelTemplateResponse,
@@ -4866,6 +4872,38 @@ def create_sale(
     data = payload.model_dump()
     data["cashier_name"] = current_user["username"]
     return SaleResponse(**state.create_sale_transaction(data))
+
+
+@router.get("/stores/{store_code}/manager-daily-control", response_model=StoreManagerDailyControlResponse, tags=["stores", "manager"])
+def get_store_manager_daily_control(
+    store_code: str,
+    date: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> StoreManagerDailyControlResponse:
+    _require_current_user(authorization=authorization)
+    return StoreManagerDailyControlResponse(**state.get_store_manager_daily_control(store_code, date=date or ""))
+
+
+@router.post("/stores/{store_code}/manager-market-feedback", response_model=ManagerMarketFeedbackResponse, tags=["stores", "manager"])
+def create_store_manager_market_feedback(
+    store_code: str,
+    payload: ManagerMarketFeedbackCreate,
+    authorization: Optional[str] = Header(default=None),
+) -> ManagerMarketFeedbackResponse:
+    current_user = _require_current_user(authorization=authorization)
+    return ManagerMarketFeedbackResponse(**state.create_manager_market_feedback(store_code, payload.model_dump(), created_by=current_user["username"]))
+
+
+@router.get("/stores/{store_code}/manager-market-feedback", response_model=ManagerMarketFeedbackListResponse, tags=["stores", "manager"])
+def list_store_manager_market_feedback(
+    store_code: str,
+    date: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> ManagerMarketFeedbackListResponse:
+    _require_current_user(authorization=authorization)
+    normalized_date = state._manager_control_date(date or "")
+    rows = state.list_manager_market_feedback(store_code, date=normalized_date)
+    return ManagerMarketFeedbackListResponse(store_code=store_code.strip().upper(), date=normalized_date, feedback=rows)
 
 
 @router.post("/stores/{store_code}/pos-sales", response_model=PosSaleResponse, tags=["sales", "pos"])
