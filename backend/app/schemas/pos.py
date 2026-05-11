@@ -100,6 +100,50 @@ class PosShiftSummaryResponse(BaseModel):
     note: str = ""
 
 
+class PosShiftReportPaymentBreakdown(BaseModel):
+    method: str
+    amount: float
+    orders: int
+
+
+class PosShiftReportCategoryBreakdown(BaseModel):
+    category: str
+    qty: int
+    amount: float
+
+
+class PosShiftReportResponse(BaseModel):
+    report_type: str
+    store_code: str
+    shift_id: str
+    cashier_id: str
+    terminal_id: str = ""
+    status: str
+    opened_at: str
+    closed_at: Optional[str] = None
+    closed_by: Optional[str] = None
+    manager_confirmed_by: str = ""
+    generated_at: str
+    opening_float: float
+    total_sales: float
+    order_count: int
+    item_count: int
+    cash_sales: float
+    mpesa_sales: float
+    mixed_cash: float
+    mixed_mpesa: float
+    expected_cash: float
+    counted_cash: Optional[float] = None
+    cash_variance: Optional[float] = None
+    hold_count: int = 0
+    active_hold_count: int = 0
+    completed_hold_count: int = 0
+    cancelled_hold_count: int = 0
+    cancelled_order_count: int = 0
+    payment_breakdown: List[PosShiftReportPaymentBreakdown] = Field(default_factory=list)
+    category_breakdown: List[PosShiftReportCategoryBreakdown] = Field(default_factory=list)
+
+
 class PosHoldItemCreate(BaseModel):
     machine_code: str = Field(min_length=1)
     display_code: str = ""

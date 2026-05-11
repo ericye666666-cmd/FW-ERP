@@ -86,6 +86,7 @@ from app.schemas.pos import (
     PosHoldResponse,
     PosShiftCloseRequest,
     PosShiftOpenRequest,
+    PosShiftReportResponse,
     PosShiftResponse,
     PosShiftSummaryResponse,
     StoreClosingChecklistResponse,
@@ -4985,6 +4986,26 @@ def get_store_pos_shift_summary(
 ) -> PosShiftSummaryResponse:
     _require_current_user(authorization=authorization)
     return PosShiftSummaryResponse(**state.get_pos_shift_summary(store_code, shift_id))
+
+
+@router.get("/stores/{store_code}/pos-shifts/{shift_id}/x-report", response_model=PosShiftReportResponse, tags=["pos"])
+def get_store_pos_shift_x_report(
+    store_code: str,
+    shift_id: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PosShiftReportResponse:
+    _require_current_user(authorization=authorization)
+    return PosShiftReportResponse(**state.get_pos_shift_x_report(store_code, shift_id))
+
+
+@router.get("/stores/{store_code}/pos-shifts/{shift_id}/z-report", response_model=PosShiftReportResponse, tags=["pos"])
+def get_store_pos_shift_z_report(
+    store_code: str,
+    shift_id: str,
+    authorization: Optional[str] = Header(default=None),
+) -> PosShiftReportResponse:
+    _require_current_user(authorization=authorization)
+    return PosShiftReportResponse(**state.get_pos_shift_z_report(store_code, shift_id))
 
 
 @router.post("/stores/{store_code}/pos-shifts/{shift_id}/close", response_model=PosShiftSummaryResponse, tags=["pos"])

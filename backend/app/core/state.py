@@ -11641,6 +11641,120 @@ class InMemoryState:
             "cancelled_order_count": cancelled_order_count,
         }
 
+    def _build_pos_shift_report(self, store_code: str, shift_id: str, report_type: str) -> dict[str, Any]:
+        shift = self._get_pos_shift_for_store(store_code, shift_id)
+        normalized_shift = self._normalize_pos_shift(shift)
+        normalized_report_type = str(report_type or "").strip().upper()
+        if normalized_report_type == "Z_REPORT" and normalized_shift["status"] != "closed":
+            raise HTTPException(status_code=400, detail="Shift is still open. Use X-report before closing.")
+
+        cash_sales = 0.0
+        mpesa_sales = 0.0
+        mixed_cash = 0.0
+        mixed_mpesa = 0.0
+        total_sales = 0.0
+        order_count = 0
+        item_count = 0
+        cancelled_order_count = 0
+        payment_breakdown: dict[str, dict[str, Any]] = {}
+        category_breakdown: dict[str, dict[str, Any]] = {}
+
+        for sale in self.sales_transactions:
+            if str(sale.get("store_code") or "").strip().upper() != normalized_shift["store_code"]:
+                continue
+            if str(sale.get("shift_id") or sale.get("shift_no") or "").strip() != normalized_shift["shift_id"]:
+                continue
+            if not self._is_pos_sale_transaction(sale):
+                continue
+            sale_status = str(sale.get("sale_status") or sale.get("status") or "").strip().lower()
+            if sale_status in {"voided", "cancelled", "canceled"}:
+                cancelled_order_count += 1
+                continue
+
+            total_amount = round(float(sale.get("total_amount") or 0), 2)
+            payment_method = str(sale.get("payment_method") or "").strip().lower() or "unknown"
+            total_sales += total_amount
+            order_count += 1
+
+            payment_row = payment_breakdown.setdefault(payment_method, {"method": payment_method, "amount": 0.0, "orders": 0})
+            payment_row["amount"] = round(payment_row["amount"] + total_amount, 2)
+            payment_row["orders"] += 1
+
+            if payment_method == "cash":
+                cash_sales += total_amount
+            elif payment_method == "mpesa":
+                mpesa_sales += total_amount
+            elif payment_method == "mixed":
+                mixed_cash += round(float(sale.get("cash_amount") or 0), 2)
+                mixed_mpesa += round(float(sale.get("mpesa_amount") or 0), 2)
+
+            for item in sale.get("sale_items") or []:
+                item_count += 1
+                category = str(item.get("category") or item.get("category_name") or "未分类").strip() or "未分类"
+                amount = round(float(item.get("final_price") if item.get("final_price") not in (None, "") else item.get("line_total") or 0), 2)
+                category_row = category_breakdown.setdefault(category, {"category": category, "qty": 0, "amount": 0.0})
+                category_row["qty"] += 1
+                category_row["amount"] = round(category_row["amount"] + amount, 2)
+
+        hold_count = 0
+        active_hold_count = 0
+        completed_hold_count = 0
+        cancelled_hold_count = 0
+        active_hold_statuses = self._active_pos_hold_statuses()
+        for hold in self.pos_holds.values():
+            if str(hold.get("store_code") or "").strip().upper() != normalized_shift["store_code"]:
+                continue
+            if str(hold.get("shift_id") or "").strip() != normalized_shift["shift_id"]:
+                continue
+            hold_count += 1
+            hold_status = str(hold.get("status") or "").strip().lower()
+            if hold_status in active_hold_statuses:
+                active_hold_count += 1
+            elif hold_status == "completed":
+                completed_hold_count += 1
+            elif hold_status in {"cancelled", "canceled"}:
+                cancelled_hold_count += 1
+
+        expected_cash = round(normalized_shift["opening_float"] + cash_sales + mixed_cash, 2)
+        counted_cash = normalized_shift["counted_cash"] if normalized_report_type == "Z_REPORT" else None
+        cash_variance = normalized_shift["cash_variance"] if normalized_report_type == "Z_REPORT" else None
+        if normalized_report_type == "Z_REPORT" and counted_cash is not None and cash_variance is None:
+            cash_variance = round(counted_cash - expected_cash, 2)
+
+        payment_order = {"cash": 0, "mpesa": 1, "mixed": 2}
+        return {
+            **normalized_shift,
+            "report_type": normalized_report_type,
+            "generated_at": now_iso(),
+            "total_sales": round(total_sales, 2),
+            "order_count": order_count,
+            "item_count": item_count,
+            "cash_sales": round(cash_sales, 2),
+            "mpesa_sales": round(mpesa_sales, 2),
+            "mixed_cash": round(mixed_cash, 2),
+            "mixed_mpesa": round(mixed_mpesa, 2),
+            "expected_cash": expected_cash,
+            "counted_cash": counted_cash,
+            "closing_cash_counted": counted_cash,
+            "cash_variance": cash_variance,
+            "hold_count": hold_count,
+            "active_hold_count": active_hold_count,
+            "completed_hold_count": completed_hold_count,
+            "cancelled_hold_count": cancelled_hold_count,
+            "cancelled_order_count": cancelled_order_count,
+            "payment_breakdown": sorted(
+                payment_breakdown.values(),
+                key=lambda row: (payment_order.get(row["method"], 99), row["method"]),
+            ),
+            "category_breakdown": sorted(category_breakdown.values(), key=lambda row: row["category"]),
+        }
+
+    def get_pos_shift_x_report(self, store_code: str, shift_id: str) -> dict[str, Any]:
+        return self._build_pos_shift_report(store_code, shift_id, "X_REPORT")
+
+    def get_pos_shift_z_report(self, store_code: str, shift_id: str) -> dict[str, Any]:
+        return self._build_pos_shift_report(store_code, shift_id, "Z_REPORT")
+
     def close_pos_shift(self, store_code: str, shift_id: str, payload: dict[str, Any], closed_by: str = "") -> dict[str, Any]:
         shift = self._get_pos_shift_for_store(store_code, shift_id)
         if str(shift.get("status") or "").strip().lower() != "open":
