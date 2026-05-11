@@ -81,7 +81,7 @@
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
           <div class="subtle small">默认测试密码：<code>demo1234</code></div>
           <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#272</span></div>
+            <div><strong>FW-ERP 主线 PR:</strong><span>#274</span></div>
             <div><strong>Android PR:</strong><span>#35</span></div>
           </section>
           <pre id="authOutput" class="output hidden-output"></pre>
@@ -3096,7 +3096,7 @@
           <button type="submit">刷新库存总览</button>
         </form>
         <div id="storeInventoryOverviewSummary" class="candidate-summary empty-state">
-          请选择门店查看 STORE_ITEM 库存总览：门店总库存 / 已上货架 / 后仓 / 未关联货架 / 今日新增入库 / 未确认。
+          请选择门店查看 STORE_ITEM 库存总览：待完成入库 / 未关联货架 / 后仓 / 已上货架 / 门店总库存 / 今日新增入库。
         </div>
         <div class="segmented-control" role="tablist" aria-label="库存总览视角">
           <button type="button" class="secondary-button" data-store-inventory-tab="category">按品类</button>
@@ -4292,16 +4292,16 @@
           (document.body || document.documentElement).appendChild(script);
         }
 
-        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-unconfirmed-stock-in-304";
-        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "unconfirmed-store-item-stock-in-list-304";
+        window.__DIRECT_LOOP_WEB_VERSION__ = "fw-erp-web-20260511-inventory-overview-ui-polish-305";
+        window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "inventory-overview-ui-polish-305";
 
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=unconfirmed-store-item-stock-in-list-304", "modern");
+          loadPdaRuntimeScript("./app.js?v=inventory-overview-ui-polish-305", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=unconfirmed-store-item-stock-in-list-304", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=inventory-overview-ui-polish-305", "legacy");
       })();
     </script>
   </body>

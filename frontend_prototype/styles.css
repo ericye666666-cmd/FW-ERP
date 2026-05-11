@@ -2798,6 +2798,27 @@ h3 {
   font-weight: 700;
 }
 
+.store-metric small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.store-metric.problem-card {
+  border-color: rgba(217, 119, 6, 0.35);
+  background: #fff7ed;
+}
+
+.inventory-location-special td {
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.inventory-location-warning td {
+  background: rgba(217, 119, 6, 0.06);
+}
+
 .store-summary-flags {
   display: flex;
   flex-wrap: wrap;
@@ -2923,6 +2944,34 @@ th {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
+}
+
+.mobile-stock-in-entry-card,
+.mobile-stock-in-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--fw-border);
+  border-radius: var(--radius-panel);
+  background: var(--fw-surface);
+}
+
+.mobile-stock-in-entry-card {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.mobile-stock-in-entry-card strong,
+.mobile-stock-in-card strong,
+.mobile-stock-in-entry-card span,
+.mobile-stock-in-card span {
+  display: block;
+}
+
+.mobile-stock-in-entry-card span,
+.mobile-stock-in-card span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .user-management-list {

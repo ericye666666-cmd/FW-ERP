@@ -53,13 +53,13 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#272/);
+  assert.match(loginVersionSection, /#274/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=unconfirmed-store-item-stock-in-list-304/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=unconfirmed-store-item-stock-in-list-304/);
+  assert.match(indexHtml, /app\.js\?v=inventory-overview-ui-polish-305/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=inventory-overview-ui-polish-305/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -175,7 +175,7 @@ test("PDA version info detects Android bridge methods without requiring native a
   assert.match(versionSource, /not supported by current Android APK/);
   assert.match(diagnosticsSource, /renderDirectLoopVersionInfoBlock\("printer_diagnostics"\)/);
   assert.match(mySource, /renderDirectLoopVersionInfoBlock\("clerk_my"\)/);
-  assert.match(appLegacyJs, /fw-erp-web-20260511-unconfirmed-stock-in-304/);
+  assert.match(appLegacyJs, /fw-erp-web-20260511-inventory-overview-ui-polish-305/);
   assert.match(appLegacyJs, /printStoreItemLabelPreview/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplNoLabelMode/);
   assert.match(appLegacyJs, /printStoreItemLabelPreviewCtplBitmapDemo/);
@@ -402,8 +402,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=unconfirmed-store-item-stock-in-list-304/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=unconfirmed-store-item-stock-in-list-304/);
+  assert.match(indexHtml, /app\.js\?v=inventory-overview-ui-polish-305/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=inventory-overview-ui-polish-305/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -2380,6 +2380,12 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
   assert.match(mySource, /未完成入库/);
+  assert.match(listSource, /未完成入库：/);
+  assert.match(listSource, /立即处理/);
+  assert.match(listSource, /mobile-stock-in-entry-card/);
+  assert.match(listSource, /mobile-stock-in-card/);
+  assert.match(listSource, /建议货架 \/ 后仓/);
+  assert.doesNotMatch(listSource, /stock_in_confirmed|legacy|未确认 \/ 历史未确认/);
   assert.match(listSource, /data-mobile-pricing-load-unconfirmed-stock-in/);
   assert.match(listSource, /STORE_ITEM/);
   assert.match(listSource, /suggested_location_code/);
@@ -2388,6 +2394,7 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   assert.match(loadSource, /inventory-overview\/unconfirmed-items/);
   assert.match(confirmSource, /confirm-stock-in/);
   assert.match(confirmSource, /confirmed|already_confirmed|location_updated/);
+  assert.match(actionSource, /失败，请重试/);
   assert.match(actionSource, /loadStoreMobileUnconfirmedStockInItems/);
   assert.match(actionSource, /confirmStoreMobileUnconfirmedStockInItem/);
 });
