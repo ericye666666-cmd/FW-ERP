@@ -3,11 +3,13 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.core.state import InMemoryState
+from app.schemas.transfers import StoreDeliveryPackageStoreItemGenerateRequest
 
 
 @pytest.fixture()
@@ -117,8 +119,8 @@ def _seed_pricing_batch_package(state: InMemoryState) -> dict:
     )
 
 
-def _pricing_payload(package: dict, pricing_batch_id: str = "PB-SDP260510001-P") -> dict:
-    return {
+def _pricing_payload(package: dict, pricing_batch_id: str = "PB-SDP260510001-P", **overrides) -> dict:
+    data = {
         "source_sdp_display_code": package["display_code"],
         "pricing_batch_id": pricing_batch_id,
         "store_code": "UTAWALA",
@@ -132,6 +134,8 @@ def _pricing_payload(package: dict, pricing_batch_id: str = "PB-SDP260510001-P")
         "assigned_clerk": "Austin",
         "created_by": "Austin",
     }
+    data.update(overrides)
+    return data
 
 
 def test_pricing_batch_generation_creates_store_items_tokens_and_pos_resolver(state):
@@ -206,6 +210,87 @@ def test_pricing_batch_generation_is_idempotent_by_pricing_batch_id(state):
     assert [row["machine_code"] for row in second["store_items"]] == [row["machine_code"] for row in first["store_items"]]
     assert [row["token_id"] for row in second["tokens"]] == [row["token_id"] for row in first["tokens"]]
     assert len([row for row in state.item_barcode_tokens.values() if row.get("pricing_batch_id") == "PB-IDEMPOTENT"]) == 3
+
+
+def test_store_item_generation_request_accepts_idempotency_key():
+    payload = StoreDeliveryPackageStoreItemGenerateRequest(
+        source_sdp_display_code="SDP260510001",
+        store_code="UTAWALA",
+        clerk="Austin",
+        sale_price_kes=450,
+        quantity=2,
+        idempotency_key="generate-SDP260510001-click-001",
+    )
+
+    assert payload.idempotency_key == "generate-SDP260510001-click-001"
+
+
+def test_same_idempotency_key_replays_generated_store_item_batch(state):
+    package = _seed_pricing_batch_package(state)
+    package["item_count"] = 10
+    state._save_store_delivery_package(package)
+    payload = _pricing_payload(
+        package,
+        pricing_batch_id="",
+        quantity=2,
+        idempotency_key="store-item-generate-repeat-001",
+    )
+
+    first = state.generate_store_items_from_pricing_batch(payload)
+    second = state.generate_store_items_from_pricing_batch(payload)
+
+    assert first["generated_count"] == second["generated_count"] == 2
+    assert [row["machine_code"] for row in second["store_items"]] == [row["machine_code"] for row in first["store_items"]]
+    assert [row["token_id"] for row in second["tokens"]] == [row["token_id"] for row in first["tokens"]]
+    assert len(state.store_items) == 2
+    assert len({row["machine_code"] for row in state.store_items.values()}) == 2
+    entry = state.store_item_generation_idempotency["store-item-generate-repeat-001"]
+    assert entry["payload_fingerprint"]
+    assert entry["store_item_ids"] == [row["store_item_id"] for row in first["store_items"]]
+
+
+def test_sdo_package_generate_retries_full_package_with_same_idempotency_key(state):
+    package = _seed_pricing_batch_package(state)
+    payload = {
+        "store_code": "UTAWALA",
+        "clerk": "Austin",
+        "rack_code": "A-01",
+        "selected_price": 450,
+        "category_main": "tops",
+        "category_sub": "lady tops",
+        "grade": "P",
+        "quantity": package["item_count"],
+        "idempotency_key": "store-item-generate-full-repeat-001",
+    }
+
+    first = state.generate_store_items_for_sdo_package(package["display_code"], payload)
+    second = state.generate_store_items_for_sdo_package(package["display_code"], payload)
+
+    assert first["generated_count"] == second["generated_count"] == package["item_count"]
+    assert [row["machine_code"] for row in second["store_items"]] == [row["machine_code"] for row in first["store_items"]]
+    assert len(state.store_items) == package["item_count"]
+    assert len({row["machine_code"] for row in state.store_items.values()}) == package["item_count"]
+
+
+def test_same_idempotency_key_different_payload_conflicts(state):
+    package = _seed_pricing_batch_package(state)
+    package["item_count"] = 10
+    state._save_store_delivery_package(package)
+    payload = _pricing_payload(
+        package,
+        pricing_batch_id="",
+        quantity=2,
+        idempotency_key="store-item-generate-conflict-001",
+    )
+
+    state.generate_store_items_from_pricing_batch(payload)
+
+    with pytest.raises(HTTPException) as exc:
+        state.generate_store_items_from_pricing_batch({**payload, "quantity": 3})
+
+    assert exc.value.status_code == 409
+    assert "idempotency_key" in str(exc.value.detail)
+    assert len(state.store_items) == 2
 
 
 def test_pricing_batch_generation_keeps_non_store_item_pos_guardrails(state):

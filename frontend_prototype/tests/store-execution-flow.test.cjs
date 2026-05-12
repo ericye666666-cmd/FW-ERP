@@ -471,6 +471,22 @@ test("store PDA generates STORE_ITEM from assigned SDP through backend only", ()
   assert.doesNotMatch(generateSource, /localStorage\.length|Date\.now\(\)|new Date\(\)\.getTime/);
 });
 
+test("store PDA sends one idempotency key per STORE_ITEM generate action", () => {
+  const generateSource = extractFunctionSource(appJs, "generateStoreItemTokensForSdoPackage");
+  const keySource = extractFunctionSource(appJs, "getStorePackageGenerateIdempotencyKey");
+  const signatureSource = extractFunctionSource(appJs, "buildStorePackageGeneratePayloadSignature");
+
+  assert.match(appJs, /storePackageGenerateIdempotencyKeyState/);
+  assert.match(generateSource, /idempotency_key/);
+  assert.match(generateSource, /buildStorePackageGeneratePayloadSignature\(payload\)/);
+  assert.match(generateSource, /getStorePackageGenerateIdempotencyKey\(actionKey,\s*payloadSignature\)/);
+  assert.match(keySource, /payload_signature/);
+  assert.match(keySource, /idempotency_key/);
+  assert.match(signatureSource, /JSON\.stringify/);
+  assert.doesNotMatch(generateSource, /machineCode = `5/);
+  assert.doesNotMatch(generateSource, /machine_code:\s*machineCode|barcode_value:\s*machineCode/);
+});
+
 test("bucketStoreManagerDispatchBales keeps received and processing bales visible to the manager console", () => {
   const result = bucketStoreManagerDispatchBales([
     { bale_no: "SDB-001", status: "in_transit" },

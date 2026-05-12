@@ -1284,6 +1284,7 @@ let storeAssignedSdoPackageTasksState = [];
 let storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), []);
 let storePackageLastGeneratedTokenState = {};
 let storePackagePrintJobState = {};
+let storePackageGenerateIdempotencyKeyState = {};
 let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
 let storeDefaultSalePrices = safeParse(localStorage.getItem(STORAGE_KEYS.storeDefaultSalePrices), {});
 let warehouseDispatchHistoryState = [];
@@ -35866,6 +35867,47 @@ function mergeGeneratedStoreItemsIntoPackageState(row = {}, generatedTokens = []
   return normalizedTokens;
 }
 
+function createStorePackageGenerateIdempotencyKey(actionKey = "") {
+  const scope = String(actionKey || "STORE_PACKAGE").trim().replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "STORE_PACKAGE";
+  const cryptoApi = globalThis.crypto || {};
+  const randomPart = typeof cryptoApi.randomUUID === "function"
+    ? cryptoApi.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `store-item-generate-${scope}-${randomPart}`;
+}
+
+function buildStorePackageGeneratePayloadSignature(payload = {}) {
+  const normalized = {
+    store_code: String(payload.store_code || "").trim().toUpperCase(),
+    clerk: String(payload.clerk || "").trim(),
+    rack_code: String(payload.rack_code || "").trim().toUpperCase(),
+    selected_price: Number(payload.selected_price || 0),
+    category_main: String(payload.category_main || "").trim(),
+    category_sub: String(payload.category_sub || "").trim(),
+    grade: String(payload.grade || "").trim().toUpperCase(),
+    quantity: Math.max(1, Number(payload.quantity || 1)),
+  };
+  return JSON.stringify(normalized);
+}
+
+function getStorePackageGenerateIdempotencyKey(actionKey = "", payloadSignature = "") {
+  const scope = String(actionKey || "STORE_PACKAGE").trim() || "STORE_PACKAGE";
+  const signature = String(payloadSignature || "").trim();
+  const existing = storePackageGenerateIdempotencyKeyState[scope];
+  if (existing && existing.payload_signature === signature && existing.idempotency_key) {
+    return existing.idempotency_key;
+  }
+  const idempotencyKey = createStorePackageGenerateIdempotencyKey(scope);
+  storePackageGenerateIdempotencyKeyState = {
+    ...storePackageGenerateIdempotencyKeyState,
+    [scope]: {
+      payload_signature: signature,
+      idempotency_key: idempotencyKey,
+    },
+  };
+  return idempotencyKey;
+}
+
 async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
   const actionKey = getStorePackageActionKey(row);
   const packageCode = getStoreReceivingPackageCode(row) || getStoreReceivingPackageMachineCode(row);
@@ -35882,6 +35924,10 @@ async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
     grade: String(options.grade || row?.grade || "").trim(),
     quantity: Math.max(1, Number(options.quantity || 1)),
   };
+  const payloadSignature = buildStorePackageGeneratePayloadSignature(payload);
+  payload.idempotency_key = String(
+    options.idempotency_key || getStorePackageGenerateIdempotencyKey(actionKey, payloadSignature)
+  ).trim();
   const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/store-items/generate`, {
     method: "POST",
     body: JSON.stringify(payload),
