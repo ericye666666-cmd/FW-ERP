@@ -297,7 +297,9 @@ test("POS manual unbarcoded sale drawer adds manual cart lines and preserves sca
   const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
   const addSource = extractFunctionSource(appJs, "addCashierTerminalManualSaleLine");
 
+  assert.match(appJs, /const POS_MANUAL_LEGACY_SALE_ENABLED = true/);
   assert.match(appJs, /CASHIER_TERMINAL_MANUAL_CATEGORY_OPTIONS/);
+  assert.match(appJs, /function isCashierTerminalManualLegacySaleEnabled/);
   assert.match(lookupSource, /data-terminal-action="open-drawer" data-terminal-drawer="manual-sale"/);
   assert.match(lookupSource, /\+ 无码销售/);
   assert.match(drawerSource, /drawer === "manual-sale"/);
@@ -312,8 +314,50 @@ test("POS manual unbarcoded sale drawer adds manual cart lines and preserves sca
   assert.match(addSource, /barcode_required:\s*false/);
   assert.match(addSource, /请填写单价和数量/);
   assert.match(addSource, /请先开班后再加入无码商品。/);
+  assert.match(addSource, /无码商品销售已关闭，请扫描 STORE_ITEM/);
   assert.match(addSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
   assert.match(actionSource, /case "add-manual-sale":[\s\S]*addCashierTerminalManualSaleLine\(\)/);
+});
+
+test("POS manual unbarcoded sale switch defaults on and blocks manual add when off", () => {
+  const enabledSource = extractFunctionSource(appJs, "isCashierTerminalManualLegacySaleEnabled");
+  const addSource = extractFunctionSource(appJs, "addCashierTerminalManualSaleLine");
+  const lookupSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalLookupPanel");
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+
+  assert.match(lookupSource, /manualSaleEnabled/);
+  assert.match(lookupSource, /manualSaleEnabled\s*\?/);
+  assert.match(drawerSource, /!manualSaleEnabled/);
+  assert.match(drawerSource, /无码商品销售已关闭，请扫描 STORE_ITEM/);
+
+  const enabledFn = vm.runInNewContext(`${enabledSource}\nisCashierTerminalManualLegacySaleEnabled;`, {
+    POS_MANUAL_LEGACY_SALE_ENABLED: true,
+  });
+  assert.equal(enabledFn(), true);
+  const disabledFn = vm.runInNewContext(`${enabledSource}\nisCashierTerminalManualLegacySaleEnabled;`, {
+    POS_MANUAL_LEGACY_SALE_ENABLED: false,
+  });
+  assert.equal(disabledFn(), false);
+
+  const context = {
+    POS_MANUAL_LEGACY_SALE_ENABLED: false,
+    cashierTerminalState: {
+      currentShift: { shift_id: "SHIFT-UTW-TEST" },
+      manualSaleCategory: "Dresses / 连衣裙",
+      manualSaleQty: "1",
+      manualSaleUnitPrice: "150",
+      cartItems: [],
+    },
+    isCashierTerminalManualLegacySaleEnabled: disabledFn,
+    ensureCashierTerminalPreviewState: () => {},
+    renderCashierTerminalDrawer: () => {},
+    normalizeCashierTerminalNumber: (value) => Number(value || 0),
+    renderCashierTerminal: () => {},
+    focusCashierTerminalScanInput: () => {},
+  };
+  const addFn = vm.runInNewContext(`${addSource}\naddCashierTerminalManualSaleLine;`, context);
+  assert.throws(() => addFn(), /无码商品销售已关闭，请扫描 STORE_ITEM/);
+  assert.deepEqual(context.cashierTerminalState.cartItems, []);
 });
 
 test("POS manual lines participate in checkout payload, totals, cart display, and receipt without inventory codes", () => {

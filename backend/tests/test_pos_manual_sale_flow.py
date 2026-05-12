@@ -56,6 +56,58 @@ def test_manual_legacy_item_sale_succeeds_without_barcode_resolver_or_inventory_
     assert not state.store_items
 
 
+def test_manual_legacy_item_sale_can_be_disabled_by_future_switch(state, monkeypatch):
+    shift = _open_shift(state)
+    monkeypatch.setattr("app.core.state.settings.allow_unbarcoded_pos_sale", False)
+
+    with pytest.raises(HTTPException) as exc:
+        state.create_pos_sale(
+            "UTAWALA",
+            _manual_sale_payload(shift_id=shift["shift_id"]),
+            created_by="store_manager_1",
+        )
+
+    assert exc.value.status_code == 400
+    assert exc.value.detail == "无码商品销售已关闭，请扫描 STORE_ITEM"
+    assert not state.sales_transactions
+    assert not state.inventory_movements
+
+
+def test_manual_legacy_disabled_switch_does_not_block_store_item_sale(state, monkeypatch):
+    _add_store_item(state, _store_item(price=250))
+    shift = _open_shift(state)
+    monkeypatch.setattr("app.core.state.settings.allow_unbarcoded_pos_sale", False)
+
+    sale = state.create_pos_sale(
+        "UTAWALA",
+        {
+            "cashier_id": "Clerk A",
+            "shift_id": shift["shift_id"],
+            "terminal_id": "POS-UTW-01",
+            "payment_method": "cash",
+            "cash_amount": 500,
+            "mpesa_amount": 0,
+            "mpesa_reference": "",
+            "discount_amount": 0,
+            "items": [
+                {
+                    "line_type": "STORE_ITEM",
+                    "machine_code": "5261240000013",
+                    "display_code": "STOREITEM-POS-001",
+                    "final_price": 250,
+                    "discount_amount": 0,
+                }
+            ],
+        },
+        created_by="store_manager_1",
+    )
+
+    assert sale["total_amount"] == 250
+    assert sale["items"][0]["line_type"] == "STORE_ITEM"
+    assert state.store_items["STOREITEM-POS-001"]["status"] == "sold"
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
+
+
 def test_pos_sale_schema_accepts_manual_line_without_machine_code_or_frontend_subtotal():
     payload = PosSaleCreate(
         cashier_id="Clerk A",

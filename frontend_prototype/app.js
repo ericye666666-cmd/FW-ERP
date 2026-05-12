@@ -91,6 +91,7 @@ const PDA_STAGING_HOST = "fw-erp-34-35-52-250.nip.io";
 const PDA_STAGING_ORIGIN = `https://${PDA_STAGING_HOST}`;
 const PDA_STAGING_API_BASE = "https://fw-erp-34-35-52-250.nip.io/api/v1";
 const LOCAL_DEV_API_BASE = "http://127.0.0.1:8000/api/v1";
+const POS_MANUAL_LEGACY_SALE_ENABLED = true;
 
 const authPage = document.querySelector("#authPage");
 const appShell = document.querySelector("#appShell");
@@ -30491,6 +30492,10 @@ function getCashierTerminalMockItems() {
   return cashierTerminalState.mockItems || [];
 }
 
+function isCashierTerminalManualLegacySaleEnabled() {
+  return POS_MANUAL_LEGACY_SALE_ENABLED === true;
+}
+
 function ensureCashierTerminalPreviewCopy() {
   Object.assign(CASHIER_TERMINAL_LOCALE_COPY.zh, {
     brandTitle: "FW-ERP POS 收银台",
@@ -30738,11 +30743,12 @@ renderCashierTerminalLookupPanel = function () {
       </div>
     `
     : "";
+  const manualSaleEnabled = isCashierTerminalManualLegacySaleEnabled();
   cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
   cashierTerminalLookupCard.innerHTML = `
     <strong>仅支持 STORE_ITEM 商品码</strong>
     <span>真实扫码接口优先；本地演示备用码：5250511000123、5250511000122、5250511000121、5250511000120</span>
-    <button type="button" class="secondary-inline cashier-manual-sale-entry" data-terminal-action="open-drawer" data-terminal-drawer="manual-sale">+ 无码销售</button>
+    ${manualSaleEnabled ? `<button type="button" class="secondary-inline cashier-manual-sale-entry" data-terminal-action="open-drawer" data-terminal-drawer="manual-sale">+ 无码销售</button>` : ""}
     ${fallbackNotice}
     ${scanError}
   `;
@@ -30995,6 +31001,17 @@ renderCashierTerminalDrawer = function () {
     cashierTerminalDrawerBackdrop.hidden = false;
   }
   if (drawer === "manual-sale") {
+    const manualSaleEnabled = isCashierTerminalManualLegacySaleEnabled();
+    if (!manualSaleEnabled) {
+      cashierTerminalDrawer.innerHTML = `
+        <div class="drawer-head"><div><p class="panel-kicker">MANUAL SALE</p><h3>无码销售</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+        <div class="drawer-body">
+          <div class="drawer-hint danger">无码商品销售已关闭，请扫描 STORE_ITEM</div>
+        </div>
+        <div class="drawer-foot"><button type="button" class="primary-inline" data-terminal-action="close-drawer">关闭</button></div>
+      `;
+      return;
+    }
     const manualSubtotal = getCashierTerminalManualSaleSubtotal();
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">MANUAL SALE</p><h3>无码销售</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
@@ -31636,6 +31653,11 @@ submitCashierTerminalLookup = async function ({ addToCart = false } = {}) {
 
 function addCashierTerminalManualSaleLine() {
   ensureCashierTerminalPreviewState();
+  if (!isCashierTerminalManualLegacySaleEnabled()) {
+    cashierTerminalState.manualSaleError = "无码商品销售已关闭，请扫描 STORE_ITEM";
+    renderCashierTerminalDrawer();
+    throw new Error("无码商品销售已关闭，请扫描 STORE_ITEM");
+  }
   if (!cashierTerminalState.currentShift?.shift_id) {
     cashierTerminalState.manualSaleError = "请先开班后再加入无码商品。";
     renderCashierTerminalDrawer();

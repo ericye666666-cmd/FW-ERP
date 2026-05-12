@@ -19,6 +19,7 @@ class Settings(BaseModel):
     state_file: Path
     frontend_dir: Path
     react_frontend_dir: Path
+    allow_unbarcoded_pos_sale: bool = True
 
 
 def _read_path(env: Mapping[str, str], key: str, default: Path) -> Path:
@@ -42,6 +43,17 @@ def _read_choice(env: Mapping[str, str], key: str, default: str, allowed: set[st
     return raw_value if raw_value in allowed else default
 
 
+def _read_bool(env: Mapping[str, str], key: str, default: bool) -> bool:
+    raw_value = str(env.get(key) or "").strip().lower()
+    if not raw_value:
+        return default
+    if raw_value in {"1", "true", "yes", "y", "on"}:
+        return True
+    if raw_value in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
 def build_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
     env_map = env if env is not None else dict(os.environ)
     default_project_dir = Path(__file__).resolve().parents[3]
@@ -55,6 +67,11 @@ def build_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
         env_map,
         "RETAIL_OPS_REACT_FRONTEND_DIR",
         project_dir / "frontend_react_admin" / "dist",
+    )
+    allow_unbarcoded_pos_sale = _read_bool(
+        env_map,
+        "ALLOW_UNBARCODED_POS_SALE",
+        _read_bool(env_map, "POS_MANUAL_LEGACY_SALE_ENABLED", True),
     )
     return Settings(
         app_name=str(env_map.get("RETAIL_OPS_APP_NAME") or "Retail Ops System").strip() or "Retail Ops System",
@@ -75,6 +92,7 @@ def build_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
         state_file=state_file,
         frontend_dir=frontend_dir,
         react_frontend_dir=react_frontend_dir,
+        allow_unbarcoded_pos_sale=allow_unbarcoded_pos_sale,
     )
 
 

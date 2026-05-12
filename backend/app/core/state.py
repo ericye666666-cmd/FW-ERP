@@ -17512,6 +17512,8 @@ class InMemoryState:
         raise HTTPException(status_code=400, detail=f"Unsupported POS sale line_type: {normalized}")
 
     def _validate_pos_manual_legacy_item(self, store_code: str, item: dict[str, Any], line_no: int) -> dict[str, Any]:
+        if not settings.allow_unbarcoded_pos_sale:
+            raise HTTPException(status_code=400, detail="无码商品销售已关闭，请扫描 STORE_ITEM")
         category = str(item.get("category") or "").strip()
         if not category:
             raise HTTPException(status_code=400, detail=f"第 {line_no} 行 MANUAL_LEGACY_ITEM category is required.")
