@@ -26,13 +26,22 @@ export const terminologyKeys = {
     },
   },
   pos: {
+    scan: {
+      storeItem: "pos.scan.storeItem",
+      storeItemOnly: "pos.scan.storeItemOnly",
+    },
     shift: {
       open: "pos.shift.open",
       close: "pos.shift.close",
+      openFirst: "pos.shift.openFirst",
     },
     report: {
       x: "pos.report.x",
       z: "pos.report.z",
+    },
+    item: {
+      addUnbarcoded: "pos.item.addUnbarcoded",
+      alreadySold: "pos.item.alreadySold",
     },
     cash: {
       variance: "pos.cash.variance",
