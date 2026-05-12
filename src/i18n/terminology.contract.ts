@@ -6,6 +6,7 @@ const expectedBusinessTerms: Array<{
   zhCN: string;
 }> = [
   { key: "inventory.overview.title", enKE: "Inventory Overview", zhCN: "库存总览" },
+  { key: "inventory.trace.storeItem", enKE: "Store Item Trace", zhCN: "门店商品追溯" },
   { key: "inventory.stockIn.pending", enKE: "Pending Stock-in", zhCN: "待完成入库" },
   { key: "inventory.stockIn.confirm", enKE: "Confirm Stock-in", zhCN: "确认入库" },
   { key: "inventory.stockIn.completed", enKE: "Stock-in Completed", zhCN: "已完成入库" },
@@ -34,18 +35,23 @@ const expectedBusinessTerms: Array<{
   { key: "pos.report.z", enKE: "Z Report", zhCN: "Z 报表" },
   { key: "pos.item.addUnbarcoded", enKE: "Add Unbarcoded Item", zhCN: "添加无码商品" },
   { key: "pos.item.alreadySold", enKE: "Item already sold.", zhCN: "商品已售出。" },
+  { key: "pos.sale.manual", enKE: "Manual Sale", zhCN: "手工销售" },
   { key: "pos.cash.variance", enKE: "Cash Variance", zhCN: "现金差异" },
   { key: "pos.order.hold", enKE: "Hold Order", zhCN: "挂单" },
   { key: "pos.order.resumeHeld", enKE: "Resume Held Order", zhCN: "取回挂单" },
   { key: "pos.receipt.reprint", enKE: "Reprint Receipt", zhCN: "重打小票" },
   { key: "pda.work.today", enKE: "My Work Today", zhCN: "我的今日工作" },
-  { key: "pda.package.scan", enKE: "Scan Package", zhCN: "扫描包裹" },
+  { key: "pda.package.scan", enKE: "Scan Package", zhCN: "扫包码" },
   { key: "pda.label.print", enKE: "Print Label", zhCN: "打印标签" },
   { key: "pda.label.printed", enKE: "Label Printed", zhCN: "标签已打印" },
   { key: "pda.label.printFailed", enKE: "Print Failed", zhCN: "打印失败" },
   { key: "pda.location.select", enKE: "Select Location", zhCN: "选择位置" },
   { key: "pda.location.selectFirst", enKE: "Select shelf or backroom first.", zhCN: "请先选择货架或后仓。" },
   { key: "pda.printer.notConnected", enKE: "Printer Not Connected", zhCN: "打印机未连接" },
+  { key: "errors.invalidCode", enKE: "Invalid code. Try again.", zhCN: "无效条码，请重试。" },
+  { key: "errors.sdoRequiredForStoreReceiving", enKE: "Scan the Store Delivery Order first.", zhCN: "请先扫描门店送货执行单。" },
+  { key: "errors.cashVarianceFound", enKE: "Cash variance found.", zhCN: "发现现金差异。" },
+  { key: "errors.stockAlreadyDeducted", enKE: "Stock already deducted.", zhCN: "库存已扣减。" },
 ];
 
 const supportedLocales: DictionaryLocale[] = ["en-KE", "zh-CN"];

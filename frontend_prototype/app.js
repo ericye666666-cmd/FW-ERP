@@ -234,7 +234,7 @@ const CLERK_PDA_TERMINOLOGY_KEYS = Object.freeze({
 const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
   zh: Object.freeze({
     "pda.work.today": "我的今日工作",
-    "pda.package.scan": "扫描包裹",
+    "pda.package.scan": "扫包码",
     "pda.label.print": "打印标签",
     "pda.label.printed": "标签已打印",
     "pda.label.printFailed": "打印失败",
@@ -393,10 +393,10 @@ function getStoreInventoryLocationTypeLabel(type = "", language = currentLanguag
 
 const HIGH_RISK_ERROR_CODE_MESSAGES = Object.freeze({
   zh: Object.freeze({
-    "INVALID_CODE": "无效条码。请重试。",
+    "INVALID_CODE": "无效条码，请重试。",
     "POS_CODE_NOT_ALLOWED": "POS 只扫描门店商品码。请扫描商品标签。",
     "STORE_ITEM_REQUIRED_FOR_POS": "POS 只扫描门店商品码。请扫描商品标签。",
-    "SDO_REQUIRED_FOR_STORE_RECEIVING": "请扫描门店送货执行单。",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "请先扫描门店送货执行单。",
     "ITEM_ALREADY_SOLD": "商品已售出。",
     "SHIFT_NOT_OPEN": "请先开班。",
     "LOCATION_REQUIRED": "请先选择货架或后仓。",
@@ -408,7 +408,7 @@ const HIGH_RISK_ERROR_CODE_MESSAGES = Object.freeze({
     "INVALID_CODE": "Invalid code. Try again.",
     "POS_CODE_NOT_ALLOWED": "POS only scans Store Item. Scan a product label.",
     "STORE_ITEM_REQUIRED_FOR_POS": "POS only scans Store Item. Scan a product label.",
-    "SDO_REQUIRED_FOR_STORE_RECEIVING": "Scan Store Delivery Order.",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "Scan the Store Delivery Order first.",
     "ITEM_ALREADY_SOLD": "Item already sold.",
     "SHIFT_NOT_OPEN": "Open shift first.",
     "LOCATION_REQUIRED": "Select shelf or backroom first.",

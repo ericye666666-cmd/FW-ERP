@@ -1,10 +1,16 @@
 import { enKEDictionary } from "./dictionaries/en-KE.ts";
 import { zhCNDictionary } from "./dictionaries/zh-CN.ts";
-import { errorCodeMessages, genericErrorMessages, translateErrorCode } from "./error-codes.ts";
+import {
+  errorCodeMessageKeys,
+  errorCodeMessages,
+  genericErrorMessages,
+  highRiskErrorCodes,
+  translateErrorCode,
+} from "./error-codes.ts";
 import { terminologyKeys, type TerminologyKey } from "./terminology.ts";
 
 export { terminologyKeys };
-export { errorCodeMessages, genericErrorMessages, translateErrorCode };
+export { errorCodeMessageKeys, errorCodeMessages, genericErrorMessages, highRiskErrorCodes, translateErrorCode };
 export type { TerminologyKey };
 
 export const supportedLocales = ["en-KE", "zh-CN"] as const;

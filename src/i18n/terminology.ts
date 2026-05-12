@@ -3,6 +3,9 @@ export const terminologyKeys = {
     overview: {
       title: "inventory.overview.title",
     },
+    trace: {
+      storeItem: "inventory.trace.storeItem",
+    },
     stockIn: {
       pending: "inventory.stockIn.pending",
       confirm: "inventory.stockIn.confirm",
@@ -61,6 +64,9 @@ export const terminologyKeys = {
       addUnbarcoded: "pos.item.addUnbarcoded",
       alreadySold: "pos.item.alreadySold",
     },
+    sale: {
+      manual: "pos.sale.manual",
+    },
     cash: {
       variance: "pos.cash.variance",
     },
@@ -91,6 +97,12 @@ export const terminologyKeys = {
     printer: {
       notConnected: "pda.printer.notConnected",
     },
+  },
+  errors: {
+    invalidCode: "errors.invalidCode",
+    sdoRequiredForStoreReceiving: "errors.sdoRequiredForStoreReceiving",
+    cashVarianceFound: "errors.cashVarianceFound",
+    stockAlreadyDeducted: "errors.stockAlreadyDeducted",
   },
 } as const;
 

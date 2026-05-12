@@ -60,10 +60,10 @@ function getExecutableErrorCodeBundle() {
 
 test("high-risk frontend error codes have stable en-KE and zh-CN copy", () => {
   const required = {
-    INVALID_CODE: ["Invalid code. Try again.", "无效条码。请重试。"],
+    INVALID_CODE: ["Invalid code. Try again.", "无效条码，请重试。"],
     POS_CODE_NOT_ALLOWED: ["POS only scans Store Item. Scan a product label.", "POS 只扫描门店商品码。请扫描商品标签。"],
     STORE_ITEM_REQUIRED_FOR_POS: ["POS only scans Store Item. Scan a product label.", "POS 只扫描门店商品码。请扫描商品标签。"],
-    SDO_REQUIRED_FOR_STORE_RECEIVING: ["Scan Store Delivery Order.", "请扫描门店送货执行单。"],
+    SDO_REQUIRED_FOR_STORE_RECEIVING: ["Scan the Store Delivery Order first.", "请先扫描门店送货执行单。"],
     ITEM_ALREADY_SOLD: ["Item already sold.", "商品已售出。"],
     SHIFT_NOT_OPEN: ["Open shift first.", "请先开班。"],
     LOCATION_REQUIRED: ["Select shelf or backroom first.", "请先选择货架或后仓。"],

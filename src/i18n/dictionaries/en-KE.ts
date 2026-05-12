@@ -2,6 +2,7 @@ import type { TerminologyKey } from "../terminology.ts";
 
 export const enKEDictionary = {
   "inventory.overview.title": "Inventory Overview",
+  "inventory.trace.storeItem": "Store Item Trace",
   "inventory.stockIn.pending": "Pending Stock-in",
   "inventory.stockIn.confirm": "Confirm Stock-in",
   "inventory.stockIn.completed": "Stock-in Completed",
@@ -30,6 +31,7 @@ export const enKEDictionary = {
   "pos.report.z": "Z Report",
   "pos.item.addUnbarcoded": "Add Unbarcoded Item",
   "pos.item.alreadySold": "Item already sold.",
+  "pos.sale.manual": "Manual Sale",
   "pos.cash.variance": "Cash Variance",
   "pos.order.hold": "Hold Order",
   "pos.order.resumeHeld": "Resume Held Order",
@@ -42,4 +44,8 @@ export const enKEDictionary = {
   "pda.location.select": "Select Location",
   "pda.location.selectFirst": "Select shelf or backroom first.",
   "pda.printer.notConnected": "Printer Not Connected",
+  "errors.invalidCode": "Invalid code. Try again.",
+  "errors.sdoRequiredForStoreReceiving": "Scan the Store Delivery Order first.",
+  "errors.cashVarianceFound": "Cash variance found.",
+  "errors.stockAlreadyDeducted": "Stock already deducted.",
 } satisfies Record<TerminologyKey, string>;
