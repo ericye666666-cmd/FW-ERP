@@ -160,6 +160,279 @@ const USER_ROLE_LABELS = {
 
 let currentLanguage = "zh";
 
+const POS_CASHIER_TERMINOLOGY_KEYS = Object.freeze({
+  scanStoreItem: "pos.scan.storeItem",
+  addUnbarcodedItem: "pos.item.addUnbarcoded",
+  openShift: "pos.shift.open",
+  closeShift: "pos.shift.close",
+  holdOrder: "pos.order.hold",
+  resumeHeldOrder: "pos.order.resumeHeld",
+  reprintReceipt: "pos.receipt.reprint",
+  xReport: "pos.report.x",
+  zReport: "pos.report.z",
+  cashVariance: "pos.cash.variance",
+  itemAlreadySold: "pos.item.alreadySold",
+  storeItemOnlyRule: "pos.scan.storeItemOnly",
+  openShiftFirst: "pos.shift.openFirst",
+});
+
+const POS_CASHIER_TERMINOLOGY_DICTIONARY = Object.freeze({
+  zh: Object.freeze({
+    "pos.scan.storeItem": "扫描门店商品码",
+    "pos.item.addUnbarcoded": "添加无码商品",
+    "pos.shift.open": "收银开班",
+    "pos.shift.close": "收银关班",
+    "pos.order.hold": "挂单",
+    "pos.order.resumeHeld": "取回挂单",
+    "pos.receipt.reprint": "重打小票",
+    "pos.report.x": "X 报表",
+    "pos.report.z": "Z 报表",
+    "pos.cash.variance": "现金差异",
+    "pos.item.alreadySold": "商品已售出。",
+    "pos.scan.storeItemOnly": "POS 只扫描门店商品码。请扫描商品标签。",
+    "pos.shift.openFirst": "请先开班。",
+  }),
+  en: Object.freeze({
+    "pos.scan.storeItem": "Scan Store Item",
+    "pos.item.addUnbarcoded": "Add Unbarcoded Item",
+    "pos.shift.open": "Open Shift",
+    "pos.shift.close": "Close Shift",
+    "pos.order.hold": "Hold Order",
+    "pos.order.resumeHeld": "Resume Held Order",
+    "pos.receipt.reprint": "Reprint Receipt",
+    "pos.report.x": "X Report",
+    "pos.report.z": "Z Report",
+    "pos.cash.variance": "Cash Variance",
+    "pos.item.alreadySold": "Item already sold.",
+    "pos.scan.storeItemOnly": "POS only scans Store Item. Scan a product label.",
+    "pos.shift.openFirst": "Open shift first.",
+  }),
+});
+
+function cashierTerminalTerm(key, language = currentLanguage) {
+  const locale = language === "en" ? "en" : "zh";
+  return POS_CASHIER_TERMINOLOGY_DICTIONARY[locale]?.[key] || key;
+}
+
+const CLERK_PDA_TERMINOLOGY_KEYS = Object.freeze({
+  myWorkToday: "pda.work.today",
+  scanPackage: "pda.package.scan",
+  printLabel: "pda.label.print",
+  labelPrinted: "pda.label.printed",
+  printFailed: "pda.label.printFailed",
+  selectLocation: "pda.location.select",
+  shelf: "inventory.location.shelf",
+  backroom: "inventory.location.backroom",
+  confirmStockIn: "inventory.stockIn.confirm",
+  pendingStockIn: "inventory.stockIn.pending",
+  stockInCompleted: "inventory.stockIn.completed",
+  printerNotConnected: "pda.printer.notConnected",
+  selectLocationFirst: "pda.location.selectFirst",
+  storeDeliveryPackage: "store.delivery.package",
+});
+
+const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
+  zh: Object.freeze({
+    "pda.work.today": "我的今日工作",
+    "pda.package.scan": "扫包码",
+    "pda.label.print": "打印标签",
+    "pda.label.printed": "标签已打印",
+    "pda.label.printFailed": "打印失败",
+    "pda.location.select": "选择位置",
+    "pda.location.selectFirst": "请先选择货架或后仓。",
+    "pda.printer.notConnected": "打印机未连接",
+    "inventory.location.shelf": "货架",
+    "inventory.location.backroom": "后仓",
+    "inventory.stockIn.confirm": "确认入库",
+    "inventory.stockIn.pending": "待完成入库",
+    "inventory.stockIn.completed": "已完成入库",
+    "store.delivery.package": "待送店包",
+  }),
+  en: Object.freeze({
+    "pda.work.today": "My Work Today",
+    "pda.package.scan": "Scan Package",
+    "pda.label.print": "Print Label",
+    "pda.label.printed": "Label Printed",
+    "pda.label.printFailed": "Print Failed",
+    "pda.location.select": "Select Location",
+    "pda.location.selectFirst": "Select shelf or backroom first.",
+    "pda.printer.notConnected": "Printer Not Connected",
+    "inventory.location.shelf": "Shelf",
+    "inventory.location.backroom": "Backroom",
+    "inventory.stockIn.confirm": "Confirm Stock-in",
+    "inventory.stockIn.pending": "Pending Stock-in",
+    "inventory.stockIn.completed": "Stock-in Completed",
+    "store.delivery.package": "Store Delivery Package",
+  }),
+});
+
+function clerkPdaTerm(key, language = currentLanguage) {
+  const locale = language === "en" ? "en" : "zh";
+  return CLERK_PDA_TERMINOLOGY_DICTIONARY[locale]?.[key] || key;
+}
+
+function getClerkPdaCopy(language = currentLanguage) {
+  const keys = CLERK_PDA_TERMINOLOGY_KEYS;
+  return {
+    myWorkToday: clerkPdaTerm(keys.myWorkToday, language),
+    scanPackage: clerkPdaTerm(keys.scanPackage, language),
+    printLabel: clerkPdaTerm(keys.printLabel, language),
+    labelPrinted: clerkPdaTerm(keys.labelPrinted, language),
+    printFailed: clerkPdaTerm(keys.printFailed, language),
+    selectLocation: clerkPdaTerm(keys.selectLocation, language),
+    shelf: clerkPdaTerm(keys.shelf, language),
+    backroom: clerkPdaTerm(keys.backroom, language),
+    confirmStockIn: clerkPdaTerm(keys.confirmStockIn, language),
+    pendingStockIn: clerkPdaTerm(keys.pendingStockIn, language),
+    stockInCompleted: clerkPdaTerm(keys.stockInCompleted, language),
+    printerNotConnected: clerkPdaTerm(keys.printerNotConnected, language),
+    selectLocationFirst: clerkPdaTerm(keys.selectLocationFirst, language),
+    storeDeliveryPackage: clerkPdaTerm(keys.storeDeliveryPackage, language),
+  };
+}
+
+const STORE_INVENTORY_TERMINOLOGY_KEYS = Object.freeze({
+  inventoryOverview: "inventory.overview.title",
+  switchStore: "store.switch",
+  currentStore: "store.current",
+  shelf: "inventory.location.shelf",
+  backroom: "inventory.location.backroom",
+  unassignedLocation: "inventory.location.unassigned",
+  inStock: "inventory.item.inStock",
+  sold: "inventory.item.sold",
+  pendingStockIn: "inventory.stockIn.pending",
+  confirmStockIn: "inventory.stockIn.confirm",
+  stockInCompleted: "inventory.stockIn.completed",
+  storeItem: "store.item.code",
+  sourcePackage: "inventory.source.package",
+  storeDeliveryOrder: "store.delivery.order",
+  stockInTime: "inventory.stockIn.time",
+  saleTime: "inventory.sale.time",
+  entityType: "inventory.field.entityType",
+  shelfLayout: "inventory.shelf.layout",
+});
+
+const STORE_INVENTORY_TERMINOLOGY_DICTIONARY = Object.freeze({
+  zh: Object.freeze({
+    "inventory.overview.title": "库存总览",
+    "store.switch": "切换门店",
+    "store.current": "当前门店",
+    "inventory.location.shelf": "货架",
+    "inventory.location.backroom": "后仓",
+    "inventory.location.unassigned": "未关联位置",
+    "inventory.item.inStock": "在库",
+    "inventory.item.sold": "已售",
+    "inventory.stockIn.pending": "待完成入库",
+    "inventory.stockIn.confirm": "确认入库",
+    "inventory.stockIn.completed": "已完成入库",
+    "store.item.code": "门店商品码",
+    "inventory.source.package": "来源包",
+    "store.delivery.order": "门店送货执行单",
+    "inventory.stockIn.time": "入库时间",
+    "inventory.sale.time": "销售时间",
+    "inventory.field.entityType": "单据类型",
+    "inventory.shelf.layout": "货架布局",
+  }),
+  en: Object.freeze({
+    "inventory.overview.title": "Inventory Overview",
+    "store.switch": "Switch Store",
+    "store.current": "Current Store",
+    "inventory.location.shelf": "Shelf",
+    "inventory.location.backroom": "Backroom",
+    "inventory.location.unassigned": "Unassigned Location",
+    "inventory.item.inStock": "In Stock",
+    "inventory.item.sold": "Sold",
+    "inventory.stockIn.pending": "Pending Stock-in",
+    "inventory.stockIn.confirm": "Confirm Stock-in",
+    "inventory.stockIn.completed": "Stock-in Completed",
+    "store.item.code": "Store Item",
+    "inventory.source.package": "Source Package",
+    "store.delivery.order": "Store Delivery Order",
+    "inventory.stockIn.time": "Stock-in Time",
+    "inventory.sale.time": "Sale Time",
+    "inventory.field.entityType": "Entity Type",
+    "inventory.shelf.layout": "Shelf Layout",
+  }),
+});
+
+function storeInventoryTerm(key, language = currentLanguage) {
+  const locale = language === "en" ? "en" : "zh";
+  return STORE_INVENTORY_TERMINOLOGY_DICTIONARY[locale]?.[key] || key;
+}
+
+function getStoreInventoryCopy(language = currentLanguage) {
+  const keys = STORE_INVENTORY_TERMINOLOGY_KEYS;
+  return {
+    inventoryOverview: storeInventoryTerm(keys.inventoryOverview, language),
+    switchStore: storeInventoryTerm(keys.switchStore, language),
+    currentStore: storeInventoryTerm(keys.currentStore, language),
+    shelf: storeInventoryTerm(keys.shelf, language),
+    backroom: storeInventoryTerm(keys.backroom, language),
+    unassignedLocation: storeInventoryTerm(keys.unassignedLocation, language),
+    inStock: storeInventoryTerm(keys.inStock, language),
+    sold: storeInventoryTerm(keys.sold, language),
+    pendingStockIn: storeInventoryTerm(keys.pendingStockIn, language),
+    confirmStockIn: storeInventoryTerm(keys.confirmStockIn, language),
+    stockInCompleted: storeInventoryTerm(keys.stockInCompleted, language),
+    storeItem: storeInventoryTerm(keys.storeItem, language),
+    sourcePackage: storeInventoryTerm(keys.sourcePackage, language),
+    storeDeliveryOrder: storeInventoryTerm(keys.storeDeliveryOrder, language),
+    stockInTime: storeInventoryTerm(keys.stockInTime, language),
+    saleTime: storeInventoryTerm(keys.saleTime, language),
+    entityType: storeInventoryTerm(keys.entityType, language),
+    shelfLayout: storeInventoryTerm(keys.shelfLayout, language),
+  };
+}
+
+function getStoreInventoryLocationTypeLabel(type = "", language = currentLanguage) {
+  const normalizedType = String(type || "").trim().toUpperCase();
+  if (normalizedType === "BACKROOM") return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.backroom, language);
+  if (normalizedType === "UNASSIGNED") return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.unassignedLocation, language);
+  return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.shelf, language);
+}
+
+const HIGH_RISK_ERROR_CODE_MESSAGES = Object.freeze({
+  zh: Object.freeze({
+    "INVALID_CODE": "无效条码，请重试。",
+    "POS_CODE_NOT_ALLOWED": "POS 只扫描门店商品码。请扫描商品标签。",
+    "STORE_ITEM_REQUIRED_FOR_POS": "POS 只扫描门店商品码。请扫描商品标签。",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "请先扫描门店送货执行单。",
+    "ITEM_ALREADY_SOLD": "商品已售出。",
+    "SHIFT_NOT_OPEN": "请先开班。",
+    "LOCATION_REQUIRED": "请先选择货架或后仓。",
+    "PRINTER_NOT_CONNECTED": "打印机未连接。",
+    "CASH_VARIANCE_FOUND": "发现现金差异。",
+    "STOCK_ALREADY_DEDUCTED": "库存已扣减。",
+  }),
+  en: Object.freeze({
+    "INVALID_CODE": "Invalid code. Try again.",
+    "POS_CODE_NOT_ALLOWED": "POS only scans Store Item. Scan a product label.",
+    "STORE_ITEM_REQUIRED_FOR_POS": "POS only scans Store Item. Scan a product label.",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "Scan the Store Delivery Order first.",
+    "ITEM_ALREADY_SOLD": "Item already sold.",
+    "SHIFT_NOT_OPEN": "Open shift first.",
+    "LOCATION_REQUIRED": "Select shelf or backroom first.",
+    "PRINTER_NOT_CONNECTED": "Printer not connected.",
+    "CASH_VARIANCE_FOUND": "Cash variance found.",
+    "STOCK_ALREADY_DEDUCTED": "Stock already deducted.",
+  }),
+});
+
+const GENERIC_FRONTEND_ERROR_MESSAGES = Object.freeze({
+  zh: "操作失败，请检查后重试。",
+  en: "Action failed. Check and try again.",
+});
+
+function getFrontendErrorLocale(language = currentLanguage) {
+  return language === "en" ? "en" : "zh";
+}
+
+function translateErrorCode(errorCode = "", language = currentLanguage) {
+  const locale = getFrontendErrorLocale(language);
+  const normalizedCode = String(errorCode || "").trim().toUpperCase();
+  return HIGH_RISK_ERROR_CODE_MESSAGES[locale]?.[normalizedCode] || "";
+}
+
 const GLOBAL_I18N_GLOSSARY = [
   { zh: "门店收货主控台", en: "Store Receiving Command Center" },
   { zh: "仓库发货", en: "Warehouse Dispatch" },
@@ -8141,21 +8414,49 @@ function formatValidationDetail(detail) {
   }
 }
 
-function extractApiErrorMessage(payload) {
+function parseApiErrorPayload(payload) {
   if (!payload) {
-    return "";
+    return payload;
   }
 
-  const parsedPayload = (() => {
-    if (typeof payload !== "string") {
-      return payload;
-    }
+  if (typeof payload === "string") {
     try {
       return JSON.parse(payload);
     } catch {
       return payload;
     }
-  })();
+  }
+
+  return payload;
+}
+
+function extractApiErrorCode(payload) {
+  const parsedPayload = parseApiErrorPayload(payload);
+  if (!parsedPayload || typeof parsedPayload !== "object") {
+    return "";
+  }
+
+  const candidates = [
+    parsedPayload.error_code,
+    parsedPayload.errorCode,
+    parsedPayload.code,
+    parsedPayload.detail?.error_code,
+    parsedPayload.detail?.errorCode,
+    parsedPayload.detail?.code,
+    parsedPayload.error?.error_code,
+    parsedPayload.error?.errorCode,
+    parsedPayload.error?.code,
+  ];
+  const matched = candidates.find((value) => typeof value === "string" && value.trim());
+  return matched ? matched.trim().toUpperCase() : "";
+}
+
+function extractApiErrorMessage(payload) {
+  if (!payload) {
+    return "";
+  }
+
+  const parsedPayload = parseApiErrorPayload(payload);
 
   if (typeof parsedPayload === "string") {
     return parsedPayload;
@@ -8180,10 +8481,18 @@ function extractApiErrorMessage(payload) {
 }
 
 function formatErrorMessage(error) {
-  if (error instanceof Error) {
-    return extractApiErrorMessage(error.message) || error.message;
+  const errorCode = error instanceof Error
+    ? (error.error_code || extractApiErrorCode(error.payload) || extractApiErrorCode(error.message))
+    : (extractApiErrorCode(error?.payload) || extractApiErrorCode(error));
+  const translatedError = translateErrorCode(errorCode);
+  if (translatedError) {
+    return translatedError;
   }
-  return extractApiErrorMessage(error) || String(error);
+
+  if (error instanceof Error) {
+    return extractApiErrorMessage(error.payload) || extractApiErrorMessage(error.message) || error.message || GENERIC_FRONTEND_ERROR_MESSAGES[getFrontendErrorLocale()];
+  }
+  return extractApiErrorMessage(error?.payload) || extractApiErrorMessage(error) || (typeof error === "string" ? error : "") || GENERIC_FRONTEND_ERROR_MESSAGES[getFrontendErrorLocale()];
 }
 
 function writeOutput(selector, value) {
@@ -25126,29 +25435,31 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计已点击确认完成入库的 STORE_ITEM；待完成入库单独处理。</div>
+    <div class="flow-summary-note">${escapeHtml(copy.currentStore)}：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计${escapeHtml(copy.stockInCompleted)}的${escapeHtml(copy.storeItem)}；${escapeHtml(copy.pendingStockIn)}单独处理。</div>
     <div class="report-summary-grid">
       <article class="store-metric problem-card">
-        <strong>待完成入库</strong>
+        <strong>${escapeHtml(copy.pendingStockIn)}</strong>
         <span>${escapeHtml(overview.unconfirmed_items ?? 0)}</span>
-        <small>已生成或已打印 STORE_ITEM，但还没有点击确认完成入库。</small>
-        <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看待完成</button>
+        <small>已生成或已打印${escapeHtml(copy.storeItem)}，但还没有${escapeHtml(copy.stockInCompleted)}。</small>
+        <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看${escapeHtml(copy.pendingStockIn)}</button>
       </article>
-      <article class="store-metric problem-card"><strong>未关联货架</strong><span>${escapeHtml(overview.unassigned_location_items ?? 0)}</span><small>已入库但没有有效货架。</small></article>
-      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml(overview.backroom_items ?? 0)}</span></article>
-      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml(overview.shelf_items ?? 0)}</span></article>
+      <article class="store-metric problem-card"><strong>${escapeHtml(copy.unassignedLocation)}</strong><span>${escapeHtml(overview.unassigned_location_items ?? 0)}</span><small>已入库但没有有效位置。</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.backroom)}</strong><span>${escapeHtml(overview.backroom_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml(overview.shelf_items ?? 0)}</span></article>
       <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml(overview.total_items ?? 0)}</span></article>
       <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml(overview.today_new_items ?? 0)}</span></article>
-      <article class="store-metric"><strong>今日已售</strong><span>${escapeHtml(overview.sold_today_items ?? 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
+      <article class="store-metric"><strong>今日${escapeHtml(copy.sold)}</strong><span>${escapeHtml(overview.sold_today_items ?? 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
     </div>
   `;
 }
 
 function renderStoreInventoryOverviewCategoryRows(rows = []) {
+  const copy = getStoreInventoryCopy();
   if (!rows.length) {
-    return `<div class="empty-state">当前门店还没有可统计的 STORE_ITEM 库存。</div>`;
+    return `<div class="empty-state">${escapeHtml(copy.currentStore)}还没有可统计的${escapeHtml(copy.storeItem)}库存。</div>`;
   }
   return `
     <div class="table-scroll">
@@ -25157,10 +25468,10 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
           <tr>
             <th>品类</th>
             <th>总库存</th>
-            <th>货架上</th>
-            <th>后仓</th>
-            <th>未关联货架</th>
-            <th>最后入库时间</th>
+            <th>${escapeHtml(copy.shelf)}</th>
+            <th>${escapeHtml(copy.backroom)}</th>
+            <th>${escapeHtml(copy.unassignedLocation)}</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
             <th>查看</th>
           </tr>
         </thead>
@@ -25183,33 +25494,41 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
 }
 
 function renderStoreInventoryOverviewLocationRows(rows = []) {
+  const copy = getStoreInventoryCopy();
   if (!rows.length) {
-    return `<div class="empty-state">当前门店还没有货架位库存。</div>`;
+    return `<div class="empty-state">${escapeHtml(copy.currentStore)}还没有${escapeHtml(copy.shelf)}库存。</div>`;
   }
   return `
     <div class="table-scroll">
       <table class="data-table compact-table">
         <thead>
           <tr>
-            <th>货架位</th>
+            <th>${escapeHtml(copy.shelf)}</th>
             <th>货架名称</th>
             <th>绑定品类</th>
             <th>商品数量</th>
-            <th>最后入库时间</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
             <th>明细</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `
+          ${rows.map((row) => {
+            const locationTypeLabel = row.location_code === "UNASSIGNED"
+              ? copy.unassignedLocation
+              : row.location_type === "BACKROOM"
+                ? copy.backroom
+                : copy.shelf;
+            return `
             <tr class="${row.location_type === "BACKROOM" ? "inventory-location-special" : row.location_code === "UNASSIGNED" ? "inventory-location-warning" : ""}">
-              <td>${escapeHtml(row.location_code || "-")}</td>
+              <td>${escapeHtml(row.location_code || "-")} · ${escapeHtml(locationTypeLabel)}</td>
               <td>${escapeHtml(row.location_name || "-")}</td>
               <td>${escapeHtml(row.category_name || "-")}</td>
               <td>${escapeHtml(row.item_count ?? 0)}</td>
               <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
               <td><button type="button" class="ghost-button mini-button" data-store-inventory-location-detail="${escapeHtml(row.location_code || "UNASSIGNED")}">查看商品</button></td>
             </tr>
-          `).join("")}
+          `;
+          }).join("")}
         </tbody>
       </table>
     </div>
@@ -25225,9 +25544,10 @@ function renderStoreInventoryOverview(overview = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const activeTab = storeInventoryOverviewState.activeTab === "location" ? "location" : "category";
   target.innerHTML = `
-    <div class="flow-summary-note">${activeTab === "location" ? "按货架分类" : "按品类分类"}</div>
+    <div class="flow-summary-note">${activeTab === "location" ? `按${escapeHtml(copy.shelf)}分类` : "按品类分类"}</div>
     ${activeTab === "location"
       ? renderStoreInventoryOverviewLocationRows(overview.by_location || [])
       : renderStoreInventoryOverviewCategoryRows(overview.by_category || [])}
@@ -25239,6 +25559,7 @@ function renderStoreInventorySoldSummary(overview = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const categoryRows = Array.isArray(overview.sold_by_category) ? overview.sold_by_category : [];
   const locationRows = Array.isArray(overview.sold_by_location) ? overview.sold_by_location : [];
   const soldCount = Number(overview.sold_today_items || 0);
@@ -25267,14 +25588,14 @@ function renderStoreInventorySoldSummary(overview = {}) {
     </tr>
   `).join("") : `<tr><td colspan="4">今天还没有 POS 销售出库。</td></tr>`;
   target.innerHTML = `
-    <div class="flow-summary-note">销售出库摘要 · 今日已售 ${escapeHtml(soldCount)} 件 · ${escapeHtml(formatKesAmount(soldAmount, "KES 0.00"))}</div>
+    <div class="flow-summary-note">销售出库摘要 · 今日${escapeHtml(copy.sold)} ${escapeHtml(soldCount)} 件 · ${escapeHtml(formatKesAmount(soldAmount, "KES 0.00"))}</div>
     <div class="two-column-grid">
       <div class="table-scroll">
         <table class="data-table compact-table">
           <thead>
             <tr>
               <th>按品类售出</th>
-              <th>今日已售件数</th>
+              <th>今日${escapeHtml(copy.sold)}件数</th>
               <th>今日销售额</th>
             </tr>
           </thead>
@@ -25285,9 +25606,9 @@ function renderStoreInventorySoldSummary(overview = {}) {
         <table class="data-table compact-table">
           <thead>
             <tr>
-              <th>货架位</th>
-              <th>按货架售出</th>
-              <th>今日已售件数</th>
+              <th>${escapeHtml(copy.shelf)}</th>
+              <th>按${escapeHtml(copy.shelf)}售出</th>
+              <th>今日${escapeHtml(copy.sold)}件数</th>
               <th>今日销售额</th>
             </tr>
           </thead>
@@ -25303,6 +25624,7 @@ function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") 
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   target.className = "report-summary";
   if (!items.length) {
     target.innerHTML = `<div class="empty-state">${escapeHtml(title)}：没有商品。</div>`;
@@ -25314,14 +25636,14 @@ function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") 
       <table class="data-table compact-table">
         <thead>
           <tr>
-            <th>STORE_ITEM machine_code / barcode</th>
+            <th>${escapeHtml(copy.storeItem)}</th>
             <th>品类</th>
             <th>价格</th>
-            <th>当前货架位</th>
-            <th>来源 SDP</th>
-            <th>来源 SDO</th>
+            <th>${escapeHtml(copy.shelf)}</th>
+            <th>${escapeHtml(copy.sourcePackage)}</th>
+            <th>${escapeHtml(copy.storeDeliveryOrder)}</th>
             <th>打印人 / 确认人</th>
-            <th>入库 / 更新时间</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
           </tr>
         </thead>
         <tbody>
@@ -25369,31 +25691,33 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const rows = Array.isArray(items) ? items : [];
   const locations = getStoreInventoryActiveStockInLocations();
   target.className = "report-summary";
   if (!rows.length) {
     target.innerHTML = `
-      <div class="flow-summary-note">待完成入库 · 0 件</div>
+      <div class="flow-summary-note">${escapeHtml(copy.pendingStockIn)} · 0 件</div>
       ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
-      <div class="empty-state">当前门店没有待完成入库的 STORE_ITEM。</div>
+      <div class="empty-state">${escapeHtml(copy.currentStore)}没有${escapeHtml(copy.pendingStockIn)}的${escapeHtml(copy.storeItem)}。</div>
     `;
     return;
   }
   target.innerHTML = `
-    <div class="flow-summary-note">待完成入库 · ${rows.length} 件。这些商品不会进入主库存，点击确认完成入库后才计入库存。</div>
+    <div class="flow-summary-note">${escapeHtml(copy.pendingStockIn)} · ${rows.length} 件。这些商品不会进入主库存，${escapeHtml(copy.stockInCompleted)}后才计入库存。</div>
     ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
     <div class="table-scroll">
       <table class="data-table compact-table">
         <thead>
           <tr>
-            <th>STORE_ITEM 码</th>
+            <th>${escapeHtml(copy.storeItem)}</th>
             <th>品类</th>
             <th>价格</th>
-            <th>建议货架 / 后仓</th>
-            <th>来源 SDP</th>
+            <th>建议${escapeHtml(copy.shelf)} / ${escapeHtml(copy.backroom)}</th>
+            <th>${escapeHtml(copy.sourcePackage)}</th>
+            <th>${escapeHtml(copy.storeDeliveryOrder)}</th>
             <th>打印人</th>
-            <th>时间</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -25408,9 +25732,9 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
                 <td>${escapeHtml(item.price_kes ?? item.sale_price_kes ?? "-")}</td>
                 <td>
                   <strong>${escapeHtml(item.suggested_location_name || suggestedLocationCode || "-")}</strong>
-                  ${item.parent_sdo_display_code ? `<div class="subtle small">SDO ${escapeHtml(item.parent_sdo_display_code)}</div>` : ""}
                 </td>
                 <td>${escapeHtml(item.source_sdp_display_code || "-")}</td>
+                <td>${escapeHtml(item.parent_sdo_display_code || "-")}</td>
                 <td>${escapeHtml(item.printed_by || "-")}</td>
                 <td>${escapeHtml(item.printed_at || item.created_at || item.updated_at || item.last_inbound_at || "-")}</td>
                 <td>
@@ -25422,7 +25746,7 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
                         </option>
                       `).join("")}
                     </select>
-                    <button type="button" class="primary-button mini-button" data-store-inventory-unconfirmed-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                    <button type="button" class="primary-button mini-button" data-store-inventory-unconfirmed-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>${escapeHtml(copy.stockInCompleted)}</button>
                   </div>
                 </td>
               </tr>
@@ -25437,10 +25761,11 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
 async function loadStoreInventoryOverview(storeCode = "") {
   const normalizedStoreCode = String(storeCode || getStoreInventoryOverviewStoreCode()).trim().toUpperCase() || "UTAWALA";
   const overview = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/inventory-overview`);
+  const copy = getStoreInventoryCopy();
   writeOutput("#storeInventoryOverviewOutput", overview);
   setInputValue("#storeInventoryOverviewForm [name='store_code']", normalizedStoreCode);
   renderStoreInventoryOverview(overview);
-  renderStoreInventoryOverviewDetail([], "点击品类或货架位查看商品明细");
+  renderStoreInventoryOverviewDetail([], `点击品类或${copy.shelf}查看商品明细`);
   return overview;
 }
 
@@ -25458,11 +25783,12 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
   const selectedElement = document.querySelector(`[data-store-inventory-unconfirmed-location="${machineCode}"]`);
   const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
+  const copy = getStoreInventoryCopy();
   if (!machineCode) {
-    throw new Error("缺少 STORE_ITEM 码。");
+    throw new Error(`缺少${copy.storeItem}。`);
   }
   if (!selectedLocation) {
-    throw new Error("请选择货架位或后仓。");
+    throw new Error(`请选择${copy.shelf}或${copy.backroom}。`);
   }
   const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/confirm-stock-in`, {
     method: "POST",
@@ -25473,8 +25799,10 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
   });
   const status = String(result.status || "confirmed").trim();
   const message = status === "already_confirmed"
-    ? "已确认入库。"
-    : "确认完成入库。";
+    ? `${copy.stockInCompleted}。`
+    : status === "location_updated"
+      ? `已换${copy.shelf}。`
+      : `${copy.stockInCompleted}。`;
   await loadStoreInventoryOverview(storeCode);
   await loadStoreInventoryUnconfirmedItems(message);
   return result;
@@ -25489,8 +25817,9 @@ async function submitStoreInventoryOverview(event) {
 
 async function loadStoreInventoryLocationDetail(locationCode = "") {
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  const copy = getStoreInventoryCopy();
   const items = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/locations/${encodeURIComponent(locationCode)}/items`);
-  renderStoreInventoryOverviewDetail(items, `货架位 ${locationCode || "未关联货架"} 商品明细`);
+  renderStoreInventoryOverviewDetail(items, `${copy.shelf} ${locationCode || copy.unassignedLocation} 商品明细`);
   return items;
 }
 
@@ -25506,45 +25835,48 @@ function renderStoreItemTraceLookupResult(trace = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const status = String(trace.trace_status || "unknown").trim();
-  const label = trace.status_label || {
-    in_stock: "在库",
-    pending_stock_in: "待完成入库",
-    sold: "已售",
-    unassigned_location: "未关联货架",
+  const label = {
+    in_stock: copy.inStock,
+    pending_stock_in: copy.pendingStockIn,
+    sold: copy.sold,
+    unassigned_location: copy.unassignedLocation,
     invalid: "不是门店商品码",
     unknown: "未找到",
-  }[status] || "未找到";
+  }[status] || trace.status_label || "未找到";
   const toneClass = status === "in_stock"
     ? "success-banner"
     : status === "sold" || status === "pending_stock_in" || status === "unassigned_location"
       ? "warning-banner"
       : "error-banner";
   const locationText = [trace.current_location_name, trace.current_location_code].filter(Boolean).join(" / ") || "-";
-  const sourceText = [trace.source_sdp_display_code, trace.parent_sdo_display_code].filter(Boolean).join(" / ") || "-";
+  const sourcePackageText = trace.source_sdp_display_code || "-";
+  const storeDeliveryOrderText = trace.parent_sdo_display_code || "-";
+  const locationTypeText = getStoreInventoryLocationTypeLabel(trace.location_type);
   const saleText = trace.sale_no || trace.sale_id || trace.sold_at || trace.sold_by
     ? [trace.sale_no || trace.sale_id, trace.sold_at, trace.sold_by].filter(Boolean).join(" / ")
     : "-";
   const operationHint = status === "pending_stock_in"
-    ? "该商品已生成或已打印，但还没有点击确认完成入库。建议去“待完成入库”列表处理。"
+    ? `该${copy.storeItem}还没有${copy.stockInCompleted}。请在“${copy.pendingStockIn}”列表处理。`
     : status === "unassigned_location"
-      ? "该商品已入库，但货架位置为空或失效。请在待完成入库或货架处理流程中修正。"
+      ? `该${copy.storeItem}已入库，但${copy.shelf}为空或失效。请在${copy.pendingStockIn}或${copy.shelf}流程中修正。`
       : status === "invalid"
-        ? "POS 和库存查询只处理 STORE_ITEM，RAW_BALE / SDB / SDP / LPK / SDO 不是商品码。"
+        ? `POS 和库存查询只处理${copy.storeItem}。`
         : status === "unknown"
-          ? "没有找到这个 STORE_ITEM。"
+          ? `没有找到这个${copy.storeItem}。`
           : trace.message || "";
   target.className = "report-summary";
   target.innerHTML = `
     <div class="${toneClass}">状态：${escapeHtml(label)}</div>
     ${operationHint ? `<div class="flow-summary-note">${escapeHtml(operationHint)}</div>` : ""}
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>STORE_ITEM</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.storeItem)}</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
       <article class="store-metric"><strong>品类</strong><span>${escapeHtml(trace.category_name || trace.category_short || "-")}</span><small>KES ${escapeHtml(trace.price_kes ?? 0)}</small></article>
-      <article class="store-metric"><strong>当前货架</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(trace.location_type || "")}</small></article>
-      <article class="store-metric"><strong>来源</strong><span>${escapeHtml(sourceText)}</span><small>SDP / SDO</small></article>
-      <article class="store-metric"><strong>确认入库</strong><span>${escapeHtml(trace.stock_in_confirmed ? "已确认" : "未确认")}</span><small>${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
-      <article class="store-metric"><strong>销售</strong><span>${escapeHtml(trace.sold ? "已售" : "未售")}</span><small>${escapeHtml(saleText)}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(locationTypeText)}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.sourcePackage)}</strong><span>${escapeHtml(sourcePackageText)}</span><small>${escapeHtml(copy.storeDeliveryOrder)}：${escapeHtml(storeDeliveryOrderText)}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.stockInCompleted)}</strong><span>${escapeHtml(trace.stock_in_confirmed ? copy.stockInCompleted : copy.pendingStockIn)}</span><small>${escapeHtml(copy.stockInTime)}：${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.sold)}</strong><span>${escapeHtml(trace.sold ? copy.sold : copy.inStock)}</span><small>${escapeHtml(copy.saleTime)}：${escapeHtml(saleText)}</small></article>
     </div>
   `;
 }
@@ -25553,7 +25885,7 @@ async function lookupStoreItemTrace(machineCode = "") {
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
   machineCode = String(machineCode || "").trim().toUpperCase();
   if (!machineCode) {
-    throw new Error("请输入 STORE_ITEM 码。");
+    throw new Error(`请输入${storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.storeItem)}。`);
   }
   const trace = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/trace`);
   writeOutput("#storeInventoryOverviewOutput", trace);
@@ -25694,10 +26026,12 @@ function handleStoreShelfFloorPlanUpload(input) {
 
 function hydrateStoreShelfLocationForm(row = {}) {
   const layout = parseStoreShelfLayout(row);
+  const locationType = row.location_type || "SHELF";
   setInputValue("#storeShelfLocationForm [name='store_code']", row.store_code || getCurrentStoreCodeFallback() || "UTAWALA");
   setInputValue("#storeShelfLocationForm [name='location_code']", row.location_code || row.rack_code || "");
   setInputValue("#storeShelfLocationForm [name='location_name']", row.location_name || "");
-  setInputValue("#storeShelfLocationForm [name='location_type']", row.location_type || "SHELF");
+  setInputValue("#storeShelfLocationForm [name='location_type']", locationType);
+  setInputValue("#storeShelfLocationForm [name='location_type_label']", getStoreInventoryLocationTypeLabel(locationType));
   setInputValue("#storeShelfLocationForm [name='category_name']", row.category_name || row.category_hint || "");
   setInputValue("#storeShelfLocationForm [name='active']", row.active === false ? "false" : "true");
   setInputValue("#storeShelfLocationForm [name='sort_order']", String(row.sort_order ?? 0));
@@ -25722,6 +26056,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
   if (!(canvasTarget instanceof HTMLElement) || !(detailTarget instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const locationRows = Array.isArray(rows) ? rows : [];
   if (locationRows.length && !storeShelfFloorPlanState.selectedLocationCode) {
     storeShelfFloorPlanState.selectedLocationCode = String(locationRows[0]?.location_code || locationRows[0]?.rack_code || "").trim().toUpperCase();
@@ -25732,7 +26067,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
   if (!locationRows.length) {
     canvasTarget.innerHTML = `
       <div class="store-shelf-empty-guide"${backgroundStyle}>
-        <strong>当前门店还没有货架布局</strong>
+        <strong>${escapeHtml(copy.currentStore)}还没有${escapeHtml(copy.shelfLayout)}</strong>
         <span>你可以使用默认 demo 模板、上传真实平面图，或从空白画布开始。</span>
         <div class="button-row">
           <button type="button" data-store-shelf-initialize="true">使用默认模板</button>
@@ -25757,12 +26092,13 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
       const layout = parseStoreShelfLayout(row, index);
       const selectedClass = code && code === storeShelfFloorPlanState.selectedLocationCode ? " is-selected" : "";
       const typeClass = String(row.location_type || "SHELF").trim().toLowerCase();
+      const typeLabel = getStoreInventoryLocationTypeLabel(row.location_type);
       return `
         <button type="button" class="store-shelf-map-object shelf-object object-${escapeHtml(typeClass)}${selectedClass}" data-store-shelf-canvas-select="${escapeHtml(code)}" style="left:${Math.round(layout.x)}px;top:${Math.round(layout.y)}px;width:${Math.round(layout.width)}px;height:${Math.round(layout.height)}px;z-index:${Number(layout.z_index || 3)}">
           <span class="map-object-badge">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
           <strong>${escapeHtml(code || "-")}</strong>
           <span>${escapeHtml(row.location_name || "-")}</span>
-          <small>${escapeHtml(row.category_name || row.category_hint || row.location_type || "-")} · ${escapeHtml(row.item_count ?? 0)} 件</small>
+          <small>${escapeHtml(row.category_name || row.category_hint || typeLabel || "-")} · ${escapeHtml(row.item_count ?? 0)} 件</small>
         </button>
       `;
     })
@@ -25798,6 +26134,7 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const locationRows = Array.isArray(rows) ? rows : [];
   const shelfCount = locationRows.filter((row) => row.location_type === "SHELF").length;
   const backroomCount = locationRows.filter((row) => row.location_type === "BACKROOM").length;
@@ -25805,25 +26142,27 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
   const totalItems = locationRows.reduce((sum, row) => sum + Number(row.item_count || 0), 0);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="flow-summary-note">${escapeHtml(message || "货架位编辑 · 平面图模式：画布是主体验，右侧只编辑当前选中的货架。")}</div>
+    <div class="flow-summary-note">${escapeHtml(message || `${copy.shelfLayout} · 平面图模式：画布是主体验，右侧只编辑当前选中的${copy.shelf}。`)}</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>货架位</strong><span>${shelfCount}</span></article>
-      <article class="store-metric"><strong>后仓</strong><span>${backroomCount}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${shelfCount}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.backroom)}</strong><span>${backroomCount}</span></article>
       <article class="store-metric"><strong>启用</strong><span>${activeCount}</span></article>
       <article class="store-metric"><strong>当前商品数</strong><span>${totalItems}</span></article>
     </div>
   `;
   renderStoreShelfFloorPlanCanvas(locationRows);
   if (!locationRows.length) {
-    listTarget.innerHTML = `<div class="empty-state">当前门店还没有货架位。请先点击“使用默认模板”。</div>`;
+    listTarget.innerHTML = `<div class="empty-state">${escapeHtml(copy.currentStore)}还没有${escapeHtml(copy.shelf)}。请先点击“使用默认模板”。</div>`;
     return;
   }
   listTarget.innerHTML = locationRows
-    .map((row) => `
+    .map((row) => {
+      const typeLabel = getStoreInventoryLocationTypeLabel(row.location_type);
+      return `
       <article class="candidate-row">
         <div class="candidate-main">
           <strong>${escapeHtml(row.location_code || row.rack_code || "-")} · ${escapeHtml(row.location_name || "-")}</strong>
-          <div class="subtle small">${escapeHtml(row.location_type || "SHELF")} · 绑定品类：${escapeHtml(row.category_name || row.category_hint || "-")}</div>
+          <div class="subtle small">${escapeHtml(typeLabel)} · 绑定品类：${escapeHtml(row.category_name || row.category_hint || "-")}</div>
           <div class="chip-row">
             <span class="meta-pill">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
             <span class="meta-pill">排序 ${escapeHtml(row.sort_order ?? 0)}</span>
@@ -25831,10 +26170,11 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
           </div>
         </div>
         ${row.location_type === "BACKROOM"
-          ? `<span class="meta-pill">系统固定后仓</span>`
+          ? `<span class="meta-pill">系统固定${escapeHtml(copy.backroom)}</span>`
           : `<div class="button-row"><button type="button" class="ghost-button mini-button" data-store-shelf-locate="${escapeHtml(row.location_code || row.rack_code || "")}">定位到画布</button><button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button></div>`}
       </article>
-    `)
+    `;
+    })
     .join("");
 }
 
@@ -25893,7 +26233,7 @@ async function submitStoreShelfLocationSave(event) {
   });
   writeOutput("#storeShelfLocationOutput", result);
   const rows = await loadStoreShelfLocations(storeCode);
-  renderStoreShelfLocationSummary(rows, `货架位 ${locationCode} 已保存。`);
+  renderStoreShelfLocationSummary(rows, `${getStoreInventoryCopy().shelf} ${locationCode} 已保存。`);
   return result;
 }
 
@@ -29282,7 +29622,7 @@ async function primeCashierTerminalSession(force = false) {
     cashierTerminalState.shiftNo = "";
     cashierTerminalState.shiftStatus = "not_opened";
     cashierTerminalState.shiftOpen = false;
-    cashierTerminalState.shiftFeedback = "请先开班后再收银。";
+    cashierTerminalState.shiftFeedback = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst);
     ["#shiftReportForm [name='shift_no']", "#handoverRequestForm [name='shift_no']", "#closeBusinessReportForm [name='shift_no']", "#saleForm [name='shift_no']"].forEach((selector) => setInputValue(selector, ""));
     renderCashierTerminal();
   }
@@ -30695,20 +31035,57 @@ function getCashierTerminalMockItems() {
 }
 
 function ensureCashierTerminalPreviewCopy() {
+  const keys = POS_CASHIER_TERMINOLOGY_KEYS;
   Object.assign(CASHIER_TERMINAL_LOCALE_COPY.zh, {
     brandTitle: "FW-ERP POS",
-    scanTitle: "扫描商品",
+    scanTitle: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
+    barcodeField: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
+    scanStoreItem: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
+    addUnbarcodedItem: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.addUnbarcodedItem, "zh"),
+    posStoreItemOnly: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule, "zh"),
+    itemAlreadySold: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.itemAlreadySold, "zh"),
+    openShiftFirst: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst, "zh"),
+    openNow: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShift, "zh"),
+    shiftAction: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShift, "zh"),
+    closeShift: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.closeShift, "zh"),
+    holdAction: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.holdOrder, "zh"),
+    resumeHeldOrder: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.resumeHeldOrder, "zh"),
+    receiptReprint: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.reprintReceipt, "zh"),
+    xReport: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.xReport, "zh"),
+    zReport: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.zReport, "zh"),
+    cashVariance: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.cashVariance, "zh"),
     addToBasket: "加入购物车",
     basketTitle: "商品篮",
     cartEmpty: "购物车为空，请扫描 STORE_ITEM 商品码",
-    lookupEmpty: "仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。",
+    lookupEmpty: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule, "zh"),
     paymentTitle: "结账",
     completeTrade: "完成销售",
     grossAmount: "应收金额",
     paidAmount: "实收",
     balanceAmount: "余额",
     clearBasket: "清空购物车",
-    barcodePlaceholder: "扫描或输入 STORE_ITEM 商品码",
+    barcodePlaceholder: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
+  });
+  Object.assign(CASHIER_TERMINAL_LOCALE_COPY.en, {
+    scanTitle: cashierTerminalTerm(keys.scanStoreItem, "en"),
+    barcodeField: cashierTerminalTerm(keys.scanStoreItem, "en"),
+    scanStoreItem: cashierTerminalTerm(keys.scanStoreItem, "en"),
+    addUnbarcodedItem: cashierTerminalTerm(keys.addUnbarcodedItem, "en"),
+    posStoreItemOnly: cashierTerminalTerm(keys.storeItemOnlyRule, "en"),
+    itemAlreadySold: cashierTerminalTerm(keys.itemAlreadySold, "en"),
+    openShiftFirst: cashierTerminalTerm(keys.openShiftFirst, "en"),
+    openNow: cashierTerminalTerm(keys.openShift, "en"),
+    shiftAction: cashierTerminalTerm(keys.openShift, "en"),
+    closeShift: cashierTerminalTerm(keys.closeShift, "en"),
+    holdAction: cashierTerminalTerm(keys.holdOrder, "en"),
+    resumeHeldOrder: cashierTerminalTerm(keys.resumeHeldOrder, "en"),
+    receiptReprint: cashierTerminalTerm(keys.reprintReceipt, "en"),
+    xReport: cashierTerminalTerm(keys.xReport, "en"),
+    zReport: cashierTerminalTerm(keys.zReport, "en"),
+    cashVariance: cashierTerminalTerm(keys.cashVariance, "en"),
+    lookupEmpty: cashierTerminalTerm(keys.storeItemOnlyRule, "en"),
+    cartEmpty: "Basket is empty. Scan Store Item.",
+    barcodePlaceholder: cashierTerminalTerm(keys.scanStoreItem, "en"),
   });
 }
 
@@ -30897,11 +31274,12 @@ renderCashierTerminalSessionStrip = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   cashierTerminalSessionStrip.innerHTML = `
     <span><b>当前门店</b>${escapeHtml(getCashierTerminalStoreCode())}</span>
     <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
     <span><b>收银员</b>${escapeHtml(getCashierTerminalCashierName())}</span>
-    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${escapeHtml(getCashierTerminalShiftNo() || "请先开班")}</span>
+    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
     <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
       <b>网络状态</b>${escapeHtml(getCashierTerminalNetworkLabel())}
     </button>
@@ -30920,11 +31298,12 @@ renderCashierTerminalStatusBar = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
   cashierTerminalStatusBar.innerHTML = `
-    <span>只支持 STORE_ITEM 商品销售 ｜ 扫描后自动加入购物车 ｜ 不支持 SDO / SDP / SDB / LPK / RAW_BALE</span>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">挂单列表</button>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">班次 / 交接班</button>
+    <span>${escapeHtml(copy.posStoreItemOnly)}</span>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">${escapeHtml(copy.resumeHeldOrder)}</button>
+    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(cashierTerminalState.currentShift?.shift_id ? copy.closeShift : copy.openNow)}</button>
     <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
   `;
 }
@@ -30934,6 +31313,7 @@ renderCashierTerminalLookupPanel = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   const fallbackNotice = cashierTerminalState.scanFallbackNotice
     ? `<span class="cashier-terminal-fallback-warning">${escapeHtml(cashierTerminalState.scanFallbackNotice)}</span>`
     : "";
@@ -30948,9 +31328,9 @@ renderCashierTerminalLookupPanel = function () {
   const recentScans = (cashierTerminalState.recentScans || []).slice(0, 4);
   cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
   cashierTerminalLookupCard.innerHTML = `
-    <strong>仅支持 STORE_ITEM 商品码</strong>
-    <span>只能扫描 STORE_ITEM 商品码。SDO / SDP / SDB / LPK / RAW_BALE 不能在 POS 销售。</span>
-    <span>该商品还未上架、已售出、pending_print 或 pending_putaway 时不可销售。</span>
+    <strong>${escapeHtml(copy.scanStoreItem)}</strong>
+    <span>${escapeHtml(copy.posStoreItemOnly)}</span>
+    <span>${escapeHtml(copy.itemAlreadySold)}</span>
     ${fallbackNotice}
     ${scanError}
     <div class="cashier-recent-scans">
@@ -31018,6 +31398,7 @@ renderCashierTerminalPaymentPanel = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   const totals = getCashierTerminalTotals();
   const paid = getCashierTerminalPaymentAssignedTotal();
   const changeDue = getCashierTerminalChangeDue();
@@ -31040,8 +31421,8 @@ renderCashierTerminalPaymentPanel = function () {
     ${saleDisabled ? `
       <div class="cashier-no-shift-card">
         <strong>POS 暂不可收银</strong>
-        <span>当前没有开班，请先开班后再收银</span>
-        <button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">开班并开始收银</button>
+        <span>${escapeHtml(copy.openShiftFirst)}</span>
+        <button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(copy.openNow)}</button>
       </div>
     ` : ""}
     <div class="cashier-terminal-grand-total">
@@ -31099,11 +31480,11 @@ renderCashierTerminalPaymentPanel = function () {
     ${mpesaManualNotice}
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
-      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? "请先开班" : "Complete Sale"}</strong></button>
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale"}</strong></button>
       <div class="secondary-actions">
-        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">挂单 Hold</button>
+        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">${escapeHtml(copy.holdAction)}</button>
         <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
-        <button type="button" class="secondary-action" data-terminal-action="reprint-receipt">重打小票</button>
+        <button type="button" class="secondary-action" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
       </div>
     </div>
   `;
@@ -31115,6 +31496,7 @@ function renderCashierTerminalReceiptPanel() {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   const sale = cashierTerminalState.latestCompletedSale;
   receiptPanel.classList.toggle("is-empty", !sale);
   const items = Array.isArray(sale?.items) ? sale.items : [];
@@ -31163,7 +31545,7 @@ function renderCashierTerminalReceiptPanel() {
     </div>
     <div class="receipt-actions">
       <button type="button" class="secondary-inline" data-terminal-action="print-receipt">打印收据 Print Receipt</button>
-      <button type="button" class="secondary-inline" data-terminal-action="reprint-receipt">重新打印最近一单</button>
+      <button type="button" class="secondary-inline" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
     </div>
     <div class="cashier-print-feedback">${escapeHtml(cashierTerminalState.printFeedback || "")}</div>
   `;
@@ -31176,6 +31558,7 @@ renderCashierTerminalQuickActions = function () {
   ensureCashierTerminalPreviewState();
   const totals = getCashierTerminalTotals();
   const paid = getCashierTerminalPaymentAssignedTotal();
+  const copy = getCashierTerminalCopy();
   cashierTerminalQuickActions.innerHTML = `
     <div class="transaction-strip-title">当前交易状态 (TRANSACTION STATUS)</div>
     <div class="cashier-terminal-status-metrics">
@@ -31185,7 +31568,7 @@ renderCashierTerminalQuickActions = function () {
       <span><strong>待收金额</strong>${escapeHtml(formatCashierPreviewMoney(Math.max(totals.totalAmount - paid, 0)))}</span>
       <span><strong>支付方式</strong>${escapeHtml(cashierTerminalState.activePaymentMode)}</span>
       <span><strong>状态</strong>${escapeHtml(totals.totalItems ? (paid >= totals.totalAmount ? "可完成" : "待收款") : "待扫码")}</span>
-      <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
     </div>
   `;
 }
@@ -31195,6 +31578,7 @@ renderCashierTerminalDrawer = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   const drawer = cashierTerminalState.activeDrawer;
   if (!drawer) {
     cashierTerminalDrawer.hidden = true;
@@ -31210,7 +31594,7 @@ renderCashierTerminalDrawer = function () {
   }
   if (drawer === "hold-create") {
     cashierTerminalDrawer.innerHTML = `
-      <div class="drawer-head"><div><p class="panel-kicker">HOLD</p><h3>创建挂单</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-head"><div><p class="panel-kicker">HOLD</p><h3>${escapeHtml(copy.holdAction)}</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body">
         <label class="field"><span>挂单原因</span><select data-terminal-drawer-field="holdReason">
           ${["顾客继续挑选", "等 M-Pesa 确认", "顾客去取钱", "收银中断", "其他"].map((reason) => `<option value="${escapeHtml(reason)}"${cashierTerminalState.holdReason === reason ? " selected" : ""}>${escapeHtml(reason)}</option>`).join("")}
@@ -31220,14 +31604,14 @@ renderCashierTerminalDrawer = function () {
         <label class="field"><span>备注，可选</span><textarea rows="3" data-terminal-drawer-field="holdNote">${escapeHtml(cashierTerminalState.holdNote || "")}</textarea></label>
         <div class="drawer-hint">挂单只用于临时保留购物车，不是赊账。挂单商品在本地预览中会标记为 held / reserved。</div>
       </div>
-      <div class="drawer-foot split-actions"><button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button><button type="button" class="primary-inline" data-terminal-action="confirm-hold">确认挂单</button></div>
+      <div class="drawer-foot split-actions"><button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button><button type="button" class="primary-inline" data-terminal-action="confirm-hold">${escapeHtml(copy.holdAction)}</button></div>
     `;
     return;
   }
   if (drawer === "hold-list") {
     const holds = cashierTerminalState.holdOrders || [];
     cashierTerminalDrawer.innerHTML = `
-      <div class="drawer-head"><div><p class="panel-kicker">HOLDS</p><h3>挂单列表</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-head"><div><p class="panel-kicker">HOLDS</p><h3>${escapeHtml(copy.resumeHeldOrder)}</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body hold-list-body">
         ${cashierTerminalState.holdFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.holdFeedback)}</div>` : ""}
         ${holds.length ? holds.map((hold) => `
@@ -31236,20 +31620,20 @@ renderCashierTerminalDrawer = function () {
             <div class="hold-meta"><span>${escapeHtml(hold.item_count || 0)} 件</span><span>${escapeHtml(formatCashierPreviewMoney(hold.total ?? hold.total_amount))}</span><span>${escapeHtml(hold.reason || "-")}</span><span>${escapeHtml(hold.status || "-")}</span></div>
             <div class="hold-meta"><span>${escapeHtml(hold.customer_name || "-")}</span><span>${escapeHtml(hold.customer_phone || "-")}</span></div>
             <div class="hold-actions">
-              <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>继续收款</button>
+              <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>${escapeHtml(copy.resumeHeldOrder)}</button>
               <button type="button" class="secondary-inline danger" data-terminal-action="cancel-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>取消挂单</button>
             </div>
           </article>
         `).join("") : `<div class="cashier-terminal-empty-card">当前没有挂单。</div>`}
       </div>
-      <div class="drawer-foot"><button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">创建挂单</button></div>
+      <div class="drawer-foot"><button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">${escapeHtml(copy.holdAction)}</button></div>
     `;
     return;
   }
   if (drawer === "reprint-confirm") {
     const saleNo = String(cashierTerminalState.pendingReprintSaleNo || cashierTerminalState.latestCompletedSale?.sale_no || "").trim();
     cashierTerminalDrawer.innerHTML = `
-      <div class="drawer-head"><div><p class="panel-kicker">REPRINT</p><h3>重打小票确认</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-head"><div><p class="panel-kicker">REPRINT</p><h3>${escapeHtml(copy.receiptReprint)}</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body">
         <div class="drawer-card cashier-reprint-confirm-card">
           <strong>这是重打小票，不会重新销售，也不会扣库存。</strong>
@@ -31258,7 +31642,7 @@ renderCashierTerminalDrawer = function () {
       </div>
       <div class="drawer-foot split-actions">
         <button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button>
-        <button type="button" class="primary-inline" data-terminal-action="confirm-reprint">确认重打</button>
+        <button type="button" class="primary-inline" data-terminal-action="confirm-reprint">${escapeHtml(copy.receiptReprint)}</button>
       </div>
     `;
     return;
@@ -31282,7 +31666,7 @@ renderCashierTerminalDrawer = function () {
               </div>
               <div class="hold-actions">
                 <button type="button" class="secondary-inline" data-terminal-action="view-sale-detail" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">查看详情</button>
-                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">重打收据</button>
+                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">${escapeHtml(copy.receiptReprint)}</button>
               </div>
             </article>
           `).join("") : `<div class="cashier-terminal-empty-card">暂无可重打销售单。</div>`}
@@ -31319,7 +31703,7 @@ renderCashierTerminalDrawer = function () {
       </div>
       <div class="drawer-foot split-actions">
         <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">刷新最近销售</button>
-        <button type="button" class="primary-inline" data-terminal-action="reprint-receipt">重新打印最近一单</button>
+        <button type="button" class="primary-inline" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
       </div>
     `;
     return;
@@ -31342,7 +31726,7 @@ renderCashierTerminalDrawer = function () {
           <span><strong>门店</strong>${escapeHtml(getCashierTerminalStoreCode())}</span>
           <span><strong>收银员</strong>${escapeHtml(getCashierTerminalCashierName())}</span>
           <span><strong>Terminal</strong>${escapeHtml(getCashierTerminalTerminalId())}</span>
-          <span><strong>班次号</strong>${escapeHtml(currentShift?.shift_id || "请先开班")}</span>
+          <span><strong>班次号</strong>${escapeHtml(currentShift?.shift_id || copy.openShiftFirst)}</span>
           <span><strong>Status</strong>${escapeHtml(currentShift?.status || "not_opened")}</span>
           <span><strong>开班时间</strong>${escapeHtml(currentShift?.opened_at || "-")}</span>
           <span><strong>Opening float</strong>${escapeHtml(formatCashierPreviewMoney(currentShift?.opening_float ?? cashierTerminalState.openingFloatCash))}</span>
@@ -31361,15 +31745,15 @@ renderCashierTerminalDrawer = function () {
         </div>
         <h4>班次报表</h4>
         <div class="shift-report-actions">
-          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="x"${!currentShift?.shift_id ? " disabled" : ""}>查看 X-report</button>
-          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="z"${!reportShiftId || !zReportReady ? " disabled" : ""}>查看 Z-report</button>
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="x"${!currentShift?.shift_id ? " disabled" : ""}>${escapeHtml(copy.xReport)}</button>
+          <button type="button" class="secondary-inline" data-terminal-action="load-shift-report" data-terminal-report-type="z"${!reportShiftId || !zReportReady ? " disabled" : ""}>${escapeHtml(copy.zReport)}</button>
           <span class="drawer-hint">${zReportReady ? "Z-report 可查看和打印。" : "结班后可查看 Z-report"}</span>
         </div>
         <h4>开班 / 结班</h4>
         ${currentShift?.shift_id ? `
           <label class="field"><span>应有现金</span><input type="text" value="${escapeHtml(formatCashierPreviewMoney(expectedCash))}" disabled /></label>
           <label class="field"><span>实点现金</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.countedCash || "")}" data-terminal-drawer-field="countedCash" placeholder="输入实点现金" /></label>
-          <div class="cashier-shift-variance ${variance === 0 ? "neutral" : variance > 0 ? "success" : "danger"}">差异：<strong id="cashierTerminalCashVariance">${escapeHtml(formatCashierPreviewMoney(variance))}</strong></div>
+          <div class="cashier-shift-variance ${variance === 0 ? "neutral" : variance > 0 ? "success" : "danger"}">${escapeHtml(copy.cashVariance)}：<strong id="cashierTerminalCashVariance">${escapeHtml(formatCashierPreviewMoney(variance))}</strong></div>
           <div class="drawer-hint cashier-shift-variance-warning${variance === 0 ? " is-hidden" : ""}" id="cashierTerminalCashVarianceHint">现金有差异，请填写原因并让店长确认。</div>
           <label class="field"><span>店长确认</span><input type="text" value="${escapeHtml(cashierTerminalState.managerConfirmedBy || "")}" data-terminal-drawer-field="managerConfirmedBy" placeholder="store_manager_1" /></label>
           <label class="field"><span>备注</span><textarea rows="3" data-terminal-drawer-field="shiftCloseNote">${escapeHtml(cashierTerminalState.shiftCloseNote || "")}</textarea></label>
@@ -31377,14 +31761,14 @@ renderCashierTerminalDrawer = function () {
         ` : `
           <label class="field"><span>Opening float</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.openingFloatCash || "2000")}" data-terminal-drawer-field="openingFloatCash" placeholder="2000" /></label>
           <label class="field"><span>开班备注</span><textarea rows="3" data-terminal-drawer-field="openingNote">${escapeHtml(cashierTerminalState.openingNote || "")}</textarea></label>
-          <div class="drawer-hint">请先开班后再收银。每笔销售会绑定当前 shift_id。</div>
+          <div class="drawer-hint">${escapeHtml(copy.openShiftFirst)} 每笔销售会绑定当前班次。</div>
         `}
       </div>
       <div class="drawer-foot split-actions">
         ${currentShift?.shift_id ? `
           <button type="button" class="secondary-inline" data-terminal-action="load-shift-summary">刷新本班统计</button>
-          <button type="button" class="primary-inline" data-terminal-action="close-shift">关闭班次</button>
-        ` : `<button type="button" class="primary-inline" data-terminal-action="open-shift">开班</button>`}
+          <button type="button" class="primary-inline" data-terminal-action="close-shift">${escapeHtml(copy.closeShift)}</button>
+        ` : `<button type="button" class="primary-inline" data-terminal-action="open-shift">${escapeHtml(copy.openNow)}</button>`}
       </div>
     `;
     return;
@@ -31426,7 +31810,7 @@ renderCashierTerminalDrawer = function () {
           <span><strong>Opening Float</strong>${escapeHtml(formatCashierPreviewMoney(report.opening_float || 0))}</span>
           <span><strong>Expected Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.expected_cash || 0))}</span>
           <span><strong>Counted Cash</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.counted_cash || 0) : "-")}</span>
-          <span><strong>Cash Variance</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.cash_variance || 0) : "-")}</span>
+          <span><strong>${escapeHtml(copy.cashVariance)}</strong>${escapeHtml(isZReport ? formatCashierPreviewMoney(report.cash_variance || 0) : "-")}</span>
         </div>
         <h4>Hold Summary</h4>
         <div class="shift-stats-grid">
@@ -31558,7 +31942,7 @@ function ensureCashierTerminalResolvedItemCanEnterCart(resolved = {}, query = ""
   }
   const barcodeType = String(resolved?.barcode_type || "").trim().toUpperCase();
   if (barcodeType !== "STORE_ITEM") {
-    throw createCashierTerminalScanRejectError("只能扫描 STORE_ITEM 商品码。", resolved);
+    throw createCashierTerminalScanRejectError(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule), resolved);
   }
   if (resolved?.pos_allowed !== true) {
     throw createCashierTerminalScanRejectError("该 STORE_ITEM 暂未被允许在 POS 销售。", resolved);
@@ -31575,7 +31959,7 @@ function ensureCashierTerminalResolvedItemCanEnterCart(resolved = {}, query = ""
   const blockedStatuses = new Set(["sold", "sold_pending_sync", "held", "reserved", "transferred_out", "voided", "pending_print", "pending_putaway"]);
   const blockedStatus = statuses.find((status) => blockedStatuses.has(status));
   if (blockedStatus === "sold" || blockedStatus === "sold_pending_sync") {
-    throw new Error("该商品已售出，不能重复销售。");
+    throw new Error(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.itemAlreadySold));
   }
   if (blockedStatus === "held" || blockedStatus === "reserved") {
     throw new Error("该商品正在挂单保留中，不能重复销售。");
@@ -31745,20 +32129,21 @@ function formatCashierTerminalScanError(error) {
   const reject_reason = String(error?.reject_reason || error?.payload?.reject_reason || error?.detail || formatErrorMessage(error) || "").trim();
   const barcodeType = String(error?.barcode_type || error?.payload?.barcode_type || "").trim().toUpperCase();
   const normalized = `${barcodeType} ${reject_reason}`.toUpperCase();
-  let detail = reject_reason || "未识别条码，请确认是否为 STORE_ITEM 商品码。";
+  const posRule = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule);
+  let detail = posRule;
   if (/STORE_DELIVERY_EXECUTION|SDO/.test(normalized)) {
-    detail = `你扫到的是 SDO 送货单码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+    detail = `${cashierTerminalState.locale === "en" ? "This is a store delivery code." : "这是门店送货单码。"} ${posRule}`;
   } else if (/STORE_DELIVERY_PACKAGE|SDP/.test(normalized)) {
-    detail = `你扫到的是 SDP 门店配送包裹码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+    detail = `${cashierTerminalState.locale === "en" ? "This is a store delivery package." : "这是门店配送包裹码。"} ${posRule}`;
   } else if (/DISPATCH_BALE|STORE_PREP_BALE|SDB/.test(normalized)) {
-    detail = `你扫到的是 SDB 仓库待送店包码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse dispatch package." : "这是仓库待送店包码。"} ${posRule}`;
   } else if (/LOOSE_PICK_TASK|LPK/.test(normalized)) {
-    detail = `你扫到的是 LPK 补差拣货工单码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse pick task." : "这是仓库拣货工单码。"} ${posRule}`;
   } else if (/RAW_BALE|RAW/.test(normalized)) {
-    detail = `你扫到的是 RAW_BALE 仓库原始包码。${reject_reason ? ` ${reject_reason}` : ""}`.trim();
+    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse bale code." : "这是仓库包码。"} ${posRule}`;
   }
   return {
-    title: "不能销售：请扫描商品码 STORE_ITEM",
+    title: posRule,
     detail,
   };
 }
@@ -32264,7 +32649,7 @@ async function closeCashierTerminalShiftBackend() {
   ensureCashierTerminalPreviewState();
   const shiftId = cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo;
   if (!shiftId) {
-    throw new Error("请先开班后再结班。");
+    throw new Error(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst));
   }
   const storeCode = getCashierTerminalStoreCode();
   const result = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/close`, {
@@ -32280,10 +32665,10 @@ async function closeCashierTerminalShiftBackend() {
   cashierTerminalState.shiftNo = "";
   cashierTerminalState.shiftStatus = "closed";
   cashierTerminalState.shiftOpen = false;
-  cashierTerminalState.shiftFeedback = `班次已关闭，现金差异 ${formatCashierPreviewMoney(result.cash_variance || 0)}。请先开班后再收银。`;
+  cashierTerminalState.shiftFeedback = `班次已关闭，现金差异 ${formatCashierPreviewMoney(result.cash_variance || 0)}。${cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst)}`;
   cashierTerminalState.countedCash = "";
   renderCashierTerminal();
-  showTransientInlineNotice("#cashierTerminalInlineNotice", "请先开班后再收银。", "warning", 2200);
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst), "warning", 2200);
   return result;
 }
 
@@ -32319,10 +32704,10 @@ function markCashierTerminalSoldItemsLocally(sale) {
 async function submitCashierTerminalBackendSale() {
   ensureCashierTerminalPreviewState();
   if (!cashierTerminalState.currentShift?.shift_id) {
-    cashierTerminalState.shiftFeedback = "请先开班后再收银。";
+    cashierTerminalState.shiftFeedback = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst);
     renderCashierTerminalPaymentPanel();
     renderCashierTerminalStatusBar();
-    throw new Error("请先开班后再收银。");
+    throw new Error(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst));
   }
   const totals = getCashierTerminalTotals();
   const payment = validateCashierTerminalPayment();
@@ -32492,7 +32877,7 @@ async function createCashierTerminalHold() {
     throw new Error("购物车为空，不能挂单");
   }
   if (!cashierTerminalState.currentShift?.shift_id) {
-    throw new Error("请先开班后再挂单");
+    throw new Error(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst));
   }
   const storeCode = getCashierTerminalStoreCode();
   const cartItems = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
@@ -32776,10 +33161,12 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    const message = extractApiErrorMessage(data) || (typeof data === "string" ? data : pretty(data));
+    const errorCode = extractApiErrorCode(data);
+    const message = translateErrorCode(errorCode) || extractApiErrorMessage(data) || (typeof data === "string" ? data : pretty(data));
     const error = new Error(message);
     error.status = response.status;
     error.payload = data;
+    error.error_code = errorCode;
     if (response.status === 401) {
       clearSession("Session expired. Please sign in again.");
     }
@@ -37022,15 +37409,15 @@ function verifyStoreMobileSdpBarcode(value = "", state = storeMobilePricingPrevi
     return { ok: true, message: "核对成功" };
   }
   if (rawValue === "SDO260504008" || rawValue === "4260504008" || /^SDO/.test(rawValue) || /^4\d{9}$/.test(rawValue)) {
-    return { ok: false, message: "请扫描 SDP 实体包，不要扫 SDO 主单。" };
+    return { ok: false, message: "Scan Package, not SDO." };
   }
   if (/^(SDB|LPK)/.test(rawValue)) {
-    return { ok: false, message: "请扫描 SDP 实体包，不要扫 SDB / LPK 来源包。" };
+    return { ok: false, message: "Scan Package, not source package." };
   }
   if (/^(STORE_ITEM|STOREITEM|STI)/.test(rawValue)) {
-    return { ok: false, message: "请先扫描 SDP 包，不要扫 STORE_ITEM 商品码。" };
+    return { ok: false, message: "Scan Package, not Store Item." };
   }
-  return { ok: false, message: "wrong SDP: 不是当前 SDP 任务条码。" };
+  return { ok: false, message: "Scan the assigned Package." };
 }
 
 function getStoreMobilePricingActiveGroup(state = storeMobilePricingPreviewState) {
@@ -37113,7 +37500,11 @@ function getStoreMobileStatusText(status = "") {
   const labels = {
     queued: "排队中",
     printing: "打印中",
-    printed: "已打印",
+    printed: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.labelPrinted),
+    sent_to_printer: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.labelPrinted),
+    pending_print: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printLabel),
+    failed: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printFailed),
+    error: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printFailed),
   };
   return labels[normalized] || String(status || "").trim();
 }
@@ -37123,18 +37514,18 @@ function renderStoreMobileStatusBadge(status = "") {
 }
 
 function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
   const totals = getStoreMobileTaskTotals(state);
   const sdpDisplayCode = String(sdp.display_code || sdp.sdp_code || "-").trim();
   const sdpMachineCode = String(sdp.machine_code || "").trim();
   const sdoDisplayCode = String(sdp.sdo_code || "-").trim();
-  const sourceDisplayCode = String(sdp.source_code || "-").trim();
   const stats = [
     ["总数", sdp.total_count || totals.total || 0],
     ["已分批", totals.allocated],
     ["已生成", totals.generated],
     ["剩余", totals.remaining],
-    ["已贴标", totals.stickered],
+    [pdaCopy.labelPrinted, totals.stickered],
     ["价格组", `${totals.completeGroups}/${totals.groupCount}`],
   ];
   return `
@@ -37143,7 +37534,7 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
         <div>
           <strong>${escapeHtml(sdpDisplayCode)}</strong>
           <span class="mobile-sdp-primary-line">${escapeHtml(`${sdp.category || "-"} / ${sdp.total_count || 0} 件`)}</span>
-          <small class="mobile-code-secondary">${escapeHtml(`${sdp.store_name || "-"} · 来源 ${sdoDisplayCode} · ${sourceDisplayCode} · machine_code ${sdpMachineCode || "-"}`)}</small>
+          <small class="mobile-code-secondary">${escapeHtml(`${sdp.store_name || "-"} · SDO ${sdoDisplayCode} · ${pdaCopy.storeDeliveryPackage} · 扫描码 ${sdpMachineCode || "-"}`)}</small>
         </div>
         ${renderStoreMobilePricingBadge(getStoreMobileTaskStatus(state))}
       </div>
@@ -37483,6 +37874,7 @@ function getStoreMobilePendingPrintCount(items = []) {
 }
 
 function renderStoreMobileGeneratedStoreItemList(group = {}) {
+  const pdaCopy = getClerkPdaCopy();
   const rawItems = Array.isArray(group.generated_store_items) ? group.generated_store_items : [];
   const items = rawItems.map((item) => normalizeStoreItemForLabelPreview(item, group)).filter((item) => item.machine_code);
   if (!items.length) {
@@ -37497,12 +37889,11 @@ function renderStoreMobileGeneratedStoreItemList(group = {}) {
       <div class="store-mobile-generated-item-list">
         ${items.map((item) => `
           <article class="store-mobile-generated-item-row">
-            <strong><span>machine_code</span>${escapeHtml(item.machine_code)}</strong>
-            <span><b>price_kes</b>${escapeHtml(item.price_kes > 0 ? `KES ${item.price_kes}` : "-")}</span>
-            <span><b>category_short</b>${escapeHtml(item.category_short || "-")}</span>
-            <span><b>grade / pricing_type</b>${escapeHtml(item.grade || item.pricing_type || "-")}</span>
-            <span><b>print_status</b>${escapeHtml(item.print_status || "pending_print")}</span>
-            <span><b>sticker_status</b>${escapeHtml(item.sticker_status || "pending")}</span>
+            <strong><span>${escapeHtml(currentLanguage === "en" ? "Scanned Code" : "扫描码")}</span>${escapeHtml(item.machine_code)}</strong>
+            <span><b>${escapeHtml(currentLanguage === "en" ? "Price" : "价格")}</b>${escapeHtml(item.price_kes > 0 ? `KES ${item.price_kes}` : "-")}</span>
+            <span><b>${escapeHtml(currentLanguage === "en" ? "Category" : "品类")}</b>${escapeHtml(item.category_short || "-")}</span>
+            <span><b>${escapeHtml(currentLanguage === "en" ? "Grade" : "等级")}</b>${escapeHtml(item.grade || item.pricing_type || "-")}</span>
+            <span><b>${escapeHtml(pdaCopy.printLabel)}</b>${escapeHtml(getStoreMobileStatusText(item.print_status || "pending_print"))}</span>
           </article>
         `).join("")}
       </div>
@@ -37579,16 +37970,22 @@ function getStoreMobilePrintedStoreItemsForStockIn(group = {}) {
     .filter((item) => item.machine_code);
 }
 
+function getStoreMobileStockInItemStatus(item = {}) {
+  return item.stock_in_status || (item.stock_in_confirmed ? "confirmed" : "");
+}
+
 function getStoreMobileStockInStatusLabel(status = "") {
   const normalized = String(status || "").trim();
-  if (normalized === "confirmed") return "已入库";
-  if (normalized === "already_confirmed") return "已确认";
-  if (normalized === "confirming") return "确认中";
+  if (normalized === "confirmed") return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted);
+  if (normalized === "already_confirmed") return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted);
+  if (normalized === "location_updated") return "已换货架";
+  if (normalized === "confirming") return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.confirmStockIn);
   if (normalized === "failed" || normalized === "error") return "失败";
-  return "待确认";
+  return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.pendingStockIn);
 }
 
 function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPreviewState, group = {}) {
+  const pdaCopy = getClerkPdaCopy();
   const locations = getStoreMobileActiveStockInLocations(state);
   const printedItems = getStoreMobilePrintedStoreItemsForStockIn(group);
   const locationError = String(state.storeMobileStockInLocationError || group.stock_in_location_error || "").trim();
@@ -37598,7 +37995,7 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
   return `
     <section class="mobile-stock-in-panel" data-mobile-stock-in-confirmation-panel="true">
       <div class="mobile-section-head">
-        <strong>确认完成入库</strong>
+        <strong>${escapeHtml(pdaCopy.confirmStockIn)}</strong>
         ${renderStoreMobilePricingBadge(`${printedItems.length} 件`)}
       </div>
       ${locationError ? `<div class="mobile-error">${escapeHtml(locationError)}</div>` : ""}
@@ -37606,7 +38003,7 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
       <div class="mobile-stock-in-list">
         ${printedItems.map((item) => {
           const selectedLocationCode = item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations);
-          const statusText = getStoreMobileStockInStatusLabel(item.stock_in_status || (item.stock_in_confirmed ? "confirmed" : ""));
+          const statusText = getStoreMobileStockInStatusLabel(getStoreMobileStockInItemStatus(item));
           const message = item.stock_in_message || item.stock_in_error || "";
           return `
             <article class="mobile-stock-in-row">
@@ -37615,18 +38012,18 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
                 <span>${escapeHtml(item.category_short || "-")} · KES ${escapeHtml(item.price_kes || 0)}</span>
               </div>
               <label class="mobile-field">
-                <span>货架位 / 后仓</span>
+                <span>${escapeHtml(pdaCopy.selectLocation)}</span>
                 <select data-mobile-stock-in-location="${escapeHtml(item.machine_code)}" ${locations.length ? "" : "disabled"}>
                   ${locations.map((location) => `
                     <option value="${escapeHtml(location.location_code)}" ${location.location_code === selectedLocationCode ? "selected" : ""}>
-                      ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                      ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_type === "BACKROOM" ? pdaCopy.backroom : pdaCopy.shelf)}
                     </option>
                   `).join("")}
                 </select>
               </label>
               <div class="mobile-stock-in-actions">
                 ${renderStoreMobilePricingBadge(statusText)}
-                <button type="button" class="primary-button" data-mobile-pricing-confirm-stock-in="${escapeHtml(item.machine_code)}" data-mobile-pricing-confirm-stock-in-group="${escapeHtml(group.group_id || "")}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                <button type="button" class="primary-button" data-mobile-pricing-confirm-stock-in="${escapeHtml(item.machine_code)}" data-mobile-pricing-confirm-stock-in-group="${escapeHtml(group.group_id || "")}" ${locations.length ? "" : "disabled"}>${escapeHtml(pdaCopy.confirmStockIn)}</button>
               </div>
               ${message ? `<div class="${item.stock_in_error ? "mobile-error" : "success-banner"}">${escapeHtml(message)}</div>` : ""}
             </article>
@@ -37647,6 +38044,7 @@ async function loadStoreMobileUnconfirmedStockInItems(state = storeMobilePricing
 }
 
 function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const rows = Array.isArray(state.storeMobileUnconfirmedStockInItems) ? state.storeMobileUnconfirmedStockInItems : [];
   const locations = getStoreMobileActiveStockInLocations(state);
   const message = String(state.storeMobileUnconfirmedStockInMessage || "").trim();
@@ -37655,10 +38053,10 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
     <section class="mobile-stock-in-panel">
       <div class="mobile-stock-in-entry-card">
         <div>
-          <strong>未完成入库：${escapeHtml(rows.length)} 件</strong>
+          <strong>${escapeHtml(pdaCopy.pendingStockIn)}：${escapeHtml(rows.length)} 件</strong>
           <span>打印后还没有确认货架的商品。</span>
         </div>
-        <button type="button" class="ghost-button mini-button" data-mobile-pricing-load-unconfirmed-stock-in="true">刷新 / 立即处理</button>
+        <button type="button" class="ghost-button mini-button" data-mobile-pricing-load-unconfirmed-stock-in="true">${escapeHtml(pdaCopy.confirmStockIn)}</button>
       </div>
       ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
       ${error ? `<div class="mobile-error">${escapeHtml(error)}</div>` : ""}
@@ -37672,24 +38070,24 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
                 <div>
                   <strong>STORE_ITEM ${escapeHtml(machineCode || "-")}</strong>
                   <span>${escapeHtml(item.category_name || item.category_short || "-")} · KES ${escapeHtml(item.price_kes || item.sale_price_kes || 0)}</span>
-                  <span>建议货架 / 后仓：${escapeHtml(item.suggested_location_name || selectedLocationCode || "-")}</span>
+                  <span>${escapeHtml(pdaCopy.selectLocation)}：${escapeHtml(item.suggested_location_name || selectedLocationCode || "-")}</span>
                 </div>
                 <label class="mobile-field">
-                  <span>货架位 / 后仓</span>
+                  <span>${escapeHtml(pdaCopy.selectLocation)}</span>
                   <select data-mobile-unconfirmed-stock-in-location="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>
                     ${locations.map((location) => `
                       <option value="${escapeHtml(location.location_code)}" ${location.location_code === selectedLocationCode ? "selected" : ""}>
-                        ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                        ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_type === "BACKROOM" ? pdaCopy.backroom : pdaCopy.shelf)}
                       </option>
                     `).join("")}
                   </select>
                 </label>
-                <button type="button" class="primary-button mobile-wide-action" data-mobile-unconfirmed-stock-in-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                <button type="button" class="primary-button mobile-wide-action" data-mobile-unconfirmed-stock-in-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>${escapeHtml(pdaCopy.confirmStockIn)}</button>
               </article>
             `;
           }).join("")}
         </div>
-      ` : '<div class="empty-state">当前没有未完成入库的 STORE_ITEM。</div>'}
+      ` : `<div class="empty-state">${escapeHtml(pdaCopy.stockInCompleted)}</div>`}
     </section>
   `;
 }
@@ -37702,7 +38100,7 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
     throw new Error("缺少 STORE_ITEM 码。");
   }
   if (!selectedLocation) {
-    throw new Error("请选择货架位或后仓。");
+    throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.selectLocationFirst));
   }
   const storeCode = getStoreMobileStoreCode(state);
   const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(normalizedMachineCode)}/confirm-stock-in`, {
@@ -37714,8 +38112,10 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
   });
   const status = String(result.status || "confirmed").trim();
   state.storeMobileUnconfirmedStockInMessage = status === "already_confirmed"
-    ? "已确认入库。"
-    : "已入库。";
+    ? `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`
+    : status === "location_updated"
+      ? "已换货架。"
+      : `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`;
   state.storeMobileUnconfirmedStockInError = "";
   await loadStoreMobileUnconfirmedStockInItems(state);
   return result;
@@ -37838,6 +38238,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
 }
 
 function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const group = getStoreMobilePricingActiveGroup(state);
   const generatedItems = getStoreMobileGeneratedStoreItems(group);
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
@@ -37866,6 +38267,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const previewPrintMessage = String(group.preview_print_message || "").trim();
   const previewPrintError = String(group.preview_print_error || "").trim();
   const shouldShowStockInConfirmation = previewPrintStatus === "sent_to_printer";
+  const labelTemplateLabel = currentLanguage === "en" ? "Label Size" : "标签尺寸";
   const summaryHtml = `
     <div class="mobile-print-summary">
       <span><b>档位</b><strong>${escapeHtml(group.tier || "-")}</strong></span>
@@ -37873,7 +38275,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       <span><b>计划数量</b><strong>${escapeHtml(group.quantity || 0)} 件</strong></span>
       <span><b>已生成数量</b><strong>${escapeHtml(generatedItems.length)} 件</strong></span>
       <span><b>待打印数量</b><strong>${escapeHtml(getStoreMobilePendingPrintCount(generatedItems))}</strong></span>
-      <span><b>label_template_size</b><strong>${escapeHtml(labelConfig.label_template_size)}</strong></span>
+      <span><b>${escapeHtml(labelTemplateLabel)}</b><strong>${escapeHtml(labelConfig.display_label)}</strong></span>
     </div>
   `;
   const labelSizeHtml = `
@@ -37900,9 +38302,9 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
       <div class="subtle small">本批共 ${escapeHtml(previewPayload.labels.length)} 张标签</div>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${payload.labels.length ? "" : "disabled"}>打印本批标签</button>
-      ${printerReady ? "" : '<div class="subtle small">请先连接并确认打印机在线，K300 请先确认蓝牙 SPP 可用。</div>'}
-      ${previewPrintStatus ? `<div class="subtle small">预览打印状态：${escapeHtml(previewPrintStatus)}</div>` : ""}
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${payload.labels.length ? "" : "disabled"}>${escapeHtml(pdaCopy.printLabel)}</button>
+      ${printerReady ? "" : `<div class="subtle small">${escapeHtml(pdaCopy.printerNotConnected)}</div>`}
+      ${previewPrintStatus ? `<div class="subtle small">${escapeHtml(getStoreMobileStatusText(previewPrintStatus))}</div>` : ""}
       ${previewPrintMessage ? `<div class="success-banner">${escapeHtml(previewPrintMessage)}</div>` : ""}
       ${previewPrintError ? `<div class="mobile-error">${escapeHtml(previewPrintError)}</div>` : ""}
       ${shouldShowStockInConfirmation ? renderStoreMobileStockInConfirmationPanel(state, group) : ""}
@@ -37952,6 +38354,7 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const backendTasks = getStoreMobileAssignedBackendTasks(state);
   const sdp = state.selectedSdp || {};
   const assignedEmployee = String(sdp.assigned_clerk || sdp.assigned_employee || getCurrentUsername() || "Austin").trim();
@@ -37968,7 +38371,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
     <section class="mobile-task-list mobile-daily-workbench">
       <div class="mobile-daily-hero">
         <div>
-          <span class="eyebrow">我的今日工作</span>
+          <span class="eyebrow">${escapeHtml(pdaCopy.myWorkToday)}</span>
           <h3>我的任务</h3>
           <p>${escapeHtml(assignedEmployee)} / ${escapeHtml(storeName)} 店员</p>
         </div>
@@ -37977,7 +38380,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
       <div class="mobile-daily-metrics">
         <span><b>今日待办</b><strong>${escapeHtml(todoCount)}</strong></span>
         <span><b>进行中</b><strong>${escapeHtml(inProgressCount)}</strong></span>
-        <span><b>待完成入库</b><strong>${escapeHtml(unconfirmedCount)}</strong></span>
+        <span><b>${escapeHtml(pdaCopy.pendingStockIn)}</b><strong>${escapeHtml(unconfirmedCount)}</strong></span>
         <span><b>已完成</b><strong>${escapeHtml(completedCount)}</strong></span>
       </div>
       <section class="mobile-urgent-list">
@@ -37985,13 +38388,13 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
         <article class="mobile-task-card mobile-task-card-warning">
           <div class="mobile-task-card-head">
             <div>
-              <span>STOCK_IN_PENDING · 待完成入库</span>
-              <strong>待完成入库 ${escapeHtml(unconfirmedCount)} 件</strong>
+              <span>${escapeHtml(pdaCopy.pendingStockIn)}</span>
+              <strong>${escapeHtml(pdaCopy.pendingStockIn)} ${escapeHtml(unconfirmedCount)} 件</strong>
               <small>已打印但还没有确认货架，库存暂未计入。</small>
             </div>
             ${renderStoreMobilePricingBadge(unconfirmedCount ? "待处理" : "已清空")}
           </div>
-          <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="my">立即处理</button>
+          <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="my">${escapeHtml(pdaCopy.confirmStockIn)}</button>
         </article>
         <article class="mobile-task-card mobile-task-card-muted">
           <div class="mobile-task-card-head">
@@ -38045,8 +38448,8 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
       <section class="mobile-quick-actions">
         <div class="mobile-section-head"><strong>快捷入口</strong></div>
         <div class="mobile-quick-action-grid">
-          <button type="button" class="primary-button" data-mobile-pricing-page="verify">扫 SDP</button>
-          <button type="button" class="ghost-button" data-mobile-pricing-page="my">未完成入库</button>
+          <button type="button" class="primary-button" data-mobile-pricing-page="verify">${escapeHtml(pdaCopy.scanPackage)}</button>
+          <button type="button" class="ghost-button" data-mobile-pricing-page="my">${escapeHtml(pdaCopy.pendingStockIn)}</button>
           <button type="button" class="ghost-button" disabled>补货</button>
           <button type="button" class="ghost-button" data-mobile-pricing-page="printer_connection">打印机</button>
         </div>
@@ -38060,7 +38463,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
       || "",
     ).trim().toUpperCase();
     return renderDailyWorkbenchShell(`
-        <div class="subtle small">SDP 分拣只是今日任务之一；后台 assigned SDP 任务按最新 assigned_at 优先。</div>
+        <div class="subtle small">Package tasks are sorted by latest assignment time.</div>
         ${backendTasks.map((task) => {
           const displayCode = getStoreMobileAssignedTaskCode(task);
           const machineCode = getStoreMobileAssignedTaskMachineCode(task);
@@ -38068,8 +38471,6 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
           const storeCode = String(task.store_code || task.store_name || state.selectedSdp?.store_name || "-").trim().toUpperCase();
           const contentSummary = String(task.content_summary || task.category || task.category_name || "未填品类").trim();
           const itemCount = task.item_count === null || task.item_count === undefined || task.item_count === "" ? "-" : `${task.item_count} 件`;
-          const sourceType = String(task.source_type || "-").trim().toUpperCase();
-          const sourceCode = String(task.source_code || task.bale_no || "-").trim().toUpperCase();
           const assignedAt = String(task.assigned_at || "-").trim();
           const status = String(task.status || "assigned").trim();
           const receivedStatus = String(task.received_status || "-").trim();
@@ -38079,16 +38480,15 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
             <article class="mobile-task-card ${isSelected ? "is-active" : ""}">
               <div class="mobile-task-card-head">
                 <div>
-                  <span>SDP_SORTING · SDP 分拣 / 打标签任务</span>
+                  <span>${escapeHtml(pdaCopy.storeDeliveryPackage)} · ${escapeHtml(pdaCopy.printLabel)}</span>
                   <strong>${escapeHtml(displayCode || machineCode || "-")}</strong>
-                  <small>${escapeHtml(`${contentSummary} · ${itemCount} · ${storeCode} · 来源 ${parentSdoDisplayCode}`)}</small>
+                  <small>${escapeHtml(`${contentSummary} · ${itemCount} · ${storeCode} · SDO ${parentSdoDisplayCode}`)}</small>
                 </div>
                 ${renderStoreMobilePricingBadge(status)}
               </div>
               <div class="mobile-task-facts">
-                <span><b>商品包码</b>${escapeHtml(machineCode || "-")}</span>
-                <span><b>来源 SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
-                <span><b>来源</b>${escapeHtml(`${sourceType} ${sourceCode}`.trim())}</span>
+                <span><b>Package Code</b>${escapeHtml(machineCode || "-")}</span>
+                <span><b>SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
                 <span><b>分配时间</b>${escapeHtml(assignedAt)}</span>
                 <span><b>收货状态</b>${escapeHtml(receivedStatus || "-")}</span>
                 <span><b>任务状态</b>${escapeHtml(assignmentStatus || status || "-")}</span>
@@ -38105,8 +38505,8 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
           <div class="mobile-task-card-head">
             <div>
               <span>正在读取后台任务</span>
-              <strong>Assigned SDP loading</strong>
-              <small>等待 /store-delivery-packages/assigned 返回。</small>
+              <strong>Loading Packages</strong>
+              <small>请稍候。</small>
             </div>
             ${renderStoreMobilePricingBadge("读取中")}
           </div>
@@ -38119,21 +38519,21 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
   const sdoCode = String(sdp.sdo_code || "SDO260504008");
   const completed = taskStatus === "已完成";
   return renderDailyWorkbenchShell(`
-      <div class="subtle small">暂无新分拣任务时，可以处理未完成入库，或等待店长分配任务。我的 SDP 任务会显示为 SDP 分拣 / 打标签任务。</div>
+      <div class="subtle small">暂无新包裹任务时，可以处理待完成入库，或等待店长分配任务。</div>
       <article class="mobile-task-card ${completed ? "is-complete" : ""}">
         <div class="mobile-task-card-head">
           <div>
-            <span>SDP_SORTING · SDP 分拣 / 打标签任务 · 演示任务 / Demo only</span>
+            <span>${escapeHtml(pdaCopy.storeDeliveryPackage)} · ${escapeHtml(pdaCopy.printLabel)} · 演示任务 / Demo only</span>
             <strong>${escapeHtml(displayCode)}</strong>
-            <small>${escapeHtml(`${categoryLine} · ${storeName} · 来源 ${sdoCode}`)}</small>
+            <small>${escapeHtml(`${categoryLine} · ${storeName} · SDO ${sdoCode}`)}</small>
           </div>
           ${renderStoreMobilePricingBadge(taskStatus)}
         </div>
         <div class="mobile-task-facts">
-          <span><b>来源包</b>${escapeHtml(sdp.source_code || "SDB-TO202605-002")}</span>
+          <span><b>Package</b>${escapeHtml(displayCode)}</span>
           <span><b>店员</b>${escapeHtml(sdp.assigned_clerk || "Austin")}</span>
           <span><b>价格组</b>${escapeHtml(`${totals.completeGroups}/${totals.groupCount}`)}</span>
-          <span><b>已贴标</b>${escapeHtml(totals.stickered)}</span>
+          <span><b>${escapeHtml(pdaCopy.labelPrinted)}</b>${escapeHtml(totals.stickered)}</span>
         </div>
         ${
           completed
@@ -38145,21 +38545,22 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileScanStep(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
   return `
     <form class="mobile-scan-step" data-mobile-pricing-scan-form="true">
       <div class="mobile-section-head">
-        <strong>扫描实体包</strong>
+        <strong>${escapeHtml(pdaCopy.scanPackage)}</strong>
         ${renderStoreMobilePricingBadge(state.scanSuccess || "待核对")}
       </div>
-      <p class="subtle small">请扫描 SDP 实体包条码</p>
+      <p class="subtle small">Scan the assigned Package label.</p>
       <label class="mobile-scan-input">
         <span>${escapeHtml(sdp.display_code || "SDP261250002")} / ${escapeHtml(sdp.machine_code || "6261250002")}</span>
         <input id="storeMobileSdpScanInput" name="sdp_scan" data-scan-input="true" data-store-mobile-sdp-scan-input="true" autocomplete="off" value="${escapeHtml(state.scanDraft || "")}" />
       </label>
       ${state.scanError ? `<div class="alert-banner">${escapeHtml(state.scanError)}</div>` : ""}
       ${state.scanSuccess ? `<div class="mobile-scan-success">${escapeHtml(state.scanSuccess)}</div>` : ""}
-      <button type="submit" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-scan="true">手动确认 / 核对</button>
+      <button type="submit" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-scan="true">${escapeHtml(pdaCopy.scanPackage)}</button>
     </form>
   `;
 }
@@ -38587,6 +38988,7 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
 }
 
 function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
   return `
     <section class="mobile-my-tab">
@@ -38599,7 +39001,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
       </div>
       ${renderDirectLoopVersionInfoBlock("clerk_my")}
       ${renderClerkPrinterConnectionEntryCard(state)}
-      <div class="mobile-section-head"><strong>未完成入库</strong></div>
+      <div class="mobile-section-head"><strong>${escapeHtml(pdaCopy.pendingStockIn)}</strong></div>
       ${renderStoreMobileUnconfirmedStockInList(state)}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-reset-task="true">重置演示任务状态</button>
       <button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button>
@@ -38608,6 +39010,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const page = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
   if (page === "tasks") {
     return renderStoreMobileTaskList(state);
@@ -38627,7 +39030,7 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
   if (page === "detail") {
     return `
       <section class="mobile-task-list">
-        <h3>SDP 详情</h3>
+        <h3>${escapeHtml(pdaCopy.storeDeliveryPackage)}</h3>
         ${renderStoreMobileSdpCard(state)}
         <div class="mobile-progress-row"><span>店长收货</span><span>分配店员</span><span>现场标价</span></div>
         <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">进入分批定价</button>
@@ -38671,12 +39074,13 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
 }
 
 function getStoreMobilePageOptions() {
+  const pdaCopy = getClerkPdaCopy();
   return [
-    { key: "tasks", label: "我的今日工作" },
-    { key: "detail", label: "SDP 详情" },
+    { key: "tasks", label: pdaCopy.myWorkToday },
+    { key: "detail", label: pdaCopy.storeDeliveryPackage },
     { key: "pricing_split", label: "分批定价" },
     { key: "group_generated", label: "本批 STORE_ITEM 生成结果" },
-    { key: "label_preview", label: "本批标签预览" },
+    { key: "label_preview", label: pdaCopy.printLabel },
     { key: "print_queue", label: "print payload 预览" },
     { key: "printer_connection", label: "打印机连接" },
   ];
@@ -38785,10 +39189,10 @@ function renderStoreMobilePricingPreview() {
           </div>
         </div>
         <div class="mobile-preview-control-block">
-          <strong>当前 mock SDP</strong>
+          <strong>当前 mock Package</strong>
           <div class="mobile-preview-sdp-mini">
             <b>${escapeHtml(state.selectedSdp?.display_code || state.selectedSdp?.sdp_code || "-")}</b>
-            <small>${escapeHtml(state.selectedSdp?.machine_code ? `machine_code: ${state.selectedSdp.machine_code}` : "")}</small>
+            <small>${escapeHtml(state.selectedSdp?.machine_code ? `Scanned Code: ${state.selectedSdp.machine_code}` : "")}</small>
             <span>${escapeHtml(state.selectedSdp?.store_name || "-")}</span>
             <span>${escapeHtml(`${state.selectedSdp?.category || "-"} · ${state.selectedSdp?.total_count || 0} 件`)}</span>
           </div>
@@ -38966,7 +39370,7 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
     return group;
   }
   if (!canRunClerkBluetoothPrinterPreviewPrint(currentPrinterStatus)) {
-    throw new Error("请先连接并确认打印机在线。");
+    throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printerNotConnected));
   }
   if (!bridge || typeof bridge.printStoreItemLabelPreview !== "function") {
     throw new Error("当前 Android 版本不支持 STORE_ITEM 预览打印，请升级 Direct Loop PDA Android App。");
@@ -38981,14 +39385,14 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
       keepError: true,
     });
     if (printStatus.last_print_result !== "success") {
-      throw new Error(printStatus.last_error || "STORE_ITEM 标签打印失败。");
+      throw new Error(printStatus.last_error || `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printFailed)}。`);
     }
   });
   if (!actionStarted) {
     throw new Error("打印机正在执行上一条操作，请稍后再试。");
   }
   group.preview_print_status = "sent_to_printer";
-  group.preview_print_message = "已发送 1 张 STORE_ITEM 预览标签到打印机。";
+  group.preview_print_message = `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.labelPrinted)}。`;
   group.preview_print_error = "";
   previewItems.forEach((item) => {
     item.preview_print_status = "sent_to_printer";
@@ -39022,7 +39426,7 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
       || "",
   ).trim().toUpperCase();
   if (!selectedLocation) {
-    throw new Error("请选择货架位或后仓。");
+    throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.selectLocationFirst));
   }
   const storeCode = getStoreMobileStoreCode(state);
   machineCode = normalizedItem.machine_code;
@@ -39044,9 +39448,11 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
   rawItem.stock_in_status = status;
   rawItem.stock_in_error = "";
   if (status === "already_confirmed") {
-    rawItem.stock_in_message = "已确认入库。";
+    rawItem.stock_in_message = `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`;
+  } else if (status === "location_updated") {
+    rawItem.stock_in_message = "已换货架。";
   } else {
-    rawItem.stock_in_message = "已入库。";
+    rawItem.stock_in_message = `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`;
   }
   return result;
 }
@@ -39226,7 +39632,7 @@ function handleStoreMobilePricingPreviewAction(button) {
           throw new Error("该型号测试打印暂未配置");
         }
         if (!canRunClerkBluetoothPrinterTestPrint(currentStatus)) {
-          throw new Error("请先连接并确认打印机在线。");
+          throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printerNotConnected));
         }
         await bridge.printTestLabel("CHITENG_S1_OFFICIAL");
       }

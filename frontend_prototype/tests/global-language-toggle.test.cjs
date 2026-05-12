@@ -43,11 +43,11 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("global language toggle is available outside the POS terminal", () => {
-  assert.match(indexHtml, /data-global-language="zh"/);
-  assert.match(indexHtml, /data-global-language="en"/);
-  assert.match(indexHtml, /id="authLanguageToggle"/);
-  assert.match(indexHtml, /id="workspaceLanguageToggle"/);
+test("global language toggle is not exposed in the main auth or workspace shell", () => {
+  assert.doesNotMatch(indexHtml, /id="authLanguageToggle"/);
+  assert.doesNotMatch(indexHtml, /id="workspaceLanguageToggle"/);
+  assert.doesNotMatch(indexHtml, /data-global-language="zh"/);
+  assert.doesNotMatch(indexHtml, /data-global-language="en"/);
 });
 
 test("pre-QA terminology uses the approved bilingual glossary", () => {

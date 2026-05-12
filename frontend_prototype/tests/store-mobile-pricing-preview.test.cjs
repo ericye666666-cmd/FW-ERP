@@ -8,6 +8,9 @@ const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const appLegacyJs = fs.readFileSync(path.join(__dirname, "..", "app.legacy.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+const terminologyTs = fs.readFileSync(path.join(__dirname, "..", "..", "src", "i18n", "terminology.ts"), "utf8");
+const enKEDictionaryTs = fs.readFileSync(path.join(__dirname, "..", "..", "src", "i18n", "dictionaries", "en-KE.ts"), "utf8");
+const zhCNDictionaryTs = fs.readFileSync(path.join(__dirname, "..", "..", "src", "i18n", "dictionaries", "zh-CN.ts"), "utf8");
 
 function extractFunctionSource(source, functionName) {
   const start = source.indexOf(`function ${functionName}`);
@@ -37,6 +40,10 @@ function getExecutableFunction(functionName, dependencies = "") {
 function getExecutableBundle(functionNames = [], dependencies = "", exportExpression = "") {
   const sources = functionNames.map((functionName) => extractFunctionSource(appJs, functionName)).join("\n");
   return vm.runInNewContext(`${dependencies}\n${sources}\n${exportExpression};`);
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 test("admin store page exposes an Android PDA batch pricing preview frame", () => {
@@ -247,7 +254,8 @@ test("mock data uses Utawala SDP display codes with matching price group quantit
   assert.match(sdpCardSource, /sdp\.display_code/);
   assert.match(sdpCardSource, /sdp\.machine_code/);
   assert.match(sdpCardSource, /sdp\.sdo_code/);
-  assert.match(sdpCardSource, /sdp\.source_code/);
+  assert.match(sdpCardSource, /pdaCopy\.storeDeliveryPackage/);
+  assert.doesNotMatch(sdpCardSource, /sdp\.source_code/);
 });
 
 test("SDP header is compact and uses the requested top statistics", () => {
@@ -261,7 +269,7 @@ test("SDP header is compact and uses the requested top statistics", () => {
   assert.match(sdpCardSource, /sdp\.total_count/);
   assert.match(sdpCardSource, /总数/);
   assert.match(sdpCardSource, /已生成/);
-  assert.match(sdpCardSource, /已贴标/);
+  assert.match(sdpCardSource, /pdaCopy\.labelPrinted/);
   assert.match(sdpCardSource, /价格组/);
   assert.doesNotMatch(sdpCardSource, /未分组/);
   assert.match(stylesCss, /\.mobile-sdp-card\.compact/);
@@ -285,12 +293,13 @@ test("PDA pricing preview keeps #195 page components but runtime bottom nav only
   const bottomTabsSource = extractFunctionSource(appJs, "renderStoreMobileBottomTabs");
   const frameSource = extractFunctionSource(appJs, "renderStoreMobileDeviceFrame");
 
-  assert.match(pageOptionsSource, /我的今日工作|我的任务/);
-  assert.match(pageOptionsSource, /SDP 详情/);
+  assert.match(pageOptionsSource, /getClerkPdaCopy/);
+  assert.match(pageOptionsSource, /pdaCopy\.myWorkToday/);
+  assert.match(pageOptionsSource, /pdaCopy\.storeDeliveryPackage/);
   assert.match(pageOptionsSource, /分批定价/);
   assert.doesNotMatch(pageOptionsSource, /当前 source line|价格组列表/);
   assert.match(pageOptionsSource, /本批 STORE_ITEM 生成结果/);
-  assert.match(pageOptionsSource, /本批标签预览/);
+  assert.match(pageOptionsSource, /pdaCopy\.printLabel/);
   assert.match(pageOptionsSource, /print payload 预览/);
   assert.match(bottomTabsSource, /const bottomTabs = \["任务", "我的"\]/);
   assert.doesNotMatch(bottomTabsSource, /扫描/);
@@ -306,36 +315,107 @@ test("clerk PDA task home is a daily workbench, not an SDP-only homepage", () =>
   const pageOptionsSource = extractFunctionSource(appJs, "getStoreMobilePageOptions");
   const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
 
-  assert.match(taskListSource, /我的今日工作|我的任务/);
+  assert.match(taskListSource, /getClerkPdaCopy/);
+  assert.match(taskListSource, /pdaCopy\.myWorkToday/);
   assert.doesNotMatch(taskListSource, /SDP 分拣首页/);
   assert.match(taskListSource, /当前店员|Austin/);
   assert.match(taskListSource, /当前门店|UTAWALA/);
   assert.match(taskListSource, /今日待办/);
   assert.match(taskListSource, /进行中/);
-  assert.match(taskListSource, /待完成入库/);
+  assert.match(taskListSource, /pdaCopy\.pendingStockIn/);
   assert.match(taskListSource, /已完成/);
   assert.match(taskListSource, /紧急待办/);
   assert.match(taskListSource, /已打印但还没有确认货架，库存暂未计入。/);
-  assert.match(taskListSource, /立即处理/);
+  assert.match(taskListSource, /pdaCopy\.confirmStockIn/);
   assert.match(taskListSource, /我的任务/);
-  assert.match(taskListSource, /SDP 分拣 \/ 打标签任务|SDP 分拣/);
+  assert.match(taskListSource, /pdaCopy\.storeDeliveryPackage/);
+  assert.match(taskListSource, /pdaCopy\.printLabel/);
   assert.match(taskListSource, /补货任务/);
   assert.match(taskListSource, /清洁任务/);
   assert.match(taskListSource, /日报填写/);
   assert.match(taskListSource, /快捷入口/);
-  assert.match(taskListSource, /扫 SDP/);
-  assert.match(taskListSource, /未完成入库/);
+  assert.match(taskListSource, /pdaCopy\.scanPackage/);
+  assert.match(taskListSource, /pdaCopy\.pendingStockIn/);
   assert.match(taskListSource, /补货/);
   assert.match(taskListSource, /打印机/);
   assert.match(taskListSource, /mobile-task-card/);
   assert.doesNotMatch(taskListSource, /<table|form-grid|stock_in_confirmed|legacy|entity_type/);
-  assert.match(pageOptionsSource, /我的今日工作|我的任务/);
-  assert.match(mySource, /未完成入库/);
+  assert.match(pageOptionsSource, /pdaCopy\.myWorkToday/);
+  assert.match(mySource, /pdaCopy\.pendingStockIn/);
   assert.match(appLegacyJs, /我的今日工作/);
   assert.match(appLegacyJs, /补货任务/);
   assert.match(appLegacyJs, /清洁任务/);
   assert.match(appLegacyJs, /日报填写/);
-  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_STORE|CASHIER_TERMINAL_PREVIEW_ITEMS|CASHIER_TERMINAL_REJECT_MESSAGES/);
+});
+
+test("Clerk PDA high-frequency copy is backed by stable dictionary keys", () => {
+  const requiredKeys = {
+    myWorkToday: "pda.work.today",
+    scanPackage: "pda.package.scan",
+    printLabel: "pda.label.print",
+    labelPrinted: "pda.label.printed",
+    printFailed: "pda.label.printFailed",
+    selectLocation: "pda.location.select",
+    shelf: "inventory.location.shelf",
+    backroom: "inventory.location.backroom",
+    confirmStockIn: "inventory.stockIn.confirm",
+    pendingStockIn: "inventory.stockIn.pending",
+    stockInCompleted: "inventory.stockIn.completed",
+    printerNotConnected: "pda.printer.notConnected",
+    selectLocationFirst: "pda.location.selectFirst",
+  };
+
+  assert.match(appJs, /CLERK_PDA_TERMINOLOGY_KEYS/);
+  assert.match(appJs, /function clerkPdaTerm/);
+
+  Object.entries(requiredKeys).forEach(([name, key]) => {
+    assert.match(terminologyTs, new RegExp(escapeRegex(key)));
+    assert.match(enKEDictionaryTs, new RegExp(escapeRegex(key)));
+    assert.match(zhCNDictionaryTs, new RegExp(escapeRegex(key)));
+    assert.match(appJs, new RegExp(`${name}:\\s*"${escapeRegex(key)}"`));
+  });
+
+  [
+    "renderStoreMobileTaskList",
+    "renderStoreMobileScanStep",
+    "renderPriceGroupPrintPanel",
+    "renderStoreMobileStockInConfirmationPanel",
+    "renderStoreMobileUnconfirmedStockInList",
+    "getStoreMobileStockInStatusLabel",
+  ].forEach((functionName) => {
+    assert.match(extractFunctionSource(appJs, functionName), /getClerkPdaCopy|clerkPdaTerm|CLERK_PDA_TERMINOLOGY_KEYS/);
+  });
+
+  assert.match(appLegacyJs, /CLERK_PDA_TERMINOLOGY_KEYS/);
+  assert.match(appLegacyJs, /Select shelf or backroom first\./);
+});
+
+test("Clerk PDA visible package and stock-in copy hides backend field names", () => {
+  const visibleSources = [
+    extractFunctionSource(appJs, "renderStoreMobileTaskList"),
+    extractFunctionSource(appJs, "renderStoreMobileSdpCard"),
+    extractFunctionSource(appJs, "renderStoreMobileScanStep"),
+    extractFunctionSource(appJs, "renderStoreMobileGeneratedStoreItemList"),
+    extractFunctionSource(appJs, "renderPriceGroupPrintPanel"),
+    extractFunctionSource(appJs, "renderStoreMobileStockInConfirmationPanel"),
+    extractFunctionSource(appJs, "renderStoreMobileUnconfirmedStockInList"),
+  ].join("\n");
+
+  assert.match(appJs, /Scan Package/);
+  assert.match(appJs, /Print Label/);
+  assert.match(appJs, /Select Location/);
+  assert.match(appJs, /Confirm Stock-in/);
+  assert.match(appJs, /Select shelf or backroom first\./);
+  [
+    "stock_in_confirmed",
+    "layout_json",
+    "entity_type",
+    "STORE_PREP_BALE",
+    "SDB / SDP",
+  ].forEach((backendWord) => {
+    assert.doesNotMatch(visibleSources, new RegExp(escapeRegex(backendWord)));
+  });
+  assert.doesNotMatch(visibleSources, /<span>machine_code<\/span>|machine_code \${|machine_code:/);
 });
 
 test("clerk PDA task runtime polls assigned SDP endpoint every 3000ms without resetting workflow state", () => {
@@ -1390,7 +1470,8 @@ test("task tab renders backend assigned SDP cards before demo fallback", () => {
   const taskListSource = extractFunctionSource(appJs, "renderStoreMobileTaskList");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(taskListSource, /我的 SDP 任务/);
+  assert.match(taskListSource, /pdaCopy\.storeDeliveryPackage/);
+  assert.match(taskListSource, /pdaCopy\.printLabel/);
   assert.match(taskListSource, /getStoreMobileAssignedBackendTasks/);
   assert.match(taskListSource, /backendTasks\.length/);
   assert.match(taskListSource, /selectedSdp\?\.backend_task/);
@@ -1398,8 +1479,8 @@ test("task tab renders backend assigned SDP cards before demo fallback", () => {
   assert.match(taskListSource, /assigned_at/);
   assert.match(taskListSource, /parent_sdo_display_code|sdo_code/);
   assert.match(taskListSource, /content_summary|category/);
-  assert.match(taskListSource, /source_type/);
-  assert.match(taskListSource, /source_code/);
+  assert.doesNotMatch(taskListSource, /source_type/);
+  assert.doesNotMatch(taskListSource, /source_code/);
   assert.match(taskListSource, /received_status/);
   assert.match(taskListSource, /assignment_status/);
   assert.match(taskListSource, /演示任务 \/ Demo only/);
@@ -1990,6 +2071,13 @@ test("generated STORE_ITEM list shows only clerk-facing item fields", () => {
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
     }
+    const currentLanguage = "en";
+    function getClerkPdaCopy() {
+      return { printLabel: "Print Label" };
+    }
+    function getStoreMobileStatusText(status = "") {
+      return status === "pending_print" ? "Print Label" : String(status || "").trim();
+    }
     ${extractFunctionSource(appJs, "normalizeStoreItemForLabelPreview")}
     `,
   );
@@ -2011,16 +2099,15 @@ test("generated STORE_ITEM list shows only clerk-facing item fields", () => {
     }],
   });
 
-  assert.match(listSource, /machine_code/);
-  assert.match(listSource, /price_kes/);
-  assert.match(listSource, /category_short/);
-  assert.match(listSource, /print_status/);
-  assert.match(listSource, /sticker_status/);
+  assert.match(listSource, /Scanned Code/);
+  assert.match(listSource, /Price/);
+  assert.match(listSource, /Category/);
+  assert.match(listSource, /pdaCopy\.printLabel/);
   assert.match(html, /526129000123/);
   assert.match(html, /KES 450/);
   assert.match(html, /Cargo/);
-  assert.match(html, /pending_print/);
-  assert.match(html, /pending/);
+  assert.match(html, /Print Label/);
+  assert.doesNotMatch(html, /machine_code|price_kes|category_short|print_status|sticker_status|pending_print|pending/);
   assert.doesNotMatch(html, /SDO260504008|SDP261290019|SDB|LPK|TO202605-001|PB-1|UTAWALA|STOREITEM26129000123/);
 });
 
@@ -2207,13 +2294,14 @@ test("barcode verification accepts selected backend SDP display or machine code"
     },
   };
 
-  assert.match(scanScreenSource, /扫描实体包/);
-  assert.match(scanScreenSource, /请扫描 SDP 实体包条码/);
+  assert.match(scanScreenSource, /pdaCopy\.scanPackage/);
+  assert.match(scanScreenSource, /Scan the assigned Package label/);
   assert.match(scanScreenSource, /data-scan-input="true"/);
-  assert.match(scanScreenSource, /手动确认 \/ 核对/);
   assert.equal(verifyBarcode("SDP261290019", state).ok, true);
   assert.equal(verifyBarcode("6261290019", state).ok, true);
   assert.equal(verifyBarcode("SDP261250002", state).ok, false);
+  assert.equal(verifyBarcode("SDB261290019", state).ok, false);
+  assert.equal(verifyBarcode("STOREITEM261290019", state).ok, false);
   assert.doesNotMatch(verifierSource, /SDP261250002|6261250002/);
   assert.match(verifierSource, /sdp\.display_code/);
   assert.match(verifierSource, /sdp\.sdp_code/);
@@ -2221,7 +2309,7 @@ test("barcode verification accepts selected backend SDP display or machine code"
   assert.match(verifierSource, /SDO260504008|4260504008/);
   assert.match(verifierSource, /SDB|LPK/);
   assert.match(verifierSource, /STORE_ITEM/);
-  assert.match(verifierSource, /wrong SDP|不是当前 SDP 任务条码/);
+  assert.match(verifierSource, /Scan the assigned Package/);
   assert.match(submitSource, /state\.verified = true/);
   assert.match(submitSource, /state\.scanSuccess = "核对成功"/);
   assert.match(submitSource, /setStoreMobileActivePage\(state,\s*"pricing_split"/);
@@ -2262,10 +2350,10 @@ test("STORE_ITEM label preview supports 60x40 and 40x30 with batch print action"
   assert.match(payloadSource, /printer_profile:\s*"CHITENG_S1_OFFICIAL"/);
   assert.match(printPayloadSource, /print_mode:\s*"preview_one"/);
   assert.match(printPayloadSource, /slice\(0,\s*1\)/);
-  assert.match(printPanelSource, /打印本批标签/);
+  assert.match(printPanelSource, /pdaCopy\.printLabel/);
   assert.match(printPanelSource, /本批共/);
   assert.match(printPanelSource, /data-mobile-pricing-print-labels/);
-  assert.match(printPanelSource, /请先连接并确认打印机在线/);
+  assert.match(printPanelSource, /pdaCopy\.printerNotConnected/);
   assert.match(printPanelSource, /payload\.labels\.length\s*\?\s*""\s*:\s*"disabled"/);
   assert.doesNotMatch(printPanelSource, /printerReady\s*&&\s*payload\.labels\.length\s*\?\s*""\s*:\s*"disabled"/);
   assert.doesNotMatch(printPanelSource, /打印一张预览标签/);
@@ -2300,7 +2388,7 @@ test("K300 40x30 label preview batch print uses raw CPCL batch without printed s
   assert.match(printPanelSource, /renderStoreItemLabelPreview/);
   assert.match(printPanelSource, /JSON preview payload/);
   assert.doesNotMatch(printPanelSource, /if \(!job\)/);
-  assert.match(printPanelSource, /打印本批标签/);
+  assert.match(printPanelSource, /pdaCopy\.printLabel/);
   assert.match(actionSource, /printStoreMobileStoreItemLabelPreview/);
   assert.match(actionSource, /mobilePricingPrintLabels/);
   assert.match(appJs, /printStoreItemLabelPreview/);
@@ -2340,7 +2428,8 @@ test("shelf stock-in selector appears only after STORE_ITEM print success", () =
 
   assert.match(printPanelSource, /renderStoreMobileStockInConfirmationPanel/);
   assert.match(printPanelSource, /previewPrintStatus === "sent_to_printer"/);
-  assert.match(appJs, /确认完成入库/);
+  assert.match(appJs, /CLERK_PDA_TERMINOLOGY_KEYS/);
+  assert.match(appJs, /confirmStockIn:\s*"inventory\.stockIn\.confirm"/);
   assert.match(appJs, /data-mobile-pricing-confirm-stock-in/);
   assert.match(appJs, /data-mobile-stock-in-location/);
 });
@@ -2376,13 +2465,13 @@ test("confirm stock-in calls the 301 API per STORE_ITEM and treats idempotent st
   assert.match(confirmSource, /location_code/);
   assert.match(confirmSource, /confirmed_by/);
   assert.match(confirmSource, /already_confirmed/);
+  assert.match(confirmSource, /location_updated/);
   assert.match(confirmSource, /stock_in_status/);
-  assert.match(confirmSource, /已入库/);
-  assert.match(confirmSource, /已确认入库/);
-  assert.doesNotMatch(confirmSource, /location_updated|已换货架/);
-  assert.match(statusLabelSource, /confirmed[\s\S]*?已入库/);
-  assert.match(statusLabelSource, /already_confirmed[\s\S]*?已确认/);
-  assert.doesNotMatch(statusLabelSource, /location_updated|已换货架/);
+  assert.match(confirmSource, /CLERK_PDA_TERMINOLOGY_KEYS\.stockInCompleted/);
+  assert.match(confirmSource, /已换货架/);
+  assert.match(statusLabelSource, /confirmed[\s\S]*?stockInCompleted/);
+  assert.match(statusLabelSource, /already_confirmed[\s\S]*?stockInCompleted/);
+  assert.match(statusLabelSource, /location_updated[\s\S]*?已换货架/);
   assert.match(actionSource, /confirmStoreMobileStoreItemStockIn/);
   assert.match(appJs, /data-mobile-pricing-confirm-stock-in/);
 });
@@ -2404,7 +2493,7 @@ test("stock-in API failure keeps the PDA confirmation retryable per STORE_ITEM",
   assert.match(actionSource, /stock_in_status = "failed"/);
   assert.match(actionSource, /stock_in_error = formatErrorMessage\(error\)/);
   assert.match(panelSource, /data-mobile-pricing-confirm-stock-in/);
-  assert.match(panelSource, /确认完成入库/);
+  assert.match(panelSource, /pdaCopy\.confirmStockIn/);
   assert.doesNotMatch(actionSource, /disabled.*failed|failed.*disabled/);
 });
 
@@ -2415,12 +2504,12 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   const confirmSource = extractFunctionSource(appJs, "confirmStoreMobileUnconfirmedStockInItem");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
-  assert.match(mySource, /未完成入库/);
-  assert.match(listSource, /未完成入库：/);
-  assert.match(listSource, /立即处理/);
+  assert.match(mySource, /pdaCopy\.pendingStockIn/);
+  assert.match(listSource, /pdaCopy\.pendingStockIn/);
+  assert.match(listSource, /pdaCopy\.confirmStockIn/);
   assert.match(listSource, /mobile-stock-in-entry-card/);
   assert.match(listSource, /mobile-stock-in-card/);
-  assert.match(listSource, /建议货架 \/ 后仓/);
+  assert.match(listSource, /pdaCopy\.selectLocation/);
   assert.doesNotMatch(listSource, /stock_in_confirmed|legacy|未确认 \/ 历史未确认/);
   assert.match(listSource, /data-mobile-pricing-load-unconfirmed-stock-in/);
   assert.match(listSource, /STORE_ITEM/);
@@ -2436,15 +2525,13 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   assert.match(actionSource, /confirmStoreMobileUnconfirmedStockInItem/);
 });
 
-test("legacy PDA bundle contains shelf confirmation without cashier terminal preview changes", () => {
+test("legacy PDA bundle contains shelf confirmation and Clerk PDA dictionary copy", () => {
   assert.match(appLegacyJs, /renderStoreMobileStockInConfirmationPanel/);
   assert.match(appLegacyJs, /renderStoreMobileUnconfirmedStockInList/);
+  assert.match(appLegacyJs, /CLERK_PDA_TERMINOLOGY_KEYS/);
   assert.match(appLegacyJs, /data-mobile-pricing-confirm-stock-in/);
   assert.match(appLegacyJs, /data-mobile-unconfirmed-stock-in-confirm/);
   assert.match(appLegacyJs, /confirm-stock-in/);
-  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_STORE/);
-  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_PREVIEW_ITEMS/);
-  assert.doesNotMatch(appLegacyJs, /CASHIER_TERMINAL_REJECT_MESSAGES/);
 });
 
 test("K300 batch payload contains every generated STORE_ITEM label with locked template metadata", () => {
@@ -2773,7 +2860,8 @@ test("preview statuses are localized for clerk UI", () => {
 
   assert.match(statusSource, /queued:\s*"排队中"/);
   assert.match(statusSource, /printing:\s*"打印中"/);
-  assert.match(statusSource, /printed:\s*"已打印"/);
+  assert.match(statusSource, /printed:\s*clerkPdaTerm\(CLERK_PDA_TERMINOLOGY_KEYS\.labelPrinted\)/);
+  assert.match(statusSource, /pending_print:\s*clerkPdaTerm\(CLERK_PDA_TERMINOLOGY_KEYS\.printLabel\)/);
   assert.doesNotMatch(statusSource, /Pending Print|pending_putaway|resolver projection/);
 });
 

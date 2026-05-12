@@ -49,9 +49,11 @@ test("shelf editor page is a floor-plan canvas editor, not only a form table", (
   assert.match(section, /layout_width/);
   assert.match(section, /layout_height/);
   assert.match(section, /layout_json/);
-  assert.match(section, /placeholder="location_code/);
-  assert.match(section, /placeholder="category_name/);
-  assert.match(section, /placeholder="sort_order/);
+  assert.match(section, /aria-label="货架布局"/);
+  assert.match(section, /placeholder="例如 PT-CR/);
+  assert.match(section, /placeholder="例如 CARGO PANT/);
+  assert.match(section, /placeholder="例如 10/);
+  assert.doesNotMatch(section, /aria-label="layout_json"|placeholder="location_code|placeholder="location_name|placeholder="category_name|placeholder="sort_order/);
   assert.doesNotMatch(section, />[^<]*(location_code|location_name|location_type|category_name|active|sort_order)[^<]*</);
   assert.match(section, /<label>货架编号/);
   assert.match(section, /<label>绑定品类/);

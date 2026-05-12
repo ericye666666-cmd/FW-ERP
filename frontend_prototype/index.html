@@ -62,10 +62,6 @@
         <section class="auth-card">
           <div class="panel-head">
             <h2>登录系统</h2>
-            <div id="authLanguageToggle" class="global-language-toggle" role="group" aria-label="Language">
-              <button type="button" class="global-language-button is-active" data-global-language="zh">中文</button>
-              <button type="button" class="global-language-button" data-global-language="en">EN</button>
-            </div>
           </div>
           <div class="hero-card">
             <label for="apiBase">API 地址（先不要改）</label>
@@ -105,10 +101,6 @@
             <button class="workspace-tab" data-workspace-target="admin" type="button">系统管理</button>
           </div>
           <div class="workspace-session-strip">
-            <div id="workspaceLanguageToggle" class="global-language-toggle" role="group" aria-label="Language">
-              <button type="button" class="global-language-button is-active" data-global-language="zh">中文</button>
-              <button type="button" class="global-language-button" data-global-language="en">EN</button>
-            </div>
             <div id="sessionSummary" class="session-summary">未登录</div>
             <div id="appSessionMeta" class="session-meta-inline">登录后显示角色和默认门店</div>
             <button id="logoutButton" type="button" class="ghost-button mini-button" data-action="logout">退出登录</button>
@@ -3096,18 +3088,18 @@
           <button type="submit">刷新库存总览</button>
         </form>
         <div id="storeInventoryOverviewSummary" class="candidate-summary empty-state">
-          请选择门店查看 STORE_ITEM 库存总览：待完成入库 / 未关联货架 / 后仓 / 已上货架 / 门店总库存 / 今日新增入库 / 今日已售。
+          请选择门店查看门店商品码库存总览：待完成入库 / 未关联位置 / 后仓 / 货架 / 门店总库存 / 今日新增入库 / 已售。
         </div>
         <div class="candidate-summary">
-          <div class="flow-summary-note">STORE_ITEM 查询</div>
+          <div class="flow-summary-note">门店商品码查询</div>
           <form id="storeItemTraceLookupForm" class="form-grid compact">
             <label>
-              请输入 / 扫描 STORE_ITEM 码
-              <input name="machine_code" aria-label="请输入 / 扫描 STORE_ITEM 码" />
+              请输入 / 扫描门店商品码
+              <input name="machine_code" data-field-label="门店商品码" data-field-help="输入或扫描门店商品码，查看当前状态、货架、来源包和销售时间。" aria-label="请输入 / 扫描门店商品码" />
             </label>
             <button type="submit">查询</button>
           </form>
-          <div id="storeItemTraceLookupResult" class="empty-state">输入 STORE_ITEM machine_code 后查看当前状态、货架、来源和销售信息。</div>
+          <div id="storeItemTraceLookupResult" class="empty-state">输入门店商品码后查看当前状态、货架、来源包和销售时间。</div>
         </div>
         <div class="segmented-control" role="tablist" aria-label="库存总览视角">
           <button type="button" class="secondary-button" data-store-inventory-tab="category">按品类</button>
@@ -3175,19 +3167,20 @@
             </div>
             <form id="storeShelfLocationForm" class="store-shelf-detail-form hidden-screen">
               <input name="store_code" type="hidden" value="UTAWALA" />
-              <label>货架编号<input name="location_code" placeholder="location_code，例如 PT-CR" /></label>
-              <label>货架名称<input name="location_name" placeholder="location_name，例如 CARGO PANT 主货架" /></label>
-              <label>类型<input name="location_type" value="SHELF" readonly /></label>
-              <label>绑定品类<input name="category_name" placeholder="category_name，例如 CARGO PANT" /></label>
+              <label>货架编号<input name="location_code" placeholder="例如 PT-CR" /></label>
+              <label>货架名称<input name="location_name" placeholder="例如 CARGO PANT 主货架" /></label>
+              <input name="location_type" type="hidden" value="SHELF" />
+              <label>类型<input name="location_type_label" value="货架" readonly data-store-shelf-location-type-label /></label>
+              <label>绑定品类<input name="category_name" placeholder="例如 CARGO PANT" /></label>
               <label>状态<select name="active"><option value="true">启用</option><option value="false">停用</option></select></label>
-              <label>排序<input name="sort_order" type="number" min="0" step="1" value="0" placeholder="sort_order" /></label>
+              <label>排序<input name="sort_order" type="number" min="0" step="1" value="0" placeholder="例如 10" /></label>
               <div class="store-shelf-layout-grid">
                 <label>位置 x<input name="layout_x" type="number" step="1" value="80" /></label>
                 <label>位置 y<input name="layout_y" type="number" step="1" value="100" /></label>
                 <label>宽度<input name="layout_width" type="number" min="40" step="1" value="160" /></label>
                 <label>高度<input name="layout_height" type="number" min="32" step="1" value="56" /></label>
               </div>
-              <textarea name="layout_json" class="visually-hidden" aria-label="layout_json"></textarea>
+              <textarea name="layout_json" class="visually-hidden" aria-label="货架布局"></textarea>
               <div class="store-shelf-readonly-count">当前商品数量：<strong data-store-shelf-item-count>0</strong></div>
               <div class="button-row">
                 <button type="submit" class="primary-button">保存修改</button>

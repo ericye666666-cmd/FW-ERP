@@ -7,6 +7,9 @@ const vm = require("node:vm");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+const terminologyTs = fs.readFileSync(path.join(__dirname, "..", "..", "src", "i18n", "terminology.ts"), "utf8");
+const enKEDictionaryTs = fs.readFileSync(path.join(__dirname, "..", "..", "src", "i18n", "dictionaries", "en-KE.ts"), "utf8");
+const zhCNDictionaryTs = fs.readFileSync(path.join(__dirname, "..", "..", "src", "i18n", "dictionaries", "zh-CN.ts"), "utf8");
 
 function extractFunctionSource(source, functionName) {
   const start = source.indexOf(`function ${functionName}`);
@@ -107,6 +110,22 @@ function extractCssRuleContaining(selectorPattern, requiredPattern) {
   return found;
 }
 
+function extractElementById(source, id) {
+  const start = source.indexOf(`id="${id}"`);
+  assert.notEqual(start, -1, `missing element ${id}`);
+  const sectionStart = source.lastIndexOf("<section", start);
+  const divStart = source.lastIndexOf("<div", start);
+  const blockStart = Math.max(sectionStart, divStart);
+  const nextSection = source.indexOf("\n            <section", start);
+  const nextPanel = source.indexOf("\n          </main>", start);
+  const blockEnd = [nextSection, nextPanel].filter((index) => index > start).sort((left, right) => left - right)[0] || source.length;
+  return source.slice(blockStart, blockEnd);
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 test("POS scans use the typed resolver with POS context before cart insert", () => {
   assert.match(appJs, /posStoreItemSaleRecords/);
   const resolverSource = extractFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
@@ -121,6 +140,78 @@ test("POS scans use the typed resolver with POS context before cart insert", () 
   assert.doesNotMatch(terminalLookupSource, /submitLookup\(\{ preventDefault\(\) \{\}, currentTarget: form \}\)/);
 });
 
+test("POS cashier high-frequency copy is backed by stable dictionary keys", () => {
+  const requiredKeys = {
+    scanStoreItem: "pos.scan.storeItem",
+    addUnbarcodedItem: "pos.item.addUnbarcoded",
+    openShift: "pos.shift.open",
+    closeShift: "pos.shift.close",
+    holdOrder: "pos.order.hold",
+    resumeHeldOrder: "pos.order.resumeHeld",
+    reprintReceipt: "pos.receipt.reprint",
+    xReport: "pos.report.x",
+    zReport: "pos.report.z",
+    cashVariance: "pos.cash.variance",
+    itemAlreadySold: "pos.item.alreadySold",
+    storeItemOnlyRule: "pos.scan.storeItemOnly",
+    openShiftFirst: "pos.shift.openFirst",
+  };
+
+  assert.match(appJs, /POS_CASHIER_TERMINOLOGY_KEYS/);
+  assert.match(appJs, /function cashierTerminalTerm/);
+
+  Object.entries(requiredKeys).forEach(([name, key]) => {
+    assert.match(terminologyTs, new RegExp(escapeRegex(key)));
+    assert.match(enKEDictionaryTs, new RegExp(escapeRegex(key)));
+    assert.match(zhCNDictionaryTs, new RegExp(escapeRegex(key)));
+    assert.match(appJs, new RegExp(`${name}:\\s*"${escapeRegex(key)}"`));
+  });
+
+  const copySource = extractFunctionSource(appJs, "ensureCashierTerminalPreviewCopy");
+  [
+    "scanStoreItem",
+    "addUnbarcodedItem",
+    "openShift",
+    "closeShift",
+    "holdOrder",
+    "resumeHeldOrder",
+    "reprintReceipt",
+    "xReport",
+    "zReport",
+    "cashVariance",
+    "itemAlreadySold",
+    "storeItemOnlyRule",
+    "openShiftFirst",
+  ].forEach((keyName) => {
+    assert.match(copySource, new RegExp(`cashierTerminalTerm\\(POS_CASHIER_TERMINOLOGY_KEYS\\.${keyName}(?:,\\s*"(?:zh|en)")?\\)`));
+  });
+});
+
+test("POS cashier visible copy is employee-facing and keeps Store Item scan guidance short", () => {
+  const terminalHtml = extractElementById(indexHtml, "cashierTerminalShell");
+  const visibleSources = [
+    terminalHtml,
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalStatusBar"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalLookupPanel"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel"),
+    extractFunctionSource(appJs, "formatCashierTerminalScanError"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer"),
+  ].join("\n");
+
+  assert.match(appJs, /POS only scans Store Item\. Scan a product label\./);
+  assert.match(visibleSources, /storeItemOnlyRule|posStoreItemOnly/);
+  [
+    "entity_type",
+    "stock_in_confirmed",
+    "manual_legacy_item",
+    "sale_out",
+    "pending_print",
+    "pending_putaway",
+  ].forEach((backendWord) => {
+    assert.doesNotMatch(visibleSources, new RegExp(escapeRegex(backendWord)));
+  });
+});
+
 test("POS cashier terminal renders cashier touch layout without changing barcode scope", () => {
   assert.match(indexHtml, /class="[^"]*cashier-terminal-shell/);
   assert.match(indexHtml, /class="[^"]*cashier-terminal-touch-layout/);
@@ -128,7 +219,7 @@ test("POS cashier terminal renders cashier touch layout without changing barcode
   assert.match(indexHtml, /id="cashierTerminalCart"[\s\S]*class="[^"]*cashier-terminal-cart/);
   assert.match(indexHtml, /id="cashierTerminalPaymentPanel"[\s\S]*class="[^"]*cashier-terminal-payment-panel/);
   assert.match(indexHtml, /id="cashierTerminalQuickActions"[\s\S]*class="[^"]*cashier-terminal-transaction-strip/);
-  assert.match(appJs, /scanTitle:\s*"扫描商品"/);
+  assert.match(appJs, /scanTitle:\s*cashierTerminalTerm\(POS_CASHIER_TERMINOLOGY_KEYS\.scanStoreItem,\s*"zh"\)/);
   assert.match(appJs, /basketTitle:\s*"商品篮"/);
   assert.match(appJs, /paymentTitle:\s*"结账"/);
   assert.match(appJs, /completeTrade:\s*"完成销售"/);
@@ -169,15 +260,16 @@ test("POS cashier terminal moves store, shift, device, and sales status into top
   ].forEach((label) => assert.match(headerSource, new RegExp(label)));
   assert.match(headerSource, /getCashierTerminalStoreCode\(\)/);
   assert.match(headerSource, /getCashierTerminalCashierName\(\)/);
-  assert.match(headerSource, /getCashierTerminalShiftNo\(\) \|\| "请先开班"/);
+  assert.match(headerSource, /getCashierTerminalShiftNo\(\) \|\| copy\.openShiftFirst/);
   assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
   assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
   assert.match(headerSource, /cashierTerminalState\.todayOrderCount/);
   assert.match(headerSource, /cashierTerminalState\.shiftOrderCount/);
   assert.match(headerSource, /cashierTerminalState\.currentTime/);
-  assert.match(infoStripSource, /只支持 STORE_ITEM 商品销售/);
-  assert.match(infoStripSource, /扫描后自动加入购物车/);
-  assert.match(infoStripSource, /不支持 SDO \/ SDP \/ SDB \/ LPK \/ RAW_BALE/);
+  assert.match(infoStripSource, /copy\.posStoreItemOnly/);
+  assert.match(infoStripSource, /copy\.resumeHeldOrder/);
+  assert.match(infoStripSource, /copy\.closeShift/);
+  assert.match(infoStripSource, /copy\.openNow/);
 });
 
 test("POS cashier terminal removes blocking bottom floating status cards", () => {
@@ -456,7 +548,7 @@ test("POS shift flow blocks sale until open shift and sends shift_id", () => {
   const summarySource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftSummary");
 
   assert.match(submitSource, /if \(!cashierTerminalState\.currentShift\?\.shift_id\)/);
-  assert.match(submitSource, /请先开班后再收银。/);
+  assert.match(submitSource, /POS_CASHIER_TERMINOLOGY_KEYS\.openShiftFirst/);
   assert.match(submitSource, /await loadCashierTerminalShiftSummary\(sale\.shift_id \|\| payload\.shift_id\)/);
   assert.match(payloadSource, /shift_id:\s*cashierTerminalState\.currentShift\?\.shift_id \|\| cashierTerminalState\.shiftNo/);
   assert.match(openSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/open`/);
@@ -473,15 +565,15 @@ test("POS shift close uses real API, records variance, and clears closed shift",
 
   assert.match(drawerSource, /当前班次/);
   assert.match(drawerSource, /本班统计/);
-  assert.match(drawerSource, /开班/);
-  assert.match(drawerSource, /关闭班次/);
+  assert.match(drawerSource, /copy\.openNow/);
+  assert.match(drawerSource, /copy\.closeShift/);
   assert.match(drawerSource, /cashierTerminalState\.shiftSummary/);
   assert.match(updateFieldSource, /field === "countedCash"/);
   assert.match(updateFieldSource, /cashierTerminalState\.shiftSummary\?\.expected_cash/);
   assert.match(closeSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/\$\{encodeURIComponent\(shiftId\)\}\/close`/);
   assert.match(closeSource, /cashierTerminalState\.currentShift\s*=\s*null/);
   assert.match(closeSource, /cashierTerminalState\.shiftOpen\s*=\s*false/);
-  assert.match(closeSource, /请先开班/);
+  assert.match(closeSource, /POS_CASHIER_TERMINOLOGY_KEYS\.openShiftFirst/);
   assert.match(actionSource, /case "open-shift":/);
   assert.match(actionSource, /await openCashierTerminalShift\(\)/);
   assert.match(actionSource, /case "close-shift":/);
@@ -494,7 +586,7 @@ test("POS shift reports load real X/Z APIs and render printable read-only drawer
   const printReportSource = extractFunctionSource(appJs, "printCashierTerminalShiftReport");
   const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
 
-  assert.match(drawerSource, /查看 X-report/);
+  assert.match(drawerSource, /copy\.xReport/);
   assert.match(drawerSource, /结班后可查看 Z-report/);
   assert.match(drawerSource, /drawer === "shift-report"/);
   assert.match(drawerSource, /DIRECT LOOP POS/);
@@ -521,7 +613,7 @@ test("POS hold flow uses real hold APIs and blocks empty cart or missing shift",
   assert.match(createSource, /if \(!totals\.totalItems\)/);
   assert.match(createSource, /购物车为空，不能挂单/);
   assert.match(createSource, /if \(!cashierTerminalState\.currentShift\?\.shift_id\)/);
-  assert.match(createSource, /请先开班后再挂单/);
+  assert.match(createSource, /POS_CASHIER_TERMINOLOGY_KEYS\.openShiftFirst/);
   assert.match(createSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-holds`/);
   assert.match(createSource, /method:\s*"POST"/);
   assert.match(createSource, /cashierTerminalState\.cartItems\s*=\s*\[\]/);
@@ -567,8 +659,8 @@ test("POS cashier UX strongly guides no-shift state and returns focus after shif
   const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
 
   assert.match(paymentSource, /POS 暂不可收银/);
-  assert.match(paymentSource, /当前没有开班，请先开班后再收银/);
-  assert.match(paymentSource, /开班并开始收银/);
+  assert.match(paymentSource, /copy\.openShiftFirst/);
+  assert.match(paymentSource, /copy\.openNow/);
   assert.match(paymentSource, /data-terminal-action="open-drawer" data-terminal-drawer="shift"/);
   assert.match(openSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
   assert.match(actionSource, /case "close-drawer":[\s\S]*focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
@@ -610,8 +702,9 @@ test("POS scan failures keep resolver details but show cashier-facing main error
   const scanListenerMatch = appJs.match(/cashierTerminalScanForm\?\.addEventListener\("submit"[\s\S]*?\n\}\);/);
   assert.ok(scanListenerMatch, "missing cashier terminal scan listener");
 
-  assert.match(formatterSource, /不能销售：请扫描商品码 STORE_ITEM/);
-  assert.match(formatterSource, /你扫到的是 SDO 送货单码。/);
+  assert.match(formatterSource, /POS_CASHIER_TERMINOLOGY_KEYS\.storeItemOnlyRule/);
+  assert.match(formatterSource, /This is a store delivery code\./);
+  assert.match(formatterSource, /这是门店送货单码。/);
   assert.match(formatterSource, /reject_reason/);
   assert.match(lookupSource, /formatCashierTerminalScanError\(error\)/);
   assert.match(lookupSource, /cashierTerminalState\.scanErrorTitle/);
@@ -626,7 +719,7 @@ test("POS reprint confirmation loads real receipt only after cashier confirmatio
 
   assert.match(drawerSource, /drawer === "reprint-confirm"/);
   assert.match(drawerSource, /这是重打小票，不会重新销售，也不会扣库存。/);
-  assert.match(drawerSource, /确认重打/);
+  assert.match(drawerSource, /copy\.receiptReprint/);
   assert.match(drawerSource, /取消/);
   assert.match(actionSource, /case "reprint-receipt":[\s\S]*openCashierTerminalReprintConfirmation/);
   assert.match(actionSource, /case "reprint-sale":[\s\S]*openCashierTerminalReprintConfirmation/);
