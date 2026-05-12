@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 
 const requiredTerms = [
   ["门店收货主控台", "Store Receiving Command Center"],
@@ -43,11 +44,26 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("global language toggle is not exposed in the main auth or workspace shell", () => {
-  assert.doesNotMatch(indexHtml, /id="authLanguageToggle"/);
-  assert.doesNotMatch(indexHtml, /id="workspaceLanguageToggle"/);
-  assert.doesNotMatch(indexHtml, /data-global-language="zh"/);
-  assert.doesNotMatch(indexHtml, /data-global-language="en"/);
+test("web language switch is mounted inside web header areas and is hidden in PDA runtime", () => {
+  const webToggles = indexHtml.match(/<div class="[^"]*web-language-toggle[^"]*global-language-toggle[\s\S]*?<\/div>/g) || [];
+  const webToggleCss = stylesCss.match(/\.web-language-toggle\s*\{[\s\S]*?\n\}/)?.[0] || "";
+
+  assert.ok(webToggles.length >= 1);
+  assert.match(indexHtml, /workspace-session-strip[\s\S]*data-web-language-toggle="true"/);
+  assert.match(indexHtml, /cashier-terminal-shell[\s\S]*data-web-language-toggle="true"/);
+  assert.match(indexHtml, /data-global-language="zh"/);
+  assert.match(indexHtml, /data-global-language="en"/);
+  assert.doesNotMatch(indexHtml, /id="webLanguageToggle"/);
+  assert.doesNotMatch(webToggleCss, /position:\s*fixed/);
+  assert.match(stylesCss, /body\.pda-runtime-mode\s+\.web-language-toggle\s*\{[\s\S]*display:\s*none\s*!important/);
+});
+
+test("web language switch does not enable partial whole-page English before copy migration", () => {
+  assert.match(appJs, /function isWholePageWebLanguageSwitchReady/);
+  assert.match(appJs, /function handleGlobalLanguageToggleClick/);
+  assert.match(appJs, /target\.closest\("\[data-web-language-toggle\]"\)/);
+  assert.match(appJs, /English is staged page by page/);
+  assert.match(appJs, /setGlobalLanguage\("zh"/);
 });
 
 test("pre-QA terminology uses the approved bilingual glossary", () => {

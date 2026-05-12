@@ -649,6 +649,64 @@ h3 {
   box-shadow: var(--shadow-control);
 }
 
+.web-language-toggle {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-control);
+}
+
+body.pda-runtime-mode .web-language-toggle {
+  display: none !important;
+}
+
+.workspace-session-strip .web-language-toggle {
+  margin-left: 2px;
+}
+
+.global-language-button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.pda-settings-card {
+  display: grid;
+  gap: 10px;
+}
+
+.pda-language-setting-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--fw-border);
+  border-radius: 8px;
+  background: var(--fw-surface);
+}
+
+.pda-language-setting-row > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pda-language-setting-row strong {
+  color: var(--fw-text);
+}
+
+.pda-language-setting-row span {
+  color: var(--fw-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pda-language-toggle {
+  justify-content: center;
+}
+
+.pda-language-toggle .global-language-button {
+  flex: 1;
+}
+
 .workspace-top-panel .global-language-toggle {
   background: var(--fw-surface-muted);
   border-color: var(--fw-border);
@@ -11494,6 +11552,29 @@ body.cashier-terminal-mode .topbar .cashier-terminal-exit {
   border-color: rgba(196, 181, 253, 0.54);
   background: rgba(124, 58, 237, 0.18);
   color: #ede9fe;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip .web-language-toggle {
+  min-width: 104px;
+  min-height: 34px;
+  align-self: stretch;
+  justify-content: center;
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.58);
+  box-shadow: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip .global-language-button {
+  min-height: 26px;
+  padding: 0 8px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip .global-language-button.is-active {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: none;
 }
 
 body.cashier-terminal-mode .network-online,
