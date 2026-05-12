@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from itertools import count
+import hashlib
 import json
 import math
 import random
@@ -236,6 +237,7 @@ class InMemoryState:
         self.sorting_tasks: dict[str, dict[str, Any]] = {}
         self.store_items: dict[str, dict[str, Any]] = {}
         self.item_barcode_tokens: dict[str, dict[str, Any]] = {}
+        self.store_item_generation_idempotency: dict[str, dict[str, Any]] = {}
         self.store_prep_bale_tasks: dict[str, dict[str, Any]] = {}
         self.store_prep_bales: dict[str, dict[str, Any]] = {}
         self.store_dispatch_bales: dict[str, dict[str, Any]] = {}
@@ -380,6 +382,7 @@ class InMemoryState:
             "sorting_tasks": self.sorting_tasks,
             "store_items": self.store_items,
             "item_barcode_tokens": self.item_barcode_tokens,
+            "store_item_generation_idempotency": self.store_item_generation_idempotency,
             "store_prep_bale_tasks": self.store_prep_bale_tasks,
             "store_prep_bales": self.store_prep_bales,
             "store_dispatch_bales": self.store_dispatch_bales,
@@ -448,6 +451,7 @@ class InMemoryState:
         self.sorting_tasks = payload.get("sorting_tasks", {})
         self.store_items = payload.get("store_items", {})
         self.item_barcode_tokens = payload.get("item_barcode_tokens", {})
+        self.store_item_generation_idempotency = payload.get("store_item_generation_idempotency", {})
         self.store_prep_bale_tasks = payload.get("store_prep_bale_tasks", {})
         self.store_prep_bales = payload.get("store_prep_bales", {})
         self.store_dispatch_bales = payload.get("store_dispatch_bales", {})
@@ -15024,6 +15028,69 @@ class InMemoryState:
                 detail="STORE_ITEM machine_code / barcode_value 必须由后端统一发号，PDA 不能提交。",
             )
 
+    def _normalize_store_item_generation_idempotency_key(self, value: Any) -> str:
+        return str(value or "").strip()
+
+    def _store_item_generation_payload_fingerprint(self, payload: dict[str, Any]) -> str:
+        def normalized_money(value: Any) -> float:
+            try:
+                return round(float(value or 0), 2)
+            except (TypeError, ValueError):
+                return 0.0
+
+        canonical_payload = {
+            "source_sdp_display_code": str(payload.get("source_sdp_display_code") or "").strip().upper(),
+            "source_sdp_machine_code": str(payload.get("source_sdp_machine_code") or "").strip().upper(),
+            "package_code": str(payload.get("package_code") or "").strip().upper(),
+            "sdo_package_code": str(payload.get("sdo_package_code") or "").strip().upper(),
+            "store_code": str(payload.get("store_code") or "").strip().upper(),
+            "clerk": str(payload.get("clerk") or "").strip(),
+            "assigned_clerk": str(payload.get("assigned_clerk") or "").strip(),
+            "created_by": str(payload.get("created_by") or "").strip(),
+            "generated_by": str(payload.get("generated_by") or "").strip(),
+            "rack_code": str(payload.get("rack_code") or payload.get("store_rack_code") or "").strip().upper(),
+            "selected_price": normalized_money(payload.get("selected_price")),
+            "sale_price_kes": normalized_money(payload.get("sale_price_kes")),
+            "category_main": str(payload.get("category_main") or "").strip(),
+            "category_sub": str(payload.get("category_sub") or "").strip(),
+            "category_short": str(payload.get("category_short") or "").strip().upper(),
+            "grade": str(payload.get("grade") or "").strip().upper(),
+            "pricing_type": str(payload.get("pricing_type") or "").strip().upper(),
+            "quantity": self._parse_optional_nonnegative_int(payload.get("quantity")) or 0,
+            "pricing_batch_id": str(payload.get("pricing_batch_id") or "").strip().upper(),
+            "source_line_key": str(payload.get("source_line_key") or "").strip(),
+        }
+        encoded = json.dumps(canonical_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+    def _store_items_by_ids(self, store_item_ids: list[Any]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for store_item_id in store_item_ids:
+            normalized_id = str(store_item_id or "").strip().upper()
+            row = self.store_items.get(normalized_id)
+            if row:
+                rows.append(row)
+        return rows
+
+    def _tokens_by_ids(self, token_ids: list[Any]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for token_id in token_ids:
+            normalized_id = str(token_id or "").strip().upper()
+            row = self.item_barcode_tokens.get(normalized_id)
+            if row:
+                rows.append(row)
+        return rows
+
+    def _replay_store_item_generation_idempotency(self, package: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
+        pricing_batch_id = str(entry.get("pricing_batch_id") or "").strip().upper()
+        store_items = self._store_items_by_ids(entry.get("store_item_ids") or [])
+        if not store_items and pricing_batch_id:
+            store_items = self._store_items_for_pricing_batch(pricing_batch_id)
+        tokens = self._tokens_by_ids(entry.get("token_ids") or [])
+        if not tokens:
+            tokens = self._tokens_for_store_items(store_items)
+        return self._store_item_generation_result(package, pricing_batch_id, store_items, tokens)
+
     def _store_item_generation_result(
         self,
         package: dict[str, Any],
@@ -15087,18 +15154,41 @@ class InMemoryState:
         if actor.get("role_code") == "store_clerk" and str(actor.get("username") or "").strip().lower() != assigned_clerk.lower():
             raise HTTPException(status_code=403, detail=f"该 SDP 已分配给 {package_assigned_clerk}，你不能处理。")
 
-        existing_count = len(self._store_items_for_sdo_package(package))
+        idempotency_key = self._normalize_store_item_generation_idempotency_key(payload.get("idempotency_key"))
+        payload_fingerprint = self._store_item_generation_payload_fingerprint(payload) if idempotency_key else ""
+        if idempotency_key:
+            existing_idempotency = self.store_item_generation_idempotency.get(idempotency_key)
+            if existing_idempotency:
+                if str(existing_idempotency.get("payload_fingerprint") or "") != payload_fingerprint:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="idempotency_key 已经用于不同的 STORE_ITEM 生成请求，不能重复使用。",
+                    )
+                return self._replay_store_item_generation_idempotency(package, existing_idempotency)
+
         pricing_batch_id = str(payload.get("pricing_batch_id") or "").strip().upper()
-        if not pricing_batch_id:
-            pricing_batch_id = f"{package['display_code']}-BATCH-{existing_count + 1:03d}"
-        existing_items = self._store_items_for_pricing_batch(pricing_batch_id)
-        if existing_items:
-            return self._store_item_generation_result(
-                package,
-                pricing_batch_id,
-                existing_items,
-                self._tokens_for_store_items(existing_items),
-            )
+        if pricing_batch_id:
+            existing_items = self._store_items_for_pricing_batch(pricing_batch_id)
+            if existing_items:
+                existing_tokens = self._tokens_for_store_items(existing_items)
+                result = self._store_item_generation_result(
+                    package,
+                    pricing_batch_id,
+                    existing_items,
+                    existing_tokens,
+                )
+                if idempotency_key:
+                    self.store_item_generation_idempotency[idempotency_key] = {
+                        "idempotency_key": idempotency_key,
+                        "payload_fingerprint": payload_fingerprint,
+                        "pricing_batch_id": pricing_batch_id,
+                        "store_item_ids": [str(row.get("store_item_id") or row.get("item_id") or "").strip().upper() for row in existing_items],
+                        "token_ids": [str(row.get("token_id") or row.get("token_no") or "").strip().upper() for row in existing_tokens],
+                        "source_sdp_display_code": str(package.get("display_code") or "").strip().upper(),
+                        "updated_at": now_iso(),
+                    }
+                    self._persist()
+                return result
 
         quantity = self._parse_optional_nonnegative_int(payload.get("quantity")) or 0
         if quantity <= 0:
@@ -15108,11 +15198,6 @@ class InMemoryState:
             raise HTTPException(status_code=409, detail="SDP item_count 未确认，不能生成 STORE_ITEM。")
         if quantity > item_count:
             raise HTTPException(status_code=409, detail="生成数量不能超过本包件数。")
-        remaining_count = max(item_count - existing_count, 0)
-        if remaining_count <= 0:
-            raise HTTPException(status_code=409, detail="这个 SDP 已完成 STORE_ITEM 生成，不能重复生成。")
-        if quantity > remaining_count:
-            raise HTTPException(status_code=409, detail="重复生成会超过本包件数，不能继续生成。")
 
         try:
             sale_price_kes = round(float(payload.get("sale_price_kes", payload.get("selected_price"))), 2)
@@ -15120,6 +15205,16 @@ class InMemoryState:
             sale_price_kes = 0.0
         if sale_price_kes <= 0:
             raise HTTPException(status_code=400, detail="sale_price_kes must be greater than 0")
+
+        existing_count = len(self._store_items_for_sdo_package(package))
+        remaining_count = max(item_count - existing_count, 0)
+        if remaining_count <= 0:
+            raise HTTPException(status_code=409, detail="这个 SDP 已完成 STORE_ITEM 生成，不能重复生成。")
+        if quantity > remaining_count:
+            raise HTTPException(status_code=409, detail="重复生成会超过本包件数，不能继续生成。")
+        if not pricing_batch_id:
+            pricing_batch_id = f"{package['display_code']}-BATCH-{existing_count + 1:03d}"
+
         pricing_type = str(payload.get("pricing_type") or "").strip().upper()
         if pricing_type not in {"P", "S", "CUSTOM"}:
             pricing_type = "CUSTOM"
@@ -15280,6 +15375,17 @@ class InMemoryState:
             },
         )
         result = self._store_item_generation_result(saved_package, pricing_batch_id, generated_items, generated_tokens)
+        if idempotency_key:
+            self.store_item_generation_idempotency[idempotency_key] = {
+                "idempotency_key": idempotency_key,
+                "payload_fingerprint": payload_fingerprint,
+                "pricing_batch_id": pricing_batch_id,
+                "store_item_ids": [str(row.get("store_item_id") or row.get("item_id") or "").strip().upper() for row in generated_items],
+                "token_ids": [str(row.get("token_id") or row.get("token_no") or "").strip().upper() for row in generated_tokens],
+                "source_sdp_display_code": str(saved_package.get("display_code") or "").strip().upper(),
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
         self._persist()
         return result
 
@@ -15305,20 +15411,32 @@ class InMemoryState:
             raise HTTPException(status_code=403, detail=f"该 SDP 已分配给 {assigned_clerk}，你不能处理。")
 
         pricing_batch_id = str(payload.get("pricing_batch_id") or "").strip().upper()
+        quantity = self._parse_optional_nonnegative_int(payload.get("quantity")) or 0
+        rack_code = str(payload.get("rack_code") or payload.get("store_rack_code") or "").strip().upper()
+        try:
+            selected_price = round(float(payload.get("selected_price")), 2)
+        except (TypeError, ValueError):
+            selected_price = 0.0
+        generation_payload = {
+            **payload,
+            "source_sdp_display_code": package["display_code"],
+            "source_sdp_machine_code": package["machine_code"],
+            "store_code": package_store,
+            "assigned_clerk": assigned_clerk,
+            "created_by": actor["username"],
+            "sale_price_kes": selected_price,
+            "rack_code": rack_code,
+            "quantity": quantity,
+            "pricing_batch_id": pricing_batch_id,
+        }
+        idempotency_key = self._normalize_store_item_generation_idempotency_key(payload.get("idempotency_key"))
+        if idempotency_key and self.store_item_generation_idempotency.get(idempotency_key):
+            return self.generate_store_items_from_pricing_batch(generation_payload)
         if pricing_batch_id and self._store_items_for_pricing_batch(pricing_batch_id):
             return self.generate_store_items_from_pricing_batch(
-                {
-                    **payload,
-                    "source_sdp_display_code": package["display_code"],
-                    "source_sdp_machine_code": package["machine_code"],
-                    "store_code": package_store,
-                    "assigned_clerk": assigned_clerk,
-                    "created_by": actor["username"],
-                    "pricing_batch_id": pricing_batch_id,
-                }
+                generation_payload
             )
 
-        quantity = self._parse_optional_nonnegative_int(payload.get("quantity")) or 0
         if quantity <= 0:
             raise HTTPException(status_code=400, detail="STORE_ITEM 生成数量必须大于 0。")
         item_count = self._parse_optional_nonnegative_int(package.get("item_count"))
@@ -15335,30 +15453,12 @@ class InMemoryState:
         if quantity > remaining_count:
             raise HTTPException(status_code=409, detail="重复生成会超过本包件数，不能继续生成。")
 
-        rack_code = str(payload.get("rack_code") or payload.get("store_rack_code") or "").strip().upper()
         if not rack_code:
             raise HTTPException(status_code=400, detail="rack_code is required")
-        try:
-            selected_price = round(float(payload.get("selected_price")), 2)
-        except (TypeError, ValueError):
-            selected_price = 0.0
         if selected_price <= 0:
             raise HTTPException(status_code=400, detail="selected_price must be greater than 0")
 
-        return self.generate_store_items_from_pricing_batch(
-            {
-                **payload,
-                "source_sdp_display_code": package["display_code"],
-                "source_sdp_machine_code": package["machine_code"],
-                "store_code": package_store,
-                "assigned_clerk": assigned_clerk,
-                "created_by": actor["username"],
-                "sale_price_kes": selected_price,
-                "rack_code": rack_code,
-                "quantity": quantity,
-                "pricing_batch_id": pricing_batch_id,
-            }
-        )
+        return self.generate_store_items_from_pricing_batch(generation_payload)
 
     def ensure_store_delivery_execution_order_packages(self, transfer_no: str, execution_order_no: str, payload: dict[str, Any]) -> dict[str, Any]:
         actor = self._require_user_role(payload["created_by"], {"warehouse_clerk", "warehouse_supervisor"})

@@ -281,6 +281,7 @@ class StoreDeliveryPackageStoreItemGenerateRequest(BaseModel):
     quantity: int = Field(ge=1)
     pricing_batch_id: str = ""
     source_line_key: str = ""
+    idempotency_key: str = ""
 
 
 class StoreDeliveryPackageStoreItemGenerateResponse(BaseModel):
