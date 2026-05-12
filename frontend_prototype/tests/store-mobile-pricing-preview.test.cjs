@@ -53,7 +53,7 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
 
   assert.match(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#281/);
+  assert.match(loginVersionSection, /#284/);
   assert.match(loginVersionSection, /Android PR:/);
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
