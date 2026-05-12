@@ -110,6 +110,8 @@ class PosShiftReportCategoryBreakdown(BaseModel):
     category: str
     qty: int
     amount: float
+    store_item_qty: int = 0
+    manual_qty: int = 0
 
 
 class PosShiftReportResponse(BaseModel):
@@ -128,6 +130,8 @@ class PosShiftReportResponse(BaseModel):
     total_sales: float
     order_count: int
     item_count: int
+    manual_item_count: int = 0
+    manual_sales_amount: float = 0
     cash_sales: float
     mpesa_sales: float
     mixed_cash: float

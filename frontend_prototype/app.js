@@ -29001,6 +29001,7 @@ function createCashierTerminalState() {
     activePaymentMode: "cash",
     paymentLines: [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")],
     latestCompletedSale: null,
+    activeSaleIdempotencyKey: "",
     activeDrawer: "",
     locale: "zh",
     networkStatus: navigator.onLine ? "online" : "offline",
@@ -31800,6 +31801,7 @@ upsertCashierTerminalCartItem = function (result) {
 resetCashierTerminalForNextSale = function () {
   cashierTerminalState.cartItems = [];
   cashierTerminalState.currentLookupResult = null;
+  clearCashierTerminalSaleIdempotencyKey();
   cashierTerminalState.activeHoldNo = "";
   cashierTerminalState.discountAmount = "";
   cashierTerminalState.cashReceived = "";
@@ -31885,6 +31887,7 @@ function buildCashierTerminalPosSalePayload(payment) {
   }
   const storeCode = getCashierTerminalStoreCode();
   return {
+    idempotency_key: getCashierTerminalSaleIdempotencyKey(),
     cashier_id: getCashierTerminalCashierName(),
     shift_id: cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo,
     terminal_id: getCashierTerminalTerminalId(),
@@ -31901,6 +31904,22 @@ function buildCashierTerminalPosSalePayload(payment) {
       discount_amount: 0,
     })),
   };
+}
+
+function getCashierTerminalSaleIdempotencyKey() {
+  ensureCashierTerminalPreviewState();
+  if (!cashierTerminalState.activeSaleIdempotencyKey) {
+    const storeCode = getCashierTerminalStoreCode();
+    const randomPart = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    cashierTerminalState.activeSaleIdempotencyKey = `POS-SALE-${storeCode}-${randomPart}`;
+  }
+  return cashierTerminalState.activeSaleIdempotencyKey;
+}
+
+function clearCashierTerminalSaleIdempotencyKey() {
+  cashierTerminalState.activeSaleIdempotencyKey = "";
 }
 
 function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {

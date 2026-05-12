@@ -260,6 +260,7 @@ class InMemoryState:
         self.store_token_receiving_sessions: dict[str, dict[str, Any]] = {}
         self.return_orders: dict[str, dict[str, Any]] = {}
         self.sales_transactions: list[dict[str, Any]] = []
+        self.pos_sale_idempotency_records: dict[str, dict[str, Any]] = {}
         self.bale_sales_pricing_profiles: dict[str, dict[str, Any]] = {}
         self.bale_sales_orders: dict[str, dict[str, Any]] = {}
         self.sale_void_requests: dict[str, dict[str, Any]] = {}
@@ -278,6 +279,7 @@ class InMemoryState:
         self.offline_sale_registry: dict[str, dict[str, Any]] = {}
         self.label_templates: dict[str, dict[str, Any]] = {}
         self._barcode_generation_lock = threading.RLock()
+        self._pos_sale_lock = threading.RLock()
         self.users: dict[int, dict[str, Any]] = {}
         self.auth_sessions: dict[str, dict[str, Any]] = {}
         self.stores: dict[str, dict[str, Any]] = {
@@ -404,6 +406,7 @@ class InMemoryState:
             "store_token_receiving_sessions": self.store_token_receiving_sessions,
             "return_orders": self.return_orders,
             "sales_transactions": self.sales_transactions,
+            "pos_sale_idempotency_records": self.pos_sale_idempotency_records,
             "bale_sales_pricing_profiles": self.bale_sales_pricing_profiles,
             "bale_sales_orders": self.bale_sales_orders,
             "sale_void_requests": self.sale_void_requests,
@@ -473,6 +476,7 @@ class InMemoryState:
         self.store_token_receiving_sessions = payload.get("store_token_receiving_sessions", {})
         self.return_orders = payload.get("return_orders", {})
         self.sales_transactions = payload.get("sales_transactions", [])
+        self.pos_sale_idempotency_records = payload.get("pos_sale_idempotency_records", {})
         self.bale_sales_pricing_profiles = payload.get("bale_sales_pricing_profiles", {})
         self.bale_sales_orders = payload.get("bale_sales_orders", {})
         self.sale_void_requests = payload.get("sale_void_requests", {})
@@ -11712,6 +11716,8 @@ class InMemoryState:
         total_sales = 0.0
         order_count = 0
         item_count = 0
+        manual_item_count = 0
+        manual_sales_amount = 0.0
         cancelled_order_count = 0
         payment_breakdown: dict[str, dict[str, Any]] = {}
         category_breakdown: dict[str, dict[str, Any]] = {}
@@ -11746,12 +11752,20 @@ class InMemoryState:
                 mixed_mpesa += round(float(sale.get("mpesa_amount") or 0), 2)
 
             for item in sale.get("sale_items") or []:
-                item_count += 1
+                line_type = self._normalize_pos_sale_line_type(item.get("line_type"))
+                qty = int(item.get("qty") or 1)
+                item_count += qty
                 category = str(item.get("category") or item.get("category_name") or "未分类").strip() or "未分类"
                 amount = round(float(item.get("final_price") if item.get("final_price") not in (None, "") else item.get("line_total") or 0), 2)
-                category_row = category_breakdown.setdefault(category, {"category": category, "qty": 0, "amount": 0.0})
-                category_row["qty"] += 1
+                category_row = category_breakdown.setdefault(category, {"category": category, "qty": 0, "amount": 0.0, "store_item_qty": 0, "manual_qty": 0})
+                category_row["qty"] += qty
                 category_row["amount"] = round(category_row["amount"] + amount, 2)
+                if line_type == "MANUAL_UNBARCODED":
+                    manual_item_count += qty
+                    manual_sales_amount = round(manual_sales_amount + amount, 2)
+                    category_row["manual_qty"] += qty
+                else:
+                    category_row["store_item_qty"] += qty
 
         hold_count = 0
         active_hold_count = 0
@@ -11786,6 +11800,8 @@ class InMemoryState:
             "total_sales": round(total_sales, 2),
             "order_count": order_count,
             "item_count": item_count,
+            "manual_item_count": manual_item_count,
+            "manual_sales_amount": round(manual_sales_amount, 2),
             "cash_sales": round(cash_sales, 2),
             "mpesa_sales": round(mpesa_sales, 2),
             "mixed_cash": round(mixed_cash, 2),
@@ -17688,6 +17704,125 @@ class InMemoryState:
             detail=f"{store_item.get('display_code') or store_item.get('machine_code') or 'STORE_ITEM'} 缺少后端销售价格，不能 POS 销售。",
         )
 
+    def _normalize_pos_sale_line_type(self, value: Any) -> str:
+        normalized = str(value or "STORE_ITEM").strip().upper().replace("-", "_")
+        if not normalized:
+            return "STORE_ITEM"
+        if normalized in {"MANUAL", "MANUAL_ITEM", "MANUAL_LEGACY_ITEM", "UNBARCODED", "MANUAL_UNBARCODED_ITEM"}:
+            return "MANUAL_UNBARCODED"
+        return normalized
+
+    def _normalize_pos_sale_idempotency_key(self, value: Any) -> str:
+        return str(value or "").strip()
+
+    def _pos_sale_idempotency_record_key(self, store_code: str, idempotency_key: str) -> str:
+        return f"{str(store_code or '').strip().upper()}::{idempotency_key}"
+
+    def _pos_sale_payload_fingerprint(self, store_code: str, payload: dict[str, Any]) -> str:
+        items = []
+        for item in payload.get("items") or []:
+            line_type = self._normalize_pos_sale_line_type(item.get("line_type"))
+            if line_type == "MANUAL_UNBARCODED":
+                items.append(
+                    {
+                        "line_type": line_type,
+                        "category": str(item.get("category") or "").strip().upper(),
+                        "qty": str(item.get("qty") if item.get("qty") is not None else 1),
+                        "unit_price": str(item.get("unit_price") if item.get("unit_price") is not None else item.get("final_price") or 0),
+                        "final_price": str(item.get("final_price") if item.get("final_price") is not None else ""),
+                        "discount_amount": str(item.get("discount_amount") if item.get("discount_amount") is not None else 0),
+                    }
+                )
+            else:
+                items.append(
+                    {
+                        "line_type": line_type,
+                        "machine_code": str(item.get("machine_code") or item.get("barcode_value") or "").strip().upper(),
+                        "display_code": str(item.get("display_code") or "").strip().upper(),
+                        "final_price": str(item.get("final_price") if item.get("final_price") is not None else ""),
+                        "discount_amount": str(item.get("discount_amount") if item.get("discount_amount") is not None else 0),
+                    }
+                )
+        canonical = {
+            "store_code": str(store_code or "").strip().upper(),
+            "cashier_id": str(payload.get("cashier_id") or "").strip(),
+            "shift_id": str(payload.get("shift_id") or "").strip(),
+            "terminal_id": str(payload.get("terminal_id") or "").strip(),
+            "hold_no": str(payload.get("hold_no") or "").strip().upper(),
+            "payment_method": str(payload.get("payment_method") or "").strip().lower(),
+            "cash_amount": str(payload.get("cash_amount") if payload.get("cash_amount") is not None else 0),
+            "mpesa_amount": str(payload.get("mpesa_amount") if payload.get("mpesa_amount") is not None else 0),
+            "mpesa_reference": str(payload.get("mpesa_reference") or "").strip().upper(),
+            "discount_amount": str(payload.get("discount_amount") if payload.get("discount_amount") is not None else 0),
+            "items": items,
+        }
+        encoded = json.dumps(canonical, sort_keys=True, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def _find_pos_sale_transaction_by_sale_no(self, store_code: str, sale_no: str) -> Optional[dict[str, Any]]:
+        normalized_store = str(store_code or "").strip().upper()
+        normalized_sale_no = str(sale_no or "").strip().upper()
+        if not normalized_sale_no:
+            return None
+        for row in self.sales_transactions:
+            if not self._is_pos_sale_transaction(row):
+                continue
+            row_sale_no = str(row.get("sale_no") or row.get("sale_id") or row.get("order_no") or "").strip().upper()
+            if row_sale_no == normalized_sale_no and str(row.get("store_code") or "").strip().upper() == normalized_store:
+                return row
+        return None
+
+    def _find_pos_sale_transaction_by_idempotency_key(self, store_code: str, idempotency_key: str) -> Optional[dict[str, Any]]:
+        normalized_store = str(store_code or "").strip().upper()
+        normalized_key = self._normalize_pos_sale_idempotency_key(idempotency_key)
+        if not normalized_key:
+            return None
+        for row in self.sales_transactions:
+            if not self._is_pos_sale_transaction(row):
+                continue
+            if str(row.get("store_code") or "").strip().upper() != normalized_store:
+                continue
+            if self._normalize_pos_sale_idempotency_key(row.get("idempotency_key")) == normalized_key:
+                return row
+        return None
+
+    def _validate_pos_manual_unbarcoded_item(self, store_code: str, item: dict[str, Any], line_no: int) -> dict[str, Any]:
+        qty = int(item.get("qty") if item.get("qty") not in (None, "") else 1)
+        if qty < 1:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual qty must be at least 1.")
+        unit_price_value = item.get("unit_price")
+        if unit_price_value in (None, ""):
+            if item.get("final_price") not in (None, ""):
+                unit_price_value = round(float(item.get("final_price") or 0) / qty, 2)
+            else:
+                unit_price_value = 0
+        unit_price = self._pos_sale_money(unit_price_value, "unit_price")
+        if unit_price <= 0:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual unit_price must be greater than 0.")
+        computed_price = round(unit_price * qty, 2)
+        final_price = self._pos_sale_money(item.get("final_price", computed_price), "final_price")
+        if final_price != computed_price:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual final_price must equal qty × unit_price.")
+        category = str(item.get("category") or item.get("category_name") or "MANUAL").strip().upper() or "MANUAL"
+        return {
+            "line_no": line_no,
+            "line_type": "MANUAL_UNBARCODED",
+            "store_item": None,
+            "token": None,
+            "store_item_id": "",
+            "display_code": str(item.get("display_code") or f"MANUAL-{line_no}").strip().upper(),
+            "machine_code": "",
+            "category": category,
+            "shelf_location": "",
+            "original_price": computed_price,
+            "final_price": final_price,
+            "discount_amount": self._pos_sale_money(item.get("discount_amount", 0), "discount_amount"),
+            "qty": qty,
+            "unit_price": unit_price,
+            "inventory_tracked": False,
+            "from_status": "",
+        }
+
     def _validate_pos_sale_item(
         self,
         store_code: str,
@@ -17696,6 +17831,11 @@ class InMemoryState:
         *,
         allow_hold_no: str = "",
     ) -> dict[str, Any]:
+        line_type = self._normalize_pos_sale_line_type(item.get("line_type"))
+        if line_type == "MANUAL_UNBARCODED":
+            return self._validate_pos_manual_unbarcoded_item(store_code, item, line_no)
+        if line_type != "STORE_ITEM":
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 POS line_type must be STORE_ITEM or MANUAL_UNBARCODED.")
         barcode = str(item.get("machine_code") or item.get("barcode_value") or item.get("display_code") or "").strip().upper()
         display_code = str(item.get("display_code") or "").strip().upper()
         if not barcode:
@@ -17799,8 +17939,45 @@ class InMemoryState:
             "original_price": original_price,
             "final_price": final_price,
             "discount_amount": round(original_price - final_price, 2),
+            "line_type": "STORE_ITEM",
+            "qty": 1,
+            "unit_price": final_price,
+            "inventory_tracked": True,
             "from_status": next((status for status in statuses if status in allowed_statuses), "") or ("held" if hold_item_matches else ""),
         }
+
+    def _ensure_pos_sale_items_not_already_completed(self, store_code: str, validated_items: list[dict[str, Any]]) -> None:
+        checked_ids = {
+            str(row.get("store_item_id") or "").strip().upper()
+            for row in validated_items
+            if row.get("line_type") == "STORE_ITEM" and str(row.get("store_item_id") or "").strip()
+        }
+        checked_codes = {
+            str(row.get("machine_code") or "").strip().upper()
+            for row in validated_items
+            if row.get("line_type") == "STORE_ITEM" and str(row.get("machine_code") or "").strip()
+        }
+        if not checked_ids and not checked_codes:
+            return
+        normalized_store = str(store_code or "").strip().upper()
+        ignored_sale_statuses = {"voided", "void", "cancelled", "canceled", "refunded", "deleted"}
+        for sale in self.sales_transactions:
+            if str(sale.get("store_code") or "").strip().upper() != normalized_store:
+                continue
+            if not self._is_pos_sale_transaction(sale):
+                continue
+            sale_status = str(sale.get("sale_status") or sale.get("status") or "completed").strip().lower()
+            if sale_status in ignored_sale_statuses:
+                continue
+            sale_no = str(sale.get("sale_no") or sale.get("sale_id") or sale.get("order_no") or "").strip()
+            for item in sale.get("sale_items") or []:
+                if self._normalize_pos_sale_line_type(item.get("line_type")) != "STORE_ITEM":
+                    continue
+                item_id = str(item.get("store_item_id") or "").strip().upper()
+                machine_code = str(item.get("machine_code") or "").strip().upper()
+                if (item_id and item_id in checked_ids) or (machine_code and machine_code in checked_codes):
+                    label = machine_code or item_id
+                    raise HTTPException(status_code=409, detail=f"{label} 已在销售单 {sale_no} 中完成销售，不能重复销售。")
 
     def _validate_pos_sale_payment(
         self,
@@ -18115,11 +18292,33 @@ class InMemoryState:
         return self._normalize_pos_hold(hold)
 
     def create_pos_sale(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
+        with self._pos_sale_lock:
+            return self._create_pos_sale_locked(store_code, payload, created_by)
+
+    def _create_pos_sale_locked(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
         store = self._ensure_store_exists(store_code)
         normalized_store = store["code"]
         cashier_id = str(payload.get("cashier_id") or created_by or "").strip()
         if not cashier_id:
             raise HTTPException(status_code=400, detail="cashier_id is required")
+        idempotency_key = self._normalize_pos_sale_idempotency_key(payload.get("idempotency_key"))
+        idempotency_record_key = ""
+        idempotency_fingerprint = ""
+        if idempotency_key:
+            idempotency_record_key = self._pos_sale_idempotency_record_key(normalized_store, idempotency_key)
+            idempotency_fingerprint = self._pos_sale_payload_fingerprint(normalized_store, payload)
+            existing_record = self.pos_sale_idempotency_records.get(idempotency_record_key)
+            existing_sale = None
+            if existing_record:
+                if existing_record.get("payload_fingerprint") != idempotency_fingerprint:
+                    raise HTTPException(status_code=409, detail="POS sale idempotency key already used with a different payload.")
+                existing_sale = self._find_pos_sale_transaction_by_sale_no(normalized_store, existing_record.get("sale_no", ""))
+            if not existing_sale:
+                existing_sale = self._find_pos_sale_transaction_by_idempotency_key(normalized_store, idempotency_key)
+                if existing_sale and existing_sale.get("idempotency_fingerprint") != idempotency_fingerprint:
+                    raise HTTPException(status_code=409, detail="POS sale idempotency key already used with a different payload.")
+            if existing_sale:
+                return self._normalize_pos_sale_detail(existing_sale)
         terminal_id = str(payload.get("terminal_id") or "").strip()
         shift = self._validate_pos_sale_shift(
             normalized_store,
@@ -18141,12 +18340,14 @@ class InMemoryState:
         seen_store_item_ids: set[str] = set()
         for index, item in enumerate(items, start=1):
             validated = self._validate_pos_sale_item(normalized_store, item, index, allow_hold_no=hold_no)
-            if validated["store_item_id"] in seen_store_item_ids:
+            if validated["line_type"] == "STORE_ITEM" and validated["store_item_id"] in seen_store_item_ids:
                 raise HTTPException(status_code=400, detail=f"{validated['display_code']} 已在本单中，不能重复销售。")
-            seen_store_item_ids.add(validated["store_item_id"])
+            if validated["line_type"] == "STORE_ITEM":
+                seen_store_item_ids.add(validated["store_item_id"])
             validated_items.append(validated)
         if hold:
             self._ensure_pos_hold_matches_sale_items(hold, validated_items)
+        self._ensure_pos_sale_items_not_already_completed(normalized_store, validated_items)
 
         subtotal = round(sum(row["original_price"] for row in validated_items), 2)
         line_discount_total = round(sum(row["discount_amount"] for row in validated_items), 2)
@@ -18194,12 +18395,16 @@ class InMemoryState:
                 "store_item_id": validated["store_item_id"],
                 "display_code": validated["display_code"],
                 "machine_code": validated["machine_code"],
+                "line_type": validated["line_type"],
                 "category": validated["category"],
                 "shelf_location": validated["shelf_location"],
                 "original_price": validated["original_price"],
                 "final_price": validated["final_price"],
                 "discount_amount": validated["discount_amount"],
                 "store_code": normalized_store,
+                "qty": validated["qty"],
+                "unit_price": validated["unit_price"],
+                "inventory_tracked": validated["inventory_tracked"],
             }
             response_items.append(response_item)
             legacy_items.append(
@@ -18207,7 +18412,7 @@ class InMemoryState:
                     "identity_id": validated["display_code"],
                     "barcode": validated["machine_code"],
                     "product_name": validated["category"] or validated["display_code"],
-                    "qty": 1,
+                    "qty": validated["qty"],
                     "launch_price": validated["original_price"],
                     "expected_price": validated["original_price"],
                     "price_cap": None,
@@ -18227,31 +18432,32 @@ class InMemoryState:
                     "returned_lot_allocations": [],
                 }
             )
-            self._record_inventory_movement(
-                movement_type="POS_SALE_OUT",
-                barcode=validated["machine_code"],
-                product_name=validated["category"] or validated["display_code"],
-                quantity_delta=-1,
-                location_type="store",
-                location_code=normalized_store,
-                reference_type="pos_sale",
-                reference_no=sale_no,
-                actor=actor,
-                note=f"POS sale in {normalized_store}",
-                details={
-                    "movement_id": "",
-                    "store_code": normalized_store,
-                    "store_item_id": validated["store_item_id"],
-                    "display_code": validated["display_code"],
-                    "machine_code": validated["machine_code"],
-                    "from_status": validated["from_status"],
-                    "to_status": "sold",
-                    "reference_sale_id": sale_no,
-                    "created_by": actor,
-                },
-            )
-            if self.inventory_movements:
-                self.inventory_movements[-1]["details"]["movement_id"] = self.inventory_movements[-1]["id"]
+            if validated["inventory_tracked"]:
+                self._record_inventory_movement(
+                    movement_type="POS_SALE_OUT",
+                    barcode=validated["machine_code"],
+                    product_name=validated["category"] or validated["display_code"],
+                    quantity_delta=-1,
+                    location_type="store",
+                    location_code=normalized_store,
+                    reference_type="pos_sale",
+                    reference_no=sale_no,
+                    actor=actor,
+                    note=f"POS sale in {normalized_store}",
+                    details={
+                        "movement_id": "",
+                        "store_code": normalized_store,
+                        "store_item_id": validated["store_item_id"],
+                        "display_code": validated["display_code"],
+                        "machine_code": validated["machine_code"],
+                        "from_status": validated["from_status"],
+                        "to_status": "sold",
+                        "reference_sale_id": sale_no,
+                        "created_by": actor,
+                    },
+                )
+                if self.inventory_movements:
+                    self.inventory_movements[-1]["details"]["movement_id"] = self.inventory_movements[-1]["id"]
 
         normalized_payments = []
         if cash_amount:
@@ -18263,6 +18469,8 @@ class InMemoryState:
             "id": sale_sequence,
             "sale_id": sale_no,
             "sale_no": sale_no,
+            "idempotency_key": idempotency_key,
+            "idempotency_fingerprint": idempotency_fingerprint,
             "client_sale_id": "",
             "sync_batch_no": "",
             "order_no": sale_no,
@@ -18276,7 +18484,7 @@ class InMemoryState:
             "sale_time": sale_time,
             "created_at": sale_time,
             "created_by": actor,
-            "total_qty": len(response_items),
+            "total_qty": sum(row["qty"] for row in response_items),
             "subtotal": subtotal,
             "discount_amount": round(line_discount_total + sale_discount, 2),
             "total_amount": total_amount,
@@ -18353,10 +18561,19 @@ class InMemoryState:
                 "item_count": len(response_items),
             },
         )
+        if idempotency_key:
+            self.pos_sale_idempotency_records[idempotency_record_key] = {
+                "store_code": normalized_store,
+                "idempotency_key": idempotency_key,
+                "payload_fingerprint": idempotency_fingerprint,
+                "sale_no": sale_no,
+                "created_at": sale_time,
+            }
         self._persist()
         return {
             "sale_id": sale_no,
             "sale_no": sale_no,
+            "idempotency_key": idempotency_key,
             "store_code": normalized_store,
             "cashier_id": cashier_id,
             "shift_id": transaction["shift_id"],
@@ -18384,6 +18601,7 @@ class InMemoryState:
         return {
             "sale_id": str(row.get("sale_id") or sale_no).strip(),
             "sale_no": sale_no,
+            "idempotency_key": self._normalize_pos_sale_idempotency_key(row.get("idempotency_key")),
             "store_code": str(row.get("store_code") or "").strip().upper(),
             "cashier_id": str(row.get("cashier_id") or row.get("cashier_name") or "").strip(),
             "shift_id": str(row.get("shift_id") or row.get("shift_no") or "").strip(),
@@ -18406,12 +18624,16 @@ class InMemoryState:
                     "store_item_id": str(item.get("store_item_id") or "").strip(),
                     "display_code": str(item.get("display_code") or "").strip(),
                     "machine_code": str(item.get("machine_code") or "").strip(),
+                    "line_type": self._normalize_pos_sale_line_type(item.get("line_type")),
                     "category": str(item.get("category") or "").strip(),
                     "shelf_location": str(item.get("shelf_location") or "").strip(),
                     "original_price": round(float(item.get("original_price") or 0), 2),
                     "final_price": round(float(item.get("final_price") or 0), 2),
                     "discount_amount": round(float(item.get("discount_amount") or 0), 2),
                     "store_code": str(item.get("store_code") or row.get("store_code") or "").strip().upper(),
+                    "qty": int(item.get("qty") or 1),
+                    "unit_price": round(float(item.get("unit_price") or item.get("final_price") or 0), 2),
+                    "inventory_tracked": bool(item.get("inventory_tracked", True)),
                 }
                 for index, item in enumerate(sale_items, start=1)
             ],
@@ -18426,7 +18648,7 @@ class InMemoryState:
             "cashier_id": detail["cashier_id"],
             "shift_id": detail["shift_id"],
             "terminal_id": detail["terminal_id"],
-            "total_items": len(detail["items"]),
+            "total_items": sum(int(row.get("qty") or 1) for row in detail["items"]),
             "total_amount": detail["total_amount"],
             "payment_method": detail["payment_method"],
             "status": detail["status"],

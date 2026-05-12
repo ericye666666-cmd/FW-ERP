@@ -1,5 +1,6 @@
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -110,8 +111,18 @@ def _open_shift(state, *, store_code="UTAWALA", cashier_id="Clerk A", terminal_i
     )
 
 
-def _sale_payload(*machine_codes, payment_method="cash", cash_amount=1000, mpesa_amount=0, mpesa_reference="", final_price=250, shift_id="", terminal_id="POS-UTW-01"):
-    return {
+def _sale_payload(
+    *machine_codes,
+    payment_method="cash",
+    cash_amount=1000,
+    mpesa_amount=0,
+    mpesa_reference="",
+    final_price=250,
+    shift_id="",
+    terminal_id="POS-UTW-01",
+    idempotency_key="",
+):
+    payload = {
         "cashier_id": "Clerk A",
         "shift_id": shift_id,
         "terminal_id": terminal_id,
@@ -130,6 +141,9 @@ def _sale_payload(*machine_codes, payment_method="cash", cash_amount=1000, mpesa
             for index, machine_code in enumerate(machine_codes)
         ],
     }
+    if idempotency_key:
+        payload["idempotency_key"] = idempotency_key
+    return payload
 
 
 def test_pos_sale_success_single_store_item(state):
@@ -154,6 +168,147 @@ def test_pos_sale_success_single_store_item(state):
     movements = state.list_inventory_movements(movement_type="POS_SALE_OUT")
     assert len(movements) == 1
     assert movements[0]["details"]["reference_sale_id"] == sale["sale_id"]
+
+
+def test_same_pos_idempotency_key_replays_existing_sale_without_second_sale_out(state):
+    _add_store_item(state, _store_item())
+    shift = _open_shift(state)
+    payload = _sale_payload(
+        "5261240000013",
+        shift_id=shift["shift_id"],
+        idempotency_key="pos-sale-retry-001",
+    )
+
+    first = state.create_pos_sale("UTAWALA", payload, created_by="store_manager_1")
+    second = state.create_pos_sale("UTAWALA", payload, created_by="store_manager_1")
+
+    assert second["sale_no"] == first["sale_no"]
+    assert second["idempotency_key"] == "pos-sale-retry-001"
+    assert len(state.sales_transactions) == 1
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
+
+
+def test_same_pos_idempotency_key_with_different_payload_conflicts(state):
+    _add_store_item(state, _store_item(store_item_id="STOREITEM-POS-001", machine_code="5261240000013", price=250))
+    _add_store_item(state, _store_item(store_item_id="STOREITEM-POS-002", machine_code="5261240000020", price=300))
+    shift = _open_shift(state)
+    first_payload = _sale_payload("5261240000013", shift_id=shift["shift_id"], idempotency_key="pos-sale-conflict-001")
+    changed_payload = _sale_payload(
+        "5261240000020",
+        cash_amount=1000,
+        final_price=300,
+        shift_id=shift["shift_id"],
+        idempotency_key="pos-sale-conflict-001",
+    )
+
+    state.create_pos_sale("UTAWALA", first_payload, created_by="store_manager_1")
+    with pytest.raises(HTTPException) as exc:
+        state.create_pos_sale("UTAWALA", changed_payload, created_by="store_manager_1")
+
+    assert exc.value.status_code == 409
+    assert "idempotency" in str(exc.value.detail).lower()
+    assert len(state.sales_transactions) == 1
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
+
+
+def test_completed_pos_sale_line_blocks_second_sale_even_if_item_status_is_stale(state):
+    _add_store_item(state, _store_item())
+    shift = _open_shift(state)
+    first = state.create_pos_sale(
+        "UTAWALA",
+        _sale_payload("5261240000013", shift_id=shift["shift_id"], idempotency_key="pos-sale-stale-001"),
+        created_by="store_manager_1",
+    )
+    for row in (state.store_items["STOREITEM-POS-001"], state.item_barcode_tokens["STOREITEM-POS-001"]):
+        row["status"] = "printed_in_store"
+        row["sale_status"] = "ready_for_sale"
+        row["store_item_status"] = "printed_in_store"
+        row["sold"] = False
+        row["sale_id"] = ""
+        row["sale_no"] = ""
+
+    with pytest.raises(HTTPException) as exc:
+        state.create_pos_sale(
+            "UTAWALA",
+            _sale_payload("5261240000013", shift_id=shift["shift_id"], idempotency_key="pos-sale-stale-002"),
+            created_by="store_manager_1",
+        )
+
+    assert exc.value.status_code == 409
+    assert first["sale_no"] in str(exc.value.detail)
+    assert len(state.sales_transactions) == 1
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
+
+
+def test_concurrent_pos_sale_same_store_item_only_completes_once(state):
+    _add_store_item(state, _store_item())
+    shift = _open_shift(state)
+
+    def attempt_sale(index):
+        try:
+            return state.create_pos_sale(
+                "UTAWALA",
+                _sale_payload(
+                    "5261240000013",
+                    shift_id=shift["shift_id"],
+                    idempotency_key=f"pos-sale-concurrent-{index}",
+                ),
+                created_by="store_manager_1",
+            )
+        except HTTPException as exc:
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(attempt_sale, [1, 2]))
+
+    successes = [row for row in results if isinstance(row, dict)]
+    failures = [row for row in results if isinstance(row, HTTPException)]
+    assert len(successes) == 1
+    assert len(failures) == 1
+    assert failures[0].status_code in {400, 409}
+    assert len(state.sales_transactions) == 1
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
+
+
+def test_manual_unbarcoded_sale_remains_separate_from_store_item_inventory(state):
+    shift = _open_shift(state)
+
+    sale = state.create_pos_sale(
+        "UTAWALA",
+        {
+            "cashier_id": "Clerk A",
+            "shift_id": shift["shift_id"],
+            "terminal_id": "POS-UTW-01",
+            "payment_method": "cash",
+            "cash_amount": 500,
+            "discount_amount": 0,
+            "idempotency_key": "manual-unbarcoded-001",
+            "items": [
+                {
+                    "line_type": "MANUAL_UNBARCODED",
+                    "category": "MANUAL",
+                    "qty": 2,
+                    "unit_price": 125,
+                    "final_price": 250,
+                }
+            ],
+        },
+        created_by="store_manager_1",
+    )
+    report = state.get_pos_shift_x_report("UTAWALA", shift["shift_id"])
+
+    assert sale["sale_no"]
+    assert sale["items"][0]["line_type"] == "MANUAL_UNBARCODED"
+    assert sale["items"][0]["machine_code"] == ""
+    assert sale["items"][0]["inventory_tracked"] is False
+    assert not state.store_items
+    assert not state.item_barcode_tokens
+    assert not state.list_inventory_movements(movement_type="POS_SALE_OUT")
+    assert state.sales_transactions[0]["sale_items"][0]["line_type"] == "MANUAL_UNBARCODED"
+    assert report["manual_item_count"] == 2
+    assert report["manual_sales_amount"] == 250
+    assert report["category_breakdown"][0]["manual_qty"] == 2
+    assert report["category_breakdown"][0]["store_item_qty"] == 0
 
 
 def test_pos_sale_success_multiple_items_reduces_inventory_overview(state):
@@ -217,6 +372,36 @@ def test_pos_sale_rejects_other_store_and_unconfirmed_items(state):
         state.create_pos_sale("UTAWALA", _sale_payload("5261240000037", shift_id=shift["shift_id"]), created_by="store_manager_1")
     with pytest.raises(HTTPException):
         state.create_pos_sale("UTAWALA", _sale_payload("5261240000044", shift_id=shift["shift_id"]), created_by="store_manager_1")
+    assert not state.sales_transactions
+
+
+def test_pos_sale_rejects_pending_print_and_pending_stock_in_items(state):
+    _add_store_item(
+        state,
+        _store_item(
+            store_item_id="STOREITEM-PENDING-PRINT",
+            machine_code="5261240000068",
+            status="pending_print",
+            sale_status="pending_print",
+            stock_in_confirmed=False,
+        ),
+    )
+    _add_store_item(
+        state,
+        _store_item(
+            store_item_id="STOREITEM-PENDING-STOCK-IN",
+            machine_code="5261240000075",
+            status="pending_stock_in",
+            sale_status="pending_stock_in",
+            stock_in_confirmed=False,
+        ),
+    )
+    shift = _open_shift(state)
+
+    for barcode in ["5261240000068", "5261240000075"]:
+        with pytest.raises(HTTPException) as exc:
+            state.create_pos_sale("UTAWALA", _sale_payload(barcode, shift_id=shift["shift_id"]), created_by="store_manager_1")
+        assert exc.value.status_code == 400
     assert not state.sales_transactions
 
 

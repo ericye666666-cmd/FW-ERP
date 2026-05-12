@@ -121,8 +121,9 @@ def _open_shift(state):
     )
 
 
-def _sale_payload(machine_code, *, shift_id):
+def _sale_payload(machine_code, *, shift_id, idempotency_key=""):
     return PosSaleCreate(
+        idempotency_key=idempotency_key,
         cashier_id="Clerk A",
         shift_id=shift_id,
         terminal_id="POS-UTW-01",
@@ -138,6 +139,31 @@ def _sale_payload(machine_code, *, shift_id):
             }
         ],
     )
+
+
+def test_route_repeated_pos_sale_idempotency_returns_same_sale(route_state):
+    state, manager_auth, _ = route_state
+    machine_code = "5261240000099"
+    _add_store_item(
+        state,
+        _store_item(
+            store_item_id="STOREITEM-306-099",
+            machine_code=machine_code,
+            location_code="PT-CR",
+            stock_in_confirmed=True,
+            status="ready_for_sale",
+        ),
+    )
+    shift = _open_shift(state)
+    payload = _sale_payload(machine_code, shift_id=shift["shift_id"], idempotency_key="route-pos-sale-retry-001")
+
+    first = routes_module.create_store_pos_sale("UTAWALA", payload, authorization=manager_auth)
+    second = routes_module.create_store_pos_sale("UTAWALA", payload, authorization=manager_auth)
+
+    assert second.sale_no == first.sale_no
+    assert second.idempotency_key == "route-pos-sale-retry-001"
+    assert len(state.sales_transactions) == 1
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
 
 
 def test_confirmed_store_item_leaves_inventory_overview_after_pos_sale(route_state):

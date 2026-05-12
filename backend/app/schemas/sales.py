@@ -42,13 +42,18 @@ class SaleCreate(BaseModel):
 
 
 class PosSaleItemCreate(BaseModel):
-    machine_code: str = Field(min_length=1)
+    line_type: str = "STORE_ITEM"
+    machine_code: str = ""
     display_code: str = ""
     final_price: float = Field(ge=0)
     discount_amount: float = Field(default=0, ge=0)
+    category: str = ""
+    qty: int = Field(default=1, ge=1)
+    unit_price: float = Field(default=0, ge=0)
 
 
 class PosSaleCreate(BaseModel):
+    idempotency_key: str = ""
     cashier_id: str = Field(min_length=1)
     shift_id: str = ""
     terminal_id: str = ""
@@ -67,17 +72,22 @@ class PosSaleItemResponse(BaseModel):
     store_item_id: str
     display_code: str
     machine_code: str
+    line_type: str = "STORE_ITEM"
     category: str = ""
     shelf_location: str = ""
     original_price: float
     final_price: float
     discount_amount: float
     store_code: str
+    qty: int = 1
+    unit_price: float = 0
+    inventory_tracked: bool = True
 
 
 class PosSaleResponse(BaseModel):
     sale_id: str
     sale_no: str
+    idempotency_key: str = ""
     store_code: str
     cashier_id: str
     shift_id: str = ""
