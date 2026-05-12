@@ -195,6 +195,88 @@ def test_area_supervisor_can_soft_deactivate_store_employee_without_physical_del
     assert retained["status"] == "inactive"
 
 
+def test_area_supervisor_cannot_reactivate_store_employee_with_active_status(isolated_state: InMemoryState):
+    state = isolated_state
+    user = _create_store_employee(state, "reactivate_status_clerk", "store_clerk")
+    state.deactivate_user(user["id"], "admin_1")
+
+    with pytest.raises(HTTPException) as exc:
+        state.update_user(
+            user["id"],
+            {
+                "updated_by": "area_supervisor_1",
+                "status": "active",
+            },
+        )
+
+    assert exc.value.status_code == 403
+    assert _user_by_username(state, user["username"])["status"] == "inactive"
+
+
+def test_area_supervisor_cannot_reactivate_store_employee_with_is_active_true(isolated_state: InMemoryState):
+    state = isolated_state
+    user = _create_store_employee(state, "reactivate_active_flag_clerk", "store_clerk")
+    state.deactivate_user(user["id"], "admin_1")
+
+    with pytest.raises(HTTPException) as exc:
+        state.update_user(
+            user["id"],
+            {
+                "updated_by": "area_supervisor_1",
+                "is_active": True,
+            },
+        )
+
+    assert exc.value.status_code == 403
+    assert _user_by_username(state, user["username"])["is_active"] is False
+
+
+def test_area_supervisor_cannot_combine_password_reset_with_status_changes(isolated_state: InMemoryState):
+    state = isolated_state
+    user = _create_store_employee(state, "reset_with_status_clerk", "store_clerk")
+
+    with pytest.raises(HTTPException) as exc:
+        state.update_user(
+            user["id"],
+            {
+                "updated_by": "area_supervisor_1",
+                "password": "newpass123",
+                "status": "inactive",
+            },
+        )
+
+    assert exc.value.status_code == 403
+    assert state.authenticate_user(user["username"], "demo1234")["user"]["username"] == user["username"]
+
+
+@pytest.mark.parametrize(
+    "field_name, field_value",
+    (
+        ("role_code", "cashier"),
+        ("store_code", "KINNO"),
+        ("managed_store_codes", ["KINNO"]),
+    ),
+)
+def test_area_supervisor_cannot_change_role_or_store_org_fields(isolated_state: InMemoryState, field_name: str, field_value):
+    state = isolated_state
+    user = _create_store_employee(state, f"blocked_{field_name}_clerk", "store_clerk")
+
+    with pytest.raises(HTTPException) as exc:
+        state.update_user(
+            user["id"],
+            {
+                "updated_by": "area_supervisor_1",
+                field_name: field_value,
+            },
+        )
+
+    retained = _user_by_username(state, user["username"])
+    assert exc.value.status_code == 403
+    assert retained["role_code"] == "store_clerk"
+    assert retained["store_code"] == "UTAWALA"
+    assert retained["managed_store_codes"] == []
+
+
 @pytest.mark.parametrize("username", ("admin_1", "warehouse_supervisor_1", "warehouse_manager_1", "warehouse_clerk_1", "area_supervisor_1", "auditor_1"))
 def test_area_supervisor_cannot_deactivate_protected_users(isolated_state: InMemoryState, username: str):
     state = isolated_state

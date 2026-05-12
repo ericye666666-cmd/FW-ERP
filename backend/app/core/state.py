@@ -44,7 +44,8 @@ PDA_DIAGNOSTIC_SECRET_KEYS = {
 }
 STORE_EMPLOYEE_ROLE_CODES = {"store_manager", "store_clerk", "cashier"}
 STORE_LAUNCH_STATUS_CODES = {"preparing", "active", "paused", "closed"}
-AREA_SUPERVISOR_USER_UPDATE_FIELDS = {"updated_by", "password", "status", "is_active"}
+AREA_SUPERVISOR_PASSWORD_RESET_FIELDS = {"updated_by", "password"}
+AREA_SUPERVISOR_SOFT_DEACTIVATE_FIELDS = {"updated_by", "status", "is_active"}
 DEFAULT_APPAREL_CATEGORY_PRESETS = [
     {"category_main": "tops", "category_sub": "lady tops", "label": "女装上衣", "rack_prefix": "A-TS-LT", "cost_p": 185, "cost_s": 138},
     {"category_main": "tops", "category_sub": "unisex T-shirt", "label": "中性T恤", "rack_prefix": "A-TS-UT", "cost_p": 165, "cost_s": 126},
@@ -12924,9 +12925,19 @@ class InMemoryState:
 
         if actor["role_code"] == "area_supervisor":
             requested_fields = set(payload.keys())
-            if not requested_fields <= AREA_SUPERVISOR_USER_UPDATE_FIELDS:
+            password = str(payload.get("password") or "").strip()
+            if password:
+                if requested_fields != AREA_SUPERVISOR_PASSWORD_RESET_FIELDS:
+                    raise HTTPException(status_code=403, detail="你没有权限")
+                action = "reset_password"
+            elif requested_fields <= AREA_SUPERVISOR_SOFT_DEACTIVATE_FIELDS and requested_fields != {"updated_by"}:
+                if "status" in payload and str(payload.get("status") or "").strip().lower() != "inactive":
+                    raise HTTPException(status_code=403, detail="你没有权限")
+                if "is_active" in payload and payload.get("is_active") is not False:
+                    raise HTTPException(status_code=403, detail="你没有权限")
+                action = "deactivate"
+            else:
                 raise HTTPException(status_code=403, detail="你没有权限")
-            action = "reset_password" if str(payload.get("password") or "").strip() else "deactivate"
             self._require_area_supervisor_store_user_role(
                 actor,
                 str(target.get("role_code") or ""),
