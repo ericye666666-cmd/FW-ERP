@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TransferItemCreate(BaseModel):
@@ -263,6 +263,8 @@ class StoreDeliveryPackageAssignRequest(BaseModel):
 
 
 class StoreDeliveryPackageStoreItemGenerateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     source_sdp_display_code: str = ""
     source_sdp_machine_code: str = ""
     store_code: str = ""
