@@ -42,6 +42,10 @@ PDA_DIAGNOSTIC_SECRET_KEYS = {
     "token",
     "password",
 }
+STORE_EMPLOYEE_ROLE_CODES = {"store_manager", "store_clerk", "cashier"}
+STORE_LAUNCH_STATUS_CODES = {"preparing", "active", "paused", "closed"}
+AREA_SUPERVISOR_PASSWORD_RESET_FIELDS = {"updated_by", "password"}
+AREA_SUPERVISOR_SOFT_DEACTIVATE_FIELDS = {"updated_by", "status", "is_active"}
 DEFAULT_APPAREL_CATEGORY_PRESETS = [
     {"category_main": "tops", "category_sub": "lady tops", "label": "女装上衣", "rack_prefix": "A-TS-LT", "cost_p": 185, "cost_s": 138},
     {"category_main": "tops", "category_sub": "unisex T-shirt", "label": "中性T恤", "rack_prefix": "A-TS-UT", "cost_p": 165, "cost_s": 126},
@@ -10120,12 +10124,14 @@ class InMemoryState:
         code = payload["code"].strip().upper()
         if code in self.stores:
             raise HTTPException(status_code=409, detail=f"Store {code} already exists")
+        status = self._normalize_store_status(payload.get("status") or "active")
 
         store = {
             "code": code,
             "name": payload["name"].strip(),
-            "status": payload["status"],
+            "status": status,
             "address": (payload.get("address") or "").strip() or None,
+            "phone": (payload.get("phone") or "").strip() or None,
             "latitude": payload.get("latitude"),
             "longitude": payload.get("longitude"),
             "google_maps_url": (payload.get("google_maps_url") or "").strip() or None,
@@ -10134,6 +10140,8 @@ class InMemoryState:
             "created_at": now_iso(),
         }
         self.stores[code] = store
+        if actor["role_code"] == "area_supervisor":
+            self._add_managed_store_code(actor, code)
         self._log_event(
             event_type="store.created",
             entity_type="store",
@@ -10141,6 +10149,43 @@ class InMemoryState:
             actor=actor["username"],
             summary=f"Store {code} created",
             details=store,
+        )
+        self._persist()
+        return store
+
+    def update_store(self, store_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        actor = self._require_user_role(payload["updated_by"], {"admin", "area_supervisor"})
+        code = store_code.strip().upper()
+        store = self._ensure_store_exists(code)
+        if actor["role_code"] == "area_supervisor":
+            self._require_area_supervisor_store_scope(actor, code)
+
+        if payload.get("name") is not None:
+            store["name"] = str(payload.get("name") or "").strip()
+        if payload.get("address") is not None:
+            store["address"] = str(payload.get("address") or "").strip() or None
+        if payload.get("phone") is not None:
+            store["phone"] = str(payload.get("phone") or "").strip() or None
+        if payload.get("google_maps_url") is not None:
+            store["google_maps_url"] = str(payload.get("google_maps_url") or "").strip() or None
+        if payload.get("manager_note") is not None:
+            store["manager_note"] = str(payload.get("manager_note") or "").strip() or None
+        if payload.get("status") is not None:
+            store["status"] = self._normalize_store_status(payload.get("status"))
+        store["updated_by"] = actor["username"]
+        store["updated_at"] = now_iso()
+        self._log_event(
+            event_type="store.updated",
+            entity_type="store",
+            entity_id=code,
+            actor=actor["username"],
+            summary=f"Store {code} updated",
+            details={
+                "name": store.get("name"),
+                "status": store.get("status"),
+                "address": store.get("address"),
+                "phone": store.get("phone"),
+            },
         )
         self._persist()
         return store
@@ -10332,6 +10377,50 @@ class InMemoryState:
             if user["username"] == normalized:
                 return user
         raise HTTPException(status_code=404, detail=f"Unknown user {normalized}")
+
+    def _normalize_store_status(self, value: Any) -> str:
+        status = str(value or "").strip().lower()
+        if status not in STORE_LAUNCH_STATUS_CODES:
+            raise HTTPException(status_code=400, detail="门店状态无效")
+        return status
+
+    def _add_managed_store_code(self, user: dict[str, Any], store_code: str) -> None:
+        managed_store_codes = self._normalize_managed_store_codes(user.get("managed_store_codes"))
+        normalized_store_code = store_code.strip().upper()
+        if normalized_store_code not in managed_store_codes:
+            managed_store_codes.append(normalized_store_code)
+        user["managed_store_codes"] = managed_store_codes
+
+    def _require_area_supervisor_store_scope(self, actor: dict[str, Any], store_code: Optional[str]) -> None:
+        if actor.get("role_code") != "area_supervisor" or not store_code:
+            return
+        normalized_store_code = store_code.strip().upper()
+        managed_store_codes = set(self._normalize_managed_store_codes(actor.get("managed_store_codes")))
+        if normalized_store_code not in managed_store_codes:
+            raise HTTPException(status_code=403, detail="该门店不属于你")
+
+    def _require_area_supervisor_store_user_role(
+        self,
+        actor: dict[str, Any],
+        role_code: str,
+        store_code: Optional[str],
+        *,
+        action: str,
+    ) -> None:
+        if actor.get("role_code") != "area_supervisor":
+            return
+        normalized_role = str(role_code or "").strip()
+        if normalized_role not in STORE_EMPLOYEE_ROLE_CODES:
+            if action == "create":
+                detail = "你不能创建这个角色"
+            elif action == "reset_password":
+                detail = "你不能重置这个账号的密码"
+            else:
+                detail = "请联系主管处理"
+            raise HTTPException(status_code=403, detail=detail)
+        if not store_code:
+            raise HTTPException(status_code=403, detail="该门店不属于你")
+        self._require_area_supervisor_store_scope(actor, store_code)
 
     def authenticate_user(self, username: str, password: str) -> dict[str, Any]:
         user = self._get_user_by_username(username)
@@ -12750,13 +12839,24 @@ class InMemoryState:
         if any(user["username"] == username for user in self.users.values()):
             raise HTTPException(status_code=409, detail=f"Username {username} already exists")
         normalized_org = self._normalize_user_org_payload(payload)
+        role_code = str(payload.get("role_code") or "").strip()
+        self._require_area_supervisor_store_user_role(
+            actor,
+            role_code,
+            normalized_org.get("store_code"),
+            action="create",
+        )
+        if actor["role_code"] == "area_supervisor":
+            normalized_org["warehouse_code"] = None
+            normalized_org["area_code"] = None
+            normalized_org["managed_store_codes"] = []
 
         user = {
             "id": next(self._user_ids),
             "created_at": now_iso(),
             "username": username,
             "full_name": str(payload.get("full_name") or "").strip(),
-            "role_code": str(payload.get("role_code") or "").strip(),
+            "role_code": role_code,
             **normalized_org,
             **hash_password(payload["password"]),
         }
@@ -12818,10 +12918,32 @@ class InMemoryState:
         }
 
     def update_user(self, user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-        actor = self._require_user_role(payload["updated_by"], {"admin"})
+        actor = self._require_user_role(payload["updated_by"], {"admin", "area_supervisor"})
         target = self.users.get(int(user_id))
         if not target:
             raise HTTPException(status_code=404, detail=f"Unknown user id {user_id}")
+
+        if actor["role_code"] == "area_supervisor":
+            requested_fields = set(payload.keys())
+            password = str(payload.get("password") or "").strip()
+            if password:
+                if requested_fields != AREA_SUPERVISOR_PASSWORD_RESET_FIELDS:
+                    raise HTTPException(status_code=403, detail="你没有权限")
+                action = "reset_password"
+            elif requested_fields <= AREA_SUPERVISOR_SOFT_DEACTIVATE_FIELDS and requested_fields != {"updated_by"}:
+                if "status" in payload and str(payload.get("status") or "").strip().lower() != "inactive":
+                    raise HTTPException(status_code=403, detail="你没有权限")
+                if "is_active" in payload and payload.get("is_active") is not False:
+                    raise HTTPException(status_code=403, detail="你没有权限")
+                action = "deactivate"
+            else:
+                raise HTTPException(status_code=403, detail="你没有权限")
+            self._require_area_supervisor_store_user_role(
+                actor,
+                str(target.get("role_code") or ""),
+                target.get("store_code"),
+                action=action,
+            )
 
         incoming_username = str(payload.get("username") or target.get("username") or "").strip()
         if incoming_username != target.get("username") and any(user["username"] == incoming_username for user in self.users.values()):

@@ -8,6 +8,7 @@ class StoreResponse(BaseModel):
     name: str
     status: str
     address: Optional[str] = None
+    phone: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     google_maps_url: Optional[str] = None
@@ -21,12 +22,23 @@ class StoreCreate(BaseModel):
     name: str = Field(min_length=1)
     status: str = "active"
     address: Optional[str] = None
+    phone: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     google_maps_url: Optional[str] = None
     catchment_area: Optional[str] = None
     manager_note: Optional[str] = None
     created_by: str = Field(min_length=1, default="admin_1")
+
+
+class StoreUpdate(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    google_maps_url: Optional[str] = None
+    manager_note: Optional[str] = None
+    updated_by: str = Field(min_length=1, default="admin_1")
 
 
 class StoreSiteRecommendationRequest(BaseModel):
