@@ -92,6 +92,21 @@ function extractAssignedAnyFunctionSource(source, functionName) {
   throw new Error(`could not extract assigned ${functionName}`);
 }
 
+function extractLastCssRule(selectorPattern) {
+  const pattern = new RegExp(`${selectorPattern}\\s*\\{[^}]*\\}`, "g");
+  const matches = Array.from(stylesCss.matchAll(pattern));
+  assert.ok(matches.length, `missing css rule ${selectorPattern}`);
+  return matches[matches.length - 1][0];
+}
+
+function extractCssRuleContaining(selectorPattern, requiredPattern) {
+  const pattern = new RegExp(`${selectorPattern}\\s*\\{[^}]*\\}`, "g");
+  const matches = Array.from(stylesCss.matchAll(pattern)).map((match) => match[0]);
+  const found = matches.find((rule) => requiredPattern.test(rule));
+  assert.ok(found, `missing css rule ${selectorPattern} containing ${requiredPattern}`);
+  return found;
+}
+
 test("POS scans use the typed resolver with POS context before cart insert", () => {
   assert.match(appJs, /posStoreItemSaleRecords/);
   const resolverSource = extractFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
@@ -170,6 +185,32 @@ test("POS cashier terminal removes blocking bottom floating status cards", () =>
   assert.doesNotMatch(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-quick-actions\s*\{[^}]*bottom:/);
   assert.match(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-transaction-strip\s*\{/);
   assert.match(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-status-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*minmax\(0,\s*1fr\)\)/);
+});
+
+test("POS hotfix keeps top header compact and receipt non-blocking", () => {
+  const topbarRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar", /grid-template-columns:\s*minmax\(180px,\s*220px\)\s+minmax\(0,\s*1fr\)/);
+  const topbarActionsRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar-actions", /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+  const statusStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-session-strip", /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(104px,\s*1fr\)\)/);
+  const mainBodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-body", /grid-template-columns:\s*minmax\(280px,\s*0\.28fr\)/);
+  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /max-height:\s*96px/);
+  const receiptEmptyRule = extractLastCssRule("body\\.cashier-terminal-mode \\.cashier-terminal-receipt-panel\\.is-empty");
+  const receiptSource = extractFunctionSource(appJs, "renderCashierTerminalReceiptPanel");
+
+  assert.match(stylesCss, /POS-UI-2-HOTFIX/);
+  assert.match(topbarRule, /display:\s*grid/);
+  assert.match(topbarRule, /grid-template-columns:\s*minmax\(180px,\s*220px\)\s+minmax\(0,\s*1fr\)/);
+  assert.match(topbarRule, /align-items:\s*center/);
+  assert.match(topbarRule, /max-height:\s*110px/);
+  assert.doesNotMatch(topbarRule, /align-items:\s*stretch/);
+  assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+  assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(104px,\s*1fr\)\)/);
+  assert.match(statusStripRule, /max-height:\s*74px/);
+  assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(280px,\s*0\.28fr\)\s+minmax\(460px,\s*0\.42fr\)\s+minmax\(360px,\s*0\.3fr\)/);
+  assert.match(mainBodyRule, /min-height:\s*calc\(100vh - 180px\)/);
+  assert.match(transactionStripRule, /max-height:\s*96px/);
+  assert.match(transactionStripRule, /overflow:\s*hidden/);
+  assert.match(receiptSource, /receiptPanel\.classList\.toggle\("is-empty",\s*!sale\)/);
+  assert.match(receiptEmptyRule, /display:\s*none/);
 });
 
 test("POS cashier terminal gates resolver results before adding items", () => {
