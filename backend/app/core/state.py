@@ -279,6 +279,7 @@ class InMemoryState:
         self.offline_sale_registry: dict[str, dict[str, Any]] = {}
         self.label_templates: dict[str, dict[str, Any]] = {}
         self._barcode_generation_lock = threading.RLock()
+        self._store_item_generation_lock = threading.RLock()
         self._pos_sale_lock = threading.RLock()
         self.users: dict[int, dict[str, Any]] = {}
         self.auth_sessions: dict[str, dict[str, Any]] = {}
@@ -15188,10 +15189,10 @@ class InMemoryState:
         }
 
     def generate_store_items_from_pricing_batch(self, payload: dict[str, Any]) -> dict[str, Any]:
-        with self._barcode_generation_lock:
-            return self._generate_store_items_from_pricing_batch(payload)
+        with self._store_item_generation_lock:
+            return self._generate_store_items_from_pricing_batch_locked(payload)
 
-    def _generate_store_items_from_pricing_batch(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def _generate_store_items_from_pricing_batch_locked(self, payload: dict[str, Any]) -> dict[str, Any]:
         self._reject_client_store_item_machine_code_payload(payload)
         package_code = str(
             payload.get("source_sdp_display_code")
