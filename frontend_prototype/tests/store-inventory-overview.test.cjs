@@ -94,7 +94,9 @@ test("inventory overview page has store switcher, tabs, metrics, and detail targ
   assert.match(section, /销售出库摘要/);
   assert.match(section, /门店商品码查询/);
   assert.match(section, /请输入 \/ 扫描门店商品码/);
+  assert.match(section, /<input name="machine_code"[^>]+data-field-label="门店商品码"/);
   assert.match(section, /待完成入库/);
+  assert.doesNotMatch(section, /Machine Code/);
   assert.match(section, /按品类/);
   assert.match(section, /按货架/);
   assert.match(section, /storeInventoryOverviewDetail/);
