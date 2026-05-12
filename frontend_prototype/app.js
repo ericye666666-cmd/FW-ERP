@@ -25474,9 +25474,7 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
   const status = String(result.status || "confirmed").trim();
   const message = status === "already_confirmed"
     ? "已确认入库。"
-    : status === "location_updated"
-      ? "已换货架。"
-      : "确认完成入库。";
+    : "确认完成入库。";
   await loadStoreInventoryOverview(storeCode);
   await loadStoreInventoryUnconfirmedItems(message);
   return result;
@@ -37566,7 +37564,6 @@ function getStoreMobileStockInStatusLabel(status = "") {
   const normalized = String(status || "").trim();
   if (normalized === "confirmed") return "已入库";
   if (normalized === "already_confirmed") return "已确认";
-  if (normalized === "location_updated") return "已换货架";
   if (normalized === "confirming") return "确认中";
   if (normalized === "failed" || normalized === "error") return "失败";
   return "待确认";
@@ -37699,9 +37696,7 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
   const status = String(result.status || "confirmed").trim();
   state.storeMobileUnconfirmedStockInMessage = status === "already_confirmed"
     ? "已确认入库。"
-    : status === "location_updated"
-      ? "已换货架。"
-      : "已入库。";
+    : "已入库。";
   state.storeMobileUnconfirmedStockInError = "";
   await loadStoreMobileUnconfirmedStockInItems(state);
   return result;
@@ -39031,8 +39026,6 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
   rawItem.stock_in_error = "";
   if (status === "already_confirmed") {
     rawItem.stock_in_message = "已确认入库。";
-  } else if (status === "location_updated") {
-    rawItem.stock_in_message = "已换货架。";
   } else {
     rawItem.stock_in_message = "已入库。";
   }

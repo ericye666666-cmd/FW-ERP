@@ -58,8 +58,8 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=clerk-pda-daily-workbench-309/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-pda-daily-workbench-309/);
+  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -439,8 +439,8 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=clerk-pda-daily-workbench-309/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=clerk-pda-daily-workbench-309/);
+  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);
 });
@@ -2376,14 +2376,13 @@ test("confirm stock-in calls the 301 API per STORE_ITEM and treats idempotent st
   assert.match(confirmSource, /location_code/);
   assert.match(confirmSource, /confirmed_by/);
   assert.match(confirmSource, /already_confirmed/);
-  assert.match(confirmSource, /location_updated/);
   assert.match(confirmSource, /stock_in_status/);
   assert.match(confirmSource, /已入库/);
   assert.match(confirmSource, /已确认入库/);
-  assert.match(confirmSource, /已换货架/);
+  assert.doesNotMatch(confirmSource, /location_updated|已换货架/);
   assert.match(statusLabelSource, /confirmed[\s\S]*?已入库/);
   assert.match(statusLabelSource, /already_confirmed[\s\S]*?已确认/);
-  assert.match(statusLabelSource, /location_updated[\s\S]*?已换货架/);
+  assert.doesNotMatch(statusLabelSource, /location_updated|已换货架/);
   assert.match(actionSource, /confirmStoreMobileStoreItemStockIn/);
   assert.match(appJs, /data-mobile-pricing-confirm-stock-in/);
 });
@@ -2430,7 +2429,8 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   assert.match(listSource, /data-mobile-unconfirmed-stock-in-confirm/);
   assert.match(loadSource, /inventory-overview\/unconfirmed-items/);
   assert.match(confirmSource, /confirm-stock-in/);
-  assert.match(confirmSource, /confirmed|already_confirmed|location_updated/);
+  assert.match(confirmSource, /confirmed|already_confirmed/);
+  assert.doesNotMatch(confirmSource, /location_updated|已换货架/);
   assert.match(actionSource, /失败，请重试/);
   assert.match(actionSource, /loadStoreMobileUnconfirmedStockInItems/);
   assert.match(actionSource, /confirmStoreMobileUnconfirmedStockInItem/);

@@ -94,12 +94,14 @@ class StoreInventoryOverviewStateTest(unittest.TestCase):
         )
 
     def test_inventory_overview_counts_category_location_backroom_and_unassigned_items(self):
-        self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR", stock_in_confirmed=True))
-        self._add_item(_store_item(store_item_id="STOREITEM-BACK", machine_code="5260511000029", location_code="UT-BACKROOM", stock_in_confirmed=True))
-        self._add_item(_store_item(store_item_id="STOREITEM-UNASSIGNED", machine_code="5260511000037", location_code="", stock_in_confirmed=True))
+        today = datetime.now(NAIROBI_TZ).replace(hour=8, minute=0, second=0, microsecond=0).isoformat()
+        self._add_item(_store_item(store_item_id="STOREITEM-SHELF", machine_code="5260511000011", location_code="PT-CR", created_at=today, stock_in_confirmed=True))
+        self._add_item(_store_item(store_item_id="STOREITEM-BACK", machine_code="5260511000029", location_code="UT-BACKROOM", created_at=today, stock_in_confirmed=True))
+        self._add_item(_store_item(store_item_id="STOREITEM-UNASSIGNED", machine_code="5260511000037", location_code="", created_at=today, stock_in_confirmed=True))
         self._add_item(_store_item(store_item_id="STOREITEM-SOLD", machine_code="5260511000045", location_code="PT-CR", status="sold"))
         self._add_item(_store_item(store_code="KINNO", store_item_id="STOREITEM-KINNO", machine_code="5260511000052", location_code="PT-CR"))
         self._add_item(_store_item(store_item_id="STOREITEM-PENDING", machine_code="5260511000060", location_code="PT-CR", stock_in_confirmed=False))
+        self._add_item(_store_item(store_item_id="STOREITEM-PENDING-PRINT", machine_code="5260511000086", location_code="PT-CR", status="pending_print", stock_in_confirmed=False))
         self._add_item(_store_item(store_item_id="STOREITEM-LEGACY", machine_code="5260511000078", location_code="PT-CR"))
 
         overview = self.state.get_store_inventory_overview("UTAWALA")
@@ -110,7 +112,7 @@ class StoreInventoryOverviewStateTest(unittest.TestCase):
         self.assertEqual(overview["backroom_items"], 1)
         self.assertEqual(overview["unassigned_location_items"], 1)
         self.assertEqual(overview["today_new_items"], 3)
-        self.assertEqual(overview["unconfirmed_items"], 2)
+        self.assertEqual(overview["unconfirmed_items"], 3)
         self.assertEqual(overview["stock_in_confirmed_filter"], "required_true")
 
         category = next(row for row in overview["by_category"] if row["category_name"] == "CARGO PANT")

@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fastapi import HTTPException
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -148,21 +150,22 @@ class StoreItemStockInInventoryIntegrationTest(unittest.TestCase):
         self.assertEqual(overview["backroom_items"], 1)
         self.assertEqual([row["machine_code"] for row in backroom_items], ["5260511003032"])
 
-    def test_repeated_confirmation_is_idempotent_and_location_update_moves_counts(self):
+    def test_repeated_confirmation_is_idempotent_and_different_location_conflicts(self):
         self._add_item(_store_item(stock_in_confirmed=False))
 
         first = self._confirm(location_code="PT-CR")
         again = self._confirm(location_code="PT-CR")
         before_move = routes_module.get_store_inventory_overview("UTAWALA", authorization=f"Bearer {self.token}")
-        moved = self._confirm(location_code="UT-BACKROOM")
-        after_move = routes_module.get_store_inventory_overview("UTAWALA", authorization=f"Bearer {self.token}")
+        with self.assertRaises(HTTPException) as ctx:
+            self._confirm(location_code="UT-BACKROOM")
+        after_conflict = routes_module.get_store_inventory_overview("UTAWALA", authorization=f"Bearer {self.token}")
 
         self.assertEqual(first.status, "confirmed")
         self.assertEqual(again.status, "already_confirmed")
         self.assertEqual(before_move["total_items"], 1)
         self.assertEqual(before_move["shelf_items"], 1)
         self.assertEqual(before_move["backroom_items"], 0)
-        self.assertEqual(moved.status, "location_updated")
-        self.assertEqual(after_move["total_items"], 1)
-        self.assertEqual(after_move["shelf_items"], 0)
-        self.assertEqual(after_move["backroom_items"], 1)
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertEqual(after_conflict["total_items"], 1)
+        self.assertEqual(after_conflict["shelf_items"], 1)
+        self.assertEqual(after_conflict["backroom_items"], 0)
