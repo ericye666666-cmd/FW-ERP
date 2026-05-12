@@ -50,7 +50,7 @@ test("store manager PDA runtime bottom nav keeps the original four manager tabs"
   assert.match(renderPreview, /isPdaRuntimeMode\(\)/);
   assert.match(renderPreview, /renderStoreManagerPdaRuntimeScreen/);
   assert.match(bottomTabs, /STORE_MANAGER_PDA_TABS\.map/);
-  ["经营总览", "收退货", "经营日志", "其他"].forEach((label) => {
+  ["经营总览", "收退货", "经营日志", "我的"].forEach((label) => {
     assert.match(appJs, new RegExp(`label: "${label}"`), `missing manager tab ${label}`);
   });
   assert.match(bottomTabs, /data-store-manager-pda-tab/);
@@ -485,6 +485,8 @@ test("manager available clerk list is data-driven from active UTAWALA store_cler
 
 test("manager other tab is scoped to PDA account settings without demo reset", () => {
   const myTab = functionSource(appJs, "renderStoreManagerPdaMyTab");
+  const languageSettingSource = functionSource(appJs, "renderPdaLanguageSettingCard");
+  const runtimeScreen = functionSource(appJs, "renderStoreManagerPdaRuntimeScreen");
 
   assert.match(myTab, /当前账号/);
   assert.match(myTab, /currentSession\.user/);
@@ -492,6 +494,13 @@ test("manager other tab is scoped to PDA account settings without demo reset", (
   assert.match(myTab, /getCurrentStoreCodeFallback/);
   assert.match(myTab, /角色/);
   assert.match(myTab, /店长/);
+  assert.match(myTab, /renderPdaLanguageSettingCard/);
+  assert.match(languageSettingSource, /设置/);
+  assert.match(languageSettingSource, /中英切换/);
+  assert.match(languageSettingSource, /data-pda-language-setting="true"/);
+  assert.match(languageSettingSource, /data-global-language="zh"/);
+  assert.match(languageSettingSource, /data-global-language="en"/);
+  assert.doesNotMatch(runtimeScreen, /data-global-language/);
   assert.match(myTab, /PDA mode \/ version/);
   assert.match(myTab, /退出登录/);
   assert.doesNotMatch(myTab, /重置演示任务状态/);

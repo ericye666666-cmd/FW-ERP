@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 
 const requiredTerms = [
   ["门店收货主控台", "Store Receiving Command Center"],
@@ -43,11 +44,16 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("global language toggle is not exposed in the main auth or workspace shell", () => {
+test("web language switch is a top-right control and is hidden in PDA runtime", () => {
+  const webToggle = indexHtml.match(/<div id="webLanguageToggle"[\s\S]*?<\/div>/)?.[0] || "";
+
+  assert.match(webToggle, /class="[^"]*web-language-toggle[^"]*global-language-toggle/);
+  assert.match(webToggle, /data-global-language="zh"/);
+  assert.match(webToggle, /data-global-language="en"/);
   assert.doesNotMatch(indexHtml, /id="authLanguageToggle"/);
   assert.doesNotMatch(indexHtml, /id="workspaceLanguageToggle"/);
-  assert.doesNotMatch(indexHtml, /data-global-language="zh"/);
-  assert.doesNotMatch(indexHtml, /data-global-language="en"/);
+  assert.match(stylesCss, /\.web-language-toggle\s*\{[\s\S]*position:\s*fixed/);
+  assert.match(stylesCss, /body\.pda-runtime-mode\s+\.web-language-toggle\s*\{[\s\S]*display:\s*none\s*!important/);
 });
 
 test("pre-QA terminology uses the approved bilingual glossary", () => {

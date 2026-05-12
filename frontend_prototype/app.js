@@ -1151,6 +1151,20 @@ function setGlobalLanguage(language = "zh", options = {}) {
   applyGlobalI18n(document.body, currentLanguage);
 }
 
+function refreshPdaLanguageSurfacesAfterLanguageChange() {
+  if (!isPdaRuntimeMode()) {
+    return;
+  }
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (roleCode === "store_clerk") {
+    renderStoreMobilePricingPreviewPreservingScroll();
+  }
+  if (roleCode === "store_manager") {
+    renderStoreManagerPdaPreviewPreservingScroll();
+  }
+  syncGlobalLanguageButtons();
+}
+
 function initializeGlobalI18n() {
   syncGlobalLanguageButtons();
   applyGlobalI18n(document.body, currentLanguage);
@@ -2851,7 +2865,7 @@ const STORE_MANAGER_PDA_TABS = [
   { id: "overview", label: "经营总览", title: "经营总览" },
   { id: "receiving", label: "收退货", title: "SDO 收退货" },
   { id: "logs", label: "经营日志", title: "经营日志" },
-  { id: "other", label: "其他", title: "其他" },
+  { id: "other", label: "我的", title: "我的" },
 ];
 
 const STORE_MANAGER_PDA_MOCK = {
@@ -6648,7 +6662,7 @@ function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
   const roleCode = String(currentSession.user?.role_code || "store_manager").trim();
   return `
     <section class="store-manager-pda-card store-manager-pda-my-tab">
-      <h3>其他</h3>
+      <h3>我的</h3>
       <div class="store-manager-pda-sdp-facts">
         <span><b>当前账号</b>${escapeHtml(username)}</span>
         <span><b>门店</b>${escapeHtml(getCurrentStoreCodeFallback())}</span>
@@ -6656,6 +6670,7 @@ function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
         <span><b>role_code</b>${escapeHtml(roleCode)}</span>
         <span><b>PDA mode / version</b>Direct Loop PDA · manager backend flow 210</span>
       </div>
+      ${renderPdaLanguageSettingCard()}
       <button type="button" class="store-manager-pda-secondary-action" data-store-manager-pda-reload="true">刷新 SDO / 店员列表</button>
       <button type="button" class="store-manager-pda-primary-action" data-action="logout">退出登录</button>
     </section>
@@ -6691,7 +6706,7 @@ function getStoreManagerPdaRuntimeTitle(state = ensureStoreManagerPdaTaskState()
   const activeTab = String(state.activeTab || "receiving");
   if (activeTab === "overview") return "经营总览";
   if (activeTab === "logs") return "经营日志";
-  if (activeTab === "other") return "其他";
+  if (activeTab === "other") return "我的";
   const page = String(state.activePage || "tasks");
   if (page === "detail") return "SDO 收货 / 分配";
   if (page === "complete") return "任务完成";
@@ -38987,6 +39002,26 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
   `;
 }
 
+function renderPdaLanguageSettingCard() {
+  const zhActive = currentLanguage === "zh" ? " is-active" : "";
+  const enActive = currentLanguage === "en" ? " is-active" : "";
+  return `
+    <section class="pda-settings-card" data-pda-language-setting="true">
+      <div class="mobile-section-head"><strong>设置</strong></div>
+      <div class="pda-language-setting-row">
+        <div>
+          <strong>中英切换</strong>
+          <span>${escapeHtml(currentLanguage === "en" ? "English" : "中文")}</span>
+        </div>
+        <div class="global-language-toggle pda-language-toggle" role="group" aria-label="中英切换">
+          <button type="button" class="global-language-button${zhActive}" data-global-language="zh">中文</button>
+          <button type="button" class="global-language-button${enActive}" data-global-language="en">EN</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
   const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
@@ -38999,6 +39034,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
         <span><b>角色</b><strong>店员</strong></span>
         <span><b>PDA mode / version</b><strong>Direct Loop PDA · task flow 208</strong></span>
       </div>
+      ${renderPdaLanguageSettingCard()}
       ${renderDirectLoopVersionInfoBlock("clerk_my")}
       ${renderClerkPrinterConnectionEntryCard(state)}
       <div class="mobile-section-head"><strong>${escapeHtml(pdaCopy.pendingStockIn)}</strong></div>
@@ -45004,6 +45040,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   setGlobalLanguage(target.dataset.globalLanguage || "zh");
+  refreshPdaLanguageSurfacesAfterLanguageChange();
 });
 window.addEventListener("online", handleCashierTerminalNetworkChange);
 window.addEventListener("offline", handleCashierTerminalNetworkChange);

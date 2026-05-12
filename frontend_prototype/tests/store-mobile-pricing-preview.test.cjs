@@ -348,6 +348,20 @@ test("clerk PDA task home is a daily workbench, not an SDP-only homepage", () =>
   assert.match(appLegacyJs, /日报填写/);
 });
 
+test("clerk PDA language switching is only under My settings", () => {
+  const mySource = extractFunctionSource(appJs, "renderStoreMobileMyTab");
+  const languageSettingSource = extractFunctionSource(appJs, "renderPdaLanguageSettingCard");
+  const runtimeSource = extractFunctionSource(appJs, "renderStoreMobileRuntimeScreen");
+
+  assert.match(mySource, /renderPdaLanguageSettingCard/);
+  assert.match(languageSettingSource, /设置/);
+  assert.match(languageSettingSource, /中英切换/);
+  assert.match(languageSettingSource, /data-pda-language-setting="true"/);
+  assert.match(languageSettingSource, /data-global-language="zh"/);
+  assert.match(languageSettingSource, /data-global-language="en"/);
+  assert.doesNotMatch(runtimeSource, /data-global-language/);
+});
+
 test("Clerk PDA high-frequency copy is backed by stable dictionary keys", () => {
   const requiredKeys = {
     myWorkToday: "pda.work.today",

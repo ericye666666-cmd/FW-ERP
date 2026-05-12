@@ -649,6 +649,58 @@ h3 {
   box-shadow: var(--shadow-control);
 }
 
+.web-language-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 80;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-control);
+}
+
+body.pda-runtime-mode .web-language-toggle {
+  display: none !important;
+}
+
+.pda-settings-card {
+  display: grid;
+  gap: 10px;
+}
+
+.pda-language-setting-row {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--fw-border);
+  border-radius: 8px;
+  background: var(--fw-surface);
+}
+
+.pda-language-setting-row > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pda-language-setting-row strong {
+  color: var(--fw-text);
+}
+
+.pda-language-setting-row span {
+  color: var(--fw-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pda-language-toggle {
+  justify-content: center;
+}
+
+.pda-language-toggle .global-language-button {
+  flex: 1;
+}
+
 .workspace-top-panel .global-language-toggle {
   background: var(--fw-surface-muted);
   border-color: var(--fw-border);
