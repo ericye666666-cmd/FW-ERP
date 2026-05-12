@@ -9327,18 +9327,18 @@ class InMemoryState:
             else "40x30"
         )
         display_name = f"{category_name} · {str(token.get('grade') or '').strip()}".strip(" ·")
-        barcode_value = str(token.get("barcode_value") or "").strip().upper()
-        if not self._is_store_item_machine_code(barcode_value):
-            barcode_value = self._store_item_barcode_value(str(token.get("task_no") or ""), int(token.get("qty_index") or 1), token.get("created_at"))
-            token["barcode_value"] = barcode_value
+        barcode_value = self._store_item_print_machine_code_for_token(token, normalized_token_no)
+        token["machine_code"] = barcode_value
         token["barcode_value"] = barcode_value
         job = {
             "id": next(self._print_job_ids),
             "job_type": "item_token_label",
             "status": "queued",
+            "print_job_status": "queued",
             "created_at": now_iso(),
             "product_id": None,
-            "barcode": normalized_token_no,
+            "barcode": barcode_value,
+            "token_no": normalized_token_no,
             "product_name": display_name,
             "template_code": str(template_code or "apparel_40x30").strip() or "apparel_40x30",
             "label_size": label_size,
@@ -9370,7 +9370,9 @@ class InMemoryState:
         }
         self.print_jobs.append(job)
         token["status"] = "print_queued"
+        token["print_status"] = "queued"
         token["updated_at"] = now_iso()
+        self._sync_store_item_print_fields(token, {"status": "print_queued", "print_status": "queued", "updated_at": token["updated_at"]})
         self._log_event(
             event_type="print.item_token_label_queued",
             entity_type="print_job",
@@ -9380,6 +9382,56 @@ class InMemoryState:
             details={**job["print_payload"], "copies": copies},
         )
         return job
+
+    def _store_item_print_machine_code_for_token(self, token: dict[str, Any], token_no: str) -> str:
+        normalized_token_no = str(token_no or "").strip().upper()
+        machine_code = str(token.get("machine_code") or "").strip().upper()
+        barcode_value = str(token.get("barcode_value") or "").strip().upper()
+        if not machine_code and barcode_value:
+            machine_code = barcode_value
+        if not self._is_store_item_machine_code(machine_code):
+            raise HTTPException(status_code=400, detail=f"Token {normalized_token_no} missing valid STORE_ITEM machine_code; print job cannot use display_code.")
+        if barcode_value and barcode_value != machine_code:
+            raise HTTPException(status_code=400, detail=f"Token {normalized_token_no} barcode_value must match machine_code for STORE_ITEM printing.")
+        return machine_code
+
+    def _item_token_for_print_job(self, job: dict[str, Any]) -> dict[str, Any] | None:
+        payload = job.get("print_payload") if isinstance(job.get("print_payload"), dict) else {}
+        references = [
+            payload.get("token_no"),
+            payload.get("identity_id"),
+            job.get("token_no"),
+            job.get("barcode"),
+            payload.get("machine_code"),
+            payload.get("barcode_value"),
+        ]
+        for reference in references:
+            normalized = str(reference or "").strip().upper()
+            if normalized and normalized in self.item_barcode_tokens:
+                return self.item_barcode_tokens[normalized]
+        for reference in references:
+            normalized = str(reference or "").strip().upper()
+            if not normalized:
+                continue
+            token = self._find_item_token_by_barcode_value(normalized)
+            if token:
+                return token
+        return None
+
+    def _sync_store_item_print_fields(self, token: dict[str, Any], fields: dict[str, Any]) -> None:
+        candidates = {
+            str(token.get("store_item_id") or "").strip().upper(),
+            str(token.get("item_id") or "").strip().upper(),
+            str(token.get("entity_id") or "").strip().upper(),
+            str(token.get("display_code") or "").strip().upper(),
+        }
+        for store_item_id in [value for value in candidates if value]:
+            row = self.store_items.get(store_item_id)
+            if row:
+                for key, value in fields.items():
+                    if key == "stock_in_confirmed" and row.get("stock_in_confirmed") is True:
+                        continue
+                    row[key] = value
 
     def queue_item_barcode_token_print_jobs(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
         actor = self._require_user_role(payload["requested_by"], {"store_manager", "store_clerk", "area_supervisor"})
@@ -15733,6 +15785,8 @@ class InMemoryState:
         if job["status"] != "queued":
             raise HTTPException(status_code=400, detail=f"Print job {job_id} is not queued")
         job["status"] = "printed"
+        if str(job.get("job_type") or "") == "item_token_label":
+            job["print_job_status"] = "success"
         job["printed_at"] = now_iso()
         job["printed_by"] = actor["username"]
         job["error_message"] = ""
@@ -15752,24 +15806,23 @@ class InMemoryState:
                         print_job_id=job["id"],
                     )
         if str(job.get("job_type") or "") == "item_token_label":
-            token_no = str(job.get("barcode") or "").strip().upper()
-            token = self.item_barcode_tokens.get(token_no)
+            token = self._item_token_for_print_job(job)
             if token:
+                token_no = str(token.get("token_no") or "").strip().upper()
                 self._enforce_store_clerk_assignment(
                     actor,
                     str(token.get("assigned_employee") or "").strip(),
                     f"门店配货 bale {str(token.get('store_dispatch_bale_no') or '').strip().upper() or token_no}",
                 )
                 token["status"] = "printed_in_store"
+                token["print_status"] = "success"
                 token["identity_no"] = token_no
                 barcode_value = str((job.get("print_payload") or {}).get("barcode_value") or token.get("barcode_value") or "").strip().upper()
                 if not self._is_store_item_machine_code(barcode_value):
-                    barcode_value = self._store_item_barcode_value(
-                        str(token.get("task_no") or ""),
-                        int(token.get("qty_index") or 1),
-                        token.get("created_at"),
-                    )
+                    raise HTTPException(status_code=400, detail=f"Print job {job_id} missing valid STORE_ITEM machine_code.")
                 token["barcode_value"] = barcode_value
+                token["machine_code"] = barcode_value
+                token.setdefault("stock_in_confirmed", False)
                 token["printed_at"] = job["printed_at"]
                 token["printed_by"] = actor["username"]
                 token["updated_at"] = job["printed_at"]
@@ -15780,6 +15833,19 @@ class InMemoryState:
                     "printed_by": actor["username"],
                     "status": token["status"],
                 }
+                self._sync_store_item_print_fields(
+                    token,
+                    {
+                        "status": "printed_in_store",
+                        "print_status": "success",
+                        "machine_code": barcode_value,
+                        "barcode_value": barcode_value,
+                        "printed_at": job["printed_at"],
+                        "printed_by": actor["username"],
+                        "updated_at": job["printed_at"],
+                        "stock_in_confirmed": False,
+                    },
+                )
                 product = self._ensure_item_token_product_exists(
                     token_no,
                     actor=actor["username"],
@@ -15813,20 +15879,32 @@ class InMemoryState:
         if job["status"] != "queued":
             raise HTTPException(status_code=400, detail=f"Print job {job_id} is not queued")
         job["status"] = "failed"
+        if str(job.get("job_type") or "") == "item_token_label":
+            job["print_job_status"] = "failed"
         job["printed_at"] = now_iso()
         job["printed_by"] = actor["username"]
         job["error_message"] = note
         if str(job.get("job_type") or "") == "item_token_label":
-            token_no = str(job.get("barcode") or "").strip().upper()
-            token = self.item_barcode_tokens.get(token_no)
+            token = self._item_token_for_print_job(job)
             if token:
+                token_no = str(token.get("token_no") or "").strip().upper()
                 self._enforce_store_clerk_assignment(
                     actor,
                     str(token.get("assigned_employee") or "").strip(),
                     f"门店配货 bale {str(token.get('store_dispatch_bale_no') or '').strip().upper() or token_no}",
                 )
                 token["status"] = "print_failed"
+                token["print_status"] = "failed"
                 token["updated_at"] = job["printed_at"]
+                self._sync_store_item_print_fields(
+                    token,
+                    {
+                        "status": "print_failed",
+                        "print_status": "failed",
+                        "updated_at": job["printed_at"],
+                        "stock_in_confirmed": False,
+                    },
+                )
                 bale_no = str(token.get("store_dispatch_bale_no") or "").strip().upper()
                 if bale_no and bale_no in self.store_dispatch_bales:
                     self._refresh_store_dispatch_bale_summary(self.store_dispatch_bales[bale_no])

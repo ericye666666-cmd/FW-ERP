@@ -107,6 +107,7 @@ class PrintJobResponse(BaseModel):
     id: int
     job_type: str
     status: str
+    print_job_status: str = "unknown"
     created_at: str
     product_id: Optional[int] = None
     document_no: str = ""

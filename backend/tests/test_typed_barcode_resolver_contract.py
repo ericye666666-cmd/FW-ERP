@@ -789,7 +789,8 @@ def test_store_prep_print_payload_uses_type_2_machine_code(state):
 
 def test_store_item_print_payload_uses_type_5_machine_code(state):
     token = _seed_store_item_token(state)
-    token["barcode_value"] = token["token_no"]
+    token["machine_code"] = "5260428001"
+    token["barcode_value"] = token["machine_code"]
 
     job = state._build_item_token_print_job(
         token["token_no"],
@@ -799,12 +800,13 @@ def test_store_item_print_payload_uses_type_5_machine_code(state):
     )
 
     payload = job["print_payload"]
-    assert payload["barcode_value"] == token["barcode_value"]
-    assert payload["machine_code"] == token["barcode_value"]
-    assert payload["human_readable"] == token["barcode_value"]
+    assert job["barcode"] == token["machine_code"]
+    assert payload["barcode_value"] == token["machine_code"]
+    assert payload["machine_code"] == token["machine_code"]
+    assert payload["human_readable"] == token["machine_code"]
     assert payload["display_code"] == token["token_no"]
-    assert re.fullmatch(r"5\d{12}", payload["barcode_value"])
-    assert state._is_valid_store_item_v2_barcode(payload["barcode_value"])
+    assert payload["display_code"] != payload["barcode_value"]
+    assert state._is_store_item_machine_code(payload["barcode_value"])
     assert payload["token_no"] == token["token_no"]
 
 
