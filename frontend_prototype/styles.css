@@ -3694,6 +3694,251 @@ th {
   gap: 10px;
 }
 
+.store-shelf-floor-plan-panel {
+  background: #f8fafc;
+}
+
+.store-shelf-floor-plan-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.store-shelf-floor-plan-toolbar label,
+.store-shelf-detail-form label {
+  display: grid;
+  gap: 5px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.store-shelf-floor-plan-toolbar input,
+.store-shelf-detail-form input,
+.store-shelf-detail-form select {
+  min-height: 38px;
+}
+
+.store-shelf-floor-plan-editor {
+  display: grid;
+  grid-template-columns: 118px minmax(520px, 1fr) minmax(260px, 320px);
+  gap: 14px;
+  align-items: stretch;
+  margin-top: 14px;
+}
+
+.store-shelf-canvas-tools,
+.store-shelf-detail-panel,
+.store-shelf-canvas-shell {
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+}
+
+.store-shelf-canvas-tools {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+}
+
+.store-shelf-canvas-tools button {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.store-shelf-canvas-shell {
+  overflow: hidden;
+}
+
+.store-shelf-canvas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.store-shelf-canvas-head strong,
+.store-shelf-canvas-head span {
+  display: block;
+}
+
+.store-shelf-canvas-head span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.store-shelf-floor-plan-canvas {
+  min-height: 620px;
+  background: #f1f5f9;
+}
+
+.store-shelf-canvas-stage,
+.store-shelf-empty-guide {
+  position: relative;
+  min-height: 620px;
+  background-color: #f8fafc;
+  background-position: center;
+  background-size: cover;
+}
+
+.store-shelf-canvas-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.store-shelf-empty-guide {
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: #334155;
+}
+
+.store-shelf-empty-guide strong {
+  font-size: 22px;
+}
+
+.store-shelf-empty-guide span {
+  color: #64748b;
+}
+
+.store-shelf-map-object {
+  position: absolute;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #93c5fd;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  color: #0f172a;
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.10);
+  cursor: pointer;
+}
+
+.store-shelf-map-object strong,
+.store-shelf-map-object span,
+.store-shelf-map-object small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.store-shelf-map-object small {
+  color: #475569;
+  font-size: 11px;
+}
+
+.store-shelf-map-object.object-backroom {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.store-shelf-map-object.display-object {
+  border-style: dashed;
+  border-color: #94a3b8;
+  background: rgba(241, 245, 249, 0.92);
+}
+
+.store-shelf-map-object.object-entrance {
+  border-color: #86efac;
+  background: #dcfce7;
+}
+
+.store-shelf-map-object.object-cashier {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+}
+
+.store-shelf-map-object.object-aisle {
+  border-color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.54);
+  color: #64748b;
+  pointer-events: none;
+}
+
+.store-shelf-map-object.is-selected {
+  outline: 3px solid rgba(37, 99, 235, 0.32);
+  border-color: #2563eb;
+}
+
+.map-object-badge {
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.store-shelf-detail-panel {
+  padding: 14px;
+}
+
+.detail-panel-empty {
+  display: grid;
+  gap: 6px;
+  color: #64748b;
+}
+
+.detail-panel-empty strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.store-shelf-detail-form {
+  display: grid;
+  gap: 10px;
+}
+
+.store-shelf-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.store-shelf-readonly-count {
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.file-button {
+  position: relative;
+}
+
+@media (max-width: 960px) {
+  .store-shelf-floor-plan-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .store-shelf-canvas-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .field-group {
   display: grid;
   gap: 8px;

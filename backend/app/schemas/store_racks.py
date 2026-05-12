@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,6 +24,11 @@ class StoreRackLocationResponse(BaseModel):
     active: Optional[bool] = True
     sort_order: Optional[int] = 0
     item_count: Optional[int] = 0
+    layout_x: Optional[int] = 0
+    layout_y: Optional[int] = 0
+    layout_width: Optional[int] = 160
+    layout_height: Optional[int] = 56
+    layout_json: Optional[Dict[str, Any]] = None
 
 
 class StoreRackLocationUpsertRequest(BaseModel):
@@ -34,6 +39,11 @@ class StoreRackLocationUpsertRequest(BaseModel):
     category_name: str = ""
     active: bool = True
     sort_order: int = 0
+    layout_x: Optional[int] = None
+    layout_y: Optional[int] = None
+    layout_width: Optional[int] = None
+    layout_height: Optional[int] = None
+    layout_json: Optional[Dict[str, Any]] = None
     updated_by: str = Field(min_length=1, default="store_manager_1")
 
 

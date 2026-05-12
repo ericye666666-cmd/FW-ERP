@@ -43,6 +43,10 @@ class StoreShelfLocationStateTest(unittest.TestCase):
         self.assertTrue(any(row["category_name"] == "cargo pant" for row in shelves))
         self.assertTrue(any(row["location_name"] == "cargo pant货架" for row in shelves))
         self.assertTrue(all("item_count" in row for row in rows))
+        self.assertTrue(all("layout_json" in row for row in rows))
+        self.assertTrue(all(isinstance(row.get("layout_json"), dict) for row in rows))
+        self.assertTrue(all("x" in row["layout_json"] for row in rows))
+        self.assertTrue(all("y" in row["layout_json"] for row in rows))
 
     def test_upsert_store_location_edits_name_category_status_and_sort_order(self):
         self.state.initialize_store_racks("UTAWALA", STORE_RACK_TEMPLATE, initialized_by="store_manager_1")
@@ -68,6 +72,47 @@ class StoreShelfLocationStateTest(unittest.TestCase):
         self.assertEqual(updated["status"], "inactive")
         self.assertFalse(updated["active"])
         self.assertEqual(updated["sort_order"], 7)
+
+    def test_upsert_store_location_saves_floor_plan_layout(self):
+        self.state.initialize_store_racks("UTAWALA", STORE_RACK_TEMPLATE, initialized_by="store_manager_1")
+
+        updated = self.state.upsert_store_location(
+            "UTAWALA",
+            {
+                "location_code": "PT-CR",
+                "location_name": "CARGO PANT 主货架",
+                "location_type": "SHELF",
+                "category_name": "CARGO PANT",
+                "layout_x": 320,
+                "layout_y": 180,
+                "layout_width": 180,
+                "layout_height": 64,
+                "layout_json": {
+                    "x": 320,
+                    "y": 180,
+                    "width": 180,
+                    "height": 64,
+                    "rotation": 0,
+                    "shape": "rect",
+                    "color": "blue",
+                    "zone": "floor",
+                    "z_index": 3,
+                },
+                "updated_by": "store_manager_1",
+            },
+        )
+
+        self.assertEqual(updated["layout_x"], 320)
+        self.assertEqual(updated["layout_y"], 180)
+        self.assertEqual(updated["layout_width"], 180)
+        self.assertEqual(updated["layout_height"], 64)
+        self.assertEqual(updated["layout_json"]["shape"], "rect")
+        self.assertEqual(updated["layout_json"]["zone"], "floor")
+
+        rows = self.state.list_store_racks("UTAWALA")
+        saved = next(row for row in rows if row["location_code"] == "PT-CR")
+        self.assertEqual(saved["layout_json"]["x"], 320)
+        self.assertEqual(saved["layout_json"]["width"], 180)
 
     def test_backroom_is_single_default_location_per_store(self):
         self.state.initialize_store_racks("UTAWALA", STORE_RACK_TEMPLATE, initialized_by="store_manager_1")

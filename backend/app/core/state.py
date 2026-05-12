@@ -19417,6 +19417,70 @@ class InMemoryState:
             for row in rows
         ]
 
+    def _default_store_location_layout(self, location_type: str, sort_order: int = 0) -> dict[str, Any]:
+        index = max(int(sort_order or 1), 1) - 1
+        if location_type == "BACKROOM":
+            return {
+                "x": 720,
+                "y": 72,
+                "width": 180,
+                "height": 132,
+                "rotation": 0,
+                "shape": "rect",
+                "color": "amber",
+                "zone": "backroom",
+                "z_index": 5,
+            }
+        column = index % 3
+        row = index // 3
+        return {
+            "x": 72 + column * 200,
+            "y": 96 + row * 92,
+            "width": 168,
+            "height": 58,
+            "rotation": 0,
+            "shape": "rect",
+            "color": "blue",
+            "zone": "floor",
+            "z_index": 3,
+        }
+
+    def _normalize_store_location_layout(
+        self,
+        row: dict[str, Any],
+        location_type: str,
+        sort_order: int = 0,
+    ) -> tuple[int, int, int, int, dict[str, Any]]:
+        raw_layout = row.get("layout_json") or {}
+        if isinstance(raw_layout, str):
+            try:
+                raw_layout = json.loads(raw_layout)
+            except json.JSONDecodeError:
+                raw_layout = {}
+        if not isinstance(raw_layout, dict):
+            raw_layout = {}
+        default_layout = self._default_store_location_layout(location_type, sort_order)
+
+        def coerce_int(value: Any, fallback: int) -> int:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return fallback
+
+        layout_x = coerce_int(row.get("layout_x", raw_layout.get("x")), int(default_layout["x"]))
+        layout_y = coerce_int(row.get("layout_y", raw_layout.get("y")), int(default_layout["y"]))
+        layout_width = max(40, coerce_int(row.get("layout_width", raw_layout.get("width")), int(default_layout["width"])))
+        layout_height = max(32, coerce_int(row.get("layout_height", raw_layout.get("height")), int(default_layout["height"])))
+        layout_json = {
+            **default_layout,
+            **raw_layout,
+            "x": layout_x,
+            "y": layout_y,
+            "width": layout_width,
+            "height": layout_height,
+        }
+        return layout_x, layout_y, layout_width, layout_height, layout_json
+
     def _normalize_store_location_row(self, row: dict[str, Any], sort_order: int = 0) -> dict[str, Any]:
         store_code = str(row.get("store_code") or "").strip().upper()
         location_code = str(row.get("location_code") or row.get("rack_code") or "").strip().upper()
@@ -19434,6 +19498,11 @@ class InMemoryState:
         if not location_name:
             location_name = "后仓" if location_type == "BACKROOM" else f"{category_name or location_code}货架"
         normalized_sort_order = int(row.get("sort_order") or sort_order or 0)
+        layout_x, layout_y, layout_width, layout_height, layout_json = self._normalize_store_location_layout(
+            row,
+            location_type,
+            normalized_sort_order,
+        )
         normalized = {
             **row,
             "id": str(row.get("id") or f"{store_code}||{location_code}").strip(),
@@ -19448,6 +19517,11 @@ class InMemoryState:
             "active": active,
             "status": "active" if active else "inactive",
             "sort_order": normalized_sort_order,
+            "layout_x": layout_x,
+            "layout_y": layout_y,
+            "layout_width": layout_width,
+            "layout_height": layout_height,
+            "layout_json": layout_json,
             "created_at": str(row.get("created_at") or now_iso()),
             "updated_at": str(row.get("updated_at") or now_iso()),
         }
@@ -19568,6 +19642,12 @@ class InMemoryState:
         key = f"{store['code']}||{location_code}"
         previous = self.store_rack_locations.get(key, {})
         timestamp = now_iso()
+        def payload_or_previous(field: str, fallback: Any) -> Any:
+            value = payload.get(field)
+            if value is None:
+                return previous.get(field, fallback)
+            return value
+
         row = {
             **previous,
             "store_code": store["code"],
@@ -19579,6 +19659,11 @@ class InMemoryState:
             "category_name": str(payload.get("category_name") or "").strip(),
             "active": bool(payload.get("active", True)),
             "sort_order": int(payload.get("sort_order") or previous.get("sort_order") or 0),
+            "layout_x": payload_or_previous("layout_x", 0),
+            "layout_y": payload_or_previous("layout_y", 0),
+            "layout_width": payload_or_previous("layout_width", 160),
+            "layout_height": payload_or_previous("layout_height", 56),
+            "layout_json": payload_or_previous("layout_json", {}) or {},
             "created_at": str(previous.get("created_at") or timestamp),
             "updated_at": timestamp,
         }
