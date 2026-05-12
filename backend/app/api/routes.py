@@ -201,6 +201,7 @@ from app.schemas.stores import (
     StoreSiteRecommendationResponse,
     StoreOperatingSummaryResponse,
     StoreResponse,
+    StoreUpdate,
 )
 from app.schemas.suppliers import SupplierCreate, SupplierResponse
 from app.schemas.transfers import (
@@ -2194,6 +2195,18 @@ def create_store(
     data = payload.model_dump()
     data["created_by"] = current_user["username"]
     return StoreResponse(**state.create_store(data))
+
+
+@router.patch("/stores/{store_code}", response_model=StoreResponse, tags=["stores"])
+def update_store(
+    store_code: str,
+    payload: StoreUpdate,
+    authorization: Optional[str] = Header(default=None),
+) -> StoreResponse:
+    current_user = _require_current_user(authorization=authorization)
+    data = payload.model_dump(exclude_unset=True)
+    data["updated_by"] = current_user["username"]
+    return StoreResponse(**state.update_store(store_code, data))
 
 
 @router.post("/stores/site-recommendation", response_model=StoreSiteRecommendationResponse, tags=["stores"])
