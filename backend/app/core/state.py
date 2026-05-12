@@ -20001,26 +20001,42 @@ class InMemoryState:
             if len(active_backrooms) != 1:
                 raise HTTPException(status_code=409, detail="Store must have exactly one active BACKROOM location")
 
-        primary_row = item_row or token_row or {}
-        was_confirmed = any(row.get("stock_in_confirmed") is True for row in candidate_rows)
+        confirmed_rows = [row for row in candidate_rows if row.get("stock_in_confirmed") is True]
+        primary_row = confirmed_rows[0] if confirmed_rows else (item_row or token_row or {})
+        was_confirmed = bool(confirmed_rows)
         previous_location = str(
-            primary_row.get("current_location_code")
+            primary_row.get("stock_in_location_code")
+            or primary_row.get("current_location_code")
             or primary_row.get("store_rack_code")
             or primary_row.get("rack_code")
             or ""
         ).strip().upper()
         if was_confirmed and previous_location == location_code:
-            result_status = "already_confirmed"
+            return {
+                "store_code": store["code"],
+                "machine_code": normalized_machine_code,
+                "current_location_code": location_code,
+                "location_type": location_type,
+                "stock_in_confirmed": True,
+                "stock_in_confirmed_at": str(primary_row.get("stock_in_confirmed_at") or "").strip(),
+                "stock_in_confirmed_by": str(primary_row.get("stock_in_confirmed_by") or actor["username"]).strip(),
+                "status": "already_confirmed",
+            }
         elif was_confirmed:
-            result_status = "location_updated"
+            raise HTTPException(
+                status_code=409,
+                detail=f"STORE_ITEM already confirmed at {previous_location or 'UNKNOWN'}; cannot confirm again at {location_code}",
+            )
         else:
             result_status = "confirmed"
 
-        timestamp = str(primary_row.get("stock_in_confirmed_at") or "").strip() if result_status == "already_confirmed" else now_iso()
+        timestamp = now_iso()
         sale_ready_statuses = {"", "pending", "pending_print", "pending_putaway", "pending_label", "printed", "printed_in_store", "active"}
         for row in candidate_rows:
             row["store_code"] = store["code"]
             row["current_location_code"] = location_code
+            row["stock_in_location_code"] = location_code
+            row["stock_in_location_type"] = location_type
             row["store_rack_code"] = location_code
             row["rack_code"] = location_code
             row["stock_in_confirmed"] = True

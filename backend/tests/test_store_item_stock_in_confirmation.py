@@ -25,6 +25,8 @@ def _store_item(
     sale_status="ready_for_sale",
     entity_type="STORE_ITEM",
     stock_in_confirmed=None,
+    stock_in_confirmed_at="",
+    stock_in_confirmed_by="",
     current_location_code="",
 ):
     row = {
@@ -55,6 +57,10 @@ def _store_item(
     }
     if stock_in_confirmed is not None:
         row["stock_in_confirmed"] = stock_in_confirmed
+    if stock_in_confirmed_at:
+        row["stock_in_confirmed_at"] = stock_in_confirmed_at
+    if stock_in_confirmed_by:
+        row["stock_in_confirmed_by"] = stock_in_confirmed_by
     return row
 
 
@@ -189,19 +195,60 @@ class StoreItemStockInConfirmationTest(unittest.TestCase):
                     self._confirm(machine_code=machine_code)
                 self.assertEqual(ctx.exception.status_code, 409)
 
-    def test_repeated_confirmation_and_location_update_are_idempotent(self):
-        self._add_item(_store_item(stock_in_confirmed=True, current_location_code="PT-CR"))
+    def test_repeated_confirmation_same_location_is_idempotent_without_changing_audit(self):
+        confirmed_at = "2026-05-11T08:30:00+03:00"
+        self._add_item(
+            _store_item(
+                stock_in_confirmed=True,
+                stock_in_confirmed_at=confirmed_at,
+                stock_in_confirmed_by="store_clerk_1",
+                current_location_code="PT-CR",
+            )
+        )
 
         already = self._confirm(location_code="PT-CR")
-        moved = self._confirm(location_code="UT-BACKROOM")
         overview = self.state.get_store_inventory_overview("UTAWALA")
 
         self.assertEqual(already.status, "already_confirmed")
-        self.assertEqual(moved.status, "location_updated")
-        self.assertEqual(moved.current_location_code, "UT-BACKROOM")
+        self.assertEqual(already.current_location_code, "PT-CR")
+        self.assertEqual(already.stock_in_confirmed_at, confirmed_at)
+        self.assertEqual(already.stock_in_confirmed_by, "store_clerk_1")
         self.assertEqual(overview["total_items"], 1)
-        self.assertEqual(overview["backroom_items"], 1)
-        self.assertEqual(overview["shelf_items"], 0)
+        self.assertEqual(overview["backroom_items"], 0)
+        self.assertEqual(overview["shelf_items"], 1)
+
+    def test_repeated_confirmation_different_location_returns_conflict(self):
+        self._add_item(_store_item(stock_in_confirmed=True, current_location_code="PT-CR"))
+
+        with self.assertRaises(HTTPException) as ctx:
+            self._confirm(location_code="UT-BACKROOM")
+
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertIn("already confirmed", str(ctx.exception.detail).lower())
+        item = self.state.store_items["STOREITEM-301-001"]
+        token = self.state.item_barcode_tokens["STOREITEM-301-001"]
+        self.assertEqual(item["current_location_code"], "PT-CR")
+        self.assertEqual(token["current_location_code"], "PT-CR")
+        overview = self.state.get_store_inventory_overview("UTAWALA")
+        self.assertEqual(overview["total_items"], 1)
+        self.assertEqual(overview["shelf_items"], 1)
+        self.assertEqual(overview["backroom_items"], 0)
+
+    def test_sold_confirmed_store_item_cannot_be_confirmed_back_into_stock(self):
+        self._add_item(
+            _store_item(
+                stock_in_confirmed=True,
+                current_location_code="PT-CR",
+                status="sold",
+                sale_status="sold",
+            )
+        )
+
+        with self.assertRaises(HTTPException) as ctx:
+            self._confirm(location_code="PT-CR")
+
+        self.assertEqual(ctx.exception.status_code, 409)
+        self.assertIn("sold", str(ctx.exception.detail).lower())
 
     def test_confirmed_store_item_enters_inventory_and_leaves_unconfirmed_count(self):
         self._add_item(_store_item(stock_in_confirmed=False))
@@ -217,4 +264,3 @@ class StoreItemStockInConfirmationTest(unittest.TestCase):
         self.assertEqual(after["total_items"], 1)
         self.assertEqual(after["shelf_items"], 1)
         self.assertEqual(after["unconfirmed_items"], 1)
-
