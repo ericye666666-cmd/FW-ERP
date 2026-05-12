@@ -30480,17 +30480,19 @@ function getCashierTerminalMockItems() {
 
 function ensureCashierTerminalPreviewCopy() {
   Object.assign(CASHIER_TERMINAL_LOCALE_COPY.zh, {
-    brandTitle: "FW-ERP POS 收银台",
-    scanTitle: "扫描 STORE_ITEM",
+    brandTitle: "FW-ERP POS",
+    scanTitle: "扫描商品",
     addToBasket: "加入购物车",
-    basketTitle: "购物车",
+    basketTitle: "商品篮",
     cartEmpty: "购物车为空，请扫描 STORE_ITEM 商品码",
     lookupEmpty: "仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。",
-    completeTrade: "完成收款",
+    paymentTitle: "结账",
+    completeTrade: "完成销售",
     grossAmount: "应收金额",
     paidAmount: "实收",
     balanceAmount: "余额",
     clearBasket: "清空购物车",
+    barcodePlaceholder: "扫描或输入 STORE_ITEM 商品码",
   });
 }
 
@@ -30507,6 +30509,9 @@ function ensureCashierTerminalPreviewState() {
   }
   if (!Array.isArray(cashierTerminalState.recentSales)) {
     cashierTerminalState.recentSales = [];
+  }
+  if (!Array.isArray(cashierTerminalState.recentScans)) {
+    cashierTerminalState.recentScans = [];
   }
   cashierTerminalState.selectedSaleDetail = cashierTerminalState.selectedSaleDetail || null;
   cashierTerminalState.saleLookupFeedback = cashierTerminalState.saleLookupFeedback || "";
@@ -30547,7 +30552,7 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.shiftCloseNote = cashierTerminalState.shiftCloseNote || "";
   cashierTerminalState.managerConfirmedBy = cashierTerminalState.managerConfirmedBy || "";
   cashierTerminalState.todaySalesAmount = Number(cashierTerminalState.todaySalesAmount || 48620);
-  cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 126);
+  cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 42);
   cashierTerminalState.shiftSalesAmount = Number(cashierTerminalState.shiftSalesAmount || 18450);
   cashierTerminalState.shiftOrderCount = Number(cashierTerminalState.shiftOrderCount || 42);
   cashierTerminalState.cashSalesAmount = Number(cashierTerminalState.cashSalesAmount || 8200);
@@ -30660,20 +30665,37 @@ function getCashierTerminalNetworkLabel() {
   }[status] || "在线";
 }
 
+function getCashierTerminalPrinterLabel() {
+  const status = String(cashierTerminalState.printerStatus || "connected").trim().toLowerCase();
+  if (["connected", "ready", "online", "placeholder"].includes(status)) {
+    return "已连接";
+  }
+  if (["offline", "disconnected"].includes(status)) {
+    return "未连接";
+  }
+  return "已连接";
+}
+
 renderCashierTerminalSessionStrip = function () {
   if (!(cashierTerminalSessionStrip instanceof HTMLElement)) {
     return;
   }
   ensureCashierTerminalPreviewState();
   cashierTerminalSessionStrip.innerHTML = `
-    <span>当前门店：${escapeHtml(getCashierTerminalStoreCode())}</span>
+    <span><b>当前门店</b>${escapeHtml(getCashierTerminalStoreCode())}</span>
     <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
-    <span>当前收银员：${escapeHtml(getCashierTerminalCashierName())}</span>
-    <span>当前班次：${escapeHtml(getCashierTerminalShiftNo() || "请先开班")}</span>
+    <span><b>收银员</b>${escapeHtml(getCashierTerminalCashierName())}</span>
+    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${escapeHtml(getCashierTerminalShiftNo() || "请先开班")}</span>
     <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
-      网络状态：${escapeHtml(getCashierTerminalNetworkLabel())}
+      <b>网络状态</b>${escapeHtml(getCashierTerminalNetworkLabel())}
     </button>
-    <span>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
+    <span class="printer-chip"><b>打印机</b>${escapeHtml(getCashierTerminalPrinterLabel())}</span>
+    <span class="sync-chip network-${escapeHtml(cashierTerminalState.networkStatus)}"><b>同步状态</b>${escapeHtml(cashierTerminalState.syncStatus || "已同步")}</span>
+    <span><b>今日销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
+    <span><b>今日订单数</b>${escapeHtml(cashierTerminalState.todayOrderCount)}</span>
+    <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
+    <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
+    <span class="time-chip"><b>当前时间</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
   `;
 }
 
@@ -30682,14 +30704,9 @@ renderCashierTerminalStatusBar = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
-  const statusText = cashierTerminalState.latestCompletedSale
-    ? `销售完成：${cashierTerminalState.latestCompletedSale.sale_no}`
-    : !cashierTerminalState.currentShift?.shift_id
-      ? "请先开班后再收银。"
-    : "扫码框在购物车上方。POS 主屏只显示收银员完成收款需要的信息。";
   cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
   cashierTerminalStatusBar.innerHTML = `
-    <span>${escapeHtml(statusText)}</span>
+    <span>只支持 STORE_ITEM 商品销售 ｜ 扫描后自动加入购物车 ｜ 不支持 SDO / SDP / SDB / LPK / RAW_BALE</span>
     <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">挂单列表</button>
     <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">班次 / 交接班</button>
     <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
@@ -30712,12 +30729,20 @@ renderCashierTerminalLookupPanel = function () {
       </div>
     `
     : "";
+  const recentScans = (cashierTerminalState.recentScans || []).slice(0, 4);
   cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
   cashierTerminalLookupCard.innerHTML = `
     <strong>仅支持 STORE_ITEM 商品码</strong>
-    <span>真实扫码接口优先；本地演示备用码：5250511000123、5250511000122、5250511000121、5250511000120</span>
+    <span>只能扫描 STORE_ITEM 商品码。SDO / SDP / SDB / LPK / RAW_BALE 不能在 POS 销售。</span>
+    <span>该商品还未上架、已售出、pending_print 或 pending_putaway 时不可销售。</span>
     ${fallbackNotice}
     ${scanError}
+    <div class="cashier-recent-scans">
+      <strong>最近扫描</strong>
+      ${recentScans.length ? recentScans.map((row) => `
+        <span><b>${escapeHtml(row.code || "-")}</b><em>${escapeHtml(row.category || "STORE_ITEM")} · ${escapeHtml(formatCashierPreviewMoney(row.price || 0))} · ${escapeHtml(row.time || "")}</em></span>
+      `).join("") : `<span class="empty">暂无扫描记录</span>`}
+    </div>
   `;
 }
 
@@ -30727,6 +30752,10 @@ renderCashierTerminalCart = function () {
   }
   ensureCashierTerminalPreviewState();
   const rows = cashierTerminalState.cartItems || [];
+  const cartCount = document.querySelector("[data-terminal-cart-count]");
+  if (cartCount) {
+    cartCount.textContent = `${rows.length} 件商品`;
+  }
   if (!rows.length) {
     cashierTerminalCart.className = "basket-list cashier-terminal-cart empty-state";
     cashierTerminalCart.innerHTML = `<div class="cashier-terminal-empty-card">购物车为空，请扫描 STORE_ITEM 商品码</div>`;
@@ -30746,11 +30775,14 @@ renderCashierTerminalCart = function () {
     </div>
     ${rows.map((row, index) => {
       const price = Number(row.price || 0);
+      const sourceSummary = String(row.source_summary || "").trim();
+      const sourceLine = /^(SDO|SDP)/i.test(sourceSummary) ? `<small>来源: ${escapeHtml(sourceSummary)}</small>` : "";
       return `
         <article class="cashier-cart-row">
           <div class="cart-code">
             <strong>${escapeHtml(row.display_code || "-")}</strong>
             <small>${escapeHtml(row.machine_code || "-")}</small>
+            ${sourceLine}
           </div>
           <div>${escapeHtml(row.category || "-")}</div>
           <div>${escapeHtml(row.shelf_location || "-")}</div>
@@ -30786,7 +30818,7 @@ renderCashierTerminalPaymentPanel = function () {
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
         <p class="panel-kicker">CHECKOUT</p>
-        <h3>结算区</h3>
+        <h3>结账</h3>
       </div>
     </div>
     ${saleDisabled ? `
@@ -30851,10 +30883,11 @@ renderCashierTerminalPaymentPanel = function () {
     ${mpesaManualNotice}
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
-      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成收款</span><strong>${saleDisabled ? "请先开班" : "Complete Sale"}</strong></button>
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? "请先开班" : "Complete Sale"}</strong></button>
       <div class="secondary-actions">
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">挂单 Hold</button>
         <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
+        <button type="button" class="secondary-action" data-terminal-action="reprint-receipt">重打小票</button>
       </div>
     </div>
   `;
@@ -30924,15 +30957,18 @@ renderCashierTerminalQuickActions = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const totals = getCashierTerminalTotals();
+  const paid = getCashierTerminalPaymentAssignedTotal();
   cashierTerminalQuickActions.innerHTML = `
+    <div class="transaction-strip-title">当前交易状态 (TRANSACTION STATUS)</div>
     <div class="cashier-terminal-status-metrics">
-      <span><strong>今日销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
-      <span><strong>本班销售额</strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
-      <span><strong>本班订单数</strong>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
-      <span><strong>打印机状态</strong>已连接 / mock</span>
-      <span><strong>同步状态</strong>${escapeHtml(cashierTerminalState.syncStatus)}</span>
+      <span><strong>商品数量</strong>${escapeHtml(totals.totalItems)}</span>
+      <span><strong>应收金额</strong>${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</span>
+      <span><strong>已收金额</strong>${escapeHtml(formatCashierPreviewMoney(paid))}</span>
+      <span><strong>待收金额</strong>${escapeHtml(formatCashierPreviewMoney(Math.max(totals.totalAmount - paid, 0)))}</span>
+      <span><strong>支付方式</strong>${escapeHtml(cashierTerminalState.activePaymentMode)}</span>
+      <span><strong>状态</strong>${escapeHtml(totals.totalItems ? (paid >= totals.totalAmount ? "可完成" : "待收款") : "待扫码")}</span>
       <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
-      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales"><span>销售记录</span><strong>最近销售</strong></button>
     </div>
   `;
 }
@@ -31398,6 +31434,15 @@ function mapCashierTerminalResolvedStoreItem(resolved = {}, query = "") {
     category,
     shelf_location: getFirstCashierTerminalField(resolved.store_rack_code, resolved.shelf_location, resolved.rack_code, businessObject.store_rack_code),
     store_rack_code: getFirstCashierTerminalField(resolved.store_rack_code, resolved.shelf_location, resolved.rack_code, businessObject.store_rack_code),
+    source_summary: getFirstCashierTerminalField(
+      resolved.source_sdo_display_code,
+      resolved.source_sdp_display_code,
+      resolved.source_sdo,
+      resolved.source_sdp,
+      businessObject.source_sdo_display_code,
+      businessObject.source_sdp_display_code,
+      "",
+    ),
     price,
     selling_price: price,
     expected_price: price,
@@ -31521,8 +31566,18 @@ upsertCashierTerminalCartItem = function (result) {
       price: Number(result.price || result.selling_price || result.expected_price || 0),
       qty: 1,
       store: result.store || getCashierTerminalStoreCode(),
+      source_summary: result.source_summary || "",
     },
   ];
+  cashierTerminalState.recentScans = [
+    {
+      code: result.display_code || result.store_item_display_code || machineCode,
+      category: result.category || result.category_summary || "STORE_ITEM",
+      price: Number(result.price || result.selling_price || result.expected_price || 0),
+      time: new Date().toLocaleTimeString("zh-CN", { hour12: false }),
+    },
+    ...(cashierTerminalState.recentScans || []),
+  ].slice(0, 6);
   renderCashierTerminal();
 }
 

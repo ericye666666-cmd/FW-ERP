@@ -109,13 +109,13 @@ test("POS scans use the typed resolver with POS context before cart insert", () 
 test("POS cashier terminal renders cashier touch layout without changing barcode scope", () => {
   assert.match(indexHtml, /class="[^"]*cashier-terminal-shell/);
   assert.match(indexHtml, /class="[^"]*cashier-terminal-touch-layout/);
-  assert.match(indexHtml, /id="cashierTerminalBarcodeInput"[\s\S]*?placeholder="扫描 STORE_ITEM 商品码"/);
+  assert.match(indexHtml, /id="cashierTerminalBarcodeInput"[\s\S]*?placeholder="扫描或输入 STORE_ITEM 商品码"/);
   assert.match(indexHtml, /id="cashierTerminalCart"[\s\S]*class="[^"]*cashier-terminal-cart/);
   assert.match(indexHtml, /id="cashierTerminalPaymentPanel"[\s\S]*class="[^"]*cashier-terminal-payment-panel/);
-  assert.match(indexHtml, /id="cashierTerminalQuickActions"[\s\S]*class="[^"]*cashier-terminal-status-footer/);
-  assert.match(appJs, /scanTitle:\s*"扫码收银"/);
+  assert.match(indexHtml, /id="cashierTerminalQuickActions"[\s\S]*class="[^"]*cashier-terminal-transaction-strip/);
+  assert.match(appJs, /scanTitle:\s*"扫描商品"/);
   assert.match(appJs, /basketTitle:\s*"商品篮"/);
-  assert.match(appJs, /paymentTitle:\s*"结账区"/);
+  assert.match(appJs, /paymentTitle:\s*"结账"/);
   assert.match(appJs, /completeTrade:\s*"完成销售"/);
   assert.match(appJs, /cashMethod:\s*"Cash"/);
   assert.match(appJs, /mpesaMethod:\s*"M-Pesa"/);
@@ -133,6 +133,43 @@ test("POS cashier terminal renders cashier touch layout without changing barcode
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_PREP_BALE"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"LOOSE_PICK_TASK"/);
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
+});
+
+test("POS cashier terminal moves store, shift, device, and sales status into top header", () => {
+  const headerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalSessionStrip");
+  const infoStripSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalStatusBar");
+
+  [
+    "当前门店",
+    "收银员",
+    "班次",
+    "网络状态",
+    "打印机",
+    "同步状态",
+    "今日销售额",
+    "今日订单数",
+    "本班销售额",
+    "本班订单数",
+    "当前时间",
+  ].forEach((label) => assert.match(headerSource, new RegExp(label)));
+  assert.match(headerSource, /getCashierTerminalStoreCode\(\)/);
+  assert.match(headerSource, /getCashierTerminalCashierName\(\)/);
+  assert.match(headerSource, /getCashierTerminalShiftNo\(\) \|\| "请先开班"/);
+  assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
+  assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
+  assert.match(headerSource, /cashierTerminalState\.todayOrderCount/);
+  assert.match(headerSource, /cashierTerminalState\.shiftOrderCount/);
+  assert.match(headerSource, /cashierTerminalState\.currentTime/);
+  assert.match(infoStripSource, /只支持 STORE_ITEM 商品销售/);
+  assert.match(infoStripSource, /扫描后自动加入购物车/);
+  assert.match(infoStripSource, /不支持 SDO \/ SDP \/ SDB \/ LPK \/ RAW_BALE/);
+});
+
+test("POS cashier terminal removes blocking bottom floating status cards", () => {
+  assert.doesNotMatch(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-quick-actions\s*\{[^}]*position:\s*fixed/);
+  assert.doesNotMatch(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-quick-actions\s*\{[^}]*bottom:/);
+  assert.match(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-transaction-strip\s*\{/);
+  assert.match(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-status-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*minmax\(0,\s*1fr\)\)/);
 });
 
 test("POS cashier terminal gates resolver results before adding items", () => {

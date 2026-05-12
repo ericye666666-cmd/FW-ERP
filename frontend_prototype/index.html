@@ -3465,7 +3465,8 @@
             <div class="brand-group">
               <div>
                 <p class="eyebrow">DIRECT LOOP RETAIL</p>
-                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">FW-ERP POS 收银台</h3>
+                <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">FW-ERP POS</h3>
+                <p class="cashier-terminal-subtitle">收银台</p>
               </div>
             </div>
             <div class="topbar-actions">
@@ -3478,12 +3479,13 @@
           <section id="cashierTerminalStatusBar" class="status-grid cashier-terminal-status cashier-terminal-context-strip"></section>
 
           <main class="workspace-grid cashier-terminal-body cashier-terminal-touch-layout">
-            <section class="flow-column cashier-terminal-main">
+            <section class="flow-column cashier-terminal-scan-column">
               <article class="panel panel-scan cashier-terminal-card cashier-terminal-scan-card">
                 <div class="panel-head cashier-terminal-card-head">
                   <div>
                     <p class="panel-kicker">SCAN</p>
-                    <h3 data-terminal-copy="scanTitle">扫描 STORE_ITEM</h3>
+                    <h3 data-terminal-copy="scanTitle">扫描商品</h3>
+                    <small>SCAN STORE_ITEM</small>
                   </div>
                   <span class="cashier-terminal-scan-rule">仅支持 STORE_ITEM 商品码</span>
                 </div>
@@ -3498,7 +3500,7 @@
                         inputmode="text"
                         autocomplete="off"
                         data-scan-input="true"
-                        placeholder="扫描 STORE_ITEM 商品码"
+                        placeholder="扫描或输入 STORE_ITEM 商品码"
                       />
                       <button type="submit" class="primary-inline scan-submit-button" data-terminal-submit="add" aria-label="扫描加入购物车">
                         <span class="scan-icon" aria-hidden="true"></span>
@@ -3516,14 +3518,18 @@
                   仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。
                 </div>
               </article>
+            </section>
 
+            <section class="flow-column cashier-terminal-cart-column">
               <article class="panel panel-basket cashier-terminal-card cashier-terminal-cart-card">
                 <div class="panel-head basket-head cashier-terminal-card-head">
                   <div>
                     <p class="panel-kicker">CART</p>
-                    <h3 data-terminal-copy="basketTitle">购物车</h3>
+                    <h3 data-terminal-copy="basketTitle">商品篮</h3>
+                    <small>CART</small>
                   </div>
                   <div class="basket-tools">
+                    <span class="cart-count-badge" data-terminal-cart-count>0 件商品</span>
                     <button type="button" class="secondary-ghost" data-terminal-action="clear-cart" data-terminal-copy="clearBasket">清空商品篮</button>
                   </div>
                 </div>
@@ -3534,17 +3540,14 @@
             <aside class="payment-column cashier-terminal-side">
               <section id="cashierTerminalPaymentPanel" class="panel panel-payment cashier-terminal-card cashier-terminal-payment-panel"></section>
             </aside>
-
-            <aside class="receipt-column cashier-terminal-receipt-side">
-              <section id="cashierTerminalReceiptPanel" class="panel cashier-terminal-card cashier-terminal-receipt-panel"></section>
-            </aside>
           </main>
 
-          <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions cashier-terminal-status-footer">
+          <section id="cashierTerminalQuickActions" class="cashier-terminal-quick-actions cashier-terminal-transaction-strip">
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift"><span>本班销售额</span><strong>-</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="sync"><span>同步状态</span><strong>-</strong></button>
             <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>重新打印最近一单</span><strong>-</strong></button>
           </section>
+          <section id="cashierTerminalReceiptPanel" class="panel cashier-terminal-card cashier-terminal-receipt-panel cashier-terminal-receipt-strip"></section>
           <div id="cashierTerminalDrawerBackdrop" class="drawer-backdrop" data-terminal-action="close-drawer" hidden></div>
           <aside id="cashierTerminalDrawer" class="side-drawer cashier-terminal-drawer" hidden></aside>
         </div>
