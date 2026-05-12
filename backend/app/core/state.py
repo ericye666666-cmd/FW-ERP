@@ -15064,9 +15064,9 @@ class InMemoryState:
         if str(package.get("assignment_status") or "").strip().lower() != "assigned" or not package_assigned_clerk:
             raise HTTPException(status_code=409, detail="这个 SDP 还没有分配给店员，不能生成 STORE_ITEM。")
         if package_assigned_clerk.lower() != assigned_clerk.lower():
-            raise HTTPException(status_code=403, detail="这个包没有分配给你，请找店长确认。")
+            raise HTTPException(status_code=403, detail=f"该 SDP 已分配给 {package_assigned_clerk}，你不能处理。")
         if actor.get("role_code") == "store_clerk" and str(actor.get("username") or "").strip().lower() != assigned_clerk.lower():
-            raise HTTPException(status_code=403, detail="当前登录店员和生成请求店员不匹配。")
+            raise HTTPException(status_code=403, detail=f"该 SDP 已分配给 {package_assigned_clerk}，你不能处理。")
 
         existing_count = len(self._store_items_for_sdo_package(package))
         pricing_batch_id = str(payload.get("pricing_batch_id") or "").strip().upper()
@@ -15277,9 +15277,9 @@ class InMemoryState:
         if str(package.get("assignment_status") or "").strip().lower() != "assigned" or not assigned_clerk:
             raise HTTPException(status_code=409, detail="这个 SDP 还没有分配给店员，不能生成 STORE_ITEM。")
         if assigned_clerk.lower() != clerk.lower():
-            raise HTTPException(status_code=403, detail="这个包没有分配给你，请找店长确认。")
+            raise HTTPException(status_code=403, detail=f"该 SDP 已分配给 {assigned_clerk}，你不能处理。")
         if actor.get("role_code") == "store_clerk" and str(actor.get("username") or "").strip().lower() != clerk.lower():
-            raise HTTPException(status_code=403, detail="当前登录店员和生成请求店员不匹配。")
+            raise HTTPException(status_code=403, detail=f"该 SDP 已分配给 {assigned_clerk}，你不能处理。")
 
         pricing_batch_id = str(payload.get("pricing_batch_id") or "").strip().upper()
         if pricing_batch_id and self._store_items_for_pricing_batch(pricing_batch_id):
