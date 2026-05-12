@@ -915,6 +915,7 @@ class InMemoryState:
             day_fragment = self._barcode_v2_day_fragment_from_value(created_at, fallback_now=True)
             allocation_state = self._store_item_barcode_allocation_state(day_fragment)
             existing_codes = allocation_state["existing_codes"]
+            existing_codes.update(self._collect_existing_machine_codes())
             next_sequence = int(allocation_state.get("next_sequence") or 1)
             while next_sequence <= 999999:
                 machine_code = self._store_item_barcode_v2_value(created_at, next_sequence)
@@ -15010,6 +15011,19 @@ class InMemoryState:
                 tokens.append(token)
         return tokens
 
+    def _reject_client_store_item_machine_code_payload(self, payload: dict[str, Any]) -> None:
+        forbidden_fields = ("machine_code", "barcode_value", "display_code", "store_item_id", "item_id")
+        submitted_fields = [
+            field_name
+            for field_name in forbidden_fields
+            if str(payload.get(field_name) or "").strip()
+        ]
+        if submitted_fields:
+            raise HTTPException(
+                status_code=400,
+                detail="STORE_ITEM machine_code / barcode_value 必须由后端统一发号，PDA 不能提交。",
+            )
+
     def _store_item_generation_result(
         self,
         package: dict[str, Any],
@@ -15039,6 +15053,11 @@ class InMemoryState:
         }
 
     def generate_store_items_from_pricing_batch(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._barcode_generation_lock:
+            return self._generate_store_items_from_pricing_batch(payload)
+
+    def _generate_store_items_from_pricing_batch(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._reject_client_store_item_machine_code_payload(payload)
         package_code = str(
             payload.get("source_sdp_display_code")
             or payload.get("source_sdp_machine_code")
@@ -15166,7 +15185,10 @@ class InMemoryState:
                 "status": "pending_print",
                 "print_status": "pending_print",
                 "sticker_status": "pending",
-                "sale_status": "ready_for_sale",
+                "stock_in_confirmed": False,
+                "stock_in_confirmed_at": "",
+                "stock_in_confirmed_by": "",
+                "sale_status": "unsold",
                 "assigned_clerk": assigned_clerk,
                 "assigned_employee": assigned_clerk,
                 "created_by": actor["username"],
@@ -15262,6 +15284,7 @@ class InMemoryState:
         return result
 
     def generate_store_items_for_sdo_package(self, package_code: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self._reject_client_store_item_machine_code_payload(payload)
         package = self._find_store_delivery_package_by_code(package_code)
         package_store = self._validate_store_delivery_package_store(package, str(payload.get("store_code") or ""))
         clerk = str(payload.get("clerk") or payload.get("assigned_clerk") or payload.get("generated_by") or "").strip()
