@@ -26,4 +26,12 @@ export const zhCNDictionary = {
   "pos.order.hold": "挂单",
   "pos.order.resumeHeld": "取回挂单",
   "pos.receipt.reprint": "重打小票",
+  "pda.work.today": "我的今日工作",
+  "pda.package.scan": "扫描包裹",
+  "pda.label.print": "打印标签",
+  "pda.label.printed": "标签已打印",
+  "pda.label.printFailed": "打印失败",
+  "pda.location.select": "选择位置",
+  "pda.location.selectFirst": "请先选择货架或后仓。",
+  "pda.printer.notConnected": "打印机未连接",
 } satisfies Record<TerminologyKey, string>;

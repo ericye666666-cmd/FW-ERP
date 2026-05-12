@@ -26,4 +26,12 @@ export const enKEDictionary = {
   "pos.order.hold": "Hold Order",
   "pos.order.resumeHeld": "Resume Held Order",
   "pos.receipt.reprint": "Reprint Receipt",
+  "pda.work.today": "My Work Today",
+  "pda.package.scan": "Scan Package",
+  "pda.label.print": "Print Label",
+  "pda.label.printed": "Label Printed",
+  "pda.label.printFailed": "Print Failed",
+  "pda.location.select": "Select Location",
+  "pda.location.selectFirst": "Select shelf or backroom first.",
+  "pda.printer.notConnected": "Printer Not Connected",
 } satisfies Record<TerminologyKey, string>;

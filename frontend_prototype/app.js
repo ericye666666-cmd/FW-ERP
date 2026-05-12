@@ -214,6 +214,83 @@ function cashierTerminalTerm(key, language = currentLanguage) {
   return POS_CASHIER_TERMINOLOGY_DICTIONARY[locale]?.[key] || key;
 }
 
+const CLERK_PDA_TERMINOLOGY_KEYS = Object.freeze({
+  myWorkToday: "pda.work.today",
+  scanPackage: "pda.package.scan",
+  printLabel: "pda.label.print",
+  labelPrinted: "pda.label.printed",
+  printFailed: "pda.label.printFailed",
+  selectLocation: "pda.location.select",
+  shelf: "inventory.location.shelf",
+  backroom: "inventory.location.backroom",
+  confirmStockIn: "inventory.stockIn.confirm",
+  pendingStockIn: "inventory.stockIn.pending",
+  stockInCompleted: "inventory.stockIn.completed",
+  printerNotConnected: "pda.printer.notConnected",
+  selectLocationFirst: "pda.location.selectFirst",
+  storeDeliveryPackage: "store.delivery.package",
+});
+
+const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
+  zh: Object.freeze({
+    "pda.work.today": "我的今日工作",
+    "pda.package.scan": "扫描包裹",
+    "pda.label.print": "打印标签",
+    "pda.label.printed": "标签已打印",
+    "pda.label.printFailed": "打印失败",
+    "pda.location.select": "选择位置",
+    "pda.location.selectFirst": "请先选择货架或后仓。",
+    "pda.printer.notConnected": "打印机未连接",
+    "inventory.location.shelf": "货架",
+    "inventory.location.backroom": "后仓",
+    "inventory.stockIn.confirm": "确认入库",
+    "inventory.stockIn.pending": "待完成入库",
+    "inventory.stockIn.completed": "已完成入库",
+    "store.delivery.package": "待送店包",
+  }),
+  en: Object.freeze({
+    "pda.work.today": "My Work Today",
+    "pda.package.scan": "Scan Package",
+    "pda.label.print": "Print Label",
+    "pda.label.printed": "Label Printed",
+    "pda.label.printFailed": "Print Failed",
+    "pda.location.select": "Select Location",
+    "pda.location.selectFirst": "Select shelf or backroom first.",
+    "pda.printer.notConnected": "Printer Not Connected",
+    "inventory.location.shelf": "Shelf",
+    "inventory.location.backroom": "Backroom",
+    "inventory.stockIn.confirm": "Confirm Stock-in",
+    "inventory.stockIn.pending": "Pending Stock-in",
+    "inventory.stockIn.completed": "Stock-in Completed",
+    "store.delivery.package": "Store Delivery Package",
+  }),
+});
+
+function clerkPdaTerm(key, language = currentLanguage) {
+  const locale = language === "en" ? "en" : "zh";
+  return CLERK_PDA_TERMINOLOGY_DICTIONARY[locale]?.[key] || key;
+}
+
+function getClerkPdaCopy(language = currentLanguage) {
+  const keys = CLERK_PDA_TERMINOLOGY_KEYS;
+  return {
+    myWorkToday: clerkPdaTerm(keys.myWorkToday, language),
+    scanPackage: clerkPdaTerm(keys.scanPackage, language),
+    printLabel: clerkPdaTerm(keys.printLabel, language),
+    labelPrinted: clerkPdaTerm(keys.labelPrinted, language),
+    printFailed: clerkPdaTerm(keys.printFailed, language),
+    selectLocation: clerkPdaTerm(keys.selectLocation, language),
+    shelf: clerkPdaTerm(keys.shelf, language),
+    backroom: clerkPdaTerm(keys.backroom, language),
+    confirmStockIn: clerkPdaTerm(keys.confirmStockIn, language),
+    pendingStockIn: clerkPdaTerm(keys.pendingStockIn, language),
+    stockInCompleted: clerkPdaTerm(keys.stockInCompleted, language),
+    printerNotConnected: clerkPdaTerm(keys.printerNotConnected, language),
+    selectLocationFirst: clerkPdaTerm(keys.selectLocationFirst, language),
+    storeDeliveryPackage: clerkPdaTerm(keys.storeDeliveryPackage, language),
+  };
+}
+
 const GLOBAL_I18N_GLOSSARY = [
   { zh: "门店收货主控台", en: "Store Receiving Command Center" },
   { zh: "仓库发货", en: "Warehouse Dispatch" },
@@ -37121,15 +37198,15 @@ function verifyStoreMobileSdpBarcode(value = "", state = storeMobilePricingPrevi
     return { ok: true, message: "核对成功" };
   }
   if (rawValue === "SDO260504008" || rawValue === "4260504008" || /^SDO/.test(rawValue) || /^4\d{9}$/.test(rawValue)) {
-    return { ok: false, message: "请扫描 SDP 实体包，不要扫 SDO 主单。" };
+    return { ok: false, message: "Scan Package, not SDO." };
   }
   if (/^(SDB|LPK)/.test(rawValue)) {
-    return { ok: false, message: "请扫描 SDP 实体包，不要扫 SDB / LPK 来源包。" };
+    return { ok: false, message: "Scan Package, not source package." };
   }
   if (/^(STORE_ITEM|STOREITEM|STI)/.test(rawValue)) {
-    return { ok: false, message: "请先扫描 SDP 包，不要扫 STORE_ITEM 商品码。" };
+    return { ok: false, message: "Scan Package, not Store Item." };
   }
-  return { ok: false, message: "wrong SDP: 不是当前 SDP 任务条码。" };
+  return { ok: false, message: "Scan the assigned Package." };
 }
 
 function getStoreMobilePricingActiveGroup(state = storeMobilePricingPreviewState) {
@@ -37212,7 +37289,11 @@ function getStoreMobileStatusText(status = "") {
   const labels = {
     queued: "排队中",
     printing: "打印中",
-    printed: "已打印",
+    printed: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.labelPrinted),
+    sent_to_printer: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.labelPrinted),
+    pending_print: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printLabel),
+    failed: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printFailed),
+    error: clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printFailed),
   };
   return labels[normalized] || String(status || "").trim();
 }
@@ -37222,18 +37303,18 @@ function renderStoreMobileStatusBadge(status = "") {
 }
 
 function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
   const totals = getStoreMobileTaskTotals(state);
   const sdpDisplayCode = String(sdp.display_code || sdp.sdp_code || "-").trim();
   const sdpMachineCode = String(sdp.machine_code || "").trim();
   const sdoDisplayCode = String(sdp.sdo_code || "-").trim();
-  const sourceDisplayCode = String(sdp.source_code || "-").trim();
   const stats = [
     ["总数", sdp.total_count || totals.total || 0],
     ["已分批", totals.allocated],
     ["已生成", totals.generated],
     ["剩余", totals.remaining],
-    ["已贴标", totals.stickered],
+    [pdaCopy.labelPrinted, totals.stickered],
     ["价格组", `${totals.completeGroups}/${totals.groupCount}`],
   ];
   return `
@@ -37242,7 +37323,7 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
         <div>
           <strong>${escapeHtml(sdpDisplayCode)}</strong>
           <span class="mobile-sdp-primary-line">${escapeHtml(`${sdp.category || "-"} / ${sdp.total_count || 0} 件`)}</span>
-          <small class="mobile-code-secondary">${escapeHtml(`${sdp.store_name || "-"} · 来源 ${sdoDisplayCode} · ${sourceDisplayCode} · machine_code ${sdpMachineCode || "-"}`)}</small>
+          <small class="mobile-code-secondary">${escapeHtml(`${sdp.store_name || "-"} · SDO ${sdoDisplayCode} · ${pdaCopy.storeDeliveryPackage} · 扫描码 ${sdpMachineCode || "-"}`)}</small>
         </div>
         ${renderStoreMobilePricingBadge(getStoreMobileTaskStatus(state))}
       </div>
@@ -37582,6 +37663,7 @@ function getStoreMobilePendingPrintCount(items = []) {
 }
 
 function renderStoreMobileGeneratedStoreItemList(group = {}) {
+  const pdaCopy = getClerkPdaCopy();
   const rawItems = Array.isArray(group.generated_store_items) ? group.generated_store_items : [];
   const items = rawItems.map((item) => normalizeStoreItemForLabelPreview(item, group)).filter((item) => item.machine_code);
   if (!items.length) {
@@ -37596,12 +37678,11 @@ function renderStoreMobileGeneratedStoreItemList(group = {}) {
       <div class="store-mobile-generated-item-list">
         ${items.map((item) => `
           <article class="store-mobile-generated-item-row">
-            <strong><span>machine_code</span>${escapeHtml(item.machine_code)}</strong>
-            <span><b>price_kes</b>${escapeHtml(item.price_kes > 0 ? `KES ${item.price_kes}` : "-")}</span>
-            <span><b>category_short</b>${escapeHtml(item.category_short || "-")}</span>
-            <span><b>grade / pricing_type</b>${escapeHtml(item.grade || item.pricing_type || "-")}</span>
-            <span><b>print_status</b>${escapeHtml(item.print_status || "pending_print")}</span>
-            <span><b>sticker_status</b>${escapeHtml(item.sticker_status || "pending")}</span>
+            <strong><span>${escapeHtml(currentLanguage === "en" ? "Scanned Code" : "扫描码")}</span>${escapeHtml(item.machine_code)}</strong>
+            <span><b>${escapeHtml(currentLanguage === "en" ? "Price" : "价格")}</b>${escapeHtml(item.price_kes > 0 ? `KES ${item.price_kes}` : "-")}</span>
+            <span><b>${escapeHtml(currentLanguage === "en" ? "Category" : "品类")}</b>${escapeHtml(item.category_short || "-")}</span>
+            <span><b>${escapeHtml(currentLanguage === "en" ? "Grade" : "等级")}</b>${escapeHtml(item.grade || item.pricing_type || "-")}</span>
+            <span><b>${escapeHtml(pdaCopy.printLabel)}</b>${escapeHtml(getStoreMobileStatusText(item.print_status || "pending_print"))}</span>
           </article>
         `).join("")}
       </div>
@@ -37678,16 +37759,22 @@ function getStoreMobilePrintedStoreItemsForStockIn(group = {}) {
     .filter((item) => item.machine_code);
 }
 
+function getStoreMobileStockInItemStatus(item = {}) {
+  return item.stock_in_status || (item.stock_in_confirmed ? "confirmed" : "");
+}
+
 function getStoreMobileStockInStatusLabel(status = "") {
   const normalized = String(status || "").trim();
-  if (normalized === "confirmed") return "已入库";
-  if (normalized === "already_confirmed") return "已确认";
-  if (normalized === "confirming") return "确认中";
+  if (normalized === "confirmed") return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted);
+  if (normalized === "already_confirmed") return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted);
+  if (normalized === "location_updated") return "已换货架";
+  if (normalized === "confirming") return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.confirmStockIn);
   if (normalized === "failed" || normalized === "error") return "失败";
-  return "待确认";
+  return clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.pendingStockIn);
 }
 
 function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPreviewState, group = {}) {
+  const pdaCopy = getClerkPdaCopy();
   const locations = getStoreMobileActiveStockInLocations(state);
   const printedItems = getStoreMobilePrintedStoreItemsForStockIn(group);
   const locationError = String(state.storeMobileStockInLocationError || group.stock_in_location_error || "").trim();
@@ -37697,7 +37784,7 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
   return `
     <section class="mobile-stock-in-panel" data-mobile-stock-in-confirmation-panel="true">
       <div class="mobile-section-head">
-        <strong>确认完成入库</strong>
+        <strong>${escapeHtml(pdaCopy.confirmStockIn)}</strong>
         ${renderStoreMobilePricingBadge(`${printedItems.length} 件`)}
       </div>
       ${locationError ? `<div class="mobile-error">${escapeHtml(locationError)}</div>` : ""}
@@ -37705,7 +37792,7 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
       <div class="mobile-stock-in-list">
         ${printedItems.map((item) => {
           const selectedLocationCode = item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations);
-          const statusText = getStoreMobileStockInStatusLabel(item.stock_in_status || (item.stock_in_confirmed ? "confirmed" : ""));
+          const statusText = getStoreMobileStockInStatusLabel(getStoreMobileStockInItemStatus(item));
           const message = item.stock_in_message || item.stock_in_error || "";
           return `
             <article class="mobile-stock-in-row">
@@ -37714,18 +37801,18 @@ function renderStoreMobileStockInConfirmationPanel(state = storeMobilePricingPre
                 <span>${escapeHtml(item.category_short || "-")} · KES ${escapeHtml(item.price_kes || 0)}</span>
               </div>
               <label class="mobile-field">
-                <span>货架位 / 后仓</span>
+                <span>${escapeHtml(pdaCopy.selectLocation)}</span>
                 <select data-mobile-stock-in-location="${escapeHtml(item.machine_code)}" ${locations.length ? "" : "disabled"}>
                   ${locations.map((location) => `
                     <option value="${escapeHtml(location.location_code)}" ${location.location_code === selectedLocationCode ? "selected" : ""}>
-                      ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                      ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_type === "BACKROOM" ? pdaCopy.backroom : pdaCopy.shelf)}
                     </option>
                   `).join("")}
                 </select>
               </label>
               <div class="mobile-stock-in-actions">
                 ${renderStoreMobilePricingBadge(statusText)}
-                <button type="button" class="primary-button" data-mobile-pricing-confirm-stock-in="${escapeHtml(item.machine_code)}" data-mobile-pricing-confirm-stock-in-group="${escapeHtml(group.group_id || "")}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                <button type="button" class="primary-button" data-mobile-pricing-confirm-stock-in="${escapeHtml(item.machine_code)}" data-mobile-pricing-confirm-stock-in-group="${escapeHtml(group.group_id || "")}" ${locations.length ? "" : "disabled"}>${escapeHtml(pdaCopy.confirmStockIn)}</button>
               </div>
               ${message ? `<div class="${item.stock_in_error ? "mobile-error" : "success-banner"}">${escapeHtml(message)}</div>` : ""}
             </article>
@@ -37746,6 +37833,7 @@ async function loadStoreMobileUnconfirmedStockInItems(state = storeMobilePricing
 }
 
 function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const rows = Array.isArray(state.storeMobileUnconfirmedStockInItems) ? state.storeMobileUnconfirmedStockInItems : [];
   const locations = getStoreMobileActiveStockInLocations(state);
   const message = String(state.storeMobileUnconfirmedStockInMessage || "").trim();
@@ -37754,10 +37842,10 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
     <section class="mobile-stock-in-panel">
       <div class="mobile-stock-in-entry-card">
         <div>
-          <strong>未完成入库：${escapeHtml(rows.length)} 件</strong>
+          <strong>${escapeHtml(pdaCopy.pendingStockIn)}：${escapeHtml(rows.length)} 件</strong>
           <span>打印后还没有确认货架的商品。</span>
         </div>
-        <button type="button" class="ghost-button mini-button" data-mobile-pricing-load-unconfirmed-stock-in="true">刷新 / 立即处理</button>
+        <button type="button" class="ghost-button mini-button" data-mobile-pricing-load-unconfirmed-stock-in="true">${escapeHtml(pdaCopy.confirmStockIn)}</button>
       </div>
       ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
       ${error ? `<div class="mobile-error">${escapeHtml(error)}</div>` : ""}
@@ -37771,24 +37859,24 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
                 <div>
                   <strong>STORE_ITEM ${escapeHtml(machineCode || "-")}</strong>
                   <span>${escapeHtml(item.category_name || item.category_short || "-")} · KES ${escapeHtml(item.price_kes || item.sale_price_kes || 0)}</span>
-                  <span>建议货架 / 后仓：${escapeHtml(item.suggested_location_name || selectedLocationCode || "-")}</span>
+                  <span>${escapeHtml(pdaCopy.selectLocation)}：${escapeHtml(item.suggested_location_name || selectedLocationCode || "-")}</span>
                 </div>
                 <label class="mobile-field">
-                  <span>货架位 / 后仓</span>
+                  <span>${escapeHtml(pdaCopy.selectLocation)}</span>
                   <select data-mobile-unconfirmed-stock-in-location="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>
                     ${locations.map((location) => `
                       <option value="${escapeHtml(location.location_code)}" ${location.location_code === selectedLocationCode ? "selected" : ""}>
-                        ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_code)}
+                        ${escapeHtml(location.location_name || location.location_code)} · ${escapeHtml(location.location_type === "BACKROOM" ? pdaCopy.backroom : pdaCopy.shelf)}
                       </option>
                     `).join("")}
                   </select>
                 </label>
-                <button type="button" class="primary-button mobile-wide-action" data-mobile-unconfirmed-stock-in-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                <button type="button" class="primary-button mobile-wide-action" data-mobile-unconfirmed-stock-in-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>${escapeHtml(pdaCopy.confirmStockIn)}</button>
               </article>
             `;
           }).join("")}
         </div>
-      ` : '<div class="empty-state">当前没有未完成入库的 STORE_ITEM。</div>'}
+      ` : `<div class="empty-state">${escapeHtml(pdaCopy.stockInCompleted)}</div>`}
     </section>
   `;
 }
@@ -37801,7 +37889,7 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
     throw new Error("缺少 STORE_ITEM 码。");
   }
   if (!selectedLocation) {
-    throw new Error("请选择货架位或后仓。");
+    throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.selectLocationFirst));
   }
   const storeCode = getStoreMobileStoreCode(state);
   const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(normalizedMachineCode)}/confirm-stock-in`, {
@@ -37813,8 +37901,10 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
   });
   const status = String(result.status || "confirmed").trim();
   state.storeMobileUnconfirmedStockInMessage = status === "already_confirmed"
-    ? "已确认入库。"
-    : "已入库。";
+    ? `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`
+    : status === "location_updated"
+      ? "已换货架。"
+      : `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`;
   state.storeMobileUnconfirmedStockInError = "";
   await loadStoreMobileUnconfirmedStockInItems(state);
   return result;
@@ -37937,6 +38027,7 @@ function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState
 }
 
 function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const group = getStoreMobilePricingActiveGroup(state);
   const generatedItems = getStoreMobileGeneratedStoreItems(group);
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
@@ -37965,6 +38056,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
   const previewPrintMessage = String(group.preview_print_message || "").trim();
   const previewPrintError = String(group.preview_print_error || "").trim();
   const shouldShowStockInConfirmation = previewPrintStatus === "sent_to_printer";
+  const labelTemplateLabel = currentLanguage === "en" ? "Label Size" : "标签尺寸";
   const summaryHtml = `
     <div class="mobile-print-summary">
       <span><b>档位</b><strong>${escapeHtml(group.tier || "-")}</strong></span>
@@ -37972,7 +38064,7 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
       <span><b>计划数量</b><strong>${escapeHtml(group.quantity || 0)} 件</strong></span>
       <span><b>已生成数量</b><strong>${escapeHtml(generatedItems.length)} 件</strong></span>
       <span><b>待打印数量</b><strong>${escapeHtml(getStoreMobilePendingPrintCount(generatedItems))}</strong></span>
-      <span><b>label_template_size</b><strong>${escapeHtml(labelConfig.label_template_size)}</strong></span>
+      <span><b>${escapeHtml(labelTemplateLabel)}</b><strong>${escapeHtml(labelConfig.display_label)}</strong></span>
     </div>
   `;
   const labelSizeHtml = `
@@ -37999,9 +38091,9 @@ function renderPriceGroupPrintPanel(state = storeMobilePricingPreviewState) {
         <pre data-store-item-label-payload-preview="true">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
       </details>
       <div class="subtle small">本批共 ${escapeHtml(previewPayload.labels.length)} 张标签</div>
-      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${payload.labels.length ? "" : "disabled"}>打印本批标签</button>
-      ${printerReady ? "" : '<div class="subtle small">请先连接并确认打印机在线，K300 请先确认蓝牙 SPP 可用。</div>'}
-      ${previewPrintStatus ? `<div class="subtle small">预览打印状态：${escapeHtml(previewPrintStatus)}</div>` : ""}
+      <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-print-labels="${escapeHtml(group.group_id || "")}" ${payload.labels.length ? "" : "disabled"}>${escapeHtml(pdaCopy.printLabel)}</button>
+      ${printerReady ? "" : `<div class="subtle small">${escapeHtml(pdaCopy.printerNotConnected)}</div>`}
+      ${previewPrintStatus ? `<div class="subtle small">${escapeHtml(getStoreMobileStatusText(previewPrintStatus))}</div>` : ""}
       ${previewPrintMessage ? `<div class="success-banner">${escapeHtml(previewPrintMessage)}</div>` : ""}
       ${previewPrintError ? `<div class="mobile-error">${escapeHtml(previewPrintError)}</div>` : ""}
       ${shouldShowStockInConfirmation ? renderStoreMobileStockInConfirmationPanel(state, group) : ""}
@@ -38051,6 +38143,7 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const backendTasks = getStoreMobileAssignedBackendTasks(state);
   const sdp = state.selectedSdp || {};
   const assignedEmployee = String(sdp.assigned_clerk || sdp.assigned_employee || getCurrentUsername() || "Austin").trim();
@@ -38067,7 +38160,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
     <section class="mobile-task-list mobile-daily-workbench">
       <div class="mobile-daily-hero">
         <div>
-          <span class="eyebrow">我的今日工作</span>
+          <span class="eyebrow">${escapeHtml(pdaCopy.myWorkToday)}</span>
           <h3>我的任务</h3>
           <p>${escapeHtml(assignedEmployee)} / ${escapeHtml(storeName)} 店员</p>
         </div>
@@ -38076,7 +38169,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
       <div class="mobile-daily-metrics">
         <span><b>今日待办</b><strong>${escapeHtml(todoCount)}</strong></span>
         <span><b>进行中</b><strong>${escapeHtml(inProgressCount)}</strong></span>
-        <span><b>待完成入库</b><strong>${escapeHtml(unconfirmedCount)}</strong></span>
+        <span><b>${escapeHtml(pdaCopy.pendingStockIn)}</b><strong>${escapeHtml(unconfirmedCount)}</strong></span>
         <span><b>已完成</b><strong>${escapeHtml(completedCount)}</strong></span>
       </div>
       <section class="mobile-urgent-list">
@@ -38084,13 +38177,13 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
         <article class="mobile-task-card mobile-task-card-warning">
           <div class="mobile-task-card-head">
             <div>
-              <span>STOCK_IN_PENDING · 待完成入库</span>
-              <strong>待完成入库 ${escapeHtml(unconfirmedCount)} 件</strong>
+              <span>${escapeHtml(pdaCopy.pendingStockIn)}</span>
+              <strong>${escapeHtml(pdaCopy.pendingStockIn)} ${escapeHtml(unconfirmedCount)} 件</strong>
               <small>已打印但还没有确认货架，库存暂未计入。</small>
             </div>
             ${renderStoreMobilePricingBadge(unconfirmedCount ? "待处理" : "已清空")}
           </div>
-          <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="my">立即处理</button>
+          <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="my">${escapeHtml(pdaCopy.confirmStockIn)}</button>
         </article>
         <article class="mobile-task-card mobile-task-card-muted">
           <div class="mobile-task-card-head">
@@ -38144,8 +38237,8 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
       <section class="mobile-quick-actions">
         <div class="mobile-section-head"><strong>快捷入口</strong></div>
         <div class="mobile-quick-action-grid">
-          <button type="button" class="primary-button" data-mobile-pricing-page="verify">扫 SDP</button>
-          <button type="button" class="ghost-button" data-mobile-pricing-page="my">未完成入库</button>
+          <button type="button" class="primary-button" data-mobile-pricing-page="verify">${escapeHtml(pdaCopy.scanPackage)}</button>
+          <button type="button" class="ghost-button" data-mobile-pricing-page="my">${escapeHtml(pdaCopy.pendingStockIn)}</button>
           <button type="button" class="ghost-button" disabled>补货</button>
           <button type="button" class="ghost-button" data-mobile-pricing-page="printer_connection">打印机</button>
         </div>
@@ -38159,7 +38252,7 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
       || "",
     ).trim().toUpperCase();
     return renderDailyWorkbenchShell(`
-        <div class="subtle small">SDP 分拣只是今日任务之一；后台 assigned SDP 任务按最新 assigned_at 优先。</div>
+        <div class="subtle small">Package tasks are sorted by latest assignment time.</div>
         ${backendTasks.map((task) => {
           const displayCode = getStoreMobileAssignedTaskCode(task);
           const machineCode = getStoreMobileAssignedTaskMachineCode(task);
@@ -38167,8 +38260,6 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
           const storeCode = String(task.store_code || task.store_name || state.selectedSdp?.store_name || "-").trim().toUpperCase();
           const contentSummary = String(task.content_summary || task.category || task.category_name || "未填品类").trim();
           const itemCount = task.item_count === null || task.item_count === undefined || task.item_count === "" ? "-" : `${task.item_count} 件`;
-          const sourceType = String(task.source_type || "-").trim().toUpperCase();
-          const sourceCode = String(task.source_code || task.bale_no || "-").trim().toUpperCase();
           const assignedAt = String(task.assigned_at || "-").trim();
           const status = String(task.status || "assigned").trim();
           const receivedStatus = String(task.received_status || "-").trim();
@@ -38178,16 +38269,15 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
             <article class="mobile-task-card ${isSelected ? "is-active" : ""}">
               <div class="mobile-task-card-head">
                 <div>
-                  <span>SDP_SORTING · SDP 分拣 / 打标签任务</span>
+                  <span>${escapeHtml(pdaCopy.storeDeliveryPackage)} · ${escapeHtml(pdaCopy.printLabel)}</span>
                   <strong>${escapeHtml(displayCode || machineCode || "-")}</strong>
-                  <small>${escapeHtml(`${contentSummary} · ${itemCount} · ${storeCode} · 来源 ${parentSdoDisplayCode}`)}</small>
+                  <small>${escapeHtml(`${contentSummary} · ${itemCount} · ${storeCode} · SDO ${parentSdoDisplayCode}`)}</small>
                 </div>
                 ${renderStoreMobilePricingBadge(status)}
               </div>
               <div class="mobile-task-facts">
-                <span><b>商品包码</b>${escapeHtml(machineCode || "-")}</span>
-                <span><b>来源 SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
-                <span><b>来源</b>${escapeHtml(`${sourceType} ${sourceCode}`.trim())}</span>
+                <span><b>Package Code</b>${escapeHtml(machineCode || "-")}</span>
+                <span><b>SDO</b>${escapeHtml(parentSdoDisplayCode || "-")}</span>
                 <span><b>分配时间</b>${escapeHtml(assignedAt)}</span>
                 <span><b>收货状态</b>${escapeHtml(receivedStatus || "-")}</span>
                 <span><b>任务状态</b>${escapeHtml(assignmentStatus || status || "-")}</span>
@@ -38204,8 +38294,8 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
           <div class="mobile-task-card-head">
             <div>
               <span>正在读取后台任务</span>
-              <strong>Assigned SDP loading</strong>
-              <small>等待 /store-delivery-packages/assigned 返回。</small>
+              <strong>Loading Packages</strong>
+              <small>请稍候。</small>
             </div>
             ${renderStoreMobilePricingBadge("读取中")}
           </div>
@@ -38218,21 +38308,21 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
   const sdoCode = String(sdp.sdo_code || "SDO260504008");
   const completed = taskStatus === "已完成";
   return renderDailyWorkbenchShell(`
-      <div class="subtle small">暂无新分拣任务时，可以处理未完成入库，或等待店长分配任务。我的 SDP 任务会显示为 SDP 分拣 / 打标签任务。</div>
+      <div class="subtle small">暂无新包裹任务时，可以处理待完成入库，或等待店长分配任务。</div>
       <article class="mobile-task-card ${completed ? "is-complete" : ""}">
         <div class="mobile-task-card-head">
           <div>
-            <span>SDP_SORTING · SDP 分拣 / 打标签任务 · 演示任务 / Demo only</span>
+            <span>${escapeHtml(pdaCopy.storeDeliveryPackage)} · ${escapeHtml(pdaCopy.printLabel)} · 演示任务 / Demo only</span>
             <strong>${escapeHtml(displayCode)}</strong>
-            <small>${escapeHtml(`${categoryLine} · ${storeName} · 来源 ${sdoCode}`)}</small>
+            <small>${escapeHtml(`${categoryLine} · ${storeName} · SDO ${sdoCode}`)}</small>
           </div>
           ${renderStoreMobilePricingBadge(taskStatus)}
         </div>
         <div class="mobile-task-facts">
-          <span><b>来源包</b>${escapeHtml(sdp.source_code || "SDB-TO202605-002")}</span>
+          <span><b>Package</b>${escapeHtml(displayCode)}</span>
           <span><b>店员</b>${escapeHtml(sdp.assigned_clerk || "Austin")}</span>
           <span><b>价格组</b>${escapeHtml(`${totals.completeGroups}/${totals.groupCount}`)}</span>
-          <span><b>已贴标</b>${escapeHtml(totals.stickered)}</span>
+          <span><b>${escapeHtml(pdaCopy.labelPrinted)}</b>${escapeHtml(totals.stickered)}</span>
         </div>
         ${
           completed
@@ -38244,21 +38334,22 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileScanStep(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
   return `
     <form class="mobile-scan-step" data-mobile-pricing-scan-form="true">
       <div class="mobile-section-head">
-        <strong>扫描实体包</strong>
+        <strong>${escapeHtml(pdaCopy.scanPackage)}</strong>
         ${renderStoreMobilePricingBadge(state.scanSuccess || "待核对")}
       </div>
-      <p class="subtle small">请扫描 SDP 实体包条码</p>
+      <p class="subtle small">Scan the assigned Package label.</p>
       <label class="mobile-scan-input">
         <span>${escapeHtml(sdp.display_code || "SDP261250002")} / ${escapeHtml(sdp.machine_code || "6261250002")}</span>
         <input id="storeMobileSdpScanInput" name="sdp_scan" data-scan-input="true" data-store-mobile-sdp-scan-input="true" autocomplete="off" value="${escapeHtml(state.scanDraft || "")}" />
       </label>
       ${state.scanError ? `<div class="alert-banner">${escapeHtml(state.scanError)}</div>` : ""}
       ${state.scanSuccess ? `<div class="mobile-scan-success">${escapeHtml(state.scanSuccess)}</div>` : ""}
-      <button type="submit" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-scan="true">手动确认 / 核对</button>
+      <button type="submit" class="primary-button mobile-wide-action" data-mobile-pricing-confirm-scan="true">${escapeHtml(pdaCopy.scanPackage)}</button>
     </form>
   `;
 }
@@ -38686,6 +38777,7 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
 }
 
 function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
   return `
     <section class="mobile-my-tab">
@@ -38698,7 +38790,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
       </div>
       ${renderDirectLoopVersionInfoBlock("clerk_my")}
       ${renderClerkPrinterConnectionEntryCard(state)}
-      <div class="mobile-section-head"><strong>未完成入库</strong></div>
+      <div class="mobile-section-head"><strong>${escapeHtml(pdaCopy.pendingStockIn)}</strong></div>
       ${renderStoreMobileUnconfirmedStockInList(state)}
       <button type="button" class="ghost-button mobile-wide-action" data-mobile-pricing-reset-task="true">重置演示任务状态</button>
       <button type="button" class="primary-button mobile-wide-action" data-action="logout">退出登录</button>
@@ -38707,6 +38799,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
 }
 
 function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
+  const pdaCopy = getClerkPdaCopy();
   const page = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
   if (page === "tasks") {
     return renderStoreMobileTaskList(state);
@@ -38726,7 +38819,7 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
   if (page === "detail") {
     return `
       <section class="mobile-task-list">
-        <h3>SDP 详情</h3>
+        <h3>${escapeHtml(pdaCopy.storeDeliveryPackage)}</h3>
         ${renderStoreMobileSdpCard(state)}
         <div class="mobile-progress-row"><span>店长收货</span><span>分配店员</span><span>现场标价</span></div>
         <button type="button" class="primary-button mobile-wide-action" data-mobile-pricing-page="pricing_split">进入分批定价</button>
@@ -38770,12 +38863,13 @@ function renderStoreMobileDeviceScreen(state = storeMobilePricingPreviewState) {
 }
 
 function getStoreMobilePageOptions() {
+  const pdaCopy = getClerkPdaCopy();
   return [
-    { key: "tasks", label: "我的今日工作" },
-    { key: "detail", label: "SDP 详情" },
+    { key: "tasks", label: pdaCopy.myWorkToday },
+    { key: "detail", label: pdaCopy.storeDeliveryPackage },
     { key: "pricing_split", label: "分批定价" },
     { key: "group_generated", label: "本批 STORE_ITEM 生成结果" },
-    { key: "label_preview", label: "本批标签预览" },
+    { key: "label_preview", label: pdaCopy.printLabel },
     { key: "print_queue", label: "print payload 预览" },
     { key: "printer_connection", label: "打印机连接" },
   ];
@@ -38884,10 +38978,10 @@ function renderStoreMobilePricingPreview() {
           </div>
         </div>
         <div class="mobile-preview-control-block">
-          <strong>当前 mock SDP</strong>
+          <strong>当前 mock Package</strong>
           <div class="mobile-preview-sdp-mini">
             <b>${escapeHtml(state.selectedSdp?.display_code || state.selectedSdp?.sdp_code || "-")}</b>
-            <small>${escapeHtml(state.selectedSdp?.machine_code ? `machine_code: ${state.selectedSdp.machine_code}` : "")}</small>
+            <small>${escapeHtml(state.selectedSdp?.machine_code ? `Scanned Code: ${state.selectedSdp.machine_code}` : "")}</small>
             <span>${escapeHtml(state.selectedSdp?.store_name || "-")}</span>
             <span>${escapeHtml(`${state.selectedSdp?.category || "-"} · ${state.selectedSdp?.total_count || 0} 件`)}</span>
           </div>
@@ -39065,7 +39159,7 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
     return group;
   }
   if (!canRunClerkBluetoothPrinterPreviewPrint(currentPrinterStatus)) {
-    throw new Error("请先连接并确认打印机在线。");
+    throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printerNotConnected));
   }
   if (!bridge || typeof bridge.printStoreItemLabelPreview !== "function") {
     throw new Error("当前 Android 版本不支持 STORE_ITEM 预览打印，请升级 Direct Loop PDA Android App。");
@@ -39080,14 +39174,14 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
       keepError: true,
     });
     if (printStatus.last_print_result !== "success") {
-      throw new Error(printStatus.last_error || "STORE_ITEM 标签打印失败。");
+      throw new Error(printStatus.last_error || `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printFailed)}。`);
     }
   });
   if (!actionStarted) {
     throw new Error("打印机正在执行上一条操作，请稍后再试。");
   }
   group.preview_print_status = "sent_to_printer";
-  group.preview_print_message = "已发送 1 张 STORE_ITEM 预览标签到打印机。";
+  group.preview_print_message = `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.labelPrinted)}。`;
   group.preview_print_error = "";
   previewItems.forEach((item) => {
     item.preview_print_status = "sent_to_printer";
@@ -39121,7 +39215,7 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
       || "",
   ).trim().toUpperCase();
   if (!selectedLocation) {
-    throw new Error("请选择货架位或后仓。");
+    throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.selectLocationFirst));
   }
   const storeCode = getStoreMobileStoreCode(state);
   machineCode = normalizedItem.machine_code;
@@ -39143,9 +39237,11 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
   rawItem.stock_in_status = status;
   rawItem.stock_in_error = "";
   if (status === "already_confirmed") {
-    rawItem.stock_in_message = "已确认入库。";
+    rawItem.stock_in_message = `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`;
+  } else if (status === "location_updated") {
+    rawItem.stock_in_message = "已换货架。";
   } else {
-    rawItem.stock_in_message = "已入库。";
+    rawItem.stock_in_message = `${clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.stockInCompleted)}。`;
   }
   return result;
 }
@@ -39325,7 +39421,7 @@ function handleStoreMobilePricingPreviewAction(button) {
           throw new Error("该型号测试打印暂未配置");
         }
         if (!canRunClerkBluetoothPrinterTestPrint(currentStatus)) {
-          throw new Error("请先连接并确认打印机在线。");
+          throw new Error(clerkPdaTerm(CLERK_PDA_TERMINOLOGY_KEYS.printerNotConnected));
         }
         await bridge.printTestLabel("CHITENG_S1_OFFICIAL");
       }

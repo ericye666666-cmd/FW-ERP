@@ -30,6 +30,14 @@ const expectedBusinessTerms: Array<{
   { key: "pos.order.hold", enKE: "Hold Order", zhCN: "挂单" },
   { key: "pos.order.resumeHeld", enKE: "Resume Held Order", zhCN: "取回挂单" },
   { key: "pos.receipt.reprint", enKE: "Reprint Receipt", zhCN: "重打小票" },
+  { key: "pda.work.today", enKE: "My Work Today", zhCN: "我的今日工作" },
+  { key: "pda.package.scan", enKE: "Scan Package", zhCN: "扫描包裹" },
+  { key: "pda.label.print", enKE: "Print Label", zhCN: "打印标签" },
+  { key: "pda.label.printed", enKE: "Label Printed", zhCN: "标签已打印" },
+  { key: "pda.label.printFailed", enKE: "Print Failed", zhCN: "打印失败" },
+  { key: "pda.location.select", enKE: "Select Location", zhCN: "选择位置" },
+  { key: "pda.location.selectFirst", enKE: "Select shelf or backroom first.", zhCN: "请先选择货架或后仓。" },
+  { key: "pda.printer.notConnected", enKE: "Printer Not Connected", zhCN: "打印机未连接" },
 ];
 
 const supportedLocales: DictionaryLocale[] = ["en-KE", "zh-CN"];
