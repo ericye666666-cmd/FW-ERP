@@ -5,15 +5,23 @@ const expectedBusinessTerms: Array<{
   enKE: string;
   zhCN: string;
 }> = [
+  { key: "inventory.overview.title", enKE: "Inventory Overview", zhCN: "库存总览" },
   { key: "inventory.stockIn.pending", enKE: "Pending Stock-in", zhCN: "待完成入库" },
   { key: "inventory.stockIn.confirm", enKE: "Confirm Stock-in", zhCN: "确认入库" },
   { key: "inventory.stockIn.completed", enKE: "Stock-in Completed", zhCN: "已完成入库" },
+  { key: "inventory.stockIn.time", enKE: "Stock-in Time", zhCN: "入库时间" },
   { key: "inventory.item.unbarcoded", enKE: "Unbarcoded Item", zhCN: "无码商品" },
   { key: "inventory.item.inStock", enKE: "In Stock", zhCN: "在库" },
   { key: "inventory.item.sold", enKE: "Sold", zhCN: "已售" },
   { key: "inventory.location.unassigned", enKE: "Unassigned Location", zhCN: "未关联位置" },
   { key: "inventory.location.backroom", enKE: "Backroom", zhCN: "后仓" },
   { key: "inventory.location.shelf", enKE: "Shelf", zhCN: "货架" },
+  { key: "inventory.source.package", enKE: "Source Package", zhCN: "来源包" },
+  { key: "inventory.sale.time", enKE: "Sale Time", zhCN: "销售时间" },
+  { key: "inventory.field.entityType", enKE: "Entity Type", zhCN: "单据类型" },
+  { key: "inventory.shelf.layout", enKE: "Shelf Layout", zhCN: "货架布局" },
+  { key: "store.switch", enKE: "Switch Store", zhCN: "切换门店" },
+  { key: "store.current", enKE: "Current Store", zhCN: "当前门店" },
   { key: "store.item.code", enKE: "Store Item", zhCN: "门店商品码" },
   { key: "store.delivery.package", enKE: "Store Delivery Package", zhCN: "待送店包" },
   { key: "store.delivery.order", enKE: "Store Delivery Order", zhCN: "门店送货执行单" },

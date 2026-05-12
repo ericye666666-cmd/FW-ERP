@@ -1,9 +1,13 @@
 export const terminologyKeys = {
   inventory: {
+    overview: {
+      title: "inventory.overview.title",
+    },
     stockIn: {
       pending: "inventory.stockIn.pending",
       confirm: "inventory.stockIn.confirm",
       completed: "inventory.stockIn.completed",
+      time: "inventory.stockIn.time",
     },
     item: {
       unbarcoded: "inventory.item.unbarcoded",
@@ -15,8 +19,22 @@ export const terminologyKeys = {
       backroom: "inventory.location.backroom",
       shelf: "inventory.location.shelf",
     },
+    source: {
+      package: "inventory.source.package",
+    },
+    sale: {
+      time: "inventory.sale.time",
+    },
+    field: {
+      entityType: "inventory.field.entityType",
+    },
+    shelf: {
+      layout: "inventory.shelf.layout",
+    },
   },
   store: {
+    switch: "store.switch",
+    current: "store.current",
     item: {
       code: "store.item.code",
     },

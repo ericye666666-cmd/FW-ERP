@@ -1,15 +1,23 @@
 import type { TerminologyKey } from "../terminology.ts";
 
 export const enKEDictionary = {
+  "inventory.overview.title": "Inventory Overview",
   "inventory.stockIn.pending": "Pending Stock-in",
   "inventory.stockIn.confirm": "Confirm Stock-in",
   "inventory.stockIn.completed": "Stock-in Completed",
+  "inventory.stockIn.time": "Stock-in Time",
   "inventory.item.unbarcoded": "Unbarcoded Item",
   "inventory.item.inStock": "In Stock",
   "inventory.item.sold": "Sold",
   "inventory.location.unassigned": "Unassigned Location",
   "inventory.location.backroom": "Backroom",
   "inventory.location.shelf": "Shelf",
+  "inventory.source.package": "Source Package",
+  "inventory.sale.time": "Sale Time",
+  "inventory.field.entityType": "Entity Type",
+  "inventory.shelf.layout": "Shelf Layout",
+  "store.switch": "Switch Store",
+  "store.current": "Current Store",
   "store.item.code": "Store Item",
   "store.delivery.package": "Store Delivery Package",
   "store.delivery.order": "Store Delivery Order",

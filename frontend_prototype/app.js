@@ -291,6 +291,106 @@ function getClerkPdaCopy(language = currentLanguage) {
   };
 }
 
+const STORE_INVENTORY_TERMINOLOGY_KEYS = Object.freeze({
+  inventoryOverview: "inventory.overview.title",
+  switchStore: "store.switch",
+  currentStore: "store.current",
+  shelf: "inventory.location.shelf",
+  backroom: "inventory.location.backroom",
+  unassignedLocation: "inventory.location.unassigned",
+  inStock: "inventory.item.inStock",
+  sold: "inventory.item.sold",
+  pendingStockIn: "inventory.stockIn.pending",
+  confirmStockIn: "inventory.stockIn.confirm",
+  stockInCompleted: "inventory.stockIn.completed",
+  storeItem: "store.item.code",
+  sourcePackage: "inventory.source.package",
+  storeDeliveryOrder: "store.delivery.order",
+  stockInTime: "inventory.stockIn.time",
+  saleTime: "inventory.sale.time",
+  entityType: "inventory.field.entityType",
+  shelfLayout: "inventory.shelf.layout",
+});
+
+const STORE_INVENTORY_TERMINOLOGY_DICTIONARY = Object.freeze({
+  zh: Object.freeze({
+    "inventory.overview.title": "库存总览",
+    "store.switch": "切换门店",
+    "store.current": "当前门店",
+    "inventory.location.shelf": "货架",
+    "inventory.location.backroom": "后仓",
+    "inventory.location.unassigned": "未关联位置",
+    "inventory.item.inStock": "在库",
+    "inventory.item.sold": "已售",
+    "inventory.stockIn.pending": "待完成入库",
+    "inventory.stockIn.confirm": "确认入库",
+    "inventory.stockIn.completed": "已完成入库",
+    "store.item.code": "门店商品码",
+    "inventory.source.package": "来源包",
+    "store.delivery.order": "门店送货执行单",
+    "inventory.stockIn.time": "入库时间",
+    "inventory.sale.time": "销售时间",
+    "inventory.field.entityType": "单据类型",
+    "inventory.shelf.layout": "货架布局",
+  }),
+  en: Object.freeze({
+    "inventory.overview.title": "Inventory Overview",
+    "store.switch": "Switch Store",
+    "store.current": "Current Store",
+    "inventory.location.shelf": "Shelf",
+    "inventory.location.backroom": "Backroom",
+    "inventory.location.unassigned": "Unassigned Location",
+    "inventory.item.inStock": "In Stock",
+    "inventory.item.sold": "Sold",
+    "inventory.stockIn.pending": "Pending Stock-in",
+    "inventory.stockIn.confirm": "Confirm Stock-in",
+    "inventory.stockIn.completed": "Stock-in Completed",
+    "store.item.code": "Store Item",
+    "inventory.source.package": "Source Package",
+    "store.delivery.order": "Store Delivery Order",
+    "inventory.stockIn.time": "Stock-in Time",
+    "inventory.sale.time": "Sale Time",
+    "inventory.field.entityType": "Entity Type",
+    "inventory.shelf.layout": "Shelf Layout",
+  }),
+});
+
+function storeInventoryTerm(key, language = currentLanguage) {
+  const locale = language === "en" ? "en" : "zh";
+  return STORE_INVENTORY_TERMINOLOGY_DICTIONARY[locale]?.[key] || key;
+}
+
+function getStoreInventoryCopy(language = currentLanguage) {
+  const keys = STORE_INVENTORY_TERMINOLOGY_KEYS;
+  return {
+    inventoryOverview: storeInventoryTerm(keys.inventoryOverview, language),
+    switchStore: storeInventoryTerm(keys.switchStore, language),
+    currentStore: storeInventoryTerm(keys.currentStore, language),
+    shelf: storeInventoryTerm(keys.shelf, language),
+    backroom: storeInventoryTerm(keys.backroom, language),
+    unassignedLocation: storeInventoryTerm(keys.unassignedLocation, language),
+    inStock: storeInventoryTerm(keys.inStock, language),
+    sold: storeInventoryTerm(keys.sold, language),
+    pendingStockIn: storeInventoryTerm(keys.pendingStockIn, language),
+    confirmStockIn: storeInventoryTerm(keys.confirmStockIn, language),
+    stockInCompleted: storeInventoryTerm(keys.stockInCompleted, language),
+    storeItem: storeInventoryTerm(keys.storeItem, language),
+    sourcePackage: storeInventoryTerm(keys.sourcePackage, language),
+    storeDeliveryOrder: storeInventoryTerm(keys.storeDeliveryOrder, language),
+    stockInTime: storeInventoryTerm(keys.stockInTime, language),
+    saleTime: storeInventoryTerm(keys.saleTime, language),
+    entityType: storeInventoryTerm(keys.entityType, language),
+    shelfLayout: storeInventoryTerm(keys.shelfLayout, language),
+  };
+}
+
+function getStoreInventoryLocationTypeLabel(type = "", language = currentLanguage) {
+  const normalizedType = String(type || "").trim().toUpperCase();
+  if (normalizedType === "BACKROOM") return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.backroom, language);
+  if (normalizedType === "UNASSIGNED") return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.unassignedLocation, language);
+  return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.shelf, language);
+}
+
 const GLOBAL_I18N_GLOSSARY = [
   { zh: "门店收货主控台", en: "Store Receiving Command Center" },
   { zh: "仓库发货", en: "Warehouse Dispatch" },
@@ -25257,29 +25357,31 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="flow-summary-note">当前门店：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计已点击确认完成入库的 STORE_ITEM；待完成入库单独处理。</div>
+    <div class="flow-summary-note">${escapeHtml(copy.currentStore)}：${escapeHtml(overview.store_code || storeInventoryOverviewState.storeCode || "UTAWALA")}。主库存只统计${escapeHtml(copy.stockInCompleted)}的${escapeHtml(copy.storeItem)}；${escapeHtml(copy.pendingStockIn)}单独处理。</div>
     <div class="report-summary-grid">
       <article class="store-metric problem-card">
-        <strong>待完成入库</strong>
+        <strong>${escapeHtml(copy.pendingStockIn)}</strong>
         <span>${escapeHtml(overview.unconfirmed_items ?? 0)}</span>
-        <small>已生成或已打印 STORE_ITEM，但还没有点击确认完成入库。</small>
-        <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看待完成</button>
+        <small>已生成或已打印${escapeHtml(copy.storeItem)}，但还没有${escapeHtml(copy.stockInCompleted)}。</small>
+        <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看${escapeHtml(copy.pendingStockIn)}</button>
       </article>
-      <article class="store-metric problem-card"><strong>未关联货架</strong><span>${escapeHtml(overview.unassigned_location_items ?? 0)}</span><small>已入库但没有有效货架。</small></article>
-      <article class="store-metric"><strong>后仓</strong><span>${escapeHtml(overview.backroom_items ?? 0)}</span></article>
-      <article class="store-metric"><strong>已上货架</strong><span>${escapeHtml(overview.shelf_items ?? 0)}</span></article>
+      <article class="store-metric problem-card"><strong>${escapeHtml(copy.unassignedLocation)}</strong><span>${escapeHtml(overview.unassigned_location_items ?? 0)}</span><small>已入库但没有有效位置。</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.backroom)}</strong><span>${escapeHtml(overview.backroom_items ?? 0)}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml(overview.shelf_items ?? 0)}</span></article>
       <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml(overview.total_items ?? 0)}</span></article>
       <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml(overview.today_new_items ?? 0)}</span></article>
-      <article class="store-metric"><strong>今日已售</strong><span>${escapeHtml(overview.sold_today_items ?? 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
+      <article class="store-metric"><strong>今日${escapeHtml(copy.sold)}</strong><span>${escapeHtml(overview.sold_today_items ?? 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
     </div>
   `;
 }
 
 function renderStoreInventoryOverviewCategoryRows(rows = []) {
+  const copy = getStoreInventoryCopy();
   if (!rows.length) {
-    return `<div class="empty-state">当前门店还没有可统计的 STORE_ITEM 库存。</div>`;
+    return `<div class="empty-state">${escapeHtml(copy.currentStore)}还没有可统计的${escapeHtml(copy.storeItem)}库存。</div>`;
   }
   return `
     <div class="table-scroll">
@@ -25288,10 +25390,10 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
           <tr>
             <th>品类</th>
             <th>总库存</th>
-            <th>货架上</th>
-            <th>后仓</th>
-            <th>未关联货架</th>
-            <th>最后入库时间</th>
+            <th>${escapeHtml(copy.shelf)}</th>
+            <th>${escapeHtml(copy.backroom)}</th>
+            <th>${escapeHtml(copy.unassignedLocation)}</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
             <th>查看</th>
           </tr>
         </thead>
@@ -25314,33 +25416,41 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
 }
 
 function renderStoreInventoryOverviewLocationRows(rows = []) {
+  const copy = getStoreInventoryCopy();
   if (!rows.length) {
-    return `<div class="empty-state">当前门店还没有货架位库存。</div>`;
+    return `<div class="empty-state">${escapeHtml(copy.currentStore)}还没有${escapeHtml(copy.shelf)}库存。</div>`;
   }
   return `
     <div class="table-scroll">
       <table class="data-table compact-table">
         <thead>
           <tr>
-            <th>货架位</th>
+            <th>${escapeHtml(copy.shelf)}</th>
             <th>货架名称</th>
             <th>绑定品类</th>
             <th>商品数量</th>
-            <th>最后入库时间</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
             <th>明细</th>
           </tr>
         </thead>
         <tbody>
-          ${rows.map((row) => `
+          ${rows.map((row) => {
+            const locationTypeLabel = row.location_code === "UNASSIGNED"
+              ? copy.unassignedLocation
+              : row.location_type === "BACKROOM"
+                ? copy.backroom
+                : copy.shelf;
+            return `
             <tr class="${row.location_type === "BACKROOM" ? "inventory-location-special" : row.location_code === "UNASSIGNED" ? "inventory-location-warning" : ""}">
-              <td>${escapeHtml(row.location_code || "-")}</td>
+              <td>${escapeHtml(row.location_code || "-")} · ${escapeHtml(locationTypeLabel)}</td>
               <td>${escapeHtml(row.location_name || "-")}</td>
               <td>${escapeHtml(row.category_name || "-")}</td>
               <td>${escapeHtml(row.item_count ?? 0)}</td>
               <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
               <td><button type="button" class="ghost-button mini-button" data-store-inventory-location-detail="${escapeHtml(row.location_code || "UNASSIGNED")}">查看商品</button></td>
             </tr>
-          `).join("")}
+          `;
+          }).join("")}
         </tbody>
       </table>
     </div>
@@ -25356,9 +25466,10 @@ function renderStoreInventoryOverview(overview = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const activeTab = storeInventoryOverviewState.activeTab === "location" ? "location" : "category";
   target.innerHTML = `
-    <div class="flow-summary-note">${activeTab === "location" ? "按货架分类" : "按品类分类"}</div>
+    <div class="flow-summary-note">${activeTab === "location" ? `按${escapeHtml(copy.shelf)}分类` : "按品类分类"}</div>
     ${activeTab === "location"
       ? renderStoreInventoryOverviewLocationRows(overview.by_location || [])
       : renderStoreInventoryOverviewCategoryRows(overview.by_category || [])}
@@ -25370,6 +25481,7 @@ function renderStoreInventorySoldSummary(overview = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const categoryRows = Array.isArray(overview.sold_by_category) ? overview.sold_by_category : [];
   const locationRows = Array.isArray(overview.sold_by_location) ? overview.sold_by_location : [];
   const soldCount = Number(overview.sold_today_items || 0);
@@ -25398,14 +25510,14 @@ function renderStoreInventorySoldSummary(overview = {}) {
     </tr>
   `).join("") : `<tr><td colspan="4">今天还没有 POS 销售出库。</td></tr>`;
   target.innerHTML = `
-    <div class="flow-summary-note">销售出库摘要 · 今日已售 ${escapeHtml(soldCount)} 件 · ${escapeHtml(formatKesAmount(soldAmount, "KES 0.00"))}</div>
+    <div class="flow-summary-note">销售出库摘要 · 今日${escapeHtml(copy.sold)} ${escapeHtml(soldCount)} 件 · ${escapeHtml(formatKesAmount(soldAmount, "KES 0.00"))}</div>
     <div class="two-column-grid">
       <div class="table-scroll">
         <table class="data-table compact-table">
           <thead>
             <tr>
               <th>按品类售出</th>
-              <th>今日已售件数</th>
+              <th>今日${escapeHtml(copy.sold)}件数</th>
               <th>今日销售额</th>
             </tr>
           </thead>
@@ -25416,9 +25528,9 @@ function renderStoreInventorySoldSummary(overview = {}) {
         <table class="data-table compact-table">
           <thead>
             <tr>
-              <th>货架位</th>
-              <th>按货架售出</th>
-              <th>今日已售件数</th>
+              <th>${escapeHtml(copy.shelf)}</th>
+              <th>按${escapeHtml(copy.shelf)}售出</th>
+              <th>今日${escapeHtml(copy.sold)}件数</th>
               <th>今日销售额</th>
             </tr>
           </thead>
@@ -25434,6 +25546,7 @@ function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") 
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   target.className = "report-summary";
   if (!items.length) {
     target.innerHTML = `<div class="empty-state">${escapeHtml(title)}：没有商品。</div>`;
@@ -25445,14 +25558,14 @@ function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") 
       <table class="data-table compact-table">
         <thead>
           <tr>
-            <th>STORE_ITEM machine_code / barcode</th>
+            <th>${escapeHtml(copy.storeItem)}</th>
             <th>品类</th>
             <th>价格</th>
-            <th>当前货架位</th>
-            <th>来源 SDP</th>
-            <th>来源 SDO</th>
+            <th>${escapeHtml(copy.shelf)}</th>
+            <th>${escapeHtml(copy.sourcePackage)}</th>
+            <th>${escapeHtml(copy.storeDeliveryOrder)}</th>
             <th>打印人 / 确认人</th>
-            <th>入库 / 更新时间</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
           </tr>
         </thead>
         <tbody>
@@ -25500,31 +25613,33 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const rows = Array.isArray(items) ? items : [];
   const locations = getStoreInventoryActiveStockInLocations();
   target.className = "report-summary";
   if (!rows.length) {
     target.innerHTML = `
-      <div class="flow-summary-note">待完成入库 · 0 件</div>
+      <div class="flow-summary-note">${escapeHtml(copy.pendingStockIn)} · 0 件</div>
       ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
-      <div class="empty-state">当前门店没有待完成入库的 STORE_ITEM。</div>
+      <div class="empty-state">${escapeHtml(copy.currentStore)}没有${escapeHtml(copy.pendingStockIn)}的${escapeHtml(copy.storeItem)}。</div>
     `;
     return;
   }
   target.innerHTML = `
-    <div class="flow-summary-note">待完成入库 · ${rows.length} 件。这些商品不会进入主库存，点击确认完成入库后才计入库存。</div>
+    <div class="flow-summary-note">${escapeHtml(copy.pendingStockIn)} · ${rows.length} 件。这些商品不会进入主库存，${escapeHtml(copy.stockInCompleted)}后才计入库存。</div>
     ${message ? `<div class="success-banner">${escapeHtml(message)}</div>` : ""}
     <div class="table-scroll">
       <table class="data-table compact-table">
         <thead>
           <tr>
-            <th>STORE_ITEM 码</th>
+            <th>${escapeHtml(copy.storeItem)}</th>
             <th>品类</th>
             <th>价格</th>
-            <th>建议货架 / 后仓</th>
-            <th>来源 SDP</th>
+            <th>建议${escapeHtml(copy.shelf)} / ${escapeHtml(copy.backroom)}</th>
+            <th>${escapeHtml(copy.sourcePackage)}</th>
+            <th>${escapeHtml(copy.storeDeliveryOrder)}</th>
             <th>打印人</th>
-            <th>时间</th>
+            <th>${escapeHtml(copy.stockInTime)}</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -25539,9 +25654,9 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
                 <td>${escapeHtml(item.price_kes ?? item.sale_price_kes ?? "-")}</td>
                 <td>
                   <strong>${escapeHtml(item.suggested_location_name || suggestedLocationCode || "-")}</strong>
-                  ${item.parent_sdo_display_code ? `<div class="subtle small">SDO ${escapeHtml(item.parent_sdo_display_code)}</div>` : ""}
                 </td>
                 <td>${escapeHtml(item.source_sdp_display_code || "-")}</td>
+                <td>${escapeHtml(item.parent_sdo_display_code || "-")}</td>
                 <td>${escapeHtml(item.printed_by || "-")}</td>
                 <td>${escapeHtml(item.printed_at || item.created_at || item.updated_at || item.last_inbound_at || "-")}</td>
                 <td>
@@ -25553,7 +25668,7 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
                         </option>
                       `).join("")}
                     </select>
-                    <button type="button" class="primary-button mini-button" data-store-inventory-unconfirmed-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>确认完成入库</button>
+                    <button type="button" class="primary-button mini-button" data-store-inventory-unconfirmed-confirm="${escapeHtml(machineCode)}" ${locations.length ? "" : "disabled"}>${escapeHtml(copy.stockInCompleted)}</button>
                   </div>
                 </td>
               </tr>
@@ -25568,10 +25683,11 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
 async function loadStoreInventoryOverview(storeCode = "") {
   const normalizedStoreCode = String(storeCode || getStoreInventoryOverviewStoreCode()).trim().toUpperCase() || "UTAWALA";
   const overview = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/inventory-overview`);
+  const copy = getStoreInventoryCopy();
   writeOutput("#storeInventoryOverviewOutput", overview);
   setInputValue("#storeInventoryOverviewForm [name='store_code']", normalizedStoreCode);
   renderStoreInventoryOverview(overview);
-  renderStoreInventoryOverviewDetail([], "点击品类或货架位查看商品明细");
+  renderStoreInventoryOverviewDetail([], `点击品类或${copy.shelf}查看商品明细`);
   return overview;
 }
 
@@ -25589,11 +25705,12 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
   const selectedElement = document.querySelector(`[data-store-inventory-unconfirmed-location="${machineCode}"]`);
   const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
+  const copy = getStoreInventoryCopy();
   if (!machineCode) {
-    throw new Error("缺少 STORE_ITEM 码。");
+    throw new Error(`缺少${copy.storeItem}。`);
   }
   if (!selectedLocation) {
-    throw new Error("请选择货架位或后仓。");
+    throw new Error(`请选择${copy.shelf}或${copy.backroom}。`);
   }
   const result = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/confirm-stock-in`, {
     method: "POST",
@@ -25604,8 +25721,10 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
   });
   const status = String(result.status || "confirmed").trim();
   const message = status === "already_confirmed"
-    ? "已确认入库。"
-    : "确认完成入库。";
+    ? `${copy.stockInCompleted}。`
+    : status === "location_updated"
+      ? `已换${copy.shelf}。`
+      : `${copy.stockInCompleted}。`;
   await loadStoreInventoryOverview(storeCode);
   await loadStoreInventoryUnconfirmedItems(message);
   return result;
@@ -25620,8 +25739,9 @@ async function submitStoreInventoryOverview(event) {
 
 async function loadStoreInventoryLocationDetail(locationCode = "") {
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
+  const copy = getStoreInventoryCopy();
   const items = await request(`/stores/${encodeURIComponent(storeCode)}/inventory-overview/locations/${encodeURIComponent(locationCode)}/items`);
-  renderStoreInventoryOverviewDetail(items, `货架位 ${locationCode || "未关联货架"} 商品明细`);
+  renderStoreInventoryOverviewDetail(items, `${copy.shelf} ${locationCode || copy.unassignedLocation} 商品明细`);
   return items;
 }
 
@@ -25637,45 +25757,48 @@ function renderStoreItemTraceLookupResult(trace = {}) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const status = String(trace.trace_status || "unknown").trim();
-  const label = trace.status_label || {
-    in_stock: "在库",
-    pending_stock_in: "待完成入库",
-    sold: "已售",
-    unassigned_location: "未关联货架",
+  const label = {
+    in_stock: copy.inStock,
+    pending_stock_in: copy.pendingStockIn,
+    sold: copy.sold,
+    unassigned_location: copy.unassignedLocation,
     invalid: "不是门店商品码",
     unknown: "未找到",
-  }[status] || "未找到";
+  }[status] || trace.status_label || "未找到";
   const toneClass = status === "in_stock"
     ? "success-banner"
     : status === "sold" || status === "pending_stock_in" || status === "unassigned_location"
       ? "warning-banner"
       : "error-banner";
   const locationText = [trace.current_location_name, trace.current_location_code].filter(Boolean).join(" / ") || "-";
-  const sourceText = [trace.source_sdp_display_code, trace.parent_sdo_display_code].filter(Boolean).join(" / ") || "-";
+  const sourcePackageText = trace.source_sdp_display_code || "-";
+  const storeDeliveryOrderText = trace.parent_sdo_display_code || "-";
+  const locationTypeText = getStoreInventoryLocationTypeLabel(trace.location_type);
   const saleText = trace.sale_no || trace.sale_id || trace.sold_at || trace.sold_by
     ? [trace.sale_no || trace.sale_id, trace.sold_at, trace.sold_by].filter(Boolean).join(" / ")
     : "-";
   const operationHint = status === "pending_stock_in"
-    ? "该商品已生成或已打印，但还没有点击确认完成入库。建议去“待完成入库”列表处理。"
+    ? `该${copy.storeItem}还没有${copy.stockInCompleted}。请在“${copy.pendingStockIn}”列表处理。`
     : status === "unassigned_location"
-      ? "该商品已入库，但货架位置为空或失效。请在待完成入库或货架处理流程中修正。"
+      ? `该${copy.storeItem}已入库，但${copy.shelf}为空或失效。请在${copy.pendingStockIn}或${copy.shelf}流程中修正。`
       : status === "invalid"
-        ? "POS 和库存查询只处理 STORE_ITEM，RAW_BALE / SDB / SDP / LPK / SDO 不是商品码。"
+        ? `POS 和库存查询只处理${copy.storeItem}。`
         : status === "unknown"
-          ? "没有找到这个 STORE_ITEM。"
+          ? `没有找到这个${copy.storeItem}。`
           : trace.message || "";
   target.className = "report-summary";
   target.innerHTML = `
     <div class="${toneClass}">状态：${escapeHtml(label)}</div>
     ${operationHint ? `<div class="flow-summary-note">${escapeHtml(operationHint)}</div>` : ""}
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>STORE_ITEM</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.storeItem)}</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
       <article class="store-metric"><strong>品类</strong><span>${escapeHtml(trace.category_name || trace.category_short || "-")}</span><small>KES ${escapeHtml(trace.price_kes ?? 0)}</small></article>
-      <article class="store-metric"><strong>当前货架</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(trace.location_type || "")}</small></article>
-      <article class="store-metric"><strong>来源</strong><span>${escapeHtml(sourceText)}</span><small>SDP / SDO</small></article>
-      <article class="store-metric"><strong>确认入库</strong><span>${escapeHtml(trace.stock_in_confirmed ? "已确认" : "未确认")}</span><small>${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
-      <article class="store-metric"><strong>销售</strong><span>${escapeHtml(trace.sold ? "已售" : "未售")}</span><small>${escapeHtml(saleText)}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(locationTypeText)}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.sourcePackage)}</strong><span>${escapeHtml(sourcePackageText)}</span><small>${escapeHtml(copy.storeDeliveryOrder)}：${escapeHtml(storeDeliveryOrderText)}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.stockInCompleted)}</strong><span>${escapeHtml(trace.stock_in_confirmed ? copy.stockInCompleted : copy.pendingStockIn)}</span><small>${escapeHtml(copy.stockInTime)}：${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.sold)}</strong><span>${escapeHtml(trace.sold ? copy.sold : copy.inStock)}</span><small>${escapeHtml(copy.saleTime)}：${escapeHtml(saleText)}</small></article>
     </div>
   `;
 }
@@ -25684,7 +25807,7 @@ async function lookupStoreItemTrace(machineCode = "") {
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
   machineCode = String(machineCode || "").trim().toUpperCase();
   if (!machineCode) {
-    throw new Error("请输入 STORE_ITEM 码。");
+    throw new Error(`请输入${storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.storeItem)}。`);
   }
   const trace = await request(`/stores/${encodeURIComponent(storeCode)}/store-items/${encodeURIComponent(machineCode)}/trace`);
   writeOutput("#storeInventoryOverviewOutput", trace);
@@ -25825,10 +25948,12 @@ function handleStoreShelfFloorPlanUpload(input) {
 
 function hydrateStoreShelfLocationForm(row = {}) {
   const layout = parseStoreShelfLayout(row);
+  const locationType = row.location_type || "SHELF";
   setInputValue("#storeShelfLocationForm [name='store_code']", row.store_code || getCurrentStoreCodeFallback() || "UTAWALA");
   setInputValue("#storeShelfLocationForm [name='location_code']", row.location_code || row.rack_code || "");
   setInputValue("#storeShelfLocationForm [name='location_name']", row.location_name || "");
-  setInputValue("#storeShelfLocationForm [name='location_type']", row.location_type || "SHELF");
+  setInputValue("#storeShelfLocationForm [name='location_type']", locationType);
+  setInputValue("#storeShelfLocationForm [name='location_type_label']", getStoreInventoryLocationTypeLabel(locationType));
   setInputValue("#storeShelfLocationForm [name='category_name']", row.category_name || row.category_hint || "");
   setInputValue("#storeShelfLocationForm [name='active']", row.active === false ? "false" : "true");
   setInputValue("#storeShelfLocationForm [name='sort_order']", String(row.sort_order ?? 0));
@@ -25853,6 +25978,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
   if (!(canvasTarget instanceof HTMLElement) || !(detailTarget instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const locationRows = Array.isArray(rows) ? rows : [];
   if (locationRows.length && !storeShelfFloorPlanState.selectedLocationCode) {
     storeShelfFloorPlanState.selectedLocationCode = String(locationRows[0]?.location_code || locationRows[0]?.rack_code || "").trim().toUpperCase();
@@ -25863,7 +25989,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
   if (!locationRows.length) {
     canvasTarget.innerHTML = `
       <div class="store-shelf-empty-guide"${backgroundStyle}>
-        <strong>当前门店还没有货架布局</strong>
+        <strong>${escapeHtml(copy.currentStore)}还没有${escapeHtml(copy.shelfLayout)}</strong>
         <span>你可以使用默认 demo 模板、上传真实平面图，或从空白画布开始。</span>
         <div class="button-row">
           <button type="button" data-store-shelf-initialize="true">使用默认模板</button>
@@ -25888,12 +26014,13 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
       const layout = parseStoreShelfLayout(row, index);
       const selectedClass = code && code === storeShelfFloorPlanState.selectedLocationCode ? " is-selected" : "";
       const typeClass = String(row.location_type || "SHELF").trim().toLowerCase();
+      const typeLabel = getStoreInventoryLocationTypeLabel(row.location_type);
       return `
         <button type="button" class="store-shelf-map-object shelf-object object-${escapeHtml(typeClass)}${selectedClass}" data-store-shelf-canvas-select="${escapeHtml(code)}" style="left:${Math.round(layout.x)}px;top:${Math.round(layout.y)}px;width:${Math.round(layout.width)}px;height:${Math.round(layout.height)}px;z-index:${Number(layout.z_index || 3)}">
           <span class="map-object-badge">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
           <strong>${escapeHtml(code || "-")}</strong>
           <span>${escapeHtml(row.location_name || "-")}</span>
-          <small>${escapeHtml(row.category_name || row.category_hint || row.location_type || "-")} · ${escapeHtml(row.item_count ?? 0)} 件</small>
+          <small>${escapeHtml(row.category_name || row.category_hint || typeLabel || "-")} · ${escapeHtml(row.item_count ?? 0)} 件</small>
         </button>
       `;
     })
@@ -25929,6 +26056,7 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
     return;
   }
+  const copy = getStoreInventoryCopy();
   const locationRows = Array.isArray(rows) ? rows : [];
   const shelfCount = locationRows.filter((row) => row.location_type === "SHELF").length;
   const backroomCount = locationRows.filter((row) => row.location_type === "BACKROOM").length;
@@ -25936,25 +26064,27 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
   const totalItems = locationRows.reduce((sum, row) => sum + Number(row.item_count || 0), 0);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="flow-summary-note">${escapeHtml(message || "货架位编辑 · 平面图模式：画布是主体验，右侧只编辑当前选中的货架。")}</div>
+    <div class="flow-summary-note">${escapeHtml(message || `${copy.shelfLayout} · 平面图模式：画布是主体验，右侧只编辑当前选中的${copy.shelf}。`)}</div>
     <div class="report-summary-grid">
-      <article class="store-metric"><strong>货架位</strong><span>${shelfCount}</span></article>
-      <article class="store-metric"><strong>后仓</strong><span>${backroomCount}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${shelfCount}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.backroom)}</strong><span>${backroomCount}</span></article>
       <article class="store-metric"><strong>启用</strong><span>${activeCount}</span></article>
       <article class="store-metric"><strong>当前商品数</strong><span>${totalItems}</span></article>
     </div>
   `;
   renderStoreShelfFloorPlanCanvas(locationRows);
   if (!locationRows.length) {
-    listTarget.innerHTML = `<div class="empty-state">当前门店还没有货架位。请先点击“使用默认模板”。</div>`;
+    listTarget.innerHTML = `<div class="empty-state">${escapeHtml(copy.currentStore)}还没有${escapeHtml(copy.shelf)}。请先点击“使用默认模板”。</div>`;
     return;
   }
   listTarget.innerHTML = locationRows
-    .map((row) => `
+    .map((row) => {
+      const typeLabel = getStoreInventoryLocationTypeLabel(row.location_type);
+      return `
       <article class="candidate-row">
         <div class="candidate-main">
           <strong>${escapeHtml(row.location_code || row.rack_code || "-")} · ${escapeHtml(row.location_name || "-")}</strong>
-          <div class="subtle small">${escapeHtml(row.location_type || "SHELF")} · 绑定品类：${escapeHtml(row.category_name || row.category_hint || "-")}</div>
+          <div class="subtle small">${escapeHtml(typeLabel)} · 绑定品类：${escapeHtml(row.category_name || row.category_hint || "-")}</div>
           <div class="chip-row">
             <span class="meta-pill">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
             <span class="meta-pill">排序 ${escapeHtml(row.sort_order ?? 0)}</span>
@@ -25962,10 +26092,11 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
           </div>
         </div>
         ${row.location_type === "BACKROOM"
-          ? `<span class="meta-pill">系统固定后仓</span>`
+          ? `<span class="meta-pill">系统固定${escapeHtml(copy.backroom)}</span>`
           : `<div class="button-row"><button type="button" class="ghost-button mini-button" data-store-shelf-locate="${escapeHtml(row.location_code || row.rack_code || "")}">定位到画布</button><button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button></div>`}
       </article>
-    `)
+    `;
+    })
     .join("");
 }
 
@@ -26024,7 +26155,7 @@ async function submitStoreShelfLocationSave(event) {
   });
   writeOutput("#storeShelfLocationOutput", result);
   const rows = await loadStoreShelfLocations(storeCode);
-  renderStoreShelfLocationSummary(rows, `货架位 ${locationCode} 已保存。`);
+  renderStoreShelfLocationSummary(rows, `${getStoreInventoryCopy().shelf} ${locationCode} 已保存。`);
   return result;
 }
 

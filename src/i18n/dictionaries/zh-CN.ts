@@ -1,15 +1,23 @@
 import type { TerminologyKey } from "../terminology.ts";
 
 export const zhCNDictionary = {
+  "inventory.overview.title": "库存总览",
   "inventory.stockIn.pending": "待完成入库",
   "inventory.stockIn.confirm": "确认入库",
   "inventory.stockIn.completed": "已完成入库",
+  "inventory.stockIn.time": "入库时间",
   "inventory.item.unbarcoded": "无码商品",
   "inventory.item.inStock": "在库",
   "inventory.item.sold": "已售",
   "inventory.location.unassigned": "未关联位置",
   "inventory.location.backroom": "后仓",
   "inventory.location.shelf": "货架",
+  "inventory.source.package": "来源包",
+  "inventory.sale.time": "销售时间",
+  "inventory.field.entityType": "单据类型",
+  "inventory.shelf.layout": "货架布局",
+  "store.switch": "切换门店",
+  "store.current": "当前门店",
   "store.item.code": "门店商品码",
   "store.delivery.package": "待送店包",
   "store.delivery.order": "门店送货执行单",
