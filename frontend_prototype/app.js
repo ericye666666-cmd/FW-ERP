@@ -1117,6 +1117,34 @@ function applyGlobalI18n(root = document.body, language = currentLanguage) {
   }
 }
 
+function renderWebLanguageToggleMarkup(extraClass = "") {
+  const className = `web-language-toggle global-language-toggle${extraClass ? ` ${extraClass}` : ""}`;
+  const zhActive = currentLanguage === "zh" ? " is-active" : "";
+  const enActive = currentLanguage === "en" ? " is-active" : "";
+  return `
+    <div class="${className}" data-web-language-toggle="true" role="group" aria-label="Language switch">
+      <button type="button" class="global-language-button${zhActive}" data-global-language="zh">中文</button>
+      <button type="button" class="global-language-button${enActive}" data-global-language="en">EN</button>
+    </div>
+  `;
+}
+
+function isWholePageWebLanguageSwitchReady(target = null) {
+  if (target instanceof HTMLElement && target.closest("[data-pda-language-setting]")) {
+    return true;
+  }
+  return false;
+}
+
+function syncWebLanguageToggleAvailability() {
+  const readyForEnglish = isWholePageWebLanguageSwitchReady();
+  document.querySelectorAll("[data-web-language-toggle] [data-global-language='en']").forEach((button) => {
+    button.classList.toggle("is-disabled", !readyForEnglish);
+    button.setAttribute("aria-disabled", readyForEnglish ? "false" : "true");
+    button.title = readyForEnglish ? "" : "English is staged page by page. This page is not migrated yet.";
+  });
+}
+
 function syncGlobalLanguageButtons() {
   document.querySelectorAll("[data-global-language], [data-terminal-locale]").forEach((button) => {
     const buttonLanguage = button.dataset.globalLanguage || button.dataset.terminalLocale;
@@ -1128,6 +1156,22 @@ function syncGlobalLanguageButtons() {
       button.textContent = "EN";
     }
   });
+  syncWebLanguageToggleAvailability();
+}
+
+function handleGlobalLanguageToggleClick(target) {
+  const requestedLanguage = target.dataset.globalLanguage || "zh";
+  if (
+    target.closest("[data-web-language-toggle]")
+    && requestedLanguage === "en"
+    && !isWholePageWebLanguageSwitchReady(target)
+  ) {
+    setGlobalLanguage("zh", { renderCashier: false });
+    syncGlobalLanguageButtons();
+    return;
+  }
+  setGlobalLanguage(requestedLanguage);
+  refreshPdaLanguageSurfacesAfterLanguageChange();
 }
 
 function setGlobalLanguage(language = "zh", options = {}) {
@@ -31305,7 +31349,9 @@ renderCashierTerminalSessionStrip = function () {
     <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
     <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
     <span class="time-chip"><b>当前时间</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
+    ${renderWebLanguageToggleMarkup("cashier-terminal-web-language-toggle")}
   `;
+  syncGlobalLanguageButtons();
 }
 
 renderCashierTerminalStatusBar = function () {
@@ -45039,8 +45085,7 @@ document.addEventListener("click", (event) => {
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  setGlobalLanguage(target.dataset.globalLanguage || "zh");
-  refreshPdaLanguageSurfacesAfterLanguageChange();
+  handleGlobalLanguageToggleClick(target);
 });
 window.addEventListener("online", handleCashierTerminalNetworkChange);
 window.addEventListener("offline", handleCashierTerminalNetworkChange);

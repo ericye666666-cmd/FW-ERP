@@ -650,16 +650,22 @@ h3 {
 }
 
 .web-language-toggle {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  z-index: 80;
+  flex: 0 0 auto;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--shadow-control);
 }
 
 body.pda-runtime-mode .web-language-toggle {
   display: none !important;
+}
+
+.workspace-session-strip .web-language-toggle {
+  margin-left: 2px;
+}
+
+.global-language-button.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .pda-settings-card {
@@ -11546,6 +11552,29 @@ body.cashier-terminal-mode .topbar .cashier-terminal-exit {
   border-color: rgba(196, 181, 253, 0.54);
   background: rgba(124, 58, 237, 0.18);
   color: #ede9fe;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip .web-language-toggle {
+  min-width: 104px;
+  min-height: 34px;
+  align-self: stretch;
+  justify-content: center;
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.58);
+  box-shadow: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip .global-language-button {
+  min-height: 26px;
+  padding: 0 8px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip .global-language-button.is-active {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: none;
 }
 
 body.cashier-terminal-mode .network-online,

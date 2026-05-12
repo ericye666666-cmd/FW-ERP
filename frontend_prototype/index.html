@@ -7,11 +7,6 @@
     <link rel="stylesheet" href="./styles.css?v=pda-runtime-polling-215" />
   </head>
   <body>
-    <div id="webLanguageToggle" class="web-language-toggle global-language-toggle" role="group" aria-label="Language switch">
-      <button type="button" class="global-language-button is-active" data-global-language="zh">中文</button>
-      <button type="button" class="global-language-button" data-global-language="en">EN</button>
-    </div>
-
     <section id="authPage" class="auth-page">
       <section class="test-home-entry panel" aria-labelledby="testHomeTitle">
         <div class="panel-head">
@@ -108,6 +103,10 @@
           <div class="workspace-session-strip">
             <div id="sessionSummary" class="session-summary">未登录</div>
             <div id="appSessionMeta" class="session-meta-inline">登录后显示角色和默认门店</div>
+            <div class="web-language-toggle global-language-toggle" data-web-language-toggle="true" role="group" aria-label="Language switch">
+              <button type="button" class="global-language-button is-active" data-global-language="zh">中文</button>
+              <button type="button" class="global-language-button" data-global-language="en">EN</button>
+            </div>
             <button id="logoutButton" type="button" class="ghost-button mini-button" data-action="logout">退出登录</button>
           </div>
         </div>
@@ -3519,7 +3518,12 @@
               </div>
             </div>
             <div class="topbar-actions">
-              <div id="cashierTerminalSessionStrip" class="cashier-terminal-session-strip"></div>
+              <div id="cashierTerminalSessionStrip" class="cashier-terminal-session-strip">
+                <div class="web-language-toggle global-language-toggle" data-web-language-toggle="true" role="group" aria-label="Language switch">
+                  <button type="button" class="global-language-button is-active" data-global-language="zh">中文</button>
+                  <button type="button" class="global-language-button" data-global-language="en">EN</button>
+                </div>
+              </div>
               <button type="button" class="secondary-ghost cashier-terminal-exit" data-terminal-action="exit-pos">退出收银台</button>
             </div>
           </header>

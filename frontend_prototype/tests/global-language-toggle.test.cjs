@@ -44,16 +44,26 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-test("web language switch is a top-right control and is hidden in PDA runtime", () => {
-  const webToggle = indexHtml.match(/<div id="webLanguageToggle"[\s\S]*?<\/div>/)?.[0] || "";
+test("web language switch is mounted inside web header areas and is hidden in PDA runtime", () => {
+  const webToggles = indexHtml.match(/<div class="[^"]*web-language-toggle[^"]*global-language-toggle[\s\S]*?<\/div>/g) || [];
+  const webToggleCss = stylesCss.match(/\.web-language-toggle\s*\{[\s\S]*?\n\}/)?.[0] || "";
 
-  assert.match(webToggle, /class="[^"]*web-language-toggle[^"]*global-language-toggle/);
-  assert.match(webToggle, /data-global-language="zh"/);
-  assert.match(webToggle, /data-global-language="en"/);
-  assert.doesNotMatch(indexHtml, /id="authLanguageToggle"/);
-  assert.doesNotMatch(indexHtml, /id="workspaceLanguageToggle"/);
-  assert.match(stylesCss, /\.web-language-toggle\s*\{[\s\S]*position:\s*fixed/);
+  assert.ok(webToggles.length >= 1);
+  assert.match(indexHtml, /workspace-session-strip[\s\S]*data-web-language-toggle="true"/);
+  assert.match(indexHtml, /cashier-terminal-shell[\s\S]*data-web-language-toggle="true"/);
+  assert.match(indexHtml, /data-global-language="zh"/);
+  assert.match(indexHtml, /data-global-language="en"/);
+  assert.doesNotMatch(indexHtml, /id="webLanguageToggle"/);
+  assert.doesNotMatch(webToggleCss, /position:\s*fixed/);
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.web-language-toggle\s*\{[\s\S]*display:\s*none\s*!important/);
+});
+
+test("web language switch does not enable partial whole-page English before copy migration", () => {
+  assert.match(appJs, /function isWholePageWebLanguageSwitchReady/);
+  assert.match(appJs, /function handleGlobalLanguageToggleClick/);
+  assert.match(appJs, /target\.closest\("\[data-web-language-toggle\]"\)/);
+  assert.match(appJs, /English is staged page by page/);
+  assert.match(appJs, /setGlobalLanguage\("zh"/);
 });
 
 test("pre-QA terminology uses the approved bilingual glossary", () => {
