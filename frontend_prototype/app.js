@@ -391,6 +391,48 @@ function getStoreInventoryLocationTypeLabel(type = "", language = currentLanguag
   return storeInventoryTerm(STORE_INVENTORY_TERMINOLOGY_KEYS.shelf, language);
 }
 
+const HIGH_RISK_ERROR_CODE_MESSAGES = Object.freeze({
+  zh: Object.freeze({
+    "INVALID_CODE": "无效条码。请重试。",
+    "POS_CODE_NOT_ALLOWED": "POS 只扫描门店商品码。请扫描商品标签。",
+    "STORE_ITEM_REQUIRED_FOR_POS": "POS 只扫描门店商品码。请扫描商品标签。",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "请扫描门店送货执行单。",
+    "ITEM_ALREADY_SOLD": "商品已售出。",
+    "SHIFT_NOT_OPEN": "请先开班。",
+    "LOCATION_REQUIRED": "请先选择货架或后仓。",
+    "PRINTER_NOT_CONNECTED": "打印机未连接。",
+    "CASH_VARIANCE_FOUND": "发现现金差异。",
+    "STOCK_ALREADY_DEDUCTED": "库存已扣减。",
+  }),
+  en: Object.freeze({
+    "INVALID_CODE": "Invalid code. Try again.",
+    "POS_CODE_NOT_ALLOWED": "POS only scans Store Item. Scan a product label.",
+    "STORE_ITEM_REQUIRED_FOR_POS": "POS only scans Store Item. Scan a product label.",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "Scan Store Delivery Order.",
+    "ITEM_ALREADY_SOLD": "Item already sold.",
+    "SHIFT_NOT_OPEN": "Open shift first.",
+    "LOCATION_REQUIRED": "Select shelf or backroom first.",
+    "PRINTER_NOT_CONNECTED": "Printer not connected.",
+    "CASH_VARIANCE_FOUND": "Cash variance found.",
+    "STOCK_ALREADY_DEDUCTED": "Stock already deducted.",
+  }),
+});
+
+const GENERIC_FRONTEND_ERROR_MESSAGES = Object.freeze({
+  zh: "操作失败，请检查后重试。",
+  en: "Action failed. Check and try again.",
+});
+
+function getFrontendErrorLocale(language = currentLanguage) {
+  return language === "en" ? "en" : "zh";
+}
+
+function translateErrorCode(errorCode = "", language = currentLanguage) {
+  const locale = getFrontendErrorLocale(language);
+  const normalizedCode = String(errorCode || "").trim().toUpperCase();
+  return HIGH_RISK_ERROR_CODE_MESSAGES[locale]?.[normalizedCode] || "";
+}
+
 const GLOBAL_I18N_GLOSSARY = [
   { zh: "门店收货主控台", en: "Store Receiving Command Center" },
   { zh: "仓库发货", en: "Warehouse Dispatch" },
@@ -8372,21 +8414,49 @@ function formatValidationDetail(detail) {
   }
 }
 
-function extractApiErrorMessage(payload) {
+function parseApiErrorPayload(payload) {
   if (!payload) {
-    return "";
+    return payload;
   }
 
-  const parsedPayload = (() => {
-    if (typeof payload !== "string") {
-      return payload;
-    }
+  if (typeof payload === "string") {
     try {
       return JSON.parse(payload);
     } catch {
       return payload;
     }
-  })();
+  }
+
+  return payload;
+}
+
+function extractApiErrorCode(payload) {
+  const parsedPayload = parseApiErrorPayload(payload);
+  if (!parsedPayload || typeof parsedPayload !== "object") {
+    return "";
+  }
+
+  const candidates = [
+    parsedPayload.error_code,
+    parsedPayload.errorCode,
+    parsedPayload.code,
+    parsedPayload.detail?.error_code,
+    parsedPayload.detail?.errorCode,
+    parsedPayload.detail?.code,
+    parsedPayload.error?.error_code,
+    parsedPayload.error?.errorCode,
+    parsedPayload.error?.code,
+  ];
+  const matched = candidates.find((value) => typeof value === "string" && value.trim());
+  return matched ? matched.trim().toUpperCase() : "";
+}
+
+function extractApiErrorMessage(payload) {
+  if (!payload) {
+    return "";
+  }
+
+  const parsedPayload = parseApiErrorPayload(payload);
 
   if (typeof parsedPayload === "string") {
     return parsedPayload;
@@ -8411,10 +8481,18 @@ function extractApiErrorMessage(payload) {
 }
 
 function formatErrorMessage(error) {
-  if (error instanceof Error) {
-    return extractApiErrorMessage(error.message) || error.message;
+  const errorCode = error instanceof Error
+    ? (error.error_code || extractApiErrorCode(error.payload) || extractApiErrorCode(error.message))
+    : (extractApiErrorCode(error?.payload) || extractApiErrorCode(error));
+  const translatedError = translateErrorCode(errorCode);
+  if (translatedError) {
+    return translatedError;
   }
-  return extractApiErrorMessage(error) || String(error);
+
+  if (error instanceof Error) {
+    return extractApiErrorMessage(error.payload) || extractApiErrorMessage(error.message) || error.message || GENERIC_FRONTEND_ERROR_MESSAGES[getFrontendErrorLocale()];
+  }
+  return extractApiErrorMessage(error?.payload) || extractApiErrorMessage(error) || (typeof error === "string" ? error : "") || GENERIC_FRONTEND_ERROR_MESSAGES[getFrontendErrorLocale()];
 }
 
 function writeOutput(selector, value) {
@@ -33083,10 +33161,12 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    const message = extractApiErrorMessage(data) || (typeof data === "string" ? data : pretty(data));
+    const errorCode = extractApiErrorCode(data);
+    const message = translateErrorCode(errorCode) || extractApiErrorMessage(data) || (typeof data === "string" ? data : pretty(data));
     const error = new Error(message);
     error.status = response.status;
     error.payload = data;
+    error.error_code = errorCode;
     if (response.status === 401) {
       clearSession("Session expired. Please sign in again.");
     }
