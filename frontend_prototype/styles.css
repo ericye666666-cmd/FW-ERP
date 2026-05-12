@@ -11372,3 +11372,294 @@ body.cashier-terminal-mode .side-drawer {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* POS-UI-2-HOTFIX: keep the cashier terminal compact and prevent header/receipt takeover. */
+body.cashier-terminal-mode,
+body.cashier-terminal-mode .app-shell,
+body.cashier-terminal-mode .workspace-shell,
+body.cashier-terminal-mode #workspacePanels,
+body.cashier-terminal-mode .cashier-sale-panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-shell {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 0 0 12px;
+  gap: 10px;
+  background: #f8fafc;
+  overflow-x: hidden;
+}
+
+body.cashier-terminal-mode .topbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 80px;
+  max-height: 110px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+  background: linear-gradient(135deg, #0f172a 0%, #111827 62%, #111827 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  padding: 12px 16px;
+}
+
+body.cashier-terminal-mode .brand-group {
+  min-width: 0;
+  gap: 10px;
+}
+
+body.cashier-terminal-mode .brand-group .eyebrow {
+  display: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-title {
+  color: #ffffff;
+  font-size: 22px;
+  line-height: 1.05;
+  font-weight: 950;
+}
+
+body.cashier-terminal-mode .cashier-terminal-subtitle {
+  color: #cbd5e1;
+  margin-top: 4px;
+}
+
+body.cashier-terminal-mode .topbar-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  max-height: 74px;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip span,
+body.cashier-terminal-mode .topbar-chip-button,
+body.cashier-terminal-mode .network-pill {
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.58);
+  color: #f8fafc;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip b,
+body.cashier-terminal-mode .network-pill b {
+  color: #cbd5e1;
+  font-size: 9px;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .topbar-chip-button {
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .topbar .cashier-terminal-exit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  white-space: nowrap;
+  border-color: rgba(196, 181, 253, 0.54);
+  background: rgba(124, 58, 237, 0.18);
+  color: #ede9fe;
+}
+
+body.cashier-terminal-mode .network-online,
+body.cashier-terminal-mode .network-synced {
+  border-color: rgba(34, 197, 94, 0.34);
+  background: rgba(20, 83, 45, 0.3);
+  color: #22c55e;
+}
+
+body.cashier-terminal-mode .network-weak,
+body.cashier-terminal-mode .network-syncing {
+  border-color: rgba(245, 158, 11, 0.38);
+  background: rgba(120, 53, 15, 0.3);
+  color: #fbbf24;
+}
+
+body.cashier-terminal-mode .network-offline,
+body.cashier-terminal-mode .network-failed {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.34);
+  color: #fca5a5;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status {
+  margin: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #4338ca;
+}
+
+body.cashier-terminal-mode .cashier-terminal-strip-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+body.cashier-terminal-mode .cashier-terminal-strip-actions .secondary-inline {
+  width: auto;
+  min-width: 112px;
+  flex: 0 0 auto;
+}
+
+body.cashier-terminal-mode .cashier-terminal-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.28fr) minmax(460px, 0.42fr) minmax(360px, 0.3fr);
+  gap: 12px;
+  min-height: calc(100vh - 180px);
+  margin: 0 16px;
+  align-items: stretch;
+}
+
+body.cashier-terminal-mode .cashier-terminal-body > * {
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-scan-card,
+body.cashier-terminal-mode .cashier-terminal-cart-card,
+body.cashier-terminal-mode .cashier-terminal-payment-panel {
+  height: 100%;
+}
+
+body.cashier-terminal-mode .lookup-preview,
+body.cashier-terminal-mode .cashier-terminal-scan-hint {
+  grid-template-columns: 1fr !important;
+  line-height: 1.55;
+}
+
+body.cashier-terminal-mode .lookup-preview span,
+body.cashier-terminal-mode .cashier-terminal-scan-hint span,
+body.cashier-terminal-mode .cashier-recent-scans span {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+body.cashier-terminal-mode .cashier-terminal-quick-actions {
+  position: static;
+  margin: 0 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(17, 24, 39, 0.05);
+}
+
+body.cashier-terminal-mode .cashier-terminal-transaction-strip {
+  max-height: 96px;
+  overflow: hidden;
+  padding: 10px 12px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status-metrics {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status-metrics > span,
+body.cashier-terminal-mode .cashier-terminal-status-metrics > button {
+  min-height: 44px;
+  padding: 6px 8px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-receipt-panel.is-empty {
+  display: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-receipt-panel {
+  margin: 0 16px;
+}
+
+@media (max-width: 1320px) {
+  body.cashier-terminal-mode .topbar {
+    max-height: none;
+  }
+
+  body.cashier-terminal-mode .cashier-terminal-session-strip {
+    max-height: none;
+  }
+
+  body.cashier-terminal-mode .cashier-terminal-body {
+    grid-template-columns: minmax(280px, 0.34fr) minmax(420px, 0.66fr);
+  }
+
+  body.cashier-terminal-mode .payment-column {
+    grid-column: 1 / -1;
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  body.cashier-terminal-mode .topbar,
+  body.cashier-terminal-mode .topbar-actions {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  body.cashier-terminal-mode .cashier-terminal-session-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.cashier-terminal-mode .cashier-terminal-status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.cashier-terminal-mode .cashier-terminal-strip-actions {
+    justify-content: stretch;
+  }
+
+  body.cashier-terminal-mode .cashier-terminal-body,
+  body.cashier-terminal-mode .cashier-terminal-status-metrics {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+}

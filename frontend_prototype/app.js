@@ -31116,6 +31116,7 @@ function renderCashierTerminalReceiptPanel() {
   }
   ensureCashierTerminalPreviewState();
   const sale = cashierTerminalState.latestCompletedSale;
+  receiptPanel.classList.toggle("is-empty", !sale);
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const isReprint = Boolean(sale?.is_reprint);
   const storeCode = sale?.store_code || getCashierTerminalStoreCode();
