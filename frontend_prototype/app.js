@@ -25573,7 +25573,128 @@ function getStoreShelfLocationStatusLabel(row = {}) {
   return row.active === false || String(row.status || "").trim().toLowerCase() === "inactive" ? "停用" : "启用";
 }
 
+let storeShelfFloorPlanState = {
+  selectedLocationCode: "",
+  backgroundImageDataUrl: "",
+  displayObjects: [],
+};
+
+function parseStoreShelfLayout(row = {}, fallbackIndex = 0) {
+  let layout = row.layout_json || {};
+  if (typeof layout === "string") {
+    try {
+      layout = JSON.parse(layout);
+    } catch (error) {
+      layout = {};
+    }
+  }
+  if (!layout || typeof layout !== "object") {
+    layout = {};
+  }
+  const locationType = String(row.location_type || "SHELF").trim().toUpperCase();
+  const column = fallbackIndex % 3;
+  const line = Math.floor(fallbackIndex / 3);
+  const defaultLayout = locationType === "BACKROOM"
+    ? { x: 720, y: 72, width: 180, height: 132, rotation: 0, shape: "rect", color: "amber", zone: "backroom", z_index: 5 }
+    : { x: 72 + column * 200, y: 96 + line * 92, width: 168, height: 58, rotation: 0, shape: "rect", color: "blue", zone: "floor", z_index: 3 };
+  const coerceNumber = (value, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
+  return {
+    ...defaultLayout,
+    ...layout,
+    x: coerceNumber(row.layout_x ?? layout.x, defaultLayout.x),
+    y: coerceNumber(row.layout_y ?? layout.y, defaultLayout.y),
+    width: Math.max(40, coerceNumber(row.layout_width ?? layout.width, defaultLayout.width)),
+    height: Math.max(32, coerceNumber(row.layout_height ?? layout.height, defaultLayout.height)),
+  };
+}
+
+function getStoreShelfDisplayObjects() {
+  return [
+    { object_code: "UT-ENTRANCE", object_name: "入口 / 出口", object_type: "ENTRANCE", x: 426, y: 526, width: 160, height: 42, color: "green", z_index: 1 },
+    { object_code: "UT-CASHIER", object_name: "收银台", object_type: "CASHIER", x: 748, y: 430, width: 160, height: 82, color: "slate", z_index: 2 },
+    { object_code: "UT-AISLE", object_name: "主通道", object_type: "AISLE", x: 300, y: 250, width: 360, height: 70, color: "light", z_index: 0 },
+    ...storeShelfFloorPlanState.displayObjects,
+  ];
+}
+
+function buildStoreShelfLayoutPayloadFromForm(payload = {}) {
+  const layout = {
+    x: Number(payload.layout_x || 0),
+    y: Number(payload.layout_y || 0),
+    width: Number(payload.layout_width || 160),
+    height: Number(payload.layout_height || 56),
+    rotation: 0,
+    shape: "rect",
+    color: String(payload.location_type || "SHELF").trim().toUpperCase() === "BACKROOM" ? "amber" : "blue",
+    zone: String(payload.location_type || "SHELF").trim().toUpperCase() === "BACKROOM" ? "backroom" : "floor",
+    z_index: String(payload.location_type || "SHELF").trim().toUpperCase() === "BACKROOM" ? 5 : 3,
+  };
+  return layout;
+}
+
+function getStoreShelfLocationRowsFromOutput() {
+  const rows = readOutput("#storeShelfLocationOutput");
+  return Array.isArray(rows) ? rows : Array.isArray(rows?.racks) ? rows.racks : [];
+}
+
+function updateStoreShelfLayoutPreviewFromForm() {
+  const form = document.querySelector("#storeShelfLocationForm");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form).entries());
+  const locationCode = String(data.location_code || "").trim().toUpperCase();
+  if (!locationCode) {
+    return;
+  }
+  const rows = getStoreShelfLocationRowsFromOutput();
+  const draftLayout = buildStoreShelfLayoutPayloadFromForm(data);
+  const draftRow = {
+    store_code: String(data.store_code || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase(),
+    location_code: locationCode,
+    rack_code: locationCode,
+    location_name: String(data.location_name || locationCode).trim(),
+    location_type: String(data.location_type || "SHELF").trim().toUpperCase(),
+    category_name: String(data.category_name || "").trim(),
+    active: String(data.active || "true") === "true",
+    sort_order: Number(data.sort_order || 0),
+    item_count: Number(document.querySelector("[data-store-shelf-item-count]")?.textContent || 0),
+    layout_x: draftLayout.x,
+    layout_y: draftLayout.y,
+    layout_width: draftLayout.width,
+    layout_height: draftLayout.height,
+    layout_json: draftLayout,
+  };
+  const nextRows = rows.some((row) => String(row.location_code || row.rack_code || "").trim().toUpperCase() === locationCode)
+    ? rows.map((row) => String(row.location_code || row.rack_code || "").trim().toUpperCase() === locationCode ? { ...row, ...draftRow } : row)
+    : [...rows, draftRow];
+  storeShelfFloorPlanState.selectedLocationCode = locationCode;
+  renderStoreShelfFloorPlanCanvas(nextRows);
+}
+
+function handleStoreShelfFloorPlanUpload(input) {
+  const file = input?.files && input.files[0];
+  if (!file) {
+    return;
+  }
+  if (!/^image\/(png|jpeg)$/.test(file.type)) {
+    renderErrorSummary("#storeShelfLocationSummary", "请上传 PNG 或 JPG 平面图。");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    storeShelfFloorPlanState.backgroundImageDataUrl = String(reader.result || "");
+    const locationRows = getStoreShelfLocationRowsFromOutput();
+    renderStoreShelfLocationSummary(locationRows, "平面图已作为本次画布背景预览；不会保存真实图片文件。");
+  };
+  reader.readAsDataURL(file);
+}
+
 function hydrateStoreShelfLocationForm(row = {}) {
+  const layout = parseStoreShelfLayout(row);
   setInputValue("#storeShelfLocationForm [name='store_code']", row.store_code || getCurrentStoreCodeFallback() || "UTAWALA");
   setInputValue("#storeShelfLocationForm [name='location_code']", row.location_code || row.rack_code || "");
   setInputValue("#storeShelfLocationForm [name='location_name']", row.location_name || "");
@@ -25581,6 +25702,95 @@ function hydrateStoreShelfLocationForm(row = {}) {
   setInputValue("#storeShelfLocationForm [name='category_name']", row.category_name || row.category_hint || "");
   setInputValue("#storeShelfLocationForm [name='active']", row.active === false ? "false" : "true");
   setInputValue("#storeShelfLocationForm [name='sort_order']", String(row.sort_order ?? 0));
+  setInputValue("#storeShelfLocationForm [name='layout_x']", String(Math.round(layout.x)));
+  setInputValue("#storeShelfLocationForm [name='layout_y']", String(Math.round(layout.y)));
+  setInputValue("#storeShelfLocationForm [name='layout_width']", String(Math.round(layout.width)));
+  setInputValue("#storeShelfLocationForm [name='layout_height']", String(Math.round(layout.height)));
+  setInputValue("#storeShelfLocationForm [name='layout_json']", JSON.stringify(layout));
+  const countTarget = document.querySelector("[data-store-shelf-item-count]");
+  if (countTarget instanceof HTMLElement) {
+    countTarget.textContent = String(row.item_count ?? 0);
+  }
+  const code = String(row.location_code || row.rack_code || "").trim().toUpperCase();
+  if (code) {
+    storeShelfFloorPlanState.selectedLocationCode = code;
+  }
+}
+
+function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
+  const canvasTarget = document.querySelector("#storeShelfFloorPlanCanvas");
+  const detailTarget = document.querySelector("#storeShelfLocationDetailPanel");
+  if (!(canvasTarget instanceof HTMLElement) || !(detailTarget instanceof HTMLElement)) {
+    return;
+  }
+  const locationRows = Array.isArray(rows) ? rows : [];
+  if (locationRows.length && !storeShelfFloorPlanState.selectedLocationCode) {
+    storeShelfFloorPlanState.selectedLocationCode = String(locationRows[0]?.location_code || locationRows[0]?.rack_code || "").trim().toUpperCase();
+  }
+  const backgroundStyle = storeShelfFloorPlanState.backgroundImageDataUrl
+    ? ` style="background-image: linear-gradient(rgba(248,250,252,0.86), rgba(248,250,252,0.92)), url('${escapeHtml(storeShelfFloorPlanState.backgroundImageDataUrl)}');"`
+    : "";
+  if (!locationRows.length) {
+    canvasTarget.innerHTML = `
+      <div class="store-shelf-empty-guide"${backgroundStyle}>
+        <strong>当前门店还没有货架布局</strong>
+        <span>你可以使用默认 demo 模板、上传真实平面图，或从空白画布开始。</span>
+        <div class="button-row">
+          <button type="button" data-store-shelf-initialize="true">使用默认模板</button>
+          <label class="secondary-button file-button">上传平面图<input class="visually-hidden" type="file" accept="image/png,image/jpeg" /></label>
+          <button type="button" data-store-shelf-canvas-blank="true">空白开始</button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  const displayObjects = getStoreShelfDisplayObjects()
+    .map((object) => `
+      <button type="button" class="store-shelf-map-object display-object object-${escapeHtml(String(object.object_type || "").toLowerCase())}" style="left:${Number(object.x || 0)}px;top:${Number(object.y || 0)}px;width:${Number(object.width || 120)}px;height:${Number(object.height || 52)}px;z-index:${Number(object.z_index || 0)}">
+        <strong>${escapeHtml(object.object_code || "")}</strong>
+        <span>${escapeHtml(object.object_name || "")}</span>
+      </button>
+    `)
+    .join("");
+  const shelfObjects = locationRows
+    .map((row, index) => {
+      const code = String(row.location_code || row.rack_code || "").trim().toUpperCase();
+      const layout = parseStoreShelfLayout(row, index);
+      const selectedClass = code && code === storeShelfFloorPlanState.selectedLocationCode ? " is-selected" : "";
+      const typeClass = String(row.location_type || "SHELF").trim().toLowerCase();
+      return `
+        <button type="button" class="store-shelf-map-object shelf-object object-${escapeHtml(typeClass)}${selectedClass}" data-store-shelf-canvas-select="${escapeHtml(code)}" style="left:${Math.round(layout.x)}px;top:${Math.round(layout.y)}px;width:${Math.round(layout.width)}px;height:${Math.round(layout.height)}px;z-index:${Number(layout.z_index || 3)}">
+          <span class="map-object-badge">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
+          <strong>${escapeHtml(code || "-")}</strong>
+          <span>${escapeHtml(row.location_name || "-")}</span>
+          <small>${escapeHtml(row.category_name || row.category_hint || row.location_type || "-")} · ${escapeHtml(row.item_count ?? 0)} 件</small>
+        </button>
+      `;
+    })
+    .join("");
+  canvasTarget.innerHTML = `
+    <div class="store-shelf-canvas-stage"${backgroundStyle}>
+      <div class="store-shelf-canvas-grid"></div>
+      ${displayObjects}
+      ${shelfObjects}
+    </div>
+  `;
+  const selectedRow = locationRows.find((row) => String(row.location_code || row.rack_code || "").trim().toUpperCase() === storeShelfFloorPlanState.selectedLocationCode) || locationRows[0];
+  if (selectedRow) {
+    hydrateStoreShelfLocationForm(selectedRow);
+  }
+  const emptyPanel = detailTarget.querySelector(".detail-panel-empty");
+  const form = detailTarget.querySelector("#storeShelfLocationForm");
+  if (emptyPanel instanceof HTMLElement && form instanceof HTMLElement) {
+    emptyPanel.classList.toggle("hidden-screen", Boolean(selectedRow));
+    form.classList.toggle("hidden-screen", !selectedRow);
+  }
+  if (message) {
+    const summaryTarget = document.querySelector("#storeShelfLocationSummary");
+    if (summaryTarget instanceof HTMLElement) {
+      summaryTarget.insertAdjacentHTML("beforeend", `<div class="flow-summary-note">${escapeHtml(message)}</div>`);
+    }
+  }
 }
 
 function renderStoreShelfLocationSummary(rows = [], message = "") {
@@ -25596,7 +25806,7 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
   const totalItems = locationRows.reduce((sum, row) => sum + Number(row.item_count || 0), 0);
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
-    <div class="flow-summary-note">${escapeHtml(message || "维护门店货架位：一类商品一个货架位，另有一个默认后仓。")}</div>
+    <div class="flow-summary-note">${escapeHtml(message || "货架位编辑 · 平面图模式：画布是主体验，右侧只编辑当前选中的货架。")}</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>货架位</strong><span>${shelfCount}</span></article>
       <article class="store-metric"><strong>后仓</strong><span>${backroomCount}</span></article>
@@ -25604,8 +25814,9 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
       <article class="store-metric"><strong>当前商品数</strong><span>${totalItems}</span></article>
     </div>
   `;
+  renderStoreShelfFloorPlanCanvas(locationRows);
   if (!locationRows.length) {
-    listTarget.innerHTML = `<div class="empty-state">当前门店还没有货架位。请先点击“初始化默认货架位”。</div>`;
+    listTarget.innerHTML = `<div class="empty-state">当前门店还没有货架位。请先点击“使用默认模板”。</div>`;
     return;
   }
   listTarget.innerHTML = locationRows
@@ -25622,7 +25833,7 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
         </div>
         ${row.location_type === "BACKROOM"
           ? `<span class="meta-pill">系统固定后仓</span>`
-          : `<button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button>`}
+          : `<div class="button-row"><button type="button" class="ghost-button mini-button" data-store-shelf-locate="${escapeHtml(row.location_code || row.rack_code || "")}">定位到画布</button><button type="button" class="ghost-button mini-button" data-store-shelf-edit="${escapeHtml(row.location_code || row.rack_code || "")}">编辑</button></div>`}
       </article>
     `)
     .join("");
@@ -25671,7 +25882,12 @@ async function submitStoreShelfLocationSave(event) {
     category_name: String(payload.category_name || "").trim(),
     active: String(payload.active || "true") === "true",
     sort_order: Number(payload.sort_order || 0),
+    layout_x: Number(payload.layout_x || 0),
+    layout_y: Number(payload.layout_y || 0),
+    layout_width: Number(payload.layout_width || 160),
+    layout_height: Number(payload.layout_height || 56),
   };
+  body.layout_json = buildStoreShelfLayoutPayloadFromForm({ ...payload, ...body });
   const result = await request(`/stores/${encodeURIComponent(storeCode)}/rack-locations/${encodeURIComponent(locationCode)}`, {
     method: "PATCH",
     body: JSON.stringify(body),
@@ -47926,27 +48142,140 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement
-    ? event.target.closest("[data-store-shelf-initialize], [data-store-shelf-edit]")
+    ? event.target.closest("[data-store-shelf-initialize], [data-store-shelf-reset-demo], [data-store-shelf-save-layout], [data-store-shelf-edit], [data-store-shelf-locate], [data-store-shelf-canvas-select], [data-store-shelf-canvas-add], [data-store-shelf-canvas-blank], [data-store-shelf-deactivate], [data-store-shelf-delete]")
     : null;
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  if (target.hasAttribute("data-store-shelf-initialize")) {
+  if (target.hasAttribute("data-store-shelf-initialize") || target.hasAttribute("data-store-shelf-reset-demo")) {
     try {
+      if (target.hasAttribute("data-store-shelf-reset-demo")) {
+        const confirmed = window.confirm("仅建议在正式录入前使用。已有库存的货架不会被删除。是否继续重置 demo 模板？");
+        if (!confirmed) {
+          return;
+        }
+      }
       await initializeStoreShelfLocations();
     } catch (error) {
       renderErrorSummary("#storeShelfLocationSummary", formatErrorMessage(error));
     }
     return;
   }
-  const locationCode = String(target.dataset.storeShelfEdit || "").trim().toUpperCase();
-  const rows = readOutput("#storeShelfLocationOutput");
-  const locationRows = Array.isArray(rows) ? rows : Array.isArray(rows?.racks) ? rows.racks : [];
+  if (target.hasAttribute("data-store-shelf-save-layout")) {
+    const form = document.querySelector("#storeShelfLocationForm");
+    if (form instanceof HTMLFormElement) {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    }
+    return;
+  }
+  if (target.hasAttribute("data-store-shelf-canvas-blank")) {
+    storeShelfFloorPlanState.selectedLocationCode = "";
+    renderStoreShelfLocationSummary([], "已切换为空白画布。");
+    return;
+  }
+  const locationRows = getStoreShelfLocationRowsFromOutput();
+  const addType = String(target.dataset.storeShelfCanvasAdd || "").trim().toUpperCase();
+  if (addType) {
+    if (addType === "CASHIER" || addType === "ENTRANCE") {
+      const nextIndex = storeShelfFloorPlanState.displayObjects.length + 1;
+      storeShelfFloorPlanState.displayObjects.push({
+        object_code: addType === "CASHIER" ? `UT-CASHIER-${nextIndex}` : `UT-ENTRANCE-${nextIndex}`,
+        object_name: addType === "CASHIER" ? "收银台" : "入口 / 出口",
+        object_type: addType,
+        x: addType === "CASHIER" ? 720 : 430,
+        y: addType === "CASHIER" ? 420 : 526,
+        width: addType === "CASHIER" ? 150 : 140,
+        height: addType === "CASHIER" ? 74 : 40,
+        color: addType === "CASHIER" ? "slate" : "green",
+        z_index: 2,
+      });
+      renderStoreShelfLocationSummary(locationRows, `${addType === "CASHIER" ? "收银台" : "入口"}已添加到本次画布预览。`);
+      return;
+    }
+    if (addType === "BACKROOM") {
+      const backroom = locationRows.find((row) => String(row.location_type || "").toUpperCase() === "BACKROOM");
+      const backroomDraft = backroom || {
+        store_code: document.querySelector("#storeShelfLocationLoadForm [name='store_code']")?.value || getCurrentStoreCodeFallback() || "UTAWALA",
+        location_code: "UT-BACKROOM",
+        location_name: "后仓",
+        location_type: "BACKROOM",
+        category_name: "",
+        active: true,
+        sort_order: locationRows.length + 1,
+        layout_x: 720,
+        layout_y: 72,
+        layout_width: 180,
+        layout_height: 132,
+      };
+      renderStoreShelfLocationSummary(locationRows, "后仓是每个门店唯一的系统固定位置，不做后仓分区。");
+      hydrateStoreShelfLocationForm(backroomDraft);
+      return;
+    }
+    const storeCode = String(document.querySelector("#storeShelfLocationLoadForm [name='store_code']")?.value || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+    const nextNumber = locationRows.filter((row) => String(row.location_type || "").toUpperCase() === "SHELF").length + 1;
+    const shortStore = storeCode.slice(0, 2) || "UT";
+    const shelfDraft = {
+      store_code: storeCode,
+      location_code: `${shortStore}-SHELF-${String(nextNumber).padStart(3, "0")}`,
+      location_name: "新货架",
+      location_type: "SHELF",
+      category_name: "",
+      active: true,
+      sort_order: locationRows.length + 1,
+      item_count: 0,
+      layout_x: 92 + (nextNumber % 3) * 190,
+      layout_y: 120 + Math.floor(nextNumber / 3) * 82,
+      layout_width: 168,
+      layout_height: 58,
+    };
+    renderStoreShelfLocationSummary(locationRows, "新货架已放到画布，请在右侧详情保存。");
+    hydrateStoreShelfLocationForm(shelfDraft);
+    return;
+  }
+  if (target.hasAttribute("data-store-shelf-deactivate")) {
+    setInputValue("#storeShelfLocationForm [name='active']", "false");
+    const form = document.querySelector("#storeShelfLocationForm");
+    if (form instanceof HTMLFormElement) {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    }
+    return;
+  }
+  if (target.hasAttribute("data-store-shelf-delete")) {
+    const itemCount = Number(document.querySelector("[data-store-shelf-item-count]")?.textContent || 0);
+    renderErrorSummary(
+      "#storeShelfLocationSummary",
+      itemCount > 0 ? "该货架已有商品，不能直接删除；请先停用。" : "第一版不做真实删除，请使用停用保护历史位置。"
+    );
+    return;
+  }
+  const locationCode = String(target.dataset.storeShelfEdit || target.dataset.storeShelfLocate || target.dataset.storeShelfCanvasSelect || "").trim().toUpperCase();
   const row = locationRows.find((item) => String(item?.location_code || item?.rack_code || "").trim().toUpperCase() === locationCode);
   if (row) {
     hydrateStoreShelfLocationForm(row);
+    renderStoreShelfLocationSummary(locationRows);
     focusElement("#storeShelfLocationForm");
   }
+});
+
+document.addEventListener("input", (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("#storeShelfLocationForm [name='layout_x'], #storeShelfLocationForm [name='layout_y'], #storeShelfLocationForm [name='layout_width'], #storeShelfLocationForm [name='layout_height']")
+    : null;
+  if (target instanceof HTMLInputElement) {
+    updateStoreShelfLayoutPreviewFromForm();
+  }
+});
+
+document.addEventListener("change", (event) => {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  if (!input || input.type !== "file" || input.accept.indexOf("image/") === -1) {
+    return;
+  }
+  const canvas = input.closest(".store-shelf-floor-plan-panel");
+  if (!(canvas instanceof HTMLElement)) {
+    return;
+  }
+  handleStoreShelfFloorPlanUpload(input);
 });
 
 document.addEventListener("click", async (event) => {

@@ -3119,32 +3119,83 @@
         <pre id="storeInventoryOverviewOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-manager store-shelf-floor-plan-panel" data-workspace-panel="store">
         <div class="panel-head">
           <h2>货架位编辑</h2>
+          <span class="meta-pill">平面图模式</span>
         </div>
-        <form id="storeShelfLocationLoadForm" class="form-grid compact">
-          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
-          <button type="submit">查看当前门店货架位</button>
-          <button type="button" data-store-shelf-initialize="true">初始化默认货架位</button>
-        </form>
-        <form id="storeShelfLocationForm" class="form-grid compact">
-          <input name="store_code" placeholder="门店代码" value="UTAWALA" />
-          <input name="location_code" placeholder="货架位代码，例如 PT-CR" />
-          <input name="location_name" placeholder="货架位名称，例如 cargo pant货架" />
-          <select name="location_type">
-            <option value="SHELF">SHELF 货架位</option>
-          </select>
-          <input name="category_name" placeholder="绑定品类，例如 cargo pant" />
-          <select name="active">
-            <option value="true">启用</option>
-            <option value="false">停用</option>
-          </select>
-          <input name="sort_order" type="number" min="0" step="1" placeholder="排序" value="0" />
-          <button type="submit">保存货架位</button>
+        <form id="storeShelfLocationLoadForm" class="store-shelf-floor-plan-toolbar">
+          <label>
+            当前门店
+            <input name="store_code" placeholder="门店代码" value="UTAWALA" />
+          </label>
+          <button type="submit" class="secondary-button">刷新货架地图</button>
+          <label class="secondary-button file-button">
+            上传平面图
+            <input id="storeShelfFloorPlanUpload" class="visually-hidden" type="file" accept="image/png,image/jpeg" />
+          </label>
+          <button type="button" class="secondary-button" data-store-shelf-initialize="true">使用默认模板</button>
+          <button type="button" class="primary-button" data-store-shelf-save-layout="true">保存布局</button>
+          <button type="button" class="ghost-button" data-store-shelf-reset-demo="true">重置 demo 模板</button>
         </form>
         <div id="storeShelfLocationSummary" class="candidate-summary empty-state">
-          当前门店会有一个默认后仓；后仓由系统固定为 UT-BACKROOM，不做后仓分区。每个现有品类模板会生成一个货架位。这里只维护货架位，不做货架码打印。
+          货架地图会在读取门店货架位后显示。当前门店会有一个默认后仓；后仓由系统固定为 UT-BACKROOM，不做后仓分区。这里只维护货架位，不做货架码打印。
+        </div>
+        <div class="store-shelf-floor-plan-editor" aria-label="货架位编辑 · 平面图模式">
+          <div class="store-shelf-canvas-tools" aria-label="画布工具">
+            <button type="button" data-store-shelf-canvas-add="SHELF">添加货架</button>
+            <button type="button" data-store-shelf-canvas-add="BACKROOM">添加后仓</button>
+            <button type="button" data-store-shelf-canvas-add="CASHIER">添加收银台</button>
+            <button type="button" data-store-shelf-canvas-add="ENTRANCE">添加入口</button>
+          </div>
+          <div class="store-shelf-canvas-shell">
+            <div class="store-shelf-canvas-head">
+              <div>
+                <strong>门店平面图画布</strong>
+                <span>点击货架块后在右侧编辑；收银台 / 入口只是地图展示对象，不作为商品入库位置。</span>
+              </div>
+              <span class="meta-pill">visual canvas</span>
+            </div>
+            <div id="storeShelfFloorPlanCanvas" class="store-shelf-floor-plan-canvas" role="application" aria-label="货架地图画布">
+              <div class="store-shelf-empty-guide">
+                <strong>当前门店还没有货架布局</strong>
+                <span>你可以使用默认 demo 模板、上传真实平面图，或从空白画布开始。</span>
+                <div class="button-row">
+                  <button type="button" data-store-shelf-initialize="true">使用默认模板</button>
+                  <label class="secondary-button file-button">上传平面图<input class="visually-hidden" type="file" accept="image/png,image/jpeg" /></label>
+                  <button type="button" data-store-shelf-canvas-blank="true">空白开始</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside id="storeShelfLocationDetailPanel" class="store-shelf-detail-panel">
+            <div class="detail-panel-empty">
+              <strong>选中货架详情</strong>
+              <span>点击画布中的货架块后，在这里编辑名称、品类和位置。</span>
+            </div>
+            <form id="storeShelfLocationForm" class="store-shelf-detail-form hidden-screen">
+              <input name="store_code" type="hidden" value="UTAWALA" />
+              <label>货架编号<input name="location_code" placeholder="location_code，例如 PT-CR" /></label>
+              <label>货架名称<input name="location_name" placeholder="location_name，例如 CARGO PANT 主货架" /></label>
+              <label>类型<input name="location_type" value="SHELF" readonly /></label>
+              <label>绑定品类<input name="category_name" placeholder="category_name，例如 CARGO PANT" /></label>
+              <label>状态<select name="active"><option value="true">启用</option><option value="false">停用</option></select></label>
+              <label>排序<input name="sort_order" type="number" min="0" step="1" value="0" placeholder="sort_order" /></label>
+              <div class="store-shelf-layout-grid">
+                <label>位置 x<input name="layout_x" type="number" step="1" value="80" /></label>
+                <label>位置 y<input name="layout_y" type="number" step="1" value="100" /></label>
+                <label>宽度<input name="layout_width" type="number" min="40" step="1" value="160" /></label>
+                <label>高度<input name="layout_height" type="number" min="32" step="1" value="56" /></label>
+              </div>
+              <textarea name="layout_json" class="visually-hidden" aria-label="layout_json"></textarea>
+              <div class="store-shelf-readonly-count">当前商品数量：<strong data-store-shelf-item-count>0</strong></div>
+              <div class="button-row">
+                <button type="submit" class="primary-button">保存修改</button>
+                <button type="button" class="secondary-button" data-store-shelf-deactivate="true">停用</button>
+                <button type="button" class="ghost-button" data-store-shelf-delete="true">停用货架</button>
+              </div>
+            </form>
+          </aside>
         </div>
         <div id="storeShelfLocationList" class="candidate-list"></div>
         <pre id="storeShelfLocationOutput" class="output hidden-output"></pre>
@@ -4310,10 +4361,10 @@
         removeUnsafeLoginQueryParams();
         restoreLegacyLoginUsername();
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=clerk-pda-daily-workbench-309", "modern");
+          loadPdaRuntimeScript("./app.js?v=store-shelf-floor-plan-canvas-editor-320", "modern");
           return;
         }
-        loadPdaRuntimeScript("./app.legacy.js?v=clerk-pda-daily-workbench-309", "legacy");
+        loadPdaRuntimeScript("./app.legacy.js?v=store-shelf-floor-plan-canvas-editor-320", "legacy");
       })();
     </script>
   </body>

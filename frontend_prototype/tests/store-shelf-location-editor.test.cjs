@@ -29,35 +29,68 @@ test("store manager menu includes inventory overview and shelf editor under PDA 
   assert.ok(overviewIndex < shelfIndex, "货架位编辑 should be after 库存总览");
 });
 
-test("shelf editor page exposes store, location type, category binding, active and sort controls", () => {
+test("shelf editor page is a floor-plan canvas editor, not only a form table", () => {
   const section = extractSectionByHeading("货架位编辑");
 
+  assert.match(section, /平面图模式|货架地图/);
+  assert.match(section, /上传平面图/);
+  assert.match(section, /使用默认模板/);
+  assert.match(section, /重置 demo 模板/);
+  assert.match(section, /storeShelfFloorPlanCanvas/);
+  assert.match(section, /添加货架/);
+  assert.match(section, /添加后仓/);
+  assert.match(section, /添加收银台/);
+  assert.match(section, /添加入口/);
+  assert.match(section, /选中货架详情/);
   assert.match(section, /storeShelfLocationForm/);
   assert.match(section, /storeShelfLocationList/);
-  assert.match(section, /location_type/);
+  assert.match(section, /layout_x/);
+  assert.match(section, /layout_y/);
+  assert.match(section, /layout_width/);
+  assert.match(section, /layout_height/);
+  assert.match(section, /layout_json/);
+  assert.match(section, /placeholder="location_code/);
+  assert.match(section, /placeholder="category_name/);
+  assert.match(section, /placeholder="sort_order/);
+  assert.doesNotMatch(section, />[^<]*(location_code|location_name|location_type|category_name|active|sort_order)[^<]*</);
+  assert.match(section, /<label>货架编号/);
+  assert.match(section, /<label>绑定品类/);
+  assert.match(section, /<label>状态/);
+  assert.match(section, /停用货架/);
+  assert.doesNotMatch(section, />删除<\/button>/);
   assert.match(section, /SHELF/);
   assert.match(section, /BACKROOM/);
   assert.doesNotMatch(section, /<option value="BACKROOM"/);
   assert.match(section, /后仓由系统固定为/);
-  assert.match(section, /category_name/);
-  assert.match(section, /active/);
-  assert.match(section, /sort_order/);
   assert.doesNotMatch(section, /barcode 打印|打印货架|货架 barcode/i);
+  const firstFormIndex = section.indexOf("storeShelfLocationForm");
+  const canvasIndex = section.indexOf("storeShelfFloorPlanCanvas");
+  assert.ok(canvasIndex !== -1 && canvasIndex < firstFormIndex, "canvas should appear before the detail form");
+  assert.doesNotMatch(section, /<main[^>]*class="[^"]*form-grid/i);
 });
 
 test("shelf editor frontend uses rack-location APIs without touching POS or STORE_ITEM generation", () => {
   assert.match(appJs, /submitStoreShelfLocationLoad/);
   assert.match(appJs, /submitStoreShelfLocationSave/);
+  assert.match(appJs, /renderStoreShelfFloorPlanCanvas/);
+  assert.match(appJs, /handleStoreShelfFloorPlanUpload/);
+  assert.match(appJs, /new FileReader/);
+  assert.match(appJs, /backgroundImageDataUrl/);
+  assert.match(appJs, /readAsDataURL/);
+  assert.match(appJs, /updateStoreShelfLayoutPreviewFromForm/);
+  assert.match(appJs, /layout_json/);
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/rack-locations"));
   assert.match(appJs, /\/stores\/\$\{encodeURIComponent\((?:storeCode|normalizedStoreCode)\)\}\/rack-locations\/initialize/);
   assert.ok(appJs.includes("/stores/${encodeURIComponent(storeCode)}/rack-locations/${encodeURIComponent(locationCode)}"));
   assert.doesNotMatch(appJs, /STORE_LOCATION.*pos_allowed\\s*=\\s*true/);
+  assert.doesNotMatch(extractSectionByHeading("货架位编辑"), /POS|Cashier|收银台预览|销售写入/);
 });
 
 test("legacy PDA bundle includes the store shelf editor menu and handlers", () => {
   assert.match(appLegacyJs, /货架位编辑/);
   assert.match(appLegacyJs, /submitStoreShelfLocationLoad/);
   assert.match(appLegacyJs, /submitStoreShelfLocationSave/);
-  assert.match(indexHtml, /app\.js\?v=inventory-overview-ui-polish-305/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=inventory-overview-ui-polish-305/);
+  assert.match(appLegacyJs, /renderStoreShelfFloorPlanCanvas/);
+  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
 });
