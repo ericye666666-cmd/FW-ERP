@@ -213,6 +213,7 @@ test("clerk package shelving step creates STORE_ITEM print jobs without marking 
   assert.match(pendingPrintSource, /print_status/);
   assert.match(pendingPrintSource, /status/);
   assert.match(pendingPrintSource, /pending_print/);
+  assert.match(pendingPrintSource, /print_failed|failed/);
   assert.match(printSource, /\/print-jobs\/item-tokens/);
   assert.match(printSource, /getStorePackagePrintableTokens/);
   assert.match(printSource, /token_nos/);
@@ -230,6 +231,9 @@ test("clerk package shelving step creates STORE_ITEM print jobs without marking 
   assert.match(generatedListSource, /打印待打印标签/);
   assert.match(generatedListSource, /当前没有待打印 STORE_ITEM/);
   assert.match(generatedListSource, /待打印/);
+  assert.match(generatedListSource, /打印失败/);
+  assert.match(generatedListSource, /可重打/);
+  assert.match(generatedListSource, /待入库确认/);
   assert.match(generatedListSource, /barcode_value/);
   assert.match(generatedListSource, /来源 SDP/);
   assert.match(generatedListSource, /所属 SDO/);

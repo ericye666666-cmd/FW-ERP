@@ -35951,7 +35951,23 @@ function getStorePackageLastGeneratedTokens(actionKey = "") {
 function isPendingPrintStoreItemToken(token = {}) {
   const printStatus = String(token?.print_status || "").trim().toLowerCase();
   const status = String(token?.status || "").trim().toLowerCase();
-  return printStatus === "pending_print" || status === "pending_print";
+  const printableStatuses = new Set(["pending_print", "not_printed", "failed", "print_failed"]);
+  return printableStatuses.has(printStatus) || printableStatuses.has(status);
+}
+
+function getStoreItemPrintFlowStatusLabel(token = {}) {
+  const printStatus = String(token?.print_status || "").trim().toLowerCase();
+  const status = String(token?.status || "").trim().toLowerCase();
+  if (["failed", "print_failed"].includes(printStatus) || ["failed", "print_failed"].includes(status)) {
+    return "打印失败 / 可重打";
+  }
+  if (["queued", "printing", "print_queued"].includes(printStatus) || ["queued", "printing", "print_queued"].includes(status)) {
+    return "待打印";
+  }
+  if (["success", "printed", "printed_in_store"].includes(printStatus) || ["success", "printed", "printed_in_store"].includes(status)) {
+    return "待入库确认";
+  }
+  return "待打印";
 }
 
 function getStorePackagePrintableTokens(actionKey = "") {
@@ -36051,23 +36067,24 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
   const printableTokens = isCurrentBatch
     ? lastGeneratedPending
     : getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
-  if (!printableTokens.length) {
+  const visibleTokens = printableTokens.length ? printableTokens : getStorePackageLastGeneratedTokens(actionKey);
+  if (!visibleTokens.length) {
     return `<div class="empty-state compact">当前没有待打印 STORE_ITEM。</div>`;
   }
   const printTitle = isCurrentBatch ? "打印本次标签" : "待打印标签";
   const printButtonText = isCurrentBatch ? "打印本次标签" : "打印待打印标签";
   return `
     <div class="store-package-print-summary">
-      <strong>${isCurrentBatch ? "本次生成数量" : "待打印标签"}</strong>
-      <span>${printableTokens.length}</span>
+      <strong>${printableTokens.length ? (isCurrentBatch ? "本次生成数量" : "待打印标签") : "待入库确认"}</strong>
+      <span>${printableTokens.length || visibleTokens.length}</span>
     </div>
     <div class="store-generated-item-list">
-      ${printableTokens.slice(0, 8).map((token) => `
+      ${visibleTokens.slice(0, 8).map((token) => `
         <article class="store-generated-item-row">
           <div>
             <strong>${escapeHtml(token.display_code || token.token_no || "-")}</strong>
             <small>${escapeHtml(`machine_code ${token.machine_code || "-"} · barcode_value ${token.barcode_value || token.machine_code || "-"}`)}</small>
-            <small>${escapeHtml(`待打印 · 来源 SDP ${token.sdo_package_display_code || token.source_package || "-"} · 所属 SDO ${token.parent_sdo_display_code || "-"} · 价格 KES ${formatCurrency(token.selected_price || token.selling_price_kes || 0)} · rack_code ${token.rack_code || token.store_rack_code || "-"}`)}</small>
+            <small>${escapeHtml(`${getStoreItemPrintFlowStatusLabel(token)} · 来源 SDP ${token.sdo_package_display_code || token.source_package || "-"} · 所属 SDO ${token.parent_sdo_display_code || "-"} · 价格 KES ${formatCurrency(token.selected_price || token.selling_price_kes || 0)} · rack_code ${token.rack_code || token.store_rack_code || "-"}`)}</small>
           </div>
           ${renderStoreItemLineageSummary(token)}
         </article>
@@ -36075,6 +36092,8 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
     </div>
     <div class="store-package-print-panel">
       <h4>${printTitle}</h4>
+      <div class="subtle small">状态：待打印 / 打印失败 / 可重打 / 待入库确认</div>
+      ${printableTokens.length ? `
       <label>
         <span>标签尺寸</span>
         <select data-store-package-label-size="${escapeHtml(actionKey)}">
@@ -36083,6 +36102,7 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
         </select>
       </label>
       <button type="button" class="primary-button" data-store-package-print-generated="${escapeHtml(actionKey)}">${printButtonText}</button>
+      ` : `<div class="subtle small">当前没有可重打标签，请继续做货架 / 后仓入库确认。</div>`}
       ${renderStorePackagePrintJobFeedback(actionKey)}
     </div>
   `;

@@ -18,7 +18,7 @@ class PrintStationQueueStateTest(unittest.TestCase):
                 state = InMemoryState()
                 created = state.create_bale_label_print_station_job(
                     {
-                        "code": "RB260427000001",
+                        "code": "1260427001",
                         "supplier": "Youxun Demo",
                         "category": "dress",
                         "subcategory": "short dress",
@@ -31,7 +31,7 @@ class PrintStationQueueStateTest(unittest.TestCase):
                 )
                 self.assertEqual(created["status"], "pending")
                 self.assertEqual(created["label_type"], "BALE_LABEL")
-                self.assertEqual(created["code"], "RB260427000001")
+                self.assertEqual(created["code"], "1260427001")
 
                 pending = state.list_pending_print_station_jobs(station_id="WS-01")
                 self.assertEqual(len(pending), 1)
@@ -57,7 +57,7 @@ class PrintStationQueueStateTest(unittest.TestCase):
                 state = InMemoryState()
                 created = state.create_bale_label_print_station_job(
                     {
-                        "code": "RB260427000099",
+                        "code": "1260427099",
                         "requested_by": "warehouse_clerk_1",
                     }
                 )
