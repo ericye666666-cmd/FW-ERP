@@ -312,6 +312,8 @@ test("POS cashier terminal gates resolver results before adding items", () => {
   assert.match(guardSource, /pos_allowed/);
   assert.match(guardSource, /reject_reason/);
   assert.match(guardSource, /store_code/);
+  assert.doesNotMatch(appJs, /getFirstCashierTerminalResolvedStatuses/);
+  assert.match(appJs, /getCashierTerminalResolvedStatuses\(resolved\)/);
   assert.match(guardSource, /!storeCode/);
   assert.match(guardSource, /getCashierTerminalStoreCode\(\)/);
   ["on_shelf", "in_stock", "available", "printed_in_store"].forEach((status) => {

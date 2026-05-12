@@ -501,6 +501,8 @@ test("manager other tab is scoped to PDA account settings without demo reset", (
   assert.match(languageSettingSource, /data-global-language="zh"/);
   assert.match(languageSettingSource, /data-global-language="en"/);
   assert.doesNotMatch(runtimeScreen, /data-global-language/);
+  assert.match(appJs, /appShell\?\.addEventListener\("click", async \(event\) => \{[\s\S]*#storeManagerPdaPreview[\s\S]*data-store-manager-pda-tab/);
+  assert.match(appJs, /!isPdaRuntimeMode\(\) && runtimeButton\.dataset\.storeManagerPdaTab[\s\S]*renderStoreManagerPdaPreview\(runtimeButton\.dataset\.storeManagerPdaTab/);
   assert.match(myTab, /PDA mode \/ version/);
   assert.match(myTab, /退出登录/);
   assert.doesNotMatch(myTab, /重置演示任务状态/);

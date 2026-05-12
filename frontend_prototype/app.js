@@ -158,7 +158,38 @@ const USER_ROLE_LABELS = {
   admin: "系统管理员",
 };
 
+const USER_ROLE_LABELS_EN = {
+  store_clerk: "Store Clerk",
+  store_manager: "Store Manager",
+  cashier: "Cashier",
+  store_cashier: "Cashier",
+  area_supervisor: "Area Supervisor",
+  warehouse_clerk: "Warehouse Clerk",
+  warehouse_manager: "Warehouse Manager",
+  warehouse_supervisor: "Warehouse Manager",
+  external_auditor: "External Auditor",
+  admin: "System Admin",
+};
+
+function getUserRoleDisplayLabel(roleCode = "", language = currentLanguage) {
+  const normalizedRoleCode = String(roleCode || "").trim().toLowerCase();
+  if (!normalizedRoleCode || normalizedRoleCode === "-") {
+    return "-";
+  }
+  return language === "en"
+    ? USER_ROLE_LABELS_EN[normalizedRoleCode] || normalizedRoleCode
+    : USER_ROLE_LABELS[normalizedRoleCode] || normalizedRoleCode;
+}
+
+function getUserDisplayNameForLanguage(user = {}, language = currentLanguage) {
+  const username = String(user?.username || "").trim();
+  const rawName = String(user?.full_name || user?.display_name || user?.name || username || "").trim();
+  const displayName = rawName ? translateI18nText(rawName, language) : "";
+  return displayName || username || "-";
+}
+
 let currentLanguage = "zh";
+const EMPLOYEE_ENGLISH_LAUNCH_READY = true;
 
 const POS_CASHIER_TERMINOLOGY_KEYS = Object.freeze({
   scanStoreItem: "pos.scan.storeItem",
@@ -793,11 +824,218 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "默认测试密码：", en: "Default test password:" },
   { zh: "登录后，这里会显示当前账号、角色和可操作范围。", en: "After signing in, this area shows the current account, role, and access scope." },
   { zh: "API 地址（先不要改）", en: "API URL (leave unchanged for now)" },
+  { zh: "语言切换", en: "Language switch" },
+  { zh: "全局", en: "Global" },
+  { zh: "系统管理员", en: "System Admin" },
   { zh: "当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。", en: "Current view: Today Overview. Use this area for store status, red alerts, and closing checks." },
   { zh: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。", en: "Current View: Store Operations. This workspace groups manager, clerk, cashier, and store admin pages." },
   { zh: "登录后显示角色和默认门店", en: "Role and default store appear after sign-in" },
   { zh: "全局账号", en: "Global Account" },
 ];
+
+const EMPLOYEE_LAUNCH_UI_TERMS = [
+  { zh: "当前门店", en: "Current Store" },
+  { zh: "切换店铺", en: "Switch Store" },
+  { zh: "收银员", en: "Cashier" },
+  { zh: "班次", en: "Shift" },
+  { zh: "网络状态", en: "Network" },
+  { zh: "打印机", en: "Printer" },
+  { zh: "同步状态", en: "Sync Status" },
+  { zh: "今日销售额", en: "Today's Sales" },
+  { zh: "今日订单数", en: "Today's Orders" },
+  { zh: "本班销售额", en: "Shift Sales" },
+  { zh: "本班订单数", en: "Shift Orders" },
+  { zh: "当前时间", en: "Current Time" },
+  { zh: "POS 暂不可收银", en: "POS not ready" },
+  { zh: "请先开班。", en: "Open shift first." },
+  { zh: "收银台", en: "Cashier" },
+  { zh: "退出收银台", en: "Exit POS" },
+  { zh: "已同步", en: "Synced" },
+  { zh: "购物车为空，请扫描 STORE_ITEM 商品码", en: "Cart is empty. Scan Store Item." },
+  { zh: "扫描门店商品码", en: "Scan Store Item" },
+  { zh: "扫描或输入 STORE_ITEM 商品码", en: "Scan or enter STORE_ITEM code" },
+  { zh: "扫码或输入 STORE_ITEM 商品码", en: "Scan or enter STORE_ITEM code" },
+  { zh: "STORE_ITEM 商品码", en: "STORE_ITEM code" },
+  { zh: "扫描加入购物车", en: "Add to Basket" },
+  { zh: "应收金额", en: "Amount Due" },
+  { zh: "商品数量", en: "Items" },
+  { zh: "小计", en: "Subtotal" },
+  { zh: "折扣", en: "Discount" },
+  { zh: "实收", en: "Paid" },
+  { zh: "找零", en: "Change" },
+  { zh: "余额", en: "Balance" },
+  { zh: "整单折扣", en: "Order Discount" },
+  { zh: "现金收款", en: "Cash Payment" },
+  { zh: "流水号", en: "Reference" },
+  { zh: "手动流水号", en: "Manual Reference" },
+  { zh: "M-Pesa 金额", en: "M-Pesa Amount" },
+  { zh: "M-Pesa 流水号", en: "M-Pesa Reference" },
+  { zh: "现金金额", en: "Cash Amount" },
+  { zh: "输入 M-Pesa 流水号", en: "Enter M-Pesa reference" },
+  { zh: "现金 + M-Pesa", en: "Cash + M-Pesa" },
+  { zh: "实收金额", en: "Amount Received" },
+  { zh: "输入现金实收", en: "Enter cash received" },
+  { zh: "最近扫描", en: "Recent Scans" },
+  { zh: "最近销售", en: "Recent Sales" },
+  { zh: "暂无扫描记录", en: "No scans yet" },
+  { zh: "取回挂单", en: "Resume Held Order" },
+  { zh: "收银开班", en: "Open Shift" },
+  { zh: "清空购物车", en: "Clear Cart" },
+  { zh: "重打小票", en: "Reprint Receipt" },
+  { zh: "挂单", en: "Hold Order" },
+  { zh: "当前交易状态", en: "Current Transaction Status" },
+  { zh: "已收金额", en: "Paid Amount" },
+  { zh: "待收金额", en: "Amount to Collect" },
+  { zh: "待扫码", en: "Waiting for Scan" },
+  { zh: "当前还没有锁定中的入库主档", en: "No locked inbound master yet" },
+  { zh: "创建入库主档", en: "Create Inbound Master" },
+  { zh: "INBOUND 流程", en: "Inbound Flow" },
+  { zh: "INBOUND流程", en: "Inbound Flow" },
+  { zh: "创建主档", en: "Create Master" },
+  { zh: "当前就在第一步", en: "Current step" },
+  { zh: "创建主档后继续录入", en: "Continue after creating the master" },
+  { zh: "录包裹", en: "Record Packages" },
+  { zh: "总确认", en: "Final Confirmation" },
+  { zh: "录完包裹后人工核对", en: "Manual check after package entry" },
+  { zh: "总确认后生成并打印", en: "Generate and print after final confirmation" },
+  { zh: "条码 / 打印", en: "Barcode / Print" },
+  { zh: "如果要继续处理之前做到一半的船单，可以到General Management里的入仓记录页查看并继续处理。", en: "To continue a half-finished shipment, open the inbound records page under General Management." },
+  { zh: "请选择中方已录船单", en: "Select a China-recorded shipment" },
+  { zh: "到仓柜日期", en: "Warehouse Arrival Date" },
+  { zh: "COC 提报货物清单", en: "COC Cargo List" },
+  { zh: "上传 COC / 原单证图片", en: "Upload COC / Source Documents" },
+  { zh: "请填写", en: "Required" },
+  { zh: "例如", en: "For example" },
+  { zh: "这一柜可以重复给多个供应商、多种货做入仓", en: "This container can receive multiple suppliers and product types." },
+  { zh: "上传", en: "Upload" },
+  { zh: "选择文件", en: "Choose File" },
+  { zh: "未选择任何文件", en: "No file selected" },
+  { zh: "航班 / 关单号", en: "Shipment / Customs No." },
+  { zh: "仓库代码", en: "Warehouse Code" },
+  { zh: "供应商", en: "Supplier" },
+  { zh: "收货日期", en: "Receiving Date" },
+  { zh: "收货商品明细", en: "Received Item Details" },
+  { zh: "收货件数", en: "Received Quantity" },
+  { zh: "单件成本", en: "Unit Cost" },
+  { zh: "提交收货", en: "Submit Receiving" },
+  { zh: "默认售价管理", en: "Default Sale Price Management" },
+  { zh: "请选择商品大类", en: "Select Category" },
+  { zh: "请选择商品小类", en: "Select Subcategory" },
+  { zh: "商品大类", en: "Category" },
+  { zh: "商品小类", en: "Subcategory" },
+  { zh: "分拣口径", en: "Sorting Grade" },
+  { zh: "默认售价", en: "Default Sale Price" },
+  { zh: "保存默认售价", en: "Save Default Price" },
+  { zh: "说明", en: "Notes" },
+  { zh: "已配总数", en: "Assigned Total" },
+  { zh: "创建配送", en: "Create Delivery" },
+  { zh: "历史配送记录", en: "Delivery History" },
+  { zh: "刷新配送数据", en: "Refresh Delivery Data" },
+  { zh: "创建配送 / 同车发货", en: "Create Delivery / Same Vehicle Dispatch" },
+  { zh: "选择门店送货单", en: "Select Store Delivery Order" },
+  { zh: "司机 / 电话 / 车牌号", en: "Driver / Phone / Plate No." },
+  { zh: "司机姓名", en: "Driver Name" },
+  { zh: "司机电话", en: "Driver Phone" },
+  { zh: "车牌号", en: "Plate No." },
+  { zh: "新增 SDO", en: "Add SDO" },
+  { zh: "删除", en: "Delete" },
+  { zh: "读取压缩工单", en: "Load Compression Work Orders" },
+  { zh: "当前还没有压缩工单。", en: "No compression work orders yet." },
+  { zh: "创建后，这里会显示待验收和已完成的压缩工单。", en: "After creation, pending and completed compression work orders appear here." },
+  { zh: "扫码 / 检索加入包裹", en: "Scan / Search to Add Packages" },
+  { zh: "绑定分拣人", en: "Assign Sorter" },
+  { zh: "加入", en: "Add" },
+  { zh: "检测", en: "Detect" },
+  { zh: "授权", en: "Authorize" },
+  { zh: "聚焦扫码区", en: "Focus Scanner Area" },
+  { zh: "清空", en: "Clear" },
+  { zh: "分拣处理人", en: "Sorter" },
+  { zh: "设备", en: "Device" },
+  { zh: "焦点", en: "Focus" },
+  { zh: "自动加入", en: "Auto Add" },
+  { zh: "最近条码", en: "Latest Barcode" },
+  { zh: "最近识别", en: "Latest Scan" },
+  { zh: "结束符", en: "Ending Key" },
+  { zh: "读取原始 Bale 库存", en: "Load Raw Bale Inventory" },
+  { zh: "搜索", en: "Search" },
+  { zh: "供应商名称", en: "Supplier Name" },
+  { zh: "联系人", en: "Contact" },
+  { zh: "联系电话", en: "Phone" },
+  { zh: "金额", en: "Amount" },
+  { zh: "数量", en: "Quantity" },
+  { zh: "件数", en: "Item Count" },
+  { zh: "包数", en: "Package Count" },
+  { zh: "总包数", en: "Total Packages" },
+  { zh: "总件数", en: "Total Items" },
+  { zh: "当前状态", en: "Current Status" },
+  { zh: "当前店员", en: "Current Clerk" },
+  { zh: "未分类", en: "Uncategorized" },
+  { zh: "未分配", en: "Unassigned" },
+  { zh: "待填写", en: "To Fill" },
+  { zh: "待核对", en: "Pending Check" },
+  { zh: "待验收", en: "Pending Receiving" },
+  { zh: "待收货", en: "Pending Receipt" },
+  { zh: "待生成", en: "Pending Generation" },
+  { zh: "待审核", en: "Pending Review" },
+  { zh: "件数待确认", en: "Item Count Pending" },
+  { zh: "已收货", en: "Received" },
+  { zh: "已连接", en: "Connected" },
+  { zh: "已驳回", en: "Rejected" },
+  { zh: "已结算", en: "Settled" },
+  { zh: "已生成 / 待打印", en: "Generated / Pending Print" },
+  { zh: "异常 / 退回", en: "Exception / Returned" },
+  { zh: "全部收货完成", en: "All Receiving Completed" },
+  { zh: "店长 PDA 工作台", en: "Store Manager PDA Workbench" },
+  { zh: "店员 PDA 上架工作台", en: "Store Clerk PDA Putaway Workbench" },
+  { zh: "我的", en: "My" },
+  { zh: "经营总览", en: "Operations Overview" },
+  { zh: "收退货", en: "Receiving / Returns" },
+  { zh: "经营日志", en: "Operations Log" },
+  { zh: "库存总览", en: "Inventory Overview" },
+  { zh: "货架位编辑", en: "Shelf Location Editor" },
+  { zh: "员工处理进度", en: "Staff Progress" },
+  { zh: "实时现场状态", en: "Live Store Status" },
+  { zh: "提醒", en: "Alerts" },
+  { zh: "需要店长处理", en: "Needs Manager Action" },
+  { zh: "去分配", en: "Assign" },
+  { zh: "看打印队列", en: "View Print Queue" },
+  { zh: "处理异常", en: "Handle Exception" },
+  { zh: "今日收货件数", en: "Today's Received Items" },
+  { zh: "待处理 SDO", en: "Pending SDO" },
+  { zh: "异常包裹", en: "Exception Packages" },
+  { zh: "异常包裹待处理", en: "Exception Packages Pending" },
+  { zh: "待打印标签", en: "Labels to Print" },
+  { zh: "标签待打印", en: "Labels Pending Print" },
+  { zh: "张标签待打印", en: "labels pending print" },
+  { zh: "未上架商品", en: "Unshelved Items" },
+  { zh: "今日客流", en: "Today's Traffic" },
+  { zh: "今日退款", en: "Today's Refunds" },
+  { zh: "今日异常", en: "Today's Exceptions" },
+  { zh: "预览数据", en: "Preview Data" },
+  { zh: "处理中", en: "In Progress" },
+  { zh: "今日完成", en: "Completed Today" },
+  { zh: "空闲", en: "Idle" },
+  { zh: "内包待分配", en: "Packages Pending Assignment" },
+  { zh: "个 SDO 内包待分配", en: "SDO packages pending assignment" },
+  { zh: "个异常包裹待处理", en: "exception packages pending" },
+  { zh: "店长 A", en: "Store Manager A" },
+  { zh: "店员 A", en: "Clerk A" },
+  { zh: "店员 B", en: "Clerk B" },
+  { zh: "店员 C", en: "Clerk C" },
+  { zh: "店长 PDA 标签页", en: "Store Manager PDA tabs" },
+  { zh: "店员 PDA 标签页", en: "Store Clerk PDA tabs" },
+  { zh: "支付方式", en: "Payment methods" },
+  { zh: "收银状态", en: "Cashier status" },
+  { zh: "包", en: "packages" },
+  { zh: "件", en: "items" },
+  { zh: "张", en: "labels" },
+  { zh: "单", en: "orders" },
+  { zh: "条", en: "records" },
+  { zh: "个", en: "items" },
+  { zh: "人", en: "people" },
+];
+
+const ALL_GLOBAL_I18N_PHRASES = [...GLOBAL_I18N_PHRASES, ...EMPLOYEE_LAUNCH_UI_TERMS];
 
 const GLOBAL_I18N_BY_ZH = new Map();
 const GLOBAL_I18N_BY_EN = new Map();
@@ -883,7 +1121,7 @@ function normalizeI18nText(value = "") {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
-[...GLOBAL_I18N_PHRASES, ...GLOBAL_I18N_STATUS_PHRASES].forEach((entry) => {
+[...ALL_GLOBAL_I18N_PHRASES, ...GLOBAL_I18N_STATUS_PHRASES].forEach((entry) => {
   const zh = normalizeI18nText(entry.zh);
   const en = normalizeI18nText(entry.en);
   if (zh && en) {
@@ -892,9 +1130,185 @@ function normalizeI18nText(value = "") {
   }
 });
 
-const GLOBAL_I18N_SEGMENT_ENTRIES = [...GLOBAL_I18N_PHRASES, ...GLOBAL_I18N_STATUS_PHRASES]
+const GLOBAL_I18N_SEGMENT_ENTRIES = [...ALL_GLOBAL_I18N_PHRASES, ...GLOBAL_I18N_STATUS_PHRASES]
   .filter((entry) => normalizeI18nText(entry.zh).length >= 4 && normalizeI18nText(entry.en).length >= 4)
   .sort((left, right) => normalizeI18nText(right.zh).length - normalizeI18nText(left.zh).length);
+
+const EMPLOYEE_LAUNCH_CJK_TOKEN_FALLBACK = [
+  ["门店送货执行单", "Store Delivery Order"],
+  ["门店商品码", "Store Item"],
+  ["收银开班", "Open Shift"],
+  ["收银关班", "Close Shift"],
+  ["现金差异", "Cash Variance"],
+  ["库存总览", "Inventory Overview"],
+  ["货架位", "Shelf Location"],
+  ["当前", "Current"],
+  ["今日", "Today"],
+  ["本班", "Shift"],
+  ["门店", "Store"],
+  ["仓库", "Warehouse"],
+  ["店长", "Manager"],
+  ["店员", "Clerk"],
+  ["收银", "Cashier"],
+  ["配送", "Delivery"],
+  ["送货", "Delivery"],
+  ["收货", "Receiving"],
+  ["发货", "Dispatch"],
+  ["到仓柜日期", "Warehouse Arrival Date"],
+  ["到仓", "Warehouse Arrival"],
+  ["流程", "Flow"],
+  ["主档", "Master"],
+  ["第一步", "First Step"],
+  ["录入", "Entry"],
+  ["核对", "Check"],
+  ["生成", "Generate"],
+  ["打印", "Print"],
+  ["船单", "Shipment"],
+  ["柜", "Container"],
+  ["日期", "Date"],
+  ["原单", "Source Document"],
+  ["证图片", "Document Images"],
+  ["货物清单", "Cargo List"],
+  ["包裹", "Package"],
+  ["包码", "Package Code"],
+  ["包", "Package"],
+  ["商品", "Item"],
+  ["条码", "Barcode"],
+  ["标签", "Label"],
+  ["打印", "Print"],
+  ["货架", "Shelf"],
+  ["后仓", "Backroom"],
+  ["库位", "Location"],
+  ["分拣", "Sorting"],
+  ["压缩", "Compression"],
+  ["工单", "Work Order"],
+  ["任务", "Task"],
+  ["库存", "Inventory"],
+  ["售价", "Sale Price"],
+  ["默认", "Default"],
+  ["成本", "Cost"],
+  ["供应商", "Supplier"],
+  ["司机", "Driver"],
+  ["车辆", "Vehicle"],
+  ["电话", "Phone"],
+  ["联系人", "Contact"],
+  ["角色", "Role"],
+  ["账号", "Account"],
+  ["权限", "Permission"],
+  ["状态", "Status"],
+  ["异常", "Exception"],
+  ["备注", "Notes"],
+  ["说明", "Notes"],
+  ["金额", "Amount"],
+  ["数量", "Quantity"],
+  ["件数", "Item Count"],
+  ["包数", "Package Count"],
+  ["订单", "Order"],
+  ["销售", "Sales"],
+  ["退款", "Refund"],
+  ["作废", "Void"],
+  ["支付", "Payment"],
+  ["现金", "Cash"],
+  ["混合", "Mixed"],
+  ["流水号", "Reference"],
+  ["小计", "Subtotal"],
+  ["折扣", "Discount"],
+  ["余额", "Balance"],
+  ["找零", "Change"],
+  ["实收", "Paid"],
+  ["应收", "Due"],
+  ["待", "Pending"],
+  ["已", ""],
+  ["未", "Not"],
+  ["全部", "All"],
+  ["新增", "Add"],
+  ["创建", "Create"],
+  ["生成", "Generate"],
+  ["保存", "Save"],
+  ["读取", "Load"],
+  ["刷新", "Refresh"],
+  ["选择", "Select"],
+  ["确认", "Confirm"],
+  ["提交", "Submit"],
+  ["取消", "Cancel"],
+  ["删除", "Delete"],
+  ["返回", "Back"],
+  ["查看", "View"],
+  ["打开", "Open"],
+  ["搜索", "Search"],
+  ["扫码", "Scan"],
+  ["输入", "Enter"],
+  ["完成", "Complete"],
+  ["处理", "Handle"],
+  ["分配", "Assign"],
+  ["可用", "Available"],
+  ["在线", "Online"],
+  ["离线", "Offline"],
+  ["连接", "Connected"],
+  ["中", "In Progress"],
+  ["件", "items"],
+  ["张", "labels"],
+  ["单", "orders"],
+  ["条", "records"],
+  ["个", "items"],
+  ["人", "people"],
+].sort((left, right) => right[0].length - left[0].length);
+
+const EMPLOYEE_LAUNCH_LATIN_TOKEN_FALLBACK = [
+  ["Retail Ops Workspace", "店铺进销存工作台"],
+  ["Today Overview", "今日总览"],
+  ["Test Tools", "测试工具"],
+  ["Warehouse", "仓库功能区"],
+  ["Operations Center", "运营中心"],
+  ["Store Operations", "门店功能区"],
+  ["System Admin", "系统管理"],
+  ["Store Manager", "店长"],
+  ["Store Clerk", "店员"],
+  ["Cashier Area", "收银功能区"],
+  ["Inventory Overview", "库存总览"],
+  ["Shelf Location Editor", "货架位编辑"],
+  ["Store Receiving", "门店收货"],
+  ["Current Store", "当前门店"],
+  ["Switch Store", "切换店铺"],
+  ["Open Shift", "收银开班"],
+  ["Close Shift", "收银关班"],
+  ["Hold Order", "挂单"],
+  ["Resume Held Order", "取回挂单"],
+  ["Reprint Receipt", "重打小票"],
+  ["Amount Due", "应收金额"],
+  ["Cash Payment", "现金收款"],
+  ["Manual Reference", "手动流水号"],
+  ["Reference", "流水号"],
+  ["reference", "流水号"],
+  ["Complete Sale", "完成销售"],
+  ["Sales Records", "销售记录"],
+  ["Pending", "待处理"],
+  ["Completed", "已完成"],
+  ["Print", "打印"],
+  ["Search", "搜索"],
+  ["Select", "选择"],
+  ["Create", "创建"],
+  ["Load", "读取"],
+  ["Refresh", "刷新"],
+  ["Save", "保存"],
+  ["Delete", "删除"],
+  ["Add", "新增"],
+  ["Edit", "编辑"],
+  ["Status", "状态"],
+  ["Notes", "备注"],
+  ["Quantity", "数量"],
+  ["Amount", "金额"],
+  ["Items", "商品数量"],
+  ["Package", "包裹"],
+  ["Packages", "包裹"],
+  ["Label", "标签"],
+  ["Labels", "标签"],
+].sort((left, right) => right[0].length - left[0].length);
+
+const EMPLOYEE_LAUNCH_PRESERVED_LATIN_RE = /^(?:FW-ERP|ERP|POS|PDA|SDO|SDP|SDB|LPK|STORE_ITEM|RAW_BALE|B2B|K300|KSh|KES|M-Pesa|API|PR|ID|URL|UI|A4|Windows|Android|Direct Loop|UTAWALA|KAWANGWARE|WH\d+|[a-z]+(?:_[a-z0-9]+)*_\d+|[A-Z]{2,}[-_A-Z0-9]*|\d+(?:[./:-]\d+)*|[-_A-Z0-9]+)$/;
+
+const GLOBAL_I18N_ORIGINAL_TEXT_NODES = new WeakMap();
+const GLOBAL_I18N_ORIGINAL_ATTRIBUTES = new WeakMap();
 
 function replaceKnownI18nSegments(value = "", language = currentLanguage) {
   const sourceKey = language === "en" ? "zh" : "en";
@@ -912,6 +1326,71 @@ function replaceKnownI18nSegments(value = "", language = currentLanguage) {
   return changed ? nextValue : "";
 }
 
+function hasCjkText(value = "") {
+  return /[\u3400-\u9fff]/.test(String(value || ""));
+}
+
+function isPreservedLatinChunk(value = "") {
+  const normalized = normalizeI18nText(value).replace(/[.,:;()[\]{}]/g, "");
+  if (!normalized) {
+    return true;
+  }
+  return EMPLOYEE_LAUNCH_PRESERVED_LATIN_RE.test(normalized);
+}
+
+function hasTranslatableLatinText(value = "") {
+  const stripped = String(value || "")
+    .split(/(\s+|[，。；：、,.!?()[\]{}]+)/)
+    .filter((chunk) => !isPreservedLatinChunk(chunk))
+    .join(" ");
+  return /[A-Za-z]{2,}/.test(stripped);
+}
+
+function translateUnknownCjkChunkToEnglish(chunk = "") {
+  const directEntry = GLOBAL_I18N_BY_ZH.get(normalizeI18nText(chunk));
+  if (directEntry?.en) {
+    return directEntry.en;
+  }
+  let nextValue = String(chunk || "");
+  EMPLOYEE_LAUNCH_CJK_TOKEN_FALLBACK.forEach(([zh, en]) => {
+    nextValue = nextValue.split(zh).join(en);
+  });
+  // Employee English launch fallback: no untranslated Chinese should leak into staff UI.
+  return hasCjkText(nextValue) ? nextValue.replace(/[\u3400-\u9fff]+/g, "Details") : nextValue;
+}
+
+function translateUnknownLatinChunkToChinese(chunk = "") {
+  const normalized = normalizeI18nText(chunk);
+  if (isPreservedLatinChunk(normalized)) {
+    return chunk;
+  }
+  const directEntry = GLOBAL_I18N_BY_EN.get(normalized);
+  if (directEntry?.zh) {
+    return directEntry.zh;
+  }
+  let nextValue = String(chunk || "");
+  EMPLOYEE_LAUNCH_LATIN_TOKEN_FALLBACK.forEach(([en, zh]) => {
+    nextValue = nextValue.split(en).join(zh);
+  });
+  return hasTranslatableLatinText(nextValue) ? "详情" : nextValue;
+}
+
+function sanitizeEmployeeLaunchCopy(value = "", language = currentLanguage) {
+  let nextValue = String(value || "");
+  const segmented = replaceKnownI18nSegments(nextValue, language);
+  if (segmented) {
+    nextValue = nextValue.replace(nextValue.trim(), segmented);
+  }
+  // Employee English launch fallback prevents unmigrated employee UI copy from leaking the other language.
+  if (language === "en" && hasCjkText(nextValue)) {
+    return nextValue.replace(/[\u3400-\u9fff]+/g, (chunk) => translateUnknownCjkChunkToEnglish(chunk));
+  }
+  if (language !== "en" && hasTranslatableLatinText(nextValue)) {
+    return nextValue.replace(/[A-Za-z][A-Za-z0-9&/ .'-]{1,}/g, (chunk) => translateUnknownLatinChunkToChinese(chunk));
+  }
+  return nextValue;
+}
+
 function translateI18nText(value = "", language = currentLanguage) {
   const raw = String(value || "");
   const trimmed = normalizeI18nText(raw);
@@ -921,10 +1400,11 @@ function translateI18nText(value = "", language = currentLanguage) {
   const entry = GLOBAL_I18N_BY_ZH.get(trimmed) || GLOBAL_I18N_BY_EN.get(trimmed);
   if (!entry) {
     const segmentTranslated = replaceKnownI18nSegments(trimmed, language);
-    return segmentTranslated ? raw.replace(raw.trim(), segmentTranslated) : raw;
+    const translated = segmentTranslated ? raw.replace(raw.trim(), segmentTranslated) : raw;
+    return sanitizeEmployeeLaunchCopy(translated, language);
   }
   const translated = language === "en" ? entry.en : entry.zh;
-  return raw.replace(raw.trim(), translated);
+  return sanitizeEmployeeLaunchCopy(raw.replace(raw.trim(), translated), language);
 }
 
 function normalizeStatusKey(value = "") {
@@ -1063,8 +1543,17 @@ function applyI18nToElementAttributes(element, language = currentLanguage) {
     if (!element.hasAttribute(attr)) {
       return;
     }
+    let originalAttributes = GLOBAL_I18N_ORIGINAL_ATTRIBUTES.get(element);
+    if (!originalAttributes) {
+      originalAttributes = new Map();
+      GLOBAL_I18N_ORIGINAL_ATTRIBUTES.set(element, originalAttributes);
+    }
+    if (!originalAttributes.has(attr)) {
+      originalAttributes.set(attr, element.getAttribute(attr) || "");
+    }
+    const sourceValue = originalAttributes.get(attr) || "";
     const currentValue = element.getAttribute(attr) || "";
-    const translated = translateI18nText(currentValue, language);
+    const translated = translateI18nText(sourceValue, language);
     if (translated !== currentValue) {
       element.setAttribute(attr, translated);
     }
@@ -1087,14 +1576,19 @@ function applyGlobalI18n(root = document.body, language = currentLanguage) {
   if (!root) {
     return;
   }
-  const skipSelector = "script, style, code, pre, textarea";
+  const skipElementSelector = "script, style, code, pre";
+  const skipTextSelector = "script, style, code, pre, textarea";
   const translateNode = (node) => {
     if (node.nodeType === Node.TEXT_NODE) {
       const parent = node.parentElement;
-      if (!parent || parent.closest(skipSelector)) {
+      if (!parent || parent.closest(skipTextSelector)) {
         return;
       }
-      const translated = translateI18nText(node.textContent || "", language);
+      if (!GLOBAL_I18N_ORIGINAL_TEXT_NODES.has(node)) {
+        GLOBAL_I18N_ORIGINAL_TEXT_NODES.set(node, node.textContent || "");
+      }
+      const sourceText = GLOBAL_I18N_ORIGINAL_TEXT_NODES.get(node) || "";
+      const translated = translateI18nText(sourceText, language);
       if (translated !== node.textContent) {
         node.textContent = translated;
       }
@@ -1102,7 +1596,7 @@ function applyGlobalI18n(root = document.body, language = currentLanguage) {
     }
     if (node.nodeType === Node.ELEMENT_NODE) {
       const element = node;
-      if (element.matches(skipSelector)) {
+      if (element.matches(skipElementSelector)) {
         return;
       }
       applyI18nToElementAttributes(element, language);
@@ -1121,10 +1615,12 @@ function renderWebLanguageToggleMarkup(extraClass = "") {
   const className = `web-language-toggle global-language-toggle${extraClass ? ` ${extraClass}` : ""}`;
   const zhActive = currentLanguage === "zh" ? " is-active" : "";
   const enActive = currentLanguage === "en" ? " is-active" : "";
+  const zhLabel = currentLanguage === "en" ? "Chinese" : "中文";
+  const enLabel = currentLanguage === "en" ? "English" : "英文";
   return `
     <div class="${className}" data-web-language-toggle="true" role="group" aria-label="Language switch">
-      <button type="button" class="global-language-button${zhActive}" data-global-language="zh">中文</button>
-      <button type="button" class="global-language-button${enActive}" data-global-language="en">EN</button>
+      <button type="button" class="global-language-button${zhActive}" data-global-language="zh">${zhLabel}</button>
+      <button type="button" class="global-language-button${enActive}" data-global-language="en">${enLabel}</button>
     </div>
   `;
 }
@@ -1133,15 +1629,15 @@ function isWholePageWebLanguageSwitchReady(target = null) {
   if (target instanceof HTMLElement && target.closest("[data-pda-language-setting]")) {
     return true;
   }
-  return false;
+  return EMPLOYEE_ENGLISH_LAUNCH_READY;
 }
 
 function syncWebLanguageToggleAvailability() {
-  const readyForEnglish = isWholePageWebLanguageSwitchReady();
   document.querySelectorAll("[data-web-language-toggle] [data-global-language='en']").forEach((button) => {
-    button.classList.toggle("is-disabled", !readyForEnglish);
-    button.setAttribute("aria-disabled", readyForEnglish ? "false" : "true");
-    button.title = readyForEnglish ? "" : "English is staged page by page. This page is not migrated yet.";
+    button.classList.remove("is-disabled");
+    button.removeAttribute("aria-disabled");
+    button.removeAttribute("title");
+    button.disabled = false;
   });
 }
 
@@ -1150,10 +1646,10 @@ function syncGlobalLanguageButtons() {
     const buttonLanguage = button.dataset.globalLanguage || button.dataset.terminalLocale;
     button.classList.toggle("is-active", buttonLanguage === currentLanguage);
     if (buttonLanguage === "zh") {
-      button.textContent = "中文";
+      button.textContent = currentLanguage === "en" ? "Chinese" : "中文";
     }
     if (buttonLanguage === "en") {
-      button.textContent = "EN";
+      button.textContent = currentLanguage === "en" ? "English" : "英文";
     }
   });
   syncWebLanguageToggleAvailability();
@@ -1161,15 +1657,6 @@ function syncGlobalLanguageButtons() {
 
 function handleGlobalLanguageToggleClick(target) {
   const requestedLanguage = target.dataset.globalLanguage || "zh";
-  if (
-    target.closest("[data-web-language-toggle]")
-    && requestedLanguage === "en"
-    && !isWholePageWebLanguageSwitchReady(target)
-  ) {
-    setGlobalLanguage("zh", { renderCashier: false });
-    syncGlobalLanguageButtons();
-    return;
-  }
   setGlobalLanguage(requestedLanguage);
   refreshPdaLanguageSurfacesAfterLanguageChange();
 }
@@ -2914,7 +3401,7 @@ const STORE_MANAGER_PDA_TABS = [
 
 const STORE_MANAGER_PDA_MOCK = {
   storeCode: "UTAWALA",
-  managerName: "店长 Sarah",
+  managerName: "店长 A",
   summaryCards: [
     { label: "今日销售额", value: "KES 48,260", tone: "success" },
     { label: "今日收货件数", value: "126 件", tone: "info" },
@@ -2927,9 +3414,9 @@ const STORE_MANAGER_PDA_MOCK = {
     { label: "今日异常", value: "3 条", tone: "danger" },
   ],
   employeeProgress: [
-    { name: "Austin", current: "处理中 2 包", done: "今日完成 5 包", tone: "info" },
-    { name: "Nancy", current: "处理中 1 包", done: "今日完成 3 包", tone: "warning" },
-    { name: "Kevin", current: "空闲", done: "今日完成 4 包", tone: "success" },
+    { name: "店员 A", current: "处理中 2 包", done: "今日完成 5 包", tone: "info" },
+    { name: "店员 B", current: "处理中 1 包", done: "今日完成 3 包", tone: "warning" },
+    { name: "店员 C", current: "空闲", done: "今日完成 4 包", tone: "success" },
   ],
   reminders: [
     { label: "2 个 SDO 内包待分配", action: "去分配", tone: "warning" },
@@ -6784,7 +7271,7 @@ function renderStoreManagerPdaRuntimeScreen(state = ensureStoreManagerPdaTaskSta
           ${renderStoreManagerPdaRuntimeBody(state)}
         </main>
       </div>
-      <nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA tabs">
+      <nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA 标签页">
         ${renderStoreManagerPdaBottomTabs(state)}
       </nav>
     </div>
@@ -6844,7 +7331,7 @@ function renderStoreManagerPdaPreview(tabId = "") {
           ${bodyHtml}
         </div>
       </div>
-      <nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA tabs">
+      <nav class="store-manager-pda-bottom-tabs" aria-label="店长 PDA 标签页">
         ${STORE_MANAGER_PDA_TABS.map((tab) => `
           <button type="button" class="${tab.id === activeTab.id ? "is-active" : ""}" data-store-manager-pda-tab="${escapeHtml(tab.id)}">
             ${escapeHtml(tab.label)}
@@ -28121,7 +28608,7 @@ function renderSiteRecommendationSummary(data) {
 
 function getUserRoleLabel(user = {}) {
   const roleCode = String(user?.role_code || "").trim();
-  return String(user?.role_label || USER_ROLE_LABELS[roleCode] || roleCode || "-");
+  return String(user?.role_label || getUserRoleDisplayLabel(roleCode) || "-");
 }
 
 function normalizeManagedStoreCodesInput(value) {
@@ -29317,13 +29804,14 @@ function renderSessionState() {
 
   const storeText = currentSession.user.store_code ? ` / ${currentSession.user.store_code}` : "";
   if (sessionSummary) {
-    sessionSummary.textContent = `${currentSession.user.full_name} · ${currentSession.user.username}`;
+    sessionSummary.textContent = `${getUserDisplayNameForLanguage(currentSession.user)} · ${currentSession.user.username}`;
   }
   if (appSessionMeta) {
     appSessionMeta.className = "session-meta-inline";
     const roleLabel = chooseI18nLabel("角色", "Role");
     const globalAccountLabel = chooseI18nLabel("全局账号", "Global Account");
-    appSessionMeta.textContent = `${roleLabel}: ${currentSession.user.role_code || "-"}${storeText || ` / ${globalAccountLabel}`}`;
+    const roleDisplayLabel = getUserRoleDisplayLabel(currentSession.user.role_code);
+    appSessionMeta.textContent = `${roleLabel}: ${roleDisplayLabel}${storeText || ` / ${globalAccountLabel}`}`;
   }
   workspacePanels.classList.remove("locked");
   logoutButton.disabled = false;
@@ -29589,6 +30077,17 @@ function getCashierTerminalPaymentBalance() {
   return getCashierTerminalTotals().totalAmount - getCashierTerminalPaymentAssignedTotal();
 }
 
+function getCashierTerminalPaymentModeLabel(mode = cashierTerminalState.activePaymentMode) {
+  const normalizedMode = String(mode || "cash").trim().toLowerCase();
+  if (normalizedMode === "mpesa") {
+    return "M-Pesa";
+  }
+  if (normalizedMode === "mixed") {
+    return chooseI18nLabel("混合", "Mixed");
+  }
+  return chooseI18nLabel("现金", "Cash");
+}
+
 function getCashierTerminalChangeDue() {
   if (cashierTerminalState.activePaymentMode !== "cash") {
     return 0;
@@ -29722,13 +30221,13 @@ function renderCashierTerminalSessionStrip() {
     return;
   }
   const user = currentSession.user || {};
-  const username = String(user.full_name || user.username || "未登录").trim() || "未登录";
+  const username = getUserDisplayNameForLanguage(user) || chooseI18nLabel("未登录", "Not signed in");
   const roleCode = String(user.role_code || "-").trim() || "-";
-  const roleLabel = String(user.role_label || USER_ROLE_LABELS[roleCode] || roleCode || "-").trim() || "-";
-  const orgCode = String(user.store_code || user.warehouse_code || user.area_code || "全局").trim() || "全局";
+  const roleLabel = String(user.role_label || getUserRoleDisplayLabel(roleCode) || "-").trim() || "-";
+  const orgCode = String(user.store_code || user.warehouse_code || user.area_code || chooseI18nLabel("全局", "Global")).trim() || chooseI18nLabel("全局", "Global");
   cashierTerminalSessionStrip.innerHTML = `
     <span>${escapeHtml(username)}</span>
-    <span>${escapeHtml(roleLabel)} / ${escapeHtml(roleCode)}</span>
+    <span>${escapeHtml(roleLabel)}</span>
     <span>${escapeHtml(orgCode)}</span>
   `;
 }
@@ -29738,7 +30237,7 @@ function renderCashierTerminalStatusBar() {
     return;
   }
   const copy = getCashierTerminalCopy();
-  const cashierName = currentSession.user?.full_name || currentSession.user?.username || "cashier";
+  const cashierName = getUserDisplayNameForLanguage(currentSession.user || {}) || "cashier";
   const localeValue = cashierTerminalState.locale === "zh" ? "中文" : "English";
   cashierTerminalStatusBar.innerHTML = `
     <article class="status-card">
@@ -29970,7 +30469,7 @@ function renderCashierTerminalPaymentPanel() {
       <strong>${escapeHtml(formatCurrency(totals.totalAmount))}</strong>
       <small>${escapeHtml(totals.totalItems)} ${escapeHtml(copy.totalItems)} · ${escapeHtml(copy.paymentStatus)}：${escapeHtml(paymentStatus)}</small>
     </div>
-    <div class="payment-methods" role="tablist" aria-label="Payment methods">
+    <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>F2</span><span>${escapeHtml(copy.cashMethod)}</span></button>
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>F3</span><span>${escapeHtml(copy.mpesaMethod)}</span></button>
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>F4</span><span>${escapeHtml(copy.mixedMethod)}</span></button>
@@ -30051,7 +30550,7 @@ function renderCashierTerminalQuickActions() {
     ? `${copy.online} · ${offlineCount || 0}`
     : `${copy.offline} · ${offlineCount || 0}`;
   cashierTerminalQuickActions.innerHTML = `
-    <div class="cashier-terminal-status-metrics" aria-label="Cashier status">
+    <div class="cashier-terminal-status-metrics" aria-label="${escapeHtml(chooseI18nLabel("收银状态", "Cashier status"))}">
       <span><strong>${escapeHtml(copy.shiftLabel)}</strong>${escapeHtml(cashierTerminalState.shiftNo || copy.noShift)}</span>
       <span><strong>${escapeHtml(copy.cashierLabel)}</strong>${escapeHtml(cashierName)}</span>
       <span><strong>${escapeHtml(copy.storeLabel)}</strong>${escapeHtml(getCashierTerminalStoreCode())}</span>
@@ -31501,10 +32000,10 @@ renderCashierTerminalPaymentPanel = function () {
       <span>整单折扣</span>
       <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.discountAmount || "")}" data-terminal-payment-field="discountAmount" placeholder="0" />
     </label>
-    <div class="payment-methods" role="tablist" aria-label="Payment methods">
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>Cash</span><small>现金收款</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>手动 reference</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>Mixed</span><small>现金 + M-Pesa</small></button>
+    <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>${escapeHtml(chooseI18nLabel("手动流水号", "Manual Reference"))}</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合", "Mixed"))}</span><small>现金 + M-Pesa</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
       ${cashierTerminalState.activePaymentMode === "cash" ? `
@@ -31515,26 +32014,26 @@ renderCashierTerminalPaymentPanel = function () {
       ` : cashierTerminalState.activePaymentMode === "mpesa" ? `
         ${mpesaOfflineNotice}
         <label class="field">
-          <span>M-Pesa Amount</span>
+          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
           <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="默认等于应收金额" />
         </label>
         <label class="field">
-          <span>M-Pesa Reference</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa reference" />
+          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference"))}</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
         </label>
       ` : `
         ${mpesaOfflineNotice}
         <label class="field">
-          <span>Cash Amount</span>
+          <span>${escapeHtml(chooseI18nLabel("现金金额", "Cash Amount"))}</span>
           <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="现金金额" />
         </label>
         <label class="field">
-          <span>M-Pesa Amount</span>
+          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
           <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="M-Pesa 金额" />
         </label>
         <label class="field">
-          <span>M-Pesa Reference No.</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="输入 M-Pesa reference" />
+          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference No."))}</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
         </label>
       `}
     </div>
@@ -31620,15 +32119,18 @@ renderCashierTerminalQuickActions = function () {
   const totals = getCashierTerminalTotals();
   const paid = getCashierTerminalPaymentAssignedTotal();
   const copy = getCashierTerminalCopy();
+  const paymentStatus = totals.totalItems
+    ? (paid >= totals.totalAmount ? chooseI18nLabel("可完成", "Ready to Complete") : chooseI18nLabel("待收款", "Collect Payment"))
+    : chooseI18nLabel("待扫码", "Waiting for Scan");
   cashierTerminalQuickActions.innerHTML = `
-    <div class="transaction-strip-title">当前交易状态 (TRANSACTION STATUS)</div>
+    <div class="transaction-strip-title">${escapeHtml(chooseI18nLabel("当前交易状态", "Current Transaction Status"))}</div>
     <div class="cashier-terminal-status-metrics">
       <span><strong>商品数量</strong>${escapeHtml(totals.totalItems)}</span>
       <span><strong>应收金额</strong>${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</span>
       <span><strong>已收金额</strong>${escapeHtml(formatCashierPreviewMoney(paid))}</span>
       <span><strong>待收金额</strong>${escapeHtml(formatCashierPreviewMoney(Math.max(totals.totalAmount - paid, 0)))}</span>
-      <span><strong>支付方式</strong>${escapeHtml(cashierTerminalState.activePaymentMode)}</span>
-      <span><strong>状态</strong>${escapeHtml(totals.totalItems ? (paid >= totals.totalAmount ? "可完成" : "待收款") : "待扫码")}</span>
+      <span><strong>支付方式</strong>${escapeHtml(getCashierTerminalPaymentModeLabel())}</span>
+      <span><strong>状态</strong>${escapeHtml(paymentStatus)}</span>
       <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
     </div>
   `;
@@ -32110,7 +32612,7 @@ function mapCashierTerminalResolvedStoreItem(resolved = {}, query = "") {
     expected_price: price,
     qty: 1,
     store: getFirstCashierTerminalField(resolved.store_code, businessObject.store_code, getCashierTerminalStoreCode()),
-    status: getFirstCashierTerminalResolvedStatuses(resolved)[0] || "on_shelf",
+    status: getCashierTerminalResolvedStatuses(resolved)[0] || "on_shelf",
     resolver_result: resolved,
   };
 }
@@ -39199,7 +39701,7 @@ function renderStoreMobileRuntimeScreen(state = storeMobilePricingPreviewState) 
       <main class="mobile-pricing-screen">
         ${renderStoreMobileDeviceScreen(state)}
       </main>
-      <nav class="mobile-pricing-tabbar" aria-label="店员 PDA tabs">
+      <nav class="mobile-pricing-tabbar" aria-label="店员 PDA 标签页">
         ${renderStoreMobileBottomTabs(state)}
       </nav>
     </section>
@@ -45325,8 +45827,11 @@ async function handlePanelJumpEvent(event) {
 workspacePageNav?.addEventListener("click", handlePanelJumpEvent);
 appShell?.addEventListener("click", handlePanelJumpEvent);
 
-document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", async (event) => {
+appShell?.addEventListener("click", async (event) => {
   if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+  if (!event.target.closest("#storeManagerPdaPreview")) {
     return;
   }
   const runtimeButton = event.target.closest([
@@ -45343,6 +45848,14 @@ document.querySelector("#storeManagerPdaPreview")?.addEventListener("click", asy
   if (runtimeButton instanceof HTMLElement) {
     event.preventDefault();
     event.stopPropagation();
+    if (!isPdaRuntimeMode() && runtimeButton.dataset.storeManagerPdaTab) {
+      if (runtimeButton.dataset.storeManagerPdaTab !== "receiving") {
+        activeStoreManagerPdaReturnCode = "";
+        storeManagerPdaReturnSubmitted = false;
+      }
+      renderStoreManagerPdaPreview(runtimeButton.dataset.storeManagerPdaTab || "overview");
+      return;
+    }
     try {
       await handleStoreManagerPdaTaskAction(runtimeButton);
     } catch (error) {
