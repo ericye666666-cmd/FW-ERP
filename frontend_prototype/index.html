@@ -1357,6 +1357,90 @@
         <pre id="supplierOutput" class="output hidden-output"></pre>
       </section>
 
+      <section class="panel" id="areaSupervisorLaunchConsole" data-workspace-panel="operations">
+        <div class="panel-head">
+          <h2>门店与员工管理</h2>
+          <button data-action="load-area-supervisor-console" type="button">刷新门店与员工</button>
+        </div>
+        <div id="areaSupervisorLaunchSummary" class="candidate-summary empty-state">
+          area_supervisor 用于上线录入门店、创建门店员工、重置密码和停用账号。真实权限以后端 RBAC 为准。
+        </div>
+        <datalist id="areaSupervisorStoreCodeOptions"></datalist>
+
+        <div class="store-summary-grid">
+          <article class="closing-checklist-panel">
+            <h3>创建门店</h3>
+            <form id="areaSupervisorStoreCreateForm" class="form-grid compact">
+              <input name="code" placeholder="门店代码，如 RUIRU" />
+              <input name="name" placeholder="门店名称" />
+              <select name="status">
+                <option value="preparing">preparing</option>
+                <option value="active">active</option>
+                <option value="paused">paused</option>
+                <option value="closed">closed</option>
+              </select>
+              <input name="address" placeholder="地址" />
+              <input name="phone" placeholder="电话" />
+              <input name="google_maps_url" placeholder="Google Maps 链接" />
+              <input name="manager_note" placeholder="备注" />
+              <button type="submit">创建门店</button>
+            </form>
+          </article>
+
+          <article class="closing-checklist-panel">
+            <h3>编辑门店基础资料</h3>
+            <form id="areaSupervisorStoreUpdateForm" class="form-grid compact">
+              <input name="code" list="areaSupervisorStoreCodeOptions" placeholder="选择或输入门店代码" />
+              <input name="name" placeholder="门店名称" />
+              <select name="status">
+                <option value="preparing">preparing</option>
+                <option value="active">active</option>
+                <option value="paused">paused</option>
+                <option value="closed">closed</option>
+              </select>
+              <input name="address" placeholder="地址" />
+              <input name="phone" placeholder="电话" />
+              <input name="google_maps_url" placeholder="Google Maps 链接" />
+              <input name="manager_note" placeholder="备注" />
+              <button type="submit">保存门店资料</button>
+            </form>
+          </article>
+
+          <article class="closing-checklist-panel">
+            <h3>创建门店员工账号</h3>
+            <form id="areaSupervisorUserCreateForm" class="form-grid compact">
+              <input name="username" placeholder="用户名" autocomplete="username" />
+              <input name="full_name" placeholder="姓名" />
+              <input name="password" type="password" placeholder="临时密码" autocomplete="new-password" />
+              <select name="role_code">
+                <option value="store_manager">店长 store_manager</option>
+                <option value="store_clerk">店员 store_clerk</option>
+                <option value="cashier">收银员 cashier</option>
+              </select>
+              <input name="store_code" list="areaSupervisorStoreCodeOptions" placeholder="门店代码" />
+              <button type="submit">创建门店员工</button>
+            </form>
+          </article>
+
+          <article class="closing-checklist-panel">
+            <h3>重置员工密码</h3>
+            <form id="areaSupervisorPasswordResetForm" class="form-grid compact">
+              <input name="user_id" type="hidden" />
+              <input name="username" placeholder="从员工列表选择账号" readonly />
+              <input name="password" type="password" placeholder="新密码" autocomplete="new-password" />
+              <button type="submit">重置密码</button>
+            </form>
+          </article>
+        </div>
+
+        <h3>当前门店列表</h3>
+        <div id="areaSupervisorStoreList" class="candidate-list empty-state">请先刷新门店列表。</div>
+
+        <h3>门店员工账号</h3>
+        <div id="areaSupervisorUserList" class="user-management-list empty-state">请先刷新员工列表。</div>
+        <pre id="areaSupervisorLaunchOutput" class="output hidden-output"></pre>
+      </section>
+
       <section class="panel" data-workspace-panel="operations">
         <div class="panel-head">
           <h2>门店限价规则</h2>

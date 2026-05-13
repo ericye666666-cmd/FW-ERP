@@ -134,8 +134,61 @@ test("role access profiles keep each account inside its operational workspace", 
   assert.match(profileSource, /return createRoleAccessProfile\(\["store"\], \{\s*store:\s*\["cashier"\]/);
   assert.match(profileSource, /const clerkRoles = new Set\(\["store_clerk", "clerk", "store_staff", "sales_clerk"\]\)/);
   assert.match(profileSource, /return createRoleAccessProfile\(\["store"\], \{\s*store:\s*\["clerk"\]/);
-  assert.match(profileSource, /const regionalRoles = new Set\(\["regional_manager", "area_manager", "operations_manager", "area_supervisor"\]\)/);
+  assert.match(profileSource, /if \(roleCode === "area_supervisor"\)/);
+  assert.match(profileSource, /operations:\s*\["launch", "insight", "action", "governance"\]/);
+  assert.match(profileSource, /const regionalRoles = new Set\(\["regional_manager", "area_manager", "operations_manager"\]\)/);
   assert.match(profileSource, /return createRoleAccessProfile\(\["overview", "operations"\], \{\s*operations:\s*\["insight", "action", "governance"\]/);
   assert.doesNotMatch(cashierBlock, /warehouse:\s*\[/);
   assert.doesNotMatch(warehouseWorkerBlock, /store:\s*\["cashier"\]/);
+});
+
+test("area supervisor gets a launch console entry without exposing admin-only user roles", () => {
+  const profileSource = extractFunctionSource(appJs, "getRoleAccessProfile");
+  const areaSupervisorBlock = profileSource.slice(
+    profileSource.indexOf("roleCode === \"area_supervisor\""),
+    profileSource.indexOf("const regionalRoles"),
+  );
+  const regionalBlock = profileSource.slice(
+    profileSource.indexOf("const regionalRoles"),
+    profileSource.indexOf("const warehouseManagerRoles"),
+  );
+  const userCreateForm = indexHtml.match(/<form id="areaSupervisorUserCreateForm"[\s\S]*?<\/form>/)?.[0] || "";
+  const allowedRoles = appJs.match(/const AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES[\s\S]*?\]\);/)?.[0] || "";
+
+  assert.match(appJs, /const AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES = Object\.freeze\(\["store_manager", "store_clerk", "cashier"\]\)/);
+  assert.doesNotMatch(allowedRoles, /admin|area_supervisor|warehouse_|external_auditor/);
+  assert.match(areaSupervisorBlock, /operations:\s*\["launch", "insight", "action", "governance"\]/);
+  assert.doesNotMatch(regionalBlock, /area_supervisor/);
+  assert.match(appJs, /match: "门店与员工管理"/);
+  assert.match(extractFunctionSource(appJs, "getUserRoleLanding"), /roleCode === "area_supervisor"[\s\S]*panelTitle: "门店与员工管理"/);
+  assert.match(indexHtml, /id="areaSupervisorLaunchConsole"/);
+  assert.match(indexHtml, />门店与员工管理</);
+  assert.match(userCreateForm, /value="store_manager"/);
+  assert.match(userCreateForm, /value="store_clerk"/);
+  assert.match(userCreateForm, /value="cashier"/);
+  assert.doesNotMatch(userCreateForm, /value="admin"|value="area_supervisor"|warehouse_|external_auditor/);
+});
+
+test("area supervisor launch console reuses existing store and user RBAC APIs", () => {
+  const requiredFunctions = [
+    "loadAreaSupervisorLaunchConsoleData",
+    "submitAreaSupervisorStoreCreate",
+    "submitAreaSupervisorStoreUpdate",
+    "submitAreaSupervisorUserCreate",
+    "submitAreaSupervisorPasswordReset",
+    "deactivateAreaSupervisorStoreUser",
+    "renderAreaSupervisorLaunchError",
+  ];
+
+  requiredFunctions.forEach((functionName) => {
+    assert.match(appJs, new RegExp(`function ${functionName}|async function ${functionName}`), `missing ${functionName}`);
+  });
+  assert.match(appJs, /request\("\/stores"\)/);
+  assert.match(appJs, /request\("\/stores",\s*\{\s*method:\s*"POST"/);
+  assert.match(appJs, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}`,\s*\{\s*method:\s*"PATCH"/);
+  assert.match(appJs, /request\("\/users"\)/);
+  assert.match(appJs, /request\("\/users",\s*\{\s*method:\s*"POST"/);
+  assert.match(appJs, /request\(`\/users\/\$\{encodeURIComponent\(userId\)\}`,\s*\{\s*method:\s*"PATCH"/);
+  assert.match(appJs, /request\(`\/users\/\$\{encodeURIComponent\(userId\)\}`,\s*\{\s*method:\s*"DELETE"/);
+  assert.match(extractFunctionSource(appJs, "renderAreaSupervisorLaunchError"), /formatErrorMessage\(error\)/);
 });
