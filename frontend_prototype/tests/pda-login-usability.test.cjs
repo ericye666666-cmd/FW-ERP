@@ -2,21 +2,43 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const appLegacyJs = fs.readFileSync(path.join(__dirname, "..", "app.legacy.js"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 const authPageHtml = indexHtml.match(/<section id="authPage"[\s\S]*?<\/section>\s*<div id="appShell"/)?.[0] || "";
 const authCardHtml = authPageHtml.match(/<section class="auth-card"[\s\S]*?<\/section>/)?.[0] || "";
 
-function extractFunctionSource(name) {
-  const start = appJs.indexOf(`function ${name}`);
-  assert.notEqual(start, -1, `${name} should exist`);
+function extractFunctionSourceFrom(source, name) {
+  const match = new RegExp(`function\\s+${name}\\s*\\(`).exec(source);
+  assert.ok(match, `${name} should exist`);
+  const start = match.index;
+  const paramsStart = source.indexOf("(", start);
+  assert.notEqual(paramsStart, -1, `${name} params should exist`);
+
+  let parenDepth = 0;
+  let paramsEnd = -1;
+  for (let index = paramsStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "(") {
+      parenDepth += 1;
+    }
+    if (char === ")") {
+      parenDepth -= 1;
+      if (parenDepth === 0) {
+        paramsEnd = index;
+        break;
+      }
+    }
+  }
+  assert.notEqual(paramsEnd, -1, `${name} params should close`);
 
   let depth = 0;
   let sawBody = false;
-  for (let index = start; index < appJs.length; index += 1) {
-    const char = appJs[index];
+  for (let index = paramsEnd + 1; index < source.length; index += 1) {
+    const char = source[index];
     if (char === "{") {
       depth += 1;
       sawBody = true;
@@ -24,7 +46,7 @@ function extractFunctionSource(name) {
     if (char === "}") {
       depth -= 1;
       if (sawBody && depth === 0) {
-        return appJs.slice(start, index + 1);
+        return source.slice(start, index + 1);
       }
     }
   }
@@ -32,24 +54,168 @@ function extractFunctionSource(name) {
   throw new Error(`${name} source could not be extracted`);
 }
 
+function extractFunctionSource(name) {
+  return extractFunctionSourceFrom(appJs, name);
+}
+
+function extractLegacyFunctionSource(name) {
+  return extractFunctionSourceFrom(appLegacyJs, name);
+}
+
+function extractConstSourceFrom(source, name) {
+  const match = source.match(new RegExp(`const ${name} = [^;]+;`));
+  assert.ok(match, `${name} const should exist`);
+  return match[0];
+}
+
+function createApiResolverHarness(source) {
+  const harnessSource = [
+    extractConstSourceFrom(source, "PRODUCTION_APP_HOST"),
+    extractConstSourceFrom(source, "PRODUCTION_WWW_HOST"),
+    extractConstSourceFrom(source, "STAGING_APP_HOST"),
+    extractConstSourceFrom(source, "LEGACY_NIP_IO_HOST"),
+    extractConstSourceFrom(source, "PRODUCTION_API_BASE"),
+    extractConstSourceFrom(source, "STAGING_API_BASE"),
+    extractConstSourceFrom(source, "LOCAL_DEV_API_BASE"),
+    extractFunctionSourceFrom(source, "getLocationHostname"),
+    extractFunctionSourceFrom(source, "getLocationProtocol"),
+    extractFunctionSourceFrom(source, "getLocationOrigin"),
+    extractFunctionSourceFrom(source, "isLocalDevHostname"),
+    extractFunctionSourceFrom(source, "normalizeApiBaseCandidate"),
+    extractFunctionSourceFrom(source, "getApiBaseForLocation"),
+    extractFunctionSourceFrom(source, "resolveApiBaseForLocation"),
+    "globalThis.__resolver = { getApiBaseForLocation, resolveApiBaseForLocation, normalizeApiBaseCandidate };",
+  ].join("\n");
+  const sandbox = { URL };
+  vm.runInNewContext(harnessSource, sandbox);
+  return sandbox.__resolver;
+}
+
+function makeLocation(url) {
+  const parsed = new URL(url);
+  return {
+    protocol: parsed.protocol,
+    hostname: parsed.hostname,
+    host: parsed.host,
+    origin: parsed.origin,
+  };
+}
+
 test("production host defaults API base to directlooperp production API", () => {
   const defaultApiBase = extractFunctionSource("defaultApiBase");
+  const getEnvironmentApiBaseForCurrentOrigin = extractFunctionSource("getEnvironmentApiBaseForCurrentOrigin");
+  const getApiBaseForLocation = extractFunctionSource("getApiBaseForLocation");
   const resolveApiBaseForCurrentOrigin = extractFunctionSource("resolveApiBaseForCurrentOrigin");
 
   assert.match(appJs, /const PRODUCTION_APP_HOST = "directlooperp\.com";/);
+  assert.match(appJs, /const PRODUCTION_WWW_HOST = "www\.directlooperp\.com";/);
+  assert.match(appJs, /const STAGING_APP_HOST = "staging\.directlooperp\.com";/);
+  assert.match(appJs, /const LEGACY_NIP_IO_HOST = "fw-erp-34-35-52-250\.nip\.io";/);
   assert.match(appJs, /const PRODUCTION_API_BASE = "https:\/\/directlooperp\.com\/api\/v1";/);
+  assert.match(appJs, /const STAGING_API_BASE = "https:\/\/staging\.directlooperp\.com\/api\/v1";/);
   assert.match(appJs, /function isProductionAppOrigin/);
-  assert.match(defaultApiBase, /isProductionAppOrigin\(\)/);
-  assert.match(defaultApiBase, /return PRODUCTION_API_BASE;/);
-  assert.match(resolveApiBaseForCurrentOrigin, /if \(isProductionAppOrigin\(\)\)/);
-  assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
+  assert.match(getApiBaseForLocation, /host === PRODUCTION_APP_HOST \|\| host === PRODUCTION_WWW_HOST/);
+  assert.match(getApiBaseForLocation, /return PRODUCTION_API_BASE;/);
+  assert.match(getApiBaseForLocation, /host === STAGING_APP_HOST \|\| host === LEGACY_NIP_IO_HOST/);
+  assert.match(getApiBaseForLocation, /return STAGING_API_BASE;/);
+  assert.match(getEnvironmentApiBaseForCurrentOrigin, /return getApiBaseForLocation\(window\.location\);/);
+  assert.match(defaultApiBase, /const locationApiBase = getApiBaseForLocation\(window\.location\);/);
+  assert.match(defaultApiBase, /return locationApiBase;/);
+  assert.match(resolveApiBaseForCurrentOrigin, /return resolveApiBaseForLocation\(window\.location,\s*current,\s*saved\);/);
   assert.doesNotMatch(appJs, /const PDA_STAGING_API_BASE = "https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1";/);
+});
+
+test("API resolver maps current app host to the correct API base", () => {
+  const resolver = createApiResolverHarness(appJs);
+  const legacyResolver = createApiResolverHarness(appLegacyJs);
+  const cases = [
+    ["https://directlooperp.com/app/", "https://directlooperp.com/api/v1"],
+    ["https://www.directlooperp.com/app/", "https://directlooperp.com/api/v1"],
+    ["https://staging.directlooperp.com/app/", "https://staging.directlooperp.com/api/v1"],
+    ["https://fw-erp-34-35-52-250.nip.io/app/", "https://staging.directlooperp.com/api/v1"],
+    ["https://prod2.directlooperp.com/app/", "https://prod2.directlooperp.com/api/v1"],
+    ["http://127.0.0.1/app/", "http://127.0.0.1:8000/api/v1"],
+    ["http://localhost/app/", "http://127.0.0.1:8000/api/v1"],
+  ];
+
+  for (const [url, expected] of cases) {
+    const location = makeLocation(url);
+    assert.equal(resolver.getApiBaseForLocation(location), expected);
+    assert.equal(legacyResolver.getApiBaseForLocation(location), expected);
+  }
+});
+
+test("current host API base overrides saved stale values and corrects /app API bases", () => {
+  const resolver = createApiResolverHarness(appJs);
+  const prod2Location = makeLocation("https://prod2.directlooperp.com/app/");
+  const staleSavedValues = [
+    "https://directlooperp.com/api/v1",
+    "https://staging.directlooperp.com/api/v1",
+    "https://fw-erp-34-35-52-250.nip.io/api/v1",
+    "http://127.0.0.1:8000/api/v1",
+    "https://prod2.directlooperp.com/app/",
+  ];
+
+  for (const saved of staleSavedValues) {
+    assert.equal(
+      resolver.resolveApiBaseForLocation(prod2Location, "https://prod2.directlooperp.com/app/", saved),
+      "https://prod2.directlooperp.com/api/v1",
+    );
+  }
+  assert.equal(
+    resolver.normalizeApiBaseCandidate("https://prod2.directlooperp.com/app/"),
+    "https://prod2.directlooperp.com/api/v1",
+  );
+});
+
+test("staging host overrides saved root or stale API bases before login", () => {
+  const resolver = createApiResolverHarness(appJs);
+  const stagingLocation = makeLocation("https://staging.directlooperp.com/app/#operations-门店与员工管理-33");
+  const staleSavedValues = [
+    "https://staging.directlooperp.com/",
+    "https://staging.directlooperp.com/app/",
+    "https://directlooperp.com/api/v1",
+    "http://127.0.0.1:8000/api/v1",
+    "https://fw-erp-34-35-52-250.nip.io/api/v1",
+  ];
+
+  for (const saved of staleSavedValues) {
+    assert.equal(
+      resolver.resolveApiBaseForLocation(stagingLocation, "https://staging.directlooperp.com/", saved),
+      "https://staging.directlooperp.com/api/v1",
+    );
+  }
+  assert.equal(
+    `${resolver.resolveApiBaseForLocation(stagingLocation, "", "https://staging.directlooperp.com/")}/auth/login`,
+    "https://staging.directlooperp.com/api/v1/auth/login",
+  );
+});
+
+test("legacy bundle keeps the same production, staging, and old nip.io API mapping", () => {
+  const getEnvironmentApiBaseForCurrentOrigin = extractLegacyFunctionSource("getEnvironmentApiBaseForCurrentOrigin");
+  const getApiBaseForLocation = extractLegacyFunctionSource("getApiBaseForLocation");
+  const resolveApiBaseForCurrentOrigin = extractLegacyFunctionSource("resolveApiBaseForCurrentOrigin");
+
+  assert.match(appLegacyJs, /const PRODUCTION_APP_HOST = "directlooperp\.com";/);
+  assert.match(appLegacyJs, /const PRODUCTION_WWW_HOST = "www\.directlooperp\.com";/);
+  assert.match(appLegacyJs, /const STAGING_APP_HOST = "staging\.directlooperp\.com";/);
+  assert.match(appLegacyJs, /const LEGACY_NIP_IO_HOST = "fw-erp-34-35-52-250\.nip\.io";/);
+  assert.match(appLegacyJs, /const PRODUCTION_API_BASE = "https:\/\/directlooperp\.com\/api\/v1";/);
+  assert.match(appLegacyJs, /const STAGING_API_BASE = "https:\/\/staging\.directlooperp\.com\/api\/v1";/);
+  assert.match(getApiBaseForLocation, /host === PRODUCTION_APP_HOST \|\| host === PRODUCTION_WWW_HOST/);
+  assert.match(getApiBaseForLocation, /return PRODUCTION_API_BASE;/);
+  assert.match(getApiBaseForLocation, /host === STAGING_APP_HOST \|\| host === LEGACY_NIP_IO_HOST/);
+  assert.match(getApiBaseForLocation, /return STAGING_API_BASE;/);
+  assert.match(getEnvironmentApiBaseForCurrentOrigin, /return getApiBaseForLocation\(window\.location\);/);
+  assert.match(resolveApiBaseForCurrentOrigin, /return resolveApiBaseForLocation\(window\.location,\s*current,\s*saved\);/);
+  assert.doesNotMatch(appLegacyJs, /const PDA_STAGING_API_BASE = "https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1";/);
 });
 
 test("static login API field is hidden but still defaults to production API for JS fallback", () => {
   assert.match(authPageHtml, /<div class="hero-card auth-api-config" hidden aria-hidden="true">/);
   assert.match(authPageHtml, /<input id="apiBase" value="https:\/\/directlooperp\.com\/api\/v1" autocomplete="off" \/>/);
   assert.match(authPageHtml, /<button id="saveBaseButton" type="button" tabindex="-1">保存地址<\/button>/);
+  assert.match(stylesCss, /\.auth-api-config\[hidden\]\s*{[\s\S]*display:\s*none\s*!important;/);
   assert.doesNotMatch(indexHtml, /<input id="apiBase" value="http:\/\/127\.0\.0\.1:8000\/api\/v1" \/>/);
   assert.doesNotMatch(authPageHtml, /<input id="apiBase" value="https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1" \/>/);
 });
@@ -57,37 +223,42 @@ test("static login API field is hidden but still defaults to production API for 
 test("localhost and 127.0.0.1 keep the local development API default", () => {
   const defaultApiBase = extractFunctionSource("defaultApiBase");
   const isLocalDevHost = extractFunctionSource("isLocalDevHost");
+  const isLocalDevHostname = extractFunctionSource("isLocalDevHostname");
 
   assert.match(appJs, /const LOCAL_DEV_API_BASE = "http:\/\/127\.0\.0\.1:8000\/api\/v1";/);
-  assert.match(isLocalDevHost, /host === "127\.0\.0\.1"/);
-  assert.match(isLocalDevHost, /host === "localhost"/);
-  assert.match(defaultApiBase, /isLocalDevHost\(\)/);
-  assert.match(defaultApiBase, /return LOCAL_DEV_API_BASE;/);
+  assert.match(isLocalDevHostname, /host === "127\.0\.0\.1"/);
+  assert.match(isLocalDevHostname, /host === "localhost"/);
+  assert.match(isLocalDevHost, /isLocalDevHostname\(getLocationHostname\(window\.location\)\)/);
+  assert.match(defaultApiBase, /getApiBaseForLocation\(window\.location\)/);
 });
 
-test("saved API base is restored off production and default resolution does not overwrite it", () => {
+test("saved API base is only restored when the current location has no API base", () => {
   const getApiBase = extractFunctionSource("getApiBase");
   const defaultApiBase = extractFunctionSource("defaultApiBase");
-  const resolveApiBaseForCurrentOrigin = extractFunctionSource("resolveApiBaseForCurrentOrigin");
+  const resolveApiBaseForLocation = extractFunctionSource("resolveApiBaseForLocation");
 
   assert.match(getApiBase, /localStorage\.getItem\(STORAGE_KEYS\.apiBase\)/);
   assert.match(getApiBase, /return resolveApiBaseForCurrentOrigin\(current, saved\);/);
-  assert.match(resolveApiBaseForCurrentOrigin, /return savedBase \|\| currentBase \|\| defaultApiBase\(\);/);
+  assert.match(resolveApiBaseForLocation, /const locationApiBase = getApiBaseForLocation\(locationLike\);/);
+  assert.match(resolveApiBaseForLocation, /return locationApiBase;/);
+  assert.match(resolveApiBaseForLocation, /const currentBase = normalizeApiBaseCandidate\(current\);/);
+  assert.match(resolveApiBaseForLocation, /const savedBase = normalizeApiBaseCandidate\(saved\);/);
+  assert.match(resolveApiBaseForLocation, /return savedBase \|\| currentBase \|\| defaultApiBase\(\);/);
   assert.match(appJs, /apiBaseInput\.value = getInitialApiBase\(\);/);
   assert.doesNotMatch(defaultApiBase, /localStorage\.setItem\(STORAGE_KEYS\.apiBase/);
 });
 
-test("production and old staging hosts ignore saved or current loopback API base", () => {
+test("production, staging, old nip.io, prod2, and local hosts ignore saved or current loopback API base", () => {
   const getInitialApiBase = extractFunctionSource("getInitialApiBase");
-  const resolveApiBaseForCurrentOrigin = extractFunctionSource("resolveApiBaseForCurrentOrigin");
+  const resolveApiBaseForLocation = extractFunctionSource("resolveApiBaseForLocation");
 
   assert.match(appJs, /function isLoopbackApiBase/);
   assert.match(appJs, /apiBase\.startsWith\("http:\/\/127\.0\.0\.1"\)/);
   assert.match(appJs, /apiBase\.startsWith\("http:\/\/localhost"\)/);
-  assert.match(resolveApiBaseForCurrentOrigin, /if \(isProductionAppOrigin\(\)\)/);
-  assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
-  assert.match(resolveApiBaseForCurrentOrigin, /if \(isStagingAppOrigin\(\)\)/);
-  assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
+  assert.match(resolveApiBaseForLocation, /const locationApiBase = getApiBaseForLocation\(locationLike\);/);
+  assert.match(resolveApiBaseForLocation, /return locationApiBase;/);
+  assert.match(appJs, /function syncEnvironmentApiBaseStorage/);
+  assert.match(appJs, /localStorage\.setItem\(STORAGE_KEYS\.apiBase,\s*locationApiBase\)/);
   assert.match(getInitialApiBase, /return resolveApiBaseForCurrentOrigin\(current, saved\);/);
 });
 
@@ -129,16 +300,20 @@ test("staging PDA username field does not hardcode admin_1", () => {
   assert.match(loginFormHtml, /name="username"/);
   assert.doesNotMatch(loginFormHtml, /name="username"[^>]*value="admin_1"/);
   assert.match(getDefaultLoginUsername, /localStorage\.getItem\(STORAGE_KEYS\.loginUsername\)/);
-  assert.match(getDefaultLoginUsername, /isStagingAppOrigin\(\) \|\| isDirectLoopPdaUserAgent\(\)/);
+  assert.match(getDefaultLoginUsername, /isStagingAppOrigin\(\) \|\| isLegacyNipIoOrigin\(\) \|\| isDirectLoopPdaUserAgent\(\)/);
   assert.match(getDefaultLoginUsername, /return "";/);
   assert.match(restoreLoginUsername, /loginUsernameInput\.value = getDefaultLoginUsername\(\)/);
 });
 
 test("submitLogin blocks native form submission before making the auth request", () => {
   const submitLogin = extractFunctionSource("submitLogin");
+  const submitLoginFromForm = extractFunctionSource("submitLoginFromForm");
+  const request = extractFunctionSource("request");
 
   assert.match(submitLogin, /function submitLogin\(event\) {\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);/);
   assert.match(submitLogin, /return submitLoginFromForm\(form\);/);
+  assert.match(submitLoginFromForm, /request\("\/auth\/login"/);
+  assert.match(request, /fetch\(`\$\{getApiBase\(\)\}\$\{path\}`/);
 });
 
 test("login button click fallback invokes JS login without native form GET", () => {
@@ -201,14 +376,23 @@ test("legacy WebView guard clears password on initial login page load", () => {
   assert.match(legacyGuard, /removeUnsafeLoginQueryParams\(\);\s*ensureLegacyPasswordCleared\(\);\s*restoreLegacyLoginUsername\(\);/);
 });
 
-test("legacy WebView guard normalizes production API before loading app bundles", () => {
+test("legacy WebView guard normalizes environment API before loading app bundles", () => {
   const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
 
   assert.match(legacyGuard, /var productionApiBase = "https:\/\/directlooperp\.com\/api\/v1";/);
-  assert.match(legacyGuard, /function syncLegacyProductionApiBase/);
-  assert.match(legacyGuard, /apiBaseInput\.value = productionApiBase/);
-  assert.match(legacyGuard, /window\.localStorage\.setItem\("retail_ops_api_base", productionApiBase\)/);
-  assert.match(legacyGuard, /removeUnsafeLoginQueryParams\(\);\s*ensureLegacyPasswordCleared\(\);\s*restoreLegacyLoginUsername\(\);\s*syncLegacyProductionApiBase\(\);/);
+  assert.match(legacyGuard, /var stagingApiBase = "https:\/\/staging\.directlooperp\.com\/api\/v1";/);
+  assert.match(legacyGuard, /var localDevApiBase = "http:\/\/127\.0\.0\.1:8000\/api\/v1";/);
+  assert.match(legacyGuard, /function getLegacyEnvironmentApiBase/);
+  assert.match(legacyGuard, /hostname === "127\.0\.0\.1" \|\| hostname === "localhost"/);
+  assert.match(legacyGuard, /hostname === "directlooperp\.com" \|\| hostname === "www\.directlooperp\.com"/);
+  assert.match(legacyGuard, /hostname === "staging\.directlooperp\.com" \|\| hostname === "fw-erp-34-35-52-250\.nip\.io"/);
+  assert.match(legacyGuard, /window\.location\.origin\.replace\(\/\\\/\$\/, ""\) \+ "\/api\/v1"/);
+  assert.match(legacyGuard, /function normalizeLegacyApiBaseCandidate/);
+  assert.match(legacyGuard, /apiBase\.replace\(\/\\\/app\$\/i, "\/api\/v1"\)/);
+  assert.match(legacyGuard, /function syncLegacyEnvironmentApiBase/);
+  assert.match(legacyGuard, /apiBaseInput\.value = environmentApiBase/);
+  assert.match(legacyGuard, /window\.localStorage\.setItem\("retail_ops_api_base", environmentApiBase\)/);
+  assert.match(legacyGuard, /removeUnsafeLoginQueryParams\(\);\s*ensureLegacyPasswordCleared\(\);\s*restoreLegacyLoginUsername\(\);\s*syncLegacyEnvironmentApiBase\(\);/);
 });
 
 test("username and password query params are stripped without reading password", () => {
