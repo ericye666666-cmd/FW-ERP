@@ -112,9 +112,12 @@ const labelTemplateFlow = globalThis.LabelTemplateFlow || {};
 const apparelDefaultCostFlow = globalThis.ApparelDefaultCostFlow || {};
 const apparelSortingRackFlow = globalThis.ApparelSortingRackFlow || {};
 const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "/store-delivery-shipments";
+const PRODUCTION_APP_HOST = "directlooperp.com";
+const PRODUCTION_APP_ORIGIN = `https://${PRODUCTION_APP_HOST}`;
+const PRODUCTION_API_BASE = "https://directlooperp.com/api/v1";
 const PDA_STAGING_HOST = "fw-erp-34-35-52-250.nip.io";
 const PDA_STAGING_ORIGIN = `https://${PDA_STAGING_HOST}`;
-const PDA_STAGING_API_BASE = "https://fw-erp-34-35-52-250.nip.io/api/v1";
+const PDA_STAGING_API_BASE = PRODUCTION_API_BASE;
 const LOCAL_DEV_API_BASE = "http://127.0.0.1:8000/api/v1";
 const authPage = document.querySelector("#authPage");
 const appShell = document.querySelector("#appShell");
@@ -252,7 +255,7 @@ const CLERK_PDA_TERMINOLOGY_KEYS = Object.freeze({
 const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
   zh: Object.freeze({
     "pda.work.today": "我的今日工作",
-    "pda.package.scan": "扫描包裹",
+    "pda.package.scan": "扫包码",
     "pda.label.print": "打印标签",
     "pda.label.printed": "标签已打印",
     "pda.label.printFailed": "打印失败",
@@ -405,10 +408,10 @@ function getStoreInventoryLocationTypeLabel(type = "", language = currentLanguag
 }
 const HIGH_RISK_ERROR_CODE_MESSAGES = Object.freeze({
   zh: Object.freeze({
-    "INVALID_CODE": "无效条码。请重试。",
+    "INVALID_CODE": "无效条码，请重试。",
     "POS_CODE_NOT_ALLOWED": "POS 只扫描门店商品码。请扫描商品标签。",
     "STORE_ITEM_REQUIRED_FOR_POS": "POS 只扫描门店商品码。请扫描商品标签。",
-    "SDO_REQUIRED_FOR_STORE_RECEIVING": "请扫描门店送货执行单。",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "请先扫描门店送货执行单。",
     "ITEM_ALREADY_SOLD": "商品已售出。",
     "SHIFT_NOT_OPEN": "请先开班。",
     "LOCATION_REQUIRED": "请先选择货架或后仓。",
@@ -420,7 +423,7 @@ const HIGH_RISK_ERROR_CODE_MESSAGES = Object.freeze({
     "INVALID_CODE": "Invalid code. Try again.",
     "POS_CODE_NOT_ALLOWED": "POS only scans Store Item. Scan a product label.",
     "STORE_ITEM_REQUIRED_FOR_POS": "POS only scans Store Item. Scan a product label.",
-    "SDO_REQUIRED_FOR_STORE_RECEIVING": "Scan Store Delivery Order.",
+    "SDO_REQUIRED_FOR_STORE_RECEIVING": "Scan the Store Delivery Order first.",
     "ITEM_ALREADY_SOLD": "Item already sold.",
     "SHIFT_NOT_OPEN": "Open shift first.",
     "LOCATION_REQUIRED": "Select shelf or backroom first.",
@@ -1095,6 +1098,31 @@ function applyGlobalI18n(root = document.body, language = currentLanguage) {
     node = walker.nextNode();
   }
 }
+function renderWebLanguageToggleMarkup(extraClass = "") {
+  const className = `web-language-toggle global-language-toggle${extraClass ? ` ${extraClass}` : ""}`;
+  const zhActive = currentLanguage === "zh" ? " is-active" : "";
+  const enActive = currentLanguage === "en" ? " is-active" : "";
+  return `
+    <div class="${className}" data-web-language-toggle="true" role="group" aria-label="Language switch">
+      <button type="button" class="global-language-button${zhActive}" data-global-language="zh">中文</button>
+      <button type="button" class="global-language-button${enActive}" data-global-language="en">EN</button>
+    </div>
+  `;
+}
+function isWholePageWebLanguageSwitchReady(target = null) {
+  if (target instanceof HTMLElement && target.closest("[data-pda-language-setting]")) {
+    return true;
+  }
+  return false;
+}
+function syncWebLanguageToggleAvailability() {
+  const readyForEnglish = isWholePageWebLanguageSwitchReady();
+  document.querySelectorAll("[data-web-language-toggle] [data-global-language='en']").forEach((button) => {
+    button.classList.toggle("is-disabled", !readyForEnglish);
+    button.setAttribute("aria-disabled", readyForEnglish ? "false" : "true");
+    button.title = readyForEnglish ? "" : "English is staged page by page. This page is not migrated yet.";
+  });
+}
 function syncGlobalLanguageButtons() {
   document.querySelectorAll("[data-global-language], [data-terminal-locale]").forEach((button) => {
     const buttonLanguage = button.dataset.globalLanguage || button.dataset.terminalLocale;
@@ -1106,6 +1134,17 @@ function syncGlobalLanguageButtons() {
       button.textContent = "EN";
     }
   });
+  syncWebLanguageToggleAvailability();
+}
+function handleGlobalLanguageToggleClick(target) {
+  const requestedLanguage = target.dataset.globalLanguage || "zh";
+  if (target.closest("[data-web-language-toggle]") && requestedLanguage === "en" && !isWholePageWebLanguageSwitchReady(target)) {
+    setGlobalLanguage("zh", { renderCashier: false });
+    syncGlobalLanguageButtons();
+    return;
+  }
+  setGlobalLanguage(requestedLanguage);
+  refreshPdaLanguageSurfacesAfterLanguageChange();
 }
 function setGlobalLanguage(language = "zh", options = {}) {
   const nextLanguage = language === "en" ? "en" : "zh";
@@ -1126,6 +1165,19 @@ function setGlobalLanguage(language = "zh", options = {}) {
   syncWorkspacePanelHeadingsToNavTitles();
   renderWorkspacePageNav();
   applyGlobalI18n(document.body, currentLanguage);
+}
+function refreshPdaLanguageSurfacesAfterLanguageChange() {
+  if (!isPdaRuntimeMode()) {
+    return;
+  }
+  const roleCode = getNormalizedRoleCode(currentSession.user);
+  if (roleCode === "store_clerk") {
+    renderStoreMobilePricingPreviewPreservingScroll();
+  }
+  if (roleCode === "store_manager") {
+    renderStoreManagerPdaPreviewPreservingScroll();
+  }
+  syncGlobalLanguageButtons();
 }
 function initializeGlobalI18n() {
   syncGlobalLanguageButtons();
@@ -1533,6 +1585,7 @@ let storeAssignedSdoPackageTasksState = [];
 let storeSdoPackageItemTokenState = safeParse(localStorage.getItem(STORAGE_KEYS.storeSdoPackageItemTokens), []);
 let storePackageLastGeneratedTokenState = {};
 let storePackagePrintJobState = {};
+let storePackageGenerateIdempotencyKeyState = {};
 let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
 let storeDefaultSalePrices = safeParse(localStorage.getItem(STORAGE_KEYS.storeDefaultSalePrices), {});
 let warehouseDispatchHistoryState = [];
@@ -2788,7 +2841,7 @@ const STORE_MANAGER_PDA_TABS = [
   { id: "overview", label: "经营总览", title: "经营总览" },
   { id: "receiving", label: "收退货", title: "SDO 收退货" },
   { id: "logs", label: "经营日志", title: "经营日志" },
-  { id: "other", label: "其他", title: "其他" }
+  { id: "other", label: "我的", title: "我的" }
 ];
 const STORE_MANAGER_PDA_MOCK = {
   storeCode: "UTAWALA",
@@ -3043,6 +3096,9 @@ function getAccessibleSectionsForWorkspace(workspace, user = currentSession.user
   const profile = getRoleAccessProfile(user);
   return [...((_a = profile.sections) == null ? void 0 : _a[workspace]) || []];
 }
+function isProductionAppOrigin() {
+  return String(window.location.origin || "").startsWith(PRODUCTION_APP_ORIGIN);
+}
 function isStagingAppOrigin() {
   return String(window.location.origin || "").startsWith(PDA_STAGING_ORIGIN);
 }
@@ -3055,8 +3111,11 @@ function isLoopbackApiBase(value = "") {
   return !apiBase || apiBase.startsWith("http://127.0.0.1") || apiBase.startsWith("http://localhost") || apiBase.startsWith("https://127.0.0.1") || apiBase.startsWith("https://localhost");
 }
 function defaultApiBase() {
+  if (isProductionAppOrigin()) {
+    return PRODUCTION_API_BASE;
+  }
   if (isStagingAppOrigin()) {
-    return PDA_STAGING_API_BASE;
+    return PRODUCTION_API_BASE;
   }
   if (isLocalDevHost()) {
     return LOCAL_DEV_API_BASE;
@@ -3190,8 +3249,11 @@ function deleteDevTask(taskId = "") {
   return row;
 }
 function resolveApiBaseForCurrentOrigin(current = "", saved = "") {
+  if (isProductionAppOrigin()) {
+    return PRODUCTION_API_BASE;
+  }
   if (isStagingAppOrigin()) {
-    return PDA_STAGING_API_BASE;
+    return PRODUCTION_API_BASE;
   }
   const currentBase = String(current || "").trim();
   const savedBase = String(saved || "").trim();
@@ -3217,9 +3279,9 @@ function renderApiModeIndicator() {
   if (!(apiModeIndicator instanceof HTMLElement)) {
     return;
   }
-  const staging = isStagingAppOrigin() && getApiBase() === PDA_STAGING_API_BASE;
-  apiModeIndicator.hidden = !staging;
-  apiModeIndicator.textContent = staging ? "API mode: staging" : "";
+  const production = (isProductionAppOrigin() || isStagingAppOrigin()) && getApiBase() === PRODUCTION_API_BASE;
+  apiModeIndicator.hidden = !production;
+  apiModeIndicator.textContent = production ? "API mode: production" : "";
 }
 function removeUnsafeLoginQueryParams() {
   if (!window.location.search || !window.history || typeof window.history.replaceState !== "function") {
@@ -6292,7 +6354,7 @@ function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
   const roleCode = String(((_b = currentSession.user) == null ? void 0 : _b.role_code) || "store_manager").trim();
   return `
     <section class="store-manager-pda-card store-manager-pda-my-tab">
-      <h3>其他</h3>
+      <h3>我的</h3>
       <div class="store-manager-pda-sdp-facts">
         <span><b>当前账号</b>${escapeHtml(username)}</span>
         <span><b>门店</b>${escapeHtml(getCurrentStoreCodeFallback())}</span>
@@ -6300,6 +6362,7 @@ function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
         <span><b>role_code</b>${escapeHtml(roleCode)}</span>
         <span><b>PDA mode / version</b>Direct Loop PDA · manager backend flow 210</span>
       </div>
+      ${renderPdaLanguageSettingCard()}
       <button type="button" class="store-manager-pda-secondary-action" data-store-manager-pda-reload="true">刷新 SDO / 店员列表</button>
       <button type="button" class="store-manager-pda-primary-action" data-action="logout">退出登录</button>
     </section>
@@ -6332,7 +6395,7 @@ function getStoreManagerPdaRuntimeTitle(state = ensureStoreManagerPdaTaskState()
   const activeTab = String(state.activeTab || "receiving");
   if (activeTab === "overview") return "经营总览";
   if (activeTab === "logs") return "经营日志";
-  if (activeTab === "other") return "其他";
+  if (activeTab === "other") return "我的";
   const page = String(state.activePage || "tasks");
   if (page === "detail") return "SDO 收货 / 分配";
   if (page === "complete") return "任务完成";
@@ -7053,11 +7116,12 @@ function setActivePanel(panelKey, options = {}) {
 }
 removeUnsafeLoginQueryParams();
 apiBaseInput.value = getInitialApiBase();
-if (isStagingAppOrigin() && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
-  localStorage.setItem(STORAGE_KEYS.apiBase, PDA_STAGING_API_BASE);
+if ((isProductionAppOrigin() || isStagingAppOrigin()) && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
+  localStorage.setItem(STORAGE_KEYS.apiBase, PRODUCTION_API_BASE);
 }
 document.querySelector("#saveBaseButton").addEventListener("click", saveApiBase);
 renderApiModeIndicator();
+ensureLoginPasswordCleared();
 restoreLoginUsername();
 if (loginUsernameInput instanceof HTMLInputElement) {
   loginUsernameInput.addEventListener("input", persistLoginUsername);
@@ -26924,6 +26988,7 @@ function createCashierTerminalState() {
     activePaymentMode: "cash",
     paymentLines: [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")],
     latestCompletedSale: null,
+    activeSaleIdempotencyKey: "",
     activeDrawer: "",
     locale: "zh",
     networkStatus: navigator.onLine ? "online" : "offline",
@@ -28781,7 +28846,9 @@ renderCashierTerminalSessionStrip = function() {
     <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
     <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
     <span class="time-chip"><b>当前时间</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
+    ${renderWebLanguageToggleMarkup("cashier-terminal-web-language-toggle")}
   `;
+  syncGlobalLanguageButtons();
 };
 renderCashierTerminalStatusBar = function() {
   var _a;
@@ -29652,6 +29719,7 @@ upsertCashierTerminalCartItem = function(result) {
 resetCashierTerminalForNextSale = function() {
   cashierTerminalState.cartItems = [];
   cashierTerminalState.currentLookupResult = null;
+  clearCashierTerminalSaleIdempotencyKey();
   cashierTerminalState.activeHoldNo = "";
   cashierTerminalState.discountAmount = "";
   cashierTerminalState.cashReceived = "";
@@ -29735,6 +29803,7 @@ function buildCashierTerminalPosSalePayload(payment) {
   }
   const storeCode = getCashierTerminalStoreCode();
   return {
+    idempotency_key: getCashierTerminalSaleIdempotencyKey(),
     cashier_id: getCashierTerminalCashierName(),
     shift_id: ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo,
     terminal_id: getCashierTerminalTerminalId(),
@@ -29751,6 +29820,18 @@ function buildCashierTerminalPosSalePayload(payment) {
       discount_amount: 0
     }))
   };
+}
+function getCashierTerminalSaleIdempotencyKey() {
+  ensureCashierTerminalPreviewState();
+  if (!cashierTerminalState.activeSaleIdempotencyKey) {
+    const storeCode = getCashierTerminalStoreCode();
+    const randomPart = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    cashierTerminalState.activeSaleIdempotencyKey = `POS-SALE-${storeCode}-${randomPart}`;
+  }
+  return cashierTerminalState.activeSaleIdempotencyKey;
+}
+function clearCashierTerminalSaleIdempotencyKey() {
+  cashierTerminalState.activeSaleIdempotencyKey = "";
 }
 function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
   const items = Array.isArray(sale.items) ? sale.items : [];
@@ -33410,6 +33491,42 @@ function mergeGeneratedStoreItemsIntoPackageState(row = {}, generatedTokens = []
   persistStoreSdoPackageItemTokenState();
   return normalizedTokens;
 }
+function createStorePackageGenerateIdempotencyKey(actionKey = "") {
+  const scope = String(actionKey || "STORE_PACKAGE").trim().replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "STORE_PACKAGE";
+  const cryptoApi = globalThis.crypto || {};
+  const randomPart = typeof cryptoApi.randomUUID === "function" ? cryptoApi.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `store-item-generate-${scope}-${randomPart}`;
+}
+function buildStorePackageGeneratePayloadSignature(payload = {}) {
+  const normalized = {
+    store_code: String(payload.store_code || "").trim().toUpperCase(),
+    clerk: String(payload.clerk || "").trim(),
+    rack_code: String(payload.rack_code || "").trim().toUpperCase(),
+    selected_price: Number(payload.selected_price || 0),
+    category_main: String(payload.category_main || "").trim(),
+    category_sub: String(payload.category_sub || "").trim(),
+    grade: String(payload.grade || "").trim().toUpperCase(),
+    quantity: Math.max(1, Number(payload.quantity || 1))
+  };
+  return JSON.stringify(normalized);
+}
+function getStorePackageGenerateIdempotencyKey(actionKey = "", payloadSignature = "") {
+  const scope = String(actionKey || "STORE_PACKAGE").trim() || "STORE_PACKAGE";
+  const signature = String(payloadSignature || "").trim();
+  const existing = storePackageGenerateIdempotencyKeyState[scope];
+  if (existing && existing.payload_signature === signature && existing.idempotency_key) {
+    return existing.idempotency_key;
+  }
+  const idempotencyKey = createStorePackageGenerateIdempotencyKey(scope);
+  storePackageGenerateIdempotencyKeyState = {
+    ...storePackageGenerateIdempotencyKeyState,
+    [scope]: {
+      payload_signature: signature,
+      idempotency_key: idempotencyKey
+    }
+  };
+  return idempotencyKey;
+}
 async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
   const actionKey = getStorePackageActionKey(row);
   const packageCode = getStoreReceivingPackageCode(row) || getStoreReceivingPackageMachineCode(row);
@@ -33426,6 +33543,10 @@ async function generateStoreItemTokensForSdoPackage(row = {}, options = {}) {
     grade: String(options.grade || (row == null ? void 0 : row.grade) || "").trim(),
     quantity: Math.max(1, Number(options.quantity || 1))
   };
+  const payloadSignature = buildStorePackageGeneratePayloadSignature(payload);
+  payload.idempotency_key = String(
+    options.idempotency_key || getStorePackageGenerateIdempotencyKey(actionKey, payloadSignature)
+  ).trim();
   const result = await request(`/store-delivery-packages/${encodeURIComponent(packageCode)}/store-items/generate`, {
     method: "POST",
     body: JSON.stringify(payload)
@@ -33445,7 +33566,22 @@ function getStorePackageLastGeneratedTokens(actionKey = "") {
 function isPendingPrintStoreItemToken(token = {}) {
   const printStatus = String((token == null ? void 0 : token.print_status) || "").trim().toLowerCase();
   const status = String((token == null ? void 0 : token.status) || "").trim().toLowerCase();
-  return printStatus === "pending_print" || status === "pending_print";
+  const printableStatuses = /* @__PURE__ */ new Set(["pending_print", "not_printed", "failed", "print_failed"]);
+  return printableStatuses.has(printStatus) || printableStatuses.has(status);
+}
+function getStoreItemPrintFlowStatusLabel(token = {}) {
+  const printStatus = String((token == null ? void 0 : token.print_status) || "").trim().toLowerCase();
+  const status = String((token == null ? void 0 : token.status) || "").trim().toLowerCase();
+  if (["failed", "print_failed"].includes(printStatus) || ["failed", "print_failed"].includes(status)) {
+    return "打印失败 / 可重打";
+  }
+  if (["queued", "printing", "print_queued"].includes(printStatus) || ["queued", "printing", "print_queued"].includes(status)) {
+    return "待打印";
+  }
+  if (["success", "printed", "printed_in_store"].includes(printStatus) || ["success", "printed", "printed_in_store"].includes(status)) {
+    return "待入库确认";
+  }
+  return "待打印";
 }
 function getStorePackagePrintableTokens(actionKey = "") {
   const lastGeneratedPending = getStorePackageLastGeneratedTokens(actionKey).filter(isPendingPrintStoreItemToken);
@@ -33534,23 +33670,24 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
   const lastGeneratedPending = getStorePackageLastGeneratedTokens(actionKey).filter(isPendingPrintStoreItemToken);
   const isCurrentBatch = lastGeneratedPending.length > 0;
   const printableTokens = isCurrentBatch ? lastGeneratedPending : getStorePackageTokens(actionKey).filter(isPendingPrintStoreItemToken);
-  if (!printableTokens.length) {
+  const visibleTokens = printableTokens.length ? printableTokens : getStorePackageLastGeneratedTokens(actionKey);
+  if (!visibleTokens.length) {
     return `<div class="empty-state compact">当前没有待打印 STORE_ITEM。</div>`;
   }
   const printTitle = isCurrentBatch ? "打印本次标签" : "待打印标签";
   const printButtonText = isCurrentBatch ? "打印本次标签" : "打印待打印标签";
   return `
     <div class="store-package-print-summary">
-      <strong>${isCurrentBatch ? "本次生成数量" : "待打印标签"}</strong>
-      <span>${printableTokens.length}</span>
+      <strong>${printableTokens.length ? isCurrentBatch ? "本次生成数量" : "待打印标签" : "待入库确认"}</strong>
+      <span>${printableTokens.length || visibleTokens.length}</span>
     </div>
     <div class="store-generated-item-list">
-      ${printableTokens.slice(0, 8).map((token) => `
+      ${visibleTokens.slice(0, 8).map((token) => `
         <article class="store-generated-item-row">
           <div>
             <strong>${escapeHtml(token.display_code || token.token_no || "-")}</strong>
             <small>${escapeHtml(`machine_code ${token.machine_code || "-"} · barcode_value ${token.barcode_value || token.machine_code || "-"}`)}</small>
-            <small>${escapeHtml(`待打印 · 来源 SDP ${token.sdo_package_display_code || token.source_package || "-"} · 所属 SDO ${token.parent_sdo_display_code || "-"} · 价格 KES ${formatCurrency(token.selected_price || token.selling_price_kes || 0)} · rack_code ${token.rack_code || token.store_rack_code || "-"}`)}</small>
+            <small>${escapeHtml(`${getStoreItemPrintFlowStatusLabel(token)} · 来源 SDP ${token.sdo_package_display_code || token.source_package || "-"} · 所属 SDO ${token.parent_sdo_display_code || "-"} · 价格 KES ${formatCurrency(token.selected_price || token.selling_price_kes || 0)} · rack_code ${token.rack_code || token.store_rack_code || "-"}`)}</small>
           </div>
           ${renderStoreItemLineageSummary(token)}
         </article>
@@ -33558,6 +33695,8 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
     </div>
     <div class="store-package-print-panel">
       <h4>${printTitle}</h4>
+      <div class="subtle small">状态：待打印 / 打印失败 / 可重打 / 待入库确认</div>
+      ${printableTokens.length ? `
       <label>
         <span>标签尺寸</span>
         <select data-store-package-label-size="${escapeHtml(actionKey)}">
@@ -33566,6 +33705,7 @@ function renderStorePackageGeneratedStoreItems(actionKey = "") {
         </select>
       </label>
       <button type="button" class="primary-button" data-store-package-print-generated="${escapeHtml(actionKey)}">${printButtonText}</button>
+      ` : `<div class="subtle small">当前没有可重打标签，请继续做货架 / 后仓入库确认。</div>`}
       ${renderStorePackagePrintJobFeedback(actionKey)}
     </div>
   `;
@@ -35847,6 +35987,25 @@ function renderClerkPrinterConnectionPage(state = storeMobilePricingPreviewState
     </section>
   `;
 }
+function renderPdaLanguageSettingCard() {
+  const zhActive = currentLanguage === "zh" ? " is-active" : "";
+  const enActive = currentLanguage === "en" ? " is-active" : "";
+  return `
+    <section class="pda-settings-card" data-pda-language-setting="true">
+      <div class="mobile-section-head"><strong>设置</strong></div>
+      <div class="pda-language-setting-row">
+        <div>
+          <strong>中英切换</strong>
+          <span>${escapeHtml(currentLanguage === "en" ? "English" : "中文")}</span>
+        </div>
+        <div class="global-language-toggle pda-language-toggle" role="group" aria-label="中英切换">
+          <button type="button" class="global-language-button${zhActive}" data-global-language="zh">中文</button>
+          <button type="button" class="global-language-button${enActive}" data-global-language="en">EN</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
 function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
   const pdaCopy = getClerkPdaCopy();
   const sdp = state.selectedSdp || {};
@@ -35859,6 +36018,7 @@ function renderStoreMobileMyTab(state = storeMobilePricingPreviewState) {
         <span><b>角色</b><strong>店员</strong></span>
         <span><b>PDA mode / version</b><strong>Direct Loop PDA · task flow 208</strong></span>
       </div>
+      ${renderPdaLanguageSettingCard()}
       ${renderDirectLoopVersionInfoBlock("clerk_my")}
       ${renderClerkPrinterConnectionEntryCard(state)}
       <div class="mobile-section-head"><strong>${escapeHtml(pdaCopy.pendingStockIn)}</strong></div>
@@ -41532,7 +41692,7 @@ document.addEventListener("click", (event) => {
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  setGlobalLanguage(target.dataset.globalLanguage || "zh");
+  handleGlobalLanguageToggleClick(target);
 });
 window.addEventListener("online", handleCashierTerminalNetworkChange);
 window.addEventListener("offline", handleCashierTerminalNetworkChange);
