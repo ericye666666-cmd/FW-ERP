@@ -44,6 +44,13 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function functionSource(name) {
+  const start = appJs.indexOf(`function ${name}`);
+  assert.notEqual(start, -1, `${name} not found`);
+  const nextFunction = appJs.indexOf("\nfunction ", start + 1);
+  return appJs.slice(start, nextFunction === -1 ? undefined : nextFunction);
+}
+
 test("web language switch is mounted inside web header areas and is hidden in PDA runtime", () => {
   const webToggles = indexHtml.match(/<div class="[^"]*web-language-toggle[^"]*global-language-toggle[\s\S]*?<\/div>/g) || [];
   const webToggleCss = stylesCss.match(/\.web-language-toggle\s*\{[\s\S]*?\n\}/)?.[0] || "";
@@ -58,12 +65,35 @@ test("web language switch is mounted inside web header areas and is hidden in PD
   assert.match(stylesCss, /body\.pda-runtime-mode\s+\.web-language-toggle\s*\{[\s\S]*display:\s*none\s*!important/);
 });
 
-test("web language switch does not enable partial whole-page English before copy migration", () => {
-  assert.match(appJs, /function isWholePageWebLanguageSwitchReady/);
-  assert.match(appJs, /function handleGlobalLanguageToggleClick/);
-  assert.match(appJs, /target\.closest\("\[data-web-language-toggle\]"\)/);
-  assert.match(appJs, /English is staged page by page/);
-  assert.match(appJs, /setGlobalLanguage\("zh"/);
+test("web language switch is enabled for employee English launch mode", () => {
+  const readinessSource = functionSource("isWholePageWebLanguageSwitchReady");
+  const availabilitySource = functionSource("syncWebLanguageToggleAvailability");
+  const clickSource = functionSource("handleGlobalLanguageToggleClick");
+
+  assert.match(readinessSource, /EMPLOYEE_ENGLISH_LAUNCH_READY/);
+  assert.doesNotMatch(clickSource, /setGlobalLanguage\("zh"/);
+  assert.doesNotMatch(appJs, /English is staged page by page/);
+  assert.doesNotMatch(availabilitySource, /toggle\("is-disabled"/);
+  assert.doesNotMatch(availabilitySource, /setAttribute\("aria-disabled"/);
+  assert.match(availabilitySource, /classList\.remove\("is-disabled"\)/);
+  assert.match(availabilitySource, /removeAttribute\("aria-disabled"\)/);
+});
+
+test("employee launch i18n has a safety scrubber for untranslated UI copy", () => {
+  const translateSource = functionSource("translateI18nText");
+  const applySource = functionSource("applyGlobalI18n");
+  const scrubberSource = functionSource("sanitizeEmployeeLaunchCopy");
+
+  assert.match(appJs, /EMPLOYEE_LAUNCH_UI_TERMS/);
+  assert.match(appJs, /GLOBAL_I18N_ORIGINAL_TEXT_NODES/);
+  assert.match(appJs, /GLOBAL_I18N_ORIGINAL_ATTRIBUTES/);
+  assert.match(translateSource, /sanitizeEmployeeLaunchCopy/);
+  assert.match(appJs, /function getUserRoleDisplayLabel/);
+  assert.match(appJs, /USER_ROLE_LABELS_EN/);
+  assert.match(applySource, /GLOBAL_I18N_ORIGINAL_TEXT_NODES\.get/);
+  assert.match(scrubberSource, /hasCjkText/);
+  assert.match(scrubberSource, /hasTranslatableLatinText/);
+  assert.match(scrubberSource, /Employee English launch fallback/);
 });
 
 test("pre-QA terminology uses the approved bilingual glossary", () => {
