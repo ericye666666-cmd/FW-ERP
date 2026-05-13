@@ -8,7 +8,7 @@
   </head>
   <body>
     <section id="authPage" class="auth-page">
-      <section class="test-home-entry panel" aria-labelledby="testHomeTitle">
+      <section class="test-home-entry panel" aria-labelledby="testHomeTitle" hidden aria-hidden="true">
         <div class="panel-head">
           <p class="eyebrow">Direct Loop / FW-ERP</p>
           <h2 id="testHomeTitle">Direct Loop / FW-ERP Test Home</h2>
@@ -37,7 +37,7 @@
       </section>
 
       <div class="auth-shell">
-        <section class="auth-brand">
+        <section class="auth-brand" hidden aria-hidden="true">
           <p class="eyebrow">Retail Ops Prototype</p>
           <h1>店铺进销存工作台</h1>
           <p class="subtle">
@@ -63,23 +63,18 @@
           <div class="panel-head">
             <h2>登录系统</h2>
           </div>
-          <div class="hero-card">
+          <div class="hero-card auth-api-config" hidden aria-hidden="true">
             <label for="apiBase">API 地址（先不要改）</label>
-            <input id="apiBase" value="https://fw-erp-34-35-52-250.nip.io/api/v1" />
-            <button id="saveBaseButton" type="button">保存地址</button>
+            <input id="apiBase" value="https://directlooperp.com/api/v1" autocomplete="off" />
+            <button id="saveBaseButton" type="button" tabindex="-1">保存地址</button>
             <div id="apiModeIndicator" class="subtle small api-mode-indicator" hidden></div>
           </div>
           <form id="loginForm" class="form-grid compact auth-form" method="post" action="javascript:void(0)" autocomplete="off" novalidate>
-            <input name="username" placeholder="用户名" />
+            <input name="username" placeholder="用户名" autocomplete="username" />
             <input name="password" type="password" placeholder="密码" autocomplete="new-password" autocapitalize="off" spellcheck="false" />
             <button id="loginSubmitButton" type="submit">登录并进入终端 / 工作区</button>
           </form>
           <div id="authResultSummary" class="candidate-summary empty-state">登录后，这里会显示当前账号、角色和可操作范围。</div>
-          <div class="subtle small">默认测试密码：<code>demo1234</code></div>
-          <section class="direct-loop-version-info direct-loop-version-info-compact" data-direct-loop-version-info="login" data-direct-loop-login-version-info="true">
-            <div><strong>FW-ERP 主线 PR:</strong><span>#284</span></div>
-            <div><strong>Android PR:</strong><span>#35</span></div>
-          </section>
           <pre id="authOutput" class="output hidden-output"></pre>
         </section>
       </div>
@@ -3875,7 +3870,7 @@
       (function legacyPdaLoginGuard() {
         var loginForm = document.getElementById("loginForm");
         var loginSubmitButton = document.getElementById("loginSubmitButton");
-        var stagingApiBase = "https://fw-erp-34-35-52-250.nip.io/api/v1";
+        var productionApiBase = "https://directlooperp.com/api/v1";
         var legacyStoreManagerTarget = null;
         var legacyFallbackBound = false;
 
@@ -3930,9 +3925,13 @@
           }
         }
 
-        function isLegacyStagingOrPda() {
+        function isLegacyProductionOrStagingOrPda() {
           var directLoopPda = window.navigator && String(window.navigator.userAgent || "").indexOf("DirectLoopPDA/1.0") !== -1;
-          return window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0 || directLoopPda;
+          return window.location.origin.indexOf("https://directlooperp.com") === 0 || window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0 || directLoopPda;
+        }
+
+        function isLegacyProductionOrStagingOrigin() {
+          return window.location.origin.indexOf("https://directlooperp.com") === 0 || window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0;
         }
 
         function restoreLegacyLoginUsername() {
@@ -3949,7 +3948,7 @@
             loginForm.elements.username.value = savedUsername;
             return;
           }
-          if (isLegacyStagingOrPda()) {
+          if (isLegacyProductionOrStagingOrPda()) {
             loginForm.elements.username.value = "";
           }
         }
@@ -4118,10 +4117,25 @@
 
         function getLegacyApiBase() {
           var apiBaseInput = document.getElementById("apiBase");
-          if (window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0) {
-            return stagingApiBase;
+          if (isLegacyProductionOrStagingOrigin()) {
+            return productionApiBase;
           }
-          return apiBaseInput && apiBaseInput.value ? apiBaseInput.value.trim() : stagingApiBase;
+          return apiBaseInput && apiBaseInput.value ? apiBaseInput.value.trim() : productionApiBase;
+        }
+
+        function syncLegacyProductionApiBase() {
+          if (!isLegacyProductionOrStagingOrigin()) {
+            return;
+          }
+          var apiBaseInput = document.getElementById("apiBase");
+          if (apiBaseInput) {
+            apiBaseInput.value = productionApiBase;
+          }
+          try {
+            window.localStorage.setItem("retail_ops_api_base", productionApiBase);
+          } catch (error) {
+            // Keep login usable when storage is unavailable.
+          }
         }
 
         function getFormValue(name) {
@@ -4132,6 +4146,16 @@
           if (loginForm && loginForm.elements.password) {
             loginForm.elements.password.value = "";
           }
+        }
+
+        function ensureLegacyPasswordCleared() {
+          clearLegacyPassword();
+          if (window.requestAnimationFrame) {
+            window.requestAnimationFrame(clearLegacyPassword);
+          }
+          window.setTimeout(clearLegacyPassword, 0);
+          window.setTimeout(clearLegacyPassword, 120);
+          window.setTimeout(clearLegacyPassword, 500);
         }
 
         function findPanelByTitle(prefix) {
@@ -4363,7 +4387,10 @@
         window.__DIRECT_LOOP_PDA_BUNDLE_VERSION__ = "clerk-pda-daily-workbench-309";
 
         removeUnsafeLoginQueryParams();
+        ensureLegacyPasswordCleared();
         restoreLegacyLoginUsername();
+        syncLegacyProductionApiBase();
+        window.addEventListener("pageshow", ensureLegacyPasswordCleared);
         if (supportsModernSyntax()) {
           loadPdaRuntimeScript("./app.js?v=store-shelf-floor-plan-canvas-editor-320", "modern");
           return;

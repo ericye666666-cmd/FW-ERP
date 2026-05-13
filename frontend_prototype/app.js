@@ -87,9 +87,12 @@ const labelTemplateFlow = globalThis.LabelTemplateFlow || {};
 const apparelDefaultCostFlow = globalThis.ApparelDefaultCostFlow || {};
 const apparelSortingRackFlow = globalThis.ApparelSortingRackFlow || {};
 const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "/store-delivery-shipments";
+const PRODUCTION_APP_HOST = "directlooperp.com";
+const PRODUCTION_APP_ORIGIN = `https://${PRODUCTION_APP_HOST}`;
+const PRODUCTION_API_BASE = "https://directlooperp.com/api/v1";
 const PDA_STAGING_HOST = "fw-erp-34-35-52-250.nip.io";
 const PDA_STAGING_ORIGIN = `https://${PDA_STAGING_HOST}`;
-const PDA_STAGING_API_BASE = "https://fw-erp-34-35-52-250.nip.io/api/v1";
+const PDA_STAGING_API_BASE = PRODUCTION_API_BASE;
 const LOCAL_DEV_API_BASE = "http://127.0.0.1:8000/api/v1";
 
 const authPage = document.querySelector("#authPage");
@@ -3185,6 +3188,10 @@ function getAccessibleSectionsForWorkspace(workspace, user = currentSession.user
   return [...(profile.sections?.[workspace] || [])];
 }
 
+function isProductionAppOrigin() {
+  return String(window.location.origin || "").startsWith(PRODUCTION_APP_ORIGIN);
+}
+
 function isStagingAppOrigin() {
   return String(window.location.origin || "").startsWith(PDA_STAGING_ORIGIN);
 }
@@ -3204,8 +3211,11 @@ function isLoopbackApiBase(value = "") {
 }
 
 function defaultApiBase() {
+  if (isProductionAppOrigin()) {
+    return PRODUCTION_API_BASE;
+  }
   if (isStagingAppOrigin()) {
-    return PDA_STAGING_API_BASE;
+    return PRODUCTION_API_BASE;
   }
   if (isLocalDevHost()) {
     return LOCAL_DEV_API_BASE;
@@ -3355,8 +3365,11 @@ function deleteDevTask(taskId = "") {
 }
 
 function resolveApiBaseForCurrentOrigin(current = "", saved = "") {
+  if (isProductionAppOrigin()) {
+    return PRODUCTION_API_BASE;
+  }
   if (isStagingAppOrigin()) {
-    return PDA_STAGING_API_BASE;
+    return PRODUCTION_API_BASE;
   }
   const currentBase = String(current || "").trim();
   const savedBase = String(saved || "").trim();
@@ -3386,9 +3399,9 @@ function renderApiModeIndicator() {
   if (!(apiModeIndicator instanceof HTMLElement)) {
     return;
   }
-  const staging = isStagingAppOrigin() && getApiBase() === PDA_STAGING_API_BASE;
-  apiModeIndicator.hidden = !staging;
-  apiModeIndicator.textContent = staging ? "API mode: staging" : "";
+  const production = (isProductionAppOrigin() || isStagingAppOrigin()) && getApiBase() === PRODUCTION_API_BASE;
+  apiModeIndicator.hidden = !production;
+  apiModeIndicator.textContent = production ? "API mode: production" : "";
 }
 
 function removeUnsafeLoginQueryParams() {
@@ -7509,11 +7522,12 @@ function setActivePanel(panelKey, options = {}) {
 
 removeUnsafeLoginQueryParams();
 apiBaseInput.value = getInitialApiBase();
-if (isStagingAppOrigin() && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
-  localStorage.setItem(STORAGE_KEYS.apiBase, PDA_STAGING_API_BASE);
+if ((isProductionAppOrigin() || isStagingAppOrigin()) && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
+  localStorage.setItem(STORAGE_KEYS.apiBase, PRODUCTION_API_BASE);
 }
 document.querySelector("#saveBaseButton").addEventListener("click", saveApiBase);
 renderApiModeIndicator();
+ensureLoginPasswordCleared();
 restoreLoginUsername();
 if (loginUsernameInput instanceof HTMLInputElement) {
   loginUsernameInput.addEventListener("input", persistLoginUsername);
