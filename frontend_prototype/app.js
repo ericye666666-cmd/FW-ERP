@@ -148,7 +148,11 @@ let saleVoidState = [];
 let saleRefundState = [];
 let paymentAnomalyState = [];
 let userDirectoryState = [];
+let areaSupervisorLaunchStores = [];
+let areaSupervisorLaunchUsers = [];
 const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier"]);
+const AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES = Object.freeze(["store_manager", "store_clerk", "cashier"]);
+const AREA_SUPERVISOR_STORE_STATUS_OPTIONS = Object.freeze(["preparing", "active", "paused", "closed"]);
 const USER_ROLE_LABELS = {
   store_clerk: "店员",
   store_manager: "店长",
@@ -2627,6 +2631,13 @@ const WAREHOUSE_NAV_SECTIONS = [
 
 const OPERATIONS_NAV_SECTIONS = [
   {
+    id: "launch",
+    title: "上线管理",
+    titleEn: "Launch Management",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.75 8.5 10 4.25l5.25 4.25v6.75H4.75V8.5Z" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"/><path d="M8.25 15.25v-4h3.5v4" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  },
+  {
     id: "insight",
     title: "经营分析",
     titleEn: "Business Analytics",
@@ -3018,6 +3029,14 @@ const WAREHOUSE_PANEL_NAV_META = [
 ];
 
 const OPERATIONS_PANEL_NAV_META = [
+  {
+    match: "门店与员工管理",
+    section: "launch",
+    order: 5,
+    icon: "店",
+    navTitle: "门店与员工管理",
+    navTitleEn: "Stores & Staff",
+  },
   {
     match: "1. 区域经营驾驶舱",
     section: "insight",
@@ -3562,7 +3581,7 @@ const LEGACY_WORKSPACE_MAP = {
 const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
   warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
-  operations: ["insight", "action", "governance"],
+  operations: ["launch", "insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"],
 });
@@ -3613,7 +3632,13 @@ function getRoleAccessProfile(user = currentSession.user) {
     });
   }
 
-  const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager", "area_supervisor"]);
+  if (roleCode === "area_supervisor") {
+    return createRoleAccessProfile(["overview", "operations"], {
+      operations: ["launch", "insight", "action", "governance"],
+    });
+  }
+
+  const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager"]);
   if (regionalRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "operations"], {
       operations: ["insight", "action", "governance"],
@@ -4060,13 +4085,16 @@ function requiresRoleLanding(user = currentSession.user) {
 }
 
 function getUserRoleLanding(user = currentSession.user) {
+  const roleCode = getNormalizedRoleCode(user);
+  if (roleCode === "area_supervisor") {
+    return { workspace: "operations", panelTitle: "门店与员工管理", label: "运营中心 / 门店与员工管理" };
+  }
   const landingResolver = storeExecutionFlow && typeof storeExecutionFlow.getStoreRoleLanding === "function"
     ? storeExecutionFlow.getStoreRoleLanding
     : null;
   if (landingResolver) {
     return landingResolver(getNormalizedRoleCode(user), Boolean(user?.store_code));
   }
-  const roleCode = getNormalizedRoleCode(user);
   if (!user?.store_code) {
     return null;
   }
@@ -8000,6 +8028,11 @@ function setActivePanel(panelKey, options = {}) {
     ].includes(panelKey)
   ) {
     loadTransferPlanningContext({ force: true }).catch(() => {});
+  }
+  if (currentSession?.token && panelKey === getPanelKeyByTitle("operations", "门店与员工管理")) {
+    loadAreaSupervisorLaunchConsoleData().catch((error) => {
+      renderAreaSupervisorLaunchError(error);
+    });
   }
   syncCashierTerminalMode();
   if (isCashierTerminalRole() && panelKey === getCashierTerminalSalesPanelKey()) {
@@ -28620,6 +28653,310 @@ function renderSiteRecommendationSummary(data) {
   `;
 }
 
+function isAreaSupervisorStoreEmployeeRole(roleCode = "") {
+  return AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES.includes(String(roleCode || "").trim().toLowerCase());
+}
+
+function getAreaSupervisorStoreStatus(value = "preparing") {
+  const status = String(value || "").trim().toLowerCase() || "preparing";
+  if (!AREA_SUPERVISOR_STORE_STATUS_OPTIONS.includes(status)) {
+    throw new Error("门店状态无效");
+  }
+  return status;
+}
+
+function getAreaSupervisorStoreByCode(storeCode = "") {
+  const normalized = String(storeCode || "").trim().toUpperCase();
+  if (!normalized) {
+    return null;
+  }
+  return areaSupervisorLaunchStores.find((store) => String(store?.code || "").trim().toUpperCase() === normalized) || null;
+}
+
+function getAreaSupervisorUserById(userId = "") {
+  const normalized = String(userId || "").trim();
+  if (!normalized) {
+    return null;
+  }
+  return areaSupervisorLaunchUsers.find((user) => String(user?.id || "").trim() === normalized) || null;
+}
+
+function getAreaSupervisorStoreEmployeeRows(rows = areaSupervisorLaunchUsers) {
+  return (Array.isArray(rows) ? rows : []).filter((user) => isAreaSupervisorStoreEmployeeRole(user?.role_code));
+}
+
+function renderAreaSupervisorStoreOptions(stores = areaSupervisorLaunchStores) {
+  const target = document.querySelector("#areaSupervisorStoreCodeOptions");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  target.innerHTML = (Array.isArray(stores) ? stores : [])
+    .map((store) => {
+      const code = String(store?.code || "").trim().toUpperCase();
+      if (!code) {
+        return "";
+      }
+      const label = [code, store?.name].filter(Boolean).join(" · ");
+      return `<option value="${escapeHtml(code)}">${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
+function renderAreaSupervisorLaunchNotice(message = "", tone = "success") {
+  const target = document.querySelector("#areaSupervisorLaunchSummary");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const normalizedMessage = String(message || "").trim();
+  if (!normalizedMessage) {
+    target.className = "candidate-summary empty-state";
+    target.textContent = "area_supervisor 用于上线录入门店、创建门店员工、重置密码和停用账号。真实权限以后端 RBAC 为准。";
+    return;
+  }
+  target.className = tone === "error" ? "candidate-summary error-summary" : "report-summary";
+  target.innerHTML = `<div class="alert-banner">${escapeHtml(normalizedMessage)}</div>`;
+}
+
+function renderAreaSupervisorLaunchError(error) {
+  const message = formatErrorMessage(error);
+  renderAreaSupervisorLaunchNotice(message || "你没有权限", "error");
+  writeOutput("#areaSupervisorLaunchOutput", message || "");
+  return message;
+}
+
+function renderAreaSupervisorStoreList(stores = areaSupervisorLaunchStores) {
+  const target = document.querySelector("#areaSupervisorStoreList");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const rows = Array.isArray(stores) ? stores : [];
+  if (!rows.length) {
+    target.className = "candidate-list empty-state";
+    target.textContent = "当前还没有读取到门店。";
+    renderAreaSupervisorStoreOptions([]);
+    return;
+  }
+  target.className = "candidate-list";
+  target.innerHTML = rows
+    .map((store) => {
+      const code = String(store?.code || "").trim().toUpperCase();
+      return `
+        <article class="candidate-card">
+          <div class="candidate-card-head">
+            <div>
+              <strong>${escapeHtml(store?.name || code || "-")}</strong>
+              <div class="subtle small">${escapeHtml(code || "-")} · ${escapeHtml(store?.status || "-")}</div>
+            </div>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-edit="${escapeHtml(code)}">编辑</button>
+          </div>
+          <div class="summary-breakdown-row"><span>地址</span><span>${escapeHtml(store?.address || "-")}</span></div>
+          <div class="summary-breakdown-row"><span>电话</span><span>${escapeHtml(store?.phone || "-")}</span></div>
+          <div class="summary-breakdown-row"><span>地图</span><span>${store?.google_maps_url ? `<a href="${escapeHtml(store.google_maps_url)}" target="_blank" rel="noreferrer">打开地图</a>` : "-"}</span></div>
+          <div class="summary-breakdown-row"><span>备注</span><span>${escapeHtml(store?.manager_note || "-")}</span></div>
+        </article>
+      `;
+    })
+    .join("");
+  renderAreaSupervisorStoreOptions(rows);
+}
+
+function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
+  const target = document.querySelector("#areaSupervisorUserList");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const rows = sortUserRowsForDisplay(getAreaSupervisorStoreEmployeeRows(users));
+  if (!rows.length) {
+    target.className = "user-management-list empty-state";
+    target.textContent = "当前还没有读取到门店员工账号。";
+    return;
+  }
+  target.className = "user-management-list";
+  target.innerHTML = rows
+    .map((user) => {
+      const userId = String(user?.id || "").trim();
+      const status = getUserStatusValue(user);
+      const canDeactivate = Boolean(userId) && status !== "inactive";
+      return `
+        <article class="user-card ${status === "inactive" ? "is-inactive" : ""}">
+          <div class="user-card-head">
+            <div>
+              <span class="user-card-label">用户名</span>
+              <strong>${escapeHtml(user?.username || "-")}</strong>
+            </div>
+            <span class="user-status-pill ${status === "active" ? "is-active" : "is-inactive"}">${escapeHtml(status)}</span>
+          </div>
+          <div class="user-card-grid">
+            <div><span>姓名</span><strong>${escapeHtml(user?.full_name || "-")}</strong></div>
+            <div><span>角色</span><strong>${escapeHtml(getUserRoleLabel(user))}</strong><small>${escapeHtml(user?.role_code || "-")}</small></div>
+            <div><span>门店</span><strong>${escapeHtml(user?.store_code || "-")}</strong></div>
+          </div>
+          <div class="user-card-actions">
+            <span class="user-card-action-label">操作</span>
+            <div class="user-card-action-buttons">
+              <button type="button" class="secondary-inline" data-area-supervisor-user-reset="${escapeHtml(userId)}">重置密码</button>
+              <button type="button" class="secondary-inline danger" data-area-supervisor-user-deactivate="${escapeHtml(userId)}" ${canDeactivate ? "" : "disabled"}>停用账号</button>
+            </div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderAreaSupervisorLaunchConsole(stores = areaSupervisorLaunchStores, users = areaSupervisorLaunchUsers) {
+  areaSupervisorLaunchStores = Array.isArray(stores) ? stores : [];
+  areaSupervisorLaunchUsers = Array.isArray(users) ? users : [];
+  renderAreaSupervisorStoreList(areaSupervisorLaunchStores);
+  renderAreaSupervisorUserList(areaSupervisorLaunchUsers);
+}
+
+function hydrateAreaSupervisorStoreUpdateForm(store = {}) {
+  setInputValue("#areaSupervisorStoreUpdateForm [name='code']", String(store?.code || "").trim().toUpperCase());
+  setInputValue("#areaSupervisorStoreUpdateForm [name='name']", store?.name || "");
+  setInputValue("#areaSupervisorStoreUpdateForm [name='status']", getAreaSupervisorStoreStatus(store?.status || "preparing"));
+  setInputValue("#areaSupervisorStoreUpdateForm [name='address']", store?.address || "");
+  setInputValue("#areaSupervisorStoreUpdateForm [name='phone']", store?.phone || "");
+  setInputValue("#areaSupervisorStoreUpdateForm [name='google_maps_url']", store?.google_maps_url || "");
+  setInputValue("#areaSupervisorStoreUpdateForm [name='manager_note']", store?.manager_note || "");
+  focusElement("#areaSupervisorStoreUpdateForm");
+}
+
+function hydrateAreaSupervisorPasswordResetForm(user = {}) {
+  setInputValue("#areaSupervisorPasswordResetForm [name='user_id']", user?.id || "");
+  setInputValue("#areaSupervisorPasswordResetForm [name='username']", user?.username || "");
+  setInputValue("#areaSupervisorPasswordResetForm [name='password']", "");
+  focusElement("#areaSupervisorPasswordResetForm [name='password']");
+}
+
+function buildAreaSupervisorStorePayload(formElement, { includeCode = true } = {}) {
+  const form = new FormData(formElement);
+  const payload = {
+    code: String(form.get("code") || "").trim().toUpperCase(),
+    name: String(form.get("name") || "").trim(),
+    status: getAreaSupervisorStoreStatus(form.get("status")),
+    address: String(form.get("address") || "").trim(),
+    phone: String(form.get("phone") || "").trim(),
+    google_maps_url: String(form.get("google_maps_url") || "").trim(),
+    manager_note: String(form.get("manager_note") || "").trim(),
+  };
+  if (!includeCode) {
+    delete payload.code;
+  }
+  return payload;
+}
+
+function buildAreaSupervisorUserCreatePayload(formElement) {
+  const form = new FormData(formElement);
+  const roleCode = String(form.get("role_code") || "").trim().toLowerCase();
+  if (!isAreaSupervisorStoreEmployeeRole(roleCode)) {
+    throw new Error("你不能创建这个角色");
+  }
+  return {
+    username: String(form.get("username") || "").trim(),
+    full_name: String(form.get("full_name") || "").trim(),
+    password: String(form.get("password") || "").trim(),
+    role_code: roleCode,
+    store_code: String(form.get("store_code") || "").trim().toUpperCase(),
+    status: "active",
+    is_active: true,
+  };
+}
+
+async function loadAreaSupervisorLaunchConsoleData() {
+  const [stores, users] = await Promise.all([
+    request("/stores"),
+    request("/users"),
+  ]);
+  renderAreaSupervisorLaunchConsole(
+    Array.isArray(stores) ? stores : [],
+    Array.isArray(users) ? users : [],
+  );
+  writeOutput("#areaSupervisorLaunchOutput", { stores: areaSupervisorLaunchStores, users: areaSupervisorLaunchUsers });
+  renderAreaSupervisorLaunchNotice(`已读取 ${areaSupervisorLaunchStores.length} 家门店、${getAreaSupervisorStoreEmployeeRows().length} 个门店员工账号。`);
+  return { stores: areaSupervisorLaunchStores, users: areaSupervisorLaunchUsers };
+}
+
+async function submitAreaSupervisorStoreCreate(event) {
+  event.preventDefault();
+  const payload = buildAreaSupervisorStorePayload(event.currentTarget);
+  const result = await request("/stores", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await loadAreaSupervisorLaunchConsoleData();
+  hydrateAreaSupervisorStoreUpdateForm(result);
+  renderAreaSupervisorLaunchNotice(`门店 ${result.code || payload.code} 已创建。`);
+  writeOutput("#areaSupervisorLaunchOutput", result);
+  event.currentTarget.reset();
+}
+
+async function submitAreaSupervisorStoreUpdate(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const storeCode = String(form.get("code") || "").trim().toUpperCase();
+  if (!storeCode) {
+    throw new Error("请先选择门店。");
+  }
+  const payload = buildAreaSupervisorStorePayload(event.currentTarget, { includeCode: false });
+  const result = await request(`/stores/${encodeURIComponent(storeCode)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  await loadAreaSupervisorLaunchConsoleData();
+  hydrateAreaSupervisorStoreUpdateForm(result);
+  renderAreaSupervisorLaunchNotice(`门店 ${result.code || storeCode} 已更新。`);
+  writeOutput("#areaSupervisorLaunchOutput", result);
+}
+
+async function submitAreaSupervisorUserCreate(event) {
+  event.preventDefault();
+  const payload = buildAreaSupervisorUserCreatePayload(event.currentTarget);
+  const result = await request("/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  await loadAreaSupervisorLaunchConsoleData();
+  renderAreaSupervisorLaunchNotice(`账号 ${result.username || payload.username} 已创建。`);
+  writeOutput("#areaSupervisorLaunchOutput", result);
+  event.currentTarget.reset();
+}
+
+async function submitAreaSupervisorPasswordReset(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const userId = String(form.get("user_id") || "").trim();
+  const password = String(form.get("password") || "").trim();
+  if (!userId) {
+    throw new Error("请先从员工列表选择账号。");
+  }
+  if (!password) {
+    throw new Error("请输入新密码。");
+  }
+  const result = await request(`/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ password }),
+  });
+  await loadAreaSupervisorLaunchConsoleData();
+  hydrateAreaSupervisorPasswordResetForm(result);
+  renderAreaSupervisorLaunchNotice(`账号 ${result.username || ""} 密码已重置。`);
+  writeOutput("#areaSupervisorLaunchOutput", result);
+}
+
+async function deactivateAreaSupervisorStoreUser(userId) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) {
+    throw new Error("请先选择要停用的账号。");
+  }
+  const result = await request(`/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
+  await loadAreaSupervisorLaunchConsoleData();
+  renderAreaSupervisorLaunchNotice(`账号 ${result.username || ""} 已停用。`);
+  writeOutput("#areaSupervisorLaunchOutput", result);
+  return result;
+}
+
 function getUserRoleLabel(user = {}) {
   const roleCode = String(user?.role_code || "").trim();
   return String(user?.role_label || getUserRoleDisplayLabel(roleCode) || "-");
@@ -45131,6 +45468,10 @@ const FORM_SUMMARY_SELECTORS = {
   "#baleSalesOutboundForm": "#baleSalesOutboundSummary",
   "#opsExceptionDeskForm": "#opsExceptionDeskSummary",
   "#opsDataTopicForm": "#opsDataIntegrationSummary",
+  "#areaSupervisorStoreCreateForm": "#areaSupervisorLaunchSummary",
+  "#areaSupervisorStoreUpdateForm": "#areaSupervisorLaunchSummary",
+  "#areaSupervisorUserCreateForm": "#areaSupervisorLaunchSummary",
+  "#areaSupervisorPasswordResetForm": "#areaSupervisorLaunchSummary",
   "#oaAttendanceForm": "#oaWorkbenchSummary",
   "#oaPayrollForm": "#oaWorkbenchSummary",
   "#oaFinanceApprovalForm": "#oaWorkbenchSummary",
@@ -45315,6 +45656,10 @@ document.querySelector("#sortingResultForm [name='loss_photo_files']")?.addEvent
 });
 bindForm("#siteRecommendationForm", submitSiteRecommendation, "#siteRecommendationOutput");
 bindForm("#priceRuleForm", submitPriceRule, "#priceRuleOutput");
+bindForm("#areaSupervisorStoreCreateForm", submitAreaSupervisorStoreCreate, "#areaSupervisorLaunchOutput");
+bindForm("#areaSupervisorStoreUpdateForm", submitAreaSupervisorStoreUpdate, "#areaSupervisorLaunchOutput");
+bindForm("#areaSupervisorUserCreateForm", submitAreaSupervisorUserCreate, "#areaSupervisorLaunchOutput");
+bindForm("#areaSupervisorPasswordResetForm", submitAreaSupervisorPasswordReset, "#areaSupervisorLaunchOutput");
 bindForm("#mpesaImportForm", submitMpesaImport, "#mpesaOutput");
 bindForm("#mpesaCallbackForm", submitMpesaCallback, "#mpesaOutput");
 bindForm("#offlineSyncForm", submitOfflineSync, "#offlineSyncOutput");
@@ -45526,6 +45871,50 @@ document.querySelector("#userList")?.addEventListener("click", async (event) => 
   } catch (error) {
     writeOutput("#userOutput", "");
     renderErrorSummary("#userResultSummary", formatErrorMessage(error));
+  }
+});
+
+document.querySelector("#areaSupervisorStoreList")?.addEventListener("click", (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-area-supervisor-store-edit]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    const store = getAreaSupervisorStoreByCode(target.dataset.areaSupervisorStoreEdit);
+    if (!store) {
+      throw new Error("请先刷新门店列表。");
+    }
+    hydrateAreaSupervisorStoreUpdateForm(store);
+    renderAreaSupervisorLaunchNotice(`正在编辑门店 ${store.code || ""}。`);
+  } catch (error) {
+    renderAreaSupervisorLaunchError(error);
+  }
+});
+
+document.querySelector("#areaSupervisorUserList")?.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-area-supervisor-user-reset], [data-area-supervisor-user-deactivate]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    if (target.dataset.areaSupervisorUserReset) {
+      const user = getAreaSupervisorUserById(target.dataset.areaSupervisorUserReset);
+      if (!user) {
+        throw new Error("请先刷新员工列表。");
+      }
+      hydrateAreaSupervisorPasswordResetForm(user);
+      renderAreaSupervisorLaunchNotice(`正在为 ${user.username || ""} 重置密码。`);
+      return;
+    }
+    if (target.dataset.areaSupervisorUserDeactivate) {
+      await deactivateAreaSupervisorStoreUser(target.dataset.areaSupervisorUserDeactivate);
+    }
+  } catch (error) {
+    renderAreaSupervisorLaunchError(error);
   }
 });
 
@@ -49895,6 +50284,10 @@ document.querySelectorAll("[data-action]").forEach((button) => {
         resetUserForm();
         return;
       }
+      if (action === "load-area-supervisor-console") {
+        await loadAreaSupervisorLaunchConsoleData();
+        return;
+      }
       if (action === "load-rack-template" || action === "load-store-racks") {
         await loadRackView(action);
         return;
@@ -50040,6 +50433,10 @@ document.querySelectorAll("[data-action]").forEach((button) => {
       if (action === "load-users" || action === "load-roles") {
         writeOutput("#userOutput", formatErrorMessage(error));
         renderErrorSummary("#userResultSummary", formatErrorMessage(error));
+        return;
+      }
+      if (action === "load-area-supervisor-console") {
+        renderAreaSupervisorLaunchError(error);
         return;
       }
       if (action === "load-stores") {
