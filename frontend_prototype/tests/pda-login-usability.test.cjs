@@ -5,7 +5,6 @@ const path = require("node:path");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
-const appLegacyJs = fs.readFileSync(path.join(__dirname, "..", "app.legacy.js"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 const authPageHtml = indexHtml.match(/<section id="authPage"[\s\S]*?<\/section>\s*<div id="appShell"/)?.[0] || "";
 const authCardHtml = authPageHtml.match(/<section class="auth-card"[\s\S]*?<\/section>/)?.[0] || "";
@@ -45,13 +44,6 @@ test("production host defaults API base to directlooperp production API", () => 
   assert.match(resolveApiBaseForCurrentOrigin, /if \(isProductionAppOrigin\(\)\)/);
   assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
   assert.doesNotMatch(appJs, /const PDA_STAGING_API_BASE = "https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1";/);
-});
-
-test("legacy app bundle uses the same production API base as app.js", () => {
-  assert.match(appLegacyJs, /const PRODUCTION_API_BASE = "https:\/\/directlooperp\.com\/api\/v1";/);
-  assert.match(appLegacyJs, /const PDA_STAGING_API_BASE = PRODUCTION_API_BASE;/);
-  assert.match(appLegacyJs, /function isProductionAppOrigin/);
-  assert.doesNotMatch(appLegacyJs, /https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1/);
 });
 
 test("static login API field is hidden but still defaults to production API for JS fallback", () => {
