@@ -5,7 +5,10 @@ const path = require("node:path");
 
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
+const appLegacyJs = fs.readFileSync(path.join(__dirname, "..", "app.legacy.js"), "utf8");
 const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+const authPageHtml = indexHtml.match(/<section id="authPage"[\s\S]*?<\/section>\s*<div id="appShell"/)?.[0] || "";
+const authCardHtml = authPageHtml.match(/<section class="auth-card"[\s\S]*?<\/section>/)?.[0] || "";
 
 function extractFunctionSource(name) {
   const start = appJs.indexOf(`function ${name}`);
@@ -30,20 +33,33 @@ function extractFunctionSource(name) {
   throw new Error(`${name} source could not be extracted`);
 }
 
-test("staging PDA host defaults API base to the FW-ERP staging API", () => {
+test("production host defaults API base to directlooperp production API", () => {
   const defaultApiBase = extractFunctionSource("defaultApiBase");
+  const resolveApiBaseForCurrentOrigin = extractFunctionSource("resolveApiBaseForCurrentOrigin");
 
-  assert.match(appJs, /const PDA_STAGING_HOST = "fw-erp-34-35-52-250\.nip\.io";/);
-  assert.match(appJs, /const PDA_STAGING_API_BASE = "https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1";/);
-  assert.match(appJs, /const PDA_STAGING_ORIGIN = `https:\/\/\$\{PDA_STAGING_HOST\}`;/);
-  assert.match(appJs, /function isStagingAppOrigin/);
-  assert.match(defaultApiBase, /isStagingAppOrigin\(\)/);
-  assert.match(defaultApiBase, /return PDA_STAGING_API_BASE;/);
+  assert.match(appJs, /const PRODUCTION_APP_HOST = "directlooperp\.com";/);
+  assert.match(appJs, /const PRODUCTION_API_BASE = "https:\/\/directlooperp\.com\/api\/v1";/);
+  assert.match(appJs, /function isProductionAppOrigin/);
+  assert.match(defaultApiBase, /isProductionAppOrigin\(\)/);
+  assert.match(defaultApiBase, /return PRODUCTION_API_BASE;/);
+  assert.match(resolveApiBaseForCurrentOrigin, /if \(isProductionAppOrigin\(\)\)/);
+  assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
+  assert.doesNotMatch(appJs, /const PDA_STAGING_API_BASE = "https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1";/);
 });
 
-test("static login API field defaults to the staging API for PDA-safe fallback", () => {
-  assert.match(indexHtml, /<input id="apiBase" value="https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1" \/>/);
+test("legacy app bundle uses the same production API base as app.js", () => {
+  assert.match(appLegacyJs, /const PRODUCTION_API_BASE = "https:\/\/directlooperp\.com\/api\/v1";/);
+  assert.match(appLegacyJs, /const PDA_STAGING_API_BASE = PRODUCTION_API_BASE;/);
+  assert.match(appLegacyJs, /function isProductionAppOrigin/);
+  assert.doesNotMatch(appLegacyJs, /https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1/);
+});
+
+test("static login API field is hidden but still defaults to production API for JS fallback", () => {
+  assert.match(authPageHtml, /<div class="hero-card auth-api-config" hidden aria-hidden="true">/);
+  assert.match(authPageHtml, /<input id="apiBase" value="https:\/\/directlooperp\.com\/api\/v1" autocomplete="off" \/>/);
+  assert.match(authPageHtml, /<button id="saveBaseButton" type="button" tabindex="-1">保存地址<\/button>/);
   assert.doesNotMatch(indexHtml, /<input id="apiBase" value="http:\/\/127\.0\.0\.1:8000\/api\/v1" \/>/);
+  assert.doesNotMatch(authPageHtml, /<input id="apiBase" value="https:\/\/fw-erp-34-35-52-250\.nip\.io\/api\/v1" \/>/);
 });
 
 test("localhost and 127.0.0.1 keep the local development API default", () => {
@@ -57,7 +73,7 @@ test("localhost and 127.0.0.1 keep the local development API default", () => {
   assert.match(defaultApiBase, /return LOCAL_DEV_API_BASE;/);
 });
 
-test("saved API base is restored on load and default resolution does not overwrite it", () => {
+test("saved API base is restored off production and default resolution does not overwrite it", () => {
   const getApiBase = extractFunctionSource("getApiBase");
   const defaultApiBase = extractFunctionSource("defaultApiBase");
   const resolveApiBaseForCurrentOrigin = extractFunctionSource("resolveApiBaseForCurrentOrigin");
@@ -69,32 +85,38 @@ test("saved API base is restored on load and default resolution does not overwri
   assert.doesNotMatch(defaultApiBase, /localStorage\.setItem\(STORAGE_KEYS\.apiBase/);
 });
 
-test("staging host ignores saved or current loopback API base", () => {
+test("production and old staging hosts ignore saved or current loopback API base", () => {
   const getInitialApiBase = extractFunctionSource("getInitialApiBase");
   const resolveApiBaseForCurrentOrigin = extractFunctionSource("resolveApiBaseForCurrentOrigin");
 
   assert.match(appJs, /function isLoopbackApiBase/);
   assert.match(appJs, /apiBase\.startsWith\("http:\/\/127\.0\.0\.1"\)/);
   assert.match(appJs, /apiBase\.startsWith\("http:\/\/localhost"\)/);
+  assert.match(resolveApiBaseForCurrentOrigin, /if \(isProductionAppOrigin\(\)\)/);
+  assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
   assert.match(resolveApiBaseForCurrentOrigin, /if \(isStagingAppOrigin\(\)\)/);
-  assert.match(resolveApiBaseForCurrentOrigin, /return PDA_STAGING_API_BASE;/);
+  assert.match(resolveApiBaseForCurrentOrigin, /return PRODUCTION_API_BASE;/);
   assert.match(getInitialApiBase, /return resolveApiBaseForCurrentOrigin\(current, saved\);/);
 });
 
-test("login page exposes a subtle staging API mode indicator", () => {
-  const renderApiModeIndicator = extractFunctionSource("renderApiModeIndicator");
-
-  assert.match(indexHtml, /id="apiModeIndicator"/);
-  assert.match(indexHtml, /class="subtle small api-mode-indicator"/);
-  assert.match(renderApiModeIndicator, /API mode: staging/);
-  assert.match(renderApiModeIndicator, /isStagingAppOrigin\(\)/);
-  assert.match(appJs, /renderApiModeIndicator\(\);/);
+test("production login page hides development and test-only information", () => {
+  assert.match(authPageHtml, /<section class="test-home-entry panel"[^>]*hidden aria-hidden="true"/);
+  assert.match(authPageHtml, /<section class="auth-brand" hidden aria-hidden="true">/);
+  assert.match(authPageHtml, /<div class="hero-card auth-api-config" hidden aria-hidden="true">/);
+  assert.doesNotMatch(authCardHtml, /默认测试密码/);
+  assert.doesNotMatch(authCardHtml, /demo1234/);
+  assert.doesNotMatch(authCardHtml, /data-direct-loop-login-version-info/);
+  assert.doesNotMatch(authCardHtml, /FW-ERP 主线 PR/);
+  assert.doesNotMatch(authCardHtml, /Android PR/);
+  assert.match(authCardHtml, /<input name="username"[^>]*>/);
+  assert.match(authCardHtml, /<input name="password" type="password"[^>]*autocomplete="new-password"[^>]*>/);
+  assert.match(authCardHtml, /id="loginSubmitButton"/);
 });
 
 test("login page keeps cache-busted app and style assets", () => {
   assert.match(indexHtml, /<link rel="stylesheet" href="\.\/styles\.css\?v=[^"]+" \/>/);
-  assert.match(indexHtml, /"\.\/app\.js\?v=pda-runtime-polling-215"/);
-  assert.match(indexHtml, /"\.\/app\.legacy\.js\?v=pda-legacy-webview-217"/);
+  assert.match(indexHtml, /"\.\/app\.js\?v=[^"]+"/);
+  assert.match(indexHtml, /"\.\/app\.legacy\.js\?v=[^"]+"/);
 });
 
 test("login form cannot fall back to native GET with credentials in the URL", () => {
@@ -149,8 +171,8 @@ test("legacy WebView guard prevents GET fallback when app.js cannot parse", () =
   assert.ok(compatibilitySetupPosition < legacyGuardPosition, "syntax detection should be available before the legacy guard");
   assert.match(legacyGuard, /supportsModernSyntax/);
   assert.match(legacyGuard, /row\?\.user\?\.name \?\?/);
-  assert.match(legacyGuard, /loadPdaRuntimeScript\("\.\/app\.js\?v=pda-runtime-polling-215", "modern"\)/);
-  assert.match(legacyGuard, /loadPdaRuntimeScript\("\.\/app\.legacy\.js\?v=pda-legacy-webview-217", "legacy"\)/);
+  assert.match(legacyGuard, /loadPdaRuntimeScript\("\.\/app\.js\?v=[^"]+", "modern"\)/);
+  assert.match(legacyGuard, /loadPdaRuntimeScript\("\.\/app\.legacy\.js\?v=[^"]+", "legacy"\)/);
   assert.match(legacyGuard, /script\.onerror/);
   assert.match(legacyGuard, /pda-legacy-bundle-failed/);
   assert.match(legacyGuard, /bindLegacyFallbackHandlers/);
@@ -175,6 +197,26 @@ test("legacy WebView guard restores and persists last login username without pas
   assert.match(legacyGuard, /loginForm\.elements\.username\.value = savedUsername/);
   assert.match(legacyGuard, /localStorage\.setItem\("retail_ops_login_username", username\)/);
   assert.doesNotMatch(legacyGuard, /localStorage\.setItem\("retail_ops_login_password"/);
+});
+
+test("legacy WebView guard clears password on initial login page load", () => {
+  const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+
+  assert.match(legacyGuard, /function clearLegacyPassword/);
+  assert.match(legacyGuard, /function ensureLegacyPasswordCleared/);
+  assert.match(legacyGuard, /window\.setTimeout\(clearLegacyPassword,\s*120\)/);
+  assert.match(legacyGuard, /window\.addEventListener\("pageshow", ensureLegacyPasswordCleared\)/);
+  assert.match(legacyGuard, /removeUnsafeLoginQueryParams\(\);\s*ensureLegacyPasswordCleared\(\);\s*restoreLegacyLoginUsername\(\);/);
+});
+
+test("legacy WebView guard normalizes production API before loading app bundles", () => {
+  const legacyGuard = indexHtml.match(/<script>\s*\(function legacyPdaLoginGuard\(\)[\s\S]*?<\/script>/)?.[0] || "";
+
+  assert.match(legacyGuard, /var productionApiBase = "https:\/\/directlooperp\.com\/api\/v1";/);
+  assert.match(legacyGuard, /function syncLegacyProductionApiBase/);
+  assert.match(legacyGuard, /apiBaseInput\.value = productionApiBase/);
+  assert.match(legacyGuard, /window\.localStorage\.setItem\("retail_ops_api_base", productionApiBase\)/);
+  assert.match(legacyGuard, /removeUnsafeLoginQueryParams\(\);\s*ensureLegacyPasswordCleared\(\);\s*restoreLegacyLoginUsername\(\);\s*syncLegacyProductionApiBase\(\);/);
 });
 
 test("username and password query params are stripped without reading password", () => {
@@ -261,10 +303,10 @@ test("PDA logout does not reset username to admin_1", () => {
   assert.doesNotMatch(submitLogout, /admin_1/);
 });
 
-test("mobile PDA auth layout hides Test Home before the login card", () => {
-  const authPageHtml = indexHtml.match(/<section id="authPage"[\s\S]*?<\/section>\s*<div id="appShell"/)?.[0] || "";
-
-  assert.match(authPageHtml, /class="test-home-entry panel"/);
+test("auth layout keeps only the login card visible before sign-in", () => {
+  assert.match(authPageHtml, /class="test-home-entry panel"[^>]*hidden aria-hidden="true"/);
+  assert.match(authPageHtml, /class="auth-brand" hidden aria-hidden="true"/);
+  assert.match(authPageHtml, /class="hero-card auth-api-config" hidden aria-hidden="true"/);
   assert.match(authPageHtml, /class="auth-card"/);
   assert.match(stylesCss, /@media \(max-width: 880px\)[\s\S]*\.test-home-entry\s*{[\s\S]*display:\s*none\s*!important;/);
   assert.match(stylesCss, /@media \(max-width: 880px\)[\s\S]*\.auth-brand\s*{[\s\S]*display:\s*none;/);
