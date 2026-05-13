@@ -150,6 +150,14 @@ let paymentAnomalyState = [];
 let userDirectoryState = [];
 let areaSupervisorLaunchStores = [];
 let areaSupervisorLaunchUsers = [];
+let areaSupervisorSelectedStoreCode = "";
+let areaSupervisorStoreSearchQuery = "";
+let areaSupervisorStoreStatusFilter = "all";
+let areaSupervisorStaffSearchQuery = "";
+let areaSupervisorStaffStoreFilter = "all";
+let areaSupervisorStaffRoleFilter = "all";
+let areaSupervisorStaffStatusFilter = "all";
+let areaSupervisorPendingDeactivateUserId = "";
 const CASHIER_ROLE_CODES = new Set(["cashier", "store_cashier"]);
 const AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES = Object.freeze(["store_manager", "store_clerk", "cashier"]);
 const AREA_SUPERVISOR_STORE_STATUS_OPTIONS = Object.freeze(["preparing", "active", "paused", "closed"]);
@@ -2631,11 +2639,39 @@ const WAREHOUSE_NAV_SECTIONS = [
 
 const OPERATIONS_NAV_SECTIONS = [
   {
-    id: "launch",
-    title: "上线管理",
-    titleEn: "Launch Management",
+    id: "areaHome",
+    title: "工作台",
+    titleEn: "Workbench",
     iconSvg:
       '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.75 8.5 10 4.25l5.25 4.25v6.75H4.75V8.5Z" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"/><path d="M8.25 15.25v-4h3.5v4" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  },
+  {
+    id: "areaStores",
+    title: "门店管理",
+    titleEn: "Stores",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 8.25 10 4l5 4.25v7H5v-7Z" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"/><path d="M7.5 15.25v-4h5v4" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"/></svg>',
+  },
+  {
+    id: "areaStaff",
+    title: "员工管理",
+    titleEn: "Staff",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7.25 7a2.75 2.75 0 1 0 5.5 0 2.75 2.75 0 0 0-5.5 0ZM4.75 15.25c.82-2.08 2.72-3.25 5.25-3.25s4.43 1.17 5.25 3.25" stroke="currentColor" stroke-width="1.55" stroke-linecap="round"/></svg>',
+  },
+  {
+    id: "areaOverview",
+    title: "运营总览",
+    titleEn: "Overview",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 14.75V10.5M10 14.75v-8M15 14.75v-5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M4 15.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+  },
+  {
+    id: "areaSettings",
+    title: "系统设置",
+    titleEn: "Settings",
+    iconSvg:
+      '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 6.75a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5Z" stroke="currentColor" stroke-width="1.45"/><path d="M10 3.25v2M10 14.75v2M16.75 10h-2M5.25 10h-2M14.75 5.25l-1.4 1.4M6.65 13.35l-1.4 1.4M14.75 14.75l-1.4-1.4M6.65 6.65l-1.4-1.4" stroke="currentColor" stroke-width="1.45" stroke-linecap="round"/></svg>',
   },
   {
     id: "insight",
@@ -3030,12 +3066,44 @@ const WAREHOUSE_PANEL_NAV_META = [
 
 const OPERATIONS_PANEL_NAV_META = [
   {
-    match: "门店与员工管理",
-    section: "launch",
+    match: "区域主管工作台",
+    section: "areaHome",
     order: 5,
+    icon: "台",
+    navTitle: "工作台",
+    navTitleEn: "Workbench",
+  },
+  {
+    match: "门店管理",
+    section: "areaStores",
+    order: 6,
     icon: "店",
-    navTitle: "门店与员工管理",
-    navTitleEn: "Stores & Staff",
+    navTitle: "门店管理",
+    navTitleEn: "Stores",
+  },
+  {
+    match: "员工管理",
+    section: "areaStaff",
+    order: 7,
+    icon: "员",
+    navTitle: "员工管理",
+    navTitleEn: "Staff",
+  },
+  {
+    match: "运营总览",
+    section: "areaOverview",
+    order: 8,
+    icon: "览",
+    navTitle: "运营总览",
+    navTitleEn: "Overview",
+  },
+  {
+    match: "系统设置",
+    section: "areaSettings",
+    order: 9,
+    icon: "设",
+    navTitle: "系统设置",
+    navTitleEn: "Settings",
   },
   {
     match: "1. 区域经营驾驶舱",
@@ -3581,7 +3649,7 @@ const LEGACY_WORKSPACE_MAP = {
 const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
   warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
-  operations: ["launch", "insight", "action", "governance"],
+  operations: ["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings", "insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"],
 });
@@ -3634,7 +3702,7 @@ function getRoleAccessProfile(user = currentSession.user) {
 
   if (roleCode === "area_supervisor") {
     return createRoleAccessProfile(["overview", "operations"], {
-      operations: ["launch", "insight", "action", "governance"],
+      operations: ["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings"],
     });
   }
 
@@ -4087,7 +4155,7 @@ function requiresRoleLanding(user = currentSession.user) {
 function getUserRoleLanding(user = currentSession.user) {
   const roleCode = getNormalizedRoleCode(user);
   if (roleCode === "area_supervisor") {
-    return { workspace: "operations", panelTitle: "门店与员工管理", label: "运营中心 / 门店与员工管理" };
+    return { workspace: "operations", panelTitle: "区域主管工作台", label: "运营中心 / 区域主管工作台" };
   }
   const landingResolver = storeExecutionFlow && typeof storeExecutionFlow.getStoreRoleLanding === "function"
     ? storeExecutionFlow.getStoreRoleLanding
@@ -4397,6 +4465,9 @@ async function autoLoadRoleHome(user = currentSession.user) {
 }
 
 function getWorkspaceNavSections(workspace) {
+  if (workspace === "operations" && getNormalizedRoleCode(currentSession.user) === "area_supervisor") {
+    return [];
+  }
   return WORKSPACE_NAV_SECTIONS_MAP[workspace] || [];
 }
 
@@ -7699,7 +7770,10 @@ function slugifyText(value) {
 function initWorkspacePageRegistry() {
   workspacePanelsList.forEach((panel, index) => {
     const workspace = panel.dataset.workspacePanel || "overview";
-    const title = panel.querySelector(".panel-head h2")?.textContent?.trim() || `页面 ${index + 1}`;
+    const title = panel.querySelector(".panel-head h2")?.textContent?.trim()
+      || panel.querySelector(".area-supervisor-page-head h3")?.textContent?.trim()
+      || panel.querySelector(".area-supervisor-topbar h2")?.textContent?.trim()
+      || `页面 ${index + 1}`;
     panel.dataset.panelTitle = title;
     panel.dataset.panelIndex = String(index + 1);
     panel.dataset.panelKey = `${workspace}-${slugifyText(title)}-${index + 1}`;
@@ -7984,6 +8058,10 @@ function setActivePanel(panelKey, options = {}) {
   }
   activePanelKey = panelKey;
   localStorage.setItem(`retail_ops_active_panel_${activeWorkspace}`, activePanelKey);
+  document.body.classList.toggle(
+    "area-supervisor-workspace-mode",
+    activeWorkspace === "operations" && getNormalizedRoleCode(currentSession.user) === "area_supervisor",
+  );
   ensureWorkspaceSectionVisibleForPanel(targetPanel);
   renderWarehouseBaleHubNav();
   workspacePanelsList.forEach((panel) => {
@@ -8029,7 +8107,16 @@ function setActivePanel(panelKey, options = {}) {
   ) {
     loadTransferPlanningContext({ force: true }).catch(() => {});
   }
-  if (currentSession?.token && panelKey === getPanelKeyByTitle("operations", "门店与员工管理")) {
+  if (
+    currentSession?.token
+    && [
+      getPanelKeyByTitle("operations", "区域主管工作台"),
+      getPanelKeyByTitle("operations", "门店管理"),
+      getPanelKeyByTitle("operations", "员工管理"),
+      getPanelKeyByTitle("operations", "运营总览"),
+      getPanelKeyByTitle("operations", "系统设置"),
+    ].includes(panelKey)
+  ) {
     loadAreaSupervisorLaunchConsoleData().catch((error) => {
       renderAreaSupervisorLaunchError(error);
     });
@@ -28657,6 +28744,39 @@ function isAreaSupervisorStoreEmployeeRole(roleCode = "") {
   return AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES.includes(String(roleCode || "").trim().toLowerCase());
 }
 
+function getAreaSupervisorStoreStatusLabel(status = "") {
+  const labels = {
+    preparing: "筹备中",
+    active: "营业中",
+    paused: "暂停营业",
+    closed: "已关闭",
+  };
+  return labels[String(status || "").trim().toLowerCase()] || "筹备中";
+}
+
+function getAreaSupervisorStoreStatusTone(status = "") {
+  const tones = {
+    preparing: "info",
+    active: "success",
+    paused: "warning",
+    closed: "neutral",
+  };
+  return tones[String(status || "").trim().toLowerCase()] || "info";
+}
+
+function getAreaSupervisorUserRoleLabel(roleCode = "") {
+  const labels = {
+    store_manager: "店长",
+    store_clerk: "店员",
+    cashier: "收银员",
+  };
+  return labels[String(roleCode || "").trim().toLowerCase()] || "店员";
+}
+
+function getAreaSupervisorUserStatusLabel(user = {}) {
+  return getUserStatusValue(user) === "inactive" ? "已停用" : "在职";
+}
+
 function getAreaSupervisorStoreStatus(value = "preparing") {
   const status = String(value || "").trim().toLowerCase() || "preparing";
   if (!AREA_SUPERVISOR_STORE_STATUS_OPTIONS.includes(status)) {
@@ -28681,6 +28801,10 @@ function getAreaSupervisorUserById(userId = "") {
   return areaSupervisorLaunchUsers.find((user) => String(user?.id || "").trim() === normalized) || null;
 }
 
+function getAreaSupervisorUserPhone(user = {}) {
+  return String(user?.phone || user?.phone_number || user?.mobile || "").trim();
+}
+
 function getAreaSupervisorStoreEmployeeRows(rows = areaSupervisorLaunchUsers) {
   return (Array.isArray(rows) ? rows : []).filter((user) => isAreaSupervisorStoreEmployeeRole(user?.role_code));
 }
@@ -28702,26 +28826,132 @@ function renderAreaSupervisorStoreOptions(stores = areaSupervisorLaunchStores) {
     .join("");
 }
 
+function renderAreaSupervisorStoreFilterOptions(stores = areaSupervisorLaunchStores) {
+  const target = document.querySelector("#areaSupervisorStaffStoreFilter");
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  const current = target.value || "all";
+  target.innerHTML = `
+    <option value="all">全部门店</option>
+    ${(Array.isArray(stores) ? stores : [])
+      .map((store) => {
+        const code = String(store?.code || "").trim().toUpperCase();
+        if (!code) {
+          return "";
+        }
+        return `<option value="${escapeHtml(code)}">${escapeHtml(store?.name || code)} · ${escapeHtml(code)}</option>`;
+      })
+      .join("")}
+  `;
+  target.value = [...target.options].some((option) => option.value === current) ? current : "all";
+}
+
 function renderAreaSupervisorLaunchNotice(message = "", tone = "success") {
-  const target = document.querySelector("#areaSupervisorLaunchSummary");
-  if (!(target instanceof HTMLElement)) {
+  const targets = Array.from(document.querySelectorAll("[data-area-supervisor-notice]"));
+  if (!targets.length) {
     return;
   }
   const normalizedMessage = String(message || "").trim();
-  if (!normalizedMessage) {
-    target.className = "candidate-summary empty-state";
-    target.textContent = "area_supervisor 用于上线录入门店、创建门店员工、重置密码和停用账号。真实权限以后端 RBAC 为准。";
-    return;
-  }
-  target.className = tone === "error" ? "candidate-summary error-summary" : "report-summary";
-  target.innerHTML = `<div class="alert-banner">${escapeHtml(normalizedMessage)}</div>`;
+  const fallbackText = "请选择门店管理或员工管理开始处理上线资料。";
+  targets.forEach((target) => {
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    target.className = `area-supervisor-notice${tone === "error" ? " is-error" : normalizedMessage ? " is-success" : ""}`;
+    if (!normalizedMessage) {
+      target.textContent = fallbackText;
+      return;
+    }
+    target.innerHTML = `<div class="alert-banner">${escapeHtml(normalizedMessage)}</div>`;
+  });
 }
 
 function renderAreaSupervisorLaunchError(error) {
   const message = formatErrorMessage(error);
   renderAreaSupervisorLaunchNotice(message || "你没有权限", "error");
   writeOutput("#areaSupervisorLaunchOutput", message || "");
-  return message;
+    return message;
+}
+
+function getAreaSupervisorStoreStats(stores = areaSupervisorLaunchStores) {
+  const rows = Array.isArray(stores) ? stores : [];
+  return {
+    total: rows.length,
+    active: rows.filter((store) => String(store?.status || "").trim().toLowerCase() === "active").length,
+    paused: rows.filter((store) => String(store?.status || "").trim().toLowerCase() === "paused").length,
+    closed: rows.filter((store) => String(store?.status || "").trim().toLowerCase() === "closed").length,
+  };
+}
+
+function getAreaSupervisorStaffStats(users = areaSupervisorLaunchUsers) {
+  const rows = getAreaSupervisorStoreEmployeeRows(users);
+  return {
+    total: rows.length,
+    active: rows.filter((user) => getUserStatusValue(user) !== "inactive").length,
+    inactive: rows.filter((user) => getUserStatusValue(user) === "inactive").length,
+    cashier: rows.filter((user) => String(user?.role_code || "").trim().toLowerCase() === "cashier").length,
+  };
+}
+
+function renderAreaSupervisorStoreStats(stores = areaSupervisorLaunchStores) {
+  const target = document.querySelector("#areaSupervisorStoreStats");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const stats = getAreaSupervisorStoreStats(stores);
+  const cards = [
+    ["全部门店", stats.total],
+    ["营业中", stats.active],
+    ["暂停营业", stats.paused],
+    ["已关闭", stats.closed],
+  ];
+  target.innerHTML = cards
+    .map(([label, value]) => `
+      <article class="area-supervisor-stat-card">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </article>
+    `)
+    .join("");
+}
+
+function renderAreaSupervisorStaffStats(users = areaSupervisorLaunchUsers) {
+  const target = document.querySelector("#areaSupervisorStaffStats");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const stats = getAreaSupervisorStaffStats(users);
+  const cards = [
+    ["全部员工", stats.total],
+    ["在职员工", stats.active],
+    ["已停用", stats.inactive],
+    ["收银员", stats.cashier],
+  ];
+  target.innerHTML = cards
+    .map(([label, value]) => `
+      <article class="area-supervisor-stat-card">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </article>
+    `)
+    .join("");
+}
+
+function getFilteredAreaSupervisorStores(stores = areaSupervisorLaunchStores) {
+  const keyword = areaSupervisorStoreSearchQuery.trim().toLowerCase();
+  const statusFilter = areaSupervisorStoreStatusFilter;
+  return (Array.isArray(stores) ? stores : []).filter((store) => {
+    const status = String(store?.status || "").trim().toLowerCase();
+    if (statusFilter !== "all" && status !== statusFilter) {
+      return false;
+    }
+    if (!keyword) {
+      return true;
+    }
+    const text = [store?.name, store?.code].filter(Boolean).join(" ").toLowerCase();
+    return text.includes(keyword);
+  });
 }
 
 function renderAreaSupervisorStoreList(stores = areaSupervisorLaunchStores) {
@@ -28729,35 +28959,112 @@ function renderAreaSupervisorStoreList(stores = areaSupervisorLaunchStores) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const rows = Array.isArray(stores) ? stores : [];
+  const rows = getFilteredAreaSupervisorStores(stores);
   if (!rows.length) {
-    target.className = "candidate-list empty-state";
-    target.textContent = "当前还没有读取到门店。";
-    renderAreaSupervisorStoreOptions([]);
+    target.className = "area-supervisor-store-list area-supervisor-empty-card";
+    target.textContent = "没有找到符合条件的门店。";
+    renderAreaSupervisorStoreDetail(null);
     return;
   }
-  target.className = "candidate-list";
+  target.className = "area-supervisor-store-list";
+  const selectedStore = getAreaSupervisorStoreByCode(areaSupervisorSelectedStoreCode) || rows[0];
+  areaSupervisorSelectedStoreCode = String(selectedStore?.code || "").trim().toUpperCase();
   target.innerHTML = rows
     .map((store) => {
       const code = String(store?.code || "").trim().toUpperCase();
+      const selected = code && code === areaSupervisorSelectedStoreCode;
       return `
-        <article class="candidate-card">
-          <div class="candidate-card-head">
+        <article class="area-supervisor-store-card ${selected ? "is-selected" : ""}">
+          <div class="area-supervisor-card-head">
             <div>
               <strong>${escapeHtml(store?.name || code || "-")}</strong>
-              <div class="subtle small">${escapeHtml(code || "-")} · ${escapeHtml(store?.status || "-")}</div>
+              <span>${escapeHtml(code || "-")}</span>
             </div>
-            <button type="button" class="secondary-inline" data-area-supervisor-store-edit="${escapeHtml(code)}">编辑</button>
+            ${renderStatusBadge(getAreaSupervisorStoreStatusLabel(store?.status), getAreaSupervisorStoreStatusTone(store?.status))}
           </div>
-          <div class="summary-breakdown-row"><span>地址</span><span>${escapeHtml(store?.address || "-")}</span></div>
-          <div class="summary-breakdown-row"><span>电话</span><span>${escapeHtml(store?.phone || "-")}</span></div>
-          <div class="summary-breakdown-row"><span>地图</span><span>${store?.google_maps_url ? `<a href="${escapeHtml(store.google_maps_url)}" target="_blank" rel="noreferrer">打开地图</a>` : "-"}</span></div>
-          <div class="summary-breakdown-row"><span>备注</span><span>${escapeHtml(store?.manager_note || "-")}</span></div>
+          <div class="area-supervisor-card-lines">
+            <span>地址：${escapeHtml(store?.address || "-")}</span>
+            <span>联系电话：${escapeHtml(store?.phone || "-")}</span>
+            <span>备注：${escapeHtml(store?.manager_note || "-")}</span>
+          </div>
+          <div class="area-supervisor-card-actions">
+            <button type="button" class="secondary-inline" data-area-supervisor-store-view="${escapeHtml(code)}">查看</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-edit="${escapeHtml(code)}">编辑</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-pause="${escapeHtml(code)}" ${store?.status === "paused" || store?.status === "closed" ? "disabled" : ""}>暂停</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-close="${escapeHtml(code)}" ${store?.status === "closed" ? "disabled" : ""}>关闭</button>
+          </div>
         </article>
       `;
     })
     .join("");
-  renderAreaSupervisorStoreOptions(rows);
+  renderAreaSupervisorStoreDetail(selectedStore);
+}
+
+function renderAreaSupervisorStoreDetail(store = null) {
+  const target = document.querySelector("#areaSupervisorStoreDetail");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  if (!store) {
+    target.className = "area-supervisor-detail-card";
+    target.innerHTML = `
+      <h3>门店详情</h3>
+      <p class="subtle">从左侧选择一家门店查看基础资料。</p>
+    `;
+    return;
+  }
+  const code = String(store?.code || "").trim().toUpperCase();
+  target.className = "area-supervisor-detail-card";
+  target.innerHTML = `
+    <div class="area-supervisor-detail-head">
+      <div>
+        <h3>门店详情</h3>
+        <strong>${escapeHtml(store?.name || code || "-")}</strong>
+      </div>
+      ${renderStatusBadge(getAreaSupervisorStoreStatusLabel(store?.status), getAreaSupervisorStoreStatusTone(store?.status))}
+    </div>
+    <dl class="area-supervisor-detail-list">
+      <div><dt>门店名称</dt><dd>${escapeHtml(store?.name || "-")}</dd></div>
+      <div><dt>门店代码</dt><dd>${escapeHtml(code || "-")}</dd></div>
+      <div><dt>地址</dt><dd>${escapeHtml(store?.address || "-")}</dd></div>
+      <div><dt>联系电话</dt><dd>${escapeHtml(store?.phone || "-")}</dd></div>
+      <div><dt>地图链接</dt><dd>${store?.google_maps_url ? `<a href="${escapeHtml(store.google_maps_url)}" target="_blank" rel="noreferrer">打开地图</a>` : "-"}</dd></div>
+      <div><dt>当前状态</dt><dd>${escapeHtml(getAreaSupervisorStoreStatusLabel(store?.status))}</dd></div>
+      <div><dt>备注</dt><dd>${escapeHtml(store?.manager_note || "-")}</dd></div>
+    </dl>
+    <div class="area-supervisor-detail-actions">
+      <button type="button" data-area-supervisor-store-edit="${escapeHtml(code)}">编辑资料</button>
+      <button type="button" class="secondary-inline" data-area-supervisor-store-pause="${escapeHtml(code)}" ${store?.status === "paused" || store?.status === "closed" ? "disabled" : ""}>暂停营业</button>
+      <button type="button" class="secondary-inline" data-area-supervisor-store-close="${escapeHtml(code)}" ${store?.status === "closed" ? "disabled" : ""}>关闭门店</button>
+    </div>
+  `;
+}
+
+function getFilteredAreaSupervisorUsers(users = areaSupervisorLaunchUsers) {
+  const keyword = areaSupervisorStaffSearchQuery.trim().toLowerCase();
+  return getAreaSupervisorStoreEmployeeRows(users).filter((user) => {
+    const storeCode = String(user?.store_code || "").trim().toUpperCase();
+    const roleCode = String(user?.role_code || "").trim().toLowerCase();
+    const status = getUserStatusValue(user);
+    if (areaSupervisorStaffStoreFilter !== "all" && storeCode !== areaSupervisorStaffStoreFilter) {
+      return false;
+    }
+    if (areaSupervisorStaffRoleFilter !== "all" && roleCode !== areaSupervisorStaffRoleFilter) {
+      return false;
+    }
+    if (areaSupervisorStaffStatusFilter !== "all" && status !== areaSupervisorStaffStatusFilter) {
+      return false;
+    }
+    if (!keyword) {
+      return true;
+    }
+    const text = [
+      user?.full_name,
+      user?.username,
+      getAreaSupervisorUserPhone(user),
+    ].filter(Boolean).join(" ").toLowerCase();
+    return text.includes(keyword);
+  });
 }
 
 function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
@@ -28765,50 +29072,70 @@ function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const rows = sortUserRowsForDisplay(getAreaSupervisorStoreEmployeeRows(users));
+  const rows = sortUserRowsForDisplay(getFilteredAreaSupervisorUsers(users));
   if (!rows.length) {
-    target.className = "user-management-list empty-state";
-    target.textContent = "当前还没有读取到门店员工账号。";
+    target.className = "area-supervisor-staff-table area-supervisor-empty-card";
+    target.textContent = "没有找到符合条件的员工。";
     return;
   }
-  target.className = "user-management-list";
-  target.innerHTML = rows
+  target.className = "area-supervisor-staff-table";
+  target.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>姓名</th>
+          <th>用户名</th>
+          <th>所属门店</th>
+          <th>角色</th>
+          <th>状态</th>
+          <th>手机号</th>
+          <th>最后登录</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
     .map((user) => {
       const userId = String(user?.id || "").trim();
       const status = getUserStatusValue(user);
       const canDeactivate = Boolean(userId) && status !== "inactive";
       return `
-        <article class="user-card ${status === "inactive" ? "is-inactive" : ""}">
-          <div class="user-card-head">
-            <div>
-              <span class="user-card-label">用户名</span>
-              <strong>${escapeHtml(user?.username || "-")}</strong>
-            </div>
-            <span class="user-status-pill ${status === "active" ? "is-active" : "is-inactive"}">${escapeHtml(status)}</span>
-          </div>
-          <div class="user-card-grid">
-            <div><span>姓名</span><strong>${escapeHtml(user?.full_name || "-")}</strong></div>
-            <div><span>角色</span><strong>${escapeHtml(getUserRoleLabel(user))}</strong><small>${escapeHtml(user?.role_code || "-")}</small></div>
-            <div><span>门店</span><strong>${escapeHtml(user?.store_code || "-")}</strong></div>
-          </div>
-          <div class="user-card-actions">
-            <span class="user-card-action-label">操作</span>
-            <div class="user-card-action-buttons">
+        <tr class="${status === "inactive" ? "is-inactive" : ""}">
+          <td><strong>${escapeHtml(user?.full_name || "-")}</strong></td>
+          <td>${escapeHtml(user?.username || "-")}</td>
+          <td>${escapeHtml(user?.store_code || "-")}</td>
+          <td>${escapeHtml(getAreaSupervisorUserRoleLabel(user?.role_code))}</td>
+          <td>${renderStatusBadge(getAreaSupervisorUserStatusLabel(user), status === "inactive" ? "neutral" : "success")}</td>
+          <td>${escapeHtml(getAreaSupervisorUserPhone(user) || "-")}</td>
+          <td>${escapeHtml(user?.last_login_at || user?.last_login || "-")}</td>
+          <td>
+            <div class="area-supervisor-table-actions">
               <button type="button" class="secondary-inline" data-area-supervisor-user-reset="${escapeHtml(userId)}">重置密码</button>
               <button type="button" class="secondary-inline danger" data-area-supervisor-user-deactivate="${escapeHtml(userId)}" ${canDeactivate ? "" : "disabled"}>停用账号</button>
             </div>
-          </div>
-        </article>
+          </td>
+        </tr>
       `;
     })
-    .join("");
+    .join("")}
+      </tbody>
+    </table>
+  `;
 }
 
 function renderAreaSupervisorLaunchConsole(stores = areaSupervisorLaunchStores, users = areaSupervisorLaunchUsers) {
   areaSupervisorLaunchStores = Array.isArray(stores) ? stores : [];
   areaSupervisorLaunchUsers = Array.isArray(users) ? users : [];
+  if (!areaSupervisorSelectedStoreCode && areaSupervisorLaunchStores[0]?.code) {
+    areaSupervisorSelectedStoreCode = String(areaSupervisorLaunchStores[0].code || "").trim().toUpperCase();
+  }
+  renderAreaSupervisorStoreOptions(areaSupervisorLaunchStores);
+  renderAreaSupervisorStoreFilterOptions(areaSupervisorLaunchStores);
+  renderAreaSupervisorStoreStats(areaSupervisorLaunchStores);
+  renderAreaSupervisorStaffStats(areaSupervisorLaunchUsers);
   renderAreaSupervisorStoreList(areaSupervisorLaunchStores);
   renderAreaSupervisorUserList(areaSupervisorLaunchUsers);
+  renderAreaSupervisorOverview();
 }
 
 function hydrateAreaSupervisorStoreUpdateForm(store = {}) {
@@ -28827,6 +29154,37 @@ function hydrateAreaSupervisorPasswordResetForm(user = {}) {
   setInputValue("#areaSupervisorPasswordResetForm [name='username']", user?.username || "");
   setInputValue("#areaSupervisorPasswordResetForm [name='password']", "");
   focusElement("#areaSupervisorPasswordResetForm [name='password']");
+}
+
+function renderAreaSupervisorOverview() {
+  const target = document.querySelector("#areaSupervisorOverviewList");
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  const rows = [...areaSupervisorLaunchStores].sort((a, b) => String(a?.code || "").localeCompare(String(b?.code || "")));
+  if (!rows.length) {
+    target.className = "area-supervisor-store-list area-supervisor-empty-card";
+    target.textContent = "当前还没有门店状态。";
+    return;
+  }
+  target.className = "area-supervisor-store-list";
+  target.innerHTML = rows
+    .map((store) => `
+      <article class="area-supervisor-store-card">
+        <div class="area-supervisor-card-head">
+          <div>
+            <strong>${escapeHtml(store?.name || store?.code || "-")}</strong>
+            <span>${escapeHtml(store?.code || "-")}</span>
+          </div>
+          ${renderStatusBadge(getAreaSupervisorStoreStatusLabel(store?.status), getAreaSupervisorStoreStatusTone(store?.status))}
+        </div>
+        <div class="area-supervisor-card-lines">
+          <span>地址：${escapeHtml(store?.address || "-")}</span>
+          <span>联系电话：${escapeHtml(store?.phone || "-")}</span>
+        </div>
+      </article>
+    `)
+    .join("");
 }
 
 function buildAreaSupervisorStorePayload(formElement, { includeCode = true } = {}) {
@@ -28852,14 +29210,16 @@ function buildAreaSupervisorUserCreatePayload(formElement) {
   if (!isAreaSupervisorStoreEmployeeRole(roleCode)) {
     throw new Error("你不能创建这个角色");
   }
+  const status = String(form.get("status") || "active").trim().toLowerCase();
   return {
     username: String(form.get("username") || "").trim(),
     full_name: String(form.get("full_name") || "").trim(),
     password: String(form.get("password") || "").trim(),
     role_code: roleCode,
     store_code: String(form.get("store_code") || "").trim().toUpperCase(),
-    status: "active",
-    is_active: true,
+    phone: String(form.get("phone") || "").trim(),
+    status,
+    is_active: status !== "inactive",
   };
 }
 
@@ -28877,6 +29237,95 @@ async function loadAreaSupervisorLaunchConsoleData() {
   return { stores: areaSupervisorLaunchStores, users: areaSupervisorLaunchUsers };
 }
 
+function closeAreaSupervisorDrawer() {
+  const drawer = document.querySelector("#areaSupervisorDrawer");
+  if (drawer instanceof HTMLElement) {
+    drawer.hidden = true;
+    drawer.dataset.mode = "";
+  }
+  document.querySelectorAll("[data-area-supervisor-drawer-form]").forEach((form) => {
+    if (form instanceof HTMLElement) {
+      form.hidden = true;
+    }
+  });
+  areaSupervisorPendingDeactivateUserId = "";
+}
+
+function setAreaSupervisorDrawerHeader(title, description) {
+  const titleElement = document.querySelector("#areaSupervisorDrawerTitle");
+  const descriptionElement = document.querySelector("#areaSupervisorDrawerDescription");
+  if (titleElement instanceof HTMLElement) {
+    titleElement.textContent = title;
+  }
+  if (descriptionElement instanceof HTMLElement) {
+    descriptionElement.textContent = description;
+  }
+}
+
+function openAreaSupervisorDrawer(mode, payload = null) {
+  const drawer = document.querySelector("#areaSupervisorDrawer");
+  if (!(drawer instanceof HTMLElement)) {
+    return;
+  }
+  closeAreaSupervisorDrawer();
+  drawer.hidden = false;
+  drawer.dataset.mode = mode;
+  const showForm = (selector) => {
+    const form = document.querySelector(selector);
+    if (form instanceof HTMLElement) {
+      form.hidden = false;
+    }
+  };
+  if (mode === "store-create") {
+    setAreaSupervisorDrawerHeader("新增门店", "填写门店基础资料。");
+    const form = document.querySelector("#areaSupervisorStoreCreateForm");
+    form?.reset();
+    setInputValue("#areaSupervisorStoreCreateForm [name='status']", "preparing");
+    showForm("#areaSupervisorStoreCreateForm");
+    focusElement("#areaSupervisorStoreCreateForm [name='name']");
+    return;
+  }
+  if (mode === "store-edit") {
+    const store = typeof payload === "string" ? getAreaSupervisorStoreByCode(payload) : payload;
+    if (!store) {
+      throw new Error("请先选择门店。");
+    }
+    setAreaSupervisorDrawerHeader("编辑门店资料", "只维护门店基础资料。");
+    hydrateAreaSupervisorStoreUpdateForm(store);
+    showForm("#areaSupervisorStoreUpdateForm");
+    return;
+  }
+  if (mode === "user-create") {
+    setAreaSupervisorDrawerHeader("新增员工", "创建店长、店员或收银员账号。");
+    const form = document.querySelector("#areaSupervisorUserCreateForm");
+    form?.reset();
+    setInputValue("#areaSupervisorUserCreateForm [name='role_code']", "store_clerk");
+    setInputValue("#areaSupervisorUserCreateForm [name='status']", "active");
+    showForm("#areaSupervisorUserCreateForm");
+    focusElement("#areaSupervisorUserCreateForm [name='full_name']");
+    return;
+  }
+  if (mode === "password-reset") {
+    const user = typeof payload === "string" ? getAreaSupervisorUserById(payload) : payload;
+    if (!user) {
+      throw new Error("请先选择员工。");
+    }
+    setAreaSupervisorDrawerHeader("重置密码", "将为该员工设置新密码，请确认后继续。");
+    hydrateAreaSupervisorPasswordResetForm(user);
+    showForm("#areaSupervisorPasswordResetForm");
+    return;
+  }
+  if (mode === "deactivate") {
+    const user = typeof payload === "string" ? getAreaSupervisorUserById(payload) : payload;
+    if (!user) {
+      throw new Error("请先选择员工。");
+    }
+    areaSupervisorPendingDeactivateUserId = String(user?.id || "").trim();
+    setAreaSupervisorDrawerHeader("停用账号", "停用后该员工不能登录系统，历史记录会保留。");
+    showForm("#areaSupervisorDeactivateConfirm");
+  }
+}
+
 async function submitAreaSupervisorStoreCreate(event) {
   event.preventDefault();
   const payload = buildAreaSupervisorStorePayload(event.currentTarget);
@@ -28889,6 +29338,7 @@ async function submitAreaSupervisorStoreCreate(event) {
   renderAreaSupervisorLaunchNotice(`门店 ${result.code || payload.code} 已创建。`);
   writeOutput("#areaSupervisorLaunchOutput", result);
   event.currentTarget.reset();
+  closeAreaSupervisorDrawer();
 }
 
 async function submitAreaSupervisorStoreUpdate(event) {
@@ -28907,6 +29357,7 @@ async function submitAreaSupervisorStoreUpdate(event) {
   hydrateAreaSupervisorStoreUpdateForm(result);
   renderAreaSupervisorLaunchNotice(`门店 ${result.code || storeCode} 已更新。`);
   writeOutput("#areaSupervisorLaunchOutput", result);
+  closeAreaSupervisorDrawer();
 }
 
 async function submitAreaSupervisorUserCreate(event) {
@@ -28920,6 +29371,7 @@ async function submitAreaSupervisorUserCreate(event) {
   renderAreaSupervisorLaunchNotice(`账号 ${result.username || payload.username} 已创建。`);
   writeOutput("#areaSupervisorLaunchOutput", result);
   event.currentTarget.reset();
+  closeAreaSupervisorDrawer();
 }
 
 async function submitAreaSupervisorPasswordReset(event) {
@@ -28941,6 +29393,7 @@ async function submitAreaSupervisorPasswordReset(event) {
   hydrateAreaSupervisorPasswordResetForm(result);
   renderAreaSupervisorLaunchNotice(`账号 ${result.username || ""} 密码已重置。`);
   writeOutput("#areaSupervisorLaunchOutput", result);
+  closeAreaSupervisorDrawer();
 }
 
 async function deactivateAreaSupervisorStoreUser(userId) {
@@ -28948,11 +29401,30 @@ async function deactivateAreaSupervisorStoreUser(userId) {
   if (!normalizedUserId) {
     throw new Error("请先选择要停用的账号。");
   }
-  const result = await request(`/users/${encodeURIComponent(userId)}`, {
-    method: "DELETE",
+  const result = await request(`/users/${encodeURIComponent(normalizedUserId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "inactive", is_active: false }),
   });
   await loadAreaSupervisorLaunchConsoleData();
   renderAreaSupervisorLaunchNotice(`账号 ${result.username || ""} 已停用。`);
+  writeOutput("#areaSupervisorLaunchOutput", result);
+  closeAreaSupervisorDrawer();
+  return result;
+}
+
+async function updateAreaSupervisorStoreStatus(storeCode, status) {
+  const normalizedStoreCode = String(storeCode || "").trim().toUpperCase();
+  if (!normalizedStoreCode) {
+    throw new Error("请先选择门店。");
+  }
+  const nextStatus = getAreaSupervisorStoreStatus(status);
+  const result = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: nextStatus }),
+  });
+  areaSupervisorSelectedStoreCode = normalizedStoreCode;
+  await loadAreaSupervisorLaunchConsoleData();
+  renderAreaSupervisorLaunchNotice(`门店 ${normalizedStoreCode} 已更新为${getAreaSupervisorStoreStatusLabel(nextStatus)}。`);
   writeOutput("#areaSupervisorLaunchOutput", result);
   return result;
 }
@@ -45411,6 +45883,10 @@ function bindForm(id, handler, outputSelector = "#authOutput") {
           showTransientInlineNotice("#sortingTaskNotice", message, "error", 2200);
           return;
         }
+        if (id.startsWith("#areaSupervisor")) {
+          renderAreaSupervisorLaunchError(error);
+          return;
+        }
         const summarySelector = FORM_SUMMARY_SELECTORS[id];
         if (summarySelector) {
           writeOutput(outputSelector, "");
@@ -45874,20 +46350,51 @@ document.querySelector("#userList")?.addEventListener("click", async (event) => 
   }
 });
 
-document.querySelector("#areaSupervisorStoreList")?.addEventListener("click", (event) => {
+function handleAreaSupervisorStoreAction(target) {
+  if (!(target instanceof HTMLElement)) {
+    return Promise.resolve();
+  }
+  if (target.dataset.areaSupervisorStoreView) {
+    areaSupervisorSelectedStoreCode = String(target.dataset.areaSupervisorStoreView || "").trim().toUpperCase();
+    renderAreaSupervisorStoreList();
+    return Promise.resolve();
+  }
+  if (target.dataset.areaSupervisorStoreEdit) {
+    openAreaSupervisorDrawer("store-edit", target.dataset.areaSupervisorStoreEdit);
+    return Promise.resolve();
+  }
+  if (target.dataset.areaSupervisorStorePause) {
+    return updateAreaSupervisorStoreStatus(target.dataset.areaSupervisorStorePause, "paused");
+  }
+  if (target.dataset.areaSupervisorStoreClose) {
+    return updateAreaSupervisorStoreStatus(target.dataset.areaSupervisorStoreClose, "closed");
+  }
+  return Promise.resolve();
+}
+
+document.querySelector("#areaSupervisorStoreList")?.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement
-    ? event.target.closest("[data-area-supervisor-store-edit]")
+    ? event.target.closest("[data-area-supervisor-store-view], [data-area-supervisor-store-edit], [data-area-supervisor-store-pause], [data-area-supervisor-store-close]")
     : null;
   if (!(target instanceof HTMLElement)) {
     return;
   }
   try {
-    const store = getAreaSupervisorStoreByCode(target.dataset.areaSupervisorStoreEdit);
-    if (!store) {
-      throw new Error("请先刷新门店列表。");
-    }
-    hydrateAreaSupervisorStoreUpdateForm(store);
-    renderAreaSupervisorLaunchNotice(`正在编辑门店 ${store.code || ""}。`);
+    await handleAreaSupervisorStoreAction(target);
+  } catch (error) {
+    renderAreaSupervisorLaunchError(error);
+  }
+});
+
+document.querySelector("#areaSupervisorStoreDetail")?.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-area-supervisor-store-edit], [data-area-supervisor-store-pause], [data-area-supervisor-store-close]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    await handleAreaSupervisorStoreAction(target);
   } catch (error) {
     renderAreaSupervisorLaunchError(error);
   }
@@ -45902,20 +46409,74 @@ document.querySelector("#areaSupervisorUserList")?.addEventListener("click", asy
   }
   try {
     if (target.dataset.areaSupervisorUserReset) {
-      const user = getAreaSupervisorUserById(target.dataset.areaSupervisorUserReset);
-      if (!user) {
-        throw new Error("请先刷新员工列表。");
-      }
-      hydrateAreaSupervisorPasswordResetForm(user);
-      renderAreaSupervisorLaunchNotice(`正在为 ${user.username || ""} 重置密码。`);
+      openAreaSupervisorDrawer("password-reset", target.dataset.areaSupervisorUserReset);
       return;
     }
     if (target.dataset.areaSupervisorUserDeactivate) {
-      await deactivateAreaSupervisorStoreUser(target.dataset.areaSupervisorUserDeactivate);
+      openAreaSupervisorDrawer("deactivate", target.dataset.areaSupervisorUserDeactivate);
     }
   } catch (error) {
     renderAreaSupervisorLaunchError(error);
   }
+});
+
+document.addEventListener("click", async (event) => {
+  const target = event.target instanceof HTMLElement
+    ? event.target.closest("[data-area-supervisor-open-drawer], [data-area-supervisor-close-drawer], [data-area-supervisor-open-page], [data-area-supervisor-confirm-deactivate]")
+    : null;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    if (target.dataset.areaSupervisorOpenDrawer) {
+      openAreaSupervisorDrawer(target.dataset.areaSupervisorOpenDrawer);
+      return;
+    }
+    if (target.dataset.areaSupervisorCloseDrawer !== undefined) {
+      closeAreaSupervisorDrawer();
+      return;
+    }
+    if (target.dataset.areaSupervisorOpenPage) {
+      const pageTitle = target.dataset.areaSupervisorOpenPage === "staff" ? "员工管理" : "门店管理";
+      const panelKey = getPanelKeyByTitle("operations", pageTitle);
+      if (panelKey) {
+        setActivePanel(panelKey);
+      }
+      return;
+    }
+    if (target.dataset.areaSupervisorConfirmDeactivate !== undefined) {
+      await deactivateAreaSupervisorStoreUser(areaSupervisorPendingDeactivateUserId);
+    }
+  } catch (error) {
+    renderAreaSupervisorLaunchError(error);
+  }
+});
+
+["input", "change"].forEach((eventName) => {
+  document.querySelector("#areaSupervisorStoreSearch")?.addEventListener(eventName, (event) => {
+    areaSupervisorStoreSearchQuery = String(event.currentTarget?.value || "");
+    renderAreaSupervisorStoreList();
+  });
+  document.querySelector("#areaSupervisorStoreStatusFilter")?.addEventListener(eventName, (event) => {
+    areaSupervisorStoreStatusFilter = String(event.currentTarget?.value || "all");
+    renderAreaSupervisorStoreList();
+  });
+  document.querySelector("#areaSupervisorStaffSearch")?.addEventListener(eventName, (event) => {
+    areaSupervisorStaffSearchQuery = String(event.currentTarget?.value || "");
+    renderAreaSupervisorUserList();
+  });
+  document.querySelector("#areaSupervisorStaffStoreFilter")?.addEventListener(eventName, (event) => {
+    areaSupervisorStaffStoreFilter = String(event.currentTarget?.value || "all");
+    renderAreaSupervisorUserList();
+  });
+  document.querySelector("#areaSupervisorStaffRoleFilter")?.addEventListener(eventName, (event) => {
+    areaSupervisorStaffRoleFilter = String(event.currentTarget?.value || "all");
+    renderAreaSupervisorUserList();
+  });
+  document.querySelector("#areaSupervisorStaffStatusFilter")?.addEventListener(eventName, (event) => {
+    areaSupervisorStaffStatusFilter = String(event.currentTarget?.value || "all");
+    renderAreaSupervisorUserList();
+  });
 });
 
 cashierTerminalShell?.addEventListener("input", (event) => {

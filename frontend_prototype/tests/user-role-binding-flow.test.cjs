@@ -20,6 +20,7 @@ const {
 
 const appJs = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+const stylesCss = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
 
 function extractFunctionSource(source, functionName) {
   const start = source.indexOf(`function ${functionName}`);
@@ -39,6 +40,10 @@ function extractFunctionSource(source, functionName) {
     }
   }
   throw new Error(`could not extract ${functionName}`);
+}
+
+function extractHtmlElementById(source, tagName, id) {
+  return source.match(new RegExp(`<${tagName}[^>]*id="${id}"[\\s\\S]*?<\\/${tagName}>`))?.[0] || "";
 }
 
 const users = [
@@ -135,7 +140,7 @@ test("role access profiles keep each account inside its operational workspace", 
   assert.match(profileSource, /const clerkRoles = new Set\(\["store_clerk", "clerk", "store_staff", "sales_clerk"\]\)/);
   assert.match(profileSource, /return createRoleAccessProfile\(\["store"\], \{\s*store:\s*\["clerk"\]/);
   assert.match(profileSource, /if \(roleCode === "area_supervisor"\)/);
-  assert.match(profileSource, /operations:\s*\["launch", "insight", "action", "governance"\]/);
+  assert.match(profileSource, /operations:\s*\["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings"\]/);
   assert.match(profileSource, /const regionalRoles = new Set\(\["regional_manager", "area_manager", "operations_manager"\]\)/);
   assert.match(profileSource, /return createRoleAccessProfile\(\["overview", "operations"\], \{\s*operations:\s*\["insight", "action", "governance"\]/);
   assert.doesNotMatch(cashierBlock, /warehouse:\s*\[/);
@@ -157,16 +162,25 @@ test("area supervisor gets a launch console entry without exposing admin-only us
 
   assert.match(appJs, /const AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES = Object\.freeze\(\["store_manager", "store_clerk", "cashier"\]\)/);
   assert.doesNotMatch(allowedRoles, /admin|area_supervisor|warehouse_|external_auditor/);
-  assert.match(areaSupervisorBlock, /operations:\s*\["launch", "insight", "action", "governance"\]/);
+  assert.match(areaSupervisorBlock, /operations:\s*\["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings"\]/);
   assert.doesNotMatch(regionalBlock, /area_supervisor/);
-  assert.match(appJs, /match: "门店与员工管理"/);
-  assert.match(extractFunctionSource(appJs, "getUserRoleLanding"), /roleCode === "area_supervisor"[\s\S]*panelTitle: "门店与员工管理"/);
-  assert.match(indexHtml, /id="areaSupervisorLaunchConsole"/);
-  assert.match(indexHtml, />门店与员工管理</);
+  assert.match(appJs, /match: "区域主管工作台"/);
+  assert.match(appJs, /match: "门店管理"/);
+  assert.match(appJs, /match: "员工管理"/);
+  assert.match(extractFunctionSource(appJs, "getUserRoleLanding"), /roleCode === "area_supervisor"[\s\S]*panelTitle: "区域主管工作台"/);
+  assert.match(
+    extractFunctionSource(appJs, "initWorkspacePageRegistry"),
+    /area-supervisor-page-head h3[\s\S]*area-supervisor-topbar h2/,
+  );
+  assert.match(extractFunctionSource(appJs, "setActivePanel"), /area-supervisor-workspace-mode/);
+  assert.match(indexHtml, /id="areaSupervisorWorkbench"/);
+  assert.match(indexHtml, /id="areaSupervisorStoreManagement"/);
+  assert.match(indexHtml, /id="areaSupervisorStaffManagement"/);
   assert.match(userCreateForm, /value="store_manager"/);
   assert.match(userCreateForm, /value="store_clerk"/);
   assert.match(userCreateForm, /value="cashier"/);
   assert.doesNotMatch(userCreateForm, /value="admin"|value="area_supervisor"|warehouse_|external_auditor/);
+  assert.doesNotMatch(userCreateForm, />[^<]*(store_manager|store_clerk|cashier)[^<]*<\/option>/);
 });
 
 test("area supervisor launch console reuses existing store and user RBAC APIs", () => {
@@ -189,6 +203,47 @@ test("area supervisor launch console reuses existing store and user RBAC APIs", 
   assert.match(appJs, /request\("\/users"\)/);
   assert.match(appJs, /request\("\/users",\s*\{\s*method:\s*"POST"/);
   assert.match(appJs, /request\(`\/users\/\$\{encodeURIComponent\(userId\)\}`,\s*\{\s*method:\s*"PATCH"/);
-  assert.match(appJs, /request\(`\/users\/\$\{encodeURIComponent\(userId\)\}`,\s*\{\s*method:\s*"DELETE"/);
+  assert.match(
+    extractFunctionSource(appJs, "deactivateAreaSupervisorStoreUser"),
+    /request\(`\/users\/\$\{encodeURIComponent\(normalizedUserId\)\}`,\s*\{\s*method:\s*"PATCH",[\s\S]*status:\s*"inactive"[\s\S]*is_active:\s*false/,
+  );
   assert.match(extractFunctionSource(appJs, "renderAreaSupervisorLaunchError"), /formatErrorMessage\(error\)/);
+});
+
+test("area supervisor store and staff pages stay business-facing and avoid dashboard clutter", () => {
+  const areaSupervisorHtml = indexHtml.match(/<section[^>]*id="areaSupervisorWorkbench"[\s\S]*?<pre id="areaSupervisorLaunchOutput"/)?.[0] || "";
+  const storePage = extractHtmlElementById(indexHtml, "section", "areaSupervisorStoreManagement");
+  const staffPage = extractHtmlElementById(indexHtml, "section", "areaSupervisorStaffManagement");
+  const drawer = indexHtml.match(/<div id="areaSupervisorDrawer"[\s\S]*?<pre id="areaSupervisorLaunchOutput"/)?.[0] || "";
+
+  assert.match(areaSupervisorHtml, /区域主管工作台/);
+  assert.match(areaSupervisorHtml, /当前用户：区域主管/);
+  assert.match(areaSupervisorHtml, /在线/);
+  assert.match(storePage, /门店管理/);
+  assert.match(storePage, /录入和维护门店基础资料/);
+  assert.match(storePage, /全部门店/);
+  assert.match(storePage, /营业中/);
+  assert.match(storePage, /暂停营业/);
+  assert.match(storePage, /已关闭/);
+  assert.match(storePage, /搜索门店名称 \/ 门店代码/);
+  assert.match(storePage, /全部状态/);
+  assert.match(storePage, /门店详情/);
+  assert.match(staffPage, /员工管理/);
+  assert.match(staffPage, /创建门店员工账号，维护账号状态/);
+  assert.match(staffPage, /搜索员工姓名 \/ 用户名 \/ 手机号/);
+  assert.match(staffPage, /所属门店/);
+  assert.match(staffPage, /角色/);
+  assert.match(staffPage, /状态/);
+  assert.match(drawer, /id="areaSupervisorStoreCreateForm"/);
+  assert.match(drawer, /id="areaSupervisorStoreUpdateForm"/);
+  assert.match(drawer, /id="areaSupervisorUserCreateForm"/);
+  assert.match(drawer, /id="areaSupervisorPasswordResetForm"/);
+  assert.match(drawer, /id="areaSupervisorDeactivateConfirm"/);
+  assert.match(drawer, /地图链接/);
+  assert.doesNotMatch(storePage, /<form id="areaSupervisorStore(Create|Update)Form"/);
+  assert.doesNotMatch(staffPage, /<form id="areaSupervisorUserCreateForm"|<form id="areaSupervisorPasswordResetForm"/);
+  assert.doesNotMatch(areaSupervisorHtml, /销售额|订单数|销售趋势|库存预警|CreateStoreDetails|DefaultAccount|raw json|Delete|删除门店|删除员工|详情链接/);
+  assert.match(stylesCss, /\.area-supervisor-form\[hidden\][\s\S]*display:\s*none/);
+  assert.match(stylesCss, /\.area-supervisor-card-actions \.secondary-inline[\s\S]*width:\s*auto/);
+  assert.match(stylesCss, /area-supervisor-workspace-mode \.workspace-page-search[\s\S]*display:\s*none/);
 });
