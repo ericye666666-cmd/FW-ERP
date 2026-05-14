@@ -514,6 +514,105 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "高速收银终端", en: "Fast POS Terminal" },
   { zh: "数据管理", en: "Data Management" },
   { zh: "账号 / 用户", en: "Users & Accounts" },
+  { zh: "区域主管工作台", en: "Area Supervisor Workbench" },
+  { zh: "当前用户：区域主管", en: "Current user: Area Supervisor" },
+  { zh: "在线", en: "Online" },
+  { zh: "请选择门店管理或员工管理开始处理上线资料。", en: "Choose Store Management or Staff Management to start launch setup." },
+  { zh: "门店管理", en: "Store Management" },
+  { zh: "员工管理", en: "Staff Management" },
+  { zh: "录入门店、维护地址电话、暂停或关闭门店。", en: "Create stores, maintain addresses and phone numbers, and pause or close stores." },
+  { zh: "录入和维护门店基础资料", en: "Create and maintain store profile details." },
+  { zh: "录入和维护门店基础资料。", en: "Create and maintain store profile details." },
+  { zh: "创建门店员工账号，维护账号状态", en: "Create store staff accounts and maintain account status." },
+  { zh: "创建门店员工账号、重置密码、停用账号。", en: "Create store staff accounts, reset passwords, and deactivate accounts." },
+  { zh: "查看、编辑和停用门店。", en: "View, edit, and pause stores." },
+  { zh: "进入门店管理", en: "Open Store Management" },
+  { zh: "进入员工管理", en: "Open Staff Management" },
+  { zh: "+ 新增门店", en: "+ Add Store" },
+  { zh: "新增门店", en: "Add Store" },
+  { zh: "+ 新增员工", en: "+ Add Staff" },
+  { zh: "编辑门店资料", en: "Edit Store Details" },
+  { zh: "门店详情", en: "Store Details" },
+  { zh: "新增员工", en: "Add Staff" },
+  { zh: "重置密码", en: "Reset Password" },
+  { zh: "停用账号", en: "Deactivate Account" },
+  { zh: "确认停用", en: "Confirm Deactivation" },
+  { zh: "地图链接", en: "Map Link" },
+  { zh: "打开地图", en: "Open Map" },
+  { zh: "门店代码", en: "Store Code" },
+  { zh: "当前状态", en: "Current Status" },
+  { zh: "编辑资料", en: "Edit Details" },
+  { zh: "暂停", en: "Pause" },
+  { zh: "关闭", en: "Close" },
+  { zh: "查看", en: "View" },
+  { zh: "编辑", en: "Edit" },
+  { zh: "暂停营业", en: "Paused" },
+  { zh: "关闭门店", en: "Close Store" },
+  { zh: "地址", en: "Address" },
+  { zh: "联系电话", en: "Phone" },
+  { zh: "备注", en: "Notes" },
+  { zh: "全部门店", en: "All Stores" },
+  { zh: "全部状态", en: "All Statuses" },
+  { zh: "状态筛选", en: "Status Filter" },
+  { zh: "门店筛选", en: "Store Filter" },
+  { zh: "角色筛选", en: "Role Filter" },
+  { zh: "全部角色", en: "All Roles" },
+  { zh: "筹备中", en: "Preparing" },
+  { zh: "营业中", en: "Active" },
+  { zh: "已关闭", en: "Closed" },
+  { zh: "全部员工", en: "All Staff" },
+  { zh: "在职员工", en: "Active Staff" },
+  { zh: "在职", en: "Active" },
+  { zh: "已停用", en: "Inactive" },
+  { zh: "所属门店", en: "Assigned Store" },
+  { zh: "姓名", en: "Name" },
+  { zh: "用户名", en: "Username" },
+  { zh: "角色", en: "Role" },
+  { zh: "状态", en: "Status" },
+  { zh: "操作", en: "Actions" },
+  { zh: "店长", en: "Store Manager" },
+  { zh: "店员", en: "Store Clerk" },
+  { zh: "收银员", en: "Cashier" },
+  { zh: "手机号", en: "Phone" },
+  { zh: "最后登录", en: "Last Login" },
+  { zh: "门店名称", en: "Store Name" },
+  { zh: "门店基础资料", en: "Store Profile Details" },
+  { zh: "门店员工账号", en: "Store Staff Accounts" },
+  { zh: "选择一家门店查看基础资料。", en: "Select a store to view profile details." },
+  { zh: "从左侧选择一家门店查看基础资料。", en: "Select a store on the left to view profile details." },
+  { zh: "填写门店基础资料。", en: "Fill in store profile details." },
+  { zh: "只维护门店基础资料。", en: "Maintain store profile details only." },
+  { zh: "创建店长、店员或收银员账号。", en: "Create a store manager, clerk, or cashier account." },
+  { zh: "将为该员工设置新密码，请确认后继续。", en: "Set a new password for this staff account. Confirm before continuing." },
+  { zh: "停用后该员工不能登录系统，历史记录会保留。", en: "After deactivation, this staff member cannot sign in. History is retained." },
+  { zh: "没有找到符合条件的门店。", en: "No stores match the current filters." },
+  { zh: "没有找到符合条件的员工。", en: "No staff match the current filters." },
+  { zh: "当前还没有门店状态。", en: "No store statuses yet." },
+  { zh: "请先刷新门店列表。", en: "Refresh the store list first." },
+  { zh: "请先刷新员工列表。", en: "Refresh the staff list first." },
+  { zh: "请先刷新门店状态。", en: "Refresh store statuses first." },
+  { zh: "这里会显示保存结果和权限提示。", en: "Save results and permission messages appear here." },
+  { zh: "这里会显示账号创建、重置密码和停用结果。", en: "Account creation, password resets, and deactivation results appear here." },
+  { zh: "这里会显示门店创建、编辑和停用结果。", en: "Store creation, edits, and pause results appear here." },
+  { zh: "这里只显示门店基础状态。", en: "Only basic store status appears here." },
+  { zh: "运营总览", en: "Operations Overview" },
+  { zh: "只查看门店基础状态", en: "View basic store status only" },
+  { zh: "系统设置", en: "System Settings" },
+  { zh: "当前页面只保留账号状态说明", en: "This page only keeps account status notes." },
+  { zh: "权限由后端统一校验。", en: "Permissions are verified by the backend." },
+  { zh: "权限以后端校验为准。需要调整角色或更高权限，请联系主管处理。", en: "Backend permission checks are authoritative. Contact a supervisor for role changes or elevated access." },
+  { zh: "填写基础资料后保存。", en: "Save after filling in the profile details." },
+  { zh: "例如 Ruiru 店", en: "Example: Ruiru Store" },
+  { zh: "例如 RUIRU", en: "Example: RUIRU" },
+  { zh: "门店地址", en: "Store Address" },
+  { zh: "员工姓名", en: "Staff Name" },
+  { zh: "登录用户名", en: "Login Username" },
+  { zh: "初始密码", en: "Initial Password" },
+  { zh: "员工账号", en: "Staff Account" },
+  { zh: "新密码", en: "New Password" },
+  { zh: "确认重置", en: "Confirm Reset" },
+  { zh: "搜索门店名称 / 门店代码", en: "Search store name / store code" },
+  { zh: "搜索员工姓名 / 用户名 / 手机号", en: "Search staff name / username / phone" },
 ];
 
 const GLOBAL_I18N_PHRASES = [
@@ -1591,8 +1690,8 @@ function applyGlobalI18n(root = document.body, language = currentLanguage) {
   if (!root) {
     return;
   }
-  const skipElementSelector = "script, style, code, pre";
-  const skipTextSelector = "script, style, code, pre, textarea";
+  const skipElementSelector = "script, style, code, pre, [data-i18n-skip]";
+  const skipTextSelector = "script, style, code, pre, textarea, [data-i18n-skip]";
   const translateNode = (node) => {
     if (node.nodeType === Node.TEXT_NODE) {
       const parent = node.parentElement;
@@ -1694,6 +1793,7 @@ function setGlobalLanguage(language = "zh", options = {}) {
   }
   syncWorkspacePanelHeadingsToNavTitles();
   renderWorkspacePageNav();
+  refreshAreaSupervisorLanguageSurfacesAfterLanguageChange();
   applyGlobalI18n(document.body, currentLanguage);
 }
 
@@ -1709,6 +1809,17 @@ function refreshPdaLanguageSurfacesAfterLanguageChange() {
     renderStoreManagerPdaPreviewPreservingScroll();
   }
   syncGlobalLanguageButtons();
+}
+
+function refreshAreaSupervisorLanguageSurfacesAfterLanguageChange() {
+  if (!areaSupervisorLaunchStores.length && !areaSupervisorLaunchUsers.length) {
+    return;
+  }
+  renderAreaSupervisorLaunchConsole(areaSupervisorLaunchStores, areaSupervisorLaunchUsers);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorLoadedNotice(
+    areaSupervisorLaunchStores.length,
+    getAreaSupervisorStoreEmployeeRows().length,
+  ));
 }
 
 function initializeGlobalI18n() {
@@ -28816,14 +28927,54 @@ function isAreaSupervisorStoreEmployeeRole(roleCode = "") {
   return AREA_SUPERVISOR_STORE_EMPLOYEE_ROLES.includes(String(roleCode || "").trim().toLowerCase());
 }
 
+function getAreaSupervisorCopy(zh = "", en = "") {
+  return chooseI18nLabel(zh, en, currentLanguage);
+}
+
+function renderAreaSupervisorCopy(zh = "", en = "") {
+  return escapeHtml(getAreaSupervisorCopy(zh, en));
+}
+
+function renderAreaSupervisorDataValue(value = "-", { tag = "span" } = {}) {
+  const safeTag = ["span", "strong", "dd", "td"].includes(tag) ? tag : "span";
+  const normalized = String(value === null || value === undefined ? "" : value).trim();
+  return `<${safeTag} data-i18n-skip>${escapeHtml(normalized || "-")}</${safeTag}>`;
+}
+
+function renderAreaSupervisorFactLine(labelZh = "", labelEn = "", value = "-") {
+  const separator = currentLanguage === "en" ? ": " : "：";
+  return `<span>${renderAreaSupervisorCopy(labelZh, labelEn)}${separator}${renderAreaSupervisorDataValue(value)}</span>`;
+}
+
+function formatAreaSupervisorLoadedNotice(storeCount = 0, staffCount = 0) {
+  return currentLanguage === "en"
+    ? `Loaded ${storeCount} stores and ${staffCount} store staff accounts.`
+    : `已读取 ${storeCount} 家门店、${staffCount} 个门店员工账号。`;
+}
+
+function formatAreaSupervisorStoreNotice(storeCode = "", actionZh = "", actionEn = "") {
+  const normalizedCode = String(storeCode || "").trim().toUpperCase() || "-";
+  return currentLanguage === "en"
+    ? `Store ${normalizedCode} ${actionEn}.`
+    : `门店 ${normalizedCode} ${actionZh}。`;
+}
+
+function formatAreaSupervisorUserNotice(username = "", actionZh = "", actionEn = "") {
+  const normalizedUsername = String(username || "").trim() || "-";
+  return currentLanguage === "en"
+    ? `Account ${normalizedUsername} ${actionEn}.`
+    : `账号 ${normalizedUsername} ${actionZh}。`;
+}
+
 function getAreaSupervisorStoreStatusLabel(status = "") {
   const labels = {
-    preparing: "筹备中",
-    active: "营业中",
-    paused: "暂停营业",
-    closed: "已关闭",
+    preparing: { zh: "筹备中", en: "Preparing" },
+    active: { zh: "营业中", en: "Active" },
+    paused: { zh: "暂停营业", en: "Paused" },
+    closed: { zh: "已关闭", en: "Closed" },
   };
-  return labels[String(status || "").trim().toLowerCase()] || "筹备中";
+  const label = labels[String(status || "").trim().toLowerCase()] || labels.preparing;
+  return getAreaSupervisorCopy(label.zh, label.en);
 }
 
 function getAreaSupervisorStoreStatusTone(status = "") {
@@ -28838,15 +28989,18 @@ function getAreaSupervisorStoreStatusTone(status = "") {
 
 function getAreaSupervisorUserRoleLabel(roleCode = "") {
   const labels = {
-    store_manager: "店长",
-    store_clerk: "店员",
-    cashier: "收银员",
+    store_manager: { zh: "店长", en: "Store Manager" },
+    store_clerk: { zh: "店员", en: "Store Clerk" },
+    cashier: { zh: "收银员", en: "Cashier" },
   };
-  return labels[String(roleCode || "").trim().toLowerCase()] || "店员";
+  const label = labels[String(roleCode || "").trim().toLowerCase()] || labels.store_clerk;
+  return getAreaSupervisorCopy(label.zh, label.en);
 }
 
 function getAreaSupervisorUserStatusLabel(user = {}) {
-  return getUserStatusValue(user) === "inactive" ? "已停用" : "在职";
+  return getUserStatusValue(user) === "inactive"
+    ? getAreaSupervisorCopy("已停用", "Inactive")
+    : getAreaSupervisorCopy("在职", "Active");
 }
 
 function getAreaSupervisorStoreStatus(value = "preparing") {
@@ -28905,14 +29059,14 @@ function renderAreaSupervisorStoreFilterOptions(stores = areaSupervisorLaunchSto
   }
   const current = target.value || "all";
   target.innerHTML = `
-    <option value="all">全部门店</option>
+    <option value="all">${renderAreaSupervisorCopy("全部门店", "All Stores")}</option>
     ${(Array.isArray(stores) ? stores : [])
       .map((store) => {
         const code = String(store?.code || "").trim().toUpperCase();
         if (!code) {
           return "";
         }
-        return `<option value="${escapeHtml(code)}">${escapeHtml(store?.name || code)} · ${escapeHtml(code)}</option>`;
+        return `<option value="${escapeHtml(code)}" data-i18n-skip>${escapeHtml(store?.name || code)} · ${escapeHtml(code)}</option>`;
       })
       .join("")}
   `;
@@ -28932,18 +29086,22 @@ function renderAreaSupervisorLaunchNotice(message = "", tone = "success") {
     }
     target.className = `area-supervisor-notice${tone === "error" ? " is-error" : normalizedMessage ? " is-success" : ""}`;
     if (!normalizedMessage) {
-      target.textContent = fallbackText;
+      target.textContent = getAreaSupervisorCopy(
+        fallbackText,
+        "Choose Store Management or Staff Management to start launch setup.",
+      );
       return;
     }
-    target.innerHTML = `<div class="alert-banner">${escapeHtml(normalizedMessage)}</div>`;
+    target.innerHTML = `<div class="alert-banner" data-i18n-skip>${escapeHtml(normalizedMessage)}</div>`;
   });
 }
 
 function renderAreaSupervisorLaunchError(error) {
   const message = formatErrorMessage(error);
-  renderAreaSupervisorLaunchNotice(message || "你没有权限", "error");
+  const translatedMessage = message ? translateI18nText(message, currentLanguage) : getAreaSupervisorCopy("你没有权限", "You do not have permission.");
+  renderAreaSupervisorLaunchNotice(translatedMessage, "error");
   writeOutput("#areaSupervisorLaunchOutput", message || "");
-    return message;
+  return message;
 }
 
 function getAreaSupervisorStoreStats(stores = areaSupervisorLaunchStores) {
@@ -28973,10 +29131,10 @@ function renderAreaSupervisorStoreStats(stores = areaSupervisorLaunchStores) {
   }
   const stats = getAreaSupervisorStoreStats(stores);
   const cards = [
-    ["全部门店", stats.total],
-    ["营业中", stats.active],
-    ["暂停营业", stats.paused],
-    ["已关闭", stats.closed],
+    [getAreaSupervisorCopy("全部门店", "All Stores"), stats.total],
+    [getAreaSupervisorCopy("营业中", "Active Stores"), stats.active],
+    [getAreaSupervisorCopy("暂停营业", "Paused"), stats.paused],
+    [getAreaSupervisorCopy("已关闭", "Closed"), stats.closed],
   ];
   target.innerHTML = cards
     .map(([label, value]) => `
@@ -28995,10 +29153,10 @@ function renderAreaSupervisorStaffStats(users = areaSupervisorLaunchUsers) {
   }
   const stats = getAreaSupervisorStaffStats(users);
   const cards = [
-    ["全部员工", stats.total],
-    ["在职员工", stats.active],
-    ["已停用", stats.inactive],
-    ["收银员", stats.cashier],
+    [getAreaSupervisorCopy("全部员工", "All Staff"), stats.total],
+    [getAreaSupervisorCopy("在职员工", "Active Staff"), stats.active],
+    [getAreaSupervisorCopy("已停用", "Inactive"), stats.inactive],
+    [getAreaSupervisorCopy("收银员", "Cashiers"), stats.cashier],
   ];
   target.innerHTML = cards
     .map(([label, value]) => `
@@ -29034,7 +29192,7 @@ function renderAreaSupervisorStoreList(stores = areaSupervisorLaunchStores) {
   const rows = getFilteredAreaSupervisorStores(stores);
   if (!rows.length) {
     target.className = "area-supervisor-store-list area-supervisor-empty-card";
-    target.textContent = "没有找到符合条件的门店。";
+    target.textContent = getAreaSupervisorCopy("没有找到符合条件的门店。", "No stores match the current filters.");
     renderAreaSupervisorStoreDetail(null);
     return;
   }
@@ -29049,21 +29207,21 @@ function renderAreaSupervisorStoreList(stores = areaSupervisorLaunchStores) {
         <article class="area-supervisor-store-card ${selected ? "is-selected" : ""}">
           <div class="area-supervisor-card-head">
             <div>
-              <strong>${escapeHtml(store?.name || code || "-")}</strong>
-              <span>${escapeHtml(code || "-")}</span>
+              ${renderAreaSupervisorDataValue(store?.name || code || "-", { tag: "strong" })}
+              ${renderAreaSupervisorDataValue(code || "-")}
             </div>
             ${renderStatusBadge(getAreaSupervisorStoreStatusLabel(store?.status), getAreaSupervisorStoreStatusTone(store?.status))}
           </div>
           <div class="area-supervisor-card-lines">
-            <span>地址：${escapeHtml(store?.address || "-")}</span>
-            <span>联系电话：${escapeHtml(store?.phone || "-")}</span>
-            <span>备注：${escapeHtml(store?.manager_note || "-")}</span>
+            ${renderAreaSupervisorFactLine("地址", "Address", store?.address)}
+            ${renderAreaSupervisorFactLine("联系电话", "Phone", store?.phone)}
+            ${renderAreaSupervisorFactLine("备注", "Notes", store?.manager_note)}
           </div>
           <div class="area-supervisor-card-actions">
-            <button type="button" class="secondary-inline" data-area-supervisor-store-view="${escapeHtml(code)}">查看</button>
-            <button type="button" class="secondary-inline" data-area-supervisor-store-edit="${escapeHtml(code)}">编辑</button>
-            <button type="button" class="secondary-inline" data-area-supervisor-store-pause="${escapeHtml(code)}" ${store?.status === "paused" || store?.status === "closed" ? "disabled" : ""}>暂停</button>
-            <button type="button" class="secondary-inline" data-area-supervisor-store-close="${escapeHtml(code)}" ${store?.status === "closed" ? "disabled" : ""}>关闭</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-view="${escapeHtml(code)}">${renderAreaSupervisorCopy("查看", "View")}</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-edit="${escapeHtml(code)}">${renderAreaSupervisorCopy("编辑", "Edit")}</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-pause="${escapeHtml(code)}" ${store?.status === "paused" || store?.status === "closed" ? "disabled" : ""}>${renderAreaSupervisorCopy("暂停", "Pause")}</button>
+            <button type="button" class="secondary-inline" data-area-supervisor-store-close="${escapeHtml(code)}" ${store?.status === "closed" ? "disabled" : ""}>${renderAreaSupervisorCopy("关闭", "Close")}</button>
           </div>
         </article>
       `;
@@ -29080,8 +29238,8 @@ function renderAreaSupervisorStoreDetail(store = null) {
   if (!store) {
     target.className = "area-supervisor-detail-card";
     target.innerHTML = `
-      <h3>门店详情</h3>
-      <p class="subtle">从左侧选择一家门店查看基础资料。</p>
+      <h3>${renderAreaSupervisorCopy("门店详情", "Store Details")}</h3>
+      <p class="subtle">${renderAreaSupervisorCopy("从左侧选择一家门店查看基础资料。", "Select a store on the left to view profile details.")}</p>
     `;
     return;
   }
@@ -29090,24 +29248,24 @@ function renderAreaSupervisorStoreDetail(store = null) {
   target.innerHTML = `
     <div class="area-supervisor-detail-head">
       <div>
-        <h3>门店详情</h3>
-        <strong>${escapeHtml(store?.name || code || "-")}</strong>
+        <h3>${renderAreaSupervisorCopy("门店详情", "Store Details")}</h3>
+        ${renderAreaSupervisorDataValue(store?.name || code || "-", { tag: "strong" })}
       </div>
       ${renderStatusBadge(getAreaSupervisorStoreStatusLabel(store?.status), getAreaSupervisorStoreStatusTone(store?.status))}
     </div>
     <dl class="area-supervisor-detail-list">
-      <div><dt>门店名称</dt><dd>${escapeHtml(store?.name || "-")}</dd></div>
-      <div><dt>门店代码</dt><dd>${escapeHtml(code || "-")}</dd></div>
-      <div><dt>地址</dt><dd>${escapeHtml(store?.address || "-")}</dd></div>
-      <div><dt>联系电话</dt><dd>${escapeHtml(store?.phone || "-")}</dd></div>
-      <div><dt>地图链接</dt><dd>${store?.google_maps_url ? `<a href="${escapeHtml(store.google_maps_url)}" target="_blank" rel="noreferrer">打开地图</a>` : "-"}</dd></div>
-      <div><dt>当前状态</dt><dd>${escapeHtml(getAreaSupervisorStoreStatusLabel(store?.status))}</dd></div>
-      <div><dt>备注</dt><dd>${escapeHtml(store?.manager_note || "-")}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("门店名称", "Store Name")}</dt><dd>${renderAreaSupervisorDataValue(store?.name)}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("门店代码", "Store Code")}</dt><dd>${renderAreaSupervisorDataValue(code)}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("地址", "Address")}</dt><dd>${renderAreaSupervisorDataValue(store?.address)}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("联系电话", "Phone")}</dt><dd>${renderAreaSupervisorDataValue(store?.phone)}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("地图链接", "Map Link")}</dt><dd>${store?.google_maps_url ? `<a href="${escapeHtml(store.google_maps_url)}" target="_blank" rel="noreferrer" data-i18n-skip>${escapeHtml(getAreaSupervisorCopy("打开地图", "Open Map"))}</a>` : "-"}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("当前状态", "Current Status")}</dt><dd>${escapeHtml(getAreaSupervisorStoreStatusLabel(store?.status))}</dd></div>
+      <div><dt>${renderAreaSupervisorCopy("备注", "Notes")}</dt><dd>${renderAreaSupervisorDataValue(store?.manager_note)}</dd></div>
     </dl>
     <div class="area-supervisor-detail-actions">
-      <button type="button" data-area-supervisor-store-edit="${escapeHtml(code)}">编辑资料</button>
-      <button type="button" class="secondary-inline" data-area-supervisor-store-pause="${escapeHtml(code)}" ${store?.status === "paused" || store?.status === "closed" ? "disabled" : ""}>暂停营业</button>
-      <button type="button" class="secondary-inline" data-area-supervisor-store-close="${escapeHtml(code)}" ${store?.status === "closed" ? "disabled" : ""}>关闭门店</button>
+      <button type="button" data-area-supervisor-store-edit="${escapeHtml(code)}">${renderAreaSupervisorCopy("编辑资料", "Edit Details")}</button>
+      <button type="button" class="secondary-inline" data-area-supervisor-store-pause="${escapeHtml(code)}" ${store?.status === "paused" || store?.status === "closed" ? "disabled" : ""}>${renderAreaSupervisorCopy("暂停营业", "Pause Store")}</button>
+      <button type="button" class="secondary-inline" data-area-supervisor-store-close="${escapeHtml(code)}" ${store?.status === "closed" ? "disabled" : ""}>${renderAreaSupervisorCopy("关闭门店", "Close Store")}</button>
     </div>
   `;
 }
@@ -29147,7 +29305,7 @@ function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
   const rows = sortUserRowsForDisplay(getFilteredAreaSupervisorUsers(users));
   if (!rows.length) {
     target.className = "area-supervisor-staff-table area-supervisor-empty-card";
-    target.textContent = "没有找到符合条件的员工。";
+    target.textContent = getAreaSupervisorCopy("没有找到符合条件的员工。", "No staff match the current filters.");
     return;
   }
   target.className = "area-supervisor-staff-table";
@@ -29155,14 +29313,14 @@ function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
     <table>
       <thead>
         <tr>
-          <th>姓名</th>
-          <th>用户名</th>
-          <th>所属门店</th>
-          <th>角色</th>
-          <th>状态</th>
-          <th>手机号</th>
-          <th>最后登录</th>
-          <th>操作</th>
+          <th>${renderAreaSupervisorCopy("姓名", "Name")}</th>
+          <th>${renderAreaSupervisorCopy("用户名", "Username")}</th>
+          <th>${renderAreaSupervisorCopy("所属门店", "Assigned Store")}</th>
+          <th>${renderAreaSupervisorCopy("角色", "Role")}</th>
+          <th>${renderAreaSupervisorCopy("状态", "Status")}</th>
+          <th>${renderAreaSupervisorCopy("手机号", "Phone")}</th>
+          <th>${renderAreaSupervisorCopy("最后登录", "Last Login")}</th>
+          <th>${renderAreaSupervisorCopy("操作", "Actions")}</th>
         </tr>
       </thead>
       <tbody>
@@ -29173,17 +29331,17 @@ function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
       const canDeactivate = Boolean(userId) && status !== "inactive";
       return `
         <tr class="${status === "inactive" ? "is-inactive" : ""}">
-          <td><strong>${escapeHtml(user?.full_name || "-")}</strong></td>
-          <td>${escapeHtml(user?.username || "-")}</td>
-          <td>${escapeHtml(user?.store_code || "-")}</td>
+          <td>${renderAreaSupervisorDataValue(user?.full_name, { tag: "strong" })}</td>
+          <td>${renderAreaSupervisorDataValue(user?.username)}</td>
+          <td>${renderAreaSupervisorDataValue(user?.store_code)}</td>
           <td>${escapeHtml(getAreaSupervisorUserRoleLabel(user?.role_code))}</td>
           <td>${renderStatusBadge(getAreaSupervisorUserStatusLabel(user), status === "inactive" ? "neutral" : "success")}</td>
-          <td>${escapeHtml(getAreaSupervisorUserPhone(user) || "-")}</td>
-          <td>${escapeHtml(user?.last_login_at || user?.last_login || "-")}</td>
+          <td>${renderAreaSupervisorDataValue(getAreaSupervisorUserPhone(user))}</td>
+          <td>${renderAreaSupervisorDataValue(user?.last_login_at || user?.last_login)}</td>
           <td>
             <div class="area-supervisor-table-actions">
-              <button type="button" class="secondary-inline" data-area-supervisor-user-reset="${escapeHtml(userId)}">重置密码</button>
-              <button type="button" class="secondary-inline danger" data-area-supervisor-user-deactivate="${escapeHtml(userId)}" ${canDeactivate ? "" : "disabled"}>停用账号</button>
+              <button type="button" class="secondary-inline" data-area-supervisor-user-reset="${escapeHtml(userId)}">${renderAreaSupervisorCopy("重置密码", "Reset Password")}</button>
+              <button type="button" class="secondary-inline danger" data-area-supervisor-user-deactivate="${escapeHtml(userId)}" ${canDeactivate ? "" : "disabled"}>${renderAreaSupervisorCopy("停用账号", "Deactivate Account")}</button>
             </div>
           </td>
         </tr>
@@ -29236,7 +29394,7 @@ function renderAreaSupervisorOverview() {
   const rows = [...areaSupervisorLaunchStores].sort((a, b) => String(a?.code || "").localeCompare(String(b?.code || "")));
   if (!rows.length) {
     target.className = "area-supervisor-store-list area-supervisor-empty-card";
-    target.textContent = "当前还没有门店状态。";
+    target.textContent = getAreaSupervisorCopy("当前还没有门店状态。", "No store statuses yet.");
     return;
   }
   target.className = "area-supervisor-store-list";
@@ -29245,14 +29403,14 @@ function renderAreaSupervisorOverview() {
       <article class="area-supervisor-store-card">
         <div class="area-supervisor-card-head">
           <div>
-            <strong>${escapeHtml(store?.name || store?.code || "-")}</strong>
-            <span>${escapeHtml(store?.code || "-")}</span>
+            ${renderAreaSupervisorDataValue(store?.name || store?.code || "-", { tag: "strong" })}
+            ${renderAreaSupervisorDataValue(store?.code || "-")}
           </div>
           ${renderStatusBadge(getAreaSupervisorStoreStatusLabel(store?.status), getAreaSupervisorStoreStatusTone(store?.status))}
         </div>
         <div class="area-supervisor-card-lines">
-          <span>地址：${escapeHtml(store?.address || "-")}</span>
-          <span>联系电话：${escapeHtml(store?.phone || "-")}</span>
+          ${renderAreaSupervisorFactLine("地址", "Address", store?.address)}
+          ${renderAreaSupervisorFactLine("联系电话", "Phone", store?.phone)}
         </div>
       </article>
     `)
@@ -29305,7 +29463,10 @@ async function loadAreaSupervisorLaunchConsoleData() {
     Array.isArray(users) ? users : [],
   );
   writeOutput("#areaSupervisorLaunchOutput", { stores: areaSupervisorLaunchStores, users: areaSupervisorLaunchUsers });
-  renderAreaSupervisorLaunchNotice(`已读取 ${areaSupervisorLaunchStores.length} 家门店、${getAreaSupervisorStoreEmployeeRows().length} 个门店员工账号。`);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorLoadedNotice(
+    areaSupervisorLaunchStores.length,
+    getAreaSupervisorStoreEmployeeRows().length,
+  ));
   return { stores: areaSupervisorLaunchStores, users: areaSupervisorLaunchUsers };
 }
 
@@ -29349,7 +29510,10 @@ function openAreaSupervisorDrawer(mode, payload = null) {
     }
   };
   if (mode === "store-create") {
-    setAreaSupervisorDrawerHeader("新增门店", "填写门店基础资料。");
+    setAreaSupervisorDrawerHeader(
+      getAreaSupervisorCopy("新增门店", "Add Store"),
+      getAreaSupervisorCopy("填写门店基础资料。", "Fill in store profile details."),
+    );
     const form = document.querySelector("#areaSupervisorStoreCreateForm");
     form?.reset();
     setInputValue("#areaSupervisorStoreCreateForm [name='status']", "preparing");
@@ -29362,13 +29526,19 @@ function openAreaSupervisorDrawer(mode, payload = null) {
     if (!store) {
       throw new Error("请先选择门店。");
     }
-    setAreaSupervisorDrawerHeader("编辑门店资料", "只维护门店基础资料。");
+    setAreaSupervisorDrawerHeader(
+      getAreaSupervisorCopy("编辑门店资料", "Edit Store Details"),
+      getAreaSupervisorCopy("只维护门店基础资料。", "Maintain store profile details only."),
+    );
     hydrateAreaSupervisorStoreUpdateForm(store);
     showForm("#areaSupervisorStoreUpdateForm");
     return;
   }
   if (mode === "user-create") {
-    setAreaSupervisorDrawerHeader("新增员工", "创建店长、店员或收银员账号。");
+    setAreaSupervisorDrawerHeader(
+      getAreaSupervisorCopy("新增员工", "Add Staff"),
+      getAreaSupervisorCopy("创建店长、店员或收银员账号。", "Create a store manager, clerk, or cashier account."),
+    );
     const form = document.querySelector("#areaSupervisorUserCreateForm");
     form?.reset();
     setInputValue("#areaSupervisorUserCreateForm [name='role_code']", "store_clerk");
@@ -29382,7 +29552,10 @@ function openAreaSupervisorDrawer(mode, payload = null) {
     if (!user) {
       throw new Error("请先选择员工。");
     }
-    setAreaSupervisorDrawerHeader("重置密码", "将为该员工设置新密码，请确认后继续。");
+    setAreaSupervisorDrawerHeader(
+      getAreaSupervisorCopy("重置密码", "Reset Password"),
+      getAreaSupervisorCopy("将为该员工设置新密码，请确认后继续。", "Set a new password for this staff account. Confirm before continuing."),
+    );
     hydrateAreaSupervisorPasswordResetForm(user);
     showForm("#areaSupervisorPasswordResetForm");
     return;
@@ -29393,7 +29566,10 @@ function openAreaSupervisorDrawer(mode, payload = null) {
       throw new Error("请先选择员工。");
     }
     areaSupervisorPendingDeactivateUserId = String(user?.id || "").trim();
-    setAreaSupervisorDrawerHeader("停用账号", "停用后该员工不能登录系统，历史记录会保留。");
+    setAreaSupervisorDrawerHeader(
+      getAreaSupervisorCopy("停用账号", "Deactivate Account"),
+      getAreaSupervisorCopy("停用后该员工不能登录系统，历史记录会保留。", "After deactivation, this staff member cannot sign in. History is retained."),
+    );
     showForm("#areaSupervisorDeactivateConfirm");
   }
 }
@@ -29407,7 +29583,7 @@ async function submitAreaSupervisorStoreCreate(event) {
   });
   await loadAreaSupervisorLaunchConsoleData();
   hydrateAreaSupervisorStoreUpdateForm(result);
-  renderAreaSupervisorLaunchNotice(`门店 ${result.code || payload.code} 已创建。`);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorStoreNotice(result.code || payload.code, "已创建", "was created"));
   writeOutput("#areaSupervisorLaunchOutput", result);
   event.currentTarget.reset();
   closeAreaSupervisorDrawer();
@@ -29427,7 +29603,7 @@ async function submitAreaSupervisorStoreUpdate(event) {
   });
   await loadAreaSupervisorLaunchConsoleData();
   hydrateAreaSupervisorStoreUpdateForm(result);
-  renderAreaSupervisorLaunchNotice(`门店 ${result.code || storeCode} 已更新。`);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorStoreNotice(result.code || storeCode, "已更新", "was updated"));
   writeOutput("#areaSupervisorLaunchOutput", result);
   closeAreaSupervisorDrawer();
 }
@@ -29440,7 +29616,7 @@ async function submitAreaSupervisorUserCreate(event) {
     body: JSON.stringify(payload),
   });
   await loadAreaSupervisorLaunchConsoleData();
-  renderAreaSupervisorLaunchNotice(`账号 ${result.username || payload.username} 已创建。`);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorUserNotice(result.username || payload.username, "已创建", "was created"));
   writeOutput("#areaSupervisorLaunchOutput", result);
   event.currentTarget.reset();
   closeAreaSupervisorDrawer();
@@ -29463,7 +29639,7 @@ async function submitAreaSupervisorPasswordReset(event) {
   });
   await loadAreaSupervisorLaunchConsoleData();
   hydrateAreaSupervisorPasswordResetForm(result);
-  renderAreaSupervisorLaunchNotice(`账号 ${result.username || ""} 密码已重置。`);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorUserNotice(result.username || "", "密码已重置", "password was reset"));
   writeOutput("#areaSupervisorLaunchOutput", result);
   closeAreaSupervisorDrawer();
 }
@@ -29478,7 +29654,7 @@ async function deactivateAreaSupervisorStoreUser(userId) {
     body: JSON.stringify({ status: "inactive", is_active: false }),
   });
   await loadAreaSupervisorLaunchConsoleData();
-  renderAreaSupervisorLaunchNotice(`账号 ${result.username || ""} 已停用。`);
+  renderAreaSupervisorLaunchNotice(formatAreaSupervisorUserNotice(result.username || "", "已停用", "was deactivated"));
   writeOutput("#areaSupervisorLaunchOutput", result);
   closeAreaSupervisorDrawer();
   return result;
@@ -29496,7 +29672,9 @@ async function updateAreaSupervisorStoreStatus(storeCode, status) {
   });
   areaSupervisorSelectedStoreCode = normalizedStoreCode;
   await loadAreaSupervisorLaunchConsoleData();
-  renderAreaSupervisorLaunchNotice(`门店 ${normalizedStoreCode} 已更新为${getAreaSupervisorStoreStatusLabel(nextStatus)}。`);
+  renderAreaSupervisorLaunchNotice(currentLanguage === "en"
+    ? `Store ${normalizedStoreCode} status changed to ${getAreaSupervisorStoreStatusLabel(nextStatus)}.`
+    : `门店 ${normalizedStoreCode} 已更新为${getAreaSupervisorStoreStatusLabel(nextStatus)}。`);
   writeOutput("#areaSupervisorLaunchOutput", result);
   return result;
 }

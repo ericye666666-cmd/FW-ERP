@@ -93,6 +93,6 @@ test("legacy PDA bundle includes the store shelf editor menu and handlers", () =
   assert.match(appLegacyJs, /submitStoreShelfLocationLoad/);
   assert.match(appLegacyJs, /submitStoreShelfLocationSave/);
   assert.match(appLegacyJs, /renderStoreShelfFloorPlanCanvas/);
-  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.js\?v=area-supervisor-i18n-hotfix-323/);
   assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
 });
