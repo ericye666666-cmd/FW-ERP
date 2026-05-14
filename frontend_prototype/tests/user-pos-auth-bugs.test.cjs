@@ -37,7 +37,7 @@ test("admin user list renders clear non-overlapping cards with edit and deactiva
   assert.match(appJs, /启用/);
   assert.match(appJs, /function activateUserFromList/);
   assert.match(appJs, /function isCurrentUserAdmin/);
-  assert.match(appJs, /admin_1 不能被停用/);
+  assert.match(appJs, /系统内置管理员不能被停用/);
   assert.match(appJs, /managed_store_codes/);
   assert.match(stylesCss, /\.user-management-list/);
   assert.match(stylesCss, /\.user-card/);
@@ -45,15 +45,15 @@ test("admin user list renders clear non-overlapping cards with edit and deactiva
   assert.match(stylesCss, /word-break:\s*break-word/);
 });
 
-test("admin user list groups accounts by organization and exposes protected test delete", () => {
+test("admin user list groups accounts by organization and protects built-in deletes", () => {
   assert.match(appJs, /function buildUserOrganizationGroups/);
   assert.match(appJs, /function renderUserOrganizationGroup/);
   assert.match(appJs, /function deleteUserFromList/);
   assert.match(appJs, /data-user-delete-id/);
-  assert.match(appJs, /确认删除该用户？此操作仅用于测试环境。/);
+  assert.match(appJs, /确认删除该用户？请先确认账号已不再承担业务操作。/);
   assert.match(appJs, /生产环境应使用 soft delete/);
   assert.match(appJs, /当前登录账号不能删除自己/);
-  assert.match(appJs, /admin_1 不能被删除/);
+  assert.match(appJs, /系统内置管理员不能被删除/);
   assert.match(appJs, /仓库 \/ Warehouse/);
   assert.match(appJs, /区域主管 \/ Area Supervisors/);
   assert.match(appJs, /门店 \/ Stores/);

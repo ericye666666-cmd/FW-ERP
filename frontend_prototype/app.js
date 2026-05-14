@@ -1,6 +1,7 @@
 const STORAGE_KEYS = {
   apiBase: "retail_ops_api_base",
   loginUsername: "retail_ops_login_username",
+  pendingRedirect: "retail_ops_pending_redirect",
   token: "retail_ops_access_token",
   user: "retail_ops_current_user",
   devTracker: "retail_ops_dev_tracker",
@@ -651,7 +652,6 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "区域主管", en: "Area Supervisor" },
   { zh: "仓库员工", en: "Warehouse Clerk" },
   { zh: "仓库主管", en: "Warehouse Manager" },
-  { zh: "今日总览", en: "Today Overview" },
   { zh: "测试工具", en: "Test Tools" },
   { zh: "仓库功能区", en: "Warehouse" },
   { zh: "运营中心", en: "Operations Center" },
@@ -806,7 +806,7 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "区域代码", en: "Area Code" },
   { zh: "管辖门店", en: "Managed Stores" },
   { zh: "临时密码", en: "Temporary Password" },
-  { zh: "填写要登录的账号，例如 admin_1 或 cashier_1。", en: "Enter the account username, for example admin_1 or cashier_1." },
+  { zh: "填写要登录的账号，例如 cashier_1 或 store_manager_1。", en: "Enter the account username, for example cashier_1 or store_manager_1." },
   { zh: "填写员工真实姓名，方便审计日志和权限管理。", en: "Enter the staff member's real name for audit logs and access control." },
   { zh: "选择角色，例如 admin、cashier、store_manager。", en: "Select a role such as admin, cashier, or store_manager." },
   { zh: "填写所属门店代码；如果是总管理员可留系统默认。", en: "Enter the assigned store code. Leave blank for global admin accounts." },
@@ -935,13 +935,12 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "位置", en: "Location" },
   { zh: "Scan barcode / 输入条码", en: "Scan barcode / type barcode" },
   { zh: "正常销售 / 顾客备注 / 交接说明", en: "Normal sale / customer note / handover note" },
-  { zh: "默认测试密码：", en: "Default test password:" },
+  { zh: "临时密码：", en: "Temporary password:" },
   { zh: "登录后，这里会显示当前账号、角色和可操作范围。", en: "After signing in, this area shows the current account, role, and access scope." },
   { zh: "API 地址（先不要改）", en: "API URL (leave unchanged for now)" },
   { zh: "语言切换", en: "Language switch" },
   { zh: "全局", en: "Global" },
   { zh: "系统管理员", en: "System Admin" },
-  { zh: "当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。", en: "Current view: Today Overview. Use this area for store status, red alerts, and closing checks." },
   { zh: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。", en: "Current View: Store Operations. This workspace groups manager, clerk, cashier, and store admin pages." },
   { zh: "登录后显示角色和默认门店", en: "Role and default store appear after sign-in" },
   { zh: "全局账号", en: "Global Account" },
@@ -1370,7 +1369,6 @@ const EMPLOYEE_LAUNCH_CJK_TOKEN_FALLBACK = [
 
 const EMPLOYEE_LAUNCH_LATIN_TOKEN_FALLBACK = [
   ["Retail Ops Workspace", "店铺进销存工作台"],
-  ["Today Overview", "今日总览"],
   ["Test Tools", "测试工具"],
   ["Warehouse", "仓库功能区"],
   ["Operations Center", "运营中心"],
@@ -2191,8 +2189,9 @@ let baleBarcodeFilters = {
   batchNo: "",
 };
 let latestShiftReport = null;
-let activeWorkspace = localStorage.getItem("retail_ops_active_workspace") || "overview";
+let activeWorkspace = localStorage.getItem("retail_ops_active_workspace") || "warehouse";
 let activePanelKey = "";
+let latestAuthRouteNotice = "";
 let cashierTerminalReturnPanelKey = "";
 let workspacePageFilterQuery = "";
 const jsonBuilderState = {};
@@ -2664,11 +2663,6 @@ function appendCategoryPairToTree(tree, mainCategory = "", subCategory = "") {
 }
 
 const WORKSPACE_META = {
-  overview: {
-    titleEn: "Today Overview",
-    zh: "当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。",
-    en: "Current View: Today Overview. Use this area for store status, red alerts, and closing checks.",
-  },
   testing: {
     titleEn: "Test Tools",
     zh: "当前显示：测试工具。这里集中放演练样本、模拟销售和一键重置，不再挂在店长工作台里。",
@@ -3503,15 +3497,6 @@ const STORE_PANEL_NAV_META = [
     navTitleEn: "10. Cycle Return to Warehouse",
     hiddenInNav: true,
   },
-  {
-    match: "实时数据查看",
-    section: "manager",
-    order: 140,
-    icon: "览",
-    navTitle: "开发调试：实时数据查看",
-    navTitleEn: "Live Store Data",
-    hiddenInNav: true,
-  },
 ];
 
 const ADMIN_PANEL_NAV_META = [
@@ -3757,7 +3742,7 @@ const LEGACY_WORKSPACE_MAP = {
   sync: "store",
 };
 
-const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
+const WORKSPACE_ORDER = ["warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
   warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
   operations: ["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings", "insight", "action", "governance"],
@@ -3780,24 +3765,24 @@ function createRoleAccessProfile(workspaces = WORKSPACE_ORDER, sections = FULL_S
 function getRoleAccessProfile(user = currentSession.user) {
   const roleCode = getNormalizedRoleCode(user);
   if (!roleCode) {
-    return createRoleAccessProfile(["overview", "testing", "warehouse", "operations", "store", "admin"]);
+    return createRoleAccessProfile([], {});
   }
 
   const superRoles = new Set(["admin", "super_admin", "owner", "boss", "headquarters", "head_office"]);
   if (superRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "testing", "warehouse", "operations", "store", "admin"]);
+    return createRoleAccessProfile(["testing", "warehouse", "operations", "store", "admin"]);
   }
 
   const chinaEntryRoles = new Set(["china_entry", "china_operator", "procurement", "buyer"]);
   if (chinaEntryRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "warehouse"], {
+    return createRoleAccessProfile(["warehouse"], {
       warehouse: ["inbound", "departmentInbound", "general", "china"],
     });
   }
 
   const chinaFinanceRoles = new Set(["china_finance", "finance", "accountant"]);
   if (chinaFinanceRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "warehouse", "operations", "admin"], {
+    return createRoleAccessProfile(["warehouse", "operations", "admin"], {
       warehouse: ["general", "china"],
       operations: ["governance", "insight"],
       admin: ["governance"],
@@ -3806,27 +3791,27 @@ function getRoleAccessProfile(user = currentSession.user) {
 
   const hrRoles = new Set(["hr", "hr_manager", "payroll"]);
   if (hrRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "admin"], {
+    return createRoleAccessProfile(["admin"], {
       admin: ["governance"],
     });
   }
 
   if (roleCode === "area_supervisor") {
-    return createRoleAccessProfile(["overview", "operations"], {
+    return createRoleAccessProfile(["operations"], {
       operations: ["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings"],
     });
   }
 
   const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager"]);
   if (regionalRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "operations"], {
+    return createRoleAccessProfile(["operations"], {
       operations: ["insight", "action", "governance"],
     });
   }
 
   const warehouseManagerRoles = new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "warehouse"], {
+    return createRoleAccessProfile(["warehouse"], {
       warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
     });
   }
@@ -3840,7 +3825,7 @@ function getRoleAccessProfile(user = currentSession.user) {
 
   const managerRoles = new Set(["store_manager", "manager", "store_supervisor", "shop_manager"]);
   if (managerRoles.has(roleCode)) {
-    return createRoleAccessProfile(["store", "testing"], {
+    return createRoleAccessProfile(["store"], {
       store: ["manager", "general"],
     });
   }
@@ -3859,7 +3844,7 @@ function getRoleAccessProfile(user = currentSession.user) {
     });
   }
 
-  return createRoleAccessProfile(["overview"], {});
+  return createRoleAccessProfile([], {});
 }
 
 function getAccessibleWorkspaces(user = currentSession.user) {
@@ -3867,7 +3852,7 @@ function getAccessibleWorkspaces(user = currentSession.user) {
 }
 
 function getFirstAccessibleWorkspace(user = currentSession.user) {
-  return getAccessibleWorkspaces(user)[0] || "overview";
+  return getAccessibleWorkspaces(user)[0] || "warehouse";
 }
 
 function isWorkspaceAccessible(workspace, user = currentSession.user) {
@@ -4207,10 +4192,7 @@ function getDefaultLoginUsername() {
   if (saved) {
     return saved;
   }
-  if (isStagingAppOrigin() || isLegacyNipIoOrigin() || isDirectLoopPdaUserAgent()) {
-    return "";
-  }
-  return "admin_1";
+  return "";
 }
 
 function scrollLoginInputIntoView(event) {
@@ -4339,8 +4321,21 @@ function requiresRoleLanding(user = currentSession.user) {
 
 function getUserRoleLanding(user = currentSession.user) {
   const roleCode = getNormalizedRoleCode(user);
+  if (roleCode === "admin" || roleCode === "super_admin" || roleCode === "owner" || roleCode === "boss" || roleCode === "headquarters" || roleCode === "head_office") {
+    return { workspace: "admin", panelTitle: "账号 / 用户", label: "系统管理 / 账号用户" };
+  }
   if (roleCode === "area_supervisor") {
     return { workspace: "operations", panelTitle: "区域主管工作台", label: "运营中心 / 区域主管工作台" };
+  }
+  const regionalRoles = new Set(["regional_manager", "area_manager", "operations_manager"]);
+  if (regionalRoles.has(roleCode)) {
+    return { workspace: "operations", panelTitle: "1. 区域经营驾驶舱", label: "运营中心 / 区域经营驾驶舱" };
+  }
+  if (roleCode === "warehouse_manager" || roleCode === "warehouse_supervisor") {
+    return { workspace: "warehouse", panelTitle: "0. 运输 / 关单主档", label: "仓库功能区 / 服装整柜入库" };
+  }
+  if (roleCode === "warehouse_clerk" || roleCode === "warehouse_staff" || roleCode === "sorter" || roleCode === "sorting_clerk" || roleCode === "dispatcher" || roleCode === "packer" || roleCode === "warehouse_dispatcher") {
+    return { workspace: "warehouse", panelTitle: "0. 运输 / 关单主档", label: "仓库功能区 / 服装整柜入库" };
   }
   const landingResolver = storeExecutionFlow && typeof storeExecutionFlow.getStoreRoleLanding === "function"
     ? storeExecutionFlow.getStoreRoleLanding
@@ -4657,7 +4652,7 @@ function getWorkspaceNavSections(workspace) {
 }
 
 function getWorkspaceHintText(workspace = activeWorkspace, language = currentLanguage) {
-  return getI18nText(WORKSPACE_META[workspace] || WORKSPACE_META.overview, "", language);
+  return getI18nText(WORKSPACE_META[workspace] || WORKSPACE_META.warehouse, "", language);
 }
 
 function getStoreManagerPdaTab(tabId = activeStoreManagerPdaTab) {
@@ -7850,7 +7845,7 @@ function isPanelAccessible(panel, user = currentSession.user) {
   if (!isWorkspaceAccessible(workspace, user)) {
     return false;
   }
-  if (workspace === "overview" || workspace === "testing") {
+  if (workspace === "testing") {
     return true;
   }
   const allowedSections = getAccessibleSectionsForWorkspace(workspace, user);
@@ -7863,7 +7858,7 @@ function isPanelAccessible(panel, user = currentSession.user) {
 
 function setActiveWorkspace(name) {
   const mappedName = LEGACY_WORKSPACE_MAP[name] || name;
-  const requestedWorkspace = WORKSPACE_META[mappedName] ? mappedName : "overview";
+  const requestedWorkspace = WORKSPACE_META[mappedName] ? mappedName : getFirstAccessibleWorkspace();
   activeWorkspace = isWorkspaceAccessible(requestedWorkspace) ? requestedWorkspace : getFirstAccessibleWorkspace();
   localStorage.setItem("retail_ops_active_workspace", activeWorkspace);
   if (workspaceSidePanel) {
@@ -7898,19 +7893,144 @@ function getHashPanelKey() {
   return decodeURIComponent(rawHash);
 }
 
+function resolveRoutePanelKey(rawHash = getHashPanelKey()) {
+  const normalizedHash = String(rawHash || "").replace(/^#/, "").trim();
+  if (!normalizedHash) {
+    return "";
+  }
+  const normalizedKey = slugifyText(normalizedHash);
+  if (normalizedHash === "pos" || normalizedKey === "pos") {
+    return getPanelKeyByTitle("store", "9. 收银销售");
+  }
+  const retiredOverviewRoutes = new Set(["overview", "today-overview", "dashboard-overview"]);
+  if (retiredOverviewRoutes.has(normalizedHash.toLowerCase()) || retiredOverviewRoutes.has(normalizedKey)) {
+    return "";
+  }
+  const exactPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === normalizedHash);
+  if (exactPanel?.dataset?.panelKey) {
+    return exactPanel.dataset.panelKey;
+  }
+  const targetWorkspace = LEGACY_WORKSPACE_MAP[normalizedHash] || normalizedHash;
+  if (WORKSPACE_META[targetWorkspace]) {
+    return getOrderedPanelsForWorkspace(targetWorkspace)[0]?.dataset?.panelKey || "";
+  }
+  const matchedPanel = workspacePanelsList.find((panel) => {
+    const panelKey = String(panel.dataset.panelKey || "").toLowerCase();
+    const panelTitleKey = slugifyText(panel.dataset.panelTitle || "");
+    return panelKey.startsWith(normalizedKey) || panelTitleKey.startsWith(normalizedKey);
+  });
+  return matchedPanel?.dataset?.panelKey || "";
+}
+
+function getPendingRedirect() {
+  return localStorage.getItem(STORAGE_KEYS.pendingRedirect) || "";
+}
+
+function clearPendingRedirect() {
+  localStorage.removeItem(STORAGE_KEYS.pendingRedirect);
+}
+
+function savePendingRedirectFromHash() {
+  const panelKey = resolveRoutePanelKey();
+  if (!panelKey) {
+    return false;
+  }
+  localStorage.setItem(STORAGE_KEYS.pendingRedirect, panelKey);
+  return true;
+}
+
+function replaceRouteHash(panelKey = "") {
+  const nextHash = panelKey ? `#${encodeURIComponent(panelKey)}` : window.location.pathname;
+  if (panelKey && window.location.hash === nextHash) {
+    return;
+  }
+  if (window.history && typeof window.history.replaceState === "function") {
+    window.history.replaceState(window.history.state, "", nextHash);
+    return;
+  }
+  if (panelKey) {
+    window.location.hash = nextHash;
+  }
+}
+
+function redirectToRoleDefaultWorkspace(user = currentSession.user, options = {}) {
+  const { replaceRoute = true, notice = "" } = options;
+  const landing = getUserRoleLanding(user);
+  const landingWorkspace = landing?.workspace && isWorkspaceAccessible(landing.workspace, user)
+    ? landing.workspace
+    : "";
+  const workspace = landingWorkspace || getFirstAccessibleWorkspace(user);
+  let panelKey = landingWorkspace && landing?.panelTitle ? getPanelKeyByTitle(landing.workspace, landing.panelTitle) : "";
+  if (!panelKey) {
+    if (activeWorkspace !== workspace) {
+      setActiveWorkspace(workspace);
+    }
+    panelKey = getOrderedPanelsForWorkspace(workspace)[0]?.dataset?.panelKey || "";
+  }
+  if (!panelKey) {
+    return false;
+  }
+  if (activeWorkspace !== workspace) {
+    setActiveWorkspace(workspace);
+  }
+  setActivePanel(panelKey, { syncHash: !replaceRoute });
+  if (replaceRoute) {
+    replaceRouteHash(panelKey);
+  }
+  if (notice) {
+    renderAuthResultSummary("notice", { message: notice });
+  }
+  return true;
+}
+
+function resolvePendingRedirectAfterLogin(user = currentSession.user) {
+  const pendingRedirect = getPendingRedirect();
+  latestAuthRouteNotice = "";
+  if (!pendingRedirect) {
+    return redirectToRoleDefaultWorkspace(user, { replaceRoute: true });
+  }
+  const targetPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === pendingRedirect);
+  clearPendingRedirect();
+  if (targetPanel && isPanelAccessible(targetPanel, user)) {
+    setActivePanel(pendingRedirect, { syncHash: false });
+    replaceRouteHash(pendingRedirect);
+    return true;
+  }
+  latestAuthRouteNotice = "当前账号无权限访问该页面，已进入你的工作台。";
+  return redirectToRoleDefaultWorkspace(user, { replaceRoute: true, notice: latestAuthRouteNotice });
+}
+
+function enforceAuthenticatedRoute() {
+  if (currentSession.token) {
+    return true;
+  }
+  savePendingRedirectFromHash();
+  authPage?.classList.remove("hidden-screen");
+  appShell?.classList.add("hidden-screen");
+  return false;
+}
+
 function applyHashRoute() {
   const panelKey = getHashPanelKey();
   if (!panelKey) {
     return false;
   }
-  const targetPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === panelKey);
+  const resolvedPanelKey = resolveRoutePanelKey(panelKey);
+  if (!resolvedPanelKey) {
+    return redirectToRoleDefaultWorkspace(currentSession.user, { replaceRoute: true });
+  }
+  const targetPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === resolvedPanelKey);
   if (!targetPanel) {
-    return false;
+    return redirectToRoleDefaultWorkspace(currentSession.user, { replaceRoute: true });
+  }
+  if (!isPanelAccessible(targetPanel, currentSession.user)) {
+    latestAuthRouteNotice = "当前账号无权限访问该页面，已进入你的工作台。";
+    return redirectToRoleDefaultWorkspace(currentSession.user, { replaceRoute: true, notice: latestAuthRouteNotice });
   }
   if (isPdaRuntimeMode(currentSession.user) && requiresRoleLanding(currentSession.user)) {
     const landing = getUserRoleLanding(currentSession.user);
     const landingPanelKey = landing ? getPanelKeyByTitle(landing.workspace, landing.panelTitle) : "";
-    if (landingPanelKey && panelKey !== landingPanelKey) {
+    if (landingPanelKey && resolvedPanelKey !== landingPanelKey) {
       if (activeWorkspace !== landing.workspace) {
         setActiveWorkspace(landing.workspace);
       }
@@ -7926,7 +8046,7 @@ function applyHashRoute() {
       return true;
     }
   }
-  setActivePanel(panelKey, { syncHash: false });
+  setActivePanel(resolvedPanelKey, { syncHash: false });
   return true;
 }
 
@@ -7954,7 +8074,7 @@ function slugifyText(value) {
 
 function initWorkspacePageRegistry() {
   workspacePanelsList.forEach((panel, index) => {
-    const workspace = panel.dataset.workspacePanel || "overview";
+    const workspace = panel.dataset.workspacePanel || "warehouse";
     const title = panel.querySelector(".panel-head h2")?.textContent?.trim()
       || panel.querySelector(".area-supervisor-page-head h3")?.textContent?.trim()
       || panel.querySelector(".area-supervisor-topbar h2")?.textContent?.trim()
@@ -8426,8 +8546,8 @@ const FIELD_LABELS_EN = {
 };
 
 const FIELD_HELP = {
-  username: "填写要登录的账号，例如 admin_1 或 cashier_1。",
-  password: "填写这个账号的登录密码，测试账号默认是 demo1234。",
+  username: "填写要登录的账号，例如 cashier_1 或 store_manager_1。",
+  password: "填写这个账号的登录密码。",
   code: "填写门店唯一代码，例如 UTAWALA。",
   name: "填写名称，例如门店名、用户姓名或规则名。",
   contact_person: "填写联系人姓名，方便仓库和采购沟通。",
@@ -8511,8 +8631,8 @@ const FIELD_HELP = {
 };
 
 const FIELD_HELP_EN = {
-  username: "Enter the account username, for example admin_1 or cashier_1.",
-  password: "Enter this account's password. Demo accounts use demo1234.",
+  username: "Enter the account username, for example cashier_1 or store_manager_1.",
+  password: "Enter this account's password.",
   code: "Enter the store code, for example UTAWALA.",
   name: "Enter the name, such as a store, user, or rule name.",
   status: "Choose whether this record is active or inactive.",
@@ -14036,13 +14156,12 @@ function renderAuthResultSummary(kind, data) {
   }
   if (kind === "notice") {
     target.className = "candidate-summary";
-    target.innerHTML = `<div class="alert-banner">${escapeHtml(data?.message || "已设置测试入口。登录后将自动进入对应模块。")}</div>`;
+    target.innerHTML = `<div class="alert-banner">${escapeHtml(data?.message || "已设置入口。登录后将自动进入对应模块。")}</div>`;
     return;
   }
   const user = data?.user || currentSession.user;
   const landing = getUserRoleLanding(user);
   const visibleWorkspaces = getAccessibleWorkspaces(user).map((workspace) => {
-    if (workspace === "overview") return "今日总览";
     if (workspace === "testing") return "测试工具";
     if (workspace === "warehouse") return "仓库功能区";
     if (workspace === "operations") return "运营中心";
@@ -14052,7 +14171,7 @@ function renderAuthResultSummary(kind, data) {
   });
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">登录成功，当前账号可以开始测试业务流程。</div>
+    <div class="alert-banner">登录成功，当前账号可以开始使用已授权功能。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>姓名</strong><span>${escapeHtml(user?.full_name || "-")}</span></article>
       <article class="store-metric"><strong>账号</strong><span>${escapeHtml(user?.username || "-")}</span></article>
@@ -30036,7 +30155,7 @@ function buildUserPayloadFromForm(formElement, options = {}) {
     delete payload.password;
   }
   if (!isUpdate && !payload.password) {
-    payload.password = "demo1234";
+    throw new Error("请填写新账号临时密码。");
   }
   delete payload.user_id;
   return payload;
@@ -30055,7 +30174,7 @@ async function deactivateUserFromList(userId) {
     throw new Error("不能停用当前登录账号。");
   }
   if (user.username === "admin_1") {
-    throw new Error("admin_1 不能被停用。");
+    throw new Error("系统内置管理员不能被停用。");
   }
   const payload = {
     username: user.username,
@@ -30118,9 +30237,9 @@ async function deleteUserFromList(userId) {
     throw new Error("当前登录账号不能删除自己。");
   }
   if (user.username === "admin_1") {
-    throw new Error("admin_1 不能被删除。");
+    throw new Error("系统内置管理员不能被删除。");
   }
-  const confirmMessage = "确认删除该用户？此操作仅用于测试环境。";
+  const confirmMessage = "确认删除该用户？请先确认账号已不再承担业务操作。";
   if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(confirmMessage)) {
     return;
   }
@@ -30606,6 +30725,9 @@ function renderPriceAlerts(rows) {
   priceAlertState = Array.isArray(rows) ? rows : [];
   const summaryTarget = document.querySelector("#priceAlertSummary");
   const listTarget = document.querySelector("#priceAlertList");
+  if (!summaryTarget || !listTarget) {
+    return;
+  }
   const todayKey = getLocalDateKey(new Date().toISOString());
   const todayRows = priceAlertState.filter((row) => getLocalDateKey(row.created_at) === todayKey);
   const breachCount = priceAlertState.filter((row) => row.event_type === "sale.price_policy_breach").length;
@@ -30814,7 +30936,7 @@ function setSession(session) {
   };
   persistSession(currentSession);
   renderSessionState();
-  const routed = applyUserDefaultLanding(currentSession.user, { force: true });
+  const routed = resolvePendingRedirectAfterLogin(session.user);
   if (!routed && requiresRoleLanding(currentSession.user)) {
     renderLoginRoutingFailure(currentSession.user);
   }
@@ -30839,7 +30961,8 @@ function ensureLoginPasswordCleared() {
   window.setTimeout(clearLoginPasswordField, 500);
 }
 
-function clearSession(message = "Not signed in.") {
+function clearSession(message = "Not signed in.", options = {}) {
+  const { clearPending = false, replaceRoute = false } = options;
   stopPdaRuntimePolling();
   stopClerkBluetoothPrinterStatusPolling();
   currentSession = { token: "", user: null };
@@ -30848,6 +30971,9 @@ function clearSession(message = "Not signed in.") {
   clearSortingTaskLockedShipment();
   localStorage.removeItem(STORAGE_KEYS.token);
   localStorage.removeItem(STORAGE_KEYS.user);
+  if (clearPending) {
+    clearPendingRedirect();
+  }
   document.body.classList.remove("cashier-terminal-mode");
   appShell?.classList.remove("cashier-terminal-mode");
   syncPdaRuntimeMode(null);
@@ -30863,6 +30989,9 @@ function clearSession(message = "Not signed in.") {
   clearLoginPasswordField();
   authPage?.classList.remove("hidden-screen");
   appShell?.classList.add("hidden-screen");
+  if (replaceRoute && window.history && typeof window.history.replaceState === "function") {
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+  }
   ensureLoginPasswordCleared();
   window.scrollTo({ top: 0, behavior: "auto" });
   renderAuthResultSummary("logout");
@@ -42314,7 +42443,11 @@ async function submitLoginFromForm(form) {
   if (!routed && requiresRoleLanding(currentSession.user)) {
     return;
   }
-  renderAuthResultSummary("login", result);
+  if (latestAuthRouteNotice) {
+    renderAuthResultSummary("notice", { message: latestAuthRouteNotice });
+  } else {
+    renderAuthResultSummary("login", result);
+  }
   await loadPostLoginDataForRole(currentSession.user);
 }
 
@@ -42350,7 +42483,7 @@ async function submitLogout() {
   } catch (error) {
     // Session may already be invalid; we still want to clear local state.
   }
-  clearSession();
+  clearSession("Logged out.", { clearPending: true, replaceRoute: true });
   authOutput.textContent = "Logged out.";
   renderAuthResultSummary("logout");
 }
@@ -47149,6 +47282,9 @@ workspaceNextButton?.addEventListener("click", () => {
 });
 
 window.addEventListener("hashchange", () => {
+  if (!enforceAuthenticatedRoute()) {
+    return;
+  }
   applyHashRoute();
 });
 
@@ -51375,8 +51511,12 @@ renderChinaSourceCostSummary();
 renderStoreManagerPdaPreview();
 initWorkspacePageRegistry();
 syncWorkspacePanelHeadingsToNavTitles();
-if (!applyHashRoute()) {
-  setActiveWorkspace(activeWorkspace);
+if (currentSession.token) {
+  if (!applyHashRoute()) {
+    setActiveWorkspace(activeWorkspace);
+  }
+} else {
+  enforceAuthenticatedRoute();
 }
 setCurrentInboundShipment(resolveCurrentInboundShipmentNo());
 initializeGlobalI18n();

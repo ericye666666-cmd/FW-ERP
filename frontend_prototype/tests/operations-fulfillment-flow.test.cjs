@@ -1607,7 +1607,7 @@ test("warehouse access profiles follow the current warehouse menu groups", () =>
   assert.match(appJs, /warehouse:\s*\["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"\]/);
   assert.match(
     appJs,
-    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["overview", "warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"\]/,
+    /warehouseManagerRoles[\s\S]*?createRoleAccessProfile\(\["warehouse"\],\s*\{\s*warehouse:\s*\["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"\]/,
   );
   assert.match(
     appJs,

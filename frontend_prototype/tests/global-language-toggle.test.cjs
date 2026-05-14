@@ -418,7 +418,7 @@ test("user management generated field labels and help copy are translated", () =
     ["区域代码", "Area Code"],
     ["管辖门店", "Managed Stores"],
     ["临时密码", "Temporary Password"],
-    ["填写要登录的账号，例如 admin_1 或 cashier_1。", "Enter the account username, for example admin_1 or cashier_1."],
+    ["填写要登录的账号，例如 cashier_1 或 store_manager_1。", "Enter the account username, for example cashier_1 or store_manager_1."],
     ["填写员工真实姓名，方便审计日志和权限管理。", "Enter the staff member's real name for audit logs and access control."],
     ["选择角色，例如 admin、cashier、store_manager。", "Select a role such as admin, cashier, or store_manager."],
     ["填写所属门店代码；如果是总管理员可留系统默认。", "Enter the assigned store code. Leave blank for global admin accounts."],

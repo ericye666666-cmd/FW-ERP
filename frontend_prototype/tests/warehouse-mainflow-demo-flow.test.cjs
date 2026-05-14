@@ -3,12 +3,17 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
+const warehouseMainflowDemoFlow = require("../warehouse-mainflow-demo-flow.js");
+const warehouseMainflowDemoExports = Object.keys(warehouseMainflowDemoFlow).length
+  ? warehouseMainflowDemoFlow
+  : globalThis.WarehouseMainflowDemoFlow || {};
+
 const {
   DEFAULT_WAREHOUSE_MAINFLOW_DEMO_TEMPLATE,
   buildWarehouseMainflowDemoSummary,
   DEFAULT_STORE_REPLENISHMENT_DEMO_TEMPLATE,
   buildStoreReplenishmentDemoSummary,
-} = require("../warehouse-mainflow-demo-flow.js");
+} = warehouseMainflowDemoExports;
 
 test("warehouse mainflow demo template keeps the fixed bale plan", () => {
   assert.equal(DEFAULT_WAREHOUSE_MAINFLOW_DEMO_TEMPLATE.perBaleWeightKg, 50);
@@ -47,13 +52,13 @@ test("buildWarehouseMainflowDemoSummary returns the latest generated shipment me
   assert.equal(summary.categories[0].source_category_sub, "summer+");
 });
 
-test("overview test tool exposes the one-click warehouse mainflow demo trigger", () => {
+test("testing workspace exposes the one-click warehouse mainflow demo trigger", () => {
   const html = fs.readFileSync(
     path.join(__dirname, "../index.html"),
     "utf8",
   );
-  assert.match(html, /data-action="generate-warehouse-mainflow-demo"/);
-  assert.match(html, /id="warehouseMainflowDemoSummary"/);
+  assert.match(html, /data-workspace-panel="testing"[\s\S]*data-action="generate-warehouse-mainflow-demo"/);
+  assert.match(html, /data-workspace-panel="testing"[\s\S]*id="warehouseMainflowDemoSummary"/);
 });
 
 test("store replenishment demo template keeps warehouse, store, and sell-through targets", () => {
@@ -88,11 +93,11 @@ test("buildStoreReplenishmentDemoSummary returns recommendation-ready metrics", 
   assert.equal(summary.waitingStoreDispatchBaleCount, 60);
 });
 
-test("overview test tool exposes the one-click store replenishment demo trigger", () => {
+test("testing workspace exposes the one-click store replenishment demo trigger", () => {
   const html = fs.readFileSync(
     path.join(__dirname, "../index.html"),
     "utf8",
   );
-  assert.match(html, /data-action="generate-store-replenishment-demo"/);
-  assert.match(html, /id="storeReplenishmentDemoSummary"/);
+  assert.match(html, /data-workspace-panel="testing"[\s\S]*data-action="generate-store-replenishment-demo"/);
+  assert.match(html, /data-workspace-panel="testing"[\s\S]*id="storeReplenishmentDemoSummary"/);
 });

@@ -128,7 +128,7 @@ test("role access profiles keep each account inside its operational workspace", 
   );
   const cashierBlock = profileSource.slice(
     profileSource.indexOf("const cashierRoles"),
-    profileSource.indexOf("return createRoleAccessProfile([\"overview\"], {})"),
+    profileSource.indexOf("return createRoleAccessProfile([], {})"),
   );
 
   assert.match(profileSource, /const warehouseManagerRoles = new Set\(\["warehouse_manager", "warehouse_supervisor"\]\)/);
@@ -142,7 +142,7 @@ test("role access profiles keep each account inside its operational workspace", 
   assert.match(profileSource, /if \(roleCode === "area_supervisor"\)/);
   assert.match(profileSource, /operations:\s*\["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings"\]/);
   assert.match(profileSource, /const regionalRoles = new Set\(\["regional_manager", "area_manager", "operations_manager"\]\)/);
-  assert.match(profileSource, /return createRoleAccessProfile\(\["overview", "operations"\], \{\s*operations:\s*\["insight", "action", "governance"\]/);
+  assert.match(profileSource, /return createRoleAccessProfile\(\["operations"\], \{\s*operations:\s*\["insight", "action", "governance"\]/);
   assert.doesNotMatch(cashierBlock, /warehouse:\s*\[/);
   assert.doesNotMatch(warehouseWorkerBlock, /store:\s*\["cashier"\]/);
 });

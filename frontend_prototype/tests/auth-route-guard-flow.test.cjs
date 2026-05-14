@@ -49,7 +49,7 @@ test("all routes are gated by login and unauthenticated deep links become pendin
 
 test("login resolves pending redirect by role access and otherwise lands on role default", () => {
   const setSessionSource = extractFunctionSource(appJs, "setSession");
-  const submitLoginSource = extractFunctionSource(appJs, "submitLogin");
+  const submitLoginSource = extractFunctionSource(appJs, "submitLoginFromForm");
   const resolveSource = extractFunctionSource(appJs, "resolvePendingRedirectAfterLogin");
   const defaultSource = extractFunctionSource(appJs, "redirectToRoleDefaultWorkspace");
   const hashSource = extractFunctionSource(appJs, "applyHashRoute");
