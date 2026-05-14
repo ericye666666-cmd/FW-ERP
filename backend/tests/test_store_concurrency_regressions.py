@@ -448,11 +448,13 @@ def test_manual_unbarcoded_sale_does_not_generate_store_item_or_standard_invento
             "idempotency_key": "manual-concurrency-regression",
             "items": [
                 {
-                    "line_type": "MANUAL_UNBARCODED",
+                    "line_type": "manual_unbarcoded",
                     "category": "MANUAL",
+                    "description": "Loose item without barcode",
                     "qty": 1,
                     "unit_price": 125,
                     "final_price": 125,
+                    "manual_reason": "Label damaged",
                 }
             ],
         },
@@ -460,7 +462,9 @@ def test_manual_unbarcoded_sale_does_not_generate_store_item_or_standard_invento
     )
     report = state.get_pos_shift_x_report("UTAWALA", shift["shift_id"])
 
-    assert sale["items"][0]["line_type"] == "MANUAL_UNBARCODED"
+    assert sale["items"][0]["line_type"] == "manual_unbarcoded"
+    assert sale["items"][0]["manual_reason"] == "Label damaged"
+    assert sale["items"][0]["requires_audit"] is True
     assert sale["items"][0]["inventory_tracked"] is False
     assert state.store_items == {}
     assert state.item_barcode_tokens == {}

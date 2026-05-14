@@ -44,12 +44,19 @@ class SaleCreate(BaseModel):
 class PosSaleItemCreate(BaseModel):
     line_type: str = "STORE_ITEM"
     machine_code: str = ""
+    store_item_machine_code: str = ""
     display_code: str = ""
+    barcode_type: str = ""
+    description: str = ""
     final_price: float = Field(ge=0)
     discount_amount: float = Field(default=0, ge=0)
     category: str = ""
     qty: int = Field(default=1, ge=1)
     unit_price: float = Field(default=0, ge=0)
+    manual_reason: str = ""
+    requires_audit: bool = False
+    inventory_tracked: bool = True
+    created_by: str = ""
 
 
 class PosSaleCreate(BaseModel):
@@ -72,16 +79,23 @@ class PosSaleItemResponse(BaseModel):
     store_item_id: str
     display_code: str
     machine_code: str
+    barcode: str = ""
+    barcode_type: str = "STORE_ITEM"
     line_type: str = "STORE_ITEM"
     category: str = ""
+    description: str = ""
     shelf_location: str = ""
     original_price: float
     final_price: float
+    subtotal: float = 0
     discount_amount: float
     store_code: str
     qty: int = 1
     unit_price: float = 0
+    manual_reason: str = ""
+    requires_audit: bool = False
     inventory_tracked: bool = True
+    created_by: str = ""
 
 
 class PosSaleResponse(BaseModel):

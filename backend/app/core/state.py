@@ -17835,6 +17835,12 @@ class InMemoryState:
             return "MANUAL_UNBARCODED"
         return normalized
 
+    def _pos_sale_response_line_type(self, value: Any) -> str:
+        normalized = self._normalize_pos_sale_line_type(value)
+        if normalized == "MANUAL_UNBARCODED":
+            return "manual_unbarcoded"
+        return normalized
+
     def _normalize_pos_sale_idempotency_key(self, value: Any) -> str:
         return str(value or "").strip()
 
@@ -17910,9 +17916,21 @@ class InMemoryState:
         return None
 
     def _validate_pos_manual_unbarcoded_item(self, store_code: str, item: dict[str, Any], line_no: int) -> dict[str, Any]:
-        qty = int(item.get("qty") if item.get("qty") not in (None, "") else 1)
+        try:
+            qty = int(item.get("qty") if item.get("qty") not in (None, "") else 1)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual qty must be a valid integer.") from exc
         if qty < 1:
             raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual qty must be at least 1.")
+        category = str(item.get("category") or item.get("category_name") or "").strip()
+        if not category:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual category is required.")
+        description = str(item.get("description") or "").strip()
+        if not description:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual description is required.")
+        manual_reason = str(item.get("manual_reason") or item.get("reason") or "").strip()
+        if not manual_reason:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual manual_reason is required.")
         unit_price_value = item.get("unit_price")
         if unit_price_value in (None, ""):
             if item.get("final_price") not in (None, ""):
@@ -17922,27 +17940,40 @@ class InMemoryState:
         unit_price = self._pos_sale_money(unit_price_value, "unit_price")
         if unit_price <= 0:
             raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual unit_price must be greater than 0.")
-        computed_price = round(unit_price * qty, 2)
-        final_price = self._pos_sale_money(item.get("final_price", computed_price), "final_price")
-        if final_price != computed_price:
-            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual final_price must equal qty × unit_price.")
-        category = str(item.get("category") or item.get("category_name") or "MANUAL").strip().upper() or "MANUAL"
+        subtotal = round(unit_price * qty, 2)
+        discount_amount = self._pos_sale_money(item.get("discount_amount", 0), "discount_amount")
+        if discount_amount > subtotal:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual discount_amount cannot exceed subtotal.")
+        expected_final_price = round(subtotal - discount_amount, 2)
+        final_price = self._pos_sale_money(
+            item.get("final_price") if item.get("final_price") not in (None, "") else expected_final_price,
+            "final_price",
+        )
+        if abs(final_price - expected_final_price) > 0.0001:
+            raise HTTPException(status_code=400, detail=f"第 {line_no} 行 manual final_price must equal qty × unit_price minus discount_amount.")
         return {
             "line_no": line_no,
-            "line_type": "MANUAL_UNBARCODED",
+            "line_type": "manual_unbarcoded",
             "store_item": None,
             "token": None,
             "store_item_id": "",
-            "display_code": str(item.get("display_code") or f"MANUAL-{line_no}").strip().upper(),
+            "display_code": "MANUAL",
             "machine_code": "",
+            "barcode": "",
+            "barcode_type": "NONE",
             "category": category,
+            "description": description,
             "shelf_location": "",
-            "original_price": computed_price,
+            "original_price": subtotal,
             "final_price": final_price,
-            "discount_amount": self._pos_sale_money(item.get("discount_amount", 0), "discount_amount"),
+            "subtotal": subtotal,
+            "discount_amount": discount_amount,
             "qty": qty,
             "unit_price": unit_price,
+            "manual_reason": manual_reason,
+            "requires_audit": True,
             "inventory_tracked": False,
+            "created_by": str(item.get("created_by") or "").strip(),
             "from_status": "",
         }
 
@@ -18519,15 +18550,22 @@ class InMemoryState:
                 "display_code": validated["display_code"],
                 "machine_code": validated["machine_code"],
                 "line_type": validated["line_type"],
+                "barcode": validated.get("barcode", validated["machine_code"]),
+                "barcode_type": validated.get("barcode_type") or ("NONE" if self._normalize_pos_sale_line_type(validated["line_type"]) == "MANUAL_UNBARCODED" else "STORE_ITEM"),
                 "category": validated["category"],
+                "description": validated.get("description", ""),
                 "shelf_location": validated["shelf_location"],
                 "original_price": validated["original_price"],
                 "final_price": validated["final_price"],
+                "subtotal": validated.get("subtotal", validated["final_price"]),
                 "discount_amount": validated["discount_amount"],
                 "store_code": normalized_store,
                 "qty": validated["qty"],
                 "unit_price": validated["unit_price"],
+                "manual_reason": validated.get("manual_reason", ""),
+                "requires_audit": bool(validated.get("requires_audit", False)),
                 "inventory_tracked": validated["inventory_tracked"],
+                "created_by": validated.get("created_by") or cashier_id,
             }
             response_items.append(response_item)
             legacy_items.append(
@@ -18747,16 +18785,27 @@ class InMemoryState:
                     "store_item_id": str(item.get("store_item_id") or "").strip(),
                     "display_code": str(item.get("display_code") or "").strip(),
                     "machine_code": str(item.get("machine_code") or "").strip(),
-                    "line_type": self._normalize_pos_sale_line_type(item.get("line_type")),
+                    "barcode": str(item.get("barcode") or ("" if self._normalize_pos_sale_line_type(item.get("line_type")) == "MANUAL_UNBARCODED" else item.get("machine_code") or "")).strip(),
+                    "barcode_type": str(item.get("barcode_type") or ("NONE" if self._normalize_pos_sale_line_type(item.get("line_type")) == "MANUAL_UNBARCODED" else "STORE_ITEM")).strip().upper(),
+                    "line_type": self._pos_sale_response_line_type(item.get("line_type")),
                     "category": str(item.get("category") or "").strip(),
+                    "description": str(item.get("description") or "").strip(),
                     "shelf_location": str(item.get("shelf_location") or "").strip(),
                     "original_price": round(float(item.get("original_price") or 0), 2),
                     "final_price": round(float(item.get("final_price") or 0), 2),
+                    "subtotal": round(float(item.get("subtotal") if item.get("subtotal") not in (None, "") else item.get("final_price") or 0), 2),
                     "discount_amount": round(float(item.get("discount_amount") or 0), 2),
                     "store_code": str(item.get("store_code") or row.get("store_code") or "").strip().upper(),
                     "qty": int(item.get("qty") or 1),
                     "unit_price": round(float(item.get("unit_price") or item.get("final_price") or 0), 2),
+                    "manual_reason": str(item.get("manual_reason") or "").strip(),
+                    "requires_audit": (
+                        True
+                        if self._normalize_pos_sale_line_type(item.get("line_type")) == "MANUAL_UNBARCODED"
+                        else bool(item.get("requires_audit", False))
+                    ),
                     "inventory_tracked": bool(item.get("inventory_tracked", True)),
+                    "created_by": str(item.get("created_by") or row.get("cashier_id") or row.get("cashier_name") or "").strip(),
                 }
                 for index, item in enumerate(sale_items, start=1)
             ],

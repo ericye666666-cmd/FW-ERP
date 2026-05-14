@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import settings
 from app.core.seed_data import STORE_RACK_TEMPLATE
 from app.core.state import InMemoryState
+from app.schemas.sales import PosSaleResponse
 
 
 @pytest.fixture()
@@ -146,6 +147,37 @@ def _sale_payload(
     return payload
 
 
+def _manual_item_payload(
+    *,
+    category="Accessories",
+    description="Loose item without barcode",
+    qty=2,
+    unit_price=125,
+    manual_reason="Label damaged",
+    discount_amount=0,
+    final_price=None,
+):
+    item = {
+        "line_type": "manual_unbarcoded",
+        "barcode_type": "NONE",
+        "display_code": "MANUAL",
+        "machine_code": "",
+        "category": category,
+        "description": description,
+        "qty": qty,
+        "unit_price": unit_price,
+        "discount_amount": discount_amount,
+        "manual_reason": manual_reason,
+        "requires_audit": True,
+        "inventory_tracked": False,
+    }
+    if final_price is not None:
+        item["final_price"] = final_price
+    else:
+        item["final_price"] = max(qty * unit_price - discount_amount, 0)
+    return item
+
+
 def test_pos_sale_success_single_store_item(state):
     _add_store_item(state, _store_item())
     shift = _open_shift(state)
@@ -271,6 +303,8 @@ def test_concurrent_pos_sale_same_store_item_only_completes_once(state):
 
 
 def test_manual_unbarcoded_sale_remains_separate_from_store_item_inventory(state):
+    _add_store_item(state, _store_item(store_item_id="STOREITEM-MANUAL-CONTROL", machine_code="5261240000990"))
+    before_store_item = dict(state.store_items["STOREITEM-MANUAL-CONTROL"])
     shift = _open_shift(state)
 
     sale = state.create_pos_sale(
@@ -283,32 +317,118 @@ def test_manual_unbarcoded_sale_remains_separate_from_store_item_inventory(state
             "cash_amount": 500,
             "discount_amount": 0,
             "idempotency_key": "manual-unbarcoded-001",
-            "items": [
-                {
-                    "line_type": "MANUAL_UNBARCODED",
-                    "category": "MANUAL",
-                    "qty": 2,
-                    "unit_price": 125,
-                    "final_price": 250,
-                }
-            ],
+            "items": [_manual_item_payload()],
         },
         created_by="store_manager_1",
     )
+    response = PosSaleResponse(**sale)
     report = state.get_pos_shift_x_report("UTAWALA", shift["shift_id"])
+    item = sale["items"][0]
 
     assert sale["sale_no"]
-    assert sale["items"][0]["line_type"] == "MANUAL_UNBARCODED"
-    assert sale["items"][0]["machine_code"] == ""
-    assert sale["items"][0]["inventory_tracked"] is False
-    assert not state.store_items
-    assert not state.item_barcode_tokens
+    assert item["line_type"] == "manual_unbarcoded"
+    assert item["barcode_type"] == "NONE"
+    assert item["display_code"] == "MANUAL"
+    assert item["machine_code"] == ""
+    assert item["barcode"] == ""
+    assert item["store_item_id"] == ""
+    assert item["category"] == "Accessories"
+    assert item["description"] == "Loose item without barcode"
+    assert item["qty"] == 2
+    assert item["unit_price"] == 125
+    assert item["subtotal"] == 250
+    assert item["final_price"] == 250
+    assert item["manual_reason"] == "Label damaged"
+    assert item["requires_audit"] is True
+    assert item["inventory_tracked"] is False
+    assert item["created_by"] == "Clerk A"
+    assert response.items[0].line_type == "manual_unbarcoded"
+    assert response.items[0].barcode_type == "NONE"
+    assert response.items[0].description == "Loose item without barcode"
+    assert response.items[0].manual_reason == "Label damaged"
+    assert response.items[0].requires_audit is True
+    assert state.store_items["STOREITEM-MANUAL-CONTROL"] == before_store_item
     assert not state.list_inventory_movements(movement_type="POS_SALE_OUT")
-    assert state.sales_transactions[0]["sale_items"][0]["line_type"] == "MANUAL_UNBARCODED"
+    assert state.sales_transactions[0]["sale_items"][0]["line_type"] == "manual_unbarcoded"
     assert report["manual_item_count"] == 2
     assert report["manual_sales_amount"] == 250
     assert report["category_breakdown"][0]["manual_qty"] == 2
     assert report["category_breakdown"][0]["store_item_qty"] == 0
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value"),
+    [
+        ("category", ""),
+        ("description", ""),
+        ("unit_price", 0),
+        ("qty", 0),
+        ("manual_reason", ""),
+    ],
+)
+def test_manual_unbarcoded_sale_requires_audit_fields(state, field_name, bad_value):
+    shift = _open_shift(state)
+    item = _manual_item_payload()
+    item[field_name] = bad_value
+    if field_name in {"qty", "unit_price"}:
+        item["final_price"] = 0
+
+    with pytest.raises(HTTPException) as exc:
+        state.create_pos_sale(
+            "UTAWALA",
+            {
+                "cashier_id": "Clerk A",
+                "shift_id": shift["shift_id"],
+                "terminal_id": "POS-UTW-01",
+                "payment_method": "cash",
+                "cash_amount": 500,
+                "idempotency_key": f"manual-required-{field_name}",
+                "items": [item],
+            },
+            created_by="store_manager_1",
+        )
+
+    assert exc.value.status_code == 400
+    assert field_name in str(exc.value.detail)
+
+
+def test_mixed_store_item_and_manual_unbarcoded_sale_only_mutates_store_item(state):
+    _add_store_item(state, _store_item())
+    shift = _open_shift(state)
+
+    sale = state.create_pos_sale(
+        "UTAWALA",
+        {
+            "cashier_id": "Clerk A",
+            "shift_id": shift["shift_id"],
+            "terminal_id": "POS-UTW-01",
+            "payment_method": "cash",
+            "cash_amount": 600,
+            "idempotency_key": "mixed-store-item-manual-001",
+            "items": [
+                {
+                    "machine_code": "5261240000013",
+                    "display_code": "STOREITEM-POS-001",
+                    "final_price": 250,
+                    "discount_amount": 0,
+                },
+                _manual_item_payload(qty=1, unit_price=125, final_price=125),
+            ],
+        },
+        created_by="store_manager_1",
+    )
+
+    assert sale["total_amount"] == 375
+    assert sum(item["qty"] for item in sale["items"]) == 2
+    store_line, manual_line = sale["items"]
+    assert store_line["line_type"] == "STORE_ITEM"
+    assert store_line["machine_code"] == "5261240000013"
+    assert manual_line["line_type"] == "manual_unbarcoded"
+    assert manual_line["machine_code"] == ""
+    assert manual_line["inventory_tracked"] is False
+    assert state.store_items["STOREITEM-POS-001"]["status"] == "sold"
+    assert state.item_barcode_tokens["STOREITEM-POS-001"]["sale_status"] == "sold"
+    assert len(state.list_inventory_movements(movement_type="POS_SALE_OUT")) == 1
 
 
 def test_pos_sale_success_multiple_items_reduces_inventory_overview(state):
