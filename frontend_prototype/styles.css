@@ -1361,6 +1361,7 @@ body.cashier-terminal-mode .cashier-terminal-shell textarea {
   .cashier-terminal-scan-form,
   .cashier-terminal-cart-grid,
   .cashier-terminal-drawer-grid,
+  .cashier-manual-drawer-grid,
   .cashier-terminal-total-grid,
   .cashier-terminal-lookup-grid {
     grid-template-columns: 1fr;
@@ -11062,6 +11063,26 @@ body.cashier-terminal-mode .preview-metrics {
   min-width: 180px;
 }
 
+body.cashier-terminal-mode .cashier-manual-item-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+body.cashier-terminal-mode .cashier-manual-item-button {
+  display: inline-grid;
+  gap: 2px;
+  align-content: center;
+  justify-items: start;
+  min-width: 150px;
+}
+
+body.cashier-terminal-mode .cashier-manual-item-button small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 body.cashier-terminal-mode .preview-metrics strong {
   display: block;
   margin-top: 4px;
@@ -11102,6 +11123,11 @@ body.cashier-terminal-mode .basket-row.is-override-pending {
   box-shadow: inset 0 0 0 1px rgba(185, 75, 69, 0.12);
 }
 
+body.cashier-terminal-mode .cashier-cart-row.is-manual-item {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
 body.cashier-terminal-mode .cashier-terminal-row-head {
   display: flex;
   justify-content: space-between;
@@ -11133,6 +11159,18 @@ body.cashier-terminal-mode .meta-chip {
 body.cashier-terminal-mode .meta-chip.danger {
   background: #fef2f2;
   color: #991b1b;
+}
+
+body.cashier-terminal-mode .manual-audit-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 body.cashier-terminal-mode .remove-btn {
@@ -11393,6 +11431,37 @@ body.cashier-terminal-mode .drawer-body {
   overflow: auto;
   display: grid;
   gap: 14px;
+}
+
+body.cashier-terminal-mode .cashier-manual-audit-card {
+  display: grid;
+  gap: 5px;
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+body.cashier-terminal-mode .cashier-manual-audit-card strong {
+  font-size: 15px;
+}
+
+body.cashier-terminal-mode .cashier-manual-audit-card span {
+  color: #92400e;
+  line-height: 1.4;
+}
+
+body.cashier-terminal-mode .cashier-manual-drawer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.cashier-terminal-mode .cashier-manual-reason-field {
+  grid-column: 1 / -1;
+}
+
+body.cashier-terminal-mode .cashier-manual-drawer-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 body.cashier-terminal-mode .drawer-close {

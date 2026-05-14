@@ -31083,6 +31083,14 @@ function createCashierTerminalPaymentLine(method = "cash") {
   };
 }
 
+const CASHIER_TERMINAL_MANUAL_ITEM_REASONS = Object.freeze([
+  "Tag missing",
+  "Label damaged",
+  "Legacy item",
+  "Manager approved manual sale",
+  "Other",
+]);
+
 function createCashierTerminalState() {
   return {
     currentLookupResult: null,
@@ -31123,6 +31131,11 @@ function createCashierTerminalState() {
     anomalyReference: "",
     anomalyCustomerId: "",
     anomalyNote: "已核实并完成处理",
+    manualItemCategory: "",
+    manualItemDescription: "",
+    manualItemQuantity: "1",
+    manualItemUnitPrice: "",
+    manualItemReason: "Tag missing",
   };
 }
 
@@ -32921,6 +32934,13 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.scanErrorTitle = cashierTerminalState.scanErrorTitle || "";
   cashierTerminalState.scanErrorDetail = cashierTerminalState.scanErrorDetail || "";
   cashierTerminalState.pendingReprintSaleNo = cashierTerminalState.pendingReprintSaleNo || "";
+  cashierTerminalState.manualItemCategory = String(cashierTerminalState.manualItemCategory || "").trim();
+  cashierTerminalState.manualItemDescription = String(cashierTerminalState.manualItemDescription || "").trim();
+  cashierTerminalState.manualItemQuantity = String(cashierTerminalState.manualItemQuantity || "1").trim() || "1";
+  cashierTerminalState.manualItemUnitPrice = String(cashierTerminalState.manualItemUnitPrice || "").trim();
+  if (!CASHIER_TERMINAL_MANUAL_ITEM_REASONS.includes(cashierTerminalState.manualItemReason)) {
+    cashierTerminalState.manualItemReason = "Tag missing";
+  }
 }
 
 syncCashierTerminalMode = function () {
@@ -32951,14 +32971,91 @@ focusCashierTerminalScanInput = function ({ select = true } = {}) {
 getCashierTerminalTotals = function () {
   ensureCashierTerminalPreviewState();
   const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
-  const subtotal = rows.reduce((sum, row) => sum + Number(row.price || row.selling_price || 0), 0);
+  const subtotal = rows.reduce((sum, row) => sum + getCashierTerminalCartRowSubtotal(row), 0);
+  const totalItems = rows.reduce((sum, row) => {
+    if (isCashierTerminalManualUnbarcodedLine(row)) {
+      return sum + Math.max(1, Number(row.quantity || row.qty || 1) || 1);
+    }
+    return sum + 1;
+  }, 0);
   const discount = Math.min(normalizeCashierTerminalNumber(cashierTerminalState.discountAmount), subtotal);
   return {
-    totalItems: rows.length,
+    totalItems,
     subtotal,
     discount,
     totalAmount: Math.max(subtotal - discount, 0),
   };
+}
+
+function isCashierTerminalManualUnbarcodedLine(row = {}) {
+  return String(row?.line_type || "").trim().toLowerCase() === "manual_unbarcoded"
+    || String(row?.barcode_type || "").trim().toUpperCase() === "NONE";
+}
+
+function getCashierTerminalCartRowSubtotal(row = {}) {
+  if (isCashierTerminalManualUnbarcodedLine(row)) {
+    const qty = Math.max(1, Number(row.quantity || row.qty || 1) || 1);
+    const unitPrice = normalizeCashierTerminalNumber(row.unit_price || row.price || row.selling_price || 0);
+    return normalizeCashierTerminalNumber(row.subtotal || row.final_price || unitPrice * qty);
+  }
+  return normalizeCashierTerminalNumber(row.price || row.selling_price || row.final_price || 0);
+}
+
+function buildCashierTerminalManualUnbarcodedLine() {
+  ensureCashierTerminalPreviewState();
+  const category = String(cashierTerminalState.manualItemCategory || "").trim();
+  const description = String(cashierTerminalState.manualItemDescription || "").trim();
+  const quantity = Math.max(1, Number(cashierTerminalState.manualItemQuantity || 1) || 1);
+  const unitPrice = normalizeCashierTerminalNumber(cashierTerminalState.manualItemUnitPrice);
+  const manualReason = String(cashierTerminalState.manualItemReason || "Tag missing").trim() || "Tag missing";
+  if (!category) {
+    throw new Error("请填写无码商品品类。");
+  }
+  if (!description) {
+    throw new Error("请填写无码商品描述。");
+  }
+  if (unitPrice <= 0) {
+    throw new Error("请填写无码商品单价。");
+  }
+  const subtotal = normalizeCashierTerminalNumber(unitPrice * quantity);
+  return {
+    row_uid: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    line_type: "manual_unbarcoded",
+    barcode_type: "NONE",
+    store_item_machine_code: null,
+    machine_code: "",
+    barcode: "",
+    display_code: "MANUAL",
+    product_name: "Manual Item / 无码商品",
+    description,
+    category,
+    quantity,
+    qty: quantity,
+    unit_price: unitPrice,
+    price: subtotal,
+    selling_price: unitPrice,
+    subtotal,
+    final_price: subtotal,
+    manual_reason: manualReason,
+    created_by: getCashierTerminalCashierName(),
+    requires_audit: true,
+    inventory_tracked: false,
+  };
+}
+
+function addCashierTerminalManualItemToCart() {
+  const line = buildCashierTerminalManualUnbarcodedLine();
+  ensureCashierTerminalPreviewState();
+  cashierTerminalState.cartItems.push(line);
+  cashierTerminalState.manualItemCategory = "";
+  cashierTerminalState.manualItemDescription = "";
+  cashierTerminalState.manualItemQuantity = "1";
+  cashierTerminalState.manualItemUnitPrice = "";
+  cashierTerminalState.manualItemReason = "Tag missing";
+  cashierTerminalState.activeDrawer = "";
+  renderCashierTerminal();
+  showTransientInlineNotice("#cashierTerminalInlineNotice", "已加入无码商品，销售记录需审计。", "warning", 1800);
+  focusCashierTerminalScanInput({ select: false });
 }
 
 getCashierTerminalPaymentAssignedTotal = function () {
@@ -33124,7 +33221,7 @@ renderCashierTerminalCart = function () {
     <div class="cashier-cart-header">
       <span>STORE_ITEM 商品码</span>
       <span>品类</span>
-      <span>货架位</span>
+      <span>货架 / 原因</span>
       <span>价格</span>
       <span>数量</span>
       <span>折扣</span>
@@ -33132,9 +33229,32 @@ renderCashierTerminalCart = function () {
       <span></span>
     </div>
     ${rows.map((row, index) => {
-      const price = Number(row.price || 0);
+      const manualLine = isCashierTerminalManualUnbarcodedLine(row);
+      const qty = manualLine ? Math.max(1, Number(row.quantity || row.qty || 1) || 1) : 1;
+      const unitPrice = manualLine
+        ? normalizeCashierTerminalNumber(row.unit_price || row.selling_price || row.price || 0)
+        : Number(row.price || 0);
+      const lineTotal = getCashierTerminalCartRowSubtotal(row);
       const sourceSummary = String(row.source_summary || "").trim();
       const sourceLine = /^(SDO|SDP)/i.test(sourceSummary) ? `<small>来源: ${escapeHtml(sourceSummary)}</small>` : "";
+      if (manualLine) {
+        return `
+          <article class="cashier-cart-row is-manual-item">
+            <div class="cart-code">
+              <strong>Manual Item / 无码商品</strong>
+              <small>${escapeHtml(row.display_code || "MANUAL")} · ${escapeHtml(row.description || "-")}</small>
+              <span class="manual-audit-badge">Manual / No barcode</span>
+            </div>
+            <div>${escapeHtml(row.category || "-")}</div>
+            <div>${escapeHtml(row.manual_reason || "-")}</div>
+            <div>${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
+            <div>${escapeHtml(qty)}</div>
+            <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
+            <div><strong>${escapeHtml(formatCashierPreviewMoney(lineTotal))}</strong></div>
+            <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
+          </article>
+        `;
+      }
       return `
         <article class="cashier-cart-row">
           <div class="cart-code">
@@ -33144,10 +33264,10 @@ renderCashierTerminalCart = function () {
           </div>
           <div>${escapeHtml(row.category || "-")}</div>
           <div>${escapeHtml(row.shelf_location || "-")}</div>
-          <div>${escapeHtml(formatCashierPreviewMoney(price))}</div>
+          <div>${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
           <div>1</div>
           <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
-          <div><strong>${escapeHtml(formatCashierPreviewMoney(price))}</strong></div>
+          <div><strong>${escapeHtml(formatCashierPreviewMoney(lineTotal))}</strong></div>
           <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
         </article>
       `;
@@ -33356,6 +33476,46 @@ renderCashierTerminalDrawer = function () {
   cashierTerminalDrawer.hidden = false;
   if (cashierTerminalDrawerBackdrop instanceof HTMLElement) {
     cashierTerminalDrawerBackdrop.hidden = false;
+  }
+  if (drawer === "manual-item") {
+    cashierTerminalDrawer.innerHTML = `
+      <div class="drawer-head"><div><p class="panel-kicker">MANUAL ITEM</p><h3>无码商品 / Manual Item</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-body">
+        <div class="drawer-card cashier-manual-audit-card">
+          <strong>Manual / No barcode</strong>
+          <span>不会生成 STORE_ITEM 商品码，不走扫码解析，不扣 STORE_ITEM 库存；销售记录需审计。</span>
+        </div>
+        <div class="cashier-manual-drawer-grid">
+          <label class="field">
+            <span>Category</span>
+            <input type="text" value="${escapeHtml(cashierTerminalState.manualItemCategory || "")}" data-terminal-drawer-field="manualItemCategory" placeholder="Accessories" />
+          </label>
+          <label class="field">
+            <span>Description</span>
+            <input type="text" value="${escapeHtml(cashierTerminalState.manualItemDescription || "")}" data-terminal-drawer-field="manualItemDescription" placeholder="Loose item description" />
+          </label>
+          <label class="field">
+            <span>Quantity</span>
+            <input type="number" min="1" step="1" value="${escapeHtml(cashierTerminalState.manualItemQuantity || "1")}" data-terminal-drawer-field="manualItemQuantity" />
+          </label>
+          <label class="field">
+            <span>Unit Price</span>
+            <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.manualItemUnitPrice || "")}" data-terminal-drawer-field="manualItemUnitPrice" placeholder="0" />
+          </label>
+          <label class="field cashier-manual-reason-field">
+            <span>Reason</span>
+            <select data-terminal-drawer-field="manualItemReason">
+              ${CASHIER_TERMINAL_MANUAL_ITEM_REASONS.map((reason) => `<option value="${escapeHtml(reason)}"${cashierTerminalState.manualItemReason === reason ? " selected" : ""}>${escapeHtml(reason)}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="drawer-foot split-actions cashier-manual-drawer-actions">
+        <button type="button" class="secondary-inline" data-terminal-action="close-drawer">Cancel</button>
+        <button type="button" class="primary-inline" data-terminal-action="add-manual-item">Add to Cart</button>
+      </div>
+    `;
+    return;
   }
   if (drawer === "hold-create") {
     cashierTerminalDrawer.innerHTML = `
@@ -34028,6 +34188,38 @@ function validateCashierTerminalPayment() {
   return { cashAmount, mpesaAmount, reference: String(cashierTerminalState.mixedMpesaReference || "").trim(), paid: cashAmount + mpesaAmount };
 }
 
+function buildCashierTerminalPosSaleItemPayload(row = {}) {
+  if (isCashierTerminalManualUnbarcodedLine(row)) {
+    const quantity = Math.max(1, Number(row.quantity || row.qty || 1) || 1);
+    const unitPrice = normalizeCashierTerminalNumber(row.unit_price || row.selling_price || row.price || 0);
+    const subtotal = normalizeCashierTerminalNumber(row.subtotal || row.final_price || unitPrice * quantity);
+    return {
+      line_type: row.line_type || "manual_unbarcoded",
+      barcode_type: "NONE",
+      store_item_machine_code: null,
+      display_code: String(row.display_code || "MANUAL").trim() || "MANUAL",
+      description: String(row.description || row.product_name || "Manual Item").trim(),
+      category: String(row.category || "Manual Item").trim(),
+      quantity,
+      qty: quantity,
+      unit_price: unitPrice,
+      subtotal,
+      final_price: subtotal,
+      manual_reason: String(row.manual_reason || "Tag missing").trim() || "Tag missing",
+      created_by: String(row.created_by || getCashierTerminalCashierName()).trim(),
+      requires_audit: true,
+      machine_code: "",
+      discount_amount: 0,
+    };
+  }
+  return {
+    machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
+    display_code: String(row.store_item_display_code || row.display_code || "").trim(),
+    final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
+    discount_amount: 0,
+  };
+}
+
 function buildCashierTerminalPosSalePayload(payment) {
   ensureCashierTerminalPreviewState();
   const totals = getCashierTerminalTotals();
@@ -34047,12 +34239,17 @@ function buildCashierTerminalPosSalePayload(payment) {
     mpesa_amount: payment.mpesaAmount,
     mpesa_reference: payment.reference,
     discount_amount: totals.discount,
-    items: cartItems.map((row) => ({
-      machine_code: String(row.store_item_machine_code || row.machine_code || row.barcode || "").trim(),
-      display_code: String(row.store_item_display_code || row.display_code || "").trim(),
-      final_price: normalizeCashierTerminalNumber(row.price || row.selling_price),
-      discount_amount: 0,
-    })),
+    items: cartItems.map((row) => {
+      const item = buildCashierTerminalPosSaleItemPayload(row);
+      return isCashierTerminalManualUnbarcodedLine(row)
+        ? item
+        : {
+            machine_code: item.machine_code,
+            display_code: item.display_code,
+            final_price: item.final_price,
+            discount_amount: item.discount_amount,
+          };
+    }),
   };
 }
 
@@ -34083,17 +34280,46 @@ function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
     shift_id: sale.shift_id || getCashierTerminalShiftNo(),
     terminal_id: sale.terminal_id || `POS-${getCashierTerminalStoreCode().slice(0, 3).toUpperCase()}-01`,
     time: sale.sale_time || cashierTerminalState.currentTime || new Date().toLocaleString("zh-CN", { hour12: false }),
-    items: items.map((item) => ({
-      line_no: item.line_no || 0,
-      display_code: item.display_code || item.machine_code || "",
-      machine_code: item.machine_code || "",
-      barcode: item.machine_code || "",
-      category: item.category || "未分类",
-      shelf_location: item.shelf_location || "",
-      price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
-      selling_price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
-      qty: 1,
-    })),
+    items: items.map((item) => {
+      if (isCashierTerminalManualUnbarcodedLine(item)) {
+        const quantity = Math.max(1, Number(item.quantity || item.qty || 1) || 1);
+        const unitPrice = normalizeCashierTerminalNumber(item.unit_price || item.final_price || item.original_price || 0);
+        const subtotal = normalizeCashierTerminalNumber(item.subtotal || item.final_price || unitPrice * quantity);
+        return {
+          line_no: item.line_no || 0,
+          line_type: "manual_unbarcoded",
+          barcode_type: "NONE",
+          store_item_machine_code: null,
+          display_code: item.display_code || "MANUAL",
+          machine_code: "",
+          barcode: "",
+          description: item.description || "Manual Item",
+          category: item.category || "Manual Item",
+          price: subtotal,
+          selling_price: unitPrice,
+          unit_price: unitPrice,
+          subtotal,
+          final_price: subtotal,
+          qty: quantity,
+          quantity,
+          manual_reason: item.manual_reason || "Tag missing",
+          created_by: item.created_by || sale.cashier_id || getCashierTerminalCashierName(),
+          requires_audit: true,
+          inventory_tracked: false,
+        };
+      }
+      return {
+        line_no: item.line_no || 0,
+        display_code: item.display_code || item.machine_code || "",
+        machine_code: item.machine_code || "",
+        barcode: item.machine_code || "",
+        category: item.category || "未分类",
+        shelf_location: item.shelf_location || "",
+        price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
+        selling_price: normalizeCashierTerminalNumber(item.final_price ?? item.original_price),
+        qty: 1,
+      };
+    }),
     total_items: items.length,
     subtotal: normalizeCashierTerminalNumber(sale.subtotal),
     discount: normalizeCashierTerminalNumber(sale.discount_amount),
@@ -34768,6 +34994,9 @@ handleCashierTerminalAction = async function (action, target) {
       cashierTerminalState.cartItems = [];
       renderCashierTerminal();
       focusCashierTerminalScanInput();
+      return;
+    case "add-manual-item":
+      addCashierTerminalManualItemToCart();
       return;
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
