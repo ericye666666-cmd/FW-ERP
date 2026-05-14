@@ -110,6 +110,13 @@ function extractCssRuleContaining(selectorPattern, requiredPattern) {
   return found;
 }
 
+function extractCssSection(startMarker, endMarker) {
+  const start = stylesCss.indexOf(startMarker);
+  assert.notEqual(start, -1, `missing css section ${startMarker}`);
+  const end = endMarker ? stylesCss.indexOf(endMarker, start + startMarker.length) : -1;
+  return stylesCss.slice(start, end === -1 ? stylesCss.length : end);
+}
+
 function extractElementById(source, id) {
   const start = source.indexOf(`id="${id}"`);
   assert.notEqual(start, -1, `missing element ${id}`);
@@ -258,9 +265,9 @@ test("POS cashier terminal moves store, shift, device, and sales status into top
     "本班订单数",
     "当前时间",
   ].forEach((label) => assert.match(headerSource, new RegExp(label)));
-  assert.match(headerSource, /getCashierTerminalStoreCode\(\)/);
-  assert.match(headerSource, /getCashierTerminalCashierName\(\)/);
-  assert.match(headerSource, /getCashierTerminalShiftNo\(\) \|\| copy\.openShiftFirst/);
+  assert.match(headerSource, /getCashierTerminalStoreDisplayName\(\)/);
+  assert.match(headerSource, /getCashierTerminalCashierDisplayName\(\)/);
+  assert.match(headerSource, /getCashierTerminalShiftNo\(\) \? renderCashierTerminalHeaderData\(getCashierTerminalShiftNo\(\)\) : escapeHtml\(copy\.openShiftFirst\)/);
   assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
   assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
   assert.match(headerSource, /cashierTerminalState\.todayOrderCount/);
@@ -272,6 +279,61 @@ test("POS cashier terminal moves store, shift, device, and sales status into top
   assert.match(infoStripSource, /copy\.openNow/);
 });
 
+test("POS top header derives store and cashier from the logged-in account", () => {
+  const storeSource = extractAssignedAnyFunctionSource(appJs, "getCashierTerminalStoreCode");
+  const storeLabelSource = extractFunctionSource(appJs, "getCashierTerminalStoreDisplayName");
+  const storeCodeLabelSource = extractFunctionSource(appJs, "formatCashierTerminalStoreNameFromCode");
+  const cashierSource = extractFunctionSource(appJs, "getCashierTerminalCashierName");
+  const cashierDisplaySource = extractFunctionSource(appJs, "getCashierTerminalCashierDisplayName");
+  const headerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalSessionStrip");
+
+  assert.doesNotMatch(storeSource, /CASHIER_TERMINAL_PREVIEW_STORE/);
+  assert.match(storeSource, /currentSession\.user/);
+  assert.match(storeSource, /getCashierTerminalSessionStoreCode/);
+  assert.match(storeLabelSource, /currentSession\.user/);
+  assert.match(storeLabelSource, /storeDirectoryState/);
+  assert.match(storeCodeLabelSource, /Lucky Summer/);
+  assert.doesNotMatch(cashierSource, /CASHIER_TERMINAL_PREVIEW_CASHIER/);
+  assert.match(cashierSource, /currentSession\.user\?\.username/);
+  assert.match(cashierDisplaySource, /currentSession\.user/);
+  assert.doesNotMatch(cashierDisplaySource, /getUserDisplayNameForLanguage/);
+  assert.match(extractFunctionSource(appJs, "renderCashierTerminalHeaderData"), /data-i18n-skip/);
+  assert.match(headerSource, /getCashierTerminalStoreDisplayName\(\)/);
+  assert.match(headerSource, /getCashierTerminalCashierDisplayName\(\)/);
+  assert.match(headerSource, /renderCashierTerminalHeaderData\(getCashierTerminalStoreDisplayName\(\)\)/);
+  assert.match(headerSource, /renderCashierTerminalHeaderData\(getCashierTerminalCashierDisplayName\(\)\)/);
+
+  const helpers = vm.runInNewContext(
+    [
+      extractFunctionSource(appJs, "getCashierTerminalSessionStoreCode"),
+      storeCodeLabelSource,
+      storeSource,
+      storeLabelSource,
+      cashierSource,
+      cashierDisplaySource,
+      "({ getCashierTerminalStoreCode, getCashierTerminalStoreDisplayName, getCashierTerminalCashierName, getCashierTerminalCashierDisplayName })",
+    ].join("\n"),
+    {
+      currentSession: {
+        user: {
+          username: "lucky_cashier_1",
+          full_name: "Lucky Summer Cashier",
+          role_code: "cashier",
+          store_code: "LUCKY_SUMMER",
+        },
+      },
+      storeDirectoryState: [],
+      getCurrentStoreCodeFallback: () => "UTAWALA",
+      getUserDisplayNameForLanguage: (user) => user.full_name || user.username || "-",
+    },
+  );
+
+  assert.equal(helpers.getCashierTerminalStoreCode(), "LUCKY_SUMMER");
+  assert.equal(helpers.getCashierTerminalStoreDisplayName(), "Lucky Summer");
+  assert.equal(helpers.getCashierTerminalCashierName(), "lucky_cashier_1");
+  assert.equal(helpers.getCashierTerminalCashierDisplayName(), "Lucky Summer Cashier");
+});
+
 test("POS cashier terminal removes blocking bottom floating status cards", () => {
   assert.doesNotMatch(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-quick-actions\s*\{[^}]*position:\s*fixed/);
   assert.doesNotMatch(stylesCss, /body\.cashier-terminal-mode \.cashier-terminal-quick-actions\s*\{[^}]*bottom:/);
@@ -280,29 +342,43 @@ test("POS cashier terminal removes blocking bottom floating status cards", () =>
 });
 
 test("POS hotfix keeps top header compact and receipt non-blocking", () => {
-  const topbarRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar", /grid-template-columns:\s*minmax\(180px,\s*220px\)\s+minmax\(0,\s*1fr\)/);
-  const topbarActionsRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar-actions", /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
-  const statusStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-session-strip", /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(104px,\s*1fr\)\)/);
-  const mainBodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-body", /grid-template-columns:\s*minmax\(280px,\s*0\.28fr\)/);
-  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /max-height:\s*96px/);
+  const topbarRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar", /grid-template-columns:\s*minmax\(150px,\s*190px\)\s+minmax\(0,\s*1fr\)/);
+  const topbarActionsRule = extractLastCssRule("body\\.cashier-terminal-mode \\.topbar-actions");
+  const statusStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-session-strip", /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(88px,\s*1fr\)\)/);
+  const mainBodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-body", /height:\s*calc\(100vh - 132px\)/);
+  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /max-height:\s*52px/);
   const receiptEmptyRule = extractLastCssRule("body\\.cashier-terminal-mode \\.cashier-terminal-receipt-panel\\.is-empty");
   const receiptSource = extractFunctionSource(appJs, "renderCashierTerminalReceiptPanel");
 
   assert.match(stylesCss, /POS-UI-2-HOTFIX/);
+  assert.match(stylesCss, /Issue #309/);
   assert.match(topbarRule, /display:\s*grid/);
-  assert.match(topbarRule, /grid-template-columns:\s*minmax\(180px,\s*220px\)\s+minmax\(0,\s*1fr\)/);
+  assert.match(topbarRule, /grid-template-columns:\s*minmax\(150px,\s*190px\)\s+minmax\(0,\s*1fr\)/);
   assert.match(topbarRule, /align-items:\s*center/);
-  assert.match(topbarRule, /max-height:\s*110px/);
+  assert.match(topbarRule, /max-height:\s*78px/);
   assert.doesNotMatch(topbarRule, /align-items:\s*stretch/);
   assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
-  assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(104px,\s*1fr\)\)/);
-  assert.match(statusStripRule, /max-height:\s*74px/);
-  assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(280px,\s*0\.28fr\)\s+minmax\(460px,\s*0\.42fr\)\s+minmax\(360px,\s*0\.3fr\)/);
-  assert.match(mainBodyRule, /min-height:\s*calc\(100vh - 180px\)/);
-  assert.match(transactionStripRule, /max-height:\s*96px/);
+  assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(88px,\s*1fr\)\)/);
+  assert.match(statusStripRule, /max-height:\s*58px/);
+  assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);
+  assert.match(mainBodyRule, /height:\s*calc\(100vh - 132px\)/);
+  assert.match(transactionStripRule, /max-height:\s*52px/);
   assert.match(transactionStripRule, /overflow:\s*hidden/);
   assert.match(receiptSource, /receiptPanel\.classList\.toggle\("is-empty",\s*!sale\)/);
   assert.match(receiptEmptyRule, /display:\s*none/);
+});
+
+test("POS 1366x768 cashier layout keeps scan cart checkout in the first viewport", () => {
+  const compactDesktopMedia = extractCssSection("@media (min-width: 1121px) and (max-width: 1320px)", "@media (max-height: 780px)");
+  assert.match(compactDesktopMedia, /body\.cashier-terminal-mode \.cashier-terminal-body\s*\{[\s\S]*grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);
+  assert.match(compactDesktopMedia, /body\.cashier-terminal-mode \.payment-column\s*\{[\s\S]*grid-column:\s*auto/);
+
+  const shortHeightMedia = extractCssSection("@media (max-height: 780px)");
+  assert.match(shortHeightMedia, /cashier-terminal-body\s*\{[\s\S]*height:\s*calc\(100vh - 154px\)/);
+  assert.match(shortHeightMedia, /cashier-terminal-transaction-strip\s*\{[\s\S]*max-height:\s*44px/);
+  assert.match(shortHeightMedia, /cashier-terminal-payment-panel\s*\{[\s\S]*overflow:\s*auto/);
+  assert.match(shortHeightMedia, /cashier-terminal-quick-actions\s*\{[\s\S]*display:\s*none/);
+  assert.doesNotMatch(shortHeightMedia, /position:\s*fixed/);
 });
 
 test("POS cashier terminal gates resolver results before adding items", () => {

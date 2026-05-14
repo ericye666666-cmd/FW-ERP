@@ -32780,12 +32780,82 @@ function normalizeCashierPreviewScan(value = "") {
   return String(value || "").trim().toUpperCase();
 }
 
+function getCashierTerminalSessionStoreCode(user = currentSession.user) {
+  const directCode = String(
+    user?.store_code
+      || user?.storeCode
+      || user?.store?.code
+      || user?.store?.store_code
+      || "",
+  ).trim();
+  if (directCode) {
+    return directCode.toUpperCase();
+  }
+  const storeName = String(user?.store_name || user?.store_label || user?.store?.name || "").trim();
+  if (!storeName || !Array.isArray(storeDirectoryState)) {
+    return "";
+  }
+  const normalizedName = storeName.toLowerCase();
+  const matchedStore = storeDirectoryState.find((row) => {
+    const name = String(row?.name || row?.store_name || row?.label || "").trim().toLowerCase();
+    return name && name === normalizedName;
+  });
+  return String(matchedStore?.code || matchedStore?.store_code || "").trim().toUpperCase();
+}
+
+function formatCashierTerminalStoreNameFromCode(storeCode = "") {
+  const normalized = String(storeCode || "").trim().toUpperCase();
+  const knownLabels = {
+    UTAWALA: "Utawala",
+    LUCKY_SUMMER: "Lucky Summer",
+    LUCKYSUMMER: "Lucky Summer",
+    "LUCKY-SUMMER": "Lucky Summer",
+  };
+  if (knownLabels[normalized]) {
+    return knownLabels[normalized];
+  }
+  return normalized
+    .split(/[_\-\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ") || normalized;
+}
+
 getCashierTerminalStoreCode = function () {
-  return CASHIER_TERMINAL_PREVIEW_STORE;
+  return getCashierTerminalSessionStoreCode(currentSession.user)
+    || getCurrentStoreCodeFallback();
+}
+
+function getCashierTerminalStoreDisplayName() {
+  const userStoreName = String(
+    currentSession.user?.store_name
+      || currentSession.user?.store_label
+      || currentSession.user?.store?.name
+      || "",
+  ).trim();
+  if (userStoreName) {
+    return userStoreName;
+  }
+  const storeCode = getCashierTerminalStoreCode();
+  const storeRow = Array.isArray(storeDirectoryState)
+    ? storeDirectoryState.find((row) => String(row?.code || row?.store_code || "").trim().toUpperCase() === storeCode)
+    : null;
+  return String(storeRow?.name || storeRow?.store_name || "").trim() || formatCashierTerminalStoreNameFromCode(storeCode);
 }
 
 function getCashierTerminalCashierName() {
-  return CASHIER_TERMINAL_PREVIEW_CASHIER;
+  return String(currentSession.user?.username || currentSession.user?.cashier_id || "").trim()
+    || "cashier";
+}
+
+function getCashierTerminalCashierDisplayName() {
+  const user = currentSession.user || {};
+  return String(user.full_name || user.display_name || user.name || user.username || "").trim()
+    || getCashierTerminalCashierName();
+}
+
+function renderCashierTerminalHeaderData(value = "") {
+  return `<em data-i18n-skip>${escapeHtml(value || "-")}</em>`;
 }
 
 function getCashierTerminalTerminalId() {
@@ -33133,10 +33203,10 @@ renderCashierTerminalSessionStrip = function () {
   ensureCashierTerminalPreviewState();
   const copy = getCashierTerminalCopy();
   cashierTerminalSessionStrip.innerHTML = `
-    <span><b>当前门店</b>${escapeHtml(getCashierTerminalStoreCode())}</span>
+    <span><b>当前门店</b>${renderCashierTerminalHeaderData(getCashierTerminalStoreDisplayName())}</span>
     <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
-    <span><b>收银员</b>${escapeHtml(getCashierTerminalCashierName())}</span>
-    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
+    <span><b>收银员</b>${renderCashierTerminalHeaderData(getCashierTerminalCashierDisplayName())}</span>
+    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${getCashierTerminalShiftNo() ? renderCashierTerminalHeaderData(getCashierTerminalShiftNo()) : escapeHtml(copy.openShiftFirst)}</span>
     <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
       <b>网络状态</b>${escapeHtml(getCashierTerminalNetworkLabel())}
     </button>
