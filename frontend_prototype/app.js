@@ -32019,11 +32019,12 @@ function ensureCashierTerminalPreviewCopy() {
   const keys = POS_CASHIER_TERMINOLOGY_KEYS;
   Object.assign(CASHIER_TERMINAL_LOCALE_COPY.zh, {
     brandTitle: "FW-ERP POS",
-    scanTitle: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
-    barcodeField: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
-    scanStoreItem: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
+    brandSubtitle: "收银台",
+    scanTitle: "扫码收银",
+    barcodeField: "请扫描 STORE_ITEM 商品码。",
+    scanStoreItem: "请扫描 STORE_ITEM 商品码。",
     addUnbarcodedItem: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.addUnbarcodedItem, "zh"),
-    posStoreItemOnly: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule, "zh"),
+    posStoreItemOnly: "POS 只扫描门店商品码。",
     itemAlreadySold: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.itemAlreadySold, "zh"),
     openShiftFirst: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst, "zh"),
     openNow: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShift, "zh"),
@@ -32037,7 +32038,7 @@ function ensureCashierTerminalPreviewCopy() {
     cashVariance: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.cashVariance, "zh"),
     addToBasket: "加入购物车",
     basketTitle: "商品篮",
-    cartEmpty: "购物车为空，请扫描 STORE_ITEM 商品码",
+    cartEmpty: "商品篮为空，请扫描商品码。",
     lookupEmpty: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule, "zh"),
     paymentTitle: "结账",
     completeTrade: "完成销售",
@@ -32045,14 +32046,16 @@ function ensureCashierTerminalPreviewCopy() {
     paidAmount: "实收",
     balanceAmount: "余额",
     clearBasket: "清空购物车",
-    barcodePlaceholder: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem, "zh"),
+    barcodePlaceholder: "请扫描 STORE_ITEM 商品码。",
   });
   Object.assign(CASHIER_TERMINAL_LOCALE_COPY.en, {
-    scanTitle: cashierTerminalTerm(keys.scanStoreItem, "en"),
-    barcodeField: cashierTerminalTerm(keys.scanStoreItem, "en"),
-    scanStoreItem: cashierTerminalTerm(keys.scanStoreItem, "en"),
+    brandTitle: "FW-ERP POS",
+    brandSubtitle: "Cashier",
+    scanTitle: "Scan Sale",
+    barcodeField: "Scan a Store Item barcode.",
+    scanStoreItem: "Scan a Store Item barcode.",
     addUnbarcodedItem: cashierTerminalTerm(keys.addUnbarcodedItem, "en"),
-    posStoreItemOnly: cashierTerminalTerm(keys.storeItemOnlyRule, "en"),
+    posStoreItemOnly: "POS only scans Store Item labels.",
     itemAlreadySold: cashierTerminalTerm(keys.itemAlreadySold, "en"),
     openShiftFirst: cashierTerminalTerm(keys.openShiftFirst, "en"),
     openNow: cashierTerminalTerm(keys.openShift, "en"),
@@ -32065,8 +32068,15 @@ function ensureCashierTerminalPreviewCopy() {
     zReport: cashierTerminalTerm(keys.zReport, "en"),
     cashVariance: cashierTerminalTerm(keys.cashVariance, "en"),
     lookupEmpty: cashierTerminalTerm(keys.storeItemOnlyRule, "en"),
-    cartEmpty: "Basket is empty. Scan Store Item.",
-    barcodePlaceholder: cashierTerminalTerm(keys.scanStoreItem, "en"),
+    basketTitle: "Cart",
+    cartEmpty: "Cart is empty. Scan Store Item.",
+    paymentTitle: "Checkout",
+    completeTrade: "Complete Sale",
+    grossAmount: "Amount Due",
+    paidAmount: "Paid",
+    balanceAmount: "Balance",
+    clearBasket: "Clear Cart",
+    barcodePlaceholder: "Scan a Store Item barcode.",
   });
 }
 
@@ -32207,47 +32217,47 @@ function getCashierTerminalPaymentGuidance() {
   }
   if (cashierTerminalState.activePaymentMode === "cash") {
     const shortage = totals.totalAmount - normalizeCashierTerminalNumber(cashierTerminalState.cashReceived);
-    return shortage > 0 ? `还差 ${formatCashierPreviewMoney(shortage)}` : "";
+    return shortage > 0 ? `${chooseI18nLabel("还差", "Short")} ${formatCashierPreviewMoney(shortage)}` : "";
   }
   if (cashierTerminalState.activePaymentMode === "mpesa") {
     const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
     if (mpesaAmount < totals.totalAmount) {
-      return `M-Pesa 还差 ${formatCashierPreviewMoney(totals.totalAmount - mpesaAmount)}`;
+      return `M-Pesa ${chooseI18nLabel("还差", "short")} ${formatCashierPreviewMoney(totals.totalAmount - mpesaAmount)}`;
     }
-    return String(cashierTerminalState.mpesaReference || "").trim() ? "" : "请输入 M-Pesa Reference";
+    return String(cashierTerminalState.mpesaReference || "").trim() ? "" : chooseI18nLabel("请输入 M-Pesa Reference", "Enter M-Pesa Reference");
   }
   const cashAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount);
   const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
   const shortage = totals.totalAmount - cashAmount - mpesaAmount;
   if (shortage > 0) {
-    return `Cash + M-Pesa 还差 ${formatCashierPreviewMoney(shortage)}`;
+    return `Cash + M-Pesa ${chooseI18nLabel("还差", "short")} ${formatCashierPreviewMoney(shortage)}`;
   }
   return mpesaAmount > 0 && !String(cashierTerminalState.mixedMpesaReference || "").trim()
-    ? "请输入 M-Pesa Reference"
+    ? chooseI18nLabel("请输入 M-Pesa Reference", "Enter M-Pesa Reference")
     : "";
 }
 
 function getCashierTerminalNetworkLabel() {
   const status = String(cashierTerminalState.networkStatus || "online");
   return {
-    online: "在线",
-    weak: "弱网",
-    offline: "离线",
-    syncing: "同步中",
-    synced: "已同步",
-    failed: "同步失败",
-  }[status] || "在线";
+    online: chooseI18nLabel("在线", "Online"),
+    weak: chooseI18nLabel("弱网", "Weak"),
+    offline: chooseI18nLabel("离线", "Offline"),
+    syncing: chooseI18nLabel("同步中", "Syncing"),
+    synced: chooseI18nLabel("已同步", "Synced"),
+    failed: chooseI18nLabel("同步失败", "Sync Failed"),
+  }[status] || chooseI18nLabel("在线", "Online");
 }
 
 function getCashierTerminalPrinterLabel() {
   const status = String(cashierTerminalState.printerStatus || "connected").trim().toLowerCase();
   if (["connected", "ready", "online", "placeholder"].includes(status)) {
-    return "已连接";
+    return chooseI18nLabel("已连接", "Ready");
   }
   if (["offline", "disconnected"].includes(status)) {
-    return "未连接";
+    return chooseI18nLabel("未连接", "Offline");
   }
-  return "已连接";
+  return chooseI18nLabel("已连接", "Ready");
 }
 
 renderCashierTerminalSessionStrip = function () {
@@ -32257,21 +32267,14 @@ renderCashierTerminalSessionStrip = function () {
   ensureCashierTerminalPreviewState();
   const copy = getCashierTerminalCopy();
   cashierTerminalSessionStrip.innerHTML = `
-    <span><b>当前门店</b>${escapeHtml(getCashierTerminalStoreCode())}</span>
-    <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
-    <span><b>收银员</b>${escapeHtml(getCashierTerminalCashierName())}</span>
-    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
-    <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
-      <b>网络状态</b>${escapeHtml(getCashierTerminalNetworkLabel())}
-    </button>
-    <span class="printer-chip"><b>打印机</b>${escapeHtml(getCashierTerminalPrinterLabel())}</span>
-    <span class="sync-chip network-${escapeHtml(cashierTerminalState.networkStatus)}"><b>同步状态</b>${escapeHtml(cashierTerminalState.syncStatus || "已同步")}</span>
-    <span><b>今日销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
-    <span><b>今日订单数</b>${escapeHtml(cashierTerminalState.todayOrderCount)}</span>
-    <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
-    <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
-    <span class="time-chip"><b>当前时间</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
-    ${renderWebLanguageToggleMarkup("cashier-terminal-web-language-toggle")}
+    <span><b>${escapeHtml(chooseI18nLabel("当前门店", "Store"))}</b>${escapeHtml(getCashierTerminalStoreCode())}</span>
+    <span><b>${escapeHtml(chooseI18nLabel("收银员", "Cashier"))}</b>${escapeHtml(getCashierTerminalCashierName())}</span>
+    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>${escapeHtml(chooseI18nLabel("班次", "Shift"))}</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
+    <span class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}"><b>${escapeHtml(chooseI18nLabel("网络状态", "Network"))}</b>${escapeHtml(getCashierTerminalNetworkLabel())}</span>
+    <span class="printer-chip"><b>${escapeHtml(chooseI18nLabel("打印机", "Printer"))}</b>${escapeHtml(getCashierTerminalPrinterLabel())}</span>
+    <span class="sync-chip network-${escapeHtml(cashierTerminalState.networkStatus)}"><b>${escapeHtml(chooseI18nLabel("同步状态", "Sync"))}</b>${escapeHtml(cashierTerminalState.syncStatus || chooseI18nLabel("已同步", "Synced"))}</span>
+    <span><b>${escapeHtml(chooseI18nLabel("今日销售额", "Today Sales"))}</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
+    <span class="time-chip"><b>${escapeHtml(chooseI18nLabel("当前时间", "Time"))}</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
   `;
   syncGlobalLanguageButtons();
 }
@@ -32285,9 +32288,6 @@ renderCashierTerminalStatusBar = function () {
   cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
   cashierTerminalStatusBar.innerHTML = `
     <span>${escapeHtml(copy.posStoreItemOnly)}</span>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">${escapeHtml(copy.resumeHeldOrder)}</button>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(cashierTerminalState.currentShift?.shift_id ? copy.closeShift : copy.openNow)}</button>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
   `;
 }
 
@@ -32313,14 +32313,13 @@ renderCashierTerminalLookupPanel = function () {
   cashierTerminalLookupCard.innerHTML = `
     <strong>${escapeHtml(copy.scanStoreItem)}</strong>
     <span>${escapeHtml(copy.posStoreItemOnly)}</span>
-    <span>${escapeHtml(copy.itemAlreadySold)}</span>
     ${fallbackNotice}
     ${scanError}
-    <div class="cashier-recent-scans">
-      <strong>最近扫描</strong>
+    <div class="cashier-recent-scans${recentScans.length ? "" : " is-empty"}">
+      <strong>${escapeHtml(chooseI18nLabel("最近扫描", "Recent Scans"))}</strong>
       ${recentScans.length ? recentScans.map((row) => `
         <span><b>${escapeHtml(row.code || "-")}</b><em>${escapeHtml(row.category || "STORE_ITEM")} · ${escapeHtml(formatCashierPreviewMoney(row.price || 0))} · ${escapeHtml(row.time || "")}</em></span>
-      `).join("") : `<span class="empty">暂无扫描记录</span>`}
+      `).join("") : ""}
     </div>
   `;
 }
@@ -32330,6 +32329,7 @@ renderCashierTerminalCart = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
+  const copy = getCashierTerminalCopy();
   const rows = cashierTerminalState.cartItems || [];
   const cartCount = document.querySelector("[data-terminal-cart-count]");
   if (cartCount) {
@@ -32337,19 +32337,19 @@ renderCashierTerminalCart = function () {
   }
   if (!rows.length) {
     cashierTerminalCart.className = "basket-list cashier-terminal-cart empty-state";
-    cashierTerminalCart.innerHTML = `<div class="cashier-terminal-empty-card">购物车为空，请扫描 STORE_ITEM 商品码</div>`;
+    cashierTerminalCart.innerHTML = `<div class="cashier-terminal-empty-card">${escapeHtml(copy.cartEmpty)}</div>`;
     return;
   }
   cashierTerminalCart.className = "basket-list cashier-terminal-cart";
   cashierTerminalCart.innerHTML = `
     <div class="cashier-cart-header">
-      <span>STORE_ITEM 商品码</span>
-      <span>品类</span>
-      <span>货架位</span>
-      <span>价格</span>
-      <span>数量</span>
-      <span>折扣</span>
-      <span>小计</span>
+      <span>${escapeHtml(chooseI18nLabel("STORE_ITEM 商品码", "Store Item"))}</span>
+      <span>${escapeHtml(chooseI18nLabel("品类", "Category"))}</span>
+      <span>${escapeHtml(chooseI18nLabel("货架位", "Rack"))}</span>
+      <span>${escapeHtml(chooseI18nLabel("价格", "Price"))}</span>
+      <span>${escapeHtml(chooseI18nLabel("数量", "Qty"))}</span>
+      <span>${escapeHtml(chooseI18nLabel("折扣", "Discount"))}</span>
+      <span>${escapeHtml(chooseI18nLabel("小计", "Subtotal"))}</span>
       <span></span>
     </div>
     ${rows.map((row, index) => {
@@ -32369,7 +32369,7 @@ renderCashierTerminalCart = function () {
           <div>1</div>
           <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
           <div><strong>${escapeHtml(formatCashierPreviewMoney(price))}</strong></div>
-          <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
+          <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="${escapeHtml(chooseI18nLabel("删除商品", "Remove item"))}">${escapeHtml(chooseI18nLabel("删除", "Remove"))}</button>
         </article>
       `;
     }).join("")}
@@ -32388,85 +32388,108 @@ renderCashierTerminalPaymentPanel = function () {
   const balance = Math.max(totals.totalAmount - paid, 0);
   const saleDisabled = !cashierTerminalState.currentShift?.shift_id;
   const paymentGuidance = getCashierTerminalPaymentGuidance();
+  const paymentLabels = {
+    checkout: chooseI18nLabel("结账", "Checkout"),
+    noShiftTitle: chooseI18nLabel("POS 暂不可收银", "POS not ready"),
+    amountDue: chooseI18nLabel("应收金额", "Amount Due"),
+    itemCount: chooseI18nLabel("商品数量", "Items"),
+    subtotal: chooseI18nLabel("小计", "Subtotal"),
+    discount: chooseI18nLabel("折扣", "Discount"),
+    paid: chooseI18nLabel("实收", "Paid"),
+    change: chooseI18nLabel("找零", "Change"),
+    balance: chooseI18nLabel("余额", "Balance"),
+    orderDiscount: chooseI18nLabel("整单折扣", "Order Discount"),
+    cash: chooseI18nLabel("现金", "Cash"),
+    mpesaReference: chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference"),
+    manualReference: chooseI18nLabel("手动流水号", "Manual Reference"),
+    mixed: chooseI18nLabel("混合", "Mixed"),
+    cashAndMpesa: chooseI18nLabel("现金 + M-Pesa", "Cash + M-Pesa"),
+    amountReceived: chooseI18nLabel("实收金额", "Amount Received"),
+    cashAmount: chooseI18nLabel("现金金额", "Cash Amount"),
+    mpesaAmount: chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"),
+    enterCash: chooseI18nLabel("输入现金实收", "Enter cash received"),
+    defaultDue: chooseI18nLabel("默认等于应收金额", "Defaults to amount due"),
+    enterMpesaRef: chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"),
+  };
   const mpesaOfflineNotice = cashierTerminalState.networkStatus === "offline"
-    ? `<div class="cashier-payment-warning">离线状态下 M-Pesa reference 仅暂存，待同步核验</div>`
+    ? `<div class="cashier-payment-warning">${escapeHtml(chooseI18nLabel("离线状态下 M-Pesa reference 仅暂存，待同步核验", "Offline M-Pesa reference is saved locally until sync verification."))}</div>`
     : "";
   const mpesaManualNotice = ["mpesa", "mixed"].includes(cashierTerminalState.activePaymentMode)
-    ? `<div class="cashier-payment-warning">请确认 M-Pesa 已到账，再点击完成收款。</div>`
+    ? `<div class="cashier-payment-warning">${escapeHtml(chooseI18nLabel("请确认 M-Pesa 已到账，再点击完成收款。", "Confirm M-Pesa has arrived before completing the sale."))}</div>`
     : "";
   cashierTerminalPaymentPanel.innerHTML = `
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
         <p class="panel-kicker">CHECKOUT</p>
-        <h3>结账</h3>
+        <h3>${escapeHtml(paymentLabels.checkout)}</h3>
       </div>
     </div>
     ${saleDisabled ? `
       <div class="cashier-no-shift-card">
-        <strong>POS 暂不可收银</strong>
+        <strong>${escapeHtml(paymentLabels.noShiftTitle)}</strong>
         <span>${escapeHtml(copy.openShiftFirst)}</span>
         <button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(copy.openNow)}</button>
       </div>
     ` : ""}
     <div class="cashier-terminal-grand-total">
-      <span>应收金额</span>
+      <span>${escapeHtml(paymentLabels.amountDue)}</span>
       <strong data-terminal-live="receivable">${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</strong>
     </div>
     <div class="summary-grid cashier-terminal-total-grid">
-      <article class="summary-box"><span>商品数量</span><strong data-terminal-live="itemCount">${escapeHtml(totals.totalItems)}</strong></article>
-      <article class="summary-box"><span>小计</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
-      <article class="summary-box"><span>折扣</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
-      <article class="summary-box"><span>实收</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
-      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" ? changeDue : balance))}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(paymentLabels.itemCount)}</span><strong data-terminal-live="itemCount">${escapeHtml(totals.totalItems)}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(paymentLabels.subtotal)}</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(paymentLabels.discount)}</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
+      <article class="summary-box"><span>${escapeHtml(paymentLabels.paid)}</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>${escapeHtml(cashierTerminalState.activePaymentMode === "cash" ? paymentLabels.change : paymentLabels.balance)}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" ? changeDue : balance))}</strong></article>
     </div>
     <label class="field cashier-discount-field">
-      <span>整单折扣</span>
+      <span>${escapeHtml(paymentLabels.orderDiscount)}</span>
       <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.discountAmount || "")}" data-terminal-payment-field="discountAmount" placeholder="0" />
     </label>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>${escapeHtml(chooseI18nLabel("手动流水号", "Manual Reference"))}</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合", "Mixed"))}</span><small>现金 + M-Pesa</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(paymentLabels.cash)}</span><small>${escapeHtml(chooseI18nLabel("现金收款", "Cash payment"))}</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>${escapeHtml(paymentLabels.manualReference)}</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(paymentLabels.mixed)}</span><small>${escapeHtml(paymentLabels.cashAndMpesa)}</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
       ${cashierTerminalState.activePaymentMode === "cash" ? `
         <label class="field">
-          <span>实收金额</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
+          <span>${escapeHtml(paymentLabels.amountReceived)}</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="${escapeHtml(paymentLabels.enterCash)}" />
         </label>
       ` : cashierTerminalState.activePaymentMode === "mpesa" ? `
         ${mpesaOfflineNotice}
         <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="默认等于应收金额" />
+          <span>${escapeHtml(paymentLabels.mpesaAmount)}</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="${escapeHtml(paymentLabels.defaultDue)}" />
         </label>
         <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference"))}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
+          <span>${escapeHtml(paymentLabels.mpesaReference)}</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(paymentLabels.enterMpesaRef)}" />
         </label>
       ` : `
         ${mpesaOfflineNotice}
         <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("现金金额", "Cash Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="现金金额" />
+          <span>${escapeHtml(paymentLabels.cashAmount)}</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="${escapeHtml(paymentLabels.cashAmount)}" />
         </label>
         <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="M-Pesa 金额" />
+          <span>${escapeHtml(paymentLabels.mpesaAmount)}</span>
+          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="${escapeHtml(paymentLabels.mpesaAmount)}" />
         </label>
         <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference No."))}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
+          <span>${escapeHtml(paymentLabels.mpesaReference)}</span>
+          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="${escapeHtml(paymentLabels.enterMpesaRef)}" />
         </label>
       `}
     </div>
     ${mpesaManualNotice}
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
-      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale"}</strong></button>
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>${escapeHtml(copy.completeTrade)}</span><strong>${saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale"}</strong></button>
       <div class="secondary-actions">
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">${escapeHtml(copy.holdAction)}</button>
-        <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
+        <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">${escapeHtml(copy.clearBasket)}</button>
         <button type="button" class="secondary-action" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
       </div>
     </div>
@@ -32482,6 +32505,10 @@ function renderCashierTerminalReceiptPanel() {
   const copy = getCashierTerminalCopy();
   const sale = cashierTerminalState.latestCompletedSale;
   receiptPanel.classList.toggle("is-empty", !sale);
+  if (!sale) {
+    receiptPanel.innerHTML = "";
+    return;
+  }
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const isReprint = Boolean(sale?.is_reprint);
   const storeCode = sale?.store_code || getCashierTerminalStoreCode();
@@ -32860,6 +32887,7 @@ renderCashierTerminal = function () {
   if (!(cashierTerminalShell instanceof HTMLElement)) {
     return;
   }
+  cashierTerminalState.locale = currentLanguage;
   ensureCashierTerminalPreviewState();
   applyCashierTerminalChromeCopy();
   renderCashierTerminalSessionStrip();
@@ -32870,7 +32898,6 @@ renderCashierTerminal = function () {
   renderCashierTerminalReceiptPanel();
   renderCashierTerminalQuickActions();
   renderCashierTerminalDrawer();
-  applyGlobalI18n(cashierTerminalShell, currentLanguage);
 }
 
 setCashierTerminalPaymentMode = function (mode) {
@@ -33115,18 +33142,20 @@ function formatCashierTerminalScanError(error) {
   const reject_reason = String(error?.reject_reason || error?.payload?.reject_reason || error?.detail || formatErrorMessage(error) || "").trim();
   const barcodeType = String(error?.barcode_type || error?.payload?.barcode_type || "").trim().toUpperCase();
   const normalized = `${barcodeType} ${reject_reason}`.toUpperCase();
-  const posRule = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule);
-  let detail = posRule;
+  const copy = getCashierTerminalCopy();
+  const posRule = copy.posStoreItemOnly || cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule);
+  const scanPrompt = copy.scanStoreItem || cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.scanStoreItem);
+  let detail = scanPrompt;
   if (/STORE_DELIVERY_EXECUTION|SDO/.test(normalized)) {
-    detail = `${cashierTerminalState.locale === "en" ? "This is a store delivery code." : "这是门店送货单码。"} ${posRule}`;
+    detail = `${cashierTerminalState.locale === "en" ? "This is a store delivery code." : "这是门店送货单码。"} ${scanPrompt}`;
   } else if (/STORE_DELIVERY_PACKAGE|SDP/.test(normalized)) {
-    detail = `${cashierTerminalState.locale === "en" ? "This is a store delivery package." : "这是门店配送包裹码。"} ${posRule}`;
+    detail = `${cashierTerminalState.locale === "en" ? "This is a store delivery package." : "这是门店配送包裹码。"} ${scanPrompt}`;
   } else if (/DISPATCH_BALE|STORE_PREP_BALE|SDB/.test(normalized)) {
-    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse dispatch package." : "这是仓库待送店包码。"} ${posRule}`;
+    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse dispatch package." : "这是仓库待送店包码。"} ${scanPrompt}`;
   } else if (/LOOSE_PICK_TASK|LPK/.test(normalized)) {
-    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse pick task." : "这是仓库拣货工单码。"} ${posRule}`;
+    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse pick task." : "这是仓库拣货工单码。"} ${scanPrompt}`;
   } else if (/RAW_BALE|RAW/.test(normalized)) {
-    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse bale code." : "这是仓库包码。"} ${posRule}`;
+    detail = `${cashierTerminalState.locale === "en" ? "This is a warehouse bale code." : "这是仓库包码。"} ${scanPrompt}`;
   }
   return {
     title: posRule,

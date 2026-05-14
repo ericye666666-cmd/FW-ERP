@@ -11748,3 +11748,392 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
     min-height: auto;
   }
 }
+
+/* POS-1366-FIT: real cashier terminal must fit the 1366x768 app viewport without page scroll. */
+body.cashier-terminal-mode {
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .app-shell,
+body.cashier-terminal-mode .workspace-shell,
+body.cashier-terminal-mode #workspacePanels,
+body.cashier-terminal-mode .cashier-sale-panel {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-shell {
+  display: grid;
+  grid-template-rows: 64px 28px minmax(0, 1fr);
+  width: 100%;
+  height: 100vh;
+  min-height: 0;
+  max-height: 100vh;
+  box-sizing: border-box;
+  gap: 6px;
+  padding: 6px 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+body.cashier-terminal-mode .topbar {
+  display: grid;
+  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  align-items: center;
+  height: 64px;
+  min-height: 56px;
+  max-height: 72px;
+  gap: 8px;
+  padding: 6px 10px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+body.cashier-terminal-mode .brand-group {
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-title {
+  font-size: 18px;
+  line-height: 1;
+}
+
+body.cashier-terminal-mode .cashier-terminal-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+body.cashier-terminal-mode .topbar-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+  max-height: 48px;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip span,
+body.cashier-terminal-mode .network-pill {
+  min-height: 32px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  font-size: 10px;
+  line-height: 1.12;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-session-strip b,
+body.cashier-terminal-mode .network-pill b {
+  font-size: 8px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .topbar .cashier-terminal-exit {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status {
+  min-height: 28px;
+  margin: 0;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .cashier-terminal-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.27fr) minmax(430px, 0.43fr) minmax(330px, 0.3fr);
+  gap: 8px;
+  height: calc(100vh - 112px);
+  min-height: 0;
+  margin: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-body > *,
+body.cashier-terminal-mode .cashier-terminal-scan-card,
+body.cashier-terminal-mode .cashier-terminal-cart-card,
+body.cashier-terminal-mode .cashier-terminal-payment-panel {
+  min-height: 0;
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-shell .panel {
+  padding: 8px;
+  border-radius: 8px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-card-head {
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-card-head h3,
+body.cashier-terminal-mode .drawer-head h3 {
+  margin-top: 0;
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+body.cashier-terminal-mode .panel-kicker,
+body.cashier-terminal-mode .preview-tag {
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-scan-card,
+body.cashier-terminal-mode .cashier-terminal-cart-card {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart-card {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+body.cashier-terminal-mode .cashier-terminal-payment-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+body.cashier-terminal-mode .field,
+body.cashier-terminal-mode .payment-mode-panel,
+body.cashier-terminal-mode .payment-actions {
+  gap: 5px;
+}
+
+body.cashier-terminal-mode .field span {
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+body.cashier-terminal-mode .field-row {
+  gap: 6px;
+}
+
+body.cashier-terminal-mode .main-field input {
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 18px;
+}
+
+body.cashier-terminal-mode .primary-inline,
+body.cashier-terminal-mode .secondary-inline {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+body.cashier-terminal-mode .lookup-preview,
+body.cashier-terminal-mode .cashier-terminal-scan-hint {
+  margin-top: 6px;
+  padding: 8px;
+  gap: 5px;
+  line-height: 1.25;
+}
+
+body.cashier-terminal-mode .cashier-recent-scans.is-empty {
+  display: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart {
+  min-height: 0;
+  overflow: auto;
+}
+
+body.cashier-terminal-mode .cashier-terminal-empty-card {
+  padding: 10px;
+  min-height: 42px;
+}
+
+body.cashier-terminal-mode .cashier-cart-header,
+body.cashier-terminal-mode .cashier-cart-row {
+  grid-template-columns: minmax(132px, 1.3fr) minmax(80px, 0.9fr) 72px 72px 42px 52px 72px 54px;
+  gap: 5px;
+}
+
+body.cashier-terminal-mode .cashier-cart-header {
+  font-size: 11px;
+}
+
+body.cashier-terminal-mode .cashier-cart-row {
+  min-height: 52px;
+  padding: 6px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+body.cashier-terminal-mode .cashier-cart-row small {
+  font-size: 10px;
+}
+
+body.cashier-terminal-mode .remove-btn {
+  width: 34px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-grand-total {
+  margin-bottom: 6px;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-grand-total strong {
+  font-size: 30px;
+  line-height: 1;
+}
+
+body.cashier-terminal-mode .summary-grid {
+  gap: 5px;
+  margin-top: 6px;
+}
+
+body.cashier-terminal-mode .summary-box {
+  padding: 6px;
+  border-radius: 7px;
+}
+
+body.cashier-terminal-mode .summary-box span {
+  font-size: 10px;
+  line-height: 1;
+}
+
+body.cashier-terminal-mode .summary-box strong {
+  margin-top: 3px;
+  font-size: 15px;
+}
+
+body.cashier-terminal-mode .cashier-discount-field {
+  margin-top: 6px;
+}
+
+body.cashier-terminal-mode .payment-methods {
+  gap: 5px;
+  margin-top: 6px;
+}
+
+body.cashier-terminal-mode .method-btn {
+  min-height: 38px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  gap: 0;
+}
+
+body.cashier-terminal-mode .method-btn small {
+  font-size: 10px;
+}
+
+body.cashier-terminal-mode .payment-body {
+  margin-top: 6px;
+}
+
+body.cashier-terminal-mode .cashier-payment-guidance,
+body.cashier-terminal-mode .cashier-payment-warning,
+body.cashier-terminal-mode .cashier-no-shift-card {
+  margin: 6px 0;
+  padding: 7px 8px;
+  border-radius: 7px;
+  gap: 4px;
+  font-size: 12px;
+}
+
+body.cashier-terminal-mode .cashier-no-shift-card strong {
+  font-size: 14px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-payment-actions {
+  margin-top: 6px;
+  gap: 6px;
+}
+
+body.cashier-terminal-mode .primary-action {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+body.cashier-terminal-mode .secondary-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+body.cashier-terminal-mode .secondary-action {
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-transaction-strip {
+  display: none;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-receipt-panel.is-empty {
+  display: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-receipt-panel:not(.is-empty) {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  width: min(320px, calc(100vw - 20px));
+  max-height: calc(100vh - 94px);
+  margin: 0;
+  overflow: auto;
+  z-index: 1050;
+}
+
+@media (max-width: 900px) {
+  body.cashier-terminal-mode {
+    height: auto;
+    overflow: auto;
+  }
+
+  body.cashier-terminal-mode .app-shell,
+  body.cashier-terminal-mode .workspace-shell,
+  body.cashier-terminal-mode #workspacePanels,
+  body.cashier-terminal-mode .cashier-sale-panel,
+  body.cashier-terminal-mode .cashier-terminal-shell {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+}

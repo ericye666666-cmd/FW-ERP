@@ -169,7 +169,6 @@ test("POS cashier high-frequency copy is backed by stable dictionary keys", () =
 
   const copySource = extractFunctionSource(appJs, "ensureCashierTerminalPreviewCopy");
   [
-    "scanStoreItem",
     "addUnbarcodedItem",
     "openShift",
     "closeShift",
@@ -180,7 +179,6 @@ test("POS cashier high-frequency copy is backed by stable dictionary keys", () =
     "zReport",
     "cashVariance",
     "itemAlreadySold",
-    "storeItemOnlyRule",
     "openShiftFirst",
   ].forEach((keyName) => {
     assert.match(copySource, new RegExp(`cashierTerminalTerm\\(POS_CASHIER_TERMINOLOGY_KEYS\\.${keyName}(?:,\\s*"(?:zh|en)")?\\)`));
@@ -219,7 +217,8 @@ test("POS cashier terminal renders cashier touch layout without changing barcode
   assert.match(indexHtml, /id="cashierTerminalCart"[\s\S]*class="[^"]*cashier-terminal-cart/);
   assert.match(indexHtml, /id="cashierTerminalPaymentPanel"[\s\S]*class="[^"]*cashier-terminal-payment-panel/);
   assert.match(indexHtml, /id="cashierTerminalQuickActions"[\s\S]*class="[^"]*cashier-terminal-transaction-strip/);
-  assert.match(appJs, /scanTitle:\s*cashierTerminalTerm\(POS_CASHIER_TERMINOLOGY_KEYS\.scanStoreItem,\s*"zh"\)/);
+  assert.match(appJs, /scanTitle:\s*"扫码收银"/);
+  assert.match(appJs, /scanStoreItem:\s*"请扫描 STORE_ITEM 商品码。"/);
   assert.match(appJs, /basketTitle:\s*"商品篮"/);
   assert.match(appJs, /paymentTitle:\s*"结账"/);
   assert.match(appJs, /completeTrade:\s*"完成销售"/);
@@ -253,23 +252,15 @@ test("POS cashier terminal moves store, shift, device, and sales status into top
     "打印机",
     "同步状态",
     "今日销售额",
-    "今日订单数",
-    "本班销售额",
-    "本班订单数",
     "当前时间",
   ].forEach((label) => assert.match(headerSource, new RegExp(label)));
   assert.match(headerSource, /getCashierTerminalStoreCode\(\)/);
   assert.match(headerSource, /getCashierTerminalCashierName\(\)/);
   assert.match(headerSource, /getCashierTerminalShiftNo\(\) \|\| copy\.openShiftFirst/);
   assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
-  assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
-  assert.match(headerSource, /cashierTerminalState\.todayOrderCount/);
-  assert.match(headerSource, /cashierTerminalState\.shiftOrderCount/);
   assert.match(headerSource, /cashierTerminalState\.currentTime/);
   assert.match(infoStripSource, /copy\.posStoreItemOnly/);
-  assert.match(infoStripSource, /copy\.resumeHeldOrder/);
-  assert.match(infoStripSource, /copy\.closeShift/);
-  assert.match(infoStripSource, /copy\.openNow/);
+  assert.doesNotMatch(infoStripSource, /<button[\s\S]*cashierTerminalStatusBar\.innerHTML/);
 });
 
 test("POS cashier terminal removes blocking bottom floating status cards", () => {
@@ -280,29 +271,63 @@ test("POS cashier terminal removes blocking bottom floating status cards", () =>
 });
 
 test("POS hotfix keeps top header compact and receipt non-blocking", () => {
-  const topbarRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar", /grid-template-columns:\s*minmax\(180px,\s*220px\)\s+minmax\(0,\s*1fr\)/);
+  const shellRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-shell", /grid-template-rows:\s*64px 28px minmax\(0,\s*1fr\)/);
+  const topbarRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar", /height:\s*64px/);
   const topbarActionsRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.topbar-actions", /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
-  const statusStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-session-strip", /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(104px,\s*1fr\)\)/);
-  const mainBodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-body", /grid-template-columns:\s*minmax\(280px,\s*0\.28fr\)/);
-  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /max-height:\s*96px/);
+  const statusStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-session-strip", /grid-template-columns:\s*repeat\(8,\s*minmax\(0,\s*1fr\)\)/);
+  const mainBodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-body", /height:\s*calc\(100vh - 112px\)/);
+  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /display:\s*none/);
   const receiptEmptyRule = extractLastCssRule("body\\.cashier-terminal-mode \\.cashier-terminal-receipt-panel\\.is-empty");
   const receiptSource = extractFunctionSource(appJs, "renderCashierTerminalReceiptPanel");
+  const renderSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminal");
 
-  assert.match(stylesCss, /POS-UI-2-HOTFIX/);
+  assert.match(stylesCss, /POS-1366-FIT/);
+  assert.match(shellRule, /grid-template-rows:\s*64px 28px minmax\(0,\s*1fr\)/);
+  assert.match(shellRule, /overflow:\s*hidden/);
   assert.match(topbarRule, /display:\s*grid/);
-  assert.match(topbarRule, /grid-template-columns:\s*minmax\(180px,\s*220px\)\s+minmax\(0,\s*1fr\)/);
+  assert.match(topbarRule, /grid-template-columns:\s*minmax\(140px,\s*180px\)\s+minmax\(0,\s*1fr\)/);
   assert.match(topbarRule, /align-items:\s*center/);
-  assert.match(topbarRule, /max-height:\s*110px/);
+  assert.match(topbarRule, /max-height:\s*72px/);
   assert.doesNotMatch(topbarRule, /align-items:\s*stretch/);
   assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
-  assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(104px,\s*1fr\)\)/);
-  assert.match(statusStripRule, /max-height:\s*74px/);
-  assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(280px,\s*0\.28fr\)\s+minmax\(460px,\s*0\.42fr\)\s+minmax\(360px,\s*0\.3fr\)/);
-  assert.match(mainBodyRule, /min-height:\s*calc\(100vh - 180px\)/);
-  assert.match(transactionStripRule, /max-height:\s*96px/);
+  assert.match(statusStripRule, /overflow:\s*hidden/);
+  assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(260px,\s*0\.27fr\)\s+minmax\(430px,\s*0\.43fr\)\s+minmax\(330px,\s*0\.3fr\)/);
+  assert.match(mainBodyRule, /overflow:\s*hidden/);
+  assert.match(transactionStripRule, /display:\s*none/);
   assert.match(transactionStripRule, /overflow:\s*hidden/);
   assert.match(receiptSource, /receiptPanel\.classList\.toggle\("is-empty",\s*!sale\)/);
   assert.match(receiptEmptyRule, /display:\s*none/);
+  assert.doesNotMatch(renderSource, /applyGlobalI18n\(cashierTerminalShell/);
+});
+
+test("POS 1366 copy hotfix removes broken fallback Details copy", () => {
+  const posSources = [
+    extractElementById(indexHtml, "cashierTerminalShell"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalSessionStrip"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalStatusBar"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalLookupPanel"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalCart"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel"),
+    extractAssignedAnyFunctionSource(appJs, "renderCashierTerminal"),
+  ].join("\n");
+
+  assert.match(appJs, /POS only scans Store Item labels\./);
+  assert.match(appJs, /Scan a Store Item barcode\./);
+  assert.match(appJs, /Cart is empty\. Scan Store Item\./);
+  assert.match(appJs, /POS 只扫描门店商品码。/);
+  assert.match(appJs, /请扫描 STORE_ITEM 商品码。/);
+  assert.match(appJs, /商品篮为空，请扫描商品码。/);
+  assert.match(extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalCart"), /const copy = getCashierTerminalCopy\(\)/);
+  assert.match(extractFunctionSource(appJs, "formatCashierTerminalScanError"), /copy\.posStoreItemOnly/);
+  assert.match(extractFunctionSource(appJs, "formatCashierTerminalScanError"), /copy\.scanStoreItem/);
+  [
+    "DetailsScan Store Item",
+    "DetailsItemLabel",
+    "ItemDetails",
+    "POS DetailsScan Store Item",
+  ].forEach((brokenCopy) => {
+    assert.doesNotMatch(posSources, new RegExp(escapeRegex(brokenCopy)));
+  });
 });
 
 test("POS cashier terminal gates resolver results before adding items", () => {

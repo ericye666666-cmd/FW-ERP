@@ -3593,7 +3593,7 @@
               <div>
                 <p class="eyebrow">DIRECT LOOP RETAIL</p>
                 <h3 class="cashier-terminal-title" data-terminal-copy="brandTitle">FW-ERP POS</h3>
-                <p class="cashier-terminal-subtitle">收银台</p>
+                <p class="cashier-terminal-subtitle" data-terminal-copy="brandSubtitle">收银台</p>
               </div>
             </div>
             <div class="topbar-actions">
@@ -3618,7 +3618,7 @@
                     <h3 data-terminal-copy="scanTitle">扫描商品</h3>
                     <small>SCAN STORE_ITEM</small>
                   </div>
-                  <span class="cashier-terminal-scan-rule">仅支持 STORE_ITEM 商品码</span>
+                  <span class="cashier-terminal-scan-rule" data-terminal-copy="posStoreItemOnly">POS 只扫描门店商品码。</span>
                 </div>
                 <form id="cashierTerminalScanForm" class="scan-grid cashier-terminal-scan-form">
                   <label class="field scan-field main-field">
@@ -3646,7 +3646,7 @@
                   data-empty-text=""
                 ></div>
                 <div id="cashierTerminalLookupCard" class="lookup-preview cashier-terminal-lookup empty-state">
-                  仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。
+                  POS 只扫描门店商品码。
                 </div>
               </article>
             </section>
