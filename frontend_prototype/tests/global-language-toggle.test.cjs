@@ -446,6 +446,88 @@ test("user management generated field labels and help copy are translated", () =
   }
 });
 
+test("area supervisor store and staff pages have natural English copy", () => {
+  const phrases = [
+    ["区域主管工作台", "Area Supervisor Workbench"],
+    ["当前用户：区域主管", "Current user: Area Supervisor"],
+    ["请选择门店管理或员工管理开始处理上线资料。", "Choose Store Management or Staff Management to start launch setup."],
+    ["门店管理", "Store Management"],
+    ["员工管理", "Staff Management"],
+    ["录入门店、维护地址电话、暂停或关闭门店。", "Create stores, maintain addresses and phone numbers, and pause or close stores."],
+    ["录入和维护门店基础资料", "Create and maintain store profile details."],
+    ["录入和维护门店基础资料。", "Create and maintain store profile details."],
+    ["创建门店员工账号，维护账号状态", "Create store staff accounts and maintain account status."],
+    ["创建门店员工账号、重置密码、停用账号。", "Create store staff accounts, reset passwords, and deactivate accounts."],
+    ["进入门店管理", "Open Store Management"],
+    ["进入员工管理", "Open Staff Management"],
+    ["+ 新增门店", "+ Add Store"],
+    ["新增门店", "Add Store"],
+    ["+ 新增员工", "+ Add Staff"],
+    ["编辑门店资料", "Edit Store Details"],
+    ["门店详情", "Store Details"],
+    ["新增员工", "Add Staff"],
+    ["重置密码", "Reset Password"],
+    ["停用账号", "Deactivate Account"],
+    ["地图链接", "Map Link"],
+    ["地址", "Address"],
+    ["联系电话", "Phone"],
+    ["备注", "Notes"],
+    ["全部门店", "All Stores"],
+    ["营业中", "Active"],
+    ["暂停营业", "Paused"],
+    ["已关闭", "Closed"],
+    ["全部员工", "All Staff"],
+    ["在职员工", "Active Staff"],
+    ["已停用", "Inactive"],
+    ["没有找到符合条件的门店。", "No stores match the current filters."],
+    ["没有找到符合条件的员工。", "No staff match the current filters."],
+    ["这里会显示保存结果和权限提示。", "Save results and permission messages appear here."],
+    ["请先刷新门店列表。", "Refresh the store list first."],
+    ["请先刷新员工列表。", "Refresh the staff list first."],
+  ];
+  for (const [zh, en] of phrases) {
+    assert.match(appJs + indexHtml, new RegExp(escapeRegex(zh)));
+    assert.match(appJs, new RegExp(escapeRegex(en)));
+  }
+
+  const areaSupervisorSource = [
+    indexHtml.match(/<section[^>]*id="areaSupervisorWorkbench"[\s\S]*?<div id="areaSupervisorDrawer"/)?.[0] || "",
+    functionSource("renderAreaSupervisorStoreList"),
+    functionSource("renderAreaSupervisorStoreDetail"),
+    functionSource("renderAreaSupervisorUserList"),
+    functionSource("renderAreaSupervisorOverview"),
+    functionSource("openAreaSupervisorDrawer"),
+    functionSource("getAreaSupervisorCopy"),
+    functionSource("formatAreaSupervisorLoadedNotice"),
+    functionSource("refreshAreaSupervisorLanguageSurfacesAfterLanguageChange"),
+    functionSource("renderAreaSupervisorDataValue"),
+    functionSource("renderAreaSupervisorFactLine"),
+  ].join("\n");
+  assert.match(areaSupervisorSource, /chooseI18nLabel/);
+  assert.match(functionSource("setGlobalLanguage"), /refreshAreaSupervisorLanguageSurfacesAfterLanguageChange/);
+  assert.match(functionSource("getAreaSupervisorStoreStatusLabel"), /Active/);
+  assert.match(functionSource("getAreaSupervisorUserRoleLabel"), /Store Manager/);
+  assert.match(functionSource("renderAreaSupervisorStoreList"), /renderAreaSupervisorDataValue/);
+  assert.match(functionSource("renderAreaSupervisorStoreList"), /renderAreaSupervisorFactLine/);
+  assert.match(functionSource("renderAreaSupervisorStoreDetail"), /renderAreaSupervisorDataValue/);
+  assert.match(functionSource("renderAreaSupervisorUserList"), /renderAreaSupervisorDataValue/);
+  assert.match(functionSource("formatAreaSupervisorLoadedNotice"), /Loaded \$\{storeCount\} stores and \$\{staffCount\} store staff accounts\./);
+  assert.match(functionSource("renderAreaSupervisorLaunchNotice"), /data-i18n-skip/);
+  const brokenFallbacks = [
+    "CreateStoreDetails",
+    "DetailsStore",
+    "StoreDetails",
+    "RefreshStoreDetails",
+    "SaveStoreDetails",
+    "DetailsAccount",
+    "DeleteDetailsAccount",
+    "SearchDetails",
+  ];
+  for (const fallback of brokenFallbacks) {
+    assert.doesNotMatch(areaSupervisorSource, new RegExp(escapeRegex(fallback)));
+  }
+});
+
 test("warehouse hub navigation descriptions and sorted garment inventory dynamic copy use i18n helpers", () => {
   const warehouseHubRenderer = (appJs.match(/function renderWarehouseBaleHubNav[\s\S]*?function summarizeWarehouseDispatchRows/) || [""])[0];
   const sortingRenderer = (appJs.match(/function renderSortingStockSummary[\s\S]*?function getItemTokenStatusLabel/) || [""])[0];

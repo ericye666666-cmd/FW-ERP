@@ -65,7 +65,7 @@ test("login page shows compact FW-ERP and Android PR version status", () => {
   assert.match(loginVersionSection, /#35/);
   assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
   assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.js\?v=area-supervisor-i18n-hotfix-323/);
   assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
 });
 
@@ -533,7 +533,7 @@ test("clerk PDA Bluetooth paired printer rows persist across status polling", ()
   assert.match(updateStatus, /selected_profile/);
   assert.doesNotMatch(pollPrinter, /bluetoothPrinterPairedPrinters\s*=/);
   assert.doesNotMatch(pollPrinter, /connectPrinter|printTestLabel|listPairedPrinters|startPrinterDiscovery|getDiscoveredPrinters/);
-  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.js\?v=area-supervisor-i18n-hotfix-323/);
   assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrinters:\s*\[\]/);
   assert.match(appLegacyJs, /bluetoothPrinterPairedPrintersLastRefreshAt/);

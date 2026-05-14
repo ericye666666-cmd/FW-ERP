@@ -1357,89 +1357,289 @@
         <pre id="supplierOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel" id="areaSupervisorLaunchConsole" data-workspace-panel="operations">
-        <div class="panel-head">
-          <h2>门店与员工管理</h2>
-          <button data-action="load-area-supervisor-console" type="button">刷新门店与员工</button>
+      <section class="panel area-supervisor-panel" id="areaSupervisorWorkbench" data-workspace-panel="operations">
+        <div class="area-supervisor-page">
+          <div class="area-supervisor-topbar">
+            <div>
+              <h2>区域主管工作台</h2>
+              <p>当前用户：区域主管</p>
+            </div>
+            <span class="area-supervisor-online">在线</span>
+          </div>
+          <div id="areaSupervisorLaunchSummary" class="area-supervisor-notice" aria-live="polite" data-area-supervisor-notice>
+            请选择门店管理或员工管理开始处理上线资料。
+          </div>
+          <div class="area-supervisor-workbench-grid">
+            <article class="area-supervisor-work-card">
+              <strong>门店管理</strong>
+              <span>录入门店、维护地址电话、暂停或关闭门店。</span>
+              <button type="button" data-area-supervisor-open-page="stores">进入门店管理</button>
+            </article>
+            <article class="area-supervisor-work-card">
+              <strong>员工管理</strong>
+              <span>创建门店员工账号、重置密码、停用账号。</span>
+              <button type="button" data-area-supervisor-open-page="staff">进入员工管理</button>
+            </article>
+          </div>
         </div>
-        <div id="areaSupervisorLaunchSummary" class="candidate-summary empty-state">
-          area_supervisor 用于上线录入门店、创建门店员工、重置密码和停用账号。真实权限以后端 RBAC 为准。
-        </div>
-        <datalist id="areaSupervisorStoreCodeOptions"></datalist>
-
-        <div class="store-summary-grid">
-          <article class="closing-checklist-panel">
-            <h3>创建门店</h3>
-            <form id="areaSupervisorStoreCreateForm" class="form-grid compact">
-              <input name="code" placeholder="门店代码，如 RUIRU" />
-              <input name="name" placeholder="门店名称" />
-              <select name="status">
-                <option value="preparing">preparing</option>
-                <option value="active">active</option>
-                <option value="paused">paused</option>
-                <option value="closed">closed</option>
-              </select>
-              <input name="address" placeholder="地址" />
-              <input name="phone" placeholder="电话" />
-              <input name="google_maps_url" placeholder="Google Maps 链接" />
-              <input name="manager_note" placeholder="备注" />
-              <button type="submit">创建门店</button>
-            </form>
-          </article>
-
-          <article class="closing-checklist-panel">
-            <h3>编辑门店基础资料</h3>
-            <form id="areaSupervisorStoreUpdateForm" class="form-grid compact">
-              <input name="code" list="areaSupervisorStoreCodeOptions" placeholder="选择或输入门店代码" />
-              <input name="name" placeholder="门店名称" />
-              <select name="status">
-                <option value="preparing">preparing</option>
-                <option value="active">active</option>
-                <option value="paused">paused</option>
-                <option value="closed">closed</option>
-              </select>
-              <input name="address" placeholder="地址" />
-              <input name="phone" placeholder="电话" />
-              <input name="google_maps_url" placeholder="Google Maps 链接" />
-              <input name="manager_note" placeholder="备注" />
-              <button type="submit">保存门店资料</button>
-            </form>
-          </article>
-
-          <article class="closing-checklist-panel">
-            <h3>创建门店员工账号</h3>
-            <form id="areaSupervisorUserCreateForm" class="form-grid compact">
-              <input name="username" placeholder="用户名" autocomplete="username" />
-              <input name="full_name" placeholder="姓名" />
-              <input name="password" type="password" placeholder="临时密码" autocomplete="new-password" />
-              <select name="role_code">
-                <option value="store_manager">店长 store_manager</option>
-                <option value="store_clerk">店员 store_clerk</option>
-                <option value="cashier">收银员 cashier</option>
-              </select>
-              <input name="store_code" list="areaSupervisorStoreCodeOptions" placeholder="门店代码" />
-              <button type="submit">创建门店员工</button>
-            </form>
-          </article>
-
-          <article class="closing-checklist-panel">
-            <h3>重置员工密码</h3>
-            <form id="areaSupervisorPasswordResetForm" class="form-grid compact">
-              <input name="user_id" type="hidden" />
-              <input name="username" placeholder="从员工列表选择账号" readonly />
-              <input name="password" type="password" placeholder="新密码" autocomplete="new-password" />
-              <button type="submit">重置密码</button>
-            </form>
-          </article>
-        </div>
-
-        <h3>当前门店列表</h3>
-        <div id="areaSupervisorStoreList" class="candidate-list empty-state">请先刷新门店列表。</div>
-
-        <h3>门店员工账号</h3>
-        <div id="areaSupervisorUserList" class="user-management-list empty-state">请先刷新员工列表。</div>
-        <pre id="areaSupervisorLaunchOutput" class="output hidden-output"></pre>
       </section>
+
+      <section class="panel area-supervisor-panel" id="areaSupervisorStoreManagement" data-workspace-panel="operations">
+        <div class="area-supervisor-page">
+          <div class="area-supervisor-topbar">
+            <div>
+              <h2>区域主管工作台</h2>
+              <p>当前用户：区域主管</p>
+            </div>
+            <span class="area-supervisor-online">在线</span>
+          </div>
+          <div class="area-supervisor-page-head">
+            <div>
+              <h3>门店管理</h3>
+              <p>录入和维护门店基础资料</p>
+            </div>
+            <button type="button" data-area-supervisor-open-drawer="store-create">+ 新增门店</button>
+          </div>
+          <div class="area-supervisor-notice" aria-live="polite" data-area-supervisor-notice>
+            这里会显示保存结果和权限提示。
+          </div>
+          <div id="areaSupervisorStoreStats" class="area-supervisor-stats">
+            <article class="area-supervisor-stat-card"><span>全部门店</span><strong>0</strong></article>
+            <article class="area-supervisor-stat-card"><span>营业中</span><strong>0</strong></article>
+            <article class="area-supervisor-stat-card"><span>暂停营业</span><strong>0</strong></article>
+            <article class="area-supervisor-stat-card"><span>已关闭</span><strong>0</strong></article>
+          </div>
+          <div class="area-supervisor-toolbar">
+            <input id="areaSupervisorStoreSearch" type="search" placeholder="搜索门店名称 / 门店代码" />
+            <select id="areaSupervisorStoreStatusFilter" aria-label="状态筛选">
+              <option value="all">全部状态</option>
+              <option value="active">营业中</option>
+              <option value="paused">暂停营业</option>
+              <option value="closed">已关闭</option>
+              <option value="preparing">筹备中</option>
+            </select>
+          </div>
+          <div class="area-supervisor-store-layout">
+            <div id="areaSupervisorStoreList" class="area-supervisor-store-list">请先刷新门店列表。</div>
+            <aside id="areaSupervisorStoreDetail" class="area-supervisor-detail-card">
+              <h3>门店详情</h3>
+              <p class="subtle">从左侧选择一家门店查看基础资料。</p>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel area-supervisor-panel" id="areaSupervisorStaffManagement" data-workspace-panel="operations">
+        <div class="area-supervisor-page">
+          <div class="area-supervisor-topbar">
+            <div>
+              <h2>区域主管工作台</h2>
+              <p>当前用户：区域主管</p>
+            </div>
+            <span class="area-supervisor-online">在线</span>
+          </div>
+          <div class="area-supervisor-page-head">
+            <div>
+              <h3>员工管理</h3>
+              <p>创建门店员工账号，维护账号状态</p>
+            </div>
+            <button type="button" data-area-supervisor-open-drawer="user-create">+ 新增员工</button>
+          </div>
+          <div class="area-supervisor-notice" aria-live="polite" data-area-supervisor-notice>
+            这里会显示账号创建、重置密码和停用结果。
+          </div>
+          <div id="areaSupervisorStaffStats" class="area-supervisor-stats">
+            <article class="area-supervisor-stat-card"><span>全部员工</span><strong>0</strong></article>
+            <article class="area-supervisor-stat-card"><span>在职员工</span><strong>0</strong></article>
+            <article class="area-supervisor-stat-card"><span>已停用</span><strong>0</strong></article>
+            <article class="area-supervisor-stat-card"><span>收银员</span><strong>0</strong></article>
+          </div>
+          <div class="area-supervisor-toolbar area-supervisor-toolbar-wide">
+            <input id="areaSupervisorStaffSearch" type="search" placeholder="搜索员工姓名 / 用户名 / 手机号" />
+            <select id="areaSupervisorStaffStoreFilter" aria-label="门店筛选">
+              <option value="all">全部门店</option>
+            </select>
+            <select id="areaSupervisorStaffRoleFilter" aria-label="角色筛选">
+              <option value="all">全部角色</option>
+              <option value="store_manager">店长</option>
+              <option value="store_clerk">店员</option>
+              <option value="cashier">收银员</option>
+            </select>
+            <select id="areaSupervisorStaffStatusFilter" aria-label="状态筛选">
+              <option value="all">全部状态</option>
+              <option value="active">在职</option>
+              <option value="inactive">已停用</option>
+            </select>
+          </div>
+          <div id="areaSupervisorUserList" class="area-supervisor-staff-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>姓名</th>
+                  <th>用户名</th>
+                  <th>所属门店</th>
+                  <th>角色</th>
+                  <th>状态</th>
+                  <th>手机号</th>
+                  <th>最后登录</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="8">请先刷新员工列表。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel area-supervisor-panel" id="areaSupervisorOperationsOverview" data-workspace-panel="operations">
+        <div class="area-supervisor-page">
+          <div class="area-supervisor-topbar">
+            <div>
+              <h2>区域主管工作台</h2>
+              <p>当前用户：区域主管</p>
+            </div>
+            <span class="area-supervisor-online">在线</span>
+          </div>
+          <div class="area-supervisor-page-head">
+            <div>
+              <h3>运营总览</h3>
+              <p>只查看门店基础状态</p>
+            </div>
+            <button data-action="load-area-supervisor-console" type="button">刷新</button>
+          </div>
+          <div class="area-supervisor-notice" aria-live="polite" data-area-supervisor-notice>
+            这里只显示门店基础状态。
+          </div>
+          <div id="areaSupervisorOverviewList" class="area-supervisor-store-list">请先刷新门店状态。</div>
+        </div>
+      </section>
+
+      <section class="panel area-supervisor-panel" id="areaSupervisorSystemSettings" data-workspace-panel="operations">
+        <div class="area-supervisor-page">
+          <div class="area-supervisor-topbar">
+            <div>
+              <h2>区域主管工作台</h2>
+              <p>当前用户：区域主管</p>
+            </div>
+            <span class="area-supervisor-online">在线</span>
+          </div>
+          <div class="area-supervisor-page-head">
+            <div>
+              <h3>系统设置</h3>
+              <p>当前页面只保留账号状态说明</p>
+            </div>
+          </div>
+          <div class="area-supervisor-notice" aria-live="polite" data-area-supervisor-notice>
+            权限由后端统一校验。
+          </div>
+          <div class="area-supervisor-empty-card">
+            权限以后端校验为准。需要调整角色或更高权限，请联系主管处理。
+          </div>
+        </div>
+      </section>
+
+      <datalist id="areaSupervisorStoreCodeOptions"></datalist>
+      <div id="areaSupervisorDrawer" class="area-supervisor-drawer-backdrop" hidden>
+        <aside class="area-supervisor-drawer" role="dialog" aria-modal="true" aria-labelledby="areaSupervisorDrawerTitle">
+          <div class="area-supervisor-drawer-head">
+            <div>
+              <h3 id="areaSupervisorDrawerTitle">新增门店</h3>
+              <p id="areaSupervisorDrawerDescription">填写基础资料后保存。</p>
+            </div>
+            <button type="button" class="ghost-button" data-area-supervisor-close-drawer>取消</button>
+          </div>
+
+          <form id="areaSupervisorStoreCreateForm" class="area-supervisor-form" data-area-supervisor-drawer-form="store-create" hidden>
+            <label>门店名称<input name="name" placeholder="例如 Ruiru 店" /></label>
+            <label>门店代码<input name="code" placeholder="例如 RUIRU" /></label>
+            <label>地址<input name="address" placeholder="门店地址" /></label>
+            <label>联系电话<input name="phone" placeholder="联系电话" /></label>
+            <label>地图链接<input name="google_maps_url" placeholder="地图链接" /></label>
+            <label>状态
+              <select name="status">
+                <option value="preparing">筹备中</option>
+                <option value="active">营业中</option>
+                <option value="paused">暂停营业</option>
+                <option value="closed">已关闭</option>
+              </select>
+            </label>
+            <label class="area-supervisor-form-wide">备注<textarea name="manager_note" rows="3" placeholder="备注"></textarea></label>
+            <div class="area-supervisor-drawer-actions">
+              <button type="submit">保存</button>
+              <button type="button" class="ghost-button" data-area-supervisor-close-drawer>取消</button>
+            </div>
+          </form>
+
+          <form id="areaSupervisorStoreUpdateForm" class="area-supervisor-form" data-area-supervisor-drawer-form="store-edit" hidden>
+            <label>门店代码<input name="code" list="areaSupervisorStoreCodeOptions" readonly /></label>
+            <label>门店名称<input name="name" placeholder="门店名称" /></label>
+            <label>地址<input name="address" placeholder="门店地址" /></label>
+            <label>联系电话<input name="phone" placeholder="联系电话" /></label>
+            <label>地图链接<input name="google_maps_url" placeholder="地图链接" /></label>
+            <label>状态
+              <select name="status">
+                <option value="preparing">筹备中</option>
+                <option value="active">营业中</option>
+                <option value="paused">暂停营业</option>
+                <option value="closed">已关闭</option>
+              </select>
+            </label>
+            <label class="area-supervisor-form-wide">备注<textarea name="manager_note" rows="3" placeholder="备注"></textarea></label>
+            <div class="area-supervisor-drawer-actions">
+              <button type="submit">保存</button>
+              <button type="button" class="ghost-button" data-area-supervisor-close-drawer>取消</button>
+            </div>
+          </form>
+
+          <form id="areaSupervisorUserCreateForm" class="area-supervisor-form" data-area-supervisor-drawer-form="user-create" hidden>
+            <label>姓名<input name="full_name" placeholder="员工姓名" /></label>
+            <label>用户名<input name="username" placeholder="登录用户名" autocomplete="username" /></label>
+            <label>初始密码<input name="password" type="password" placeholder="初始密码" autocomplete="new-password" /></label>
+            <label>所属门店<input name="store_code" list="areaSupervisorStoreCodeOptions" placeholder="门店代码" /></label>
+            <label>角色
+              <select name="role_code">
+                <option value="store_manager">店长</option>
+                <option value="store_clerk">店员</option>
+                <option value="cashier">收银员</option>
+              </select>
+            </label>
+            <label>手机号<input name="phone" placeholder="手机号" /></label>
+            <label>状态
+              <select name="status">
+                <option value="active">在职</option>
+                <option value="inactive">已停用</option>
+              </select>
+            </label>
+            <div class="area-supervisor-drawer-actions">
+              <button type="submit">保存</button>
+              <button type="button" class="ghost-button" data-area-supervisor-close-drawer>取消</button>
+            </div>
+          </form>
+
+          <form id="areaSupervisorPasswordResetForm" class="area-supervisor-form" data-area-supervisor-drawer-form="password-reset" hidden>
+            <input name="user_id" type="hidden" />
+            <label>员工账号<input name="username" readonly /></label>
+            <label>新密码<input name="password" type="password" placeholder="新密码" autocomplete="new-password" /></label>
+            <p class="area-supervisor-help">将为该员工设置新密码，请确认后继续。</p>
+            <div class="area-supervisor-drawer-actions">
+              <button type="submit">确认重置</button>
+              <button type="button" class="ghost-button" data-area-supervisor-close-drawer>取消</button>
+            </div>
+          </form>
+
+          <div id="areaSupervisorDeactivateConfirm" class="area-supervisor-confirm" data-area-supervisor-drawer-form="deactivate" hidden>
+            <h4>停用账号</h4>
+            <p>停用后该员工不能登录系统，历史记录会保留。</p>
+            <div class="area-supervisor-drawer-actions">
+              <button type="button" class="danger-button" data-area-supervisor-confirm-deactivate>确认停用</button>
+              <button type="button" class="ghost-button" data-area-supervisor-close-drawer>取消</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+      <pre id="areaSupervisorLaunchOutput" class="output hidden-output"></pre>
 
       <section class="panel" data-workspace-panel="operations">
         <div class="panel-head">
@@ -4502,7 +4702,7 @@
         syncLegacyEnvironmentApiBase();
         window.addEventListener("pageshow", ensureLegacyPasswordCleared);
         if (supportsModernSyntax()) {
-          loadPdaRuntimeScript("./app.js?v=store-shelf-floor-plan-canvas-editor-320", "modern");
+          loadPdaRuntimeScript("./app.js?v=area-supervisor-i18n-hotfix-323", "modern");
           return;
         }
         loadPdaRuntimeScript("./app.legacy.js?v=store-shelf-floor-plan-canvas-editor-320", "legacy");

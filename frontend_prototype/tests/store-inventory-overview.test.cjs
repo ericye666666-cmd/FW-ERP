@@ -236,6 +236,6 @@ test("legacy bundle includes inventory overview page logic and cache key", () =>
   assert.match(appLegacyJs, /data-store-inventory-category-detail/);
   assert.match(appLegacyJs, /loadStoreInventoryUnconfirmedItems/);
   assert.match(appLegacyJs, /data-store-inventory-unconfirmed-confirm/);
-  assert.match(indexHtml, /app\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /app\.js\?v=area-supervisor-i18n-hotfix-323/);
   assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
 });
