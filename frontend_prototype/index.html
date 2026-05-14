@@ -4155,6 +4155,8 @@
         var loginForm = document.getElementById("loginForm");
         var loginSubmitButton = document.getElementById("loginSubmitButton");
         var productionApiBase = "https://directlooperp.com/api/v1";
+        var stagingApiBase = "https://staging.directlooperp.com/api/v1";
+        var localDevApiBase = "http://127.0.0.1:8000/api/v1";
         var legacyStoreManagerTarget = null;
         var legacyFallbackBound = false;
 
@@ -4211,11 +4213,25 @@
 
         function isLegacyProductionOrStagingOrPda() {
           var directLoopPda = window.navigator && String(window.navigator.userAgent || "").indexOf("DirectLoopPDA/1.0") !== -1;
-          return window.location.origin.indexOf("https://directlooperp.com") === 0 || window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0 || directLoopPda;
+          return Boolean(getLegacyEnvironmentApiBase()) || directLoopPda;
         }
 
-        function isLegacyProductionOrStagingOrigin() {
-          return window.location.origin.indexOf("https://directlooperp.com") === 0 || window.location.origin.indexOf("https://fw-erp-34-35-52-250.nip.io") === 0;
+        function getLegacyEnvironmentApiBase() {
+          var hostname = window.location.hostname || "";
+          var protocol = window.location.protocol || "";
+          if (!hostname || hostname === "127.0.0.1" || hostname === "localhost") {
+            return localDevApiBase;
+          }
+          if (window.location.protocol === "https:" && (hostname === "directlooperp.com" || hostname === "www.directlooperp.com")) {
+            return productionApiBase;
+          }
+          if (window.location.protocol === "https:" && (hostname === "staging.directlooperp.com" || hostname === "fw-erp-34-35-52-250.nip.io")) {
+            return stagingApiBase;
+          }
+          if ((protocol === "http:" || protocol === "https:") && window.location.origin) {
+            return window.location.origin.replace(/\/$/, "") + "/api/v1";
+          }
+          return "";
         }
 
         function restoreLegacyLoginUsername() {
@@ -4401,22 +4417,32 @@
 
         function getLegacyApiBase() {
           var apiBaseInput = document.getElementById("apiBase");
-          if (isLegacyProductionOrStagingOrigin()) {
-            return productionApiBase;
+          var environmentApiBase = getLegacyEnvironmentApiBase();
+          if (environmentApiBase) {
+            return environmentApiBase;
           }
-          return apiBaseInput && apiBaseInput.value ? apiBaseInput.value.trim() : productionApiBase;
+          return apiBaseInput && apiBaseInput.value ? normalizeLegacyApiBaseCandidate(apiBaseInput.value) : productionApiBase;
         }
 
-        function syncLegacyProductionApiBase() {
-          if (!isLegacyProductionOrStagingOrigin()) {
+        function normalizeLegacyApiBaseCandidate(value) {
+          var apiBase = String(value || "").trim().replace(/\/+$/, "");
+          if (/^https?:\/\/[^/]+\/app$/i.test(apiBase)) {
+            return apiBase.replace(/\/app$/i, "/api/v1");
+          }
+          return apiBase;
+        }
+
+        function syncLegacyEnvironmentApiBase() {
+          var environmentApiBase = getLegacyEnvironmentApiBase();
+          if (!environmentApiBase) {
             return;
           }
           var apiBaseInput = document.getElementById("apiBase");
           if (apiBaseInput) {
-            apiBaseInput.value = productionApiBase;
+            apiBaseInput.value = environmentApiBase;
           }
           try {
-            window.localStorage.setItem("retail_ops_api_base", productionApiBase);
+            window.localStorage.setItem("retail_ops_api_base", environmentApiBase);
           } catch (error) {
             // Keep login usable when storage is unavailable.
           }
@@ -4673,7 +4699,7 @@
         removeUnsafeLoginQueryParams();
         ensureLegacyPasswordCleared();
         restoreLegacyLoginUsername();
-        syncLegacyProductionApiBase();
+        syncLegacyEnvironmentApiBase();
         window.addEventListener("pageshow", ensureLegacyPasswordCleared);
         if (supportsModernSyntax()) {
           loadPdaRuntimeScript("./app.js?v=store-shelf-floor-plan-canvas-editor-320", "modern");

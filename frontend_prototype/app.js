@@ -88,11 +88,11 @@ const apparelDefaultCostFlow = globalThis.ApparelDefaultCostFlow || {};
 const apparelSortingRackFlow = globalThis.ApparelSortingRackFlow || {};
 const STORE_DELIVERY_SHIPMENTS_ENDPOINT = "/store-delivery-shipments";
 const PRODUCTION_APP_HOST = "directlooperp.com";
-const PRODUCTION_APP_ORIGIN = `https://${PRODUCTION_APP_HOST}`;
+const PRODUCTION_WWW_HOST = "www.directlooperp.com";
+const STAGING_APP_HOST = "staging.directlooperp.com";
+const LEGACY_NIP_IO_HOST = "fw-erp-34-35-52-250.nip.io";
 const PRODUCTION_API_BASE = "https://directlooperp.com/api/v1";
-const PDA_STAGING_HOST = "fw-erp-34-35-52-250.nip.io";
-const PDA_STAGING_ORIGIN = `https://${PDA_STAGING_HOST}`;
-const PDA_STAGING_API_BASE = PRODUCTION_API_BASE;
+const STAGING_API_BASE = "https://staging.directlooperp.com/api/v1";
 const LOCAL_DEV_API_BASE = "http://127.0.0.1:8000/api/v1";
 
 const authPage = document.querySelector("#authPage");
@@ -3768,17 +3768,70 @@ function getAccessibleSectionsForWorkspace(workspace, user = currentSession.user
   return [...(profile.sections?.[workspace] || [])];
 }
 
+function getLocationHostname(locationLike = window.location) {
+  return String(locationLike?.hostname || "").trim().toLowerCase();
+}
+
+function getLocationProtocol(locationLike = window.location) {
+  return String(locationLike?.protocol || "").trim().toLowerCase();
+}
+
+function getLocationOrigin(locationLike = window.location) {
+  const origin = String(locationLike?.origin || "").trim().replace(/\/$/, "");
+  if (origin && origin !== "null") {
+    return origin;
+  }
+  const protocol = getLocationProtocol(locationLike);
+  const host = String(locationLike?.host || locationLike?.hostname || "").trim();
+  if ((protocol === "http:" || protocol === "https:") && host) {
+    return `${protocol}//${host}`.replace(/\/$/, "");
+  }
+  return "";
+}
+
+function isLocalDevHostname(hostname = "") {
+  const host = String(hostname || "").trim().toLowerCase();
+  return !host || host === "127.0.0.1" || host === "localhost";
+}
+
 function isProductionAppOrigin() {
-  return String(window.location.origin || "").startsWith(PRODUCTION_APP_ORIGIN);
+  const host = getLocationHostname(window.location);
+  return getLocationProtocol(window.location) === "https:" && (host === PRODUCTION_APP_HOST || host === PRODUCTION_WWW_HOST);
 }
 
 function isStagingAppOrigin() {
-  return String(window.location.origin || "").startsWith(PDA_STAGING_ORIGIN);
+  return getLocationProtocol(window.location) === "https:" && getLocationHostname(window.location) === STAGING_APP_HOST;
+}
+
+function isLegacyNipIoOrigin() {
+  return getLocationProtocol(window.location) === "https:" && getLocationHostname(window.location) === LEGACY_NIP_IO_HOST;
+}
+
+function getApiBaseForLocation(locationLike = window.location) {
+  const protocol = getLocationProtocol(locationLike);
+  const host = getLocationHostname(locationLike);
+  if (isLocalDevHostname(host)) {
+    return LOCAL_DEV_API_BASE;
+  }
+  if (protocol !== "http:" && protocol !== "https:") {
+    return "";
+  }
+  if (host === PRODUCTION_APP_HOST || host === PRODUCTION_WWW_HOST) {
+    return PRODUCTION_API_BASE;
+  }
+  if (host === STAGING_APP_HOST || host === LEGACY_NIP_IO_HOST) {
+    return STAGING_API_BASE;
+  }
+  const origin = getLocationOrigin(locationLike);
+  return origin ? `${origin}/api/v1` : "";
+}
+
+function getEnvironmentApiBaseForCurrentOrigin() {
+  return getApiBaseForLocation(window.location);
 }
 
 function isLocalDevHost() {
-  const host = window.location.hostname || "";
-  return !host || host === "127.0.0.1" || host === "localhost";
+  return isLocalDevHostname(getLocationHostname(window.location));
 }
 
 function isLoopbackApiBase(value = "") {
@@ -3791,17 +3844,9 @@ function isLoopbackApiBase(value = "") {
 }
 
 function defaultApiBase() {
-  if (isProductionAppOrigin()) {
-    return PRODUCTION_API_BASE;
-  }
-  if (isStagingAppOrigin()) {
-    return PRODUCTION_API_BASE;
-  }
-  if (isLocalDevHost()) {
-    return LOCAL_DEV_API_BASE;
-  }
-  if (window.location.protocol.startsWith("http")) {
-    return `${window.location.origin.replace(/\/$/, "")}/api/v1`;
+  const locationApiBase = getApiBaseForLocation(window.location);
+  if (locationApiBase) {
+    return locationApiBase;
   }
   return LOCAL_DEV_API_BASE;
 }
@@ -3944,16 +3989,34 @@ function deleteDevTask(taskId = "") {
   return row;
 }
 
-function resolveApiBaseForCurrentOrigin(current = "", saved = "") {
-  if (isProductionAppOrigin()) {
-    return PRODUCTION_API_BASE;
+function normalizeApiBaseCandidate(value = "") {
+  const apiBase = String(value || "").trim().replace(/\/+$/, "");
+  if (!apiBase) {
+    return "";
   }
-  if (isStagingAppOrigin()) {
-    return PRODUCTION_API_BASE;
+  try {
+    const url = new URL(apiBase);
+    if ((url.protocol === "http:" || url.protocol === "https:") && url.pathname.replace(/\/+$/, "") === "/app") {
+      return `${url.origin}/api/v1`;
+    }
+  } catch (error) {
+    // Keep non-URL manual values untouched for non-hosted development contexts.
   }
-  const currentBase = String(current || "").trim();
-  const savedBase = String(saved || "").trim();
+  return apiBase;
+}
+
+function resolveApiBaseForLocation(locationLike = window.location, current = "", saved = "") {
+  const locationApiBase = getApiBaseForLocation(locationLike);
+  if (locationApiBase) {
+    return locationApiBase;
+  }
+  const currentBase = normalizeApiBaseCandidate(current);
+  const savedBase = normalizeApiBaseCandidate(saved);
   return savedBase || currentBase || defaultApiBase();
+}
+
+function resolveApiBaseForCurrentOrigin(current = "", saved = "") {
+  return resolveApiBaseForLocation(window.location, current, saved);
 }
 
 function getInitialApiBase() {
@@ -3979,9 +4042,20 @@ function renderApiModeIndicator() {
   if (!(apiModeIndicator instanceof HTMLElement)) {
     return;
   }
-  const production = (isProductionAppOrigin() || isStagingAppOrigin()) && getApiBase() === PRODUCTION_API_BASE;
-  apiModeIndicator.hidden = !production;
-  apiModeIndicator.textContent = production ? "API mode: production" : "";
+  const apiBase = getApiBase();
+  const lockedLocationApiBase = getApiBaseForLocation(window.location);
+  const locked = Boolean(lockedLocationApiBase) && apiBase === lockedLocationApiBase;
+  apiModeIndicator.hidden = !locked;
+  apiModeIndicator.textContent = locked ? `API mode: ${apiBase === STAGING_API_BASE ? "staging" : "production"}` : "";
+}
+
+function syncEnvironmentApiBaseStorage() {
+  const locationApiBase = getApiBaseForLocation(window.location);
+  if (!locationApiBase) {
+    return;
+  }
+  apiBaseInput.value = locationApiBase;
+  localStorage.setItem(STORAGE_KEYS.apiBase, locationApiBase);
 }
 
 function removeUnsafeLoginQueryParams() {
@@ -4022,7 +4096,7 @@ function getDefaultLoginUsername() {
   if (saved) {
     return saved;
   }
-  if (isStagingAppOrigin() || isDirectLoopPdaUserAgent()) {
+  if (isStagingAppOrigin() || isLegacyNipIoOrigin() || isDirectLoopPdaUserAgent()) {
     return "";
   }
   return "admin_1";
@@ -8129,9 +8203,7 @@ function setActivePanel(panelKey, options = {}) {
 
 removeUnsafeLoginQueryParams();
 apiBaseInput.value = getInitialApiBase();
-if ((isProductionAppOrigin() || isStagingAppOrigin()) && isLoopbackApiBase(localStorage.getItem(STORAGE_KEYS.apiBase))) {
-  localStorage.setItem(STORAGE_KEYS.apiBase, PRODUCTION_API_BASE);
-}
+syncEnvironmentApiBaseStorage();
 document.querySelector("#saveBaseButton").addEventListener("click", saveApiBase);
 renderApiModeIndicator();
 ensureLoginPasswordCleared();

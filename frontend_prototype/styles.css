@@ -76,6 +76,10 @@ body {
   display: none !important;
 }
 
+.auth-api-config[hidden] {
+  display: none !important;
+}
+
 .auth-page {
   min-height: 100vh;
   padding: 32px;
