@@ -330,6 +330,123 @@ test("POS cashier terminal gates resolver results before adding items", () => {
   assert.doesNotMatch(appJs, /barcode:\s*token\.display_code/);
 });
 
+test("POS manual unbarcoded item is an explicit separate audited action", () => {
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  const addSource = extractFunctionSource(appJs, "addCashierTerminalManualItemToCart");
+  const payloadSource = extractFunctionSource(appJs, "buildCashierTerminalPosSaleItemPayload");
+
+  assert.match(indexHtml, /data-terminal-drawer="manual-item"/);
+  assert.match(indexHtml, /无码商品/);
+  assert.match(indexHtml, /Manual Item/);
+  assert.match(drawerSource, /drawer === "manual-item"/);
+  [
+    "manualItemCategory",
+    "manualItemDescription",
+    "manualItemQuantity",
+    "manualItemUnitPrice",
+    "manualItemReason",
+  ].forEach((fieldName) => assert.match(drawerSource, new RegExp(fieldName)));
+  [
+    "Tag missing",
+    "Label damaged",
+    "Legacy item",
+    "Manager approved manual sale",
+    "Other",
+  ].forEach((reason) => assert.match(appJs, new RegExp(escapeRegex(reason))));
+  assert.match(actionSource, /case "add-manual-item":/);
+  assert.match(actionSource, /addCashierTerminalManualItemToCart\(\)/);
+  assert.match(addSource, /buildCashierTerminalManualUnbarcodedLine\(\)/);
+  assert.match(addSource, /cashierTerminalState\.cartItems\.push\(line\)/);
+  assert.doesNotMatch(addSource, /resolveBarcodeForContext|resolveCashierTerminalStoreItemForPos|ensureCashierTerminalResolvedItemCanEnterCart/);
+  assert.match(payloadSource, /line_type:\s*row\.line_type \|\| "manual_unbarcoded"/);
+  assert.match(payloadSource, /barcode_type:\s*"NONE"/);
+  assert.match(payloadSource, /store_item_machine_code:\s*null/);
+  assert.match(payloadSource, /requires_audit:\s*true/);
+});
+
+test("POS manual item builder creates cart row without STORE_ITEM machine code", () => {
+  const source = [
+    extractFunctionSource(appJs, "isCashierTerminalManualUnbarcodedLine"),
+    extractFunctionSource(appJs, "buildCashierTerminalManualUnbarcodedLine"),
+  ].join("\n");
+  const context = {
+    cashierTerminalState: {
+      manualItemCategory: "Accessories",
+      manualItemDescription: "Button pack",
+      manualItemQuantity: "2",
+      manualItemUnitPrice: "125",
+      manualItemReason: "Label damaged",
+    },
+    ensureCashierTerminalPreviewState: () => {},
+    normalizeCashierTerminalNumber: (value) => Number(value || 0),
+    getCashierTerminalCashierName: () => "Clerk A",
+  };
+  const buildManualLine = vm.runInNewContext(`${source}\nbuildCashierTerminalManualUnbarcodedLine;`, context);
+
+  const line = buildManualLine();
+
+  assert.equal(line.line_type, "manual_unbarcoded");
+  assert.equal(line.barcode_type, "NONE");
+  assert.equal(line.store_item_machine_code, null);
+  assert.equal(line.machine_code, "");
+  assert.equal(line.display_code, "MANUAL");
+  assert.equal(line.description, "Button pack");
+  assert.equal(line.category, "Accessories");
+  assert.equal(line.quantity, 2);
+  assert.equal(line.unit_price, 125);
+  assert.equal(line.subtotal, 250);
+  assert.equal(line.manual_reason, "Label damaged");
+  assert.equal(line.created_by, "Clerk A");
+  assert.equal(line.requires_audit, true);
+  assert.equal(line.inventory_tracked, false);
+});
+
+test("POS manual item payload stays separately identifiable and does not mimic STORE_ITEM", () => {
+  const source = [
+    extractFunctionSource(appJs, "isCashierTerminalManualUnbarcodedLine"),
+    extractFunctionSource(appJs, "buildCashierTerminalPosSaleItemPayload"),
+  ].join("\n");
+  const context = {
+    normalizeCashierTerminalNumber: (value) => Number(value || 0),
+  };
+  const buildPayloadLine = vm.runInNewContext(`${source}\nbuildCashierTerminalPosSaleItemPayload;`, context);
+
+  const payload = buildPayloadLine({
+    line_type: "manual_unbarcoded",
+    barcode_type: "NONE",
+    store_item_machine_code: null,
+    display_code: "MANUAL",
+    description: "Loose scarf",
+    category: "Accessories",
+    quantity: 3,
+    unit_price: 80,
+    subtotal: 240,
+    manual_reason: "Manager approved manual sale",
+    created_by: "Clerk A",
+    requires_audit: true,
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(payload)), {
+    line_type: "manual_unbarcoded",
+    barcode_type: "NONE",
+    store_item_machine_code: null,
+    display_code: "MANUAL",
+    description: "Loose scarf",
+    category: "Accessories",
+    quantity: 3,
+    qty: 3,
+    unit_price: 80,
+    subtotal: 240,
+    final_price: 240,
+    manual_reason: "Manager approved manual sale",
+    created_by: "Clerk A",
+    requires_audit: true,
+    machine_code: "",
+    discount_amount: 0,
+  });
+});
+
 test("POS fallback is backend-unavailable demo data only and does not prefix-allow sales", () => {
   const resolverSource = extractAsyncFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
   const fallbackSource = extractFunctionSource(appJs, "resolveCashierTerminalLocalDemoItem");
