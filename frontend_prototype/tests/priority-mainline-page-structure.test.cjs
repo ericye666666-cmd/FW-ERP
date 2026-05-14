@@ -178,7 +178,6 @@ test("legacy, support, and non-priority pages are hidden from the left navigatio
     "11. Safaricom / M-Pesa",
     "12. 离线销售同步",
     "10. 周期退仓",
-    "实时数据查看",
     "门店管理",
     "供应商管理",
     "OA / HR / 财务审批框架",

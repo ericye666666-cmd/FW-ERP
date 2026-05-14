@@ -88,9 +88,8 @@
             <strong>店铺进销存工作台</strong>
           </div>
           <div class="workspace-tabs">
-            <button class="workspace-tab active" data-workspace-target="overview" type="button">今日总览</button>
             <button class="workspace-tab" data-workspace-target="testing" type="button">测试工具</button>
-            <button class="workspace-tab" data-workspace-target="warehouse" type="button">仓库功能区</button>
+            <button class="workspace-tab active" data-workspace-target="warehouse" type="button">仓库功能区</button>
             <button class="workspace-tab" data-workspace-target="operations" type="button">运营中心</button>
             <button class="workspace-tab" data-workspace-target="store" type="button">门店功能区</button>
             <button class="workspace-tab" data-workspace-target="admin" type="button">系统管理</button>
@@ -105,13 +104,13 @@
             <button id="logoutButton" type="button" class="ghost-button mini-button" data-action="logout">退出登录</button>
           </div>
         </div>
-        <div id="workspaceHint" class="workspace-top-hint">当前显示：今日总览。这里主要看门店状态、红色预警和关店检查。</div>
+        <div id="workspaceHint" class="workspace-top-hint">当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理和中方管理七条线组织仓库页面。</div>
       </section>
 
       <div class="workspace-shell">
         <aside class="workspace-side-panel">
         <div class="workspace-page-bar">
-          <h3 id="workspacePageTitle" class="hidden-screen" aria-hidden="true">今日总览</h3>
+          <h3 id="workspacePageTitle" class="hidden-screen" aria-hidden="true">仓库功能区</h3>
           <div class="button-row">
             <button id="workspacePrevButton" type="button" class="ghost-button">上一页</button>
             <button id="workspaceNextButton" type="button" class="ghost-button">下一页</button>
@@ -125,298 +124,6 @@
         </aside>
 
         <main id="workspacePanels" class="layout locked">
-      <section class="panel guide-panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>先这样测试</h2>
-        </div>
-        <ol class="guide-list">
-          <li>先登录，用户名 <code>admin_1</code>，密码 <code>demo1234</code>。</li>
-          <li><strong>主流程</strong> 默认走分拣流：关单主档、包裹入仓、总确认、一包一码、创建分拣任务、分拣确认入库。</li>
-          <li>分拣员线下记录数量，仓库主管核验后，在 <strong>分拣确认入库</strong> 里录入结果、库位，并生成商品 token。</li>
-          <li><strong>例外流程</strong> 只有少量已分好、可直接挂店的货才走：<strong>4.5 直挂拆包计件 / 成本确认</strong>，然后直接接门店调拨和门店工作台。</li>
-          <li>仓库配货、门店配货 bale、配送跟踪、门店签收和店员分配，分别在 <strong>仓库功能区</strong> 的“门店补货”分组和 <strong>门店功能区</strong> 继续执行。</li>
-          <li><strong>运营中心</strong> 负责区域经理的经营分析、限价动作、风控异常、现金记录、巡店和会议闭环。</li>
-          <li><strong>门店功能区</strong> 负责门店验收 bale、分配店员、PDA 编辑售价/货架位、蓝牙打印贴码、上架、收银和退仓。</li>
-          <li>如果收银打错单或顾客临时不要了，用 <strong>作废单</strong>；如果顾客买走后退货，用 <strong>退款单</strong>；钱不对，用 <strong>支付异常单</strong>。</li>
-          <li>最后回 <strong>今日总览</strong> 看门店经营摘要、红色预警和关店待办。</li>
-        </ol>
-        <p class="subtle">系统管理里再看：门店、供应商、货物类型、账号权限和新店建议。</p>
-      </section>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>全链路流程 / 角色分工</h2>
-        </div>
-        <div class="ops-overview-grid">
-          <article class="ops-overview-card">
-            <div class="ops-overview-head">
-              <span class="eyebrow">Flow</span>
-              <strong>当前业务主线（主分拣流）</strong>
-            </div>
-            <div class="summary-breakdown-list ops-step-list">
-              <div class="summary-breakdown-row ops-step-item">
-                <span>1. 中方建档 / 补成本</span>
-                <span>4.2 / 4.3</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>2. 肯方集装箱建档</span>
-                <span>运输 / 关单主档</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>3. Bale 入库</span>
-                <span>中方预报项 -> 肯方实收</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>4. 总确认 / 差异核对</span>
-                <span>预报 vs 实收</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>5. 入仓 Bale 一包一码</span>
-                <span>仓库内部追踪</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>6. 创建分拣任务</span>
-                <span>绑定分拣人</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>7. 分拣结果入库</span>
-                <span>生成商品 token</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>8. 门店调拨单 / 仓库配货</span>
-                <span>按门店销量配货</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>9. 门店配货 Bale 液压打包</span>
-                <span>生成门店 bale 码</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>10. 门店签收 / 分配店员</span>
-                <span>一包只给一个店员</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>11. Token 编辑 / 蓝牙打印贴码</span>
-                <span>生成商品身份证 ID</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>12. 门店上架 / 销售 / 编辑 / 退仓</span>
-                <span>全部围绕商品 ID</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="ops-overview-card">
-            <div class="ops-overview-head">
-              <span class="eyebrow">Exception</span>
-              <strong>例外直挂流</strong>
-            </div>
-            <div class="summary-breakdown-list ops-step-list">
-              <div class="summary-breakdown-row ops-step-item">
-                <span>1. 中方建档 / 补成本</span>
-                <span>4.2 / 4.3</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>2. 肯方入仓 / 一包一码</span>
-                <span>只确认到包裹</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>3. 直挂拆包计件</span>
-                <span>4.5 锁单件成本</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>4. 门店调拨 / 仓库配货</span>
-                <span>按件形成门店配货 bale</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>5. 门店签收 / 分配店员</span>
-                <span>一包只给一个店员</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>6. 直挂店员工作台</span>
-                <span>编辑售价 / 货架位</span>
-              </div>
-              <div class="summary-breakdown-row ops-step-item">
-                <span>7. 蓝牙打印 / 上架</span>
-                <span>生成商品身份证 ID</span>
-              </div>
-            </div>
-          </article>
-
-          <article class="ops-overview-card">
-            <div class="ops-overview-head">
-              <span class="eyebrow">Roles</span>
-              <strong>当前主要角色</strong>
-            </div>
-            <div class="summary-breakdown-list ops-role-list">
-              <div class="summary-breakdown-row ops-role-item">
-                <span>中方录入员</span>
-                <span>整柜预报</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>中方财务</span>
-                <span>货值 / 头程 / 清关 / 尾程</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>肯尼亚入仓员</span>
-                <span>实收 Bale</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>仓库主管</span>
-                <span>总确认 / 分拣任务 / 调拨配货</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>分拣员</span>
-                <span>分件数 / 分等级 / 入库</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>配货员 / 发货员</span>
-                <span>门店拣货 / 压 Bale / 出库</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>门店主管 / 店长</span>
-                <span>签收 / 分配店员 / 监督完成</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>门店店员</span>
-                <span>改售价 / 货架位 / 打印贴码 / 上架</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>区域经理</span>
-                <span>调货 / 定价 / 执行追踪</span>
-              </div>
-              <div class="summary-breakdown-row ops-role-item">
-                <span>老板 / 总部</span>
-                <span>看货 / 钱 / 人 / 风险</span>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>开发顺序 / 开发待办</h2>
-        </div>
-        <div id="devTrackerSummary" class="candidate-summary empty-state">这里会显示当前开发节奏、进行中事项和高优先级待办。</div>
-        <div class="dev-board-grid">
-          <article class="dev-board-card">
-            <div class="dev-board-head">
-              <span class="eyebrow">Roadmap</span>
-              <strong>当前开发顺序</strong>
-            </div>
-            <div id="devRoadmapList" class="dev-roadmap-list"></div>
-          </article>
-
-          <article class="dev-board-card">
-            <div class="dev-board-head">
-              <span class="eyebrow">Editor</span>
-              <strong>维护开发事项</strong>
-            </div>
-            <form id="devTaskForm" class="form-grid compact">
-              <input type="hidden" name="task_id" value="" />
-              <input name="title" placeholder="事项标题，如：第四步接真实打印机" />
-              <select name="track">
-                <option value="roadmap">开发顺序</option>
-                <option value="backlog">开发待办</option>
-              </select>
-              <select name="bucket">
-                <option value="current">本轮优先</option>
-                <option value="next">下一轮</option>
-              </select>
-              <select name="status">
-                <option value="in_progress">进行中</option>
-                <option value="todo">待开始</option>
-                <option value="planned">已规划</option>
-                <option value="done">已完成</option>
-              </select>
-              <select name="priority">
-                <option value="high">高优先级</option>
-                <option value="medium">中优先级</option>
-                <option value="low">低优先级</option>
-              </select>
-              <select name="module">
-                <option value="warehouse">仓库</option>
-                <option value="store">门店</option>
-                <option value="operations">运营中心</option>
-                <option value="ai">AI 看板</option>
-                <option value="finance">业财融合</option>
-                <option value="general">通用</option>
-              </select>
-              <input name="next_action" placeholder="下一步动作，如：接打印机真实动作与回写" />
-              <textarea name="detail" rows="4" placeholder="补充背景、目标和完成标准"></textarea>
-              <div class="button-row">
-                <button type="submit">保存事项</button>
-                <button type="button" class="ghost-button" id="devTaskResetButton">清空编辑</button>
-              </div>
-            </form>
-          </article>
-        </div>
-        <div class="dev-board-grid">
-          <article class="dev-board-card">
-            <div class="dev-board-head">
-              <span class="eyebrow">Current Sprint</span>
-              <strong>本轮优先</strong>
-            </div>
-            <div id="devCurrentList" class="dev-task-stack"></div>
-          </article>
-          <article class="dev-board-card">
-            <div class="dev-board-head">
-              <span class="eyebrow">Next Wave</span>
-              <strong>下一轮</strong>
-            </div>
-            <div id="devNextList" class="dev-task-stack"></div>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>下一阶段五大块</h2>
-        </div>
-        <div class="report-summary-grid">
-          <article class="store-metric"><strong>权限矩阵</strong><span>角色 / 设备 / 数据范围</span></article>
-          <article class="store-metric"><strong>异常流</strong><span>统一闭环</span></article>
-          <article class="store-metric"><strong>运营数据</strong><span>接真实接口</span></article>
-          <article class="store-metric"><strong>代售包裹</strong><span>A/B 混包</span></article>
-          <article class="store-metric"><strong>简易 OA</strong><span>HR / 财务审批</span></article>
-        </div>
-        <div class="ops-overview-grid">
-          <article class="ops-overview-card">
-            <div class="ops-overview-head">
-              <span class="eyebrow">1 / 2 / 3</span>
-              <strong>当前优先三块</strong>
-            </div>
-            <div class="summary-breakdown-list">
-              <div class="summary-breakdown-row"><span>权限矩阵</span><span>统一一个系统，按角色和设备裁剪首页、菜单与动作</span></div>
-              <div class="summary-breakdown-row"><span>异常流</span><span>把少件、多件、拒收、打印失败、任务中断统一进异常闭环</span></div>
-              <div class="summary-breakdown-row"><span>运营数据接入</span><span>把 POS、人流、Lark、M-Pesa、现金闭环接成真实主题</span></div>
-            </div>
-          </article>
-          <article class="ops-overview-card">
-            <div class="ops-overview-head">
-              <span class="eyebrow">Warehouse</span>
-              <strong>新增：代售包裹</strong>
-            </div>
-            <div class="summary-breakdown-list">
-              <div class="summary-breakdown-row"><span>业务口径</span><span>把 A 类与 B 类货按可控比例混在一个包裹里，按重量卖市场</span></div>
-              <div class="summary-breakdown-row"><span>控制项</span><span>比例、总重、单包重、来源等级、售价 / KG、结算回款</span></div>
-              <div class="summary-breakdown-row"><span>系统落点</span><span>先放到仓库工单，再决定是否接成真实执行流</span></div>
-            </div>
-          </article>
-          <article class="ops-overview-card">
-            <div class="ops-overview-head">
-              <span class="eyebrow">Admin</span>
-              <strong>新增：简易 OA</strong>
-            </div>
-            <div class="summary-breakdown-list">
-              <div class="summary-breakdown-row"><span>HR</span><span>打卡、班次、请假、加班</span></div>
-              <div class="summary-breakdown-row"><span>Payroll</span><span>底薪、提成、扣款、补贴、工资单确认</span></div>
-              <div class="summary-breakdown-row"><span>Finance</span><span>采购、借款、报销、付款审批与回写</span></div>
-            </div>
-          </article>
-        </div>
-      </section>
-
       <section class="panel warehouse-workbench-panel warehouse-workbench-panel-primary" data-workspace-panel="warehouse">
         <div class="panel-head hidden-screen" aria-hidden="true">
           <h2>0. 运输 / 关单主档</h2>
@@ -1059,59 +766,6 @@
           </div>
         </div>
       </div>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>总览 Dashboard</h2>
-          <button data-action="load-dashboard" type="button">刷新</button>
-        </div>
-        <div id="dashboardCards" class="cards"></div>
-      </section>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>门店经营摘要</h2>
-          <button data-action="load-store-operating-summary" type="button">刷新门店摘要</button>
-        </div>
-        <div id="storeOperatingSummary" class="store-summary-grid">
-          <div class="empty-state">这里会按门店显示今日销售、毛利、库存和待处理异常。</div>
-        </div>
-      </section>
-
-      <section class="panel" id="storeClosingPanel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>店铺结束营业检查</h2>
-          <button data-action="load-store-closing-checklist" type="button">读取关店检查表</button>
-        </div>
-        <form id="storeClosingChecklistForm" class="form-grid compact">
-          <select name="store_code" data-store-select="required">
-            <option value="UTAWALA">UTAWALA</option>
-          </select>
-          <button type="submit">查看这家店今天该先处理什么</button>
-        </form>
-        <div id="storeClosingChecklistSummary" class="candidate-summary empty-state">
-          这里会汇总该门店的待交班、待退仓、待批差异和今日经营情况。
-        </div>
-      </section>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>红色价格预警</h2>
-          <button data-action="load-price-alerts" type="button">读取改价 / 超限价预警</button>
-        </div>
-        <div id="priceAlertSummary" class="alert-summary empty-state">先点一次上面的按钮，读取今天的红色预警。</div>
-        <div id="priceAlertList" class="alert-list"></div>
-        <pre id="priceAlertOutput" class="output hidden-output"></pre>
-      </section>
-
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>线上收款 / 离线同步异常</h2>
-          <button id="refreshOpsAlertsButton" type="button">刷新线上 / 离线异常</button>
-        </div>
-        <div id="opsAlertSummary" class="alert-summary empty-state">这里会显示未匹配 M-Pesa 和离线同步失败/重复的异常。</div>
-        <div id="opsAlertList" class="alert-list"></div>
-      </section>
 
       <section class="panel" data-workspace-panel="testing">
         <div class="panel-head">
@@ -2177,7 +1831,7 @@
               <tr>
                 <td>总部管理员</td>
                 <td>电脑</td>
-                <td>今日总览</td>
+                <td>系统管理</td>
                 <td>全局</td>
                 <td>配置主数据、账号权限、全局报表与审计</td>
               </tr>
@@ -4068,42 +3722,6 @@
         <pre id="offlineSyncOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel" data-workspace-panel="overview">
-        <div class="panel-head">
-          <h2>实时数据查看</h2>
-          <div class="button-row">
-            <button data-action="load-products" type="button">商品</button>
-            <button data-action="load-parcel-batches" type="button">包裹批次</button>
-            <button data-action="load-sorting-tasks" type="button">分拣任务</button>
-            <button data-action="load-sorting-stock" type="button">分拣库存</button>
-            <button data-action="load-warehouse-stock" type="button">仓库库存</button>
-            <button data-action="load-store-stock" type="button">门店库存</button>
-            <button data-action="load-transfers" type="button">调拨单</button>
-            <button data-action="load-receiving-sessions" type="button">收货会话</button>
-            <button data-action="load-returns" type="button">退仓单</button>
-            <button data-action="load-return-candidates" type="button">退仓候选</button>
-            <button data-action="load-price-rules" type="button">限价规则</button>
-            <button data-action="load-shifts" type="button">收银班次</button>
-            <button data-action="load-handovers" type="button">交接班日志</button>
-            <button data-action="load-sales" type="button">销售单</button>
-            <button data-action="load-void-requests" type="button">作废单</button>
-            <button data-action="load-refund-requests" type="button">退款单</button>
-            <button data-action="load-payment-anomalies" type="button">支付异常单</button>
-            <button data-action="load-mpesa-collections" type="button">M-Pesa 流水</button>
-            <button data-action="load-mpesa-customer-insights" type="button">M-Pesa 熟客</button>
-            <button data-action="load-offline-sync-batches" type="button">离线同步批次</button>
-            <button data-action="load-print-jobs" type="button">打印任务</button>
-            <button data-action="load-adjustments" type="button">差异调整</button>
-            <button data-action="load-movements" type="button">库存流水</button>
-            <button data-action="load-audit" type="button">操作日志</button>
-          </div>
-        </div>
-        <div id="tableSummary" class="candidate-summary empty-state">
-          点上面的按钮后，这里会告诉你当前看的是什么数据，以及一共有多少条。
-        </div>
-        <div id="tablePreview" class="data-preview-grid"></div>
-        <pre id="tableOutput" class="output large hidden-output"></pre>
-      </section>
         </main>
       </div>
     </div>
@@ -4491,7 +4109,13 @@
             targetTitle = "9. 收银销售";
           }
 
-          var targetPanel = targetTitle ? findPanelByTitle(targetTitle) : findPanelByTitle("先这样测试");
+          if (roleCode === "warehouse_manager" || roleCode === "warehouse_supervisor" || roleCode === "warehouse_clerk") {
+            targetTitle = "0. 运输 / 关单主档";
+          } else if (roleCode === "area_supervisor") {
+            targetTitle = "区域主管工作台";
+          }
+
+          var targetPanel = targetTitle ? findPanelByTitle(targetTitle) : findPanelByTitle("0. 运输 / 关单主档");
           if (!targetPanel) {
             renderLegacyLoginError("登录成功，但旧版 WebView 无法进入默认工作台。请联系管理员升级 WebView。");
             return;
@@ -4502,7 +4126,7 @@
           var workspacePanels = document.getElementById("workspacePanels");
           var sessionSummary = document.getElementById("sessionSummary");
           var appSessionMeta = document.getElementById("appSessionMeta");
-          var workspace = targetPanel.getAttribute("data-workspace-panel") || "overview";
+          var workspace = targetPanel.getAttribute("data-workspace-panel") || "warehouse";
 
           var runtimeRole = roleCode === "store_clerk" || roleCode === "store_manager" || roleCode === "cashier" || roleCode === "store_cashier";
           var directLoopPda = window.navigator && String(window.navigator.userAgent || "").indexOf("DirectLoopPDA/1.0") !== -1;
