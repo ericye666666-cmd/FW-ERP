@@ -508,6 +508,7 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "完成销售", en: "Complete Sale" },
   { zh: "打印助手", en: "Print Agent" },
   { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
+  { zh: "下载 Windows 打印助手（无需解压）", en: "Download Windows Print Agent (no unzip required)" },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -2168,7 +2169,80 @@ let localPrintAgentState = {
   printerMessage: "",
 };
 const SDO_PRINT_TASK_TYPE = "store_delivery_execution";
-const WINDOWS_PRINT_AGENT_DOWNLOAD_URL = "/downloads/fw-erp-print-agent-windows.zip";
+const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows.ps1";
+const WINDOWS_PRINT_AGENT_DOWNLOAD_URL = `/downloads/${WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME}`;
+const LOCAL_PRINT_AGENT_CONNECTION_HELP = "打印助手未连接：请确认 Windows 打印助手已启动、端口 8719 未被占用、浏览器允许访问本机 127.0.0.1。";
+const WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT = String.raw`# FW-ERP Windows Print Agent launcher.
+# Download this file, right click it, and choose "Run with PowerShell".
+# It installs the Python local print agent into the current Windows user profile
+# and starts the local API on http://127.0.0.1:8719.
+
+param(
+    [string]$RepoRawBase = "https://raw.githubusercontent.com/ericye666666-cmd/FW-ERP/main/ops/local_print_agent"
+)
+
+$ErrorActionPreference = "Stop"
+$InstallDir = Join-Path $env:LOCALAPPDATA "FW-ERP\PrintAgent"
+$HealthUrl = "http://127.0.0.1:8719/health"
+$PrintersUrl = "http://127.0.0.1:8719/printers"
+
+Write-Host "FW-ERP Windows Print Agent"
+Write-Host "Install folder: $InstallDir"
+Write-Host "Health check: $HealthUrl"
+Write-Host "Printer list: $PrintersUrl"
+
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+Set-Location $InstallDir
+
+function Resolve-Python {
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        return @{ Command = "py"; Args = @("-3") }
+    }
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    if ($python) {
+        return @{ Command = "python"; Args = @() }
+    }
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        Write-Host "Python was not found. Installing Python 3 with winget..."
+        winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
+        $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+        if ($pyLauncher) {
+            return @{ Command = "py"; Args = @("-3") }
+        }
+        $python = Get-Command python -ErrorAction SilentlyContinue
+        if ($python) {
+            return @{ Command = "python"; Args = @() }
+        }
+    }
+    throw "Python is required. Install Python 3, then run this launcher again."
+}
+
+function Download-AgentFile([string]$Name) {
+    $target = Join-Path $InstallDir $Name
+    $uri = "$RepoRawBase/$Name"
+    Write-Host "Downloading $Name ..."
+    Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $target
+}
+
+Download-AgentFile "agent.py"
+Download-AgentFile "requirements.txt"
+
+$python = Resolve-Python
+$pythonCommand = $python.Command
+$pythonArgs = @($python.Args)
+& $pythonCommand @pythonArgs -m venv .venv
+$agentPython = Join-Path $InstallDir ".venv\Scripts\python.exe"
+& $agentPython -m pip install --upgrade pip
+& $agentPython -m pip install -r requirements.txt
+
+Write-Host ""
+Write-Host "Starting FW-ERP Print Agent on http://127.0.0.1:8719 ..."
+Write-Host "Keep this window open while printing from ERP."
+Write-Host "After it starts, return to ERP and click Detect Print Agent."
+& $agentPython agent.py local-api
+`;
 let baleBarcodeDirectoryNotice = null;
 let balePrinterConsoleNotice = null;
 let balePrinterJobState = [];
@@ -23387,6 +23461,33 @@ function getLocalPrinterDetectionMessage(printers = []) {
   return { type: "warning", message: "已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。" };
 }
 
+function formatLocalPrintAgentConnectionError(error) {
+  const detail = formatErrorMessage(error);
+  if (!detail || /failed to fetch|networkerror|load failed/i.test(detail)) {
+    return LOCAL_PRINT_AGENT_CONNECTION_HELP;
+  }
+  return `${LOCAL_PRINT_AGENT_CONNECTION_HELP} (${detail})`;
+}
+
+function renderLocalPrinterQueueList(printers = []) {
+  const rows = Array.isArray(printers) ? printers : [];
+  if (!rows.length) {
+    return "";
+  }
+  const items = rows
+    .map((printer) => {
+      const name = String(printer?.name || printer?.printer_name || "-").trim() || "-";
+      const status = String(printer?.status || (printer?.available === true ? "available" : "") || "").trim();
+      const statusSuffix = status ? ` / ${status}` : "";
+      return `<li>${escapeHtml(`${name}${statusSuffix}`)}</li>`;
+    })
+    .join("");
+  return `
+    <div class="subtle small">打印机队列</div>
+    <ul class="subtle small local-printer-queue-list">${items}</ul>
+  `;
+}
+
 function renderBaleLocalPrintAgentStatus() {
   const statusArea = document.querySelector("#balePrintModalLocalAgentStatus");
   if (!(statusArea instanceof HTMLElement)) {
@@ -23406,6 +23507,7 @@ function renderBaleLocalPrintAgentStatus() {
     ? "可以点击主按钮打印。"
     : "请先启动 Windows 打印助手。";
   const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
+  const printerListHtml = renderLocalPrinterQueueList(printers);
   statusArea.className = "candidate-summary";
   statusArea.innerHTML = `
     <div class="${agentClass} status-block status-block--${localPrintAgentState.connected ? "success" : "warning"}">
@@ -23417,6 +23519,7 @@ function renderBaleLocalPrintAgentStatus() {
       ${suffix}
     </div>
     <div class="subtle small">${escapeHtml(printerText)}</div>
+    ${printerListHtml}
   `;
 }
 
@@ -23465,12 +23568,13 @@ async function checkLocalPrintAgentHealth() {
     renderBalePrintModal();
     return payload;
   } catch (error) {
+    const message = formatLocalPrintAgentConnectionError(error);
     localPrintAgentState.connected = false;
     localPrintAgentState.checking = false;
-    localPrintAgentState.lastMessage = "health failed";
-    setLocalPrintAgentMessage("error", "打印助手未连接，请先启动 Windows 打印助手。");
+    localPrintAgentState.lastMessage = message;
+    setLocalPrintAgentMessage("error", message);
     renderBalePrintModal();
-    throw error;
+    throw new Error(message);
   }
 }
 
@@ -23483,25 +23587,32 @@ async function checkLocalPrintAgentPrinters() {
   try {
     const response = await fetch(`${agentUrl}/printers`, { method: "GET" });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    if (!response.ok && !Array.isArray(payload?.printers)) {
       throw new Error(String(payload?.warning || payload?.message || `printer check failed (${response.status})`));
     }
     const printers = Array.isArray(payload?.printers) ? payload.printers : [];
     localPrintAgentState.printers = printers;
     localPrintAgentState.printerChecking = false;
     const detection = getLocalPrinterDetectionMessage(printers);
-    localPrintAgentState.printerMessage = detection.message;
+    localPrintAgentState.printerMessage = String(payload?.warning || detection.message || "").trim();
     setLocalPrintAgentMessage(detection.type, localPrintAgentState.printerMessage);
     renderBalePrintModal();
     return payload;
   } catch (error) {
+    const message = formatLocalPrintAgentConnectionError(error);
     localPrintAgentState.printers = [];
     localPrintAgentState.printerChecking = false;
-    localPrintAgentState.printerMessage = "检测本机打印队列失败，请确认打印助手已经启动。";
+    localPrintAgentState.printerMessage = message;
     setLocalPrintAgentMessage("error", localPrintAgentState.printerMessage);
     renderBalePrintModal();
-    throw error;
+    throw new Error(message);
   }
+}
+
+async function checkLocalPrintAgentConnection() {
+  const healthPayload = await checkLocalPrintAgentHealth();
+  await checkLocalPrintAgentPrinters();
+  return healthPayload;
 }
 
 function getWindowsPrintAgentDownloadUrl() {
@@ -23515,12 +23626,19 @@ function getWindowsPrintAgentDownloadUrl() {
 async function downloadWindowsPrintAgentPackage() {
   const downloadUrl = getWindowsPrintAgentDownloadUrl();
   const link = document.createElement("a");
-  link.href = downloadUrl;
-  link.download = "fw-erp-print-agent-windows.zip";
+  const scriptBlob = typeof Blob === "function" && typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
+    ? new Blob([WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT], { type: "text/plain;charset=utf-8" })
+    : null;
+  const objectUrl = scriptBlob ? URL.createObjectURL(scriptBlob) : "";
+  link.href = objectUrl || downloadUrl;
+  link.download = WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手。");
+  if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+  }
+  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（无需解压）。");
   renderBalePrintModal();
 }
 
@@ -47673,7 +47791,7 @@ document.querySelector("#balePrintModalRefreshButton")?.addEventListener("click"
   renderBalePrintModal();
 });
 document.querySelector("#balePrintModalCheckLocalAgentButton")?.addEventListener("click", () => {
-  checkLocalPrintAgentHealth().catch((error) => {
+  checkLocalPrintAgentConnection().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
@@ -47687,6 +47805,13 @@ document.querySelector("#balePrintModalCheckLocalPrintersButton")?.addEventListe
 document.querySelector("#balePrintModalInstallStepsButton")?.addEventListener("click", () => {
   localPrintAgentState.installStepsVisible = !localPrintAgentState.installStepsVisible;
   renderBalePrintModal();
+});
+document.querySelector("#balePrintModalDownloadAgentLink")?.addEventListener("click", (event) => {
+  event.preventDefault();
+  downloadWindowsPrintAgentPackage().catch((error) => {
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {

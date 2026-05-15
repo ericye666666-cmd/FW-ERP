@@ -140,9 +140,10 @@ test("bale print modal moves technical print controls into collapsed advanced op
   assert.match(advancedHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?高级：打印全部/);
   assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?高级：批量重试/);
   assert.match(advancedHtml, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
-  assert.match(advancedHtml, /download/);
-  assert.match(advancedHtml, /下载 Windows 打印助手/);
+  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedHtml, /download="fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedHtml, /下载 Windows 打印助手（无需解压）/);
+  assert.doesNotMatch(advancedHtml, /\.zip/);
   assert.doesNotMatch(primaryActions[0], /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedHtml, /查看安装步骤/);
   assert.doesNotMatch(advancedHtml, /直接打印本张/);
@@ -168,7 +169,11 @@ test("bale print modal includes local print agent status and controls", () => {
   assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*本地地址：http:\/\/127\.0\.0\.1:8719/);
   assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印助手/);
   assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*高级：重试本张/);
+  assert.match(appJs, /async function checkLocalPrintAgentConnection/);
+  assert.match(appJs, /#balePrintModalCheckLocalAgentButton[\s\S]{0,260}checkLocalPrintAgentConnection\(\)/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
+  assert.match(appJs, /fetch\(`\$\{agentUrl\}\/printers`, \{ method: "GET" \}\)/);
+  assert.match(appJs, /请确认 Windows 打印助手已启动、端口 8719 未被占用、浏览器允许访问本机 127\.0\.0\.1/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/label`, \{/);
 });
 
@@ -181,8 +186,9 @@ test("field advanced print controls stay limited to safe operator actions", () =
   assert.match(advancedHtml, /高级：重试本张/);
   assert.match(advancedHtml, /高级：打印全部/);
   assert.match(advancedHtml, /高级：批量重试/);
-  assert.match(advancedHtml, /下载 Windows 打印助手/);
-  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
+  assert.match(advancedHtml, /下载 Windows 打印助手（无需解压）/);
+  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.ps1"/);
+  assert.doesNotMatch(advancedHtml, /\.zip/);
   assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalSendStationButton/);
