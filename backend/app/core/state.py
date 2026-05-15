@@ -43,6 +43,9 @@ PDA_DIAGNOSTIC_SECRET_KEYS = {
     "password",
 }
 STORE_EMPLOYEE_ROLE_CODES = {"store_manager", "store_clerk", "cashier"}
+ROLE_PERMISSION_ALIASES = {
+    "warehouse_supervisor": {"warehouse_manager"},
+}
 STORE_LAUNCH_STATUS_CODES = {"preparing", "active", "paused", "closed"}
 AREA_SUPERVISOR_PASSWORD_RESET_FIELDS = {"updated_by", "password"}
 AREA_SUPERVISOR_SOFT_DEACTIVATE_FIELDS = {"updated_by", "status", "is_active"}
@@ -10486,9 +10489,12 @@ class InMemoryState:
         store_code: Optional[str] = None,
     ) -> dict[str, Any]:
         user = self._get_user_by_username(username)
+        expanded_allowed_roles = set(allowed_roles)
+        for role_code in allowed_roles:
+            expanded_allowed_roles.update(ROLE_PERMISSION_ALIASES.get(role_code, set()))
         if not user.get("is_active", True):
             raise HTTPException(status_code=403, detail=f"Inactive user {username}")
-        if user["role_code"] != "admin" and user["role_code"] not in allowed_roles:
+        if user["role_code"] != "admin" and user["role_code"] not in expanded_allowed_roles:
             raise HTTPException(
                 status_code=403,
                 detail=f"User {username} does not have permission for this action",
