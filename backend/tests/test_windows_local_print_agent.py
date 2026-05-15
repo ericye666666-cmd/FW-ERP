@@ -16,6 +16,14 @@ spec.loader.exec_module(agent)
 
 
 class WindowsLocalPrintAgentTest(unittest.TestCase):
+    def test_cors_allowed_origins_include_directlooperp_hosts_without_dropping_legacy_hosts(self):
+        self.assertIn("https://staging.directlooperp.com", agent.ALLOWED_ORIGINS)
+        self.assertIn("https://directlooperp.com", agent.ALLOWED_ORIGINS)
+        self.assertIn("https://fw-erp-staging.onrender.com", agent.ALLOWED_ORIGINS)
+        self.assertIn("https://fw-erp-34-35-52-250.nip.io", agent.ALLOWED_ORIGINS)
+        self.assertIn("http://localhost:8000", agent.ALLOWED_ORIGINS)
+        self.assertIn("http://127.0.0.1:8000", agent.ALLOWED_ORIGINS)
+
     def _tspl_text_y_values(self, tspl):
         return [int(match.group(1)) for match in re.finditer(r"^TEXT\s+\d+,(\d+),", tspl, re.MULTILINE)]
 
