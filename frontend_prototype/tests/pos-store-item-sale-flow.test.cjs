@@ -274,9 +274,60 @@ test("POS cashier terminal moves store, shift, device, and sales status into top
   assert.match(headerSource, /cashierTerminalState\.shiftOrderCount/);
   assert.match(headerSource, /cashierTerminalState\.currentTime/);
   assert.match(infoStripSource, /copy\.posStoreItemOnly/);
+  assert.match(infoStripSource, /cashier-terminal-status-summary/);
+  assert.match(infoStripSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
+  assert.match(infoStripSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
+  assert.match(infoStripSource, /cashierTerminalState\.todayOrderCount/);
+  assert.match(infoStripSource, /cashierTerminalState\.shiftOrderCount/);
   assert.match(infoStripSource, /copy\.resumeHeldOrder/);
   assert.match(infoStripSource, /copy\.closeShift/);
   assert.match(infoStripSource, /copy\.openNow/);
+});
+
+test("POS cashier terminal exposes a fullscreen entry with browser API fallback", () => {
+  const terminalHtml = extractElementById(indexHtml, "cashierTerminalShell");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  const toggleSource = extractAsyncFunctionSource(appJs, "toggleCashierTerminalFullscreen");
+  const syncSource = extractFunctionSource(appJs, "syncCashierTerminalFullscreenState");
+
+  assert.match(terminalHtml, /data-terminal-action="toggle-fullscreen"/);
+  assert.match(terminalHtml, /data-terminal-action="toggle-fullscreen" data-i18n-skip/);
+  assert.match(terminalHtml, /全屏收银 \/ Enter Fullscreen/);
+  assert.match(actionSource, /case "toggle-fullscreen":[\s\S]*await toggleCashierTerminalFullscreen\(\)/);
+  assert.match(toggleSource, /requestFullscreen\(\)/);
+  assert.match(toggleSource, /exitFullscreen\(\)/);
+  assert.match(toggleSource, /F11/);
+  assert.match(toggleSource, /fullscreenFeedback/);
+  assert.match(syncSource, /document\.fullscreenElement/);
+  assert.match(appJs, /fullscreenchange/);
+});
+
+test("POS header sales counters sync from real shift and recent sale data instead of demo defaults", () => {
+  const previewSource = extractFunctionSource(appJs, "ensureCashierTerminalPreviewState");
+  const summarySource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftSummary");
+  const recentSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalRecentSales");
+  const saleSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
+  const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");
+  const primeSource = extractAsyncFunctionSource(appJs, "primeCashierTerminalSession");
+  const applyShiftSource = extractFunctionSource(appJs, "applyCashierTerminalShiftSummaryToHeader");
+  const applySalesSource = extractFunctionSource(appJs, "applyCashierTerminalTodaySalesSummaryFromSales");
+
+  assert.doesNotMatch(previewSource, /48620|18450/);
+  assert.match(previewSource, /todaySalesAmount\s*=\s*normalizeCashierTerminalNumber\(cashierTerminalState\.todaySalesAmount\)/);
+  assert.match(previewSource, /shiftSalesAmount\s*=\s*normalizeCashierTerminalNumber\(cashierTerminalState\.shiftSalesAmount\)/);
+  assert.match(applyShiftSource, /summary\.total_sales/);
+  assert.match(applyShiftSource, /summary\.order_count/);
+  assert.match(applySalesSource, /getLocalDateKey/);
+  assert.match(applySalesSource, /cashierTerminalState\.latestCompletedSale/);
+  assert.match(summarySource, /applyCashierTerminalShiftSummaryToHeader\(summary\)/);
+  assert.match(summarySource, /await loadCashierTerminalTodaySalesSummary\(\{\s*render:\s*false\s*\}\)/);
+  assert.match(summarySource, /renderCashierTerminalSessionStrip\(\)/);
+  assert.match(recentSource, /applyCashierTerminalTodaySalesSummaryFromSales\(cashierTerminalState\.recentSales\)/);
+  assert.match(saleSource, /await loadCashierTerminalShiftSummary\(sale\.shift_id \|\| payload\.shift_id\)/);
+  assert.match(saleSource, /await loadCashierTerminalTodaySalesSummary\(\{\s*render:\s*false\s*\}\)/);
+  assert.match(openSource, /await loadCashierTerminalShiftSummary\(cashierTerminalState\.currentShift\.shift_id\)/);
+  assert.match(primeSource, /await loadCashierTerminalTodaySalesSummary\(\{\s*render:\s*false\s*\}\)/);
+  assert.match(primeSource, /renderCashierTerminal\(\)/);
 });
 
 test("POS top header derives store and cashier from the logged-in account", () => {
@@ -357,7 +408,7 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
   assert.match(topbarRule, /align-items:\s*center/);
   assert.match(topbarRule, /max-height:\s*78px/);
   assert.doesNotMatch(topbarRule, /align-items:\s*stretch/);
-  assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+  assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+auto/);
   assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(88px,\s*1fr\)\)/);
   assert.match(statusStripRule, /max-height:\s*58px/);
   assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);
@@ -379,6 +430,20 @@ test("POS 1366x768 cashier layout keeps scan cart checkout in the first viewport
   assert.match(shortHeightMedia, /cashier-terminal-payment-panel\s*\{[\s\S]*overflow:\s*auto/);
   assert.match(shortHeightMedia, /cashier-terminal-quick-actions\s*\{[\s\S]*display:\s*none/);
   assert.doesNotMatch(shortHeightMedia, /position:\s*fixed/);
+});
+
+test("POS fullscreen shell fills the viewport on cashier all-in-one terminals", () => {
+  const shellRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-shell", /height:\s*100dvh/);
+  const fullscreenRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-shell:fullscreen", /width:\s*100vw/);
+  const bodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode", /overflow:\s*hidden/);
+  const shortHeightMedia = extractCssSection("@media (max-height: 780px)");
+
+  assert.match(shellRule, /height:\s*100dvh/);
+  assert.match(shellRule, /max-height:\s*100dvh/);
+  assert.match(fullscreenRule, /height:\s*100dvh/);
+  assert.match(fullscreenRule, /background:/);
+  assert.match(bodyRule, /overflow:\s*hidden/);
+  assert.match(shortHeightMedia, /cashier-terminal-body\s*\{[\s\S]*height:\s*calc\(100dvh - 144px\)/);
 });
 
 test("POS cashier terminal gates resolver results before adding items", () => {
