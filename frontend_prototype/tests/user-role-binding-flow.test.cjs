@@ -56,6 +56,36 @@ const users = [
   { username: "warehouse_other", full_name: "Other Warehouse", role_code: "warehouse_clerk", warehouse_code: "WH2", status: "active", is_active: true },
 ];
 
+function extractUserRoleOptions() {
+  const formMatch = indexHtml.match(/<form id="userForm"[\s\S]*?<\/form>/);
+  assert.ok(formMatch, "Users & Accounts form should exist");
+  const selectMatch = formMatch[0].match(/<select name="role_code">([\s\S]*?)<\/select>/);
+  assert.ok(selectMatch, "Users & Accounts role select should exist");
+  return [...selectMatch[1].matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)].map((match) => ({
+    value: match[1],
+    label: match[2].trim(),
+  }));
+}
+
+test("Users & Accounts role dropdown exposes distinct warehouse account roles", () => {
+  const options = extractUserRoleOptions();
+  const optionsByValue = new Map(options.map((option) => [option.value, option]));
+
+  assert.equal(optionsByValue.get("warehouse_clerk")?.label, "仓库员工");
+  assert.equal(optionsByValue.get("warehouse_manager")?.label, "仓库经理");
+  assert.equal(optionsByValue.get("warehouse_supervisor")?.label, "仓库主管");
+  assert.notEqual(
+    optionsByValue.get("warehouse_manager")?.label,
+    optionsByValue.get("warehouse_supervisor")?.label,
+  );
+  assert.match(appJs, /warehouse_manager:\s*"仓库经理"/);
+  assert.match(appJs, /warehouse_supervisor:\s*"仓库主管"/);
+  assert.match(appJs, /warehouse_supervisor:\s*"Warehouse Supervisor"/);
+  assert.match(appJs, /USER_ROLE_LABELS_EN\[normalizedRoleCode\]/);
+  assert.match(appJs, /USER_ROLE_LABELS\[normalizedRoleCode\]/);
+  assert.match(appJs, /mappedLabel\s*\|\|\s*user\?\.role_label/);
+});
+
 test("store clerk assignment only shows active store_clerk users from the same store", () => {
   const rows = getAssignableStoreClerks(users, "UTAWALA");
 
