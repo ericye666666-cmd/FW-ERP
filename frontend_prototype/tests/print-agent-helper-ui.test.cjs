@@ -19,6 +19,9 @@ const employeeBat = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/sta
 const directLauncherCmd = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.cmd"))
   ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.cmd"), "utf8")
   : "";
+const directLauncherPs1 = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"))
+  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"), "utf8")
+  : "";
 const readme = fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/README.md"), "utf8");
 const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"))
   ? fs.readFileSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"), "utf8")
@@ -252,6 +255,19 @@ test("Windows direct CMD launcher double-clicks into PowerShell local-api startu
   assert.match(directLauncherCmd, /Keep this black window open/i);
   assert.doesNotMatch(directLauncherCmd, /Expand-Archive|\.zip|FW-ERP-Print-Agent\.exe/);
   assert.doesNotMatch(directLauncherCmd, /cmd\.exe\s*\/c\s*notepad/i);
+});
+
+test("Windows PowerShell launcher rejects fake Python aliases before creating venv", () => {
+  assert.match(directLauncherPs1, /function Test-PythonCandidate/);
+  assert.match(directLauncherPs1, /import sys; print\(sys\.executable\)/);
+  assert.match(directLauncherPs1, /Microsoft Store/);
+  assert.match(directLauncherPs1, /Python was not found/);
+  assert.match(directLauncherPs1, /winget install -e --id Python\.Python\.3\.12/);
+  assert.match(directLauncherPs1, /请安装 Python 3，并勾选 Add Python to PATH，然后重新双击启动助手。/);
+  assert.match(directLauncherPs1, /创建 Python 虚拟环境失败/);
+  assert.match(directLauncherPs1, /Test-Path \$agentPython/);
+  assert.match(directLauncherPs1, /\$LASTEXITCODE -ne 0/);
+  assert.doesNotMatch(directLauncherPs1, /& \$agentPython -m pip install --upgrade pip[\s\S]{0,120}& \$pythonCommand @pythonArgs -m venv/);
 });
 
 test("Windows print agent package script and zip ignore rules are present", () => {
