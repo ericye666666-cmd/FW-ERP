@@ -47861,7 +47861,7 @@ cashierTerminalShell?.addEventListener("change", (event) => {
   }
   if (target.dataset.terminalDrawerField) {
     updateCashierTerminalDrawerField(target.dataset.terminalDrawerField, target.value);
-    renderCashierTerminal();
+    return;
   }
 });
 
