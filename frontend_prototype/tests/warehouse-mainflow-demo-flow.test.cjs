@@ -15,6 +15,30 @@ const {
   buildStoreReplenishmentDemoSummary,
 } = warehouseMainflowDemoExports;
 
+const appJs = fs.readFileSync(path.join(__dirname, "../app.js"), "utf8");
+
+function extractFunctionSource(source, functionName) {
+  const start = source.indexOf(`function ${functionName}`);
+  const asyncStart = source.indexOf(`async function ${functionName}`);
+  const actualStart = start === -1 ? asyncStart : (asyncStart === -1 ? start : Math.min(start, asyncStart));
+  assert.notEqual(actualStart, -1, `missing function ${functionName}`);
+  const signatureEnd = source.indexOf(") {", actualStart);
+  assert.notEqual(signatureEnd, -1, `missing function body for ${functionName}`);
+  const braceStart = signatureEnd + 2;
+  let depth = 0;
+  for (let index = braceStart; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(actualStart, index + 1);
+      }
+    }
+  }
+  throw new Error(`could not extract ${functionName}`);
+}
+
 test("warehouse mainflow demo template keeps the fixed bale plan", () => {
   assert.equal(DEFAULT_WAREHOUSE_MAINFLOW_DEMO_TEMPLATE.perBaleWeightKg, 50);
   assert.equal(
@@ -59,6 +83,23 @@ test("testing workspace exposes the one-click warehouse mainflow demo trigger", 
   );
   assert.match(html, /data-workspace-panel="testing"[\s\S]*data-action="generate-warehouse-mainflow-demo"/);
   assert.match(html, /data-workspace-panel="testing"[\s\S]*id="warehouseMainflowDemoSummary"/);
+});
+
+test("inbound master submit stays inside warehouse receiving DOM", () => {
+  const submitInboundShipmentSource = extractFunctionSource(appJs, "submitInboundShipment");
+
+  assert.match(submitInboundShipmentSource, /request\("\/warehouse\/inbound-shipments"/);
+  assert.match(submitInboundShipmentSource, /renderInboundShipmentSummary\("create", result\)/);
+  assert.match(submitInboundShipmentSource, /openInboundFlowStep\("packages", result\.shipment_no\)/);
+  assert.doesNotMatch(submitInboundShipmentSource, /await loadDashboard\(\)/);
+});
+
+test("store operating summary errors use guarded rendering when DOM is absent", () => {
+  assert.doesNotMatch(appJs, /document\.querySelector\("#storeOperatingSummary"\)\.innerHTML/);
+  assert.match(
+    appJs,
+    /if \(action === "load-store-operating-summary"\) \{\s*renderErrorSummary\("#storeOperatingSummary", formatErrorMessage\(error\)\);\s*return;\s*\}/,
+  );
 });
 
 test("store replenishment demo template keeps warehouse, store, and sell-through targets", () => {

@@ -43265,7 +43265,6 @@ async function submitInboundShipment(event) {
   renderInboundShipmentSummary("create", result);
   renderInboundShipmentHistorySummary(inboundShipmentState);
   renderParcelDirectorySummary(parcelBatchState);
-  await loadDashboard();
   openInboundFlowStep("packages", result.shipment_no);
 }
 
@@ -52013,7 +52012,7 @@ document.querySelectorAll("[data-action]").forEach((button) => {
         return;
       }
       if (action === "load-store-operating-summary") {
-        document.querySelector("#storeOperatingSummary").innerHTML = `<div class="empty-state">${escapeHtml(formatErrorMessage(error))}</div>`;
+        renderErrorSummary("#storeOperatingSummary", formatErrorMessage(error));
         return;
       }
       if (action === "load-price-rules") {
