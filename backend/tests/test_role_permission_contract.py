@@ -86,6 +86,57 @@ def _create_sorting_token(state: InMemoryState):
     return next(iter(state.item_barcode_tokens.values()))
 
 
+def test_warehouse_manager_uses_warehouse_supervisor_permission_bucket(isolated_state: InMemoryState):
+    state = isolated_state
+
+    actor = state._require_user_role("warehouse_manager_1", {"warehouse_supervisor"})
+
+    assert actor["username"] == "warehouse_manager_1"
+    assert actor["role_code"] == "warehouse_manager"
+
+
+def test_warehouse_manager_can_edit_default_sale_price(isolated_state: InMemoryState):
+    state = isolated_state
+
+    updated = state.upsert_apparel_default_sale_price(
+        {
+            "category_main": "dress",
+            "category_sub": "2 pieces",
+            "grade": "S",
+            "default_sale_price_kes": 350,
+            "note": "warehouse manager staging edit",
+        },
+        updated_by="warehouse_manager_1",
+    )
+
+    assert updated["default_sale_price_kes"] == 350
+    assert updated["updated_by"] == "warehouse_manager_1"
+
+    state.delete_apparel_default_sale_price(
+        "dress",
+        "2 pieces",
+        "S",
+        deleted_by="warehouse_manager_1",
+    )
+
+    assert not any(
+        row["category_main"] == "dress"
+        and row["category_sub"] == "2 pieces"
+        and row["grade"] == "S"
+        and row["updated_by"] == "warehouse_manager_1"
+        for row in state.list_apparel_default_sale_prices()
+    )
+
+
+def test_warehouse_clerk_still_cannot_use_supervisor_permission_bucket(isolated_state: InMemoryState):
+    state = isolated_state
+
+    with pytest.raises(HTTPException) as exc:
+        state._require_user_role("warehouse_clerk_1", {"warehouse_supervisor"})
+
+    assert exc.value.status_code == 403
+
+
 def test_contract_cost_fill_denies_store_role(isolated_state: InMemoryState):
     state = isolated_state
     state.create_or_update_china_source_record(
