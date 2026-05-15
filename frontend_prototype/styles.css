@@ -12432,7 +12432,7 @@ body.cashier-terminal-mode .topbar {
 
 body.cashier-terminal-mode .topbar-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -12485,6 +12485,31 @@ body.cashier-terminal-mode .cashier-terminal-session-strip .web-language-toggle 
 body.cashier-terminal-mode .cashier-terminal-session-strip .global-language-button {
   min-height: 22px;
   padding: 0 7px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-web-language-toggle {
+  justify-self: end;
+  min-height: 42px;
+  min-width: 88px;
+  padding: 3px;
+  gap: 3px;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+body.cashier-terminal-mode .cashier-terminal-web-language-toggle .global-language-button {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 0 7px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+body.cashier-terminal-mode .cashier-terminal-language-divider {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 body.cashier-terminal-mode [data-action="exit-pos"] {
