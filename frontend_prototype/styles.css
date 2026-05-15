@@ -11873,6 +11873,134 @@ body.cashier-terminal-mode .receipt-preview-paper {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.cashier-terminal-print-root {
+  display: none;
+}
+
+.cashier-thermal-paper-57mm {
+  width: 57mm;
+  max-width: 57mm;
+  margin: 0 auto;
+  padding: 2mm 2.5mm;
+  background: #ffffff;
+  color: #000000;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.cashier-thermal-paper-57mm .thermal-center {
+  display: grid;
+  justify-items: center;
+  gap: 1mm;
+  text-align: center;
+}
+
+.cashier-thermal-paper-57mm .thermal-title {
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.cashier-thermal-paper-57mm .thermal-muted {
+  color: #111111;
+  font-size: 9px;
+}
+
+.cashier-thermal-paper-57mm .thermal-divider {
+  margin: 1.6mm 0;
+  border-top: 1px dashed #000000;
+}
+
+.cashier-thermal-paper-57mm .thermal-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+  margin: 0.8mm 0;
+}
+
+.cashier-thermal-paper-57mm .thermal-line span:last-child,
+.cashier-thermal-paper-57mm .thermal-line strong:last-child {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.cashier-thermal-paper-57mm .thermal-total {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.cashier-thermal-paper-57mm .thermal-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px 34px 34px 38px;
+  gap: 1mm;
+  align-items: start;
+  margin: 1mm 0;
+}
+
+.cashier-thermal-paper-57mm .thermal-item span,
+.cashier-thermal-paper-57mm .thermal-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cashier-thermal-paper-57mm .thermal-item span:not(:first-child),
+.cashier-thermal-paper-57mm .thermal-item strong:not(:first-child) {
+  text-align: right;
+}
+
+.cashier-thermal-paper-57mm .thermal-section-title {
+  margin: 1.4mm 0 0.8mm;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+@media print {
+  html,
+  body {
+    width: 57mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  body.cashier-terminal-printing > :not(.cashier-terminal-print-root) {
+    display: none !important;
+  }
+
+  body.cashier-terminal-printing .cashier-terminal-print-root {
+    display: block !important;
+    position: static !important;
+    width: 57mm !important;
+    min-width: 57mm !important;
+    max-width: 57mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+  }
+
+  body.cashier-terminal-printing .cashier-thermal-paper-57mm {
+    width: 57mm !important;
+    max-width: 57mm !important;
+    margin: 0 !important;
+    padding: 2mm 2.5mm !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .cashier-print-actions,
+  .receipt-actions,
+  .drawer-foot,
+  .drawer-head button,
+  .topbar,
+  .cashier-terminal-status,
+  .cashier-terminal-quick-actions {
+    display: none !important;
+  }
+}
+
 body.cashier-terminal-mode .cashier-terminal-quick-actions {
   display: block;
   border-radius: 14px;

@@ -2190,6 +2190,7 @@ let baleBarcodeFilters = {
   batchNo: "",
 };
 let latestShiftReport = null;
+let cashierTerminalPrintCleanupTimer = null;
 let activeWorkspace = localStorage.getItem("retail_ops_active_workspace") || "warehouse";
 let activePanelKey = "";
 let latestAuthRouteNotice = "";
@@ -3954,7 +3955,7 @@ function safeParse(value, fallback) {
   }
   try {
     return JSON.parse(value);
-  } catch (error) {
+  } catch {
     return fallback;
   }
 }
@@ -17602,43 +17603,21 @@ function renderShiftSummaryPanel(result, label = "") {
 }
 
 function buildShiftReportPreviewHtml(report) {
-  const paymentRows = Object.entries(report.payment_breakdown || {})
-    .map(([key, value]) => `<tr><td>${escapeHtml(key)}</td><td>${formatCurrency(value)}</td></tr>`)
-    .join("");
+  const reportHtml = buildCashierTerminal57mmShiftReportHtml(report);
   return `<!doctype html>
   <html lang="zh-CN">
     <head>
       <meta charset="utf-8" />
-      <title>Z Report Preview</title>
+      <title>57mm POS Shift Report</title>
       <style>
-        body { font-family: "Segoe UI", sans-serif; padding: 32px; color: #1f1b16; }
-        h1,h2 { margin: 0 0 12px; }
-        .grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px; margin: 18px 0; }
-        .card { border: 1px solid #ddd4c7; border-radius: 12px; padding: 14px; }
-        .label { color: #6b6256; font-size: 13px; }
-        .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-        th, td { border: 1px solid #ddd4c7; padding: 10px; text-align: left; }
-        .muted { color: #6b6256; }
+        ${getCashierTerminalStandalone57mmPrintCss()}
       </style>
     </head>
     <body>
-      <h1>${report.report_type === "z_report" ? "店铺关店 Z-report" : "班次 T-report"}</h1>
-      <div class="muted">${escapeHtml(report.store_code)} · ${escapeHtml(report.shift_no)} · ${escapeHtml(report.cashier_name)}</div>
-      <div class="grid">
-        <div class="card"><div class="label">销售额</div><div class="value">${formatCurrency(report.total_sales)}</div></div>
-        <div class="card"><div class="label">退款额</div><div class="value">${formatCurrency(report.refund_total)}</div></div>
-        <div class="card"><div class="label">毛利</div><div class="value">${formatCurrency(report.total_profit)}</div></div>
-        <div class="card"><div class="label">交易单数</div><div class="value">${escapeHtml(report.transaction_count || 0)}</div></div>
-        <div class="card"><div class="label">改价预警</div><div class="value">${escapeHtml(report.override_alert_count || 0)}</div></div>
-        <div class="card"><div class="label">现金差异</div><div class="value">${formatCurrency(report.cash_variance)}</div></div>
+      <div class="cashier-print-actions">
+        <button type="button" onclick="window.print()">Print 57mm</button>
       </div>
-      <h2>支付明细</h2>
-      <table>
-        <thead><tr><th>方式</th><th>金额</th></tr></thead>
-        <tbody>${paymentRows || '<tr><td colspan="2">暂无</td></tr>'}</tbody>
-      </table>
-      <p class="muted">生成时间：${new Date().toLocaleString()}</p>
+      ${reportHtml}
     </body>
   </html>`;
 }
@@ -33831,10 +33810,14 @@ renderCashierTerminalDrawer = function () {
           <span><strong>Total Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.total_sales || 0))}</span>
           <span><strong>Orders</strong>${escapeHtml(report.order_count || 0)}</span>
           <span><strong>Items</strong>${escapeHtml(report.item_count || 0)}</span>
+          <span><strong>Discount</strong>${escapeHtml(formatCashierPreviewMoney(report.discount_amount || 0))}</span>
           <span><strong>Cash Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.cash_sales || 0))}</span>
           <span><strong>M-Pesa Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.mpesa_sales || 0))}</span>
+          <span><strong>Card Sales</strong>${escapeHtml(formatCashierPreviewMoney(report.card_sales || 0))}</span>
           <span><strong>Mixed Cash</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_cash || 0))}</span>
           <span><strong>Mixed M-Pesa</strong>${escapeHtml(formatCashierPreviewMoney(report.mixed_mpesa || 0))}</span>
+          <span><strong>Cancelled</strong>${escapeHtml(report.cancelled_order_count || 0)}</span>
+          <span><strong>Refund</strong>${escapeHtml(formatCashierPreviewMoney(report.refund_total || 0))}</span>
         </div>
         <h4>Cash Accountability</h4>
         <div class="shift-stats-grid">
@@ -34680,10 +34663,15 @@ function normalizeCashierTerminalShiftReport(report = {}) {
     total_sales: normalizeCashierTerminalNumber(report.total_sales),
     order_count: Number(report.order_count || 0),
     item_count: Number(report.item_count || 0),
+    discount_amount: normalizeCashierTerminalNumber(report.discount_amount ?? report.discount),
     cash_sales: normalizeCashierTerminalNumber(report.cash_sales),
     mpesa_sales: normalizeCashierTerminalNumber(report.mpesa_sales),
+    card_sales: normalizeCashierTerminalNumber(report.card_sales),
     mixed_cash: normalizeCashierTerminalNumber(report.mixed_cash),
     mixed_mpesa: normalizeCashierTerminalNumber(report.mixed_mpesa),
+    mixed_sales: normalizeCashierTerminalNumber(report.mixed_sales ?? (normalizeCashierTerminalNumber(report.mixed_cash) + normalizeCashierTerminalNumber(report.mixed_mpesa))),
+    refund_count: Number(report.refund_count || 0),
+    refund_total: normalizeCashierTerminalNumber(report.refund_total ?? report.refund_amount),
     expected_cash: normalizeCashierTerminalNumber(report.expected_cash),
     counted_cash: report.counted_cash == null ? null : normalizeCashierTerminalNumber(report.counted_cash),
     cash_variance: report.cash_variance == null ? null : normalizeCashierTerminalSignedNumber(report.cash_variance),
@@ -34705,6 +34693,370 @@ function normalizeCashierTerminalShiftReport(report = {}) {
   };
 }
 
+function getCashierTerminalStandalone57mmPrintCss() {
+  return `
+    @page { size: 57mm auto; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { width: 57mm; margin: 0; padding: 0; background: #fff; color: #000; }
+    body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .cashier-print-actions { display: flex; gap: 8px; padding: 8px; }
+    .cashier-print-actions button { min-height: 36px; padding: 0 12px; border: 1px solid #111; background: #fff; color: #111; font-weight: 700; }
+    .cashier-thermal-paper-57mm { width: 57mm; max-width: 57mm; margin: 0 auto; padding: 2mm 2.5mm; background: #fff; color: #000; font-size: 10px; line-height: 1.25; }
+    .thermal-center { display: grid; justify-items: center; gap: 1mm; text-align: center; }
+    .thermal-title { font-size: 13px; font-weight: 900; text-transform: uppercase; }
+    .thermal-muted { color: #111; font-size: 9px; }
+    .thermal-divider { margin: 1.6mm 0; border-top: 1px dashed #000; }
+    .thermal-line { display: flex; justify-content: space-between; gap: 2mm; margin: .8mm 0; }
+    .thermal-line span:last-child, .thermal-line strong:last-child { text-align: right; overflow-wrap: anywhere; }
+    .thermal-total { font-size: 12px; font-weight: 900; }
+    .thermal-item { display: grid; grid-template-columns: minmax(0, 1fr) 18px 34px 34px 38px; gap: 1mm; align-items: start; margin: 1mm 0; }
+    .thermal-item span, .thermal-item strong { min-width: 0; overflow-wrap: anywhere; }
+    .thermal-item span:not(:first-child), .thermal-item strong:not(:first-child) { text-align: right; }
+    .thermal-section-title { margin: 1.4mm 0 .8mm; font-weight: 900; text-transform: uppercase; }
+    @media print { .cashier-print-actions { display: none !important; } }
+  `;
+}
+
+function getCashierTerminalPrintMoney(value) {
+  return formatCashierPreviewMoney(normalizeCashierTerminalNumber(value));
+}
+
+function getCashierTerminalPrintSignedMoney(value) {
+  const numeric = Number(value || 0);
+  const safeNumeric = Number.isFinite(numeric) ? numeric : 0;
+  return `KSh ${safeNumeric.toLocaleString("en-KE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function getCashierTerminalPrintTimestamp(value = "") {
+  if (!value) {
+    return new Date().toLocaleString("zh-CN", { hour12: false });
+  }
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleString("zh-CN", { hour12: false });
+  }
+  return String(value);
+}
+
+function getCashierTerminalFirstNumber(source = {}, keys = []) {
+  for (const key of keys) {
+    if (source[key] != null && source[key] !== "") {
+      return normalizeCashierTerminalNumber(source[key]);
+    }
+  }
+  return 0;
+}
+
+function getCashierTerminalReceiptItemPrintRows(items = []) {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const quantity = Math.max(1, Number(item.quantity ?? item.qty ?? 1) || 1);
+    const unitPrice = getCashierTerminalFirstNumber(item, ["unit_price", "selling_price", "selected_price", "price", "final_price"]);
+    const discount = getCashierTerminalFirstNumber(item, ["discount_amount", "discount"]);
+    const lineTotal = getCashierTerminalFirstNumber(item, ["subtotal", "line_total", "total", "final_price", "price"]) || Math.max(unitPrice * quantity - discount, 0);
+    return {
+      code: String(item.display_code || item.store_item_display_code || item.machine_code || item.barcode || item.description || "ITEM").trim() || "ITEM",
+      description: String(item.description || item.category || item.product_name || "").trim(),
+      quantity,
+      unitPrice,
+      discount,
+      lineTotal,
+    };
+  });
+}
+
+function buildCashierTerminal57mmReceiptHtml(sale = {}) {
+  const safeSale = sale || {};
+  const storeCode = safeSale.store_code || getCashierTerminalStoreCode();
+  const itemRows = getCashierTerminalReceiptItemPrintRows(safeSale.items);
+  const subtotal = getCashierTerminalFirstNumber(safeSale, ["subtotal", "subtotal_amount"]) || itemRows.reduce((sum, item) => sum + item.lineTotal + item.discount, 0);
+  const discount = getCashierTerminalFirstNumber(safeSale, ["discount", "discount_amount"]);
+  const total = getCashierTerminalFirstNumber(safeSale, ["total", "total_amount", "amount_total"]) || Math.max(subtotal - discount, 0);
+  const cashAmount = getCashierTerminalFirstNumber(safeSale, ["cash_amount", "cash"]);
+  const mpesaAmount = getCashierTerminalFirstNumber(safeSale, ["mpesa_amount", "m_pesa_amount"]);
+  const cardAmount = getCashierTerminalFirstNumber(safeSale, ["card_amount"]);
+  const paid = getCashierTerminalFirstNumber(safeSale, ["paid_amount", "amount_paid", "paid"]) || cashAmount + mpesaAmount + cardAmount || total;
+  const change = getCashierTerminalFirstNumber(safeSale, ["change", "change_amount", "change_due"]) || Math.max(paid - total, 0);
+  const saleNo = safeSale.sale_no || safeSale.sale_id || safeSale.order_no || "-";
+  const orderNo = safeSale.order_no || safeSale.sale_no || "-";
+  const totalItems = Number(safeSale.total_items ?? itemRows.reduce((sum, item) => sum + item.quantity, 0));
+  return `
+    <article class="cashier-thermal-paper-57mm cashier-receipt-57mm" data-print-kind="receipt">
+      <div class="thermal-center">
+        <strong class="thermal-title">DIRECT LOOP</strong>
+        <span>${escapeHtml(getCashierTerminalStoreDisplayName())}</span>
+        <span class="thermal-muted">57mm POS Receipt</span>
+      </div>
+      ${safeSale.is_reprint ? `<div class="thermal-center thermal-muted">REPRINT COPY</div>` : ""}
+      <div class="thermal-divider"></div>
+      <div class="thermal-line"><span>Store</span><strong>${escapeHtml(storeCode)}</strong></div>
+      <div class="thermal-line"><span>Cashier</span><span>${escapeHtml(safeSale.cashier || safeSale.cashier_id || getCashierTerminalCashierName())}</span></div>
+      <div class="thermal-line"><span>Terminal</span><span>${escapeHtml(safeSale.terminal_id || getCashierTerminalTerminalId())}</span></div>
+      <div class="thermal-line"><span>Shift</span><span>${escapeHtml(safeSale.shift_id || safeSale.shift_no || getCashierTerminalShiftNo() || "N/A")}</span></div>
+      <div class="thermal-line"><span>Sale No.</span><strong>${escapeHtml(saleNo)}</strong></div>
+      <div class="thermal-line"><span>Order No.</span><span>${escapeHtml(orderNo)}</span></div>
+      <div class="thermal-line"><span>Time</span><span>${escapeHtml(getCashierTerminalPrintTimestamp(safeSale.time || safeSale.sale_time || safeSale.sold_at))}</span></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-item thermal-muted"><strong>Item</strong><strong>Qty</strong><strong>Unit</strong><strong>Discount</strong><strong>Total</strong></div>
+      ${itemRows.length ? itemRows.map((item) => `
+        <div class="thermal-item">
+          <span><strong>${escapeHtml(item.code)}</strong>${item.description ? `<br><span class="thermal-muted">${escapeHtml(item.description)}</span>` : ""}</span>
+          <span>${escapeHtml(item.quantity)}</span>
+          <span>${escapeHtml(getCashierTerminalPrintMoney(item.unitPrice))}</span>
+          <span>${escapeHtml(getCashierTerminalPrintMoney(item.discount))}</span>
+          <strong>${escapeHtml(getCashierTerminalPrintMoney(item.lineTotal))}</strong>
+        </div>
+      `).join("") : `<div class="thermal-center thermal-muted">No sale lines</div>`}
+      <div class="thermal-divider"></div>
+      <div class="thermal-line"><span>Total Items</span><strong>${escapeHtml(totalItems)}</strong></div>
+      <div class="thermal-line"><span>Subtotal</span><span>${escapeHtml(getCashierTerminalPrintMoney(subtotal))}</span></div>
+      <div class="thermal-line"><span>Discount</span><span>${escapeHtml(getCashierTerminalPrintMoney(discount))}</span></div>
+      <div class="thermal-line thermal-total"><span>Total</span><strong>${escapeHtml(getCashierTerminalPrintMoney(total))}</strong></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-line"><span>Payment</span><span>${escapeHtml(safeSale.payment_method || "-")}</span></div>
+      <div class="thermal-line"><span>Cash</span><span>${escapeHtml(getCashierTerminalPrintMoney(cashAmount))}</span></div>
+      <div class="thermal-line"><span>M-Pesa</span><span>${escapeHtml(getCashierTerminalPrintMoney(mpesaAmount))}</span></div>
+      <div class="thermal-line"><span>Card</span><span>${escapeHtml(getCashierTerminalPrintMoney(cardAmount))}</span></div>
+      <div class="thermal-line"><span>Paid</span><strong>${escapeHtml(getCashierTerminalPrintMoney(paid))}</strong></div>
+      <div class="thermal-line"><span>Change</span><strong>${escapeHtml(getCashierTerminalPrintMoney(change))}</strong></div>
+      <div class="thermal-line"><span>M-Pesa Ref</span><span>${escapeHtml(safeSale.mpesa_reference || safeSale.reference || "N/A")}</span></div>
+      <div class="thermal-line"><span>Status</span><span>${escapeHtml(safeSale.status || "completed")}</span></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-center">Thank you. Karibu tena.</div>
+    </article>
+  `;
+}
+
+function getCashierTerminalPaymentBreakdownAmount(report = {}, matcher) {
+  const breakdown = report.payment_breakdown;
+  if (Array.isArray(breakdown)) {
+    return breakdown
+      .filter((row) => matcher(String(row.method || "").trim().toLowerCase()))
+      .reduce((sum, row) => sum + normalizeCashierTerminalNumber(row.amount), 0);
+  }
+  if (breakdown && typeof breakdown === "object") {
+    return Object.entries(breakdown)
+      .filter(([key]) => matcher(String(key || "").trim().toLowerCase()))
+      .reduce((sum, [, value]) => sum + normalizeCashierTerminalNumber(value), 0);
+  }
+  return 0;
+}
+
+function normalizeCashierTerminalShiftReportForPrint(report = {}) {
+  const rawReportType = String(report.report_type || report.report_kind || "").trim().toUpperCase();
+  const reportType = rawReportType.includes("Z") ? "Z_REPORT" : rawReportType.includes("T") ? "T_REPORT" : "X_REPORT";
+  const cashSales = getCashierTerminalFirstNumber(report, ["cash_sales", "cash_total"]) || getCashierTerminalPaymentBreakdownAmount(report, (method) => method === "cash");
+  const mpesaSales = getCashierTerminalFirstNumber(report, ["mpesa_sales", "m_pesa_sales", "mpesa_total"]) || getCashierTerminalPaymentBreakdownAmount(report, (method) => method.includes("mpesa") || method.includes("m-pesa"));
+  const cardSales = getCashierTerminalFirstNumber(report, ["card_sales", "card_total"]) || getCashierTerminalPaymentBreakdownAmount(report, (method) => method.includes("card"));
+  const mixedCash = getCashierTerminalFirstNumber(report, ["mixed_cash", "mixed_cash_sales"]);
+  const mixedMpesa = getCashierTerminalFirstNumber(report, ["mixed_mpesa", "mixed_mpesa_sales"]);
+  return {
+    ...report,
+    report_type: reportType,
+    store_code: String(report.store_code || getCashierTerminalStoreCode()).trim().toUpperCase(),
+    shift_id: String(report.shift_id || report.shift_no || getCashierTerminalShiftNo() || "").trim(),
+    cashier_id: String(report.cashier_id || report.cashier_name || getCashierTerminalCashierName()).trim(),
+    terminal_id: String(report.terminal_id || getCashierTerminalTerminalId()).trim(),
+    report_date: String(report.report_date || report.business_date || new Date().toISOString().slice(0, 10)).trim(),
+    opened_at: String(report.opened_at || "").trim(),
+    closed_at: String(report.closed_at || "").trim(),
+    generated_at: String(report.generated_at || getCashierTerminalPrintTimestamp()).trim(),
+    status: String(report.status || "").trim() || "N/A",
+    total_sales: getCashierTerminalFirstNumber(report, ["total_sales", "total_amount", "net_sales"]),
+    discount_amount: getCashierTerminalFirstNumber(report, ["discount_amount", "discount", "discount_total"]),
+    order_count: Number(report.order_count ?? report.transaction_count ?? 0),
+    item_count: Number(report.item_count ?? report.total_items ?? report.sales_item_count ?? 0),
+    cash_sales: cashSales,
+    mpesa_sales: mpesaSales,
+    card_sales: cardSales,
+    mixed_cash: mixedCash,
+    mixed_mpesa: mixedMpesa,
+    mixed_sales: getCashierTerminalFirstNumber(report, ["mixed_sales", "mixed_total"]) || mixedCash + mixedMpesa,
+    cancelled_order_count: Number(report.cancelled_order_count ?? report.void_count ?? report.cancel_count ?? 0),
+    refund_count: Number(report.refund_count ?? 0),
+    refund_total: getCashierTerminalFirstNumber(report, ["refund_total", "refund_amount", "refund_amount_total"]),
+    opening_float: getCashierTerminalFirstNumber(report, ["opening_float", "opening_float_cash"]),
+    expected_cash: getCashierTerminalFirstNumber(report, ["expected_cash"]),
+    counted_cash: report.counted_cash == null ? null : normalizeCashierTerminalNumber(report.counted_cash),
+    cash_variance: report.cash_variance == null ? null : normalizeCashierTerminalSignedNumber(report.cash_variance),
+  };
+}
+
+function buildCashierTerminalShiftReportFromCurrentState(reportType = "X_REPORT") {
+  ensureCashierTerminalPreviewState();
+  const summary = cashierTerminalState.shiftSummary || {};
+  const latestCompletedSale = cashierTerminalState.latestCompletedSale || {};
+  const currentShift = cashierTerminalState.currentShift || {};
+  const shiftId = currentShift.shift_id || summary.shift_id || cashierTerminalState.shiftNo || latestCompletedSale.shift_id || "";
+  const latestSaleBelongsToShift = Boolean(latestCompletedSale.sale_no || latestCompletedSale.order_no)
+    && (!latestCompletedSale.shift_id || !shiftId || String(latestCompletedSale.shift_id) === String(shiftId));
+  const latestItems = latestSaleBelongsToShift
+    ? getCashierTerminalReceiptItemPrintRows(latestCompletedSale.items).reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
+  const latestTotal = latestSaleBelongsToShift
+    ? getCashierTerminalFirstNumber(latestCompletedSale, ["total", "total_amount", "amount_total"])
+    : 0;
+  const latestDiscount = latestSaleBelongsToShift
+    ? getCashierTerminalFirstNumber(latestCompletedSale, ["discount", "discount_amount"])
+    : 0;
+  return normalizeCashierTerminalShiftReportForPrint({
+    report_type: reportType,
+    store_code: currentShift.store_code || summary.store_code || latestCompletedSale.store_code || getCashierTerminalStoreCode(),
+    shift_id: shiftId,
+    cashier_id: currentShift.cashier_id || summary.cashier_id || latestCompletedSale.cashier || getCashierTerminalCashierName(),
+    terminal_id: currentShift.terminal_id || summary.terminal_id || latestCompletedSale.terminal_id || getCashierTerminalTerminalId(),
+    opened_at: currentShift.opened_at || summary.opened_at || "",
+    closed_at: currentShift.closed_at || summary.closed_at || "",
+    status: currentShift.status || summary.status || cashierTerminalState.shiftStatus || "open",
+    opening_float: currentShift.opening_float ?? summary.opening_float ?? cashierTerminalState.openingFloatCash,
+    total_sales: summary.total_sales ?? cashierTerminalState.shiftSalesAmount ?? latestTotal,
+    discount_amount: summary.discount_amount ?? summary.discount ?? latestDiscount,
+    order_count: summary.order_count ?? cashierTerminalState.shiftOrderCount ?? (latestSaleBelongsToShift ? 1 : 0),
+    item_count: summary.item_count ?? summary.total_items ?? latestItems,
+    cash_sales: summary.cash_sales ?? cashierTerminalState.cashSalesAmount ?? getCashierTerminalFirstNumber(latestCompletedSale, ["cash_amount"]),
+    mpesa_sales: summary.mpesa_sales ?? cashierTerminalState.mpesaSalesAmount ?? getCashierTerminalFirstNumber(latestCompletedSale, ["mpesa_amount"]),
+    card_sales: summary.card_sales ?? 0,
+    mixed_cash: summary.mixed_cash ?? cashierTerminalState.mixedCashAmountTotal ?? 0,
+    mixed_mpesa: summary.mixed_mpesa ?? cashierTerminalState.mixedMpesaAmountTotal ?? 0,
+    cancelled_order_count: summary.cancelled_order_count ?? cashierTerminalState.cancelledOrderCount ?? 0,
+    refund_count: summary.refund_count ?? 0,
+    refund_total: summary.refund_total ?? summary.refund_amount ?? 0,
+    expected_cash: summary.expected_cash ?? currentShift.expected_cash ?? 0,
+    counted_cash: summary.counted_cash ?? currentShift.counted_cash ?? null,
+    cash_variance: summary.cash_variance ?? currentShift.cash_variance ?? null,
+    generated_at: getCashierTerminalPrintTimestamp(),
+  });
+}
+
+function buildCashierTerminal57mmShiftReportHtml(report = {}) {
+  const normalized = normalizeCashierTerminalShiftReportForPrint(report);
+  const isZReport = normalized.report_type === "Z_REPORT";
+  return `
+    <article class="cashier-thermal-paper-57mm cashier-shift-report-57mm" data-print-kind="shift-report">
+      <div class="thermal-center">
+        <strong class="thermal-title">DIRECT LOOP POS</strong>
+        <span>${escapeHtml(isZReport ? "Z REPORT" : normalized.report_type === "T_REPORT" ? "SHIFT REPORT" : "X REPORT")}</span>
+        <span class="thermal-muted">57mm Shift Summary</span>
+      </div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-line"><span>Date</span><strong>${escapeHtml(normalized.report_date || "N/A")}</strong></div>
+      <div class="thermal-line"><span>Store</span><strong>${escapeHtml(normalized.store_code || "N/A")}</strong></div>
+      <div class="thermal-line"><span>Shift</span><span>${escapeHtml(normalized.shift_id || "N/A")}</span></div>
+      <div class="thermal-line"><span>Cashier</span><span>${escapeHtml(normalized.cashier_id || "N/A")}</span></div>
+      <div class="thermal-line"><span>Terminal</span><span>${escapeHtml(normalized.terminal_id || "N/A")}</span></div>
+      <div class="thermal-line"><span>Status</span><span>${escapeHtml(normalized.status || "N/A")}</span></div>
+      <div class="thermal-line"><span>Opened</span><span>${escapeHtml(normalized.opened_at || "N/A")}</span></div>
+      <div class="thermal-line"><span>Closed</span><span>${escapeHtml(normalized.closed_at || "N/A")}</span></div>
+      <div class="thermal-line"><span>Generated</span><span>${escapeHtml(normalized.generated_at || "N/A")}</span></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-section-title">Sales Summary</div>
+      <div class="thermal-line"><span>Orders</span><strong>${escapeHtml(normalized.order_count || 0)}</strong></div>
+      <div class="thermal-line"><span>Items</span><strong>${escapeHtml(normalized.item_count || 0)}</strong></div>
+      <div class="thermal-line"><span>Total Sales</span><strong>${escapeHtml(getCashierTerminalPrintMoney(normalized.total_sales))}</strong></div>
+      <div class="thermal-line"><span>Discount</span><span>${escapeHtml(getCashierTerminalPrintMoney(normalized.discount_amount))}</span></div>
+      <div class="thermal-line"><span>Cancelled</span><span>${escapeHtml(normalized.cancelled_order_count || 0)}</span></div>
+      <div class="thermal-line"><span>Refund</span><span>${escapeHtml(normalized.refund_count || 0)} / ${escapeHtml(getCashierTerminalPrintMoney(normalized.refund_total))}</span></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-section-title">Payment Summary</div>
+      <div class="thermal-line"><span>Cash</span><strong>${escapeHtml(getCashierTerminalPrintMoney(normalized.cash_sales))}</strong></div>
+      <div class="thermal-line"><span>M-Pesa</span><strong>${escapeHtml(getCashierTerminalPrintMoney(normalized.mpesa_sales))}</strong></div>
+      <div class="thermal-line"><span>Card</span><strong>${escapeHtml(getCashierTerminalPrintMoney(normalized.card_sales))}</strong></div>
+      <div class="thermal-line"><span>Mixed</span><strong>${escapeHtml(getCashierTerminalPrintMoney(normalized.mixed_sales))}</strong></div>
+      <div class="thermal-line"><span>Mixed Cash</span><span>${escapeHtml(getCashierTerminalPrintMoney(normalized.mixed_cash))}</span></div>
+      <div class="thermal-line"><span>Mixed M-Pesa</span><span>${escapeHtml(getCashierTerminalPrintMoney(normalized.mixed_mpesa))}</span></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-section-title">Cash Accountability</div>
+      <div class="thermal-line"><span>Opening Float</span><span>${escapeHtml(getCashierTerminalPrintMoney(normalized.opening_float))}</span></div>
+      <div class="thermal-line"><span>Expected Cash</span><strong>${escapeHtml(getCashierTerminalPrintMoney(normalized.expected_cash))}</strong></div>
+      <div class="thermal-line"><span>Counted Cash</span><span>${escapeHtml(normalized.counted_cash == null ? "N/A" : getCashierTerminalPrintMoney(normalized.counted_cash))}</span></div>
+      <div class="thermal-line"><span>Variance</span><span>${escapeHtml(normalized.cash_variance == null ? "N/A" : getCashierTerminalPrintSignedMoney(normalized.cash_variance))}</span></div>
+      <div class="thermal-divider"></div>
+      <div class="thermal-center thermal-muted">${escapeHtml(isZReport ? "End of day report" : "Shift report")}</div>
+    </article>
+  `;
+}
+
+function finishCashierTerminal57mmPrint() {
+  if (cashierTerminalPrintCleanupTimer && typeof window !== "undefined" && typeof window.clearTimeout === "function") {
+    window.clearTimeout(cashierTerminalPrintCleanupTimer);
+  }
+  cashierTerminalPrintCleanupTimer = null;
+  if (typeof document === "undefined") {
+    return;
+  }
+  document.body?.classList.remove("cashier-terminal-printing");
+  document.body?.removeAttribute("data-cashier-print-mode");
+  const root = document.querySelector("#cashierTerminalPrintRoot");
+  if (root) {
+    root.setAttribute("aria-hidden", "true");
+  }
+  document.querySelector("#cashierTerminal57mmPrintStyle")?.remove();
+}
+
+function ensureCashierTerminal57mmPageStyle() {
+  if (typeof document === "undefined" || !document.head) {
+    return null;
+  }
+  let style = document.querySelector("#cashierTerminal57mmPrintStyle");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "cashierTerminal57mmPrintStyle";
+    document.head.appendChild(style);
+  }
+  style.textContent = "@page { size: 57mm auto; margin: 0; }";
+  return style;
+}
+
+function printCashierTerminal57mmHtml(html, printMode = "receipt") {
+  if (typeof document === "undefined" || !document.body) {
+    return null;
+  }
+  let root = document.querySelector("#cashierTerminalPrintRoot");
+  if (!root) {
+    root = document.createElement("section");
+    root.id = "cashierTerminalPrintRoot";
+    root.className = "cashier-terminal-print-root";
+    document.body.appendChild(root);
+  }
+  root.className = "cashier-terminal-print-root";
+  root.dataset.printMode = printMode;
+  root.removeAttribute("aria-hidden");
+  root.innerHTML = html;
+  document.body.classList.add("cashier-terminal-printing");
+  document.body.dataset.cashierPrintMode = printMode;
+  ensureCashierTerminal57mmPageStyle();
+  if (typeof window !== "undefined") {
+    if (cashierTerminalPrintCleanupTimer && typeof window.clearTimeout === "function") {
+      window.clearTimeout(cashierTerminalPrintCleanupTimer);
+    }
+    if (typeof window.addEventListener === "function") {
+      window.addEventListener("afterprint", finishCashierTerminal57mmPrint, { once: true });
+    }
+    if (typeof window.setTimeout === "function") {
+      cashierTerminalPrintCleanupTimer = window.setTimeout(finishCashierTerminal57mmPrint, 3000);
+    }
+    if (typeof window.print === "function") {
+      window.print();
+    }
+  }
+  return root;
+}
+
+function printCashierTerminalReceipt() {
+  ensureCashierTerminalPreviewState();
+  const sale = cashierTerminalState.latestCompletedSale;
+  if (!sale?.sale_no && !sale?.order_no) {
+    cashierTerminalState.printFeedback = "还没有最近一单可打印。";
+    renderCashierTerminalReceiptPanel();
+    throw new Error(cashierTerminalState.printFeedback);
+  }
+  cashierTerminalState.printFeedback = `57mm 小票已准备打印：${sale.sale_no || sale.order_no}`;
+  renderCashierTerminalReceiptPanel();
+  return printCashierTerminal57mmHtml(buildCashierTerminal57mmReceiptHtml(sale), "receipt");
+}
+
 async function loadCashierTerminalShiftReport(reportType = "x") {
   ensureCashierTerminalPreviewState();
   const normalizedReportType = String(reportType || "x").trim().toLowerCase();
@@ -34721,9 +35073,14 @@ async function loadCashierTerminalShiftReport(reportType = "x") {
     throw new Error(cashierTerminalState.shiftReportFeedback);
   }
   const storeCode = getCashierTerminalStoreCode();
-  const report = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/${reportSlug}-report`);
-  cashierTerminalState.shiftReport = normalizeCashierTerminalShiftReport(report);
-  cashierTerminalState.shiftReportFeedback = `已加载 ${cashierTerminalState.shiftReport.report_type === "Z_REPORT" ? "Z-report" : "X-report"}：${cashierTerminalState.shiftReport.shift_id}`;
+  try {
+    const report = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/${reportSlug}-report`);
+    cashierTerminalState.shiftReport = normalizeCashierTerminalShiftReport(report);
+    cashierTerminalState.shiftReportFeedback = `已加载 ${cashierTerminalState.shiftReport.report_type === "Z_REPORT" ? "Z-report" : "X-report"}：${cashierTerminalState.shiftReport.shift_id}`;
+  } catch (error) {
+    cashierTerminalState.shiftReport = buildCashierTerminalShiftReportFromCurrentState(reportSlug === "z" ? "Z_REPORT" : "X_REPORT");
+    cashierTerminalState.shiftReportFeedback = `报表接口暂不可用，已使用当前班次数据生成 57mm ${reportSlug === "z" ? "Z-report" : "X-report"}。`;
+  }
   cashierTerminalState.activeDrawer = "shift-report";
   renderCashierTerminalDrawer();
   return cashierTerminalState.shiftReport;
@@ -34731,15 +35088,16 @@ async function loadCashierTerminalShiftReport(reportType = "x") {
 
 function printCashierTerminalShiftReport() {
   ensureCashierTerminalPreviewState();
-  const report = cashierTerminalState.shiftReport;
+  const report = cashierTerminalState.shiftReport?.shift_id
+    ? normalizeCashierTerminalShiftReportForPrint(cashierTerminalState.shiftReport)
+    : buildCashierTerminalShiftReportFromCurrentState("X_REPORT");
   if (!report?.shift_id) {
     throw new Error("请先加载班次报表。");
   }
+  cashierTerminalState.shiftReport = report;
   cashierTerminalState.shiftReportFeedback = `${report.report_type === "Z_REPORT" ? "Z-report" : "X-report"} 已准备打印：${report.shift_id}`;
   renderCashierTerminalDrawer();
-  if (typeof window.print === "function") {
-    window.print();
-  }
+  return printCashierTerminal57mmHtml(buildCashierTerminal57mmShiftReportHtml(report), "shift-report");
 }
 
 async function closeCashierTerminalShiftBackend() {
@@ -35178,10 +35536,7 @@ handleCashierTerminalAction = async function (action, target) {
       renderCashierTerminal();
       return;
     case "print-receipt":
-      cashierTerminalState.printFeedback = cashierTerminalState.latestCompletedSale
-        ? `mock：已发送打印 ${cashierTerminalState.latestCompletedSale.sale_no}`
-        : "还没有最近一单可打印。";
-      renderCashierTerminalReceiptPanel();
+      printCashierTerminalReceipt();
       return;
     case "reprint-receipt":
       openCashierTerminalReprintConfirmation("");
