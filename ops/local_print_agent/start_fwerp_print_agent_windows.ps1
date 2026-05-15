@@ -11,38 +11,100 @@ $ErrorActionPreference = "Stop"
 $InstallDir = Join-Path $env:LOCALAPPDATA "FW-ERP\PrintAgent"
 $HealthUrl = "http://127.0.0.1:8719/health"
 $PrintersUrl = "http://127.0.0.1:8719/printers"
+$ManualPythonMessage = "请安装 Python 3，并勾选 Add Python to PATH，然后重新双击启动助手。"
 
 Write-Host "FW-ERP Windows Print Agent"
 Write-Host "Install folder: $InstallDir"
 Write-Host "Health check: $HealthUrl"
 Write-Host "Printer list: $PrintersUrl"
 
-New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-Set-Location $InstallDir
+function Test-PythonCandidate {
+    param(
+        [string]$Command,
+        [string[]]$CandidateArgs = @()
+    )
+
+    $commandInfo = Get-Command $Command -ErrorAction SilentlyContinue
+    if (-not $commandInfo) {
+        return $null
+    }
+
+    $displayCommand = "$Command $($CandidateArgs -join ' ')".Trim()
+    $probeArgs = @($CandidateArgs) + @("-c", "import sys; print(sys.executable)")
+    Write-Host "Checking Python candidate: $displayCommand"
+
+    $probeOutput = & $Command @probeArgs 2>&1
+    $probeExitCode = $LASTEXITCODE
+    $probeText = ($probeOutput | Out-String).Trim()
+    $storeAliasPattern = "Microsoft Store|Python was not found|run without arguments to install|App Execution Alias|App Installer"
+
+    if ($probeExitCode -ne 0) {
+        if ($probeText -match $storeAliasPattern) {
+            Write-Host "Skipping Microsoft Store Python alias: $probeText"
+        } else {
+            Write-Host "Skipping Python candidate '$displayCommand' because it failed: $probeText"
+        }
+        return $null
+    }
+
+    if (-not $probeText) {
+        Write-Host "Skipping Python candidate '$displayCommand' because it did not report sys.executable."
+        return $null
+    }
+
+    if ($probeText -match $storeAliasPattern) {
+        Write-Host "Skipping Microsoft Store Python alias: $probeText"
+        return $null
+    }
+
+    Write-Host "Using Python: $probeText"
+    return @{ Command = $Command; Args = @($CandidateArgs); Executable = $probeText }
+}
+
+function Get-ValidPythonCandidate {
+    $candidate = Test-PythonCandidate -Command "py" -CandidateArgs @("-3")
+    if ($candidate) {
+        return $candidate
+    }
+
+    $candidate = Test-PythonCandidate -Command "python" -CandidateArgs @()
+    if ($candidate) {
+        return $candidate
+    }
+
+    return $null
+}
+
+function Refresh-PathFromRegistry {
+    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = "$machinePath;$userPath"
+}
 
 function Resolve-Python {
-    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
-    if ($pyLauncher) {
-        return @{ Command = "py"; Args = @("-3") }
+    $candidate = Get-ValidPythonCandidate
+    if ($candidate) {
+        return $candidate
     }
-    $python = Get-Command python -ErrorAction SilentlyContinue
-    if ($python) {
-        return @{ Command = "python"; Args = @() }
-    }
+
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     if ($winget) {
-        Write-Host "Python was not found. Installing Python 3 with winget..."
+        Write-Host "Python was not found. Installing Python 3.12 with winget..."
         winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
-        $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
-        if ($pyLauncher) {
-            return @{ Command = "py"; Args = @("-3") }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "winget failed to install Python 3.12. Exit code: $LASTEXITCODE"
+        } else {
+            Refresh-PathFromRegistry
+            $candidate = Get-ValidPythonCandidate
+            if ($candidate) {
+                return $candidate
+            }
         }
-        $python = Get-Command python -ErrorAction SilentlyContinue
-        if ($python) {
-            return @{ Command = "python"; Args = @() }
-        }
+    } else {
+        Write-Host "winget was not found, so Python cannot be installed automatically."
     }
-    throw "Python is required. Install Python 3, then run this launcher again."
+
+    throw "Python is required. $ManualPythonMessage"
 }
 
 function Download-AgentFile([string]$Name) {
@@ -52,19 +114,47 @@ function Download-AgentFile([string]$Name) {
     Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $target
 }
 
-Download-AgentFile "agent.py"
-Download-AgentFile "requirements.txt"
+try {
+    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+    Set-Location $InstallDir
 
-$python = Resolve-Python
-$pythonCommand = $python.Command
-$pythonArgs = @($python.Args)
-& $pythonCommand @pythonArgs -m venv .venv
-$agentPython = Join-Path $InstallDir ".venv\Scripts\python.exe"
-& $agentPython -m pip install --upgrade pip
-& $agentPython -m pip install -r requirements.txt
+    Download-AgentFile "agent.py"
+    Download-AgentFile "requirements.txt"
 
-Write-Host ""
-Write-Host "Starting FW-ERP Print Agent on http://127.0.0.1:8719 ..."
-Write-Host "Keep this window open while printing from ERP."
-Write-Host "After it starts, return to ERP and click Detect Print Agent."
-& $agentPython agent.py local-api
+    $python = Resolve-Python
+    $pythonCommand = $python.Command
+    $pythonArgs = @($python.Args)
+    & $pythonCommand @pythonArgs -m venv .venv
+    if ($LASTEXITCODE -ne 0) {
+        throw "创建 Python 虚拟环境失败，无法启动打印助手。$ManualPythonMessage"
+    }
+
+    $agentPython = Join-Path $InstallDir ".venv\Scripts\python.exe"
+    if (-not (Test-Path $agentPython)) {
+        throw "创建 Python 虚拟环境失败：未找到 $agentPython。$ManualPythonMessage"
+    }
+
+    & $agentPython -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) {
+        throw "安装 Python pip 依赖工具失败，无法启动打印助手。"
+    }
+
+    & $agentPython -m pip install -r requirements.txt
+    if ($LASTEXITCODE -ne 0) {
+        throw "安装打印助手 Python 依赖失败，无法启动打印助手。"
+    }
+
+    Write-Host ""
+    Write-Host "Starting FW-ERP Print Agent on http://127.0.0.1:8719 ..."
+    Write-Host "Keep this window open while printing from ERP."
+    Write-Host "After it starts, return to ERP and click Detect Print Agent."
+    & $agentPython agent.py local-api
+    exit $LASTEXITCODE
+} catch {
+    Write-Host ""
+    Write-Host "FW-ERP Print Agent failed to start."
+    Write-Host $_.Exception.Message
+    Write-Host ""
+    Write-Host $ManualPythonMessage
+    exit 1
+}
