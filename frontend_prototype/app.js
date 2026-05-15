@@ -33078,7 +33078,9 @@ function getCashierTerminalCartRowSubtotal(row = {}) {
 
 function getCashierTerminalManualCategoryOptions() {
   const configuredRows = ensureApparelDefaultSalePriceState();
-  const presetRows = Array.isArray(DEFAULT_APPAREL_CATEGORY_PRESETS) ? DEFAULT_APPAREL_CATEGORY_PRESETS : [];
+  const presetRows = typeof DEFAULT_APPAREL_CATEGORY_PRESETS !== "undefined" && Array.isArray(DEFAULT_APPAREL_CATEGORY_PRESETS)
+    ? DEFAULT_APPAREL_CATEGORY_PRESETS
+    : [];
   const configuredMains = new Set(
     configuredRows
       .map((row) => String(row?.category_main || "").trim())
