@@ -656,6 +656,18 @@ test("POS manual item action adds to cart without legacy preset globals", () => 
   assert.equal(context.cashierTerminalState.activeDrawer, "");
 });
 
+test("POS manual item drawer field blur does not detach Add to Cart before click", () => {
+  const changeListenerMatch = appJs.match(/cashierTerminalShell\?\.addEventListener\("change"[\s\S]*?\n\}\);/);
+  assert.ok(changeListenerMatch, "missing cashier terminal change listener");
+  const changeListenerSource = changeListenerMatch[0];
+  const drawerFieldBranchMatch = changeListenerSource.match(/if \(target\.dataset\.terminalDrawerField\) \{[\s\S]*?\n  \}/);
+  assert.ok(drawerFieldBranchMatch, "missing drawer field change branch");
+
+  assert.match(drawerFieldBranchMatch[0], /updateCashierTerminalDrawerField\(target\.dataset\.terminalDrawerField,\s*target\.value\)/);
+  assert.doesNotMatch(drawerFieldBranchMatch[0], /renderCashierTerminal\(\)/);
+  assert.match(extractAssignedFunctionSource(appJs, "handleCashierTerminalAction"), /case "add-manual-item":[\s\S]*addCashierTerminalManualItemToCart\(\)/);
+});
+
 test("POS manual item payload stays separately identifiable and does not mimic STORE_ITEM", () => {
   const source = [
     extractFunctionSource(appJs, "isCashierTerminalManualUnbarcodedLine"),
