@@ -509,6 +509,8 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "打印助手", en: "Print Agent" },
   { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
   { zh: "下载 Windows 打印助手（无需解压）", en: "Download Windows Print Agent (no unzip required)" },
+  { zh: "下载 Windows 打印助手（双击运行）", en: "Download Windows Print Agent (double-click to run)" },
+  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -2169,79 +2171,41 @@ let localPrintAgentState = {
   printerMessage: "",
 };
 const SDO_PRINT_TASK_TYPE = "store_delivery_execution";
-const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows.ps1";
+const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows.cmd";
 const WINDOWS_PRINT_AGENT_DOWNLOAD_URL = `/downloads/${WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME}`;
 const LOCAL_PRINT_AGENT_CONNECTION_HELP = "打印助手未连接：请确认 Windows 打印助手已启动、端口 8719 未被占用、浏览器允许访问本机 127.0.0.1。";
-const WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT = String.raw`# FW-ERP Windows Print Agent launcher.
-# Download this file, right click it, and choose "Run with PowerShell".
-# It installs the Python local print agent into the current Windows user profile
-# and starts the local API on http://127.0.0.1:8719.
+const WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT = String.raw`@echo off
+setlocal
+title FW-ERP Windows Print Agent
 
-param(
-    [string]$RepoRawBase = "https://raw.githubusercontent.com/ericye666666-cmd/FW-ERP/main/ops/local_print_agent"
-)
+echo FW-ERP Windows Print Agent
+echo.
+echo Keep this black window open while printing from ERP.
+echo After the agent starts, return to ERP and click Detect Print Agent.
+echo Local agent URL: http://127.0.0.1:8719
+echo.
 
-$ErrorActionPreference = "Stop"
-$InstallDir = Join-Path $env:LOCALAPPDATA "FW-ERP\PrintAgent"
-$HealthUrl = "http://127.0.0.1:8719/health"
-$PrintersUrl = "http://127.0.0.1:8719/printers"
+set "SCRIPT_URL=https://raw.githubusercontent.com/ericye666666-cmd/FW-ERP/main/ops/local_print_agent/start_fwerp_print_agent_windows.ps1"
+set "SCRIPT_PATH=%TEMP%\fw-erp-print-agent-windows.ps1"
 
-Write-Host "FW-ERP Windows Print Agent"
-Write-Host "Install folder: $InstallDir"
-Write-Host "Health check: $HealthUrl"
-Write-Host "Printer list: $PrintersUrl"
+echo Downloading startup logic...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%SCRIPT_URL%' -OutFile '%SCRIPT_PATH%' } catch { Write-Host $_; exit 1 }"
+if errorlevel 1 goto download_failed
 
-New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-Set-Location $InstallDir
+echo Starting Print Agent through PowerShell...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_PATH%"
+set "EXIT_CODE=%ERRORLEVEL%"
+echo.
+echo Print Agent exited with code %EXIT_CODE%.
+pause
+exit /b %EXIT_CODE%
 
-function Resolve-Python {
-    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
-    if ($pyLauncher) {
-        return @{ Command = "py"; Args = @("-3") }
-    }
-    $python = Get-Command python -ErrorAction SilentlyContinue
-    if ($python) {
-        return @{ Command = "python"; Args = @() }
-    }
-    $winget = Get-Command winget -ErrorAction SilentlyContinue
-    if ($winget) {
-        Write-Host "Python was not found. Installing Python 3 with winget..."
-        winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
-        $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
-        if ($pyLauncher) {
-            return @{ Command = "py"; Args = @("-3") }
-        }
-        $python = Get-Command python -ErrorAction SilentlyContinue
-        if ($python) {
-            return @{ Command = "python"; Args = @() }
-        }
-    }
-    throw "Python is required. Install Python 3, then run this launcher again."
-}
-
-function Download-AgentFile([string]$Name) {
-    $target = Join-Path $InstallDir $Name
-    $uri = "$RepoRawBase/$Name"
-    Write-Host "Downloading $Name ..."
-    Invoke-WebRequest -UseBasicParsing -Uri $uri -OutFile $target
-}
-
-Download-AgentFile "agent.py"
-Download-AgentFile "requirements.txt"
-
-$python = Resolve-Python
-$pythonCommand = $python.Command
-$pythonArgs = @($python.Args)
-& $pythonCommand @pythonArgs -m venv .venv
-$agentPython = Join-Path $InstallDir ".venv\Scripts\python.exe"
-& $agentPython -m pip install --upgrade pip
-& $agentPython -m pip install -r requirements.txt
-
-Write-Host ""
-Write-Host "Starting FW-ERP Print Agent on http://127.0.0.1:8719 ..."
-Write-Host "Keep this window open while printing from ERP."
-Write-Host "After it starts, return to ERP and click Detect Print Agent."
-& $agentPython agent.py local-api
+:download_failed
+echo.
+echo Could not download FW-ERP Print Agent startup logic.
+echo Check the internet connection, then double-click this file again.
+pause
+exit /b 1
 `;
 let baleBarcodeDirectoryNotice = null;
 let balePrinterConsoleNotice = null;
@@ -23505,7 +23469,7 @@ function renderBaleLocalPrintAgentStatus() {
     : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印队列");
   const helperMessage = localPrintAgentState.connected
     ? "可以点击主按钮打印。"
-    : "请先启动 Windows 打印助手。";
+    : "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。";
   const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
   const printerListHtml = renderLocalPrinterQueueList(printers);
   statusArea.className = "candidate-summary";
@@ -23638,7 +23602,7 @@ async function downloadWindowsPrintAgentPackage() {
   if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
-  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（无需解压）。");
+  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。");
   renderBalePrintModal();
 }
 
