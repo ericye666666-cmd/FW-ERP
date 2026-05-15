@@ -31293,12 +31293,20 @@ function syncCashierTerminalMode() {
   renderCashierTerminal();
 }
 
-function focusCashierTerminalScanInput({ select = true } = {}) {
+function focusCashierTerminalScanInput({ select = true, preventScroll = false } = {}) {
   if (!isCashierTerminalRole() || !isCashierTerminalPanelActive() || !(cashierTerminalBarcodeInput instanceof HTMLInputElement)) {
     return;
   }
   window.setTimeout(() => {
-    cashierTerminalBarcodeInput.focus();
+    try {
+      if (preventScroll) {
+        cashierTerminalBarcodeInput.focus({ preventScroll: true });
+      } else {
+        cashierTerminalBarcodeInput.focus();
+      }
+    } catch (error) {
+      cashierTerminalBarcodeInput.focus();
+    }
     if (select) {
       cashierTerminalBarcodeInput.select();
     }
@@ -33167,14 +33175,38 @@ async function toggleCashierTerminalFullscreen() {
   }
 }
 
-focusCashierTerminalScanInput = function ({ select = true } = {}) {
+focusCashierTerminalScanInput = function ({ select = true, preventScroll = false } = {}) {
   if (!isCashierTerminalPanelActive() || !(cashierTerminalBarcodeInput instanceof HTMLInputElement)) {
     return;
   }
   window.setTimeout(() => {
-    cashierTerminalBarcodeInput.focus();
+    try {
+      if (preventScroll) {
+        cashierTerminalBarcodeInput.focus({ preventScroll: true });
+      } else {
+        cashierTerminalBarcodeInput.focus();
+      }
+    } catch (error) {
+      cashierTerminalBarcodeInput.focus();
+    }
     if (select) {
       cashierTerminalBarcodeInput.select();
+    }
+  }, 0);
+}
+
+function revealCashierTerminalCartAfterManualAdd() {
+  if (!(cashierTerminalCart instanceof HTMLElement) || typeof window === "undefined") {
+    return;
+  }
+  window.setTimeout(() => {
+    const manualRows = cashierTerminalCart.querySelectorAll(".cashier-cart-row.is-manual-item");
+    const latestManualRow = manualRows.length ? manualRows[manualRows.length - 1] : null;
+    const target = latestManualRow instanceof HTMLElement
+      ? latestManualRow
+      : cashierTerminalCart.closest(".cashier-terminal-cart-card") || cashierTerminalCart;
+    if (target instanceof HTMLElement && typeof target.scrollIntoView === "function") {
+      target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
     }
   }, 0);
 }
@@ -33289,8 +33321,9 @@ function addCashierTerminalManualItemToCart() {
   cashierTerminalState.manualItemReason = "Tag missing";
   cashierTerminalState.activeDrawer = "";
   renderCashierTerminal();
+  revealCashierTerminalCartAfterManualAdd(line);
   showTransientInlineNotice("#cashierTerminalInlineNotice", "已加入无码商品，销售记录需审计。", "warning", 1800);
-  focusCashierTerminalScanInput({ select: false });
+  focusCashierTerminalScanInput({ select: false, preventScroll: true });
 }
 
 getCashierTerminalPaymentAssignedTotal = function () {
