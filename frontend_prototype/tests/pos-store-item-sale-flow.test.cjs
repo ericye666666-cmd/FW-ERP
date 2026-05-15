@@ -885,9 +885,76 @@ test("POS shift reports load real X/Z APIs and render printable read-only drawer
   assert.match(loadReportSource, /cashierTerminalState\.shiftReport\s*=/);
   assert.match(loadReportSource, /cashierTerminalState\.activeDrawer\s*=\s*"shift-report"/);
   assert.doesNotMatch(loadReportSource, /submitCashierTerminalBackendSale|resetCashierTerminalForNextSale|cashierTerminalState\.cartItems\s*=\s*\[\]|cashierTerminalState\.currentShift\s*=\s*null/);
-  assert.match(printReportSource, /window\.print\(\)/);
+  assert.match(printReportSource, /printCashierTerminal57mmHtml/);
   assert.match(actionSource, /case "load-shift-report":[\s\S]*await loadCashierTerminalShiftReport\(target\.dataset\.terminalReportType\)/);
   assert.match(actionSource, /case "print-shift-report":[\s\S]*printCashierTerminalShiftReport\(\)/);
+});
+
+test("POS receipt print action builds a real 57mm thermal receipt", () => {
+  const receiptPrintSource = extractFunctionSource(appJs, "printCashierTerminalReceipt");
+  const receiptHtmlSource = extractFunctionSource(appJs, "buildCashierTerminal57mmReceiptHtml");
+  const printSource = extractFunctionSource(appJs, "printCashierTerminal57mmHtml");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+
+  assert.match(receiptHtmlSource, /cashier-receipt-57mm/);
+  assert.match(receiptHtmlSource, /Sale No\./);
+  assert.match(receiptHtmlSource, /Order No\./);
+  assert.match(receiptHtmlSource, /Qty/);
+  assert.match(receiptHtmlSource, /Unit/);
+  assert.match(receiptHtmlSource, /Discount/);
+  assert.match(receiptHtmlSource, /Total/);
+  assert.match(receiptHtmlSource, /Payment/);
+  assert.match(receiptHtmlSource, /Paid/);
+  assert.match(receiptHtmlSource, /Change/);
+  assert.match(receiptPrintSource, /cashierTerminalState\.latestCompletedSale/);
+  assert.match(receiptPrintSource, /buildCashierTerminal57mmReceiptHtml\(sale\)/);
+  assert.match(receiptPrintSource, /printCashierTerminal57mmHtml/);
+  assert.match(printSource, /cashier-terminal-print-root/);
+  assert.match(printSource, /window\.print\(\)/);
+  assert.match(actionSource, /case "print-receipt":[\s\S]*printCashierTerminalReceipt\(\)/);
+  assert.doesNotMatch(actionSource, /mock：已发送打印/);
+});
+
+test("POS shift and Z Report print uses 57mm content with state fallback totals", () => {
+  const fallbackSource = extractFunctionSource(appJs, "buildCashierTerminalShiftReportFromCurrentState");
+  const reportHtmlSource = extractFunctionSource(appJs, "buildCashierTerminal57mmShiftReportHtml");
+  const printReportSource = extractFunctionSource(appJs, "printCashierTerminalShiftReport");
+  const legacyPreviewSource = extractFunctionSource(appJs, "buildShiftReportPreviewHtml");
+
+  assert.match(fallbackSource, /cashierTerminalState\.shiftSummary/);
+  assert.match(fallbackSource, /cashierTerminalState\.latestCompletedSale/);
+  assert.match(fallbackSource, /card_sales/);
+  assert.match(fallbackSource, /refund_total/);
+  assert.match(fallbackSource, /cancelled_order_count/);
+  assert.match(reportHtmlSource, /cashier-shift-report-57mm/);
+  assert.match(reportHtmlSource, /Orders/);
+  assert.match(reportHtmlSource, /Items/);
+  assert.match(reportHtmlSource, /Total Sales/);
+  assert.match(reportHtmlSource, /Discount/);
+  assert.match(reportHtmlSource, /Cash/);
+  assert.match(reportHtmlSource, /M-Pesa/);
+  assert.match(reportHtmlSource, /Card/);
+  assert.match(reportHtmlSource, /Mixed/);
+  assert.match(reportHtmlSource, /Cancelled/);
+  assert.match(reportHtmlSource, /Refund/);
+  assert.match(printReportSource, /buildCashierTerminalShiftReportFromCurrentState/);
+  assert.match(printReportSource, /buildCashierTerminal57mmShiftReportHtml/);
+  assert.match(printReportSource, /printCashierTerminal57mmHtml/);
+  assert.match(legacyPreviewSource, /buildCashierTerminal57mmShiftReportHtml\(report\)/);
+  assert.match(legacyPreviewSource, /window\.print\(\)/);
+});
+
+test("POS print CSS isolates 57mm thermal paper from cashier UI", () => {
+  const printSource = extractFunctionSource(appJs, "printCashierTerminal57mmHtml");
+  const pageStyleSource = extractFunctionSource(appJs, "ensureCashierTerminal57mmPageStyle");
+
+  assert.match(pageStyleSource, /@page \{ size: 57mm auto; margin: 0; \}/);
+  assert.match(printSource, /ensureCashierTerminal57mmPageStyle\(\)/);
+  assert.match(stylesCss, /@media print\s*\{[\s\S]*cashier-terminal-print-root[\s\S]*\}/);
+  assert.match(stylesCss, /body\.cashier-terminal-printing\s*>\s*:not\(\.cashier-terminal-print-root\)/);
+  assert.match(stylesCss, /\.cashier-terminal-print-root\s*\{[\s\S]*display:\s*none;/);
+  assert.match(stylesCss, /\.cashier-thermal-paper-57mm\s*\{[\s\S]*width:\s*57mm;/);
+  assert.match(stylesCss, /cashier-print-actions[\s\S]*display:\s*none/);
 });
 
 test("POS hold flow uses real hold APIs and blocks empty cart or missing shift", () => {
