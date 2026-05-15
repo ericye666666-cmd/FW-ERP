@@ -16,6 +16,9 @@ const buildExeScript = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/
 const employeeBat = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"))
   ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"), "utf8")
   : "";
+const directLauncherPs1 = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"))
+  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"), "utf8")
+  : "";
 const readme = fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/README.md"), "utf8");
 const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"))
   ? fs.readFileSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"), "utf8")
@@ -85,9 +88,10 @@ test("print modal advanced options expose only field-safe print helper controls"
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
-  assert.match(advancedSection, /download/);
-  assert.match(advancedSection, /下载 Windows 打印助手/);
+  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedSection, /下载 Windows 打印助手（无需解压）/);
+  assert.doesNotMatch(advancedSection, /\.zip/);
   assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedSection, /查看安装步骤/);
   assert.doesNotMatch(advancedSection, /直接打印本张/);
@@ -125,14 +129,25 @@ test("RAW_BALE machine_code repair UI calls the admin repair endpoint with dry-r
 });
 
 test("print helper detection checks local health and local printers without opening browser print", () => {
+  assert.match(appJs, /async function checkLocalPrintAgentConnection/);
+  assert.match(appJs, /await checkLocalPrintAgentHealth\(\)/);
+  assert.match(appJs, /await checkLocalPrintAgentPrinters\(\)/);
+  assert.match(appJs, /#balePrintModalCheckLocalAgentButton[\s\S]{0,260}checkLocalPrintAgentConnection\(\)/);
   assert.match(appJs, /async function checkLocalPrintAgentPrinters/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/printers`/);
+  assert.match(appJs, /打印机队列/);
   assert.match(appJs, /已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。/);
   assert.match(appJs, /当前未检测到本机打印队列。/);
   assert.match(appJs, /已检测到 \$\{rows\.length\} 个打印队列，未发现 Deli DL-720C。/);
   assert.doesNotMatch(appJs, /Deli DL-720C 当前在线/);
   assert.doesNotMatch(appJs, /已检测到 Deli DL-720C/);
   assert.doesNotMatch(appJs, /checkLocalPrintAgentPrinters[\s\S]{0,1200}browserPrintCurrentBaleModalJob/);
+});
+
+test("local agent connection failures explain Windows startup, port, and browser localhost access", () => {
+  assert.match(appJs, /请确认 Windows 打印助手已启动、端口 8719 未被占用、浏览器允许访问本机 127\.0\.0\.1/);
+  assert.match(appJs, /formatLocalPrintAgentConnectionError/);
+  assert.match(appJs, /new Error\(message\)/);
 });
 
 test("printer detection clears stale Deli state before each request and on failure", () => {
@@ -214,14 +229,25 @@ test("print helper exposes a static Windows agent download link in advanced opti
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
-  assert.match(advancedSection, /download/);
-  assert.match(advancedSection, /下载 Windows 打印助手/);
-  assert.match(appJs, /Download Windows Print Agent/);
+  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedSection, /下载 Windows 打印助手（无需解压）/);
+  assert.doesNotMatch(advancedSection, /\.zip/);
+  assert.match(appJs, /Download Windows Print Agent \(no unzip required\)/);
+  assert.match(appJs, /const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows\.ps1"/);
+  assert.match(appJs, /new Blob\(\[WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT\]/);
   assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(indexHtml, /id="balePrintModalDownloadAgentButton"/);
   assert.doesNotMatch(appJs, /balePrintModalDownloadAgentButton/);
   assert.doesNotMatch(appJs, /fetch\(downloadUrl,\s*\{\s*method:\s*"HEAD"/);
+});
+
+test("Windows direct launcher script bootstraps local-api without zip or exe artifacts", () => {
+  assert.match(directLauncherPs1, /127\.0\.0\.1:8719\/health/);
+  assert.match(directLauncherPs1, /127\.0\.0\.1:8719\/printers/);
+  assert.match(directLauncherPs1, /agent\.py local-api/);
+  assert.match(directLauncherPs1, /raw\.githubusercontent\.com/);
+  assert.doesNotMatch(directLauncherPs1, /Expand-Archive|\.zip|FW-ERP-Print-Agent\.exe/);
 });
 
 test("Windows print agent package script and zip ignore rules are present", () => {
