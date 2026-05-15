@@ -430,6 +430,9 @@ test("POS manual unbarcoded item is an explicit separate audited action", () => 
     "Manager approved manual sale",
     "Other",
   ].forEach((reason) => assert.match(appJs, new RegExp(escapeRegex(reason))));
+  assert.match(drawerSource, /getCashierTerminalManualCategoryOptions\(\)/);
+  assert.match(drawerSource, /<select data-terminal-drawer-field="manualItemCategory"/);
+  assert.doesNotMatch(drawerSource, /<input type="text"[^>]+data-terminal-drawer-field="manualItemCategory"/);
   assert.match(actionSource, /case "add-manual-item":/);
   assert.match(actionSource, /addCashierTerminalManualItemToCart\(\)/);
   assert.match(addSource, /buildCashierTerminalManualUnbarcodedLine\(\)/);
@@ -441,19 +444,53 @@ test("POS manual unbarcoded item is an explicit separate audited action", () => 
   assert.match(payloadSource, /requires_audit:\s*true/);
 });
 
+test("POS manual sale category options come from warehouse default sale price category mains", () => {
+  const source = [
+    extractFunctionSource(appJs, "getCashierTerminalManualCategoryOptions"),
+  ].join("\n");
+
+  assert.match(source, /ensureApparelDefaultSalePriceState\(\)/);
+  assert.match(source, /category_main/);
+  assert.match(source, /getCategoryMainDisplayLabel/);
+  assert.match(source, /DEFAULT_APPAREL_CATEGORY_PRESETS/);
+
+  const getOptions = vm.runInNewContext(`${source}\ngetCashierTerminalManualCategoryOptions;`, {
+    ensureApparelDefaultSalePriceState: () => [
+      { category_main: "dress", category_sub: "short dress", grade: "P", default_sale_price_kes: 440 },
+      { category_main: "dress", category_sub: "long dress", grade: "S", default_sale_price_kes: 376 },
+      { category_main: "shoes", category_sub: "sport shoes", grade: "P", default_sale_price_kes: 640 },
+    ],
+    getCategoryMainDisplayLabel: (value, options = {}) => options.bilingual ? `${value} / ${value.toUpperCase()}` : value,
+    DEFAULT_APPAREL_CATEGORY_PRESETS: [
+      { category_main: "dress" },
+      { category_main: "shoes" },
+      { category_main: "tops" },
+    ],
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(getOptions().map((row) => row.value))), ["dress", "shoes"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(getOptions().map((row) => row.label))), ["dress / DRESS", "shoes / SHOES"]);
+});
+
 test("POS manual item builder creates cart row without STORE_ITEM machine code", () => {
   const source = [
+    extractFunctionSource(appJs, "getCashierTerminalManualCategoryOptions"),
     extractFunctionSource(appJs, "isCashierTerminalManualUnbarcodedLine"),
     extractFunctionSource(appJs, "buildCashierTerminalManualUnbarcodedLine"),
   ].join("\n");
   const context = {
     cashierTerminalState: {
-      manualItemCategory: "Accessories",
+      manualItemCategory: "dress",
       manualItemDescription: "Button pack",
       manualItemQuantity: "2",
       manualItemUnitPrice: "125",
       manualItemReason: "Label damaged",
     },
+    ensureApparelDefaultSalePriceState: () => [
+      { category_main: "dress", category_sub: "short dress", grade: "P", default_sale_price_kes: 440 },
+    ],
+    DEFAULT_APPAREL_CATEGORY_PRESETS: [{ category_main: "dress" }],
+    getCategoryMainDisplayLabel: (value) => value,
     ensureCashierTerminalPreviewState: () => {},
     normalizeCashierTerminalNumber: (value) => Number(value || 0),
     getCashierTerminalCashierName: () => "Clerk A",
@@ -468,7 +505,7 @@ test("POS manual item builder creates cart row without STORE_ITEM machine code",
   assert.equal(line.machine_code, "");
   assert.equal(line.display_code, "MANUAL");
   assert.equal(line.description, "Button pack");
-  assert.equal(line.category, "Accessories");
+  assert.equal(line.category, "dress");
   assert.equal(line.quantity, 2);
   assert.equal(line.unit_price, 125);
   assert.equal(line.subtotal, 250);

@@ -33071,6 +33071,25 @@ function getCashierTerminalCartRowSubtotal(row = {}) {
   return normalizeCashierTerminalNumber(row.price || row.selling_price || row.final_price || 0);
 }
 
+function getCashierTerminalManualCategoryOptions() {
+  const configuredRows = ensureApparelDefaultSalePriceState();
+  const presetRows = Array.isArray(DEFAULT_APPAREL_CATEGORY_PRESETS) ? DEFAULT_APPAREL_CATEGORY_PRESETS : [];
+  const configuredMains = new Set(
+    configuredRows
+      .map((row) => String(row?.category_main || "").trim())
+      .filter(Boolean),
+  );
+  const sourceMains = configuredMains.size
+    ? [...configuredMains]
+    : presetRows.map((row) => String(row?.category_main || "").trim()).filter(Boolean);
+  return [...new Set(sourceMains)]
+    .sort((left, right) => left.localeCompare(right, "zh-CN"))
+    .map((value) => ({
+      value,
+      label: getCategoryMainDisplayLabel(value, { bilingual: true }) || value,
+    }));
+}
+
 function buildCashierTerminalManualUnbarcodedLine() {
   ensureCashierTerminalPreviewState();
   const category = String(cashierTerminalState.manualItemCategory || "").trim();
@@ -33079,7 +33098,10 @@ function buildCashierTerminalManualUnbarcodedLine() {
   const unitPrice = normalizeCashierTerminalNumber(cashierTerminalState.manualItemUnitPrice);
   const manualReason = String(cashierTerminalState.manualItemReason || "Tag missing").trim() || "Tag missing";
   if (!category) {
-    throw new Error("请填写无码商品品类。");
+    throw new Error("请选择无码商品大类。");
+  }
+  if (!getCashierTerminalManualCategoryOptions().some((option) => option.value === category)) {
+    throw new Error("请选择仓库默认售价里已配置的商品大类。");
   }
   if (!description) {
     throw new Error("请填写无码商品描述。");
@@ -33548,6 +33570,10 @@ renderCashierTerminalDrawer = function () {
     cashierTerminalDrawerBackdrop.hidden = false;
   }
   if (drawer === "manual-item") {
+    const manualCategoryOptions = getCashierTerminalManualCategoryOptions();
+    const selectedManualCategory = manualCategoryOptions.some((option) => option.value === cashierTerminalState.manualItemCategory)
+      ? cashierTerminalState.manualItemCategory
+      : "";
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">MANUAL ITEM</p><h3>无码商品 / Manual Item</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body">
@@ -33557,8 +33583,11 @@ renderCashierTerminalDrawer = function () {
         </div>
         <div class="cashier-manual-drawer-grid">
           <label class="field">
-            <span>Category</span>
-            <input type="text" value="${escapeHtml(cashierTerminalState.manualItemCategory || "")}" data-terminal-drawer-field="manualItemCategory" placeholder="Accessories" />
+            <span>商品大类 / Category</span>
+            <select data-terminal-drawer-field="manualItemCategory">
+              <option value="">选择商品大类</option>
+              ${manualCategoryOptions.map((option) => `<option value="${escapeHtml(option.value)}"${selectedManualCategory === option.value ? " selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+            </select>
           </label>
           <label class="field">
             <span>Description</span>
@@ -35071,6 +35100,10 @@ handleCashierTerminalAction = async function (action, target) {
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
       renderCashierTerminal();
+      if (cashierTerminalState.activeDrawer === "manual-item") {
+        await loadApparelDefaultSalePricesForPdaRuntime();
+        renderCashierTerminal();
+      }
       if (cashierTerminalState.activeDrawer === "recent-sales") {
         await loadCashierTerminalRecentSales(20);
       } else if (cashierTerminalState.activeDrawer === "shift" && cashierTerminalState.currentShift?.shift_id) {
