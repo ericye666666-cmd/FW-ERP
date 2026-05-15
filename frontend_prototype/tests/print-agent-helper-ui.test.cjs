@@ -16,8 +16,8 @@ const buildExeScript = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/
 const employeeBat = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"))
   ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"), "utf8")
   : "";
-const directLauncherPs1 = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"))
-  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"), "utf8")
+const directLauncherCmd = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.cmd"))
+  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.cmd"), "utf8")
   : "";
 const readme = fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/README.md"), "utf8");
 const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"))
@@ -88,10 +88,11 @@ test("print modal advanced options expose only field-safe print helper controls"
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.ps1"/);
-  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.ps1"/);
-  assert.match(advancedSection, /下载 Windows 打印助手（无需解压）/);
-  assert.doesNotMatch(advancedSection, /\.zip/);
+  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
+  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.cmd"/);
+  assert.match(advancedSection, /下载 Windows 打印助手（双击运行）/);
+  assert.match(advancedSection, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手/);
+  assert.doesNotMatch(advancedSection, /\.zip|\.exe|\.ps1/);
   assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedSection, /查看安装步骤/);
   assert.doesNotMatch(advancedSection, /直接打印本张/);
@@ -229,12 +230,13 @@ test("print helper exposes a static Windows agent download link in advanced opti
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.ps1"/);
-  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.ps1"/);
-  assert.match(advancedSection, /下载 Windows 打印助手（无需解压）/);
-  assert.doesNotMatch(advancedSection, /\.zip/);
-  assert.match(appJs, /Download Windows Print Agent \(no unzip required\)/);
-  assert.match(appJs, /const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows\.ps1"/);
+  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
+  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.cmd"/);
+  assert.match(advancedSection, /下载 Windows 打印助手（双击运行）/);
+  assert.match(advancedSection, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手/);
+  assert.doesNotMatch(advancedSection, /\.zip|\.exe|\.ps1/);
+  assert.match(appJs, /Download Windows Print Agent \(double-click to run\)/);
+  assert.match(appJs, /const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows\.cmd"/);
   assert.match(appJs, /new Blob\(\[WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT\]/);
   assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(indexHtml, /id="balePrintModalDownloadAgentButton"/);
@@ -242,12 +244,14 @@ test("print helper exposes a static Windows agent download link in advanced opti
   assert.doesNotMatch(appJs, /fetch\(downloadUrl,\s*\{\s*method:\s*"HEAD"/);
 });
 
-test("Windows direct launcher script bootstraps local-api without zip or exe artifacts", () => {
-  assert.match(directLauncherPs1, /127\.0\.0\.1:8719\/health/);
-  assert.match(directLauncherPs1, /127\.0\.0\.1:8719\/printers/);
-  assert.match(directLauncherPs1, /agent\.py local-api/);
-  assert.match(directLauncherPs1, /raw\.githubusercontent\.com/);
-  assert.doesNotMatch(directLauncherPs1, /Expand-Archive|\.zip|FW-ERP-Print-Agent\.exe/);
+test("Windows direct CMD launcher double-clicks into PowerShell local-api startup", () => {
+  assert.match(directLauncherCmd, /powershell\.exe/);
+  assert.match(directLauncherCmd, /-ExecutionPolicy Bypass/);
+  assert.match(directLauncherCmd, /start_fwerp_print_agent_windows\.ps1/);
+  assert.match(directLauncherCmd, /127\.0\.0\.1:8719/);
+  assert.match(directLauncherCmd, /Keep this black window open/i);
+  assert.doesNotMatch(directLauncherCmd, /Expand-Archive|\.zip|FW-ERP-Print-Agent\.exe/);
+  assert.doesNotMatch(directLauncherCmd, /cmd\.exe\s*\/c\s*notepad/i);
 });
 
 test("Windows print agent package script and zip ignore rules are present", () => {
