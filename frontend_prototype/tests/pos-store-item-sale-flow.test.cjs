@@ -472,6 +472,22 @@ test("POS manual sale category options come from warehouse default sale price ca
   assert.deepEqual(JSON.parse(JSON.stringify(getOptions().map((row) => row.label))), ["dress / DRESS", "shoes / SHOES"]);
 });
 
+test("POS manual sale category options render without legacy preset globals", () => {
+  const source = [
+    extractFunctionSource(appJs, "getCashierTerminalManualCategoryOptions"),
+  ].join("\n");
+
+  const getOptions = vm.runInNewContext(`${source}\ngetCashierTerminalManualCategoryOptions;`, {
+    ensureApparelDefaultSalePriceState: () => [
+      { category_main: "dress", category_sub: "short dress", grade: "P", default_sale_price_kes: 440 },
+      { category_main: "shoes", category_sub: "sport shoes", grade: "P", default_sale_price_kes: 640 },
+    ],
+    getCategoryMainDisplayLabel: (value, options = {}) => options.bilingual ? `${value} / ${value.toUpperCase()}` : value,
+  });
+
+  assert.deepEqual(JSON.parse(JSON.stringify(getOptions().map((row) => row.value))), ["dress", "shoes"]);
+});
+
 test("POS manual item builder creates cart row without STORE_ITEM machine code", () => {
   const source = [
     extractFunctionSource(appJs, "getCashierTerminalManualCategoryOptions"),
@@ -513,6 +529,45 @@ test("POS manual item builder creates cart row without STORE_ITEM machine code",
   assert.equal(line.created_by, "Clerk A");
   assert.equal(line.requires_audit, true);
   assert.equal(line.inventory_tracked, false);
+});
+
+test("POS manual item action adds to cart without legacy preset globals", () => {
+  const source = [
+    extractFunctionSource(appJs, "getCashierTerminalManualCategoryOptions"),
+    extractFunctionSource(appJs, "isCashierTerminalManualUnbarcodedLine"),
+    extractFunctionSource(appJs, "buildCashierTerminalManualUnbarcodedLine"),
+    extractFunctionSource(appJs, "addCashierTerminalManualItemToCart"),
+  ].join("\n");
+  const context = {
+    cashierTerminalState: {
+      cartItems: [],
+      activeDrawer: "manual-item",
+      manualItemCategory: "dress",
+      manualItemDescription: "Loose scarf",
+      manualItemQuantity: "1",
+      manualItemUnitPrice: "125",
+      manualItemReason: "Label damaged",
+    },
+    ensureApparelDefaultSalePriceState: () => [
+      { category_main: "dress", category_sub: "short dress", grade: "P", default_sale_price_kes: 440 },
+    ],
+    getCategoryMainDisplayLabel: (value) => value,
+    ensureCashierTerminalPreviewState: () => {},
+    normalizeCashierTerminalNumber: (value) => Number(value || 0),
+    getCashierTerminalCashierName: () => "Clerk A",
+    renderCashierTerminal: () => {},
+    showTransientInlineNotice: () => {},
+    focusCashierTerminalScanInput: () => {},
+  };
+  const addManualItem = vm.runInNewContext(`${source}\naddCashierTerminalManualItemToCart;`, context);
+
+  addManualItem();
+
+  assert.equal(context.cashierTerminalState.cartItems.length, 1);
+  assert.equal(context.cashierTerminalState.cartItems[0].line_type, "manual_unbarcoded");
+  assert.equal(context.cashierTerminalState.cartItems[0].store_item_machine_code, null);
+  assert.equal(context.cashierTerminalState.cartItems[0].barcode_type, "NONE");
+  assert.equal(context.cashierTerminalState.activeDrawer, "");
 });
 
 test("POS manual item payload stays separately identifiable and does not mimic STORE_ITEM", () => {
