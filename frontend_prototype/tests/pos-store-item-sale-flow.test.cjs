@@ -642,6 +642,7 @@ test("POS manual item action adds to cart without legacy preset globals", () => 
     normalizeCashierTerminalNumber: (value) => Number(value || 0),
     getCashierTerminalCashierName: () => "Clerk A",
     renderCashierTerminal: () => {},
+    revealCashierTerminalCartAfterManualAdd: () => {},
     showTransientInlineNotice: () => {},
     focusCashierTerminalScanInput: () => {},
   };
@@ -654,6 +655,64 @@ test("POS manual item action adds to cart without legacy preset globals", () => 
   assert.equal(context.cashierTerminalState.cartItems[0].store_item_machine_code, null);
   assert.equal(context.cashierTerminalState.cartItems[0].barcode_type, "NONE");
   assert.equal(context.cashierTerminalState.activeDrawer, "");
+});
+
+test("POS manual item add-to-cart closes drawer, resets form, and returns to cart", () => {
+  const source = [
+    extractFunctionSource(appJs, "getCashierTerminalManualCategoryOptions"),
+    extractFunctionSource(appJs, "isCashierTerminalManualUnbarcodedLine"),
+    extractFunctionSource(appJs, "buildCashierTerminalManualUnbarcodedLine"),
+    extractFunctionSource(appJs, "addCashierTerminalManualItemToCart"),
+  ].join("\n");
+  const renderSnapshots = [];
+  const revealedLines = [];
+  const focusCalls = [];
+  const context = {
+    cashierTerminalState: {
+      cartItems: [],
+      activeDrawer: "manual-item",
+      manualItemCategory: "dress",
+      manualItemDescription: "Loose belt",
+      manualItemQuantity: "2",
+      manualItemUnitPrice: "125",
+      manualItemReason: "Label damaged",
+    },
+    ensureApparelDefaultSalePriceState: () => [
+      { category_main: "dress", category_sub: "short dress", grade: "P", default_sale_price_kes: 440 },
+    ],
+    getCategoryMainDisplayLabel: (value) => value,
+    ensureCashierTerminalPreviewState: () => {},
+    normalizeCashierTerminalNumber: (value) => Number(value || 0),
+    getCashierTerminalCashierName: () => "Clerk A",
+    renderCashierTerminal: () => {
+      renderSnapshots.push({
+        activeDrawer: context.cashierTerminalState.activeDrawer,
+        cartItems: context.cashierTerminalState.cartItems.length,
+      });
+    },
+    revealCashierTerminalCartAfterManualAdd: (line) => {
+      revealedLines.push(line);
+    },
+    showTransientInlineNotice: () => {},
+    focusCashierTerminalScanInput: (options) => {
+      focusCalls.push(options);
+    },
+  };
+  const addManualItem = vm.runInNewContext(`${source}\naddCashierTerminalManualItemToCart;`, context);
+
+  addManualItem();
+
+  assert.equal(context.cashierTerminalState.activeDrawer, "");
+  assert.equal(context.cashierTerminalState.cartItems.length, 1);
+  assert.equal(context.cashierTerminalState.manualItemCategory, "");
+  assert.equal(context.cashierTerminalState.manualItemDescription, "");
+  assert.equal(context.cashierTerminalState.manualItemQuantity, "1");
+  assert.equal(context.cashierTerminalState.manualItemUnitPrice, "");
+  assert.equal(context.cashierTerminalState.manualItemReason, "Tag missing");
+  assert.deepEqual(renderSnapshots, [{ activeDrawer: "", cartItems: 1 }]);
+  assert.equal(revealedLines.length, 1);
+  assert.equal(revealedLines[0].line_type, "manual_unbarcoded");
+  assert.deepEqual(JSON.parse(JSON.stringify(focusCalls)), [{ select: false, preventScroll: true }]);
 });
 
 test("POS manual item drawer field blur does not detach Add to Cart before click", () => {
