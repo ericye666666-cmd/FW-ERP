@@ -302,6 +302,27 @@ test("POS cashier terminal exposes a fullscreen entry with browser API fallback"
   assert.match(appJs, /fullscreenchange/);
 });
 
+test("POS topbar exposes a compact cashier language switch", () => {
+  const terminalHtml = extractElementById(indexHtml, "cashierTerminalShell");
+  const headerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalSessionStrip");
+  const syncSource = extractFunctionSource(appJs, "syncGlobalLanguageButtons");
+  const topbarActionsRule = extractLastCssRule("body\\.cashier-terminal-mode \\.topbar-actions");
+  const compactLanguageRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-web-language-toggle", /min-width:\s*88px/);
+  const compactButtonRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-web-language-toggle \\.global-language-button", /min-width:\s*34px/);
+
+  assert.match(terminalHtml, /cashier-terminal-web-language-toggle/);
+  assert.match(terminalHtml, /data-i18n-skip/);
+  assert.match(terminalHtml, /data-global-language="zh">中<\/button>\s*<span class="cashier-terminal-language-divider"[^>]*>\/<\/span>\s*<button type="button" class="global-language-button" data-global-language="en">Eng<\/button>/);
+  assert.match(syncSource, /closest\("\.cashier-terminal-web-language-toggle"\)/);
+  assert.match(syncSource, /button\.textContent = isCashierCompactLanguageButton \? "中"/);
+  assert.match(syncSource, /button\.textContent = isCashierCompactLanguageButton \? "Eng"/);
+  assert.doesNotMatch(headerSource, /renderWebLanguageToggleMarkup\("cashier-terminal-web-language-toggle"\)/);
+  assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+auto\s+auto/);
+  assert.match(compactLanguageRule, /justify-self:\s*end/);
+  assert.match(compactLanguageRule, /white-space:\s*nowrap/);
+  assert.match(compactButtonRule, /font-size:\s*12px/);
+});
+
 test("POS header sales counters sync from real shift and recent sale data instead of demo defaults", () => {
   const previewSource = extractFunctionSource(appJs, "ensureCashierTerminalPreviewState");
   const summarySource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftSummary");
@@ -408,7 +429,7 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
   assert.match(topbarRule, /align-items:\s*center/);
   assert.match(topbarRule, /max-height:\s*78px/);
   assert.doesNotMatch(topbarRule, /align-items:\s*stretch/);
-  assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+auto/);
+  assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+auto\s+auto/);
   assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(88px,\s*1fr\)\)/);
   assert.match(statusStripRule, /max-height:\s*58px/);
   assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);

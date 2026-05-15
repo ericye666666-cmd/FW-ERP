@@ -3453,10 +3453,11 @@
             </div>
             <div class="topbar-actions">
               <div id="cashierTerminalSessionStrip" class="cashier-terminal-session-strip">
-                <div class="web-language-toggle global-language-toggle" data-web-language-toggle="true" role="group" aria-label="Language switch">
-                  <button type="button" class="global-language-button is-active" data-global-language="zh">中文</button>
-                  <button type="button" class="global-language-button" data-global-language="en">EN</button>
-                </div>
+              </div>
+              <div class="web-language-toggle global-language-toggle cashier-terminal-web-language-toggle" data-web-language-toggle="true" data-i18n-skip role="group" aria-label="POS language switch">
+                <button type="button" class="global-language-button is-active" data-global-language="zh">中</button>
+                <span class="cashier-terminal-language-divider" aria-hidden="true">/</span>
+                <button type="button" class="global-language-button" data-global-language="en">Eng</button>
               </div>
               <button type="button" class="secondary-ghost cashier-terminal-fullscreen-button" data-terminal-action="toggle-fullscreen" data-i18n-skip aria-pressed="false">全屏收银 / Enter Fullscreen</button>
               <button type="button" class="secondary-ghost cashier-terminal-exit" data-terminal-action="exit-pos">退出收银台</button>

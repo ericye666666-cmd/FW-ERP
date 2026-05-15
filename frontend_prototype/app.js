@@ -1760,12 +1760,13 @@ function syncWebLanguageToggleAvailability() {
 function syncGlobalLanguageButtons() {
   document.querySelectorAll("[data-global-language], [data-terminal-locale]").forEach((button) => {
     const buttonLanguage = button.dataset.globalLanguage || button.dataset.terminalLocale;
+    const isCashierCompactLanguageButton = Boolean(button.closest(".cashier-terminal-web-language-toggle"));
     button.classList.toggle("is-active", buttonLanguage === currentLanguage);
     if (buttonLanguage === "zh") {
-      button.textContent = currentLanguage === "en" ? "Chinese" : "中文";
+      button.textContent = isCashierCompactLanguageButton ? "中" : currentLanguage === "en" ? "Chinese" : "中文";
     }
     if (buttonLanguage === "en") {
-      button.textContent = currentLanguage === "en" ? "English" : "英文";
+      button.textContent = isCashierCompactLanguageButton ? "Eng" : currentLanguage === "en" ? "English" : "英文";
     }
   });
   syncWebLanguageToggleAvailability();
@@ -33381,7 +33382,6 @@ renderCashierTerminalSessionStrip = function () {
     <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
     <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
     <span class="time-chip"><b>当前时间</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
-    ${renderWebLanguageToggleMarkup("cashier-terminal-web-language-toggle")}
   `;
   syncGlobalLanguageButtons();
 }
