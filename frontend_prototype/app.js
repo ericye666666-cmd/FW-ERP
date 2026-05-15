@@ -31202,6 +31202,17 @@ function createCashierTerminalState() {
     manualItemQuantity: "1",
     manualItemUnitPrice: "",
     manualItemReason: "Tag missing",
+    todaySalesAmount: 0,
+    todayOrderCount: 0,
+    shiftSalesAmount: 0,
+    shiftOrderCount: 0,
+    cashSalesAmount: 0,
+    mpesaSalesAmount: 0,
+    mixedCashAmountTotal: 0,
+    mixedMpesaAmountTotal: 0,
+    cancelledOrderCount: 0,
+    fullscreenActive: false,
+    fullscreenFeedback: "",
   };
 }
 
@@ -31455,6 +31466,8 @@ async function primeCashierTerminalSession(force = false) {
     const activeShift = await fetchCashierTerminalCurrentShift();
     applyCashierTerminalShift(activeShift);
     await loadCashierTerminalShiftSummary(activeShift.shift_id || activeShift.shift_no);
+    await loadCashierTerminalTodaySalesSummary({ render: false });
+    renderCashierTerminal();
   } catch (error) {
     cashierTerminalState.currentShift = null;
     cashierTerminalState.shiftSummary = null;
@@ -31463,6 +31476,12 @@ async function primeCashierTerminalSession(force = false) {
     cashierTerminalState.shiftOpen = false;
     cashierTerminalState.shiftFeedback = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst);
     ["#shiftReportForm [name='shift_no']", "#handoverRequestForm [name='shift_no']", "#closeBusinessReportForm [name='shift_no']", "#saleForm [name='shift_no']"].forEach((selector) => setInputValue(selector, ""));
+    try {
+      await loadCashierTerminalTodaySalesSummary({ render: false });
+    } catch (summaryError) {
+      cashierTerminalState.todaySalesAmount = 0;
+      cashierTerminalState.todayOrderCount = 0;
+    }
     renderCashierTerminal();
   }
 }
@@ -33053,19 +33072,21 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.countedCash = String(cashierTerminalState.countedCash ?? "");
   cashierTerminalState.shiftCloseNote = cashierTerminalState.shiftCloseNote || "";
   cashierTerminalState.managerConfirmedBy = cashierTerminalState.managerConfirmedBy || "";
-  cashierTerminalState.todaySalesAmount = Number(cashierTerminalState.todaySalesAmount || 48620);
-  cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 42);
-  cashierTerminalState.shiftSalesAmount = Number(cashierTerminalState.shiftSalesAmount || 18450);
-  cashierTerminalState.shiftOrderCount = Number(cashierTerminalState.shiftOrderCount || 42);
-  cashierTerminalState.cashSalesAmount = Number(cashierTerminalState.cashSalesAmount || 8200);
-  cashierTerminalState.mpesaSalesAmount = Number(cashierTerminalState.mpesaSalesAmount || 7350);
-  cashierTerminalState.mixedCashAmountTotal = Number(cashierTerminalState.mixedCashAmountTotal || 1500);
-  cashierTerminalState.mixedMpesaAmountTotal = Number(cashierTerminalState.mixedMpesaAmountTotal || 1400);
+  cashierTerminalState.todaySalesAmount = normalizeCashierTerminalNumber(cashierTerminalState.todaySalesAmount);
+  cashierTerminalState.todayOrderCount = Number(cashierTerminalState.todayOrderCount || 0);
+  cashierTerminalState.shiftSalesAmount = normalizeCashierTerminalNumber(cashierTerminalState.shiftSalesAmount);
+  cashierTerminalState.shiftOrderCount = Number(cashierTerminalState.shiftOrderCount || 0);
+  cashierTerminalState.cashSalesAmount = normalizeCashierTerminalNumber(cashierTerminalState.cashSalesAmount);
+  cashierTerminalState.mpesaSalesAmount = normalizeCashierTerminalNumber(cashierTerminalState.mpesaSalesAmount);
+  cashierTerminalState.mixedCashAmountTotal = normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmountTotal);
+  cashierTerminalState.mixedMpesaAmountTotal = normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmountTotal);
   cashierTerminalState.cancelledOrderCount = Number(cashierTerminalState.cancelledOrderCount || 0);
   cashierTerminalState.saleSequence = Number(cashierTerminalState.saleSequence || 12);
   cashierTerminalState.holdSequence = Number(cashierTerminalState.holdSequence || 8);
   cashierTerminalState.printFeedback = cashierTerminalState.printFeedback || "";
   cashierTerminalState.switchStoreFeedback = cashierTerminalState.switchStoreFeedback || "";
+  cashierTerminalState.fullscreenActive = Boolean(cashierTerminalState.fullscreenActive);
+  cashierTerminalState.fullscreenFeedback = String(cashierTerminalState.fullscreenFeedback || "").trim();
   cashierTerminalState.scanFallbackNotice = cashierTerminalState.scanFallbackNotice || "";
   cashierTerminalState.scanErrorTitle = cashierTerminalState.scanErrorTitle || "";
   cashierTerminalState.scanErrorDetail = cashierTerminalState.scanErrorDetail || "";
@@ -33090,6 +33111,59 @@ syncCashierTerminalMode = function () {
   ensureCashierTerminalClock();
   renderCashierTerminal();
   focusCashierTerminalScanInput({ select: false });
+}
+
+function syncCashierTerminalFullscreenState({ renderStatus = true } = {}) {
+  if (!(cashierTerminalShell instanceof HTMLElement) || typeof document === "undefined") {
+    return false;
+  }
+  const fullscreenElement = document.fullscreenElement || null;
+  const active = Boolean(fullscreenElement && (fullscreenElement === cashierTerminalShell || cashierTerminalShell.contains(fullscreenElement)));
+  cashierTerminalState.fullscreenActive = active;
+  cashierTerminalShell.classList.toggle("is-fullscreen", active);
+  document.body?.classList.toggle("cashier-terminal-fullscreen-active", active);
+  const fullscreenButton = cashierTerminalShell.querySelector('[data-terminal-action="toggle-fullscreen"]');
+  if (fullscreenButton instanceof HTMLElement) {
+    fullscreenButton.textContent = active ? "退出全屏 / Exit Fullscreen" : "全屏收银 / Enter Fullscreen";
+    fullscreenButton.setAttribute("aria-pressed", active ? "true" : "false");
+    fullscreenButton.classList.toggle("is-active", active);
+  }
+  if (renderStatus) {
+    renderCashierTerminalStatusBar();
+  }
+  return active;
+}
+
+async function toggleCashierTerminalFullscreen() {
+  ensureCashierTerminalPreviewState();
+  if (!(cashierTerminalShell instanceof HTMLElement) || typeof document === "undefined") {
+    return false;
+  }
+  try {
+    if (document.fullscreenElement) {
+      if (typeof document.exitFullscreen === "function") {
+        await document.exitFullscreen();
+      }
+      cashierTerminalState.fullscreenFeedback = "已退出全屏。";
+      syncCashierTerminalFullscreenState();
+      return false;
+    }
+    if (!document.fullscreenEnabled || typeof cashierTerminalShell.requestFullscreen !== "function") {
+      cashierTerminalState.fullscreenFeedback = "浏览器未允许全屏，请按 F11 或允许 Fullscreen。";
+      renderCashierTerminalStatusBar();
+      showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.fullscreenFeedback, "warning", 2200);
+      return false;
+    }
+    await cashierTerminalShell.requestFullscreen();
+    cashierTerminalState.fullscreenFeedback = "已进入全屏收银。按 Esc 或 F11 可退出。";
+    syncCashierTerminalFullscreenState();
+    return true;
+  } catch (error) {
+    cashierTerminalState.fullscreenFeedback = "浏览器拒绝全屏，请按 F11 或允许 Fullscreen。";
+    renderCashierTerminalStatusBar();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.fullscreenFeedback, "warning", 2200);
+    return false;
+  }
 }
 
 focusCashierTerminalScanInput = function ({ select = true } = {}) {
@@ -33318,12 +33392,24 @@ renderCashierTerminalStatusBar = function () {
   }
   ensureCashierTerminalPreviewState();
   const copy = getCashierTerminalCopy();
+  const fullscreenHint = cashierTerminalState.fullscreenFeedback
+    ? `<span class="cashier-terminal-fullscreen-hint">${escapeHtml(cashierTerminalState.fullscreenFeedback)}</span>`
+    : "";
   cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
   cashierTerminalStatusBar.innerHTML = `
-    <span>${escapeHtml(copy.posStoreItemOnly)}</span>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">${escapeHtml(copy.resumeHeldOrder)}</button>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(cashierTerminalState.currentShift?.shift_id ? copy.closeShift : copy.openNow)}</button>
-    <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
+    <div class="cashier-terminal-status-summary">
+      <span>${escapeHtml(copy.posStoreItemOnly)}</span>
+      <span><b>今日销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
+      <span><b>今日订单数</b>${escapeHtml(cashierTerminalState.todayOrderCount)}</span>
+      <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
+      <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
+    </div>
+    <div class="cashier-terminal-strip-actions">
+      <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">${escapeHtml(copy.resumeHeldOrder)}</button>
+      <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(cashierTerminalState.currentShift?.shift_id ? copy.closeShift : copy.openNow)}</button>
+      <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
+    </div>
+    ${fullscreenHint}
   `;
 }
 
@@ -33972,6 +34058,7 @@ renderCashierTerminal = function () {
   }
   ensureCashierTerminalPreviewState();
   applyCashierTerminalChromeCopy();
+  syncCashierTerminalFullscreenState({ renderStatus: false });
   renderCashierTerminalSessionStrip();
   renderCashierTerminalStatusBar();
   renderCashierTerminalLookupPanel();
@@ -34550,9 +34637,12 @@ async function loadCashierTerminalRecentSales(limit = 20) {
   try {
     const response = await fetchCashierTerminalRecentSales(limit);
     cashierTerminalState.recentSales = Array.isArray(response?.sales) ? response.sales : [];
+    applyCashierTerminalTodaySalesSummaryFromSales(cashierTerminalState.recentSales);
     cashierTerminalState.saleLookupFeedback = cashierTerminalState.recentSales.length
       ? `已加载最近销售：${cashierTerminalState.recentSales.length} 单`
       : "暂无可重打销售单。";
+    renderCashierTerminalSessionStrip();
+    renderCashierTerminalStatusBar();
     renderCashierTerminalDrawer();
     return cashierTerminalState.recentSales;
   } catch (error) {
@@ -34670,6 +34760,86 @@ function applyCashierTerminalShift(shift = null) {
   return normalized;
 }
 
+function getCashierTerminalSaleSummaryKey(sale = {}) {
+  return String(sale.sale_no || sale.sale_id || sale.order_no || "").trim();
+}
+
+function getCashierTerminalSaleDateKey(sale = {}) {
+  const timestamp = String(sale.sale_time || sale.sold_at || sale.created_at || sale.time || "").trim();
+  if (!timestamp) {
+    return "";
+  }
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? "" : getLocalDateKey(date.toISOString());
+}
+
+function applyCashierTerminalShiftSummaryToHeader(summary = {}) {
+  cashierTerminalState.shiftSummary = summary;
+  cashierTerminalState.shiftSalesAmount = normalizeCashierTerminalNumber(summary.total_sales);
+  cashierTerminalState.shiftOrderCount = Number(summary.order_count || 0);
+  cashierTerminalState.cashSalesAmount = normalizeCashierTerminalNumber(summary.cash_sales);
+  cashierTerminalState.mpesaSalesAmount = normalizeCashierTerminalNumber(summary.mpesa_sales);
+  cashierTerminalState.mixedCashAmountTotal = normalizeCashierTerminalNumber(summary.mixed_cash);
+  cashierTerminalState.mixedMpesaAmountTotal = normalizeCashierTerminalNumber(summary.mixed_mpesa);
+  cashierTerminalState.cancelledOrderCount = Number(summary.cancelled_order_count || 0);
+  if (summary.shift_id || summary.shift_no) {
+    cashierTerminalState.shiftNo = String(summary.shift_id || summary.shift_no).trim();
+  }
+  if (summary.status) {
+    cashierTerminalState.shiftStatus = String(summary.status).trim().toLowerCase();
+  }
+  cashierTerminalState.shiftOpen = Boolean(cashierTerminalState.shiftNo) && !["closed", "completed"].includes(String(cashierTerminalState.shiftStatus || "").toLowerCase());
+  return {
+    shiftSalesAmount: cashierTerminalState.shiftSalesAmount,
+    shiftOrderCount: cashierTerminalState.shiftOrderCount,
+  };
+}
+
+function applyCashierTerminalTodaySalesSummaryFromSales(sales = []) {
+  ensureCashierTerminalPreviewState();
+  const todayKey = getLocalDateKey(new Date().toISOString());
+  const storeCode = getCashierTerminalStoreCode();
+  const rows = Array.isArray(sales) ? [...sales] : [];
+  const latestSale = cashierTerminalState.latestCompletedSale;
+  if (latestSale && (latestSale.sale_no || latestSale.order_no)) {
+    const latestKey = getCashierTerminalSaleSummaryKey(latestSale);
+    if (!latestKey || !rows.some((row) => getCashierTerminalSaleSummaryKey(row) === latestKey)) {
+      rows.push(latestSale);
+    }
+  }
+  const completedRows = rows.filter((row) => {
+    const rowStoreCode = String(row.store_code || storeCode).trim().toUpperCase();
+    const status = String(row.status || "completed").trim().toLowerCase();
+    return rowStoreCode === storeCode
+      && getCashierTerminalSaleDateKey(row) === todayKey
+      && !["voided", "cancelled", "refunded"].includes(status);
+  });
+  cashierTerminalState.todayOrderCount = completedRows.length;
+  cashierTerminalState.todaySalesAmount = completedRows.reduce(
+    (sum, row) => sum + getCashierTerminalFirstNumber(row, ["total_amount", "total", "amount_total"]),
+    0,
+  );
+  return {
+    todaySalesAmount: cashierTerminalState.todaySalesAmount,
+    todayOrderCount: cashierTerminalState.todayOrderCount,
+  };
+}
+
+async function loadCashierTerminalTodaySalesSummary({ render = true, limit = 100 } = {}) {
+  ensureCashierTerminalPreviewState();
+  const response = await fetchCashierTerminalRecentSales(limit);
+  const sales = Array.isArray(response?.sales) ? response.sales : [];
+  if (!cashierTerminalState.recentSales?.length) {
+    cashierTerminalState.recentSales = sales;
+  }
+  const summary = applyCashierTerminalTodaySalesSummaryFromSales(sales);
+  if (render) {
+    renderCashierTerminalSessionStrip();
+    renderCashierTerminalStatusBar();
+  }
+  return summary;
+}
+
 async function fetchCashierTerminalCurrentShift() {
   const storeCode = getCashierTerminalStoreCode();
   const cashierId = getCashierTerminalCashierName();
@@ -34708,13 +34878,14 @@ async function loadCashierTerminalShiftSummary(shiftId = cashierTerminalState.cu
   const storeCode = getCashierTerminalStoreCode();
   const summary = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/${encodeURIComponent(shiftId)}/summary`);
   cashierTerminalState.shiftSummary = summary;
-  cashierTerminalState.shiftSalesAmount = normalizeCashierTerminalNumber(summary.total_sales);
-  cashierTerminalState.shiftOrderCount = Number(summary.order_count || 0);
-  cashierTerminalState.cashSalesAmount = normalizeCashierTerminalNumber(summary.cash_sales);
-  cashierTerminalState.mpesaSalesAmount = normalizeCashierTerminalNumber(summary.mpesa_sales);
-  cashierTerminalState.mixedCashAmountTotal = normalizeCashierTerminalNumber(summary.mixed_cash);
-  cashierTerminalState.mixedMpesaAmountTotal = normalizeCashierTerminalNumber(summary.mixed_mpesa);
-  cashierTerminalState.cancelledOrderCount = Number(summary.cancelled_order_count || 0);
+  applyCashierTerminalShiftSummaryToHeader(summary);
+  try {
+    await loadCashierTerminalTodaySalesSummary({ render: false });
+  } catch (error) {
+    cashierTerminalState.saleLookupFeedback = "今日销售汇总暂未刷新。";
+  }
+  renderCashierTerminalSessionStrip();
+  renderCashierTerminalStatusBar();
   renderCashierTerminalDrawer();
   renderCashierTerminalQuickActions();
   return summary;
@@ -35281,6 +35452,11 @@ async function submitCashierTerminalBackendSale() {
     cashierTerminalState.mixedMpesaAmountTotal += sale.mpesa_amount || payment.mpesaAmount;
   }
   await loadCashierTerminalShiftSummary(sale.shift_id || payload.shift_id);
+  try {
+    await loadCashierTerminalTodaySalesSummary({ render: false });
+  } catch (error) {
+    applyCashierTerminalTodaySalesSummaryFromSales(cashierTerminalState.recentSales || []);
+  }
   resetCashierTerminalForNextSale();
   showTransientInlineNotice("#cashierTerminalInlineNotice", `销售完成：${sale.sale_no}`, "success", 2200);
   return sale;
@@ -35535,6 +35711,9 @@ handleCashierTerminalAction = async function (action, target) {
       return;
     case "exit-pos":
       exitCashierTerminalPreview();
+      return;
+    case "toggle-fullscreen":
+      await toggleCashierTerminalFullscreen();
       return;
     case "clear-cart":
       cashierTerminalState.cartItems = [];
@@ -47439,6 +47618,10 @@ cashierTerminalScanForm?.addEventListener("submit", async (event) => {
   } finally {
     focusCashierTerminalScanInput({ select: true });
   }
+});
+
+document.addEventListener("fullscreenchange", () => {
+  syncCashierTerminalFullscreenState();
 });
 
 cashierTerminalShell?.addEventListener("click", async (event) => {

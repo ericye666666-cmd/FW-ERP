@@ -10681,6 +10681,7 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
 
 body.cashier-terminal-mode {
   background: #f8fafc;
+  overflow: hidden;
 }
 
 body.cashier-terminal-mode .app-shell {
@@ -12402,10 +12403,20 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
 /* Issue #309: keep staging POS synced to the active cashier account and usable on 1366x768 cashier terminals. */
 body.cashier-terminal-mode .cashier-terminal-shell {
   height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 6px;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-shell:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  background: #f8fafc;
   overflow: hidden;
 }
 
@@ -12421,7 +12432,7 @@ body.cashier-terminal-mode .topbar {
 
 body.cashier-terminal-mode .topbar-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   min-width: 0;
@@ -12482,11 +12493,59 @@ body.cashier-terminal-mode [data-action="exit-pos"] {
   padding: 0 12px;
 }
 
+body.cashier-terminal-mode .cashier-terminal-fullscreen-button {
+  min-height: 42px;
+  min-width: 172px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .cashier-terminal-fullscreen-button.is-active {
+  background: #e0f2fe;
+  color: #075985;
+  border-color: rgba(14, 165, 233, 0.45);
+}
+
+body.cashier-terminal-mode .cashier-terminal-fullscreen-hint {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: #fffbeb;
+  color: #92400e;
+}
+
 body.cashier-terminal-mode .cashier-terminal-status {
   min-height: 34px;
   margin: 4px 12px;
   gap: 8px;
   font-size: 12px;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status-summary {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) repeat(4, minmax(74px, 0.7fr));
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: stretch;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status-summary > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 4px 7px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #1e3a8a;
+  line-height: 1.05;
+  overflow: hidden;
+}
+
+body.cashier-terminal-mode .cashier-terminal-status-summary b {
+  color: #475569;
+  font-size: 8px;
+  line-height: 1;
 }
 
 body.cashier-terminal-mode .cashier-terminal-strip-actions {
@@ -12721,6 +12780,7 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
 
   body.cashier-terminal-mode .cashier-terminal-body {
     height: calc(100vh - 154px);
+    height: calc(100dvh - 144px);
     gap: 8px;
     margin: 0 10px;
   }
