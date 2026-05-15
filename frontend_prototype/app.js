@@ -168,7 +168,7 @@ const USER_ROLE_LABELS = {
   cashier: "收银员",
   area_supervisor: "区域主管",
   warehouse_clerk: "仓库员工",
-  warehouse_manager: "仓库主管",
+  warehouse_manager: "仓库经理",
   warehouse_supervisor: "仓库主管",
   external_auditor: "外部审计",
   admin: "系统管理员",
@@ -182,7 +182,7 @@ const USER_ROLE_LABELS_EN = {
   area_supervisor: "Area Supervisor",
   warehouse_clerk: "Warehouse Clerk",
   warehouse_manager: "Warehouse Manager",
-  warehouse_supervisor: "Warehouse Manager",
+  warehouse_supervisor: "Warehouse Supervisor",
   external_auditor: "External Auditor",
   admin: "System Admin",
 };
@@ -651,7 +651,8 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "收银员", en: "Cashier" },
   { zh: "区域主管", en: "Area Supervisor" },
   { zh: "仓库员工", en: "Warehouse Clerk" },
-  { zh: "仓库主管", en: "Warehouse Manager" },
+  { zh: "仓库经理", en: "Warehouse Manager" },
+  { zh: "仓库主管", en: "Warehouse Supervisor" },
   { zh: "测试工具", en: "Test Tools" },
   { zh: "仓库功能区", en: "Warehouse" },
   { zh: "运营中心", en: "Operations Center" },
@@ -29800,7 +29801,11 @@ async function updateAreaSupervisorStoreStatus(storeCode, status) {
 
 function getUserRoleLabel(user = {}) {
   const roleCode = String(user?.role_code || "").trim();
-  return String(user?.role_label || getUserRoleDisplayLabel(roleCode) || "-");
+  const normalizedRoleCode = roleCode.toLowerCase();
+  const mappedLabel = currentLanguage === "en"
+    ? USER_ROLE_LABELS_EN[normalizedRoleCode]
+    : USER_ROLE_LABELS[normalizedRoleCode];
+  return String(mappedLabel || user?.role_label || getUserRoleDisplayLabel(roleCode) || "-");
 }
 
 function normalizeManagedStoreCodesInput(value) {
