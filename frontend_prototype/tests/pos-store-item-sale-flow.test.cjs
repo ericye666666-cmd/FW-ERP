@@ -434,7 +434,7 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
   assert.match(mainBodyRule, /height:\s*calc\(100vh - 132px\)/);
   assert.match(transactionStripRule, /min-height:\s*52px/);
   assert.match(transactionStripRule, /overflow:\s*visible/);
-  assert.match(receiptSource, /receiptPanel\.classList\.toggle\("is-empty",\s*!sale\)/);
+  assert.match(receiptSource, /receiptPanel\.hidden\s*=\s*true/);
   assert.match(receiptEmptyRule, /display:\s*none/);
 });
 
@@ -989,12 +989,14 @@ test("POS real receipt reprint loads sale detail/list without creating a sale", 
   assert.match(detailSource, /收据已准备重打：/);
   assert.match(actionSource, /case "reprint-receipt":/);
   assert.match(actionSource, /openCashierTerminalReprintConfirmation\(""\)/);
+assert.match(appJs, /打印小票 \/ Print Receipt/);
+  assert.match(appJs, /class=\"cashier-terminal-sale-complete\"/);
   assert.match(actionSource, /case "confirm-reprint":/);
   assert.match(actionSource, /await loadCashierTerminalLatestReceiptForReprint\(\)/);
   assert.doesNotMatch(detailSource, /submitCashierTerminalBackendSale/);
   assert.doesNotMatch(detailSource, /resetCashierTerminalForNextSale/);
   assert.doesNotMatch(detailSource, /create_pos_sale/);
-  assert.match(receiptSource, /REPRINT COPY/);
+  assert.match(receiptSource, /receiptPanel\.innerHTML\s*=\s*""/);
 });
 
 test("POS recent sales drawer can list, view, and reprint real sales", () => {
