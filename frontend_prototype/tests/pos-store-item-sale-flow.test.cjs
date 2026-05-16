@@ -1108,10 +1108,13 @@ test("POS receipt print action builds a real 57mm thermal receipt", () => {
   assert.match(receiptHtmlSource, /Qty/);
   assert.match(receiptHtmlSource, /Unit/);
   assert.match(receiptHtmlSource, /Discount/);
-  assert.match(receiptHtmlSource, /Total/);
+  assert.match(receiptHtmlSource, /Subtotal excl\. VAT/);
+  assert.match(receiptHtmlSource, /VAT 16%/);
+  assert.match(receiptHtmlSource, /TOTAL/);
   assert.match(receiptHtmlSource, /Payment/);
   assert.match(receiptHtmlSource, /Paid/);
   assert.match(receiptHtmlSource, /Change/);
+  assert.doesNotMatch(receiptHtmlSource, /Fiscal Receipt|eTIMS|KRA QR|Control Unit|fiscal invoice/i);
   assert.match(receiptPrintSource, /cashierTerminalState\.latestCompletedSale/);
   assert.match(receiptPrintSource, /buildCashierTerminal57mmReceiptHtml\(sale\)/);
   assert.match(receiptPrintSource, /printCashierTerminal57mmHtml/);
