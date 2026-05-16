@@ -507,10 +507,10 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "结账区", en: "Checkout" },
   { zh: "完成销售", en: "Complete Sale" },
   { zh: "打印助手", en: "Print Agent" },
-  { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
-  { zh: "下载 Windows 打印助手（无需解压）", en: "Download Windows Print Agent (no unzip required)" },
-  { zh: "下载 Windows 打印助手（双击运行）", en: "Download Windows Print Agent (double-click to run)" },
-  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
+  { zh: "下载 Start Warehouse Print Agent（双击运行）", en: "Download Start Warehouse Print Agent (double-click to run)" },
+  { zh: "下载 Start Warehouse Print Agent（无需解压）", en: "Download Start Warehouse Print Agent (no unzip required)" },
+  { zh: "下载 Start Warehouse Print Agent", en: "Download Start Warehouse Print Agent" },
+  { zh: "仓库打印电脑先双击 Start Warehouse Print Agent，保持黑色窗口不要关闭，再点击检测打印助手。", en: "On the warehouse print computer, double-click Start Warehouse Print Agent, keep the black window open, then click Detect Print Agent." },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -2172,39 +2172,114 @@ let localPrintAgentState = {
   printerMessage: "",
 };
 const SDO_PRINT_TASK_TYPE = "store_delivery_execution";
-const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows.cmd";
+const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "start_warehouse_print_agent.cmd";
 const WINDOWS_PRINT_AGENT_DOWNLOAD_URL = `/downloads/${WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME}`;
 const LOCAL_PRINT_AGENT_CONNECTION_HELP = "打印助手未连接：请确认 Windows 打印助手已启动、端口 8719 未被占用、浏览器允许访问本机 127.0.0.1。";
 const WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT = String.raw`@echo off
-setlocal
-title FW-ERP Windows Print Agent
+setlocal EnableExtensions
+title FW-ERP Warehouse Print Agent
 
-echo FW-ERP Windows Print Agent
+echo FW-ERP Warehouse Print Agent
 echo.
-echo Keep this black window open while printing from ERP.
+echo Keep this window open while printing.
 echo After the agent starts, return to ERP and click Detect Print Agent.
 echo Local agent URL: http://127.0.0.1:8719
 echo.
 
-set "SCRIPT_URL=https://raw.githubusercontent.com/ericye666666-cmd/FW-ERP/main/ops/local_print_agent/start_fwerp_print_agent_windows.ps1"
-set "SCRIPT_PATH=%TEMP%\fw-erp-print-agent-windows.ps1"
+set "INSTALL_DIR=%LOCALAPPDATA%\FW-ERP\PrintAgent"
+set "REPO_RAW_BASE=https://raw.githubusercontent.com/ericye666666-cmd/FW-ERP/main/ops/local_print_agent"
+set "AGENT_URL=%REPO_RAW_BASE%/agent.py"
+set "REQ_URL=%REPO_RAW_BASE%/requirements.txt"
 
-echo Downloading startup logic...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%SCRIPT_URL%' -OutFile '%SCRIPT_PATH%' } catch { Write-Host $_; exit 1 }"
+where curl.exe >nul 2>nul
+if errorlevel 1 (
+  echo curl.exe was not found. Windows 10 or newer includes curl.exe.
+  echo Update Windows or install curl, then run this file again.
+  pause
+  exit /b 1
+)
+
+set "PYTHON_CMD="
+py -3 -c "import sys" >nul 2>nul
+if not errorlevel 1 set "PYTHON_CMD=py -3"
+if not defined PYTHON_CMD (
+  python -c "import sys" >nul 2>nul
+  if not errorlevel 1 set "PYTHON_CMD=python"
+)
+if not defined PYTHON_CMD (
+  echo Install Python 3 and check Add Python to PATH, then run this file again.
+  pause
+  exit /b 1
+)
+
+if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+if errorlevel 1 (
+  echo Could not create install folder: %INSTALL_DIR%
+  pause
+  exit /b 1
+)
+
+pushd "%INSTALL_DIR%"
+if errorlevel 1 (
+  echo Could not open install folder: %INSTALL_DIR%
+  pause
+  exit /b 1
+)
+
+echo Downloading latest agent.py...
+curl.exe -fL --retry 3 -o agent.py "%AGENT_URL%"
 if errorlevel 1 goto download_failed
 
-echo Starting Print Agent through PowerShell...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_PATH%"
+echo Downloading latest requirements.txt...
+curl.exe -fL --retry 3 -o requirements.txt "%REQ_URL%"
+if errorlevel 1 goto download_failed
+
+if not exist ".venv\Scripts\python.exe" (
+  echo Creating Python virtual environment...
+  %PYTHON_CMD% -m venv .venv
+  if errorlevel 1 goto venv_failed
+)
+
+set "AGENT_PYTHON=%CD%\.venv\Scripts\python.exe"
+if not exist "%AGENT_PYTHON%" goto venv_failed
+
+echo Installing Python requirements...
+"%AGENT_PYTHON%" -m pip install -r requirements.txt
+if errorlevel 1 goto pip_failed
+
+echo.
+echo Starting FW-ERP Warehouse Print Agent on http://127.0.0.1:8719 ...
+echo Keep this window open while printing.
+echo.
+"%AGENT_PYTHON%" agent.py local-api
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.
 echo Print Agent exited with code %EXIT_CODE%.
+popd
 pause
 exit /b %EXIT_CODE%
 
 :download_failed
 echo.
-echo Could not download FW-ERP Print Agent startup logic.
-echo Check the internet connection, then double-click this file again.
+echo Could not download the latest FW-ERP Print Agent files.
+echo Check the internet connection, then run this file again.
+popd
+pause
+exit /b 1
+
+:venv_failed
+echo.
+echo Could not create or reuse the Python virtual environment.
+echo Install Python 3 and check Add Python to PATH, then run this file again.
+popd
+pause
+exit /b 1
+
+:pip_failed
+echo.
+echo Could not install Python requirements.
+echo Check the internet connection, then run this file again.
+popd
 pause
 exit /b 1
 `;
@@ -23470,7 +23545,7 @@ function renderBaleLocalPrintAgentStatus() {
     : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印队列");
   const helperMessage = localPrintAgentState.connected
     ? "可以点击主按钮打印。"
-    : "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。";
+    : "仓库打印电脑先双击 Start Warehouse Print Agent，保持黑色窗口不要关闭，再点击检测打印助手。";
   const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
   const printerListHtml = renderLocalPrinterQueueList(printers);
   statusArea.className = "candidate-summary";
@@ -23603,7 +23678,7 @@ async function downloadWindowsPrintAgentPackage() {
   if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
-  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。");
+  setLocalPrintAgentMessage("success", "已开始下载 Start Warehouse Print Agent。仓库打印电脑双击启动后，保持黑色窗口不要关闭，再点击检测打印助手。");
   renderBalePrintModal();
 }
 

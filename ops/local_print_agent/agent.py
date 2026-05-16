@@ -21,16 +21,8 @@ from urllib.parse import urlparse
 APP_VERSION = "0.3.0"
 HOST = "127.0.0.1"
 PORT = 8719
-ALLOWED_ORIGINS = {
-    "https://staging.directlooperp.com",
-    "https://directlooperp.com",
-    "https://fw-erp-staging.onrender.com",
-    "http://34.35.52.250:8000",
-    "https://fw-erp-34-35-52-250.nip.io",
-    "http://fw-erp-34-35-52-250.nip.io",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-}
+CORS_ALLOW_HEADERS = "Content-Type"
+CORS_ALLOW_METHODS = "GET,POST,OPTIONS"
 
 _PRINTER_STATUS_MARKERS = [
     "正在接受请求",
@@ -1210,16 +1202,18 @@ def run_print_station(config_path: Path):
 class PrintAgentHandler(BaseHTTPRequestHandler):
     server_version = "FWERPPrintAgent/0.2"
 
+    def _cors_origin(self) -> str:
+        origin = str(self.headers.get("Origin") or "").strip()
+        return origin or "*"
+
     def _set_headers(self, status_code: int = 200):
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
-        origin = self.headers.get("Origin")
-        if origin in ALLOWED_ORIGINS:
-            self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-            self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Access-Control-Allow-Origin", self._cors_origin())
+        self.send_header("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS)
+        self.send_header("Access-Control-Allow-Methods", CORS_ALLOW_METHODS)
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Vary", "Origin")
         self.end_headers()
 
     def _send_json(self, payload: dict, status_code: int = 200):

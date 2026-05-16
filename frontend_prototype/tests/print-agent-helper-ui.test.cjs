@@ -16,11 +16,8 @@ const buildExeScript = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/
 const employeeBat = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"))
   ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.bat"), "utf8")
   : "";
-const directLauncherCmd = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.cmd"))
-  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.cmd"), "utf8")
-  : "";
-const directLauncherPs1 = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"))
-  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_fwerp_print_agent_windows.ps1"), "utf8")
+const warehouseLauncherCmd = fs.existsSync(path.join(repoRoot, "ops/local_print_agent/start_warehouse_print_agent.cmd"))
+  ? fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/start_warehouse_print_agent.cmd"), "utf8")
   : "";
 const readme = fs.readFileSync(path.join(repoRoot, "ops/local_print_agent/README.md"), "utf8");
 const githubWorkflow = fs.existsSync(path.join(repoRoot, ".github/workflows/build-windows-print-agent.yml"))
@@ -91,12 +88,12 @@ test("print modal advanced options expose only field-safe print helper controls"
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedSection, /下载 Windows 打印助手（双击运行）/);
-  assert.match(advancedSection, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手/);
+  assert.match(advancedSection, /href="\/downloads\/start_warehouse_print_agent\.cmd"/);
+  assert.match(advancedSection, /download="start_warehouse_print_agent\.cmd"/);
+  assert.match(advancedSection, /下载 Start Warehouse Print Agent/);
+  assert.match(advancedSection, /仓库打印电脑先双击 Start Warehouse Print Agent，保持黑色窗口不要关闭，再点击检测打印助手/);
   assert.doesNotMatch(advancedSection, /\.zip|\.exe|\.ps1/);
-  assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
+  assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Start Warehouse Print Agent|Download Start Warehouse Print Agent/);
   assert.doesNotMatch(advancedSection, /查看安装步骤/);
   assert.doesNotMatch(advancedSection, /直接打印本张/);
   assert.doesNotMatch(advancedSection, /发送到打印站/);
@@ -233,41 +230,33 @@ test("print helper exposes a static Windows agent download link in advanced opti
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(advancedSection, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedSection, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedSection, /download="fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedSection, /下载 Windows 打印助手（双击运行）/);
-  assert.match(advancedSection, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手/);
+  assert.match(advancedSection, /href="\/downloads\/start_warehouse_print_agent\.cmd"/);
+  assert.match(advancedSection, /download="start_warehouse_print_agent\.cmd"/);
+  assert.match(advancedSection, /下载 Start Warehouse Print Agent/);
+  assert.match(advancedSection, /仓库打印电脑先双击 Start Warehouse Print Agent，保持黑色窗口不要关闭，再点击检测打印助手/);
   assert.doesNotMatch(advancedSection, /\.zip|\.exe|\.ps1/);
-  assert.match(appJs, /Download Windows Print Agent \(double-click to run\)/);
-  assert.match(appJs, /const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows\.cmd"/);
+  assert.match(appJs, /Download Start Warehouse Print Agent/);
+  assert.match(appJs, /const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "start_warehouse_print_agent\.cmd"/);
   assert.match(appJs, /new Blob\(\[WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT\]/);
-  assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
+  assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Start Warehouse Print Agent|Download Start Warehouse Print Agent/);
   assert.doesNotMatch(indexHtml, /id="balePrintModalDownloadAgentButton"/);
   assert.doesNotMatch(appJs, /balePrintModalDownloadAgentButton/);
   assert.doesNotMatch(appJs, /fetch\(downloadUrl,\s*\{\s*method:\s*"HEAD"/);
 });
 
-test("Windows direct CMD launcher double-clicks into PowerShell local-api startup", () => {
-  assert.match(directLauncherCmd, /powershell\.exe/);
-  assert.match(directLauncherCmd, /-ExecutionPolicy Bypass/);
-  assert.match(directLauncherCmd, /start_fwerp_print_agent_windows\.ps1/);
-  assert.match(directLauncherCmd, /127\.0\.0\.1:8719/);
-  assert.match(directLauncherCmd, /Keep this black window open/i);
-  assert.doesNotMatch(directLauncherCmd, /Expand-Archive|\.zip|FW-ERP-Print-Agent\.exe/);
-  assert.doesNotMatch(directLauncherCmd, /cmd\.exe\s*\/c\s*notepad/i);
-});
-
-test("Windows PowerShell launcher rejects fake Python aliases before creating venv", () => {
-  assert.match(directLauncherPs1, /function Test-PythonCandidate/);
-  assert.match(directLauncherPs1, /import sys; print\(sys\.executable\)/);
-  assert.match(directLauncherPs1, /Microsoft Store/);
-  assert.match(directLauncherPs1, /Python was not found/);
-  assert.match(directLauncherPs1, /winget install -e --id Python\.Python\.3\.12/);
-  assert.match(directLauncherPs1, /请安装 Python 3，并勾选 Add Python to PATH，然后重新双击启动助手。/);
-  assert.match(directLauncherPs1, /创建 Python 虚拟环境失败/);
-  assert.match(directLauncherPs1, /Test-Path \$agentPython/);
-  assert.match(directLauncherPs1, /\$LASTEXITCODE -ne 0/);
-  assert.doesNotMatch(directLauncherPs1, /& \$agentPython -m pip install --upgrade pip[\s\S]{0,120}& \$pythonCommand @pythonArgs -m venv/);
+test("Warehouse CMD launcher starts local-api without PowerShell or auto Python install", () => {
+  assert.match(warehouseLauncherCmd, /curl\.exe -fL --retry 3 -o agent\.py "%AGENT_URL%"/);
+  assert.match(warehouseLauncherCmd, /curl\.exe -fL --retry 3 -o requirements\.txt "%REQ_URL%"/);
+  assert.match(warehouseLauncherCmd, /set "INSTALL_DIR=%LOCALAPPDATA%\\FW-ERP\\PrintAgent"/);
+  assert.match(warehouseLauncherCmd, /py -3 -c "import sys"/);
+  assert.match(warehouseLauncherCmd, /python -c "import sys"/);
+  assert.match(warehouseLauncherCmd, /Install Python 3 and check Add Python to PATH, then run this file again\./);
+  assert.match(warehouseLauncherCmd, /%PYTHON_CMD% -m venv \.venv/);
+  assert.match(warehouseLauncherCmd, /\.venv\\Scripts\\python\.exe/);
+  assert.match(warehouseLauncherCmd, /"%AGENT_PYTHON%" agent\.py local-api/);
+  assert.match(warehouseLauncherCmd, /Keep this window open while printing\./);
+  assert.match(warehouseLauncherCmd, /127\.0\.0\.1:8719/);
+  assert.doesNotMatch(warehouseLauncherCmd, /powershell|ExecutionPolicy|winget|Expand-Archive|\.zip|FW-ERP-Print-Agent\.exe|start_fwerp_print_agent_windows\.ps1/i);
 });
 
 test("Windows print agent package script and zip ignore rules are present", () => {
@@ -302,17 +291,18 @@ test("Windows exe build script uses PyInstaller for administrator packaging", ()
   assert.match(buildExeScript, /dist[\\/]FW-ERP-Print-Agent\.exe/);
 });
 
-test("print agent README separates employee startup from developer exe build", () => {
-  assert.match(readme, /普通员工/);
-  assert.match(readme, /不需要安装 Python/);
-  assert.match(readme, /双击 `启动 FW-ERP 打印助手\.bat`/);
-  assert.match(readme, /管理员 \/ 开发者/);
-  assert.match(readme, /PyInstaller/);
-  assert.match(readme, /build_windows_exe\.ps1/);
-  const employeeSection = readme.split("## 普通员工")[1]?.split("## GitHub Actions 自动打包")[0] || "";
-  assert.doesNotMatch(employeeSection, /python\.org/i);
-  assert.doesNotMatch(employeeSection, /python -m/i);
-  assert.doesNotMatch(employeeSection, /PyInstaller/);
+test("print agent README documents the fixed warehouse CMD startup path", () => {
+  assert.match(readme, /FW-ERP Warehouse Print Station/);
+  assert.match(readme, /Install Python 3 on the warehouse Windows computer once/);
+  assert.match(readme, /Add Python to PATH/);
+  assert.match(readme, /Double-click `start_warehouse_print_agent\.cmd`/);
+  assert.match(readme, /Keep the black window open while printing/);
+  assert.match(readme, /Do not use the PowerShell launcher as the main warehouse startup path/);
+  assert.match(readme, /uses `curl\.exe` to download\/update `agent\.py` and `requirements\.txt`/);
+  assert.match(readme, /%LOCALAPPDATA%\\FW-ERP\\PrintAgent/);
+  assert.match(readme, /Install Python 3 and check Add Python to PATH, then run this file again\./);
+  assert.match(readme, /\.venv\\Scripts\\python\.exe agent\.py local-api/);
+  assert.match(readme, /仓库打印电脑先双击 Start Warehouse Print Agent，保持黑色窗口不要关闭，再点击检测打印助手。/);
 });
 
 test("GitHub Actions workflow builds Windows print agent artifacts", () => {
@@ -330,17 +320,9 @@ test("GitHub Actions workflow builds Windows print agent artifacts", () => {
   assert.match(githubWorkflow, /actions\/upload-artifact@v4/);
 });
 
-test("print agent README documents GitHub Actions build path", () => {
-  assert.match(readme, /GitHub Actions/);
-  assert.match(readme, /Build Windows Print Agent/);
-  assert.match(readme, /workflow_dispatch/);
-  assert.match(readme, /Artifacts/);
-  assert.match(readme, /\/downloads\/fw-erp-print-agent-windows\.zip/);
-});
-
 test("print agent README documents TSPL raw label printing as the formal Deli path", () => {
-  assert.match(readme, /TSPL raw/);
+  assert.match(readme, /RAW TSPL/);
   assert.match(readme, /\/print\/label/);
-  assert.match(readme, /SIZE 60 mm,40 mm/);
-  assert.match(readme, /does not open Edge\/Chrome/i);
+  assert.match(readme, /60x40 labels/);
+  assert.match(readme, /RAW_BALE barcode and label rules are not changed/);
 });
