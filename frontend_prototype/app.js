@@ -33012,6 +33012,7 @@ function ensureCashierTerminalPreviewCopy() {
     holdAction: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.holdOrder, "zh"),
     resumeHeldOrder: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.resumeHeldOrder, "zh"),
     receiptReprint: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.reprintReceipt, "zh"),
+    receiptPrinterEntry: "小票打印",
     xReport: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.xReport, "zh"),
     zReport: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.zReport, "zh"),
     cashVariance: cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.cashVariance, "zh"),
@@ -33041,6 +33042,7 @@ function ensureCashierTerminalPreviewCopy() {
     holdAction: cashierTerminalTerm(keys.holdOrder, "en"),
     resumeHeldOrder: cashierTerminalTerm(keys.resumeHeldOrder, "en"),
     receiptReprint: cashierTerminalTerm(keys.reprintReceipt, "en"),
+    receiptPrinterEntry: "Receipt Printing",
     xReport: cashierTerminalTerm(keys.xReport, "en"),
     zReport: cashierTerminalTerm(keys.zReport, "en"),
     cashVariance: cashierTerminalTerm(keys.cashVariance, "en"),
@@ -33639,7 +33641,7 @@ renderCashierTerminalPaymentPanel = function () {
       <div class="secondary-actions">
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">${escapeHtml(copy.holdAction)}</button>
         <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
-        <button type="button" class="secondary-action" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
+        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">${escapeHtml(copy.receiptPrinterEntry || "小票打印")}</button>
       </div>
     </div>
   `;
@@ -33664,7 +33666,7 @@ renderCashierTerminalQuickActions = function () {
   cashierTerminalQuickActions.innerHTML = `
     <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift"><span>本班销售额</span><strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</strong></button>
     <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="sync"><span>同步状态</span><strong>${escapeHtml(cashierTerminalState.syncStatus || "已同步")}</strong></button>
-    <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
+    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales"><span>${escapeHtml(copy.receiptPrinterEntry || "小票打印")}</span><strong>></strong></button>
   `;
 }
 
@@ -33790,12 +33792,14 @@ renderCashierTerminalDrawer = function () {
     return;
   }
   if (drawer === "recent-sales") {
-    const sales = cashierTerminalState.recentSales || [];
+    const allSales = cashierTerminalState.recentSales || [];
+    const currentShiftId = String(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo || "").trim();
+    const sales = currentShiftId ? allSales.filter((sale) => !sale?.shift_id || String(sale.shift_id) === currentShiftId) : allSales;
     const detail = cashierTerminalState.selectedSaleDetail;
     cashierTerminalDrawer.innerHTML = `
-      <div class="drawer-head"><div><p class="panel-kicker">SALES</p><h3>最近销售</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-head"><div><p class="panel-kicker">RECEIPT</p><h3>小票打印</h3><p class="drawer-subtitle">最近销售（本班次内），选择要重打的小票.</p></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body recent-sales-body">
-        ${cashierTerminalState.saleLookupFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.saleLookupFeedback)}</div>` : ""}
+        <div class="drawer-card"><strong>只显示当前班次内的销售记录.</strong></div>${cashierTerminalState.saleLookupFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.saleLookupFeedback)}</div>` : ""}
         <div class="recent-sales-list">
           ${sales.length ? sales.map((sale) => `
             <article class="hold-card status-${escapeHtml(sale.status || "completed")}">
@@ -33808,10 +33812,10 @@ renderCashierTerminalDrawer = function () {
               </div>
               <div class="hold-actions">
                 <button type="button" class="secondary-inline" data-terminal-action="view-sale-detail" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">查看详情</button>
-                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">${escapeHtml(copy.receiptReprint)}</button>
+                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">小票重打</button>
               </div>
             </article>
-          `).join("") : `<div class="cashier-terminal-empty-card">暂无可重打销售单。</div>`}
+          `).join("") : `<div class="cashier-terminal-empty-card">当前班次暂无可打印小票.</div>`}
         </div>
         ${detail ? `
           <div class="recent-sale-detail">
@@ -33844,8 +33848,8 @@ renderCashierTerminalDrawer = function () {
         ` : ""}
       </div>
       <div class="drawer-foot split-actions">
-        <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">刷新最近销售</button>
-        <button type="button" class="primary-inline" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
+        <div class="drawer-hint">小票重打不会重复创建销售记录，仅重新打印该销售单的小票.</div>
+        <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">刷新小票列表</button>
       </div>
     `;
     return;
@@ -35939,6 +35943,9 @@ handleCashierTerminalAction = async function (action, target) {
       return;
     case "reprint-receipt":
       openCashierTerminalReprintConfirmation("");
+      return;
+    case "open-receipt-printing":
+      openCashierTerminalDrawer("recent-sales");
       return;
     case "view-sale-detail":
       await loadCashierTerminalSaleReceiptForReprint(target.dataset.terminalSaleNo, { reprint: false });
