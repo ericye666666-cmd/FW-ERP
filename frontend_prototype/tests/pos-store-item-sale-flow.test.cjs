@@ -1228,9 +1228,15 @@ test("POS hides unfinished M-Pesa checkout buttons and keeps cash as the live pa
   assert.match(modeSource, /M-Pesa \/ 混合支付暂未上线，本次 POS 只开放现金收款。/);
 });
 
-test("POS hides unfinished cashier feature pages and keeps offline sync visible with date filter", () => {
+test("POS hides unfinished cashier feature pages while keeping offline sync entry visible and routable", () => {
   const navMetaSource = appJs.slice(appJs.indexOf("const STORE_PANEL_NAV_META"), appJs.indexOf("const STORE_MANAGER_PDA_TABS"));
   const offlineSection = extractElementById(indexHtml, "offlineSyncSummary");
+
+  const offlineNavIndex = navMetaSource.indexOf('match: "12. 离线销售同步"');
+  assert.ok(offlineNavIndex >= 0, "offline sync nav meta should exist");
+  const offlineNavBlock = navMetaSource.slice(offlineNavIndex, navMetaSource.indexOf("\n  },", offlineNavIndex));
+  assert.doesNotMatch(offlineNavBlock, /hiddenInNav:\s*true/);
+  assert.match(offlineNavBlock, /section:\s*"cashier"/);
 
   ["作废单", "顾客退货 / 退款单", "支付异常单", "11. Safaricom / M-Pesa"].forEach((title) => {
     const index = navMetaSource.indexOf(`match: "${title}"`);
@@ -1244,6 +1250,8 @@ test("POS hides unfinished cashier feature pages and keeps offline sync visible 
   assert.match(offlineSection, /演示 \/ 本地记录/);
   assert.match(indexHtml, /id="offlineSyncDateFilter" type="date"/);
   assert.match(indexHtml, /id="offlineSyncBatchList"/);
+  assert.match(appJs, /panel\.classList\.toggle\("hidden-screen",\s*!active\)/);
+  assert.match(appJs, /document\.querySelector\("#offlineSyncDateFilter"\)\?\.addEventListener\("change"/);
 });
 
 test("POS scan failures keep resolver details but show cashier-facing main error and refocus scan", () => {
