@@ -1001,6 +1001,21 @@ test("POS shift flow blocks sale until open shift and sends shift_id", () => {
   assert.match(summarySource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/\$\{encodeURIComponent\(shiftId\)\}\/summary`\)/);
 });
 
+test("POS open shift gives loading, existing-shift, success, and error feedback", () => {
+  const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");
+  const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
+
+  assert.match(openSource, /shiftActionInFlight\s*=\s*true/);
+  assert.match(openSource, /正在开班，请稍候/);
+  assert.match(openSource, /fetchCashierTerminalCurrentShift\(\)/);
+  assert.match(openSource, /当前已有开班：/);
+  assert.match(openSource, /已成功开班：/);
+  assert.match(openSource, /开班失败：/);
+  assert.match(openSource, /renderCashierTerminalSessionStrip\(\)/);
+  assert.match(openSource, /renderCashierTerminalStatusBar\(\)/);
+  assert.match(drawerSource, /正在开班\.\.\./);
+});
+
 test("POS shift close uses real API, records variance, and clears closed shift", () => {
   const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
   const closeSource = extractAsyncFunctionSource(appJs, "closeCashierTerminalShiftBackend");
@@ -1202,9 +1217,33 @@ test("POS payment validation uses cashier-facing shortage and M-Pesa messages", 
   assert.throws(() => fn(), /Cash \+ M-Pesa 还差 KSh 100/);
 });
 
-test("POS M-Pesa UI warns manual reference is not automatic settlement proof", () => {
+test("POS hides unfinished M-Pesa checkout buttons and keeps cash as the live payment path", () => {
   const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
-  assert.match(paymentSource, /请确认 M-Pesa 已到账，再点击完成收款。/);
+  const modeSource = extractFunctionSource(appJs, "setCashierTerminalPaymentMode");
+
+  assert.match(paymentSource, /activePaymentMode\)\)\s*\{\s*cashierTerminalState\.activePaymentMode = "cash"/);
+  assert.match(paymentSource, /data-terminal-payment-mode="cash"/);
+  assert.doesNotMatch(paymentSource, /data-terminal-payment-mode="mpesa"/);
+  assert.doesNotMatch(paymentSource, /data-terminal-payment-mode="mixed"/);
+  assert.match(modeSource, /M-Pesa \/ 混合支付暂未上线，本次 POS 只开放现金收款。/);
+});
+
+test("POS hides unfinished cashier feature pages and keeps offline sync visible with date filter", () => {
+  const navMetaSource = appJs.slice(appJs.indexOf("const STORE_PANEL_NAV_META"), appJs.indexOf("const STORE_MANAGER_PDA_TABS"));
+  const offlineSection = extractElementById(indexHtml, "offlineSyncSummary");
+
+  ["作废单", "顾客退货 / 退款单", "支付异常单", "11. Safaricom / M-Pesa"].forEach((title) => {
+    const index = navMetaSource.indexOf(`match: "${title}"`);
+    assert.ok(index >= 0, `${title} nav meta should exist`);
+    assert.match(navMetaSource.slice(index, navMetaSource.indexOf("\n  },", index)), /hiddenInNav:\s*true/);
+  });
+  assert.match(indexHtml, /<h2>作废单<\/h2>[\s\S]{0,200}aria-hidden="true"|aria-hidden="true"[\s\S]{0,200}<h2>作废单<\/h2>/);
+  assert.match(indexHtml, /<h2>顾客退货 \/ 退款单<\/h2>[\s\S]{0,200}aria-hidden="true"|aria-hidden="true"[\s\S]{0,200}<h2>顾客退货 \/ 退款单<\/h2>/);
+  assert.match(indexHtml, /<h2>支付异常单<\/h2>[\s\S]{0,200}aria-hidden="true"|aria-hidden="true"[\s\S]{0,200}<h2>支付异常单<\/h2>/);
+  assert.match(indexHtml, /<h2>11\. Safaricom \/ M-Pesa<\/h2>[\s\S]{0,200}aria-hidden="true"|aria-hidden="true"[\s\S]{0,200}<h2>11\. Safaricom \/ M-Pesa<\/h2>/);
+  assert.match(offlineSection, /演示 \/ 本地记录/);
+  assert.match(indexHtml, /id="offlineSyncDateFilter" type="date"/);
+  assert.match(indexHtml, /id="offlineSyncBatchList"/);
 });
 
 test("POS scan failures keep resolver details but show cashier-facing main error and refocus scan", () => {

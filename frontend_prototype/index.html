@@ -848,7 +848,7 @@
         <pre id="storeRecentSalesSimulationOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-manager hidden-screen" data-workspace-panel="store" aria-hidden="true">
         <div class="panel-head">
           <h2>作废单</h2>
           <button data-action="load-void-requests" type="button">读取待审核作废单</button>
@@ -878,7 +878,7 @@
         <pre id="saleVoidOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-clerk" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-clerk hidden-screen" data-workspace-panel="store" aria-hidden="true">
         <div class="panel-head">
           <h2>顾客退货 / 退款单</h2>
           <button data-action="load-refund-requests" type="button">读取待审核退货 / 退款单</button>
@@ -930,7 +930,7 @@
         <pre id="saleRefundOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-manager hidden-screen" data-workspace-panel="store" aria-hidden="true">
         <div class="panel-head">
           <h2>支付异常单</h2>
           <button data-action="load-payment-anomalies" type="button">读取待处理支付异常</button>
@@ -3650,7 +3650,7 @@
         </div>
       </section>
 
-      <section class="panel" data-workspace-panel="store">
+      <section class="panel hidden-screen" data-workspace-panel="store" aria-hidden="true">
         <div class="panel-head">
           <h2>11. Safaricom / M-Pesa</h2>
           <div class="button-row">
@@ -3696,13 +3696,19 @@
         <pre id="mpesaOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel" data-workspace-panel="store">
+      <section class="panel hidden-screen" data-workspace-panel="store" aria-hidden="true">
         <div class="panel-head">
           <h2>12. 离线销售同步</h2>
-          <button data-action="load-offline-sync-batches" type="button">读取离线同步批次</button>
+          <div class="button-row">
+            <label class="inline-filter-field">
+              <span>同步日期</span>
+              <input id="offlineSyncDateFilter" type="date" />
+            </label>
+            <button data-action="load-offline-sync-batches" type="button">读取离线同步批次</button>
+          </div>
         </div>
         <div id="offlineSyncSummary" class="candidate-summary empty-state">
-          这里会汇总断网补同步的批次数、成功行、重复行和失败行。
+          演示 / 本地记录：这里会汇总断网补同步的批次数、成功行、重复行和失败行，不代表真实生产故障。
         </div>
         <form id="offlineSyncForm" class="form-grid">
           <input name="device_id" placeholder="设备号" value="POS-TAB-01" />
@@ -3728,6 +3734,7 @@
         <div id="offlineSyncResultSummary" class="candidate-summary empty-state">
           这里会显示最近一次离线补同步成功了多少、失败了多少。
         </div>
+        <div id="offlineSyncBatchList" class="candidate-list offline-sync-batch-list"></div>
         <pre id="offlineSyncOutput" class="output hidden-output"></pre>
       </section>
 

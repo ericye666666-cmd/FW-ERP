@@ -3478,6 +3478,7 @@ const STORE_PANEL_NAV_META = [
     icon: "废",
     navTitle: "作废单",
     navTitleEn: "Voided Orders",
+    hiddenInNav: true,
   },
   {
     match: "顾客退货 / 退款单",
@@ -3486,6 +3487,7 @@ const STORE_PANEL_NAV_META = [
     icon: "退",
     navTitle: "顾客退货 / 退款单",
     navTitleEn: "Customer Returns / Refunds",
+    hiddenInNav: true,
   },
   {
     match: "支付异常单",
@@ -3494,6 +3496,7 @@ const STORE_PANEL_NAV_META = [
     icon: "异",
     navTitle: "支付异常单",
     navTitleEn: "Payment Exceptions",
+    hiddenInNav: true,
   },
   {
     match: "11. Safaricom / M-Pesa",
@@ -3502,6 +3505,7 @@ const STORE_PANEL_NAV_META = [
     icon: "付",
     navTitle: "11. Safaricom / M-Pesa",
     navTitleEn: "11. Safaricom / M-Pesa",
+    hiddenInNav: true,
   },
   {
     match: "12. 离线销售同步",
@@ -31214,6 +31218,7 @@ function createCashierTerminalState() {
     cancelledOrderCount: 0,
     fullscreenActive: false,
     fullscreenFeedback: "",
+    shiftActionInFlight: false,
   };
 }
 
@@ -32165,13 +32170,14 @@ function renderCashierTerminal() {
 }
 
 function setCashierTerminalPaymentMode(mode) {
-  cashierTerminalState.activePaymentMode = mode;
+  if (mode !== "cash") {
+    cashierTerminalState.activePaymentMode = "cash";
+    showTransientInlineNotice("#cashierTerminalInlineNotice", "M-Pesa / 混合支付暂未上线，本次 POS 只开放现金收款。", "warning", 2200);
+  } else {
+    cashierTerminalState.activePaymentMode = mode;
+  }
   if (mode === "cash") {
     cashierTerminalState.cashReceived = cashierTerminalState.cashReceived || "";
-  } else if (mode === "mpesa") {
-    cashierTerminalState.mpesaAmount = cashierTerminalState.mpesaAmount || "";
-  } else if (!Array.isArray(cashierTerminalState.paymentLines) || !cashierTerminalState.paymentLines.length) {
-    cashierTerminalState.paymentLines = [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")];
   }
   renderCashierTerminal();
 }
@@ -33566,12 +33572,9 @@ renderCashierTerminalPaymentPanel = function () {
   const balance = Math.max(totals.totalAmount - paid, 0);
   const saleDisabled = !cashierTerminalState.currentShift?.shift_id;
   const paymentGuidance = getCashierTerminalPaymentGuidance();
-  const mpesaOfflineNotice = cashierTerminalState.networkStatus === "offline"
-    ? `<div class="cashier-payment-warning">离线状态下 M-Pesa reference 仅暂存，待同步核验</div>`
-    : "";
-  const mpesaManualNotice = ["mpesa", "mixed"].includes(cashierTerminalState.activePaymentMode)
-    ? `<div class="cashier-payment-warning">请确认 M-Pesa 已到账，再点击完成收款。</div>`
-    : "";
+  if (["mpesa", "mixed"].includes(cashierTerminalState.activePaymentMode)) {
+    cashierTerminalState.activePaymentMode = "cash";
+  }
   cashierTerminalPaymentPanel.innerHTML = `
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
@@ -33603,42 +33606,13 @@ renderCashierTerminalPaymentPanel = function () {
     </label>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>${escapeHtml(chooseI18nLabel("手动流水号", "Manual Reference"))}</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合", "Mixed"))}</span><small>现金 + M-Pesa</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
-      ${cashierTerminalState.activePaymentMode === "cash" ? `
-        <label class="field">
-          <span>实收金额</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
-        </label>
-      ` : cashierTerminalState.activePaymentMode === "mpesa" ? `
-        ${mpesaOfflineNotice}
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="默认等于应收金额" />
-        </label>
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference"))}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
-        </label>
-      ` : `
-        ${mpesaOfflineNotice}
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("现金金额", "Cash Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="现金金额" />
-        </label>
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="M-Pesa 金额" />
-        </label>
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference No."))}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
-        </label>
-      `}
+      <label class="field">
+        <span>实收金额</span>
+        <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
+      </label>
     </div>
-    ${mpesaManualNotice}
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
       <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale"}</strong></button>
@@ -33979,7 +33953,7 @@ renderCashierTerminalDrawer = function () {
         ${currentShift?.shift_id ? `
           <button type="button" class="secondary-inline" data-terminal-action="load-shift-summary">刷新本班统计</button>
           <button type="button" class="primary-inline" data-terminal-action="close-shift">${escapeHtml(copy.closeShift)}</button>
-        ` : `<button type="button" class="primary-inline" data-terminal-action="open-shift">${escapeHtml(copy.openNow)}</button>`}
+        ` : `<button type="button" class="primary-inline" data-terminal-action="open-shift"${cashierTerminalState.shiftActionInFlight ? " disabled" : ""}>${escapeHtml(cashierTerminalState.shiftActionInFlight ? "正在开班..." : copy.openNow)}</button>`}
       </div>
     `;
     return;
@@ -34883,23 +34857,69 @@ async function fetchCashierTerminalCurrentShift() {
 async function openCashierTerminalShift() {
   ensureCashierTerminalPreviewState();
   const storeCode = getCashierTerminalStoreCode();
-  const shift = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/open`, {
-    method: "POST",
-    body: JSON.stringify({
-      cashier_id: getCashierTerminalCashierName(),
-      terminal_id: getCashierTerminalTerminalId(),
-      opening_float: normalizeCashierTerminalNumber(cashierTerminalState.openingFloatCash || 0),
-      note: cashierTerminalState.openingNote || "",
-    }),
-  });
-  cashierTerminalState.currentShift = normalizeCashierTerminalShift(shift);
-  applyCashierTerminalShift(cashierTerminalState.currentShift);
-  cashierTerminalState.shiftFeedback = `已成功开班：${cashierTerminalState.currentShift.shift_id}`;
-  await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+  const existingShift = cashierTerminalState.currentShift?.shift_id
+    && String(cashierTerminalState.currentShift?.status || "open").toLowerCase() === "open"
+    ? cashierTerminalState.currentShift
+    : null;
+  if (existingShift) {
+    cashierTerminalState.shiftFeedback = `当前已有开班：${existingShift.shift_id}`;
+    renderCashierTerminal();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "warning", 2200);
+    focusCashierTerminalScanInput({ select: false });
+    return existingShift;
+  }
+  cashierTerminalState.shiftActionInFlight = true;
+  cashierTerminalState.shiftFeedback = "正在开班，请稍候...";
   renderCashierTerminal();
-  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "success", 1800);
-  focusCashierTerminalScanInput({ select: false });
-  return cashierTerminalState.currentShift;
+  try {
+    try {
+      const currentShift = await fetchCashierTerminalCurrentShift();
+      const normalizedCurrentShift = normalizeCashierTerminalShift(currentShift);
+      if (normalizedCurrentShift.shift_id && normalizedCurrentShift.status === "open") {
+        applyCashierTerminalShift(normalizedCurrentShift);
+        cashierTerminalState.shiftFeedback = `当前已有开班：${normalizedCurrentShift.shift_id}`;
+        await loadCashierTerminalShiftSummary(normalizedCurrentShift.shift_id);
+        renderCashierTerminal();
+        showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "warning", 2200);
+        focusCashierTerminalScanInput({ select: false });
+        return normalizedCurrentShift;
+      }
+    } catch (error) {
+      if (!isCashierTerminalSaleLookupApiUnavailableError(error)) {
+        cashierTerminalState.shiftFeedback = "未读取到当前开班，将尝试新开班。";
+      }
+    }
+    const shift = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/open`, {
+      method: "POST",
+      body: JSON.stringify({
+        cashier_id: getCashierTerminalCashierName(),
+        terminal_id: getCashierTerminalTerminalId(),
+        opening_float: normalizeCashierTerminalNumber(cashierTerminalState.openingFloatCash || 0),
+        note: cashierTerminalState.openingNote || "",
+      }),
+    });
+    cashierTerminalState.currentShift = normalizeCashierTerminalShift(shift);
+    applyCashierTerminalShift(cashierTerminalState.currentShift);
+    cashierTerminalState.shiftFeedback = `已成功开班：${cashierTerminalState.currentShift.shift_id}`;
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+    renderCashierTerminal();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "success", 2200);
+    focusCashierTerminalScanInput({ select: false });
+    return cashierTerminalState.currentShift;
+  } catch (error) {
+    const message = formatErrorMessage(error);
+    cashierTerminalState.shiftFeedback = message.includes("already") || message.includes("已有")
+      ? `当前已有开班。请刷新本班统计或继续收银。${message ? `（${message}）` : ""}`
+      : `开班失败：${message}`;
+    renderCashierTerminal();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "error", 3200);
+    throw error;
+  } finally {
+    cashierTerminalState.shiftActionInFlight = false;
+    renderCashierTerminalSessionStrip();
+    renderCashierTerminalStatusBar();
+    renderCashierTerminalDrawer();
+  }
 }
 
 async function loadCashierTerminalShiftSummary(shiftId = cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo) {
@@ -35855,6 +35875,7 @@ handleCashierTerminalAction = async function (action, target) {
       renderCashierTerminalDrawer();
       return;
     default:
+      showTransientInlineNotice("#cashierTerminalInlineNotice", "这个按钮暂未绑定上线功能，已阻止静默无响应。", "warning", 2200);
       return;
   }
 }
@@ -36059,15 +36080,68 @@ function renderMpesaSummary(collections = mpesaCollectionsState, insights = mpes
   `;
 }
 
+function getOfflineSyncBatchTimestamp(row = {}) {
+  return String(row.synced_at || row.created_at || row.updated_at || row.received_at || row.completed_at || row.started_at || "").trim();
+}
+
+function getOfflineSyncBatchDateKey(row = {}) {
+  const timestamp = getOfflineSyncBatchTimestamp(row);
+  return timestamp ? getLocalDateKey(timestamp) : "";
+}
+
+function getOfflineSyncFilteredBatches(batches = offlineSyncBatchState) {
+  const rows = Array.isArray(batches) ? batches : [];
+  const filterDate = String(document.querySelector("#offlineSyncDateFilter")?.value || "").trim();
+  return filterDate ? rows.filter((row) => getOfflineSyncBatchDateKey(row) === filterDate) : rows;
+}
+
+function renderOfflineSyncBatchList(batches = offlineSyncBatchState) {
+  const target = document.querySelector("#offlineSyncBatchList");
+  if (!target) {
+    return;
+  }
+  const rows = getOfflineSyncFilteredBatches(batches);
+  if (!rows.length) {
+    target.innerHTML = `<div class="empty-state">当前日期没有离线同步记录。这里是演示 / 本地记录，不代表真实故障。</div>`;
+    return;
+  }
+  target.innerHTML = rows.map((row) => {
+    const timestamp = getOfflineSyncBatchTimestamp(row);
+    const status = String(row.status || row.sync_status || (Number(row.failed_count || 0) > 0 ? "failed" : "synced")).trim();
+    const reason = String(row.reason || row.note || row.error || row.error_message || "").trim() || "无";
+    const resultRows = Array.isArray(row.results) ? row.results : [];
+    const failedReasons = resultRows
+      .filter((item) => String(item.status || "").toLowerCase() === "failed")
+      .map((item) => String(item.reason || item.error || item.message || "").trim())
+      .filter(Boolean)
+      .slice(0, 2);
+    return `
+      <article class="candidate-row offline-sync-batch-row">
+        <div>
+          <strong>${escapeHtml(row.sync_batch_no || row.batch_no || row.client_batch_id || "离线同步批次")}</strong>
+          <div class="subtle small">同步时间：${escapeHtml(timestamp ? formatLocalDateTime(timestamp) : "-")}</div>
+        </div>
+        <div class="candidate-row-meta">
+          <span>${renderStatusBadge(status, status.toLowerCase().includes("fail") ? "danger" : "success")}</span>
+          <span>设备号：${escapeHtml(row.device_id || "-")}</span>
+          <span>成功 ${escapeHtml(row.accepted_count || 0)} / 重复 ${escapeHtml(row.duplicate_count || 0)} / 失败 ${escapeHtml(row.failed_count || 0)}</span>
+          <span>原因：${escapeHtml(failedReasons.length ? failedReasons.join("；") : reason)}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderOfflineSyncSummary(batches = offlineSyncBatchState) {
   const target = document.querySelector("#offlineSyncSummary");
   if (!target) {
     return;
   }
-  const rows = Array.isArray(batches) ? batches : [];
+  const rows = getOfflineSyncFilteredBatches(batches);
   if (!rows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会汇总断网补同步的批次数、成功行、重复行和失败行。";
+    target.textContent = "演示 / 本地记录：当前日期没有离线同步批次，不代表真实生产故障。";
+    renderOfflineSyncBatchList(batches);
     return;
   }
   const accepted = rows.reduce((sum, row) => sum + Number(row.accepted_count || 0), 0);
@@ -36094,8 +36168,9 @@ function renderOfflineSyncSummary(batches = offlineSyncBatchState) {
         <span>${failed}</span>
       </article>
     </div>
-    <div class="subtle">涉及设备：${devices} 台</div>
+    <div class="subtle">演示 / 本地记录：涉及设备 ${devices} 台。请按日期查看同步时间、状态、设备号和原因。</div>
   `;
+  renderOfflineSyncBatchList(batches);
 }
 
 function renderOpsAlerts() {
@@ -47509,6 +47584,9 @@ bindForm("#areaSupervisorPasswordResetForm", submitAreaSupervisorPasswordReset, 
 bindForm("#mpesaImportForm", submitMpesaImport, "#mpesaOutput");
 bindForm("#mpesaCallbackForm", submitMpesaCallback, "#mpesaOutput");
 bindForm("#offlineSyncForm", submitOfflineSync, "#offlineSyncOutput");
+document.querySelector("#offlineSyncDateFilter")?.addEventListener("change", () => {
+  renderOfflineSyncSummary();
+});
 bindForm("#saleVoidRequestForm", submitSaleVoidRequest, "#saleVoidOutput");
 bindForm("#saleVoidReviewForm", submitSaleVoidReview, "#saleVoidOutput");
 
