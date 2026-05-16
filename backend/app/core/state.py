@@ -11747,6 +11747,16 @@ class InMemoryState:
             raise HTTPException(status_code=404, detail="No open POS shift for this cashier and terminal.")
         return self._normalize_pos_shift(shift)
 
+    def list_store_pos_shifts(self, store_code: str) -> list[dict[str, Any]]:
+        store = self._ensure_store_exists(store_code)
+        rows = [
+            self._normalize_pos_shift(shift)
+            for shift in self.cashier_shifts.values()
+            if str(shift.get("store_code") or "").strip().upper() == store["code"]
+        ]
+        rows.sort(key=lambda row: (str(row.get("opened_at") or ""), str(row.get("shift_id") or "")), reverse=True)
+        return rows
+
     def get_pos_shift_summary(self, store_code: str, shift_id: str) -> dict[str, Any]:
         shift = self._get_pos_shift_for_store(store_code, shift_id)
         normalized_shift = self._normalize_pos_shift(shift)

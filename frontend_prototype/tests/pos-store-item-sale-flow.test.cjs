@@ -222,12 +222,13 @@ test("POS cashier visible copy is employee-facing and keeps Store Item scan guid
 test("POS cashier shift lookup page is wired with nav entry, refresh action, and empty-state copy", () => {
   assert.match(indexHtml, /9\.1 收银班次查询/);
   assert.match(indexHtml, /id="cashierShiftLookupRefreshButton"/);
-  assert.match(indexHtml, /刷新当前班次/);
+  assert.match(indexHtml, /刷新门店终端总览/);
   assert.match(appJs, /match:\s*"9\.1 收银班次查询"/);
   assert.match(appJs, /navTitle:\s*"收银班次查询"/);
   assert.match(appJs, /function renderCashierShiftLookupSummary/);
   assert.match(appJs, /async function refreshCashierShiftLookupSummary/);
-  assert.match(appJs, /当前 terminal 暂无 open shift\./);
+  assert.match(appJs, /一家门店可以有多个 POS 终端/);
+  assert.match(appJs, /如果这台电脑不是原 POS 机，请改用新的 terminal_id/);
 });
 
 test("POS cashier terminal renders cashier touch layout without changing barcode scope", () => {
