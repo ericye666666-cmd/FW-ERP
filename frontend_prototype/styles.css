@@ -12578,7 +12578,7 @@ body.cashier-terminal-mode .cashier-terminal-status {
 
 body.cashier-terminal-mode .cashier-terminal-status-summary {
   display: grid;
-  grid-template-columns: minmax(140px, 1.2fr) repeat(4, minmax(74px, 0.7fr));
+  grid-template-columns: repeat(6, minmax(96px, 1fr));
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
@@ -12784,7 +12784,7 @@ body.cashier-terminal-mode .cashier-terminal-transaction-strip {
 }
 
 body.cashier-terminal-mode .cashier-terminal-status-metrics {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -12942,4 +12942,9 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
   body.cashier-terminal-mode .cashier-terminal-quick-actions {
     display: none;
   }
+}
+
+
+body.cashier-terminal-mode .cashier-terminal-receipt-panel[hidden] {
+  display: none !important;
 }

@@ -260,37 +260,23 @@ test("POS cashier terminal renders cashier touch layout without changing barcode
   assert.doesNotMatch(appJs, /resolveBarcodeForContext\([^)]*"pos",\s*\[[^\]]*"STORE_DELIVERY_EXECUTION"/);
 });
 
-test("POS cashier terminal moves store, shift, device, and sales status into top header", () => {
+test("POS cashier terminal separates top status and shift-only strip metrics", () => {
   const headerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalSessionStrip");
   const infoStripSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalStatusBar");
 
-  [
-    "当前门店",
-    "收银员",
-    "班次",
-    "网络状态",
-    "打印机",
-    "同步状态",
-    "今日销售额",
-    "今日订单数",
-    "本班销售额",
-    "本班订单数",
-    "当前时间",
-  ].forEach((label) => assert.match(headerSource, new RegExp(label)));
+  ["当前门店", "收银员", "班次", "网络状态", "打印机", "同步状态"].forEach((label) => assert.match(headerSource, new RegExp(label)));
+  ["今日销售额", "今日订单数", "本班销售额", "本班订单数", "当前时间"].forEach((label) => assert.doesNotMatch(headerSource, new RegExp(label)));
   assert.match(headerSource, /getCashierTerminalStoreDisplayName\(\)/);
   assert.match(headerSource, /getCashierTerminalCashierDisplayName\(\)/);
   assert.match(headerSource, /getCashierTerminalShiftNo\(\) \? renderCashierTerminalHeaderData\(getCashierTerminalShiftNo\(\)\) : escapeHtml\(copy\.openShiftFirst\)/);
-  assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
-  assert.match(headerSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
-  assert.match(headerSource, /cashierTerminalState\.todayOrderCount/);
-  assert.match(headerSource, /cashierTerminalState\.shiftOrderCount/);
-  assert.match(headerSource, /cashierTerminalState\.currentTime/);
-  assert.match(infoStripSource, /copy\.posStoreItemOnly/);
   assert.match(infoStripSource, /cashier-terminal-status-summary/);
-  assert.match(infoStripSource, /formatCashierPreviewMoney\(cashierTerminalState\.todaySalesAmount\)/);
-  assert.match(infoStripSource, /formatCashierPreviewMoney\(cashierTerminalState\.shiftSalesAmount\)/);
-  assert.match(infoStripSource, /cashierTerminalState\.todayOrderCount/);
-  assert.match(infoStripSource, /cashierTerminalState\.shiftOrderCount/);
+  ["班次号", "班次状态", "开班时间", "备用金", "本班销售额", "本班订单数"].forEach((label) => assert.match(infoStripSource, new RegExp(label)));
+  assert.match(infoStripSource, /getCashierTerminalShiftNo\(\) \|\| copy\.openShiftFirst/);
+  assert.match(infoStripSource, /cashierTerminalState\.currentShift\?\.opened_at/);
+  assert.match(infoStripSource, /cashierTerminalState\.currentShift\?\.opening_float_cash/);
+  assert.doesNotMatch(infoStripSource, /copy\.posStoreItemOnly/);
+  assert.doesNotMatch(infoStripSource, /todaySalesAmount/);
+  assert.doesNotMatch(infoStripSource, /todayOrderCount/);
   assert.match(infoStripSource, /copy\.resumeHeldOrder/);
   assert.match(infoStripSource, /copy\.closeShift/);
   assert.match(infoStripSource, /copy\.openNow/);
