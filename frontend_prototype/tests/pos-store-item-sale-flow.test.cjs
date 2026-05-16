@@ -219,6 +219,17 @@ test("POS cashier visible copy is employee-facing and keeps Store Item scan guid
   });
 });
 
+test("POS cashier shift lookup page is wired with nav entry, refresh action, and empty-state copy", () => {
+  assert.match(indexHtml, /9\.1 收银班次查询/);
+  assert.match(indexHtml, /id="cashierShiftLookupRefreshButton"/);
+  assert.match(indexHtml, /刷新当前班次/);
+  assert.match(appJs, /match:\s*"9\.1 收银班次查询"/);
+  assert.match(appJs, /navTitle:\s*"收银班次查询"/);
+  assert.match(appJs, /function renderCashierShiftLookupSummary/);
+  assert.match(appJs, /async function refreshCashierShiftLookupSummary/);
+  assert.match(appJs, /当前 terminal 暂无 open shift\./);
+});
+
 test("POS cashier terminal renders cashier touch layout without changing barcode scope", () => {
   assert.match(indexHtml, /class="[^"]*cashier-terminal-shell/);
   assert.match(indexHtml, /class="[^"]*cashier-terminal-touch-layout/);

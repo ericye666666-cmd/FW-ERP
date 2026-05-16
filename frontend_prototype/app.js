@@ -3472,6 +3472,14 @@ const STORE_PANEL_NAV_META = [
     navTitleEn: "9. Cashier Shift & POS Sales",
   },
   {
+    match: "9.1 收银班次查询",
+    section: "cashier",
+    order: 65,
+    icon: "查",
+    navTitle: "收银班次查询",
+    navTitleEn: "Cashier Shift Lookup",
+  },
+  {
     match: "作废单",
     section: "cashier",
     order: 70,
@@ -34854,6 +34862,46 @@ async function fetchCashierTerminalCurrentShift() {
   return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/current?cashier_id=${encodeURIComponent(cashierId)}&terminal_id=${encodeURIComponent(terminalId)}`);
 }
 
+function renderCashierShiftLookupSummary(shift = null) {
+  const target = document.querySelector("#cashierShiftLookupSummary");
+  if (!target) return;
+  const user = currentSession?.user || {};
+  const username = String(user.username || "-").trim() || "-";
+  const roleCode = String(user.role || "").trim().toLowerCase();
+  const role = String(user.role_label || getUserRoleDisplayLabel(roleCode) || roleCode || "-").trim() || "-";
+  const name = String(user.full_name || user.display_name || user.name || "-").trim() || "-";
+  const storeCode = getCashierTerminalStoreCode();
+  const storeName = getCashierTerminalStoreDisplayName() || "-";
+  const terminalId = getCashierTerminalTerminalId();
+  const currentShift = shift?.shift_id ? normalizeCashierTerminalShift(shift) : null;
+  target.classList.remove("empty-state");
+  target.innerHTML = `
+    <div class="metrics-grid">
+      <article class="store-metric"><strong>当前登录用户</strong><span>${escapeHtml(username)}</span></article>
+      <article class="store-metric"><strong>姓名</strong><span>${escapeHtml(name)}</span></article>
+      <article class="store-metric"><strong>角色</strong><span>${escapeHtml(role)}</span></article>
+      <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCode)} / ${escapeHtml(storeName)}</span></article>
+      <article class="store-metric"><strong>terminal_id</strong><span>${escapeHtml(terminalId)}</span></article>
+    </div>
+    <div class="metrics-grid">
+      ${
+  currentShift
+    ? `<article class="store-metric"><strong>shift_id</strong><span>${escapeHtml(currentShift.shift_id || "-")}</span></article>
+         <article class="store-metric"><strong>status</strong><span>${escapeHtml(currentShift.status || "-")}</span></article>
+         <article class="store-metric"><strong>cashier</strong><span>${escapeHtml(currentShift.cashier_id || "-")} / ${escapeHtml(currentShift.cashier_name || "-")}</span></article>
+         <article class="store-metric"><strong>opening_time</strong><span>${escapeHtml(currentShift.opened_at || "-")}</span></article>
+         <article class="store-metric"><strong>opening_float</strong><span>${escapeHtml(String(currentShift.opening_float ?? "-"))}</span></article>`
+    : `<div class="empty-state">当前 terminal 暂无 open shift.</div>`
+}
+    </div>
+  `;
+}
+
+async function refreshCashierShiftLookupSummary() {
+  const shift = await fetchCashierTerminalCurrentShift();
+  renderCashierShiftLookupSummary(shift);
+}
+
 async function openCashierTerminalShift() {
   ensureCashierTerminalPreviewState();
   const storeCode = getCashierTerminalStoreCode();
@@ -47736,6 +47784,13 @@ bindForm("#consignmentBundleForm", submitConsignmentBundle, "#consignmentBundleO
 bindForm("#baleSalesOutboundScanForm", submitBaleSalesOutboundScan, "#baleSalesOutboundOutput");
 bindForm("#baleSalesOutboundForm", submitBaleSalesOutbound, "#baleSalesOutboundOutput");
 bindForm("#productImportPreviewForm", submitProductImportPreview, "#productOutput");
+document.querySelector("#cashierShiftLookupRefreshButton")?.addEventListener("click", async () => {
+  try {
+    await refreshCashierShiftLookupSummary();
+  } catch (error) {
+    renderErrorSummary("#cashierShiftLookupSummary", formatErrorMessage(error));
+  }
+});
 
 cashierTerminalScanForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
