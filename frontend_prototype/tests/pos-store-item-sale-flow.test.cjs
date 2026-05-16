@@ -999,19 +999,17 @@ assert.match(appJs, /打印小票 \/ Print Receipt/);
   assert.match(receiptSource, /receiptPanel\.innerHTML\s*=\s*""/);
 });
 
-test("POS recent sales drawer can list, view, and reprint real sales", () => {
+test("POS recent sales drawer stays list-only and only supports reprint action", () => {
   const drawerSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalDrawer");
   const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
   const loadListSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalRecentSales");
   assert.match(appJs, /data-terminal-drawer="recent-sales"/);
   assert.match(drawerSource, /drawer === "recent-sales"/);
   assert.match(drawerSource, /最近销售/);
-  assert.match(drawerSource, /data-terminal-action="view-sale-detail"/);
   assert.match(drawerSource, /data-terminal-action="reprint-sale"/);
+  assert.doesNotMatch(drawerSource, /data-terminal-action="view-sale-detail"/);
   assert.match(loadListSource, /fetchCashierTerminalRecentSales\(limit\)/);
   assert.match(loadListSource, /cashierTerminalState\.recentSales\s*=/);
-  assert.match(actionSource, /case "view-sale-detail":/);
-  assert.match(actionSource, /await loadCashierTerminalSaleReceiptForReprint\(target\.dataset\.terminalSaleNo,\s*\{\s*reprint:\s*false\s*\}\)/);
   assert.match(actionSource, /case "reprint-sale":/);
   assert.match(actionSource, /openCashierTerminalReprintConfirmation\(target\.dataset\.terminalSaleNo\)/);
 });
