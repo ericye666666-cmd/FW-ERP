@@ -12769,15 +12769,17 @@ body.cashier-terminal-mode .cashier-terminal-no-shift {
 }
 
 body.cashier-terminal-mode .cashier-terminal-quick-actions {
-  max-height: 52px;
+  max-height: none;
+  min-height: 52px;
   margin: 0 12px;
   padding: 6px 8px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 body.cashier-terminal-mode .cashier-terminal-transaction-strip {
-  max-height: 52px;
-  overflow: hidden;
+  max-height: none;
+  min-height: 52px;
+  overflow: visible;
   padding: 6px 8px;
 }
 
@@ -12932,7 +12934,8 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
   }
 
   body.cashier-terminal-mode .cashier-terminal-transaction-strip {
-    max-height: 44px;
+    max-height: none;
+    min-height: 44px;
     padding: 5px 8px;
   }
 

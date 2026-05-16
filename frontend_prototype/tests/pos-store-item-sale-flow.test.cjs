@@ -430,7 +430,7 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
   const topbarActionsRule = extractLastCssRule("body\\.cashier-terminal-mode \\.topbar-actions");
   const statusStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-session-strip", /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(88px,\s*1fr\)\)/);
   const mainBodyRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-body", /height:\s*calc\(100vh - 132px\)/);
-  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /max-height:\s*52px/);
+  const transactionStripRule = extractCssRuleContaining("body\\.cashier-terminal-mode \\.cashier-terminal-transaction-strip", /min-height:\s*52px/);
   const receiptEmptyRule = extractLastCssRule("body\\.cashier-terminal-mode \\.cashier-terminal-receipt-panel\\.is-empty");
   const receiptSource = extractFunctionSource(appJs, "renderCashierTerminalReceiptPanel");
 
@@ -446,8 +446,8 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
   assert.match(statusStripRule, /max-height:\s*58px/);
   assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);
   assert.match(mainBodyRule, /height:\s*calc\(100vh - 132px\)/);
-  assert.match(transactionStripRule, /max-height:\s*52px/);
-  assert.match(transactionStripRule, /overflow:\s*hidden/);
+  assert.match(transactionStripRule, /min-height:\s*52px/);
+  assert.match(transactionStripRule, /overflow:\s*visible/);
   assert.match(receiptSource, /receiptPanel\.classList\.toggle\("is-empty",\s*!sale\)/);
   assert.match(receiptEmptyRule, /display:\s*none/);
 });
@@ -459,7 +459,7 @@ test("POS 1366x768 cashier layout keeps scan cart checkout in the first viewport
 
   const shortHeightMedia = extractCssSection("@media (max-height: 780px)");
   assert.match(shortHeightMedia, /cashier-terminal-body\s*\{[\s\S]*height:\s*calc\(100vh - 154px\)/);
-  assert.match(shortHeightMedia, /cashier-terminal-transaction-strip\s*\{[\s\S]*max-height:\s*44px/);
+  assert.match(shortHeightMedia, /cashier-terminal-transaction-strip\s*\{[\s\S]*min-height:\s*44px/);
   assert.match(shortHeightMedia, /cashier-terminal-payment-panel\s*\{[\s\S]*overflow:\s*auto/);
   assert.match(shortHeightMedia, /cashier-terminal-quick-actions\s*\{[\s\S]*display:\s*none/);
   assert.doesNotMatch(shortHeightMedia, /position:\s*fixed/);
@@ -1263,15 +1263,16 @@ test("POS payment validation uses cashier-facing shortage and M-Pesa messages", 
   assert.throws(() => fn(), /Cash \+ M-Pesa 还差 KSh 100/);
 });
 
-test("POS hides unfinished M-Pesa checkout buttons and keeps cash as the live payment path", () => {
+test("POS checkout shows Cash / M-Pesa / Mixed payment modes", () => {
   const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
   const modeSource = extractFunctionSource(appJs, "setCashierTerminalPaymentMode");
 
-  assert.match(paymentSource, /activePaymentMode\)\)\s*\{\s*cashierTerminalState\.activePaymentMode = "cash"/);
   assert.match(paymentSource, /data-terminal-payment-mode="cash"/);
-  assert.doesNotMatch(paymentSource, /data-terminal-payment-mode="mpesa"/);
-  assert.doesNotMatch(paymentSource, /data-terminal-payment-mode="mixed"/);
-  assert.match(modeSource, /M-Pesa \/ 混合支付暂未上线，本次 POS 只开放现金收款。/);
+  assert.match(paymentSource, /data-terminal-payment-mode="mpesa"/);
+  assert.match(paymentSource, /data-terminal-payment-mode="mixed"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mpesaAmount"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mpesaReference"/);
+  assert.doesNotMatch(modeSource, /只开放现金收款/);
 });
 
 test("POS hides unfinished cashier feature pages while keeping offline sync entry visible and routable", () => {
