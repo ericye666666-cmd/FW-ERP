@@ -34908,11 +34908,29 @@ async function openCashierTerminalShift() {
     return cashierTerminalState.currentShift;
   } catch (error) {
     const message = formatErrorMessage(error);
-    cashierTerminalState.shiftFeedback = message.includes("already") || message.includes("已有")
-      ? `当前已有开班。请刷新本班统计或继续收银。${message ? `（${message}）` : ""}`
-      : `开班失败：${message}`;
+    const isAlreadyOpenError = message.includes("already") || message.includes("已有开班") || message.includes("已有");
+    if (isAlreadyOpenError) {
+      try {
+        const currentShift = await fetchCashierTerminalCurrentShift();
+        const normalizedCurrentShift = normalizeCashierTerminalShift(currentShift);
+        if (normalizedCurrentShift.shift_id && normalizedCurrentShift.status === "open") {
+          applyCashierTerminalShift(normalizedCurrentShift);
+          cashierTerminalState.shiftFeedback = `当前已有开班：${normalizedCurrentShift.shift_id}`;
+          await loadCashierTerminalShiftSummary(normalizedCurrentShift.shift_id);
+          renderCashierTerminal();
+          showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "warning", 2600);
+          focusCashierTerminalScanInput({ select: false });
+          return normalizedCurrentShift;
+        }
+        cashierTerminalState.shiftFeedback = "已有开班但未能读取当前班次，请刷新或联系管理员。";
+      } catch (currentShiftError) {
+        cashierTerminalState.shiftFeedback = "已有开班但未能读取当前班次，请刷新或联系管理员。";
+      }
+    } else {
+      cashierTerminalState.shiftFeedback = `开班失败：${message}`;
+    }
     renderCashierTerminal();
-    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "error", 3200);
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, isAlreadyOpenError ? "warning" : "error", 3200);
     throw error;
   } finally {
     cashierTerminalState.shiftActionInFlight = false;
