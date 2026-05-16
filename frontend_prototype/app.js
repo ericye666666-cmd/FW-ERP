@@ -145,6 +145,7 @@ let selectedReturnBarcodes = new Set();
 let mpesaCollectionsState = [];
 let mpesaCustomerInsightsState = [];
 let offlineSyncBatchState = [];
+let offlineSyncDateFilter = "";
 let saleVoidState = [];
 let saleRefundState = [];
 let paymentAnomalyState = [];
@@ -7881,6 +7882,9 @@ function getWorkspacePanelTitle(panel, language = currentLanguage) {
 function isPanelAccessible(panel, user = currentSession.user) {
   const workspace = panel?.dataset?.workspacePanel || "";
   if (!workspace) {
+    return false;
+  }
+  if (panel?.dataset?.unreleasedPosFeature) {
     return false;
   }
   if (!isWorkspaceAccessible(workspace, user)) {
@@ -30495,19 +30499,23 @@ function renderOfflineSyncResultSummary(result) {
   }
   if (!result) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会显示最近一次离线补同步成功了多少、失败了多少。";
+    target.textContent = "演示/本地记录：这里会显示最近一次离线补同步成功了多少、失败了多少。";
     return;
   }
+  const timestamp = getOfflineSyncBatchTimestamp(result);
   target.className = "report-summary";
   target.innerHTML = `
-    <div class="alert-banner">离线销售补同步已经处理完成。</div>
+    <div class="alert-banner">演示/本地记录：离线销售补同步已经处理完成。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>批次号</strong><span>${escapeHtml(result.sync_batch_no || "-")}</span></article>
       <article class="store-metric"><strong>设备号</strong><span>${escapeHtml(result.device_id || "-")}</span></article>
+      <article class="store-metric"><strong>同步时间</strong><span>${escapeHtml(formatLocalDateTime(timestamp) || getOfflineSyncBatchDateKey(result) || "-")}</span></article>
+      <article class="store-metric"><strong>状态</strong><span>${escapeHtml(getOfflineSyncBatchStatus(result))}</span></article>
       <article class="store-metric"><strong>成功行</strong><span>${escapeHtml(result.accepted_count ?? 0)}</span></article>
       <article class="store-metric"><strong>重复行</strong><span>${escapeHtml(result.duplicate_count ?? 0)}</span></article>
       <article class="store-metric"><strong>失败行</strong><span>${escapeHtml(result.failed_count ?? 0)}</span></article>
     </div>
+    <div class="subtle small">原因：${escapeHtml(getOfflineSyncBatchReason(result))}</div>
   `;
 }
 
@@ -31163,7 +31171,7 @@ function createCashierTerminalState() {
     currentLookupResult: null,
     cartItems: [],
     activePaymentMode: "cash",
-    paymentLines: [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")],
+    paymentLines: [createCashierTerminalPaymentLine("cash")],
     latestCompletedSale: null,
     activeSaleIdempotencyKey: "",
     activeDrawer: "",
@@ -31768,9 +31776,7 @@ function renderCashierTerminalPaymentPanel() {
         <h3>${escapeHtml(copy.paymentTitle)}</h3>
       </div>
       <div class="shortcut-stack">
-        <span class="shortcut-chip${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}"><kbd>F2</kbd> ${escapeHtml(copy.cashMethod)}</span>
-        <span class="shortcut-chip${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}"><kbd>F3</kbd> ${escapeHtml(copy.mpesaMethod)}</span>
-        <span class="shortcut-chip${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}"><kbd>F4</kbd> ${escapeHtml(copy.mixedMethod)}</span>
+        <span class="shortcut-chip is-active"><kbd>F2</kbd> ${escapeHtml(copy.cashMethod)}</span>
       </div>
     </div>
     <div class="cashier-terminal-grand-total" aria-label="${escapeHtml(copy.grossAmount)}">
@@ -31779,9 +31785,7 @@ function renderCashierTerminalPaymentPanel() {
       <small>${escapeHtml(totals.totalItems)} ${escapeHtml(copy.totalItems)} · ${escapeHtml(copy.paymentStatus)}：${escapeHtml(paymentStatus)}</small>
     </div>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>F2</span><span>${escapeHtml(copy.cashMethod)}</span></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>F3</span><span>${escapeHtml(copy.mpesaMethod)}</span></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>F4</span><span>${escapeHtml(copy.mixedMethod)}</span></button>
+      <button type="button" class="method-btn is-active" data-terminal-payment-mode="cash"><span>F2</span><span>${escapeHtml(copy.cashMethod)}</span></button>
     </div>
     <div class="summary-grid cashier-terminal-total-grid">
       <article class="summary-box"><span>${escapeHtml(copy.totalItems)}</span><strong>${escapeHtml(totals.totalItems)}</strong></article>
@@ -31827,7 +31831,6 @@ function renderCashierTerminalPaymentPanel() {
       <div class="secondary-actions">
         <button type="button" class="secondary-action" disabled>${escapeHtml(copy.holdAction)}</button>
         <button type="button" class="secondary-action" data-terminal-action="clear-cart">${escapeHtml(copy.clearBasket)}</button>
-        <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer">${escapeHtml(copy.voidAction)}</button>
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer">${escapeHtml(copy.receiptReprint)}</button>
         <button type="button" class="secondary-action" data-terminal-action="clear-lookup">${escapeHtml(copy.cancelAction)}</button>
       </div>
@@ -31851,9 +31854,6 @@ function renderCashierTerminalQuickActions() {
   }
   const copy = getCashierTerminalCopy();
   const offlineCount = Array.isArray(offlineSyncBatchState) ? offlineSyncBatchState.length : 0;
-  const anomalyCount = Array.isArray(paymentAnomalyState)
-    ? paymentAnomalyState.filter((row) => String(row?.status || "").trim().toLowerCase() === "open").length
-    : 0;
   const cashierName = currentSession.user?.full_name || currentSession.user?.username || "cashier";
   const syncText = cashierTerminalState.networkStatus === "online"
     ? `${copy.online} · ${offlineCount || 0}`
@@ -31870,10 +31870,8 @@ function renderCashierTerminalQuickActions() {
     <div class="cashier-terminal-footer-actions">
       <button type="button" class="quick-action-button" disabled><span>${escapeHtml(copy.holdAction)}</span><strong>-</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="clear-cart"><span>${escapeHtml(copy.clearBasket)}</span><strong>${escapeHtml(getCashierTerminalTotals().totalItems)}</strong></button>
-      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>F7</span><strong>${escapeHtml(copy.voidAction)}</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.order_no || "-")}</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline" data-drawer="offlineDrawer"><span>${escapeHtml(copy.offlineAction)}</span><strong>${escapeHtml(offlineCount || 0)}</strong></button>
-      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>${escapeHtml(copy.paymentAnomaly)}</span><strong>${escapeHtml(anomalyCount || 0)}</strong></button>
     </div>
   `;
 }
@@ -32165,13 +32163,14 @@ function renderCashierTerminal() {
 }
 
 function setCashierTerminalPaymentMode(mode) {
-  cashierTerminalState.activePaymentMode = mode;
-  if (mode === "cash") {
+  const normalizedMode = String(mode || "cash").trim().toLowerCase();
+  if (normalizedMode !== "cash") {
+    cashierTerminalState.paymentFeedback = "线上收款 / M-Pesa 暂未上线，请使用现金完成收款。";
+    cashierTerminalState.activePaymentMode = "cash";
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.paymentFeedback, "warning", 2200);
+  } else {
+    cashierTerminalState.activePaymentMode = "cash";
     cashierTerminalState.cashReceived = cashierTerminalState.cashReceived || "";
-  } else if (mode === "mpesa") {
-    cashierTerminalState.mpesaAmount = cashierTerminalState.mpesaAmount || "";
-  } else if (!Array.isArray(cashierTerminalState.paymentLines) || !cashierTerminalState.paymentLines.length) {
-    cashierTerminalState.paymentLines = [createCashierTerminalPaymentLine("cash"), createCashierTerminalPaymentLine("mpesa")];
   }
   renderCashierTerminal();
 }
@@ -33563,15 +33562,8 @@ renderCashierTerminalPaymentPanel = function () {
   const totals = getCashierTerminalTotals();
   const paid = getCashierTerminalPaymentAssignedTotal();
   const changeDue = getCashierTerminalChangeDue();
-  const balance = Math.max(totals.totalAmount - paid, 0);
   const saleDisabled = !cashierTerminalState.currentShift?.shift_id;
   const paymentGuidance = getCashierTerminalPaymentGuidance();
-  const mpesaOfflineNotice = cashierTerminalState.networkStatus === "offline"
-    ? `<div class="cashier-payment-warning">离线状态下 M-Pesa reference 仅暂存，待同步核验</div>`
-    : "";
-  const mpesaManualNotice = ["mpesa", "mixed"].includes(cashierTerminalState.activePaymentMode)
-    ? `<div class="cashier-payment-warning">请确认 M-Pesa 已到账，再点击完成收款。</div>`
-    : "";
   cashierTerminalPaymentPanel.innerHTML = `
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
@@ -33595,50 +33587,21 @@ renderCashierTerminalPaymentPanel = function () {
       <article class="summary-box"><span>小计</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
       <article class="summary-box"><span>折扣</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
       <article class="summary-box"><span>实收</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
-      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" ? changeDue : balance))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>找零</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(changeDue))}</strong></article>
     </div>
     <label class="field cashier-discount-field">
       <span>整单折扣</span>
       <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.discountAmount || "")}" data-terminal-payment-field="discountAmount" placeholder="0" />
     </label>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mpesa" ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>M-Pesa</span><small>${escapeHtml(chooseI18nLabel("手动流水号", "Manual Reference"))}</small></button>
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "mixed" ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合", "Mixed"))}</span><small>现金 + M-Pesa</small></button>
+      <button type="button" class="method-btn is-active" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
-      ${cashierTerminalState.activePaymentMode === "cash" ? `
-        <label class="field">
-          <span>实收金额</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
-        </label>
-      ` : cashierTerminalState.activePaymentMode === "mpesa" ? `
-        ${mpesaOfflineNotice}
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || totals.totalAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="默认等于应收金额" />
-        </label>
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference"))}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
-        </label>
-      ` : `
-        ${mpesaOfflineNotice}
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("现金金额", "Cash Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="现金金额" />
-        </label>
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa Amount"))}</span>
-          <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="M-Pesa 金额" />
-        </label>
-        <label class="field">
-          <span>${escapeHtml(chooseI18nLabel("M-Pesa 流水号", "M-Pesa Reference No."))}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" />
-        </label>
-      `}
+      <label class="field">
+        <span>实收金额</span>
+        <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
+      </label>
     </div>
-    ${mpesaManualNotice}
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
       <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale"}</strong></button>
@@ -33732,6 +33695,7 @@ renderCashierTerminalQuickActions = function () {
       <span><strong>待收金额</strong>${escapeHtml(formatCashierPreviewMoney(Math.max(totals.totalAmount - paid, 0)))}</span>
       <span><strong>支付方式</strong>${escapeHtml(getCashierTerminalPaymentModeLabel())}</span>
       <span><strong>状态</strong>${escapeHtml(paymentStatus)}</span>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline"><span>${escapeHtml(copy.offlineAction)}</span><strong>${escapeHtml(Array.isArray(offlineSyncBatchState) ? offlineSyncBatchState.length : 0)}</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
     </div>
   `;
@@ -34458,25 +34422,8 @@ function validateCashierTerminalPayment() {
     }
     return { cashAmount: cash, mpesaAmount: 0, reference: "", paid: cash };
   }
-  if (cashierTerminalState.activePaymentMode === "mpesa") {
-    const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mpesaAmount || totals.totalAmount);
-    if (mpesaAmount < totals.totalAmount) {
-      throw new Error(`M-Pesa 还差 ${formatCashierPreviewMoney(totals.totalAmount - mpesaAmount)}`);
-    }
-    if (!String(cashierTerminalState.mpesaReference || "").trim()) {
-      throw new Error("请输入 M-Pesa Reference");
-    }
-    return { cashAmount: 0, mpesaAmount, reference: String(cashierTerminalState.mpesaReference || "").trim(), paid: mpesaAmount };
-  }
-  const cashAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedCashAmount);
-  const mpesaAmount = normalizeCashierTerminalNumber(cashierTerminalState.mixedMpesaAmount);
-  if (cashAmount + mpesaAmount < totals.totalAmount) {
-    throw new Error(`Cash + M-Pesa 还差 ${formatCashierPreviewMoney(totals.totalAmount - cashAmount - mpesaAmount)}`);
-  }
-  if (mpesaAmount > 0 && !String(cashierTerminalState.mixedMpesaReference || "").trim()) {
-    throw new Error("请输入 M-Pesa Reference");
-  }
-  return { cashAmount, mpesaAmount, reference: String(cashierTerminalState.mixedMpesaReference || "").trim(), paid: cashAmount + mpesaAmount };
+  cashierTerminalState.activePaymentMode = "cash";
+  throw new Error("线上收款 / M-Pesa 暂未上线，请使用现金完成收款。");
 }
 
 function buildCashierTerminalPosSaleItemPayload(row = {}) {
@@ -34882,24 +34829,42 @@ async function fetchCashierTerminalCurrentShift() {
 
 async function openCashierTerminalShift() {
   ensureCashierTerminalPreviewState();
+  if (cashierTerminalState.currentShift?.shift_id && cashierTerminalState.shiftOpen) {
+    cashierTerminalState.shiftFeedback = `当前已有开班：${cashierTerminalState.currentShift.shift_id}`;
+    renderCashierTerminal();
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "warning", 2200);
+    focusCashierTerminalScanInput({ select: false });
+    return cashierTerminalState.currentShift;
+  }
   const storeCode = getCashierTerminalStoreCode();
-  const shift = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/open`, {
-    method: "POST",
-    body: JSON.stringify({
-      cashier_id: getCashierTerminalCashierName(),
-      terminal_id: getCashierTerminalTerminalId(),
-      opening_float: normalizeCashierTerminalNumber(cashierTerminalState.openingFloatCash || 0),
-      note: cashierTerminalState.openingNote || "",
-    }),
-  });
-  cashierTerminalState.currentShift = normalizeCashierTerminalShift(shift);
-  applyCashierTerminalShift(cashierTerminalState.currentShift);
-  cashierTerminalState.shiftFeedback = `已成功开班：${cashierTerminalState.currentShift.shift_id}`;
-  await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+  cashierTerminalState.shiftFeedback = "正在开班，请稍候...";
   renderCashierTerminal();
-  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "success", 1800);
-  focusCashierTerminalScanInput({ select: false });
-  return cashierTerminalState.currentShift;
+  showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "info", 1200);
+  try {
+    const shift = await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/open`, {
+      method: "POST",
+      body: JSON.stringify({
+        cashier_id: getCashierTerminalCashierName(),
+        terminal_id: getCashierTerminalTerminalId(),
+        opening_float: normalizeCashierTerminalNumber(cashierTerminalState.openingFloatCash || 0),
+        note: cashierTerminalState.openingNote || "",
+      }),
+    });
+    cashierTerminalState.currentShift = normalizeCashierTerminalShift(shift);
+    applyCashierTerminalShift(cashierTerminalState.currentShift);
+    cashierTerminalState.shiftFeedback = `已成功开班：${cashierTerminalState.currentShift.shift_id}`;
+    await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
+    renderCashierTerminal();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "success", 1800);
+    focusCashierTerminalScanInput({ select: false });
+    return cashierTerminalState.currentShift;
+  } catch (error) {
+    cashierTerminalState.shiftFeedback = formatErrorMessage(error) || "开班失败，请重试。";
+    renderCashierTerminal();
+    showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalState.shiftFeedback, "error", 2600);
+    throw error;
+  }
 }
 
 async function loadCashierTerminalShiftSummary(shiftId = cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo) {
@@ -35758,6 +35723,11 @@ handleCashierTerminalAction = async function (action, target) {
       return;
     case "open-drawer":
       cashierTerminalState.activeDrawer = target.dataset.terminalDrawer || "";
+      if (["void", "refund", "anomaly"].includes(cashierTerminalState.activeDrawer)) {
+        cashierTerminalState.activeDrawer = "";
+        renderCashierTerminal();
+        throw new Error("该 POS 功能暂未上线，现场收银端已隐藏。");
+      }
       renderCashierTerminal();
       if (cashierTerminalState.activeDrawer === "manual-item") {
         await loadApparelDefaultSalePricesForPdaRuntime();
@@ -35855,7 +35825,7 @@ handleCashierTerminalAction = async function (action, target) {
       renderCashierTerminalDrawer();
       return;
     default:
-      return;
+      throw new Error("这个 POS 按钮暂未绑定功能，请联系店长或使用已上线入口。");
   }
 }
 
@@ -36059,15 +36029,62 @@ function renderMpesaSummary(collections = mpesaCollectionsState, insights = mpes
   `;
 }
 
+function getOfflineSyncBatchTimestamp(row = {}) {
+  return String(row.synced_at || row.created_at || row.processed_at || row.updated_at || row.submitted_at || "").trim();
+}
+
+function getOfflineSyncBatchDateKey(row = {}) {
+  const timestamp = getOfflineSyncBatchTimestamp(row);
+  return timestamp ? getLocalDateKey(timestamp) : "";
+}
+
+function getFilteredOfflineSyncBatches(batches = offlineSyncBatchState) {
+  const rows = Array.isArray(batches) ? batches : [];
+  const activeDate = String(offlineSyncDateFilter || "").trim();
+  if (!activeDate) {
+    return rows;
+  }
+  return rows.filter((row) => getOfflineSyncBatchDateKey(row) === activeDate);
+}
+
+function getOfflineSyncBatchStatus(row = {}) {
+  const failed = Number(row.failed_count || 0);
+  const duplicate = Number(row.duplicate_count || 0);
+  if (failed > 0) {
+    return "有失败";
+  }
+  if (duplicate > 0) {
+    return "有重复";
+  }
+  return String(row.status || row.sync_status || "已处理").trim() || "已处理";
+}
+
+function getOfflineSyncBatchReason(row = {}) {
+  const resultReason = Array.isArray(row.results)
+    ? row.results.map((item) => item.message || item.reason || item.error).find(Boolean)
+    : "";
+  return String(row.reason || row.note || resultReason || "离线销售补同步记录").trim();
+}
+
+function renderOfflineSyncDateFilter() {
+  const input = document.querySelector("#offlineSyncDateFilter");
+  if (input instanceof HTMLInputElement) {
+    input.value = offlineSyncDateFilter || "";
+  }
+}
+
 function renderOfflineSyncSummary(batches = offlineSyncBatchState) {
   const target = document.querySelector("#offlineSyncSummary");
   if (!target) {
     return;
   }
-  const rows = Array.isArray(batches) ? batches : [];
+  renderOfflineSyncDateFilter();
+  const rows = getFilteredOfflineSyncBatches(batches);
   if (!rows.length) {
     target.className = "candidate-summary empty-state";
-    target.textContent = "这里会汇总断网补同步的批次数、成功行、重复行和失败行。";
+    target.textContent = offlineSyncDateFilter
+      ? `演示/本地记录：${offlineSyncDateFilter} 暂无离线销售同步记录。`
+      : "演示/本地记录：这里会汇总断网补同步的批次数、成功行、重复行和失败行。";
     return;
   }
   const accepted = rows.reduce((sum, row) => sum + Number(row.accepted_count || 0), 0);
@@ -36094,7 +36111,23 @@ function renderOfflineSyncSummary(batches = offlineSyncBatchState) {
         <span>${failed}</span>
       </article>
     </div>
-    <div class="subtle">涉及设备：${devices} 台</div>
+    <div class="subtle">演示/本地记录 · ${offlineSyncDateFilter ? `筛选日期：${escapeHtml(offlineSyncDateFilter)} · ` : ""}涉及设备：${devices} 台</div>
+    <div class="candidate-list">
+      ${rows
+        .map((row) => {
+          const timestamp = getOfflineSyncBatchTimestamp(row);
+          return `
+            <article class="candidate-row">
+              <div class="candidate-main">
+                <strong>${escapeHtml(row.sync_batch_no || row.batch_no || "离线同步批次")}</strong>
+                <div class="subtle small">${escapeHtml(formatLocalDateTime(timestamp) || getOfflineSyncBatchDateKey(row) || "同步时间待记录")} · 状态：${escapeHtml(getOfflineSyncBatchStatus(row))}</div>
+                <div class="subtle small">设备号：${escapeHtml(row.device_id || "-")} · 原因：${escapeHtml(getOfflineSyncBatchReason(row))}</div>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
   `;
 }
 
@@ -47664,7 +47697,13 @@ cashierTerminalShell?.addEventListener("click", async (event) => {
   if (!(target instanceof HTMLElement)) {
     return;
   }
+  const actionLabel = target.dataset.terminalAction || target.dataset.terminalPaymentMode || "";
+  const canToggleBusy = target instanceof HTMLButtonElement && !target.disabled;
   try {
+    if (canToggleBusy && actionLabel) {
+      target.disabled = true;
+      target.setAttribute("aria-busy", "true");
+    }
     if (target.dataset.terminalLocale) {
       setGlobalLanguage(target.dataset.terminalLocale);
       updateCashierTerminalClock();
@@ -47687,6 +47726,11 @@ cashierTerminalShell?.addEventListener("click", async (event) => {
     await handleCashierTerminalAction(target.dataset.terminalAction || "", target);
   } catch (error) {
     showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
+  } finally {
+    if (canToggleBusy) {
+      target.disabled = false;
+      target.removeAttribute("aria-busy");
+    }
   }
 });
 
@@ -51304,6 +51348,17 @@ document.querySelector("#paymentAnomalyList")?.addEventListener("click", (event)
   }
   hydratePaymentAnomalyForm(row);
   focusElement("#paymentAnomalyResolveForm");
+});
+
+document.querySelector("#offlineSyncDateFilter")?.addEventListener("change", (event) => {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  offlineSyncDateFilter = input?.value || "";
+  renderOfflineSyncSummary();
+});
+
+document.querySelector("#offlineSyncTodayButton")?.addEventListener("click", () => {
+  offlineSyncDateFilter = getLocalDateKey(new Date().toISOString());
+  renderOfflineSyncSummary();
 });
 
 document.querySelector("#saleVoidList")?.addEventListener("click", (event) => {

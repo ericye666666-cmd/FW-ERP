@@ -1177,7 +1177,7 @@ test("POS cashier UX strongly guides no-shift state and returns focus after shif
   assert.match(actionSource, /case "close-drawer":[\s\S]*focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
 });
 
-test("POS payment validation uses cashier-facing shortage and M-Pesa messages", () => {
+test("POS payment validation keeps cash active and blocks hidden online payment modes", () => {
   const source = extractFunctionSource(appJs, "validateCashierTerminalPayment");
   const context = {
     cashierTerminalState: {
@@ -1197,14 +1197,59 @@ test("POS payment validation uses cashier-facing shortage and M-Pesa messages", 
 
   assert.throws(() => fn(), /还差 KSh 150/);
   context.cashierTerminalState.activePaymentMode = "mpesa";
-  assert.throws(() => fn(), /请输入 M-Pesa Reference/);
+  assert.throws(() => fn(), /M-Pesa 暂未上线/);
   context.cashierTerminalState.activePaymentMode = "mixed";
-  assert.throws(() => fn(), /Cash \+ M-Pesa 还差 KSh 100/);
+  assert.throws(() => fn(), /M-Pesa 暂未上线/);
 });
 
-test("POS M-Pesa UI warns manual reference is not automatic settlement proof", () => {
+test("POS payment UI hides M-Pesa and mixed payment from the cashier terminal", () => {
   const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
-  assert.match(paymentSource, /请确认 M-Pesa 已到账，再点击完成收款。/);
+  assert.doesNotMatch(paymentSource, /data-terminal-payment-mode="mpesa"/);
+  assert.doesNotMatch(paymentSource, /data-terminal-payment-mode="mixed"/);
+  assert.doesNotMatch(paymentSource, /data-terminal-drawer="void"/);
+});
+
+test("POS hotfix hides unreleased cashier functions while keeping offline sync visible", () => {
+  const quickActionSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalQuickActions");
+  const accessibleSource = extractFunctionSource(appJs, "isPanelAccessible");
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+
+  ["sale-void", "sale-refund", "payment-anomaly", "safaricom-mpesa"].forEach((feature) => {
+    assert.match(indexHtml, new RegExp(`data-unreleased-pos-feature="${feature}" hidden`));
+  });
+  assert.match(indexHtml, /12\. 离线销售同步/);
+  assert.match(indexHtml, /id="offlineSyncDateFilter"/);
+  assert.match(indexHtml, /演示\/本地记录/);
+  assert.match(accessibleSource, /panel\?\.dataset\?\.unreleasedPosFeature/);
+  assert.doesNotMatch(quickActionSource, /data-terminal-drawer="void"/);
+  assert.doesNotMatch(quickActionSource, /data-terminal-drawer="anomaly"/);
+  assert.match(quickActionSource, /data-terminal-drawer="offline"/);
+  assert.match(actionSource, /暂未绑定功能/);
+});
+
+test("POS open shift shows loading, reuses current open shift, and refreshes header state", () => {
+  const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");
+
+  assert.match(openSource, /当前已有开班/);
+  assert.match(openSource, /正在开班，请稍候/);
+  assert.match(openSource, /showTransientInlineNotice\("#cashierTerminalInlineNotice", cashierTerminalState\.shiftFeedback, "info"/);
+  assert.match(openSource, /applyCashierTerminalShift\(cashierTerminalState\.currentShift\)/);
+  assert.match(openSource, /await loadCashierTerminalShiftSummary\(cashierTerminalState\.currentShift\.shift_id\)/);
+  assert.match(openSource, /catch \(error\)[\s\S]*开班失败/);
+});
+
+test("offline sales sync lists date, status, device, and reason with local-record labeling", () => {
+  const summarySource = extractFunctionSource(appJs, "renderOfflineSyncSummary");
+  const resultSource = extractFunctionSource(appJs, "renderOfflineSyncResultSummary");
+
+  assert.match(summarySource, /getFilteredOfflineSyncBatches\(batches\)/);
+  assert.match(summarySource, /演示\/本地记录/);
+  assert.match(summarySource, /formatLocalDateTime\(timestamp\)/);
+  assert.match(summarySource, /getOfflineSyncBatchStatus\(row\)/);
+  assert.match(summarySource, /设备号/);
+  assert.match(summarySource, /原因/);
+  assert.match(resultSource, /同步时间/);
+  assert.match(resultSource, /getOfflineSyncBatchReason\(result\)/);
 });
 
 test("POS scan failures keep resolver details but show cashier-facing main error and refocus scan", () => {

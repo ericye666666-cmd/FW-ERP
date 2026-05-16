@@ -54,7 +54,7 @@
             </article>
             <article>
               <strong>门店功能区</strong>
-              <span>门店分批上架、货架位、收银结算、作废、退款和支付异常。</span>
+              <span>门店分批上架、货架位、收银结算和离线销售同步。</span>
             </article>
           </div>
         </section>
@@ -657,7 +657,6 @@
               <select name="payment_method">
                 <option value="bank_transfer">Bank transfer</option>
                 <option value="cash">Cash</option>
-                <option value="mpesa">M-Pesa</option>
               </select>
               <textarea name="note" rows="3" placeholder="备注，例如提货方式、尾款说明、现场要求"></textarea>
               <button type="submit">完成真实出库</button>
@@ -848,7 +847,7 @@
         <pre id="storeRecentSalesSimulationOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-manager hidden-output" data-workspace-panel="store" data-unreleased-pos-feature="sale-void" hidden>
         <div class="panel-head">
           <h2>作废单</h2>
           <button data-action="load-void-requests" type="button">读取待审核作废单</button>
@@ -878,7 +877,7 @@
         <pre id="saleVoidOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-clerk" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-clerk hidden-output" data-workspace-panel="store" data-unreleased-pos-feature="sale-refund" hidden>
         <div class="panel-head">
           <h2>顾客退货 / 退款单</h2>
           <button data-action="load-refund-requests" type="button">读取待审核退货 / 退款单</button>
@@ -930,7 +929,7 @@
         <pre id="saleRefundOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel store-role-panel store-role-panel-manager" data-workspace-panel="store">
+      <section class="panel store-role-panel store-role-panel-manager hidden-output" data-workspace-panel="store" data-unreleased-pos-feature="payment-anomaly" hidden>
         <div class="panel-head">
           <h2>支付异常单</h2>
           <button data-action="load-payment-anomalies" type="button">读取待处理支付异常</button>
@@ -3629,7 +3628,7 @@
               <div class="line-builder-head">
                 <div>
                   <strong>收款明细</strong>
-                  <p>现金、M-Pesa 或混合支付都在这里逐行填写。</p>
+                  <p>现金收款在这里填写；线上收款入口暂不对现场收银开放。</p>
                 </div>
                 <button type="button" class="ghost-button mini-button" data-builder-add="sale-payments">新增一行</button>
               </div>
@@ -3650,7 +3649,7 @@
         </div>
       </section>
 
-      <section class="panel" data-workspace-panel="store">
+      <section class="panel hidden-output" data-workspace-panel="store" data-unreleased-pos-feature="safaricom-mpesa" hidden>
         <div class="panel-head">
           <h2>11. Safaricom / M-Pesa</h2>
           <div class="button-row">
@@ -3701,8 +3700,15 @@
           <h2>12. 离线销售同步</h2>
           <button data-action="load-offline-sync-batches" type="button">读取离线同步批次</button>
         </div>
+        <div class="filter-row compact-filter-row">
+          <label class="field compact-field">
+            <span>同步日期</span>
+            <input id="offlineSyncDateFilter" type="date" />
+          </label>
+          <button id="offlineSyncTodayButton" class="ghost-button mini-button" type="button">今天</button>
+        </div>
         <div id="offlineSyncSummary" class="candidate-summary empty-state">
-          这里会汇总断网补同步的批次数、成功行、重复行和失败行。
+          演示/本地记录：这里会按日期汇总断网补同步的批次数、成功行、重复行和失败行。
         </div>
         <form id="offlineSyncForm" class="form-grid">
           <input name="device_id" placeholder="设备号" value="POS-TAB-01" />
@@ -3711,7 +3717,7 @@
             name="sales_json"
             class="json-raw-field"
             rows="8"
-            placeholder='[{"client_sale_id":"OFF-001","order_no":"SO-OFFLINE-001","store_code":"UTAWALA","cashier_name":"active_cashier","shift_no":"","power_mode":"offline","note":"synced after blackout","items":[{"barcode":"生成后自动带出","qty":1,"selling_price":390,"override_reason":"power outage manual price","customer_id":"CUST-9001"}],"payments":[{"method":"mpesa","amount":390,"reference":"OFFPAY001","customer_id":"CUST-9001"}]}]'
+            placeholder='[{"client_sale_id":"OFF-001","order_no":"SO-OFFLINE-001","store_code":"UTAWALA","cashier_name":"active_cashier","shift_no":"","power_mode":"offline","note":"synced after blackout","items":[{"barcode":"生成后自动带出","qty":1,"selling_price":390,"override_reason":"power outage manual price","customer_id":"CUST-9001"}],"payments":[{"method":"cash","amount":390,"reference":"OFFPAY001","customer_id":"CUST-9001"}]}]'
           >[]</textarea>
           <div class="line-builder" data-builder="offline-sales">
             <div class="line-builder-head">
@@ -3726,7 +3732,7 @@
           <button type="submit">提交离线销售同步</button>
         </form>
         <div id="offlineSyncResultSummary" class="candidate-summary empty-state">
-          这里会显示最近一次离线补同步成功了多少、失败了多少。
+          演示/本地记录：这里会显示最近一次离线补同步成功了多少、失败了多少。
         </div>
         <pre id="offlineSyncOutput" class="output hidden-output"></pre>
       </section>

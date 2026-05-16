@@ -220,8 +220,8 @@ test("print modal uses neutral compact ERP visual styling", () => {
   assert.match(stylesCss, /\.bale-print-modal-side \.flow-summary-note\.warning\s*\{[\s\S]*?border-color:\s*var\(--status-warning-border\);[\s\S]*?background:\s*var\(--status-warning-bg\);[\s\S]*?color:\s*var\(--status-warning-text\);/);
   assert.match(stylesCss, /\.bale-modal-status-row \.warning-pill\s*\{[\s\S]*?border:\s*1px solid var\(--status-warning-border\);[\s\S]*?background:\s*var\(--status-warning-bg\);[\s\S]*?color:\s*var\(--status-warning-text\);/);
   assert.match(stylesCss, /\.bale-print-modal-side \.candidate-row\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
-  assert.match(stylesCss, /\.bale-preview-card,\n\.printer-status-card\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
-  assert.match(stylesCss, /\.bale-print-panel-head,\n\.bale-print-workbench-head\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
+  assert.match(stylesCss, /\.bale-preview-card,\r?\n\.printer-status-card\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
+  assert.match(stylesCss, /\.bale-print-panel-head,\r?\n\.bale-print-workbench-head\s*\{[\s\S]*?border-radius:\s*8px;[\s\S]*?border:\s*1px solid #e2e8f0;[\s\S]*?background:\s*#ffffff;/);
   const printModalCss = [
     stylesCss.match(/\.modal-card\s*\{[\s\S]*?\n\}/)?.[0] || "",
     stylesCss.match(/\.bale-print-modal-preview\s*\{[\s\S]*?\n\}/)?.[0] || "",
@@ -365,7 +365,7 @@ test("4.1 manual replenishment page uses compact warehouse workbench layout", ()
   assert.match(transferHtml, /<input name="to_store_code" type="hidden" value="UTAWALA" \/>/);
   assert.match(transferHtml, /<input name="required_arrival_date" type="hidden" value="2026-05-03" \/>/);
   assert.match(appJs, /function syncManualReplenishmentContextToForm/);
-  assert.match(appJs, /syncManualReplenishmentContextToForm\(\);\n\s*const form = new FormData\(event\.currentTarget\);/);
+  assert.match(appJs, /syncManualReplenishmentContextToForm\(\);\r?\n\s*const form = new FormData\(event\.currentTarget\);/);
 
   assert.match(transferHtml, /class="manual-replenishment-layout"/);
   assert.match(transferHtml, /class="transfer-ops-card manual-replenishment-entry-card"/);

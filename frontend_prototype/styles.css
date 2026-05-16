@@ -10576,6 +10576,19 @@ body.pda-runtime-mode .store-manager-pda-bottom-tabs {
   min-height: 46px;
 }
 
+.filter-row.compact-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+.filter-row.compact-filter-row .compact-field {
+  min-width: 180px;
+  margin: 0;
+}
+
 .output {
   background: #161310;
   color: #d7f9ff;
