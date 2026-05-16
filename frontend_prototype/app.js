@@ -34917,7 +34917,7 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
       一家门店可以有多个 POS 终端，每个终端可以各自开班。下面表格显示本店各 terminal 当前状态。
     </div>
     <div class="candidate-summary">
-      <strong>本机终端：</strong>${escapeHtml(terminalId)}。如果这台电脑不是原 POS 机，请改用新的 terminal_id，例如 POS-UTW-02。
+      <strong>本机记录的 terminal_id（仅作设备来源参考）：</strong>${escapeHtml(terminalId)}。如需更改本机记录，请联系管理员更新 terminal_id。
     </div>
     <div class="metrics-grid">
       ${

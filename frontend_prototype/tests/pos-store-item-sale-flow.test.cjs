@@ -228,7 +228,7 @@ test("POS cashier shift lookup page is wired with nav entry, refresh action, and
   assert.match(appJs, /function renderCashierShiftLookupSummary/);
   assert.match(appJs, /async function refreshCashierShiftLookupSummary/);
   assert.match(appJs, /一家门店可以有多个 POS 终端/);
-  assert.match(appJs, /如果这台电脑不是原 POS 机，请改用新的 terminal_id/);
+  assert.match(appJs, /本机记录的 terminal_id（仅作设备来源参考）/);
 });
 
 test("POS cashier terminal renders cashier touch layout without changing barcode scope", () => {
