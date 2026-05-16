@@ -4991,6 +4991,15 @@ def get_current_store_pos_shift(
     return PosShiftResponse(**shift)
 
 
+@router.get("/stores/{store_code}/pos-shifts", response_model=list[PosShiftResponse], tags=["pos"])
+def list_store_pos_shifts(
+    store_code: str,
+    authorization: Optional[str] = Header(default=None),
+) -> list[PosShiftResponse]:
+    _require_current_user(authorization=authorization)
+    return [PosShiftResponse(**row) for row in state.list_store_pos_shifts(store_code)]
+
+
 @router.get("/stores/{store_code}/pos-shifts/{shift_id}/summary", response_model=PosShiftSummaryResponse, tags=["pos"])
 def get_store_pos_shift_summary(
     store_code: str,

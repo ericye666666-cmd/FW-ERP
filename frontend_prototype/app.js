@@ -34862,7 +34862,12 @@ async function fetchCashierTerminalCurrentShift() {
   return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/current?cashier_id=${encodeURIComponent(cashierId)}&terminal_id=${encodeURIComponent(terminalId)}`);
 }
 
-function renderCashierShiftLookupSummary(shift = null) {
+async function fetchStorePosShiftList() {
+  const storeCode = getCashierTerminalStoreCode();
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts`);
+}
+
+function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
   const target = document.querySelector("#cashierShiftLookupSummary");
   if (!target) return;
   const user = currentSession?.user || {};
@@ -34874,6 +34879,31 @@ function renderCashierShiftLookupSummary(shift = null) {
   const storeName = getCashierTerminalStoreDisplayName() || "-";
   const terminalId = getCashierTerminalTerminalId();
   const currentShift = shift?.shift_id ? normalizeCashierTerminalShift(shift) : null;
+  const normalizedRows = Array.isArray(shiftRows)
+    ? shiftRows.map((row) => normalizeCashierTerminalShift(row)).filter((row) => row?.shift_id)
+    : [];
+  const terminalMap = new Map();
+  normalizedRows.forEach((row) => {
+    const key = String(row.terminal_id || "").trim() || "UNKNOWN";
+    if (!terminalMap.has(key)) {
+      terminalMap.set(key, row);
+    }
+  });
+  if (!terminalMap.has(terminalId)) {
+    terminalMap.set(terminalId, null);
+  }
+  const terminalRows = [...terminalMap.entries()].map(([id, row]) => {
+    const status = row ? (String(row.status || "").toLowerCase() === "open" ? "open" : "idle") : "unknown";
+    return {
+      terminal_id: id,
+      status,
+      shift_id: row?.shift_id || "-",
+      cashier_id: row?.cashier_id || "-",
+      cashier_name: row?.cashier_name || "-",
+      opened_at: row?.opened_at || "-",
+      opening_float: row?.opening_float ?? "-",
+    };
+  });
   target.classList.remove("empty-state");
   target.innerHTML = `
     <div class="metrics-grid">
@@ -34882,6 +34912,12 @@ function renderCashierShiftLookupSummary(shift = null) {
       <article class="store-metric"><strong>角色</strong><span>${escapeHtml(role)}</span></article>
       <article class="store-metric"><strong>门店</strong><span>${escapeHtml(storeCode)} / ${escapeHtml(storeName)}</span></article>
       <article class="store-metric"><strong>terminal_id</strong><span>${escapeHtml(terminalId)}</span></article>
+    </div>
+    <div class="candidate-summary">
+      一家门店可以有多个 POS 终端，每个终端可以各自开班。下面表格显示本店各 terminal 当前状态。
+    </div>
+    <div class="candidate-summary">
+      <strong>本机终端：</strong>${escapeHtml(terminalId)}。如果这台电脑不是原 POS 机，请改用新的 terminal_id，例如 POS-UTW-02。
     </div>
     <div class="metrics-grid">
       ${
@@ -34894,12 +34930,46 @@ function renderCashierShiftLookupSummary(shift = null) {
     : `<div class="empty-state">当前 terminal 暂无 open shift.</div>`
 }
     </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>terminal_id</th>
+            <th>status</th>
+            <th>shift_id</th>
+            <th>cashier</th>
+            <th>cashier_name</th>
+            <th>opening_time</th>
+            <th>opening_float</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${terminalRows.map((row) => `
+            <tr>
+              <td>${escapeHtml(row.terminal_id)}</td>
+              <td>${escapeHtml(row.status)}</td>
+              <td>${escapeHtml(row.shift_id)}</td>
+              <td>${escapeHtml(row.cashier_id)}</td>
+              <td>${escapeHtml(row.cashier_name)}</td>
+              <td>${escapeHtml(row.opened_at)}</td>
+              <td>${escapeHtml(String(row.opening_float))}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
 async function refreshCashierShiftLookupSummary() {
-  const shift = await fetchCashierTerminalCurrentShift();
-  renderCashierShiftLookupSummary(shift);
+  let shift = null;
+  try {
+    shift = await fetchCashierTerminalCurrentShift();
+  } catch (error) {
+    shift = null;
+  }
+  const shiftRows = await fetchStorePosShiftList();
+  renderCashierShiftLookupSummary(shift, shiftRows);
 }
 
 async function openCashierTerminalShift() {
