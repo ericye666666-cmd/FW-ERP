@@ -44,7 +44,7 @@ class SaleCreate(BaseModel):
 class PosSaleItemCreate(BaseModel):
     line_type: str = "STORE_ITEM"
     machine_code: str = ""
-    store_item_machine_code: str = ""
+    store_item_machine_code: Optional[str] = None
     display_code: str = ""
     barcode_type: str = ""
     description: str = ""
