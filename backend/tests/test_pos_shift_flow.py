@@ -77,7 +77,7 @@ def _sell(state, shift_id, machine_code, *, payment_method="cash", cash_amount=1
     return state.create_pos_sale("UTAWALA", payload, created_by="store_manager_1")
 
 
-def test_open_shift_and_duplicate_guards(state):
+def test_open_shift_cashier_based_uniqueness_and_terminal_metadata(state):
     shift = _open_shift(state)
 
     assert shift["shift_id"].startswith("SHIFT-UTW-")
@@ -87,20 +87,30 @@ def test_open_shift_and_duplicate_guards(state):
     assert shift["opening_float"] == 2000
     assert shift["status"] == "open"
 
-    with pytest.raises(HTTPException):
-        _open_shift(state, cashier_id="Clerk A", terminal_id="POS-UTW-02")
-    with pytest.raises(HTTPException):
-        _open_shift(state, cashier_id="Clerk B", terminal_id="POS-UTW-01")
+    reused = _open_shift(state, cashier_id="Clerk A", terminal_id="POS-UTW-02")
+    assert reused["shift_id"] == shift["shift_id"]
+
+    second_cashier = _open_shift(state, cashier_id="textcashier", terminal_id="POS-UTW-01")
+    assert second_cashier["shift_id"] != shift["shift_id"]
+    assert second_cashier["cashier_id"] == "textcashier"
+    assert second_cashier["terminal_id"] == "POS-UTW-01"
+
+    reused_second = _open_shift(state, cashier_id="textcashier", terminal_id="POS-UTW-09")
+    assert reused_second["shift_id"] == second_cashier["shift_id"]
+
+    open_rows = [row for row in state.list_store_pos_shifts("UTAWALA") if row["status"] == "open"]
+    assert {row["cashier_id"] for row in open_rows} >= {"Clerk A", "textcashier"}
 
 
 def test_current_shift_route_and_missing_404(route_state):
     state, authorization = route_state
     shift = _open_shift(state)
 
+    _open_shift(state, cashier_id="textcashier", terminal_id="POS-UTW-01")
     current = routes_module.get_current_store_pos_shift(
         "UTAWALA",
         cashier_id="Clerk A",
-        terminal_id="POS-UTW-01",
+        terminal_id="POS-UTW-99",
         authorization=authorization,
     )
 
@@ -195,3 +205,12 @@ def test_close_shift_records_variance_and_blocks_reclose_or_sales(state):
     with pytest.raises(HTTPException):
         state.close_pos_shift("UTAWALA", shift["shift_id"], {"counted_cash": 2250}, closed_by="store_manager_1")
     assert sale["shift_id"] == shift["shift_id"]
+
+def test_current_shift_lookup_returns_cashier_shift_not_terminal_owner(state):
+    clerk_shift = _open_shift(state, cashier_id="Clerk A", terminal_id="POS-UTW-01")
+    text_shift = _open_shift(state, cashier_id="textcashier", terminal_id="POS-UTW-01")
+
+    current = state.get_current_pos_shift("UTAWALA", cashier_id="textcashier", terminal_id="POS-UTW-01")
+
+    assert current["shift_id"] == text_shift["shift_id"]
+    assert current["shift_id"] != clerk_shift["shift_id"]

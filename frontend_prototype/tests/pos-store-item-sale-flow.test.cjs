@@ -227,7 +227,7 @@ test("POS cashier shift lookup page is wired with nav entry, refresh action, and
   assert.match(appJs, /navTitle:\s*"收银班次查询"/);
   assert.match(appJs, /function renderCashierShiftLookupSummary/);
   assert.match(appJs, /async function refreshCashierShiftLookupSummary/);
-  assert.match(appJs, /一家门店可以有多个 POS 终端/);
+  assert.match(appJs, /一家门店可同时有多个收银员开班/);
   assert.match(appJs, /本机记录的 terminal_id（仅作设备来源参考）/);
 });
 

@@ -34859,8 +34859,7 @@ async function loadCashierTerminalTodaySalesSummary({ render = true, limit = 100
 async function fetchCashierTerminalCurrentShift() {
   const storeCode = getCashierTerminalStoreCode();
   const cashierId = getCashierTerminalCashierName();
-  const terminalId = getCashierTerminalTerminalId();
-  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/current?cashier_id=${encodeURIComponent(cashierId)}&terminal_id=${encodeURIComponent(terminalId)}`);
+  return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts/current?cashier_id=${encodeURIComponent(cashierId)}`);
 }
 
 async function fetchStorePosShiftList() {
@@ -34883,28 +34882,26 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
   const normalizedRows = Array.isArray(shiftRows)
     ? shiftRows.map((row) => normalizeCashierTerminalShift(row)).filter((row) => row?.shift_id)
     : [];
-  const terminalMap = new Map();
-  normalizedRows.forEach((row) => {
-    const key = String(row.terminal_id || "").trim() || "UNKNOWN";
-    if (!terminalMap.has(key)) {
-      terminalMap.set(key, row);
-    }
-  });
-  if (!terminalMap.has(terminalId)) {
-    terminalMap.set(terminalId, null);
-  }
-  const terminalRows = [...terminalMap.entries()].map(([id, row]) => {
-    const status = row ? (String(row.status || "").toLowerCase() === "open" ? "open" : "idle") : "unknown";
-    return {
-      terminal_id: id,
-      status,
-      shift_id: row?.shift_id || "-",
-      cashier_id: row?.cashier_id || "-",
-      cashier_name: row?.cashier_name || "-",
-      opened_at: row?.opened_at || "-",
-      opening_float: row?.opening_float ?? "-",
-    };
-  });
+  const openShiftRows = normalizedRows
+    .filter((row) => String(row.status || "").trim().toLowerCase() === "open")
+    .map((row) => {
+      const knownUser = Array.isArray(userDirectoryState)
+        ? userDirectoryState.find((user) => String(user?.username || "").trim() === String(row.cashier_id || row.cashier_name || "").trim())
+        : null;
+      const fallbackCashier = String(row.cashier_id || row.cashier_name || "-").trim() || "-";
+      const displayName = knownUser
+        ? String(knownUser.full_name || knownUser.display_name || knownUser.name || knownUser.username || fallbackCashier).trim()
+        : `${fallbackCashier}（历史/未知账号，不在当前用户表）`;
+      return {
+        shift_id: row.shift_id || "-",
+        cashier_id: fallbackCashier,
+        cashier_name: displayName,
+        status: row.status || "open",
+        opened_at: row.opened_at || "-",
+        opening_float: row.opening_float ?? "-",
+        terminal_id: row.terminal_id || "-",
+      };
+    });
   target.classList.remove("empty-state");
   target.innerHTML = `
     <div class="metrics-grid">
@@ -34915,7 +34912,7 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
       <article class="store-metric"><strong>terminal_id</strong><span>${escapeHtml(terminalId)}</span></article>
     </div>
     <div class="candidate-summary">
-      一家门店可以有多个 POS 终端，每个终端可以各自开班。下面表格显示本店各 terminal 当前状态。
+      一家门店可同时有多个收银员开班。下面表格显示本店当前 open shifts（按收银员）。
     </div>
     <div class="candidate-summary">
       <strong>本机记录的 terminal_id（仅作设备来源参考）：</strong>${escapeHtml(terminalId)}。如需更改本机记录，请联系管理员更新 terminal_id。
@@ -34928,32 +34925,32 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
          <article class="store-metric"><strong>cashier</strong><span>${escapeHtml(currentShift.cashier_id || "-")} / ${escapeHtml(currentShift.cashier_name || "-")}</span></article>
          <article class="store-metric"><strong>opening_time</strong><span>${escapeHtml(currentShift.opened_at || "-")}</span></article>
          <article class="store-metric"><strong>opening_float</strong><span>${escapeHtml(String(currentShift.opening_float ?? "-"))}</span></article>`
-    : `<div class="empty-state">当前 terminal 暂无 open shift.</div>`
+    : `<div class="empty-state">当前收银员在本店暂无 open shift.</div>`
 }
     </div>
     <div class="table-scroll">
       <table class="data-table">
         <thead>
           <tr>
-            <th>terminal_id</th>
-            <th>status</th>
             <th>shift_id</th>
-            <th>cashier</th>
+            <th>cashier_id/username</th>
             <th>cashier_name</th>
+            <th>status</th>
             <th>opening_time</th>
             <th>opening_float</th>
+            <th>terminal_id</th>
           </tr>
         </thead>
         <tbody>
-          ${terminalRows.map((row) => `
+          ${openShiftRows.map((row) => `
             <tr>
-              <td>${escapeHtml(row.terminal_id)}</td>
-              <td>${escapeHtml(row.status)}</td>
               <td>${escapeHtml(row.shift_id)}</td>
               <td>${escapeHtml(row.cashier_id)}</td>
               <td>${escapeHtml(row.cashier_name)}</td>
+              <td>${escapeHtml(row.status)}</td>
               <td>${escapeHtml(row.opened_at)}</td>
               <td>${escapeHtml(String(row.opening_float))}</td>
+              <td>${escapeHtml(row.terminal_id)}</td>
             </tr>
           `).join("")}
         </tbody>
