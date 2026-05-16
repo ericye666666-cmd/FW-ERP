@@ -31747,6 +31747,7 @@ function renderCashierTerminalPaymentPanel() {
   const paymentStatus = totals.totalItems
     ? (displayAmountDue <= 0 ? copy.paidStatus : copy.collectStatus)
     : copy.scanStatus;
+  const latestSale = cashierTerminalState.latestCompletedSale;
   const mixedRows = (cashierTerminalState.paymentLines || [])
     .map((row, index) => `
       <div class="cashier-terminal-payment-line">
@@ -31845,6 +31846,20 @@ function renderCashierTerminalPaymentPanel() {
         <button type="button" class="secondary-action" data-terminal-action="clear-lookup">${escapeHtml(copy.cancelAction)}</button>
       </div>
     </div>
+    ${latestSale ? `
+      <div class="cashier-terminal-sale-complete" aria-label="Sale completion summary">
+        <div class="sale-complete-grid">
+          <span><strong>Sale No.</strong>${escapeHtml(latestSale.sale_no || latestSale.order_no || "-")}</span>
+          <span><strong>Total</strong>${escapeHtml(formatCashierPreviewMoney(latestSale.total || 0))}</span>
+          <span><strong>Payment</strong>${escapeHtml(latestSale.payment_method || "-")}</span>
+          <span><strong>Change</strong>${escapeHtml(formatCashierPreviewMoney(latestSale.change || 0))}</span>
+        </div>
+        <div class="sale-complete-actions">
+          <button type="button" class="primary-inline" data-terminal-action="print-receipt">打印小票 / Print Receipt</button>
+          <button type="button" class="secondary-inline" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
+        </div>
+      </div>
+    ` : ""}
     <div class="payment-meta">
       <div>
         <span class="metric-label">${escapeHtml(copy.shiftLabel)}</span>
@@ -31852,7 +31867,7 @@ function renderCashierTerminalPaymentPanel() {
       </div>
       <div>
         <span class="metric-label">${escapeHtml(copy.latestSale)}</span>
-        <strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.order_no || "-")}</strong>
+        <strong>${escapeHtml(latestSale?.order_no || latestSale?.sale_no || "-")}</strong>
       </div>
     </div>
   `;
@@ -33635,61 +33650,9 @@ function renderCashierTerminalReceiptPanel() {
   if (!(receiptPanel instanceof HTMLElement)) {
     return;
   }
-  ensureCashierTerminalPreviewState();
-  const copy = getCashierTerminalCopy();
-  const sale = cashierTerminalState.latestCompletedSale;
-  receiptPanel.classList.toggle("is-empty", !sale);
-  receiptPanel.hidden = !sale;
-  const items = Array.isArray(sale?.items) ? sale.items : [];
-  const isReprint = Boolean(sale?.is_reprint);
-  const storeCode = sale?.store_code || getCashierTerminalStoreCode();
-  receiptPanel.innerHTML = `
-    <div class="panel-head cashier-terminal-card-head">
-      <div>
-        <p class="panel-kicker">RECEIPT</p>
-        <h3>收据预览</h3>
-      </div>
-    </div>
-    <div class="receipt-preview-paper">
-      <div class="receipt-center">
-        <strong>DIRECT LOOP</strong>
-        <span>UTAWALA STORE</span>
-      </div>
-      ${isReprint ? `<div class="receipt-center receipt-reprint-label">REPRINT COPY</div>` : ""}
-      <div class="receipt-divider"></div>
-      <div class="receipt-line"><span>Sale No.</span><strong>${escapeHtml(sale?.sale_no || "-")}</strong></div>
-      <div class="receipt-line"><span>Store</span><span>${escapeHtml(storeCode)}</span></div>
-      <div class="receipt-line"><span>Cashier</span><span>${escapeHtml(sale?.cashier || getCashierTerminalCashierName())}</span></div>
-      <div class="receipt-line"><span>Shift</span><span>${escapeHtml(sale?.shift_id || getCashierTerminalShiftNo())}</span></div>
-      <div class="receipt-line"><span>Terminal</span><span>${escapeHtml(sale?.terminal_id || `POS-${storeCode.slice(0, 3).toUpperCase()}-01`)}</span></div>
-      <div class="receipt-line"><span>Time</span><span>${escapeHtml(sale?.time || cashierTerminalState.currentTime || "-")}</span></div>
-      <div class="receipt-divider"></div>
-      ${items.length ? items.map((item) => `
-        <div class="receipt-item">
-          <strong>${escapeHtml(item.display_code)}</strong>
-          <span>${escapeHtml(item.category)} · ${escapeHtml(formatCashierPreviewMoney(item.price))}</span>
-        </div>
-      `).join("") : `<div class="receipt-empty">完成收款后显示小票内容</div>`}
-      <div class="receipt-divider"></div>
-      <div class="receipt-line"><span>Total Items</span><strong>${escapeHtml(sale?.total_items || 0)}</strong></div>
-      <div class="receipt-line"><span>Subtotal</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.subtotal || 0))}</span></div>
-      <div class="receipt-line"><span>Discount</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.discount || 0))}</span></div>
-      <div class="receipt-line receipt-total"><span>Total</span><strong>${escapeHtml(formatCashierPreviewMoney(sale?.total || 0))}</strong></div>
-      <div class="receipt-line"><span>Payment</span><span>${escapeHtml(sale?.payment_method || "-")}</span></div>
-      <div class="receipt-line"><span>Cash</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.cash_amount || 0))}</span></div>
-      <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.mpesa_amount || 0))}</span></div>
-      <div class="receipt-line"><span>Ref</span><span>${escapeHtml(sale?.mpesa_reference || "-")}</span></div>
-      <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney(sale?.change || 0))}</span></div>
-      <div class="receipt-line"><span>Status</span><span>${escapeHtml(sale?.status || "-")}</span></div>
-      <div class="receipt-divider"></div>
-      <div class="receipt-center receipt-thanks">Thank you. Karibu tena.</div>
-    </div>
-    <div class="receipt-actions">
-      <button type="button" class="secondary-inline" data-terminal-action="print-receipt">打印收据 Print Receipt</button>
-      <button type="button" class="secondary-inline" data-terminal-action="reprint-receipt">${escapeHtml(copy.receiptReprint)}</button>
-    </div>
-    <div class="cashier-print-feedback">${escapeHtml(cashierTerminalState.printFeedback || "")}</div>
-  `;
+  receiptPanel.classList.add("is-empty");
+  receiptPanel.hidden = true;
+  receiptPanel.innerHTML = "";
 }
 
 renderCashierTerminalQuickActions = function () {
