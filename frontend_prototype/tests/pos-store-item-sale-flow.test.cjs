@@ -772,6 +772,38 @@ test("POS manual item payload stays separately identifiable and does not mimic S
   });
 });
 
+test("POS manual unbarcoded sale closure keeps payload and guardrails intact", () => {
+  const builderSource = extractFunctionSource(appJs, "buildCashierTerminalManualUnbarcodedLine");
+  const payloadLineSource = extractFunctionSource(appJs, "buildCashierTerminalPosSaleItemPayload");
+  const payloadSource = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  const submitSource = extractAssignedFunctionSource(appJs, "submitCashierTerminalSale");
+  const backendSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
+  const guardSource = extractFunctionSource(appJs, "ensureCashierTerminalResolvedItemCanEnterCart");
+
+  assert.match(indexHtml, /无码商品|manual unbarcoded sale/i);
+  assert.match(builderSource, /manualItemCategory/);
+  assert.match(builderSource, /manualItemDescription/);
+  assert.match(builderSource, /manualItemQuantity/);
+  assert.match(builderSource, /manualItemUnitPrice/);
+  assert.match(submitSource, /await submitCashierTerminalBackendSale\(\)/);
+
+  assert.match(payloadLineSource, /line_type:\s*row\.line_type \|\| "manual_unbarcoded"/);
+  assert.match(payloadLineSource, /barcode_type:\s*"NONE"/);
+  assert.match(payloadLineSource, /store_item_machine_code:\s*null/);
+  assert.doesNotMatch(payloadLineSource, /barcode_value:/);
+
+  assert.match(payloadSource, /items:\s*cartItems\.map/);
+  assert.match(backendSource, /\/pos-sales/);
+  assert.doesNotMatch(backendSource, /createStoreItem|generateStoreItem|store_item_create/i);
+  assert.doesNotMatch(backendSource, /createInventoryMovement|inventory_movement_type\s*:\s*"standard"/i);
+
+  assert.match(guardSource, /STORE_ITEM/);
+  assert.match(appJs, /此码不能用于 POS 销售，请扫描 STORE_ITEM 商品码。/);
+  assert.match(appJs, /STORE_DELIVERY_EXECUTION/);
+  assert.match(appJs, /SDP 是 SDO 内包明细/);
+});
+
+
 test("POS fallback is backend-unavailable demo data only and does not prefix-allow sales", () => {
   const resolverSource = extractAsyncFunctionSource(appJs, "resolveCashierTerminalStoreItemForPos");
   const fallbackSource = extractFunctionSource(appJs, "resolveCashierTerminalLocalDemoItem");
