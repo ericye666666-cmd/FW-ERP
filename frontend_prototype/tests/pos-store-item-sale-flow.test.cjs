@@ -1041,7 +1041,9 @@ test("POS open shift gives loading, existing-shift, success, and error feedback"
   assert.match(openSource, /正在开班，请稍候/);
   assert.match(openSource, /fetchCashierTerminalCurrentShift\(\)/);
   assert.match(openSource, /当前已有开班：/);
+  assert.match(openSource, /message\.includes\("already"\) \|\| message\.includes\("已有开班"\) \|\| message\.includes\("已有"\)/);
   assert.match(openSource, /已成功开班：/);
+  assert.match(openSource, /已有开班但未能读取当前班次，请刷新或联系管理员。/);
   assert.match(openSource, /开班失败：/);
   assert.match(openSource, /renderCashierTerminalSessionStrip\(\)/);
   assert.match(openSource, /renderCashierTerminalStatusBar\(\)/);
