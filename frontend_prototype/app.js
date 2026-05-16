@@ -33776,6 +33776,8 @@ renderCashierTerminalDrawer = function () {
   }
   if (drawer === "reprint-confirm") {
     const saleNo = String(cashierTerminalState.pendingReprintSaleNo || cashierTerminalState.latestCompletedSale?.sale_no || "").trim();
+    const selectedSale = cashierTerminalState.selectedSaleDetail;
+    const previewHtml = selectedSale ? buildCashierTerminal57mmReceiptHtml(selectedSale) : "";
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">REPRINT</p><h3>${escapeHtml(copy.receiptReprint)}</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body">
@@ -33783,6 +33785,7 @@ renderCashierTerminalDrawer = function () {
           <strong>这是重打小票，不会重新销售，也不会扣库存。</strong>
           <span>${escapeHtml(saleNo ? `销售单：${saleNo}` : "将加载最近一单真实销售记录。")}</span>
         </div>
+        ${previewHtml ? `<div class="receipt-preview-paper">${previewHtml}</div>` : `<div class="drawer-hint cashier-reprint-error">小票预览加载失败，请返回列表重试。</div>`}
       </div>
       <div class="drawer-foot split-actions">
         <button type="button" class="secondary-inline" data-terminal-action="close-drawer">取消</button>
@@ -33795,57 +33798,22 @@ renderCashierTerminalDrawer = function () {
     const allSales = cashierTerminalState.recentSales || [];
     const currentShiftId = String(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo || "").trim();
     const sales = currentShiftId ? allSales.filter((sale) => !sale?.shift_id || String(sale.shift_id) === currentShiftId) : allSales;
-    const detail = cashierTerminalState.selectedSaleDetail;
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">RECEIPT</p><h3>小票打印</h3><p class="drawer-subtitle">最近销售（本班次内），选择要重打的小票.</p></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body recent-sales-body">
         <div class="drawer-card"><strong>只显示当前班次内的销售记录.</strong></div>${cashierTerminalState.saleLookupFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.saleLookupFeedback)}</div>` : ""}
-        <div class="recent-sales-list">
+        <div class="recent-sales-table">
+          <div class="recent-sales-table-head"><span>销售单号</span><span>时间</span><span>金额</span><span>支付方式</span><span>操作</span></div>
           ${sales.length ? sales.map((sale) => `
-            <article class="hold-card status-${escapeHtml(sale.status || "completed")}">
-              <div><strong>${escapeHtml(sale.sale_no || "-")}</strong><span>${escapeHtml(sale.sale_time || "-")} · ${escapeHtml(sale.cashier_id || "-")}</span></div>
-              <div class="hold-meta">
-                <span>${escapeHtml(sale.total_items || 0)} 件</span>
-                <span>${escapeHtml(formatCashierPreviewMoney(sale.total_amount || 0))}</span>
-                <span>${escapeHtml(sale.payment_method || "-")}</span>
-                <span>${escapeHtml(sale.status || "-")}</span>
-              </div>
-              <div class="hold-actions">
-                <button type="button" class="secondary-inline" data-terminal-action="view-sale-detail" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">查看详情</button>
-                <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">小票重打</button>
-              </div>
+            <article class="recent-sales-row status-${escapeHtml(sale.status || "completed")}">
+              <span class="sale-no">${escapeHtml(sale.sale_no || "-")}</span>
+              <span>${escapeHtml(sale.sale_time || "-")}</span>
+              <strong>${escapeHtml(formatCashierPreviewMoney(sale.total_amount || 0))}</strong>
+              <span>${escapeHtml(sale.payment_method || "-")}</span>
+              <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">小票重打</button>
             </article>
           `).join("") : `<div class="cashier-terminal-empty-card">当前班次暂无可打印小票.</div>`}
         </div>
-        ${detail ? `
-          <div class="recent-sale-detail">
-            <h4>${escapeHtml(detail.sale_no || "-")}</h4>
-            <div class="shift-info-grid">
-              <span><strong>Store</strong>${escapeHtml(detail.store_code || getCashierTerminalStoreCode())}</span>
-              <span><strong>Cashier</strong>${escapeHtml(detail.cashier || "-")}</span>
-              <span><strong>Shift</strong>${escapeHtml(detail.shift_id || "-")}</span>
-              <span><strong>Terminal</strong>${escapeHtml(detail.terminal_id || "-")}</span>
-              <span><strong>Time</strong>${escapeHtml(detail.time || "-")}</span>
-              <span><strong>Status</strong>${escapeHtml(detail.status || "-")}</span>
-            </div>
-            <div class="receipt-divider"></div>
-            ${(detail.items || []).map((item) => `
-              <div class="receipt-item">
-                <strong>${escapeHtml(item.display_code || item.machine_code || "-")}</strong>
-                <span>${escapeHtml(item.category || "-")} · ${escapeHtml(formatCashierPreviewMoney(item.price || 0))}</span>
-              </div>
-            `).join("")}
-            <div class="receipt-divider"></div>
-            <div class="receipt-line"><span>Subtotal</span><span>${escapeHtml(formatCashierPreviewMoney(detail.subtotal || 0))}</span></div>
-            <div class="receipt-line"><span>Discount</span><span>${escapeHtml(formatCashierPreviewMoney(detail.discount || 0))}</span></div>
-            <div class="receipt-line receipt-total"><span>Total</span><strong>${escapeHtml(formatCashierPreviewMoney(detail.total || 0))}</strong></div>
-            <div class="receipt-line"><span>Payment</span><span>${escapeHtml(detail.payment_method || "-")}</span></div>
-            <div class="receipt-line"><span>Cash</span><span>${escapeHtml(formatCashierPreviewMoney(detail.cash_amount || 0))}</span></div>
-            <div class="receipt-line"><span>M-Pesa</span><span>${escapeHtml(formatCashierPreviewMoney(detail.mpesa_amount || 0))}</span></div>
-            <div class="receipt-line"><span>Ref</span><span>${escapeHtml(detail.mpesa_reference || "-")}</span></div>
-            <div class="receipt-line"><span>Change</span><span>${escapeHtml(formatCashierPreviewMoney(detail.change || 0))}</span></div>
-          </div>
-        ` : ""}
       </div>
       <div class="drawer-foot split-actions">
         <div class="drawer-hint">小票重打不会重复创建销售记录，仅重新打印该销售单的小票.</div>
