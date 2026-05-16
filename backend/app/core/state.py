@@ -11690,10 +11690,9 @@ class InMemoryState:
             raise HTTPException(status_code=400, detail="cashier_id is required")
         terminal_id = str(payload.get("terminal_id") or "").strip()
         opening_float = self._pos_sale_money(payload.get("opening_float", 0), "opening_float")
-        if self._find_open_pos_shift(store["code"], cashier_id=cashier_id):
-            raise HTTPException(status_code=400, detail=f"Cashier {cashier_id} already has an open POS shift in {store['code']}.")
-        if terminal_id and self._find_open_pos_shift(store["code"], terminal_id=terminal_id):
-            raise HTTPException(status_code=400, detail=f"Terminal {terminal_id} already has an open POS shift in {store['code']}.")
+        existing_shift = self._find_open_pos_shift(store["code"], cashier_id=cashier_id)
+        if existing_shift:
+            return self._normalize_pos_shift(existing_shift)
 
         sequence = next(self._cashier_shift_ids)
         shift_id = f"SHIFT-{self._pos_sale_store_prefix(store['code'])}-{datetime.now(NAIROBI_TZ).strftime('%y%m%d')}-{sequence:04d}"
@@ -11742,9 +11741,11 @@ class InMemoryState:
         cashier = str(cashier_id or "").strip()
         if not cashier:
             raise HTTPException(status_code=400, detail="cashier_id is required")
-        shift = self._find_open_pos_shift(store["code"], cashier_id=cashier, terminal_id=terminal_id)
+        shift = self._find_open_pos_shift(store["code"], cashier_id=cashier)
+        if not shift and terminal_id:
+            shift = self._find_open_pos_shift(store["code"], cashier_id=cashier, terminal_id=terminal_id)
         if not shift:
-            raise HTTPException(status_code=404, detail="No open POS shift for this cashier and terminal.")
+            raise HTTPException(status_code=404, detail="No open POS shift for this cashier in this store.")
         return self._normalize_pos_shift(shift)
 
     def list_store_pos_shifts(self, store_code: str) -> list[dict[str, Any]]:
