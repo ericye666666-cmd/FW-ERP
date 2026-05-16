@@ -33419,11 +33419,6 @@ renderCashierTerminalSessionStrip = function () {
     </button>
     <span class="printer-chip"><b>打印机</b>${escapeHtml(getCashierTerminalPrinterLabel())}</span>
     <span class="sync-chip network-${escapeHtml(cashierTerminalState.networkStatus)}"><b>同步状态</b>${escapeHtml(cashierTerminalState.syncStatus || "已同步")}</span>
-    <span><b>今日销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
-    <span><b>今日订单数</b>${escapeHtml(cashierTerminalState.todayOrderCount)}</span>
-    <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
-    <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
-    <span class="time-chip"><b>当前时间</b>${escapeHtml(cashierTerminalState.currentTime || "")}</span>
   `;
   syncGlobalLanguageButtons();
 }
@@ -33440,9 +33435,10 @@ renderCashierTerminalStatusBar = function () {
   cashierTerminalStatusBar.className = `cashier-terminal-status cashier-terminal-preview-status status-${cashierTerminalState.networkStatus}`;
   cashierTerminalStatusBar.innerHTML = `
     <div class="cashier-terminal-status-summary">
-      <span>${escapeHtml(copy.posStoreItemOnly)}</span>
-      <span><b>今日销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.todaySalesAmount))}</span>
-      <span><b>今日订单数</b>${escapeHtml(cashierTerminalState.todayOrderCount)}</span>
+      <span><b>班次号</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
+      <span><b>班次状态</b>${escapeHtml(cashierTerminalState.currentShift?.shift_id ? "开班中" : "未开班")}</span>
+      <span><b>开班时间</b>${escapeHtml(cashierTerminalState.currentShift?.opened_at || "-")}</span>
+      <span><b>备用金</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.currentShift?.opening_float_cash || 0))}</span>
       <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
       <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
     </div>
@@ -33643,6 +33639,7 @@ function renderCashierTerminalReceiptPanel() {
   const copy = getCashierTerminalCopy();
   const sale = cashierTerminalState.latestCompletedSale;
   receiptPanel.classList.toggle("is-empty", !sale);
+  receiptPanel.hidden = !sale;
   const items = Array.isArray(sale?.items) ? sale.items : [];
   const isReprint = Boolean(sale?.is_reprint);
   const storeCode = sale?.store_code || getCashierTerminalStoreCode();
@@ -33700,23 +33697,11 @@ renderCashierTerminalQuickActions = function () {
     return;
   }
   ensureCashierTerminalPreviewState();
-  const totals = getCashierTerminalTotals();
-  const paid = getCashierTerminalPaymentAssignedTotal();
   const copy = getCashierTerminalCopy();
-  const paymentStatus = totals.totalItems
-    ? (paid >= totals.totalAmount ? chooseI18nLabel("可完成", "Ready to Complete") : chooseI18nLabel("待收款", "Collect Payment"))
-    : chooseI18nLabel("待扫码", "Waiting for Scan");
   cashierTerminalQuickActions.innerHTML = `
-    <div class="transaction-strip-title">${escapeHtml(chooseI18nLabel("当前交易状态", "Current Transaction Status"))}</div>
-    <div class="cashier-terminal-status-metrics">
-      <span><strong>商品数量</strong>${escapeHtml(totals.totalItems)}</span>
-      <span><strong>应收金额</strong>${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</span>
-      <span><strong>已收金额</strong>${escapeHtml(formatCashierPreviewMoney(paid))}</span>
-      <span><strong>待收金额</strong>${escapeHtml(formatCashierPreviewMoney(Math.max(totals.totalAmount - paid, 0)))}</span>
-      <span><strong>支付方式</strong>${escapeHtml(getCashierTerminalPaymentModeLabel())}</span>
-      <span><strong>状态</strong>${escapeHtml(paymentStatus)}</span>
-      <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
-    </div>
+    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="shift"><span>本班销售额</span><strong>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</strong></button>
+    <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="sync"><span>同步状态</span><strong>${escapeHtml(cashierTerminalState.syncStatus || "已同步")}</strong></button>
+    <button type="button" class="quick-action-button" data-terminal-action="reprint-receipt"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(cashierTerminalState.latestCompletedSale?.sale_no || "-")}</strong></button>
   `;
 }
 
