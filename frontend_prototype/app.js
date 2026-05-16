@@ -32178,12 +32178,7 @@ function renderCashierTerminal() {
 }
 
 function setCashierTerminalPaymentMode(mode) {
-  if (mode !== "cash") {
-    cashierTerminalState.activePaymentMode = "cash";
-    showTransientInlineNotice("#cashierTerminalInlineNotice", "M-Pesa / 混合支付暂未上线，本次 POS 只开放现金收款。", "warning", 2200);
-  } else {
-    cashierTerminalState.activePaymentMode = mode;
-  }
+  cashierTerminalState.activePaymentMode = ["cash", "mpesa", "mixed"].includes(mode) ? mode : "cash";
   if (mode === "cash") {
     cashierTerminalState.cashReceived = cashierTerminalState.cashReceived || "";
   }
@@ -33580,9 +33575,8 @@ renderCashierTerminalPaymentPanel = function () {
   const balance = Math.max(totals.totalAmount - paid, 0);
   const saleDisabled = !cashierTerminalState.currentShift?.shift_id;
   const paymentGuidance = getCashierTerminalPaymentGuidance();
-  if (["mpesa", "mixed"].includes(cashierTerminalState.activePaymentMode)) {
-    cashierTerminalState.activePaymentMode = "cash";
-  }
+  const isMpesaMode = cashierTerminalState.activePaymentMode === "mpesa";
+  const isMixedMode = cashierTerminalState.activePaymentMode === "mixed";
   cashierTerminalPaymentPanel.innerHTML = `
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
@@ -33614,12 +33608,19 @@ renderCashierTerminalPaymentPanel = function () {
     </label>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
+      <button type="button" class="method-btn${isMpesaMode ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>${escapeHtml(chooseI18nLabel("M-Pesa", "M-Pesa"))}</span><small>手动输入参考号</small></button>
+      <button type="button" class="method-btn${isMixedMode ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合支付", "Mixed"))}</span><small>Cash + M-Pesa</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
-      <label class="field">
-        <span>实收金额</span>
-        <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" />
-      </label>
+      ${isMpesaMode
+        ? `<label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="输入 M-Pesa 实收" /></label>
+           <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
+        : isMixedMode
+          ? `<label class="field"><span>现金金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金金额" /></label>
+             <label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="输入 M-Pesa 金额" /></label>
+             <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
+          : `<label class="field"><span>实收金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" /></label>`
+      }
     </div>
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
