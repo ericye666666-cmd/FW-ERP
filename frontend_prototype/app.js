@@ -32724,7 +32724,11 @@ async function handleCashierTerminalAction(action, target) {
       return;
     }
     case "complete-sale":
-      await submitCashierTerminalSale();
+      try {
+        await submitCashierTerminalBackendSale();
+      } catch (error) {
+        showCashierTerminalPaymentError(error);
+      }
       return;
     case "open-shift":
     case "submit-open-shift":
@@ -32782,9 +32786,7 @@ function handleCashierTerminalHotkeys(event) {
   }
   if (event.key === "F8") {
     event.preventDefault();
-    submitCashierTerminalSale().catch((error) => {
-      showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
-    });
+    submitCashierTerminalSale().catch(() => {});
     return;
   }
   if (event.key === "F9") {
@@ -35535,6 +35537,14 @@ function markCashierTerminalSoldItemsLocally(sale) {
   );
 }
 
+
+function showCashierTerminalPaymentError(error) {
+  const message = formatErrorMessage(error);
+  cashierTerminalState.paymentFeedback = message;
+  renderCashierTerminalPaymentPanel();
+  return message;
+}
+
 async function submitCashierTerminalBackendSale() {
   ensureCashierTerminalPreviewState();
   if (!hasOpenCashierTerminalShift()) {
@@ -35594,7 +35604,12 @@ async function submitCashierTerminalBackendSale() {
 }
 
 submitCashierTerminalSale = async function () {
-  return await submitCashierTerminalBackendSale();
+  try {
+    return await submitCashierTerminalBackendSale();
+  } catch (error) {
+    showCashierTerminalPaymentError(error);
+    throw error;
+  }
 }
 
 updateCashierTerminalPaymentField = function (field, value, index = null) {
@@ -35930,7 +35945,11 @@ handleCashierTerminalAction = async function (action, target) {
       focusCashierTerminalScanInput({ select: false });
       return;
     case "complete-sale":
-      await submitCashierTerminalSale();
+      try {
+        await submitCashierTerminalBackendSale();
+      } catch (error) {
+        showCashierTerminalPaymentError(error);
+      }
       return;
     case "open-shift":
     case "submit-open-shift":
@@ -36039,9 +36058,7 @@ handleCashierTerminalHotkeys = function (event) {
   }
   if (event.key === "F8") {
     event.preventDefault();
-    submitCashierTerminalSale().catch((error) => {
-      showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
-    });
+    submitCashierTerminalSale().catch(() => {});
     return;
   }
   if (event.key === "Escape" && cashierTerminalState.activeDrawer) {
