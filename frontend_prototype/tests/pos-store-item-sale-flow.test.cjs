@@ -430,7 +430,7 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
   assert.match(topbarActionsRule, /grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+auto\s+auto/);
   assert.match(statusStripRule, /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(88px,\s*1fr\)\)/);
   assert.match(statusStripRule, /max-height:\s*58px/);
-  assert.match(mainBodyRule, /grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);
+  assert.match(mainBodyRule, /grid-template-columns:\s*280px\s+minmax\(0,\s*1fr\)\s+380px/);
   assert.match(mainBodyRule, /height:\s*calc\(100vh - 132px\)/);
   assert.match(transactionStripRule, /min-height:\s*52px/);
   assert.match(transactionStripRule, /overflow:\s*visible/);
@@ -440,7 +440,7 @@ test("POS hotfix keeps top header compact and receipt non-blocking", () => {
 
 test("POS 1366x768 cashier layout keeps scan cart checkout in the first viewport", () => {
   const compactDesktopMedia = extractCssSection("@media (min-width: 1121px) and (max-width: 1320px)", "@media (max-height: 780px)");
-  assert.match(compactDesktopMedia, /body\.cashier-terminal-mode \.cashier-terminal-body\s*\{[\s\S]*grid-template-columns:\s*minmax\(230px,\s*0\.27fr\)\s+minmax\(390px,\s*0\.43fr\)\s+minmax\(300px,\s*0\.3fr\)/);
+  assert.match(compactDesktopMedia, /body\.cashier-terminal-mode \.cashier-terminal-body\s*\{[\s\S]*grid-template-columns:\s*260px\s+minmax\(0,\s*1fr\)\s+360px/);
   assert.match(compactDesktopMedia, /body\.cashier-terminal-mode \.payment-column\s*\{[\s\S]*grid-column:\s*auto/);
 
   const shortHeightMedia = extractCssSection("@media (max-height: 780px)");
@@ -498,7 +498,7 @@ test("POS manual unbarcoded item is an explicit separate audited action", () => 
 
   assert.match(indexHtml, /data-terminal-drawer="manual-item"/);
   assert.match(indexHtml, /无码商品/);
-  assert.match(indexHtml, /Manual Item/);
+  assert.match(indexHtml, /aria-label="无码商品"/);
   assert.match(drawerSource, /drawer === "manual-item"/);
   [
     "manualItemCategory",
