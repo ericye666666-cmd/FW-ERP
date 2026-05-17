@@ -1379,7 +1379,7 @@ test("operations analytics renders POS store summaries and source-chain sale rec
 });
 
 test("operations center exposes all POS sales data with brief analysis", () => {
-  assert.match(indexHtml, /<h2>2\. 全部销售数据 \/ 简要分析<\/h2>/);
+  assert.match(indexHtml, /<h2>2\. 销售数据总览<\/h2>/);
   [
     "operationsAllSalesOverview",
     "operationsAllSalesAnalysis",
@@ -1396,7 +1396,7 @@ test("operations center exposes all POS sales data with brief analysis", () => {
     "storeCount",
     "averageTicket",
     "todaySalesAmount",
-    "last7DaysSalesAmount",
+    "last30DaysSalesAmount",
     "cashSalesAmount",
     "mpesaSalesAmount",
     "mixedSalesAmount",
@@ -1425,8 +1425,8 @@ test("operations center exposes all POS sales data with brief analysis", () => {
     "毛利待确认",
   ].forEach((field) => assert.match(allSalesRenderSource, new RegExp(field)));
   assert.match(appJs, /renderOperationsAllSalesData\(records\)/);
-  assert.match(appJs, /match:\s*"2\. 全部销售数据 \/ 简要分析"/);
-  const navMetaStart = appJs.indexOf('match: "2. 全部销售数据 / 简要分析"');
+  assert.match(appJs, /match:\s*"2\. 销售数据总览"/);
+  const navMetaStart = appJs.indexOf('match: "2. 销售数据总览"');
   const navMetaEnd = appJs.indexOf("\n  },", navMetaStart);
   assert.doesNotMatch(appJs.slice(navMetaStart, navMetaEnd), /hiddenInNav:\s*true/);
 });

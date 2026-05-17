@@ -3268,12 +3268,12 @@ const OPERATIONS_PANEL_NAV_META = [
     navTitleEn: "2. AI Analytics Framework",
   },
   {
-    match: "2. 全部销售数据 / 简要分析",
+    match: "2. 销售数据总览",
     section: "insight",
     order: 21,
     icon: "售",
-    navTitle: "2. 全部销售数据 / 简要分析",
-    navTitleEn: "2. All Sales Data / Brief Analysis",
+    navTitle: "2. 销售数据总览",
+    navTitleEn: "2. Sales Overview",
   },
   {
     match: "3. 业务动作台",
@@ -38671,7 +38671,9 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   const list = Array.isArray(records) ? records : [];
   const now = new Date();
   const todayKey = getLocalDateKey(now.toISOString());
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).getTime();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).getTime();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
   const totalSalesAmount = list.reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const totalItemCount = list.length;
   const totalOrderCount = new Set(list.map((row) => row.sale_no).filter(Boolean)).size;
@@ -38679,8 +38681,17 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   const todaySalesAmount = list
     .filter((row) => getLocalDateKey(row?.sold_at || "") === todayKey)
     .reduce((sum, row) => sum + Number(row?.price || 0), 0);
-  const last7DaysSalesAmount = list
-    .filter((row) => new Date(row?.sold_at || 0).getTime() >= sevenDaysAgo)
+  const todayOrderCount = new Set(
+    list.filter((row) => getLocalDateKey(row?.sold_at || "") === todayKey).map((row) => row.sale_no).filter(Boolean),
+  ).size;
+  const monthSalesAmount = list
+    .filter((row) => {
+      const d = new Date(row?.sold_at || 0);
+      return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+    })
+    .reduce((sum, row) => sum + Number(row?.price || 0), 0);
+  const last30DaysSalesAmount = list
+    .filter((row) => new Date(row?.sold_at || 0).getTime() >= thirtyDaysAgo)
     .reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const cashSalesAmount = list.filter((row) => String(row?.payment_method || "cash").toLowerCase() === "cash").reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const mpesaSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mpesa").reduce((sum, row) => sum + Number(row?.price || 0), 0);
@@ -38700,17 +38711,19 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   const categorySummaries = [...categoryMap.entries()].map(([category_summary, sales_amount]) => ({ category_summary, sales_amount }));
   const analysisLines = [
     totalItemCount ? `共售出 ${totalItemCount} 个 STORE_ITEM，销售额 ${formatKesAmount(totalSalesAmount, "KES 0.00")}。` : "当前没有生成销售记录。",
-    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "等待 POS 完成第一笔 STORE_ITEM 销售。",
+    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "当前暂无真实销售记录。",
     marginPendingRecordCount ? `${marginPendingRecordCount} 条销售记录毛利待确认，原因是上游成本仍未确认。` : `已知成本销售毛利 ${formatKesAmount(knownGrossMarginAmount, "KES 0.00")}。`,
   ];
   return {
     totalSalesAmount,
     totalItemCount,
     totalOrderCount,
+    todayOrderCount,
     storeCount,
     averageTicket: totalOrderCount ? totalSalesAmount / totalOrderCount : 0,
     todaySalesAmount,
-    last7DaysSalesAmount,
+    monthSalesAmount,
+    last30DaysSalesAmount,
     cashSalesAmount,
     mpesaSalesAmount,
     mixedSalesAmount,
@@ -38730,16 +38743,13 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
   if (overviewTarget instanceof HTMLElement) {
     overviewTarget.className = "report-summary-grid";
     overviewTarget.innerHTML = `
-      <article class="store-metric"><strong>全部销售额</strong><span>${escapeHtml(formatKesAmount(summary.totalSalesAmount, "KES 0.00"))}</span></article>
       <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatKesAmount(summary.todaySalesAmount, "KES 0.00"))}</span></article>
-      <article class="store-metric"><strong>销售件数</strong><span>${summary.totalItemCount}</span></article>
-      <article class="store-metric"><strong>订单数</strong><span>${summary.totalOrderCount}</span></article>
+      <article class="store-metric"><strong>今日订单数</strong><span>${summary.todayOrderCount}</span></article>
+      <article class="store-metric"><strong>本月销售额</strong><span>${escapeHtml(formatKesAmount(summary.monthSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>总销售额</strong><span>${escapeHtml(formatKesAmount(summary.totalSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>总订单数</strong><span>${summary.totalOrderCount}</span></article>
       <article class="store-metric"><strong>客单价</strong><span>${escapeHtml(formatKesAmount(summary.averageTicket, "KES 0.00"))}</span></article>
-      <article class="store-metric"><strong>近 7 天</strong><span>${escapeHtml(formatKesAmount(summary.last7DaysSalesAmount, "KES 0.00"))}</span></article>
-      <article class="store-metric"><strong>成本已知件数</strong><span>${summary.costKnownItemCount}</span></article>
-      <article class="store-metric"><strong>成本待确认件数</strong><span>${summary.costUnknownItemCount}</span></article>
-      <article class="store-metric"><strong>已知成本销售毛利</strong><span>${escapeHtml(formatKesAmount(summary.knownGrossMarginAmount, "KES 0.00"))}</span></article>
-      <article class="store-metric"><strong>毛利待确认记录数</strong><span>${summary.marginPendingRecordCount}</span></article>
+      <article class="store-metric"><strong>近 30 天销售额</strong><span>${escapeHtml(formatKesAmount(summary.last30DaysSalesAmount, "KES 0.00"))}</span></article>
     `;
   }
   const analysisTarget = document.querySelector("#operationsAllSalesAnalysis");

@@ -133,7 +133,7 @@ test("priority 1 mainline pages stay visible in navigation", () => {
     "8. 门店货架位",
     "9. 收银销售",
     "1. 区域经营驾驶舱",
-    "2. 全部销售数据 / 简要分析",
+    "2. 销售数据总览",
     "角色 / 权限矩阵",
     "账号 / 用户",
     "数据管理 / Test Data Tools",
