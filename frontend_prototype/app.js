@@ -33810,7 +33810,7 @@ renderCashierTerminalDrawer = function () {
               <span>${escapeHtml(getCashierTerminalPrintTimestamp(sale.sale_time || sale.sold_at || sale.created_at || sale.time || ""))}</span>
               <strong>${escapeHtml(formatCashierPreviewMoney(sale.total_amount || 0))}</strong>
               <span>${escapeHtml(sale.payment_method || "-")}</span>
-              <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">小票重打</button>
+              <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}" aria-label="重打小票" title="重打小票"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true" width="18" height="18"><path d="M6 7V4.75A1.75 1.75 0 0 1 7.75 3h4.5A1.75 1.75 0 0 1 14 4.75V7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect x="5" y="7" width="10" height="6" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 11.25h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M7 13v2.25h6V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </article>
           `).join("") : `<div class="cashier-terminal-empty-card">当前班次暂无可打印小票.</div>`}
         </div>
