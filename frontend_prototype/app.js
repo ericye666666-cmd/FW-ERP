@@ -3268,12 +3268,12 @@ const OPERATIONS_PANEL_NAV_META = [
     navTitleEn: "2. AI Analytics Framework",
   },
   {
-    match: "2. 全部销售数据 / 简要分析",
+    match: "2. 销售数据总览",
     section: "insight",
     order: 21,
     icon: "售",
-    navTitle: "2. 全部销售数据 / 简要分析",
-    navTitleEn: "2. All Sales Data / Brief Analysis",
+    navTitle: "2. 销售数据总览",
+    navTitleEn: "2. Sales Overview",
   },
   {
     match: "3. 业务动作台",
