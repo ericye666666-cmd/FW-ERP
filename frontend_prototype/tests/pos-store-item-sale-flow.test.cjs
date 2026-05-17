@@ -1219,10 +1219,10 @@ test("POS cashier UX strongly guides no-shift state and returns focus after shif
   const openSource = extractAsyncFunctionSource(appJs, "openCashierTerminalShift");
   const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
 
-  assert.match(paymentSource, /POS 暂不可收银/);
-  assert.match(paymentSource, /copy\.openShiftFirst/);
-  assert.match(paymentSource, /copy\.openNow/);
-  assert.match(paymentSource, /data-terminal-action="open-drawer" data-terminal-drawer="shift"/);
+  assert.doesNotMatch(paymentSource, /POS 暂不可收银/);
+  assert.doesNotMatch(paymentSource, /cashier-no-shift-card/);
+  assert.match(paymentSource, /data-terminal-action="complete-sale"\$\{saleDisabled \? " disabled" : ""\}/);
+  assert.match(paymentSource, /saleDisabled \? escapeHtml\(copy\.openShiftFirst\) : "Complete Sale"/);
   assert.match(openSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
   assert.match(actionSource, /case "close-drawer":[\s\S]*focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
 });
