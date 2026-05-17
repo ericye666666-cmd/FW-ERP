@@ -502,7 +502,6 @@ test("POS manual unbarcoded item is an explicit separate audited action", () => 
   assert.match(drawerSource, /drawer === "manual-item"/);
   [
     "manualItemCategory",
-    "manualItemDescription",
     "manualItemQuantity",
     "manualItemUnitPrice",
     "manualItemReason",
@@ -581,7 +580,6 @@ test("POS manual item builder creates cart row without STORE_ITEM machine code",
   const context = {
     cashierTerminalState: {
       manualItemCategory: "dress",
-      manualItemDescription: "Button pack",
       manualItemQuantity: "2",
       manualItemUnitPrice: "125",
       manualItemReason: "Label damaged",
@@ -604,7 +602,7 @@ test("POS manual item builder creates cart row without STORE_ITEM machine code",
   assert.equal(line.store_item_machine_code, null);
   assert.equal(line.machine_code, "");
   assert.equal(line.display_code, "MANUAL");
-  assert.equal(line.description, "Button pack");
+  assert.equal(line.description, "dress · Label damaged");
   assert.equal(line.category, "dress");
   assert.equal(line.quantity, 2);
   assert.equal(line.unit_price, 125);
@@ -627,7 +625,6 @@ test("POS manual item action adds to cart without legacy preset globals", () => 
       cartItems: [],
       activeDrawer: "manual-item",
       manualItemCategory: "dress",
-      manualItemDescription: "Loose scarf",
       manualItemQuantity: "1",
       manualItemUnitPrice: "125",
       manualItemReason: "Label damaged",
@@ -670,7 +667,6 @@ test("POS manual item add-to-cart closes drawer, resets form, and returns to car
       cartItems: [],
       activeDrawer: "manual-item",
       manualItemCategory: "dress",
-      manualItemDescription: "Loose belt",
       manualItemQuantity: "2",
       manualItemUnitPrice: "125",
       manualItemReason: "Label damaged",
@@ -703,7 +699,6 @@ test("POS manual item add-to-cart closes drawer, resets form, and returns to car
   assert.equal(context.cashierTerminalState.activeDrawer, "");
   assert.equal(context.cashierTerminalState.cartItems.length, 1);
   assert.equal(context.cashierTerminalState.manualItemCategory, "");
-  assert.equal(context.cashierTerminalState.manualItemDescription, "");
   assert.equal(context.cashierTerminalState.manualItemQuantity, "1");
   assert.equal(context.cashierTerminalState.manualItemUnitPrice, "");
   assert.equal(context.cashierTerminalState.manualItemReason, "Tag missing");
@@ -780,7 +775,6 @@ test("POS manual unbarcoded sale closure keeps payload and guardrails intact", (
 
   assert.match(indexHtml, /无码商品|manual unbarcoded sale/i);
   assert.match(builderSource, /manualItemCategory/);
-  assert.match(builderSource, /manualItemDescription/);
   assert.match(builderSource, /manualItemQuantity/);
   assert.match(builderSource, /manualItemUnitPrice/);
   assert.match(submitSource, /await submitCashierTerminalBackendSale\(\)/);
@@ -1222,7 +1216,7 @@ test("POS cashier UX strongly guides no-shift state and returns focus after shif
   assert.doesNotMatch(paymentSource, /POS 暂不可收银/);
   assert.doesNotMatch(paymentSource, /cashier-no-shift-card/);
   assert.match(paymentSource, /data-terminal-action="complete-sale"\$\{saleDisabled \? " disabled" : ""\}/);
-  assert.match(paymentSource, /saleDisabled \? escapeHtml\(copy\.openShiftFirst\) : "Complete Sale"/);
+  assert.match(paymentSource, /<strong>\$\{escapeHtml\(chooseI18nLabel\("完成销售", "Complete Sale"\)\)\}<\/strong>/);
   assert.match(openSource, /focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
   assert.match(actionSource, /case "close-drawer":[\s\S]*focusCashierTerminalScanInput\(\{\s*select:\s*false\s*\}\)/);
 });

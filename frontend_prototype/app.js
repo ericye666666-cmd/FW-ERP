@@ -33127,7 +33127,6 @@ function ensureCashierTerminalPreviewState() {
   cashierTerminalState.scanErrorDetail = cashierTerminalState.scanErrorDetail || "";
   cashierTerminalState.pendingReprintSaleNo = cashierTerminalState.pendingReprintSaleNo || "";
   cashierTerminalState.manualItemCategory = String(cashierTerminalState.manualItemCategory || "").trim();
-  cashierTerminalState.manualItemDescription = String(cashierTerminalState.manualItemDescription || "").trim();
   cashierTerminalState.manualItemQuantity = String(cashierTerminalState.manualItemQuantity || "1").trim() || "1";
   cashierTerminalState.manualItemUnitPrice = String(cashierTerminalState.manualItemUnitPrice || "").trim();
   if (!CASHIER_TERMINAL_MANUAL_ITEM_REASONS.includes(cashierTerminalState.manualItemReason)) {
@@ -33294,7 +33293,6 @@ function getCashierTerminalManualCategoryOptions() {
 function buildCashierTerminalManualUnbarcodedLine() {
   ensureCashierTerminalPreviewState();
   const category = String(cashierTerminalState.manualItemCategory || "").trim();
-  const description = String(cashierTerminalState.manualItemDescription || "").trim();
   const quantity = Math.max(1, Number(cashierTerminalState.manualItemQuantity || 1) || 1);
   const unitPrice = normalizeCashierTerminalNumber(cashierTerminalState.manualItemUnitPrice);
   const manualReason = String(cashierTerminalState.manualItemReason || "Tag missing").trim() || "Tag missing";
@@ -33303,9 +33301,6 @@ function buildCashierTerminalManualUnbarcodedLine() {
   }
   if (!getCashierTerminalManualCategoryOptions().some((option) => option.value === category)) {
     throw new Error("请选择仓库默认售价里已配置的商品大类。");
-  }
-  if (!description) {
-    throw new Error("请填写无码商品描述。");
   }
   if (unitPrice <= 0) {
     throw new Error("请填写无码商品单价。");
@@ -33320,7 +33315,7 @@ function buildCashierTerminalManualUnbarcodedLine() {
     barcode: "",
     display_code: "MANUAL",
     product_name: "Manual Item / 无码商品",
-    description,
+    description: `${category} · ${manualReason}`,
     category,
     quantity,
     qty: quantity,
@@ -33341,7 +33336,6 @@ function addCashierTerminalManualItemToCart() {
   ensureCashierTerminalPreviewState();
   cashierTerminalState.cartItems.push(line);
   cashierTerminalState.manualItemCategory = "";
-  cashierTerminalState.manualItemDescription = "";
   cashierTerminalState.manualItemQuantity = "1";
   cashierTerminalState.manualItemUnitPrice = "";
   cashierTerminalState.manualItemReason = "Tag missing";
@@ -33631,7 +33625,7 @@ renderCashierTerminalPaymentPanel = function () {
     </div>
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
-      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>${escapeHtml(chooseI18nLabel("完成销售", "Complete Sale"))}</span><strong>${!shiftOpen ? escapeHtml(copy.openShiftFirst) : (saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale")}</strong></button>
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>${escapeHtml(chooseI18nLabel("完成销售", "Complete Sale"))}</span><strong>${escapeHtml(chooseI18nLabel("完成销售", "Complete Sale"))}</strong></button>
       <div class="secondary-actions">
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">${escapeHtml(copy.holdAction)}</button>
         <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>
@@ -33691,10 +33685,6 @@ renderCashierTerminalDrawer = function () {
     cashierTerminalDrawer.innerHTML = `
       <div class="drawer-head"><div><p class="panel-kicker">MANUAL ITEM</p><h3>无码商品 / Manual Item</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body">
-        <div class="drawer-card cashier-manual-audit-card">
-          <strong>Manual / No barcode</strong>
-          <span>不会生成 STORE_ITEM 商品码，不走扫码解析，不扣 STORE_ITEM 库存；销售记录需审计。</span>
-        </div>
         <div class="cashier-manual-drawer-grid">
           <label class="field">
             <span>商品大类 / Category</span>
@@ -33702,10 +33692,6 @@ renderCashierTerminalDrawer = function () {
               <option value="">选择商品大类</option>
               ${manualCategoryOptions.map((option) => `<option value="${escapeHtml(option.value)}"${selectedManualCategory === option.value ? " selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
             </select>
-          </label>
-          <label class="field">
-            <span>Description</span>
-            <input type="text" value="${escapeHtml(cashierTerminalState.manualItemDescription || "")}" data-terminal-drawer-field="manualItemDescription" placeholder="Loose item description" />
           </label>
           <label class="field">
             <span>Quantity</span>
