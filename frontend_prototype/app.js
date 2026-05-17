@@ -33488,9 +33488,6 @@ renderCashierTerminalLookupPanel = function () {
   const recentScans = (cashierTerminalState.recentScans || []).slice(0, 4);
   cashierTerminalLookupCard.className = "lookup-preview cashier-terminal-lookup cashier-terminal-scan-hint";
   cashierTerminalLookupCard.innerHTML = `
-    <strong>${escapeHtml(copy.scanStoreItem)}</strong>
-    <span>${escapeHtml(copy.posStoreItemOnly)}</span>
-    <span>${escapeHtml(copy.itemAlreadySold)}</span>
     ${fallbackNotice}
     ${scanError}
     <div class="cashier-recent-scans">

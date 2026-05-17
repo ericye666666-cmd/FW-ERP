@@ -12702,7 +12702,7 @@ body.cashier-terminal-mode .cashier-terminal-strip-actions .secondary-inline {
 
 body.cashier-terminal-mode .cashier-terminal-body {
   display: grid;
-  grid-template-columns: minmax(230px, 0.27fr) minmax(390px, 0.43fr) minmax(300px, 0.3fr);
+  grid-template-columns: 280px minmax(0, 1fr) 380px;
   gap: 10px;
   height: calc(100vh - 132px);
   min-height: 0;
@@ -12739,7 +12739,7 @@ body.cashier-terminal-mode .cashier-terminal-card-head h3 {
 }
 
 body.cashier-terminal-mode .cashier-terminal-scan-form {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -12756,6 +12756,19 @@ body.cashier-terminal-mode .cashier-terminal-note-field {
 
 body.cashier-terminal-mode .cashier-terminal-scan-form .field-row input {
   flex: 1 1 auto;
+}
+
+body.cashier-terminal-mode .cashier-terminal-scan-form .cashier-manual-icon-button {
+  flex: 0 0 42px;
+  width: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 18px;
 }
 
 body.cashier-terminal-mode .cashier-terminal-scan-form .scan-submit-button {
@@ -12897,7 +12910,7 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
   }
 
   body.cashier-terminal-mode .cashier-terminal-body {
-    grid-template-columns: minmax(230px, 0.27fr) minmax(390px, 0.43fr) minmax(300px, 0.3fr);
+    grid-template-columns: 260px minmax(0, 1fr) 360px;
   }
 
   body.cashier-terminal-mode .payment-column {

@@ -3481,6 +3481,9 @@
                   <label class="field scan-field main-field">
                     <span data-terminal-copy="barcodeField">扫描 STORE_ITEM 商品码</span>
                     <div class="field-row">
+                      <button type="button" class="secondary-inline cashier-manual-icon-button" data-terminal-action="open-drawer" data-terminal-drawer="manual-item" aria-label="无码商品" title="无码商品">
+                        <span aria-hidden="true">🏷️</span>
+                      </button>
                       <input
                         id="cashierTerminalBarcodeInput"
                         name="barcode"
@@ -3504,12 +3507,6 @@
                 ></div>
                 <div id="cashierTerminalLookupCard" class="lookup-preview cashier-terminal-lookup empty-state">
                   仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。
-                </div>
-                <div class="cashier-manual-item-actions">
-                  <button type="button" class="secondary-inline cashier-manual-item-button" data-terminal-action="open-drawer" data-terminal-drawer="manual-item">
-                    <span>无码商品</span>
-                    <small>Manual Item</small>
-                  </button>
                 </div>
               </article>
             </section>
