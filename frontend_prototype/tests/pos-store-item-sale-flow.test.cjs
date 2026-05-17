@@ -1378,7 +1378,7 @@ test("operations analytics renders POS store summaries and source-chain sale rec
   assert.match(appJs, /renderPosSalesAnalyticsSummary\(posStoreItemSaleRecordState\)/);
 });
 
-test("operations center exposes all POS sales data with brief analysis", () => {
+test("operations center exposes sales overview with real POS report fields", () => {
   assert.match(indexHtml, /<h2>2\. 全部销售数据 \/ 简要分析<\/h2>/);
   [
     "operationsAllSalesOverview",
@@ -1397,6 +1397,7 @@ test("operations center exposes all POS sales data with brief analysis", () => {
     "averageTicket",
     "todaySalesAmount",
     "last7DaysSalesAmount",
+    "categorySummaries",
     "cashSalesAmount",
     "mpesaSalesAmount",
     "mixedSalesAmount",
@@ -1413,12 +1414,15 @@ test("operations center exposes all POS sales data with brief analysis", () => {
     "operationsAllSalesAnalysis",
     "operationsAllSalesByStore",
     "operationsAllSalesRecords",
+    "sale_no",
+    "store_code",
+    "cashier",
+    "payment_method",
     "source_sdo",
     "source_package",
     "source_type",
     "assigned_employee",
     "store_rack_code",
-    "cashier",
     "category_summary",
     "cost_status",
     "gross_margin",
