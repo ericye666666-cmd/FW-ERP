@@ -31580,11 +31580,11 @@ function renderCashierTerminalStatusBar() {
     </article>
     <article class="status-card">
       <span class="status-label">${escapeHtml(copy.networkLabel)}</span>
-      <strong class="ok-dot"><span></span><span>${escapeHtml(cashierTerminalState.networkStatus === "online" ? copy.online : copy.offline)}</span></strong>
+      <strong class="ok-dot"><span>操作</span><span>${escapeHtml(cashierTerminalState.networkStatus === "online" ? copy.online : copy.offline)}</span></strong>
     </article>
     <article class="status-card">
       <span class="status-label">${escapeHtml(copy.printerLabel)}</span>
-      <strong class="ok-dot"><span></span><span>${escapeHtml(copy.printer)}</span></strong>
+      <strong class="ok-dot"><span>操作</span><span>${escapeHtml(copy.printer)}</span></strong>
     </article>
     <article class="status-card">
       <span class="status-label">${escapeHtml(copy.localeLabel)}</span>
@@ -33527,7 +33527,7 @@ renderCashierTerminalCart = function () {
       <span>数量</span>
       <span>折扣</span>
       <span>小计</span>
-      <span></span>
+      <span>操作</span>
     </div>
     ${rows.map((row, index) => {
       const manualLine = isCashierTerminalManualUnbarcodedLine(row);
@@ -33546,13 +33546,13 @@ renderCashierTerminalCart = function () {
               <small>${escapeHtml(row.display_code || "MANUAL")} · ${escapeHtml(row.description || "-")}</small>
               <span class="manual-audit-badge">Manual / No barcode</span>
             </div>
-            <div>${escapeHtml(row.category || "-")}</div>
-            <div>${escapeHtml(row.manual_reason || "-")}</div>
-            <div>${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
-            <div>${escapeHtml(qty)}</div>
-            <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
-            <div><strong>${escapeHtml(formatCashierPreviewMoney(lineTotal))}</strong></div>
-            <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
+            <div class="cart-cell-ellipsis">${escapeHtml(row.category || "-")}</div>
+            <div class="cart-cell-ellipsis">${escapeHtml(row.manual_reason || "-")}</div>
+            <div class="cart-cell-num">${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
+            <div class="cart-cell-num">${escapeHtml(qty)}</div>
+            <div class="cart-cell-num">${escapeHtml(formatCashierPreviewMoney(0))}</div>
+            <div class="cart-cell-num"><strong>${escapeHtml(formatCashierPreviewMoney(lineTotal))}</strong></div>
+            <button type="button" class="remove-btn cart-action-remove" data-terminal-cart-remove="${index}" aria-label="${escapeHtml(chooseI18nLabel("删除", "Remove"))}" title="${escapeHtml(chooseI18nLabel("删除", "Remove"))}"><span aria-hidden="true">🗑</span></button>
           </article>
         `;
       }
@@ -33563,13 +33563,13 @@ renderCashierTerminalCart = function () {
             <small>${escapeHtml(row.machine_code || "-")}</small>
             ${sourceLine}
           </div>
-          <div>${escapeHtml(row.category || "-")}</div>
-          <div>${escapeHtml(row.shelf_location || "-")}</div>
-          <div>${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
+          <div class="cart-cell-ellipsis">${escapeHtml(row.category || "-")}</div>
+          <div class="cart-cell-ellipsis">${escapeHtml(row.shelf_location || "-")}</div>
+          <div class="cart-cell-num">${escapeHtml(formatCashierPreviewMoney(unitPrice))}</div>
           <div>1</div>
-          <div>${escapeHtml(formatCashierPreviewMoney(0))}</div>
-          <div><strong>${escapeHtml(formatCashierPreviewMoney(lineTotal))}</strong></div>
-          <button type="button" class="remove-btn" data-terminal-cart-remove="${index}" aria-label="删除商品">删除</button>
+          <div class="cart-cell-num">${escapeHtml(formatCashierPreviewMoney(0))}</div>
+          <div class="cart-cell-num"><strong>${escapeHtml(formatCashierPreviewMoney(lineTotal))}</strong></div>
+          <button type="button" class="remove-btn cart-action-remove" data-terminal-cart-remove="${index}" aria-label="${escapeHtml(chooseI18nLabel("删除", "Remove"))}" title="${escapeHtml(chooseI18nLabel("删除", "Remove"))}"><span aria-hidden="true">🗑</span></button>
         </article>
       `;
     }).join("")}
