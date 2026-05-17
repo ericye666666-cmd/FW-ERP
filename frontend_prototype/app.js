@@ -38731,8 +38731,31 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   };
 }
 
+function normalizeOperationsPosSaleOverviewRecords(records = []) {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+  return records.map((record) => {
+    const normalized = record && typeof record === "object" ? { ...record } : {};
+    const categorySummary = String(
+      normalized.category_summary
+        || normalized.category
+        || normalized.category_name
+        || normalized.category_display
+        || normalized.content_summary
+        || ""
+    ).trim();
+    return {
+      ...normalized,
+      category: String(normalized.category || categorySummary).trim(),
+      category_summary: categorySummary || "未分类",
+    };
+  });
+}
+
 function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
-  const summary = summarizeAllPosStoreItemSalesForOperations(records);
+  const normalizedRecords = normalizeOperationsPosSaleOverviewRecords(records);
+  const summary = summarizeAllPosStoreItemSalesForOperations(normalizedRecords);
   const overviewTarget = document.querySelector("#operationsAllSalesOverview");
   if (overviewTarget instanceof HTMLElement) {
     overviewTarget.className = "report-summary-grid";
@@ -38772,15 +38795,15 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
   const recordsTarget = document.querySelector("#operationsAllSalesRecords");
   if (recordsTarget instanceof HTMLElement) {
     recordsTarget.className = "candidate-list";
-    recordsTarget.innerHTML = (Array.isArray(records) && records.length)
-      ? records.slice(0, 50).map((record) => `
+    recordsTarget.innerHTML = normalizedRecords.length
+      ? normalizedRecords.slice(0, 50).map((record) => `
         <article class="candidate-row">
           <div class="candidate-main">
             <strong>${escapeHtml(record.sale_no || "-")}</strong>
             <div class="subtle small">${escapeHtml(`${record.order_no || record.sale_no || "-"} · ${record.store_code || "-"} · ${formatKesAmount(record.total_amount ?? record.price ?? 0, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · source_type ${record.source_type || "-"}`)}</div>
-            <div class="subtle small">${escapeHtml(`assigned_employee ${record.assigned_employee || "-"} · store_rack_code ${record.store_rack_code || "-"} · cashier ${record.cashier || "-"} · shift ${record.shift_id || "-"} · status ${record.status || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`assigned_employee ${record.assigned_employee || "-"} · category_summary ${record.category_summary || record.category || "未分类"} · store_rack_code ${record.store_rack_code || "-"} · cashier ${record.cashier || "-"} · shift ${record.shift_id || "-"} · status ${record.status || "-"}`)}</div>
             <div class="subtle small">${escapeHtml(`item_count ${record.item_count || 0} · sale_time ${record.created_at ? formatLocalDateTime(record.created_at) : "-"}`)}</div>
           </div>
           <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.payment_method || "-")}</span></div>
@@ -38794,7 +38817,7 @@ async function loadOperationsRealPosSalesOverview() {
   try {
     const response = await request("/reports/pos-sales-overview?date_range=all&payment_method=all&limit=100");
     operationsRealPosSalesOverviewState = response;
-    const records = Array.isArray(response?.records) ? response.records : [];
+    const records = normalizeOperationsPosSaleOverviewRecords(response?.records);
     renderOperationsAllSalesData(records);
   } catch (error) {
     const target = document.querySelector("#operationsAllSalesAnalysis");
