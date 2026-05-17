@@ -12702,7 +12702,7 @@ body.cashier-terminal-mode .cashier-terminal-strip-actions .secondary-inline {
 
 body.cashier-terminal-mode .cashier-terminal-body {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) 350px;
   gap: 10px;
   height: calc(100vh - 132px);
   min-height: 0;
@@ -12719,6 +12719,12 @@ body.cashier-terminal-mode .payment-column {
   min-width: 0;
 }
 
+body.cashier-terminal-mode .payment-column {
+  width: 350px;
+  min-width: 350px;
+  max-width: 350px;
+}
+
 body.cashier-terminal-mode .cashier-terminal-card,
 body.cashier-terminal-mode .cashier-terminal-scan-card,
 body.cashier-terminal-mode .cashier-terminal-cart-card,
@@ -12733,6 +12739,24 @@ body.cashier-terminal-mode .cashier-terminal-payment-panel {
 body.cashier-terminal-mode .cashier-terminal-card-head {
   margin-bottom: 8px;
 }
+
+body.cashier-terminal-mode .cashier-terminal-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-scan-card {
+  height: auto;
+  overflow: visible;
+}
+
+body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-cart-card {
+  flex: 1 1 auto;
+}
+
 
 body.cashier-terminal-mode .cashier-terminal-card-head h3 {
   font-size: 18px;
@@ -12772,7 +12796,8 @@ body.cashier-terminal-mode .cashier-terminal-scan-form .cashier-manual-icon-butt
 }
 
 body.cashier-terminal-mode .cashier-terminal-scan-form .scan-submit-button {
-  flex: 0 0 132px;
+  flex: 0 0 120px;
+  min-width: 120px;
 }
 
 body.cashier-terminal-mode #cashierTerminalBarcodeInput {
@@ -12910,7 +12935,7 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
   }
 
   body.cashier-terminal-mode .cashier-terminal-body {
-    grid-template-columns: 260px minmax(0, 1fr) 360px;
+    grid-template-columns: minmax(0, 1fr) 350px;
   }
 
   body.cashier-terminal-mode .payment-column {
