@@ -11782,9 +11782,10 @@ body.cashier-terminal-mode .primary-action {
 body.cashier-terminal-mode .cashier-cart-header,
 body.cashier-terminal-mode .cashier-cart-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.4fr) minmax(110px, 1fr) 86px 86px 54px 68px 86px 66px;
+  grid-template-columns: minmax(190px, 2.2fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(86px, 0.85fr) minmax(64px, 0.6fr) minmax(70px, 0.7fr) minmax(94px, 0.9fr) 56px;
   gap: 8px;
   align-items: center;
+  width: 100%;
 }
 
 body.cashier-terminal-mode .cashier-cart-row {
@@ -11796,6 +11797,46 @@ body.cashier-terminal-mode .cashier-cart-row {
   box-shadow: 0 4px 12px rgba(17, 24, 39, 0.04);
 }
 
+
+body.cashier-terminal-mode .cashier-cart-header > span,
+body.cashier-terminal-mode .cashier-cart-row > div,
+body.cashier-terminal-mode .cashier-cart-row > button {
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cart-cell-ellipsis,
+body.cashier-terminal-mode .cart-code strong,
+body.cashier-terminal-mode .cart-code small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .cart-cell-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+body.cashier-terminal-mode .cashier-cart-header > span:nth-child(n + 4):nth-child(-n + 7) {
+  text-align: right;
+}
+
+body.cashier-terminal-mode .cashier-cart-header > span:last-child {
+  text-align: center;
+}
+
+body.cashier-terminal-mode .cart-action-remove {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+}
 body.cashier-terminal-mode .cashier-terminal-grand-total {
   border-color: #ddd6fe;
   border-radius: 14px;
