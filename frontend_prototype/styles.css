@@ -11865,7 +11865,7 @@ body.cashier-terminal-mode .recent-sales-table {
 body.cashier-terminal-mode .recent-sales-table-head,
 body.cashier-terminal-mode .recent-sales-row {
   display: grid;
-  grid-template-columns: minmax(170px, 1.4fr) minmax(150px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) 120px;
+  grid-template-columns: minmax(170px, 1.25fr) minmax(190px, 1.1fr) minmax(120px, 0.8fr) minmax(130px, 0.9fr) 140px;
   gap: 10px;
   align-items: center;
   padding: 12px 14px;
@@ -12120,7 +12120,8 @@ body.cashier-terminal-mode .cashier-terminal-status-metrics > button {
 }
 
 body.cashier-terminal-mode .side-drawer {
-  width: min(560px, calc(100vw - 32px));
+  right: 10px;
+  width: min(760px, calc(100vw - 20px));
   border-radius: 16px;
 }
 

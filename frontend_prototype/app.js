@@ -33799,15 +33799,15 @@ renderCashierTerminalDrawer = function () {
     const currentShiftId = String(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo || "").trim();
     const sales = currentShiftId ? allSales.filter((sale) => !sale?.shift_id || String(sale.shift_id) === currentShiftId) : allSales;
     cashierTerminalDrawer.innerHTML = `
-      <div class="drawer-head"><div><p class="panel-kicker">RECEIPT</p><h3>小票打印</h3><p class="drawer-subtitle">最近销售（本班次内），选择要重打的小票.</p></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
+      <div class="drawer-head"><div><p class="panel-kicker">RECEIPT</p><h3>小票打印</h3></div><button type="button" class="drawer-close" data-terminal-action="close-drawer">&times;</button></div>
       <div class="drawer-body recent-sales-body">
-        <div class="drawer-card"><strong>只显示当前班次内的销售记录.</strong></div>${cashierTerminalState.saleLookupFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.saleLookupFeedback)}</div>` : ""}
+
         <div class="recent-sales-table">
           <div class="recent-sales-table-head"><span>销售单号</span><span>时间</span><span>金额</span><span>支付方式</span><span>操作</span></div>
           ${sales.length ? sales.map((sale) => `
             <article class="recent-sales-row status-${escapeHtml(sale.status || "completed")}">
               <span class="sale-no">${escapeHtml(sale.sale_no || "-")}</span>
-              <span>${escapeHtml(sale.sale_time || "-")}</span>
+              <span>${escapeHtml(getCashierTerminalPrintTimestamp(sale.sale_time || sale.sold_at || sale.created_at || sale.time || ""))}</span>
               <strong>${escapeHtml(formatCashierPreviewMoney(sale.total_amount || 0))}</strong>
               <span>${escapeHtml(sale.payment_method || "-")}</span>
               <button type="button" class="secondary-inline" data-terminal-action="reprint-sale" data-terminal-sale-no="${escapeHtml(sale.sale_no || "")}">小票重打</button>
@@ -33816,7 +33816,6 @@ renderCashierTerminalDrawer = function () {
         </div>
       </div>
       <div class="drawer-foot split-actions">
-        <div class="drawer-hint">小票重打不会重复创建销售记录，仅重新打印该销售单的小票.</div>
         <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">刷新小票列表</button>
       </div>
     `;
