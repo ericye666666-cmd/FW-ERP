@@ -33584,9 +33584,13 @@ renderCashierTerminalPaymentPanel = function () {
   const changeDue = getCashierTerminalChangeDue();
   const balance = Math.max(totals.totalAmount - paid, 0);
   const paymentGuidance = getCashierTerminalPaymentGuidance();
-  const saleDisabled = !hasOpenCashierTerminalShift() || !totals.totalItems || Boolean(paymentGuidance);
+  const shiftOpen = hasOpenCashierTerminalShift();
+  const saleDisabled = !shiftOpen || !totals.totalItems || Boolean(paymentGuidance);
   const isMpesaMode = cashierTerminalState.activePaymentMode === "mpesa";
   const isMixedMode = cashierTerminalState.activePaymentMode === "mixed";
+  const completeSaleHint = !shiftOpen
+    ? copy.openShiftFirst
+    : (saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale");
   cashierTerminalPaymentPanel.innerHTML = `
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
@@ -33610,24 +33614,24 @@ renderCashierTerminalPaymentPanel = function () {
       <input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.discountAmount || "")}" data-terminal-payment-field="discountAmount" placeholder="0" />
     </label>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
-      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>现金收款</small></button>
-      <button type="button" class="method-btn${isMpesaMode ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>${escapeHtml(chooseI18nLabel("M-Pesa", "M-Pesa"))}</span><small>手动输入参考号</small></button>
-      <button type="button" class="method-btn${isMixedMode ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合支付", "Mixed"))}</span><small>Cash + M-Pesa</small></button>
+      <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>${escapeHtml(chooseI18nLabel("现金收款", "Cash payment"))}</small></button>
+      <button type="button" class="method-btn${isMpesaMode ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>${escapeHtml(chooseI18nLabel("M-Pesa", "M-Pesa"))}</span><small>${escapeHtml(chooseI18nLabel("手动输入参考号", "Enter reference manually"))}</small></button>
+      <button type="button" class="method-btn${isMixedMode ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合支付", "Mixed"))}</span><small>${escapeHtml(chooseI18nLabel("现金 + M-Pesa", "Cash + M-Pesa"))}</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
       ${isMpesaMode
-        ? `<label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="输入 M-Pesa 实收" /></label>
-           <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
+        ? `<label class="field"><span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa amount"))}</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 实收", "Enter M-Pesa amount"))}" /></label>
+           <label class="field"><span>${escapeHtml(chooseI18nLabel("参考号", "Reference"))}</span><input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" /></label>`
         : isMixedMode
-          ? `<label class="field"><span>现金金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="输入现金金额" /></label>
-             <label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="输入 M-Pesa 金额" /></label>
-             <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
-          : `<label class="field"><span>实收金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" /></label>`
+          ? `<label class="field"><span>${escapeHtml(chooseI18nLabel("现金金额", "Cash amount"))}</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="${escapeHtml(chooseI18nLabel("输入现金金额", "Enter cash amount"))}" /></label>
+             <label class="field"><span>${escapeHtml(chooseI18nLabel("M-Pesa 金额", "M-Pesa amount"))}</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 金额", "Enter M-Pesa amount"))}" /></label>
+             <label class="field"><span>${escapeHtml(chooseI18nLabel("参考号", "Reference"))}</span><input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="${escapeHtml(chooseI18nLabel("输入 M-Pesa 流水号", "Enter M-Pesa reference"))}" /></label>`
+          : `<label class="field"><span>${escapeHtml(chooseI18nLabel("实收金额", "Received amount"))}</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="${escapeHtml(chooseI18nLabel("输入现金实收", "Enter cash received"))}" /></label>`
       }
     </div>
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
-      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>完成销售</span><strong>${saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale"}</strong></button>
+      <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>${escapeHtml(chooseI18nLabel("完成销售", "Complete Sale"))}</span><strong>${!shiftOpen ? escapeHtml(copy.openShiftFirst) : (saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale")}</strong></button>
       <div class="secondary-actions">
         <button type="button" class="secondary-action" data-terminal-action="open-drawer" data-terminal-drawer="hold-create">${escapeHtml(copy.holdAction)}</button>
         <button type="button" class="secondary-action danger" data-terminal-action="clear-cart">清空购物车</button>

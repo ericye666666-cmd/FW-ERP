@@ -12755,6 +12755,14 @@ body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-scan-
 
 body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-cart-card {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-cart {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 
@@ -12891,19 +12899,9 @@ body.cashier-terminal-mode .cashier-terminal-no-shift {
   padding: 10px;
 }
 
-body.cashier-terminal-mode .cashier-terminal-quick-actions {
-  max-height: none;
-  min-height: 52px;
-  margin: 0 12px;
-  padding: 6px 8px;
-  overflow: visible;
-}
-
-body.cashier-terminal-mode .cashier-terminal-transaction-strip {
-  max-height: none;
-  min-height: 52px;
-  overflow: visible;
-  padding: 6px 8px;
+body.cashier-terminal-mode .cashier-terminal-quick-actions,
+body.cashier-terminal-mode .cashier-terminal-receipt-panel {
+  display: none !important;
 }
 
 body.cashier-terminal-mode .cashier-terminal-status-metrics {
@@ -13070,4 +13068,9 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
 
 body.cashier-terminal-mode .cashier-terminal-receipt-panel[hidden] {
   display: none !important;
+}
+
+body.cashier-terminal-mode .cashier-terminal-transaction-strip {
+  min-height: 52px;
+  overflow: visible;
 }
