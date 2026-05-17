@@ -13141,3 +13141,70 @@ body.cashier-terminal-mode .cashier-cart-row > div,
 body.cashier-terminal-mode .cashier-cart-header > span {
   font-size: 11px;
 }
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) {
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  max-height: 320px;
+  padding: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-header,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 2.5fr) minmax(72px, 1fr) minmax(96px, 1.2fr) minmax(62px, 0.9fr) minmax(46px, 0.65fr) minmax(62px, 0.9fr) minmax(72px, 0.95fr) 34px;
+  gap: 4px;
+  align-items: center;
+  margin: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 32px;
+  padding: 0 6px;
+  border-radius: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .basket-row,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-terminal-cart-row,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .basket-item,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-terminal-cart-card {
+  min-height: 60px;
+  height: 60px;
+  max-height: 64px;
+  padding: 0 6px;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+  flex: 0 0 auto;
+  align-self: auto;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row > *,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-header > * {
+  min-width: 0;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row .cart-code {
+  display: grid;
+  gap: 1px;
+  align-content: center;
+}
+
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row .cart-code strong,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row .cart-code small,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row .cart-code span,
+body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-cart-row .cart-cell-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
