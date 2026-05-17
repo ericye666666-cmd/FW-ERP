@@ -18189,10 +18189,20 @@ class InMemoryState:
                     "hold_id": str(item.get("hold_id") or hold.get("hold_id") or hold.get("hold_no") or "").strip(),
                     "hold_no": str(item.get("hold_no") or hold.get("hold_no") or "").strip(),
                     "line_no": int(item.get("line_no") or index),
+                    "line_type": self._pos_sale_response_line_type(item.get("line_type")),
+                    "barcode_type": str(item.get("barcode_type") or "STORE_ITEM").strip().upper(),
                     "store_item_id": str(item.get("store_item_id") or "").strip(),
                     "display_code": str(item.get("display_code") or "").strip(),
                     "machine_code": str(item.get("machine_code") or "").strip(),
                     "category": str(item.get("category") or "").strip(),
+                    "description": str(item.get("description") or "").strip(),
+                    "quantity": int(item.get("quantity") or item.get("qty") or 1),
+                    "unit_price": round(float(item.get("unit_price") or 0), 2),
+                    "subtotal": round(float(item.get("subtotal") or item.get("final_price") or 0), 2),
+                    "manual_reason": str(item.get("manual_reason") or "").strip(),
+                    "requires_audit": bool(item.get("requires_audit")),
+                    "inventory_tracked": bool(item.get("inventory_tracked", True)),
+                    "created_by": str(item.get("created_by") or "").strip(),
                     "shelf_location": str(item.get("shelf_location") or "").strip(),
                     "original_price": round(float(item.get("original_price") or 0), 2),
                     "final_price": round(float(item.get("final_price") or 0), 2),
@@ -18247,22 +18257,34 @@ class InMemoryState:
         return str(row.get(field_name) or "").strip().lower()
 
     def _build_pos_hold_item(self, hold_no: str, validated: dict[str, Any]) -> dict[str, Any]:
-        store_item = validated["store_item"]
+        line_type = self._normalize_pos_sale_line_type(validated.get("line_type"))
+        store_item = validated.get("store_item") or {}
+        is_manual = line_type == "MANUAL_UNBARCODED"
         return {
             "hold_id": hold_no,
             "hold_no": hold_no,
             "line_no": validated["line_no"],
-            "store_item_id": validated["store_item_id"],
-            "display_code": validated["display_code"],
-            "machine_code": validated["machine_code"],
+            "line_type": "manual_unbarcoded" if is_manual else "STORE_ITEM",
+            "barcode_type": "NONE" if is_manual else "STORE_ITEM",
+            "store_item_id": validated.get("store_item_id", ""),
+            "display_code": validated.get("display_code", ""),
+            "machine_code": validated.get("machine_code", ""),
             "category": validated["category"],
+            "description": validated.get("description", ""),
+            "quantity": int(validated.get("qty") or 1),
+            "unit_price": round(float(validated.get("unit_price") or validated.get("final_price") or 0), 2),
+            "subtotal": round(float(validated.get("subtotal") or validated.get("final_price") or 0), 2),
+            "manual_reason": str(validated.get("manual_reason") or "").strip(),
+            "requires_audit": bool(validated.get("requires_audit")) if is_manual else False,
+            "inventory_tracked": not is_manual,
+            "created_by": str(validated.get("created_by") or "").strip(),
             "shelf_location": validated["shelf_location"],
             "original_price": validated["original_price"],
             "final_price": validated["final_price"],
             "discount_amount": validated["discount_amount"],
-            "previous_status": self._pos_hold_row_status(store_item, "status") or validated["from_status"],
-            "previous_sale_status": self._pos_hold_row_status(store_item, "sale_status") or validated["from_status"],
-            "previous_store_item_status": self._pos_hold_row_status(store_item, "store_item_status") or validated["from_status"],
+            "previous_status": self._pos_hold_row_status(store_item, "status") or validated.get("from_status", ""),
+            "previous_sale_status": self._pos_hold_row_status(store_item, "sale_status") or validated.get("from_status", ""),
+            "previous_store_item_status": self._pos_hold_row_status(store_item, "store_item_status") or validated.get("from_status", ""),
             "hold_status": "held",
             "store_code": str(store_item.get("store_code") or "").strip().upper(),
         }
@@ -18284,6 +18306,8 @@ class InMemoryState:
 
     def _restore_pos_hold_item_statuses(self, hold: dict[str, Any], actor: str, released_at: str) -> None:
         for item in hold.get("items") or []:
+            if self._normalize_pos_sale_line_type(item.get("line_type")) == "MANUAL_UNBARCODED":
+                continue
             store_item_id = str(item.get("store_item_id") or "").strip().upper()
             machine_code = str(item.get("machine_code") or "").strip().upper()
             display_code = str(item.get("display_code") or "").strip().upper()
@@ -18322,8 +18346,12 @@ class InMemoryState:
             for item in hold.get("items") or []
             if str(item.get("store_item_id") or "").strip()
         }
-        sale_ids = {row["store_item_id"] for row in validated_items}
-        if hold_ids != sale_ids or len(hold_ids) != len(validated_items):
+        sale_ids = {
+            str(row.get("store_item_id") or "").strip().upper()
+            for row in validated_items
+            if self._normalize_pos_sale_line_type(row.get("line_type")) == "STORE_ITEM" and str(row.get("store_item_id") or "").strip()
+        }
+        if hold_ids != sale_ids:
             raise HTTPException(status_code=400, detail=f"{hold.get('hold_no') or 'HOLD'} 挂单商品与本次收款商品不一致。")
 
     def create_pos_hold(self, store_code: str, payload: dict[str, Any], created_by: str = "") -> dict[str, Any]:
@@ -18342,9 +18370,10 @@ class InMemoryState:
         seen_store_item_ids: set[str] = set()
         for index, item in enumerate(items, start=1):
             validated = self._validate_pos_sale_item(normalized_store, item, index)
-            if validated["store_item_id"] in seen_store_item_ids:
+            if validated.get("line_type") == "STORE_ITEM" and validated["store_item_id"] in seen_store_item_ids:
                 raise HTTPException(status_code=400, detail=f"{validated['display_code']} 已在本张挂单中，不能重复挂单。")
-            seen_store_item_ids.add(validated["store_item_id"])
+            if validated.get("line_type") == "STORE_ITEM":
+                seen_store_item_ids.add(validated["store_item_id"])
             validated_items.append(validated)
 
         hold_sequence = next(self._pos_hold_ids)

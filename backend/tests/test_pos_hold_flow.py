@@ -23,6 +23,22 @@ def _hold_payload(*machine_codes, shift_id="", cashier_id="Clerk A", terminal_id
         ],
     }
 
+def _manual_hold_line(final_price=320, qty=2):
+    return {
+        "line_type": "manual_unbarcoded",
+        "display_code": "MANUAL",
+        "description": "Manual Item",
+        "category": "Manual Item",
+        "quantity": qty,
+        "qty": qty,
+        "unit_price": round(final_price / qty, 2),
+        "subtotal": final_price,
+        "final_price": final_price,
+        "manual_reason": "Tag missing",
+        "created_by": "Clerk A",
+        "machine_code": "",
+    }
+
 
 def _audit_types(state):
     return [event["event_type"] for event in state.audit_events]
@@ -154,3 +170,28 @@ def test_sale_from_hold_rejects_item_mismatch(state):
     assert state.store_items["STOREITEM-POS-001"]["status"] == "held"
     assert state.store_items["STOREITEM-POS-002"]["status"] == "printed_in_store"
     assert not state.sales_transactions
+
+
+def test_manual_unbarcoded_line_can_hold_list_resume_and_complete_sale(state):
+    _add_store_item(state, _store_item(store_item_id="STOREITEM-POS-001", machine_code="5261240000013", price=250))
+    shift = _open_shift(state)
+    payload = _hold_payload("5261240000013", shift_id=shift["shift_id"], final_price=250)
+    payload["items"].append(_manual_hold_line(final_price=320, qty=2))
+
+    hold = state.create_pos_hold("UTAWALA", payload, created_by="store_manager_1")
+    assert hold["item_count"] == 2
+    assert hold["items"][1]["line_type"] == "manual_unbarcoded"
+    assert hold["items"][1]["machine_code"] == ""
+    assert hold["items"][1]["store_item_id"] == ""
+
+    listed = state.list_pos_holds("UTAWALA", status="held", limit=20)
+    resumed = state.resume_pos_hold("UTAWALA", hold["hold_no"], resumed_by="store_manager_1")
+    assert listed["holds"][0]["items"][1]["line_type"] == "manual_unbarcoded"
+    assert resumed["items"][1]["line_type"] == "manual_unbarcoded"
+
+    sale_payload = _sale_payload("5261240000013", cash_amount=570, shift_id=shift["shift_id"], final_price=250)
+    sale_payload["hold_no"] = hold["hold_no"]
+    sale_payload["items"].append(_manual_hold_line(final_price=320, qty=2))
+    sale = state.create_pos_sale("UTAWALA", sale_payload, created_by="store_manager_1")
+    assert sale["hold_no"] == hold["hold_no"]
+    assert any(item.get("line_type") == "manual_unbarcoded" for item in sale["items"])

@@ -149,10 +149,18 @@ class PosShiftReportResponse(BaseModel):
 
 
 class PosHoldItemCreate(BaseModel):
-    machine_code: str = Field(min_length=1)
+    line_type: str = "STORE_ITEM"
+    machine_code: str = ""
     display_code: str = ""
     final_price: float = Field(ge=0)
     discount_amount: float = Field(default=0, ge=0)
+    quantity: int = Field(default=1, ge=1)
+    unit_price: float = Field(default=0, ge=0)
+    subtotal: float = Field(default=0, ge=0)
+    category: str = ""
+    description: str = ""
+    manual_reason: str = ""
+    created_by: str = ""
 
 
 class PosHoldCreateRequest(BaseModel):
@@ -174,10 +182,20 @@ class PosHoldItemResponse(BaseModel):
     hold_id: str
     hold_no: str = ""
     line_no: int
-    store_item_id: str
+    line_type: str = "STORE_ITEM"
+    barcode_type: str = "STORE_ITEM"
+    store_item_id: str = ""
     display_code: str
     machine_code: str
     category: str = ""
+    description: str = ""
+    quantity: int = 1
+    unit_price: float = 0
+    subtotal: float = 0
+    manual_reason: str = ""
+    requires_audit: bool = False
+    inventory_tracked: bool = True
+    created_by: str = ""
     shelf_location: str = ""
     original_price: float
     final_price: float
