@@ -31491,11 +31491,7 @@ async function primeCashierTerminalSession(force = false) {
     await loadCashierTerminalTodaySalesSummary({ render: false });
     renderCashierTerminal();
   } catch (error) {
-    cashierTerminalState.currentShift = null;
-    cashierTerminalState.shiftSummary = null;
-    cashierTerminalState.shiftNo = "";
-    cashierTerminalState.shiftStatus = "not_opened";
-    cashierTerminalState.shiftOpen = false;
+    resetCashierTerminalShiftState();
     cashierTerminalState.shiftFeedback = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst);
     ["#shiftReportForm [name='shift_no']", "#handoverRequestForm [name='shift_no']", "#closeBusinessReportForm [name='shift_no']", "#saleForm [name='shift_no']"].forEach((selector) => setInputValue(selector, ""));
     try {
@@ -34673,14 +34669,30 @@ function normalizeCashierTerminalShift(shift = {}) {
   return normalized;
 }
 
+function resetCashierTerminalShiftState() {
+  cashierTerminalState.currentShift = null;
+  cashierTerminalState.shiftSummary = null;
+  cashierTerminalState.shiftNo = "";
+  cashierTerminalState.shiftStatus = "not_opened";
+  cashierTerminalState.shiftOpen = false;
+  cashierTerminalState.shiftOpenedAt = "";
+  cashierTerminalState.openingFloatCash = "0";
+  cashierTerminalState.shiftSalesAmount = 0;
+  cashierTerminalState.shiftOrderCount = 0;
+}
+
 function applyCashierTerminalShift(shift = null) {
   const normalized = shift?.shift_id ? normalizeCashierTerminalShift(shift) : null;
+  if (!normalized?.shift_id || String(normalized.status || "").toLowerCase() !== "open") {
+    resetCashierTerminalShiftState();
+    return null;
+  }
   cashierTerminalState.currentShift = normalized;
-  cashierTerminalState.shiftNo = normalized?.shift_id || "";
-  cashierTerminalState.shiftStatus = String(normalized?.status || "not_opened").trim().toLowerCase();
-  cashierTerminalState.shiftOpen = hasOpenCashierTerminalShift();
-  cashierTerminalState.shiftOpenedAt = normalized?.opened_at || "";
-  if (normalized?.opening_float != null) {
+  cashierTerminalState.shiftNo = normalized.shift_id;
+  cashierTerminalState.shiftStatus = String(normalized.status || "open").trim().toLowerCase();
+  cashierTerminalState.shiftOpen = true;
+  cashierTerminalState.shiftOpenedAt = normalized.opened_at || "";
+  if (normalized.opening_float != null) {
     cashierTerminalState.openingFloatCash = String(normalized.opening_float);
   }
   return normalized;
@@ -35497,12 +35509,12 @@ async function closeCashierTerminalShiftBackend() {
     }),
   });
   cashierTerminalState.shiftSummary = result;
-  cashierTerminalState.currentShift = null;
-  cashierTerminalState.shiftNo = "";
-  cashierTerminalState.shiftStatus = "closed";
-  cashierTerminalState.shiftOpen = false;
+  resetCashierTerminalShiftState();
   cashierTerminalState.shiftFeedback = `班次已关闭，现金差异 ${formatCashierPreviewMoney(result.cash_variance || 0)}。${cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst)}`;
   cashierTerminalState.countedCash = "";
+  renderCashierTerminalSessionStrip();
+  renderCashierTerminalStatusBar();
+  renderCashierTerminalPaymentPanel();
   renderCashierTerminal();
   showTransientInlineNotice("#cashierTerminalInlineNotice", cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst), "warning", 2200);
   return result;
