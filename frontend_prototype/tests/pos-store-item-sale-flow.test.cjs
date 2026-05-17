@@ -1246,6 +1246,30 @@ test("POS payment validation uses cashier-facing shortage and M-Pesa messages", 
   assert.throws(() => fn(), /Cash \+ M-Pesa 还差 KSh 100/);
 });
 
+
+test("POS complete-sale action routes errors into payment guidance area", () => {
+  const actionSource = extractAssignedFunctionSource(appJs, "handleCashierTerminalAction");
+  assert.match(actionSource, /case "complete-sale":[\s\S]*await submitCashierTerminalBackendSale\(\)/);
+  assert.match(actionSource, /case "complete-sale":[\s\S]*showCashierTerminalPaymentError\(error\)/);
+  assert.doesNotMatch(actionSource, /case "complete-sale":[\s\S]*console\.error/);
+});
+
+test("POS submit sale and hotkey propagate validate\/payload errors to payment feedback", () => {
+  const submitSource = extractAssignedFunctionSource(appJs, "submitCashierTerminalSale");
+  const hotkeySource = extractAssignedAnyFunctionSource(appJs, "handleCashierTerminalHotkeys");
+  const backendSource = extractAsyncFunctionSource(appJs, "submitCashierTerminalBackendSale");
+
+  assert.match(submitSource, /showCashierTerminalPaymentError\(error\)/);
+  assert.match(backendSource, /const payment = validateCashierTerminalPayment\(\)/);
+  assert.match(backendSource, /const payload = buildCashierTerminalPosSalePayload\(payment\)/);
+  assert.match(hotkeySource, /event\.key === "F8"[\s\S]*submitCashierTerminalSale\(\)\.catch\(\(\) => \{\}\)/);
+});
+
+test("POS mixed payment can unlock complete-sale with Amount Due 1, Cash 1, M-Pesa 1, Reference 1", () => {
+  const syncSource = extractFunctionSource(appJs, "syncCashierTerminalPaymentPreview");
+  assert.match(syncSource, /const guidance = getCashierTerminalPaymentGuidance\(\)/);
+  assert.match(syncSource, /const saleDisabled = !hasOpenCashierTerminalShift\(\) \|\| !totals\.totalItems \|\| Boolean\(guidance\)/);
+});
 test("POS checkout shows Cash / M-Pesa / Mixed payment modes", () => {
   const paymentSource = extractAssignedAnyFunctionSource(appJs, "renderCashierTerminalPaymentPanel");
   const modeSource = extractFunctionSource(appJs, "setCashierTerminalPaymentMode");

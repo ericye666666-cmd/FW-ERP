@@ -32724,7 +32724,11 @@ async function handleCashierTerminalAction(action, target) {
       return;
     }
     case "complete-sale":
-      await submitCashierTerminalSale();
+      try {
+        await submitCashierTerminalBackendSale();
+      } catch (error) {
+        showCashierTerminalPaymentError(error);
+      }
       return;
     case "open-shift":
     case "submit-open-shift":
@@ -32782,9 +32786,7 @@ function handleCashierTerminalHotkeys(event) {
   }
   if (event.key === "F8") {
     event.preventDefault();
-    submitCashierTerminalSale().catch((error) => {
-      showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
-    });
+    submitCashierTerminalSale().catch(() => {});
     return;
   }
   if (event.key === "F9") {
@@ -33623,6 +33625,7 @@ renderCashierTerminalPaymentPanel = function () {
           : `<label class="field"><span>${escapeHtml(chooseI18nLabel("实收金额", "Received amount"))}</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="${escapeHtml(chooseI18nLabel("输入现金实收", "Enter cash received"))}" /></label>`
       }
     </div>
+    ${cashierTerminalState.paymentFeedback ? `<div class="cashier-payment-feedback" role="status" aria-live="polite">${escapeHtml(cashierTerminalState.paymentFeedback)}</div>` : ""}
     ${paymentGuidance ? `<div class="cashier-payment-guidance" data-terminal-payment-guidance>${escapeHtml(paymentGuidance)}</div>` : `<div class="cashier-payment-guidance" data-terminal-payment-guidance hidden></div>`}
     <div class="payment-actions cashier-terminal-payment-actions">
       <button type="button" class="primary-action" data-terminal-action="complete-sale"${saleDisabled ? " disabled" : ""}><span>${escapeHtml(chooseI18nLabel("完成销售", "Complete Sale"))}</span><strong>${escapeHtml(chooseI18nLabel("完成销售", "Complete Sale"))}</strong></button>
@@ -35534,6 +35537,14 @@ function markCashierTerminalSoldItemsLocally(sale) {
   );
 }
 
+
+function showCashierTerminalPaymentError(error) {
+  const message = formatErrorMessage(error);
+  cashierTerminalState.paymentFeedback = message;
+  renderCashierTerminalPaymentPanel();
+  return message;
+}
+
 async function submitCashierTerminalBackendSale() {
   ensureCashierTerminalPreviewState();
   if (!hasOpenCashierTerminalShift()) {
@@ -35546,6 +35557,8 @@ async function submitCashierTerminalBackendSale() {
   const payment = validateCashierTerminalPayment();
   const payload = buildCashierTerminalPosSalePayload(payment);
   const storeCode = getCashierTerminalStoreCode();
+  cashierTerminalState.paymentFeedback = chooseI18nLabel("正在完成销售…", "Completing sale…");
+  renderCashierTerminalPaymentPanel();
   let backendSale;
   try {
     backendSale = await request(`/stores/${encodeURIComponent(storeCode)}/pos-sales`, {
@@ -35553,6 +35566,8 @@ async function submitCashierTerminalBackendSale() {
       body: JSON.stringify(payload),
     });
   } catch (error) {
+    cashierTerminalState.paymentFeedback = "";
+    renderCashierTerminalPaymentPanel();
     if (isCashierTerminalSaleApiUnavailableError(error)) {
       throw new Error("真实销售接口不可用，本单未完成。请恢复系统后重试。");
     }
@@ -35582,13 +35597,19 @@ async function submitCashierTerminalBackendSale() {
   } catch (error) {
     applyCashierTerminalTodaySalesSummaryFromSales(cashierTerminalState.recentSales || []);
   }
+  cashierTerminalState.paymentFeedback = "";
   resetCashierTerminalForNextSale();
   showTransientInlineNotice("#cashierTerminalInlineNotice", `销售完成：${sale.sale_no}`, "success", 2200);
   return sale;
 }
 
 submitCashierTerminalSale = async function () {
-  return await submitCashierTerminalBackendSale();
+  try {
+    return await submitCashierTerminalBackendSale();
+  } catch (error) {
+    showCashierTerminalPaymentError(error);
+    throw error;
+  }
 }
 
 updateCashierTerminalPaymentField = function (field, value, index = null) {
@@ -35625,9 +35646,11 @@ updateCashierTerminalDrawerField = function (field, value) {
 function syncCashierTerminalPaymentPreview() {
   const totals = getCashierTerminalTotals();
   const paid = getCashierTerminalPaymentAssignedTotal();
+  const guidance = getCashierTerminalPaymentGuidance();
   const change = cashierTerminalState.activePaymentMode === "cash"
     ? getCashierTerminalChangeDue()
     : Math.max(totals.totalAmount - paid, 0);
+  const saleDisabled = !hasOpenCashierTerminalShift() || !totals.totalItems || Boolean(guidance);
   const pairs = {
     itemCount: totals.totalItems,
     subtotal: formatCashierPreviewMoney(totals.subtotal),
@@ -35642,9 +35665,11 @@ function syncCashierTerminalPaymentPreview() {
     });
   });
   document.querySelectorAll("[data-terminal-payment-guidance]").forEach((node) => {
-    const guidance = getCashierTerminalPaymentGuidance();
     node.textContent = guidance;
     node.hidden = !guidance;
+  });
+  document.querySelectorAll('[data-terminal-action="complete-sale"]').forEach((node) => {
+    node.disabled = saleDisabled;
   });
 }
 
@@ -35920,7 +35945,11 @@ handleCashierTerminalAction = async function (action, target) {
       focusCashierTerminalScanInput({ select: false });
       return;
     case "complete-sale":
-      await submitCashierTerminalSale();
+      try {
+        await submitCashierTerminalBackendSale();
+      } catch (error) {
+        showCashierTerminalPaymentError(error);
+      }
       return;
     case "open-shift":
     case "submit-open-shift":
@@ -36029,9 +36058,7 @@ handleCashierTerminalHotkeys = function (event) {
   }
   if (event.key === "F8") {
     event.preventDefault();
-    submitCashierTerminalSale().catch((error) => {
-      showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
-    });
+    submitCashierTerminalSale().catch(() => {});
     return;
   }
   if (event.key === "Escape" && cashierTerminalState.activeDrawer) {
