@@ -551,3 +551,30 @@ def test_pos_sale_is_atomic_when_any_item_fails(state):
     assert state.item_barcode_tokens["STOREITEM-VALID"]["status"] == "printed_in_store"
     assert not state.sales_transactions
     assert not state.inventory_movements
+
+
+def test_pos_sales_overview_includes_open_shift_and_manual_lines(state):
+    _add_store_item(state, _store_item(store_item_id="STOREITEM-POS-200", machine_code="5261240000013", price=200))
+    shift = _open_shift(state, cashier_id="Cashier A", terminal_id="POS-UTW-01")
+    sale = state.create_pos_sale(
+        "UTAWALA",
+        {
+            "cashier_id": "Cashier A",
+            "shift_id": shift["shift_id"],
+            "terminal_id": "POS-UTW-01",
+            "payment_method": "mixed",
+            "cash_amount": 200,
+            "mpesa_amount": 50,
+            "mpesa_reference": "MPESA-TEST-1",
+            "items": [
+                {"line_type": "store_item", "machine_code": "5261240000013", "final_price": 200},
+                {"line_type": "manual_unbarcoded", "description": "manual", "category": "manual", "final_price": 50, "qty": 1, "manual_reason": "tag missing"},
+            ],
+        },
+        created_by="Cashier A",
+    )
+    overview = state.get_pos_sales_overview(limit=50)
+    assert overview["summary"]["total_order_count"] >= 1
+    target = next(row for row in overview["records"] if row["sale_no"] == sale["sale_no"])
+    assert target["payment_method"] == "mixed"
+    assert target["item_count"] == 2
