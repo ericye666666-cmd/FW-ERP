@@ -11829,15 +11829,15 @@ body.cashier-terminal-mode .primary-action {
 body.cashier-terminal-mode .cashier-cart-header,
 body.cashier-terminal-mode .cashier-cart-row {
   display: grid;
-  grid-template-columns: minmax(190px, 2.2fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(86px, 0.85fr) minmax(64px, 0.6fr) minmax(70px, 0.7fr) minmax(94px, 0.9fr) 56px;
-  gap: 8px;
+  grid-template-columns: minmax(160px, 2fr) minmax(72px, 0.9fr) minmax(72px, 0.9fr) minmax(72px, 0.8fr) minmax(56px, 0.55fr) minmax(64px, 0.65fr) minmax(78px, 0.8fr) 40px;
+  gap: 6px;
   align-items: center;
   width: 100%;
 }
 
 body.cashier-terminal-mode .cashier-cart-row {
-  min-height: 70px;
-  padding: 10px;
+  min-height: 60px;
+  padding: 8px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
@@ -12809,7 +12809,8 @@ body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-cart-
 body.cashier-terminal-mode .cashier-terminal-main-column .cashier-terminal-cart {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 
@@ -13120,4 +13121,17 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel[hidden] {
 body.cashier-terminal-mode .cashier-terminal-transaction-strip {
   min-height: 52px;
   overflow: visible;
+}
+
+body.cashier-terminal-mode .cashier-cart-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  padding: 8px 6px;
+  border-radius: 10px;
+}
+body.cashier-terminal-mode .cashier-cart-row > div,
+body.cashier-terminal-mode .cashier-cart-header > span {
+  font-size: 12px;
 }
