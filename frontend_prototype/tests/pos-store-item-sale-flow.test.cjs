@@ -1261,9 +1261,22 @@ test("POS checkout shows Cash / M-Pesa / Mixed payment modes", () => {
   assert.match(paymentSource, /data-terminal-payment-mode="mixed"/);
   assert.match(paymentSource, /data-terminal-payment-field="mpesaAmount"/);
   assert.match(paymentSource, /data-terminal-payment-field="mpesaReference"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mixedCashAmount"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mixedMpesaAmount"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mixedMpesaReference"/);
+  assert.match(paymentSource, /data-terminal-action="complete-sale"\$\{saleDisabled \? " disabled" : ""\}/);
   assert.doesNotMatch(modeSource, /只开放现金收款/);
 });
 
+
+
+test("POS mixed payment payload includes cash and mpesa lines with reference", () => {
+  const source = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  assert.match(source, /payment_lines:/);
+  assert.match(source, /method: "cash"/);
+  assert.match(source, /method: "mpesa"/);
+  assert.match(source, /reference: payment\.reference/);
+});
 test("POS hides unfinished cashier feature pages while keeping offline sync entry visible and routable", () => {
   const navMetaSource = appJs.slice(appJs.indexOf("const STORE_PANEL_NAV_META"), appJs.indexOf("const STORE_MANAGER_PDA_TABS"));
   const offlineSection = extractElementById(indexHtml, "offlineSyncSummary");

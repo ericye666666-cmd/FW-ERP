@@ -33586,8 +33586,8 @@ renderCashierTerminalPaymentPanel = function () {
   const paid = getCashierTerminalPaymentAssignedTotal();
   const changeDue = getCashierTerminalChangeDue();
   const balance = Math.max(totals.totalAmount - paid, 0);
-  const saleDisabled = !cashierTerminalState.currentShift?.shift_id;
   const paymentGuidance = getCashierTerminalPaymentGuidance();
+  const saleDisabled = !cashierTerminalState.currentShift?.shift_id || !totals.totalItems || Boolean(paymentGuidance);
   const isMpesaMode = cashierTerminalState.activePaymentMode === "mpesa";
   const isMixedMode = cashierTerminalState.activePaymentMode === "mixed";
   cashierTerminalPaymentPanel.innerHTML = `
@@ -33613,7 +33613,7 @@ renderCashierTerminalPaymentPanel = function () {
       <article class="summary-box"><span>小计</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
       <article class="summary-box"><span>折扣</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
       <article class="summary-box"><span>实收</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
-      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" ? changeDue : balance))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" || isMixedMode ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" || isMixedMode ? changeDue : balance))}</strong></article>
     </div>
     <label class="field cashier-discount-field">
       <span>整单折扣</span>
@@ -33629,9 +33629,9 @@ renderCashierTerminalPaymentPanel = function () {
         ? `<label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="输入 M-Pesa 实收" /></label>
            <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
         : isMixedMode
-          ? `<label class="field"><span>现金金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金金额" /></label>
-             <label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mpesaAmount || "")}" data-terminal-payment-field="mpesaAmount" placeholder="输入 M-Pesa 金额" /></label>
-             <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mpesaReference || "")}" data-terminal-payment-field="mpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
+          ? `<label class="field"><span>现金金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedCashAmount || "")}" data-terminal-payment-field="mixedCashAmount" placeholder="输入现金金额" /></label>
+             <label class="field"><span>M-Pesa 金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.mixedMpesaAmount || "")}" data-terminal-payment-field="mixedMpesaAmount" placeholder="输入 M-Pesa 金额" /></label>
+             <label class="field"><span>M-Pesa Reference</span><input type="text" value="${escapeHtml(cashierTerminalState.mixedMpesaReference || "")}" data-terminal-payment-field="mixedMpesaReference" placeholder="输入 M-Pesa 流水号" /></label>`
           : `<label class="field"><span>实收金额</span><input type="number" min="0" step="1" value="${escapeHtml(cashierTerminalState.cashReceived || "")}" data-terminal-payment-field="cashReceived" placeholder="输入现金实收" /></label>`
       }
     </div>
@@ -34431,6 +34431,14 @@ function buildCashierTerminalPosSalePayload(payment) {
     cash_amount: payment.cashAmount,
     mpesa_amount: payment.mpesaAmount,
     mpesa_reference: payment.reference,
+    payment_lines: cashierTerminalState.activePaymentMode === "mixed"
+      ? [
+          ...(payment.cashAmount > 0 ? [{ method: "cash", amount: payment.cashAmount, reference: "", customer_id: "" }] : []),
+          ...(payment.mpesaAmount > 0 ? [{ method: "mpesa", amount: payment.mpesaAmount, reference: payment.reference, customer_id: "" }] : []),
+        ]
+      : (cashierTerminalState.activePaymentMode === "cash"
+        ? [{ method: "cash", amount: payment.cashAmount, reference: "", customer_id: "" }]
+        : [{ method: "mpesa", amount: payment.mpesaAmount, reference: payment.reference, customer_id: "" }]),
     discount_amount: totals.discount,
     items: cartItems.map((row) => {
       const item = buildCashierTerminalPosSaleItemPayload(row);
