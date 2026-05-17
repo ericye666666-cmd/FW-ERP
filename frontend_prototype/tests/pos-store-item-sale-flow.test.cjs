@@ -1005,7 +1005,7 @@ test("POS recent sales drawer stays list-only and only supports reprint action",
   const loadListSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalRecentSales");
   assert.match(appJs, /data-terminal-drawer="recent-sales"/);
   assert.match(drawerSource, /drawer === "recent-sales"/);
-  assert.match(drawerSource, /最近销售/);
+  assert.match(drawerSource, /小票打印/);
   assert.match(drawerSource, /data-terminal-action="reprint-sale"/);
   assert.doesNotMatch(drawerSource, /data-terminal-action="view-sale-detail"/);
   assert.match(loadListSource, /fetchCashierTerminalRecentSales\(limit\)/);
@@ -1261,9 +1261,22 @@ test("POS checkout shows Cash / M-Pesa / Mixed payment modes", () => {
   assert.match(paymentSource, /data-terminal-payment-mode="mixed"/);
   assert.match(paymentSource, /data-terminal-payment-field="mpesaAmount"/);
   assert.match(paymentSource, /data-terminal-payment-field="mpesaReference"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mixedCashAmount"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mixedMpesaAmount"/);
+  assert.match(paymentSource, /data-terminal-payment-field="mixedMpesaReference"/);
+  assert.match(paymentSource, /data-terminal-action="complete-sale"\$\{saleDisabled \? " disabled" : ""\}/);
   assert.doesNotMatch(modeSource, /只开放现金收款/);
 });
 
+
+
+test("POS mixed payment payload includes cash and mpesa lines with reference", () => {
+  const source = extractFunctionSource(appJs, "buildCashierTerminalPosSalePayload");
+  assert.match(source, /payment_lines:/);
+  assert.match(source, /method: "cash"/);
+  assert.match(source, /method: "mpesa"/);
+  assert.match(source, /reference: payment\.reference/);
+});
 test("POS hides unfinished cashier feature pages while keeping offline sync entry visible and routable", () => {
   const navMetaSource = appJs.slice(appJs.indexOf("const STORE_PANEL_NAV_META"), appJs.indexOf("const STORE_MANAGER_PDA_TABS"));
   const offlineSection = extractElementById(indexHtml, "offlineSyncSummary");
