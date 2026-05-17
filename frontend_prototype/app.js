@@ -33430,7 +33430,7 @@ renderCashierTerminalSessionStrip = function () {
     <span><b>当前门店</b>${renderCashierTerminalHeaderData(getCashierTerminalStoreDisplayName())}</span>
     <button type="button" class="topbar-chip-button" data-terminal-action="open-drawer" data-terminal-drawer="store-switch">切换店铺</button>
     <span><b>收银员</b>${renderCashierTerminalHeaderData(getCashierTerminalCashierDisplayName())}</span>
-    <span class="${cashierTerminalState.currentShift?.shift_id ? "shift-open" : "shift-missing"}"><b>班次</b>${getCashierTerminalShiftNo() ? renderCashierTerminalHeaderData(getCashierTerminalShiftNo()) : escapeHtml(copy.openShiftFirst)}</span>
+    <span class="${hasOpenCashierTerminalShift() ? "shift-open" : "shift-missing"}"><b>班次</b>${getCashierTerminalShiftNo() ? renderCashierTerminalHeaderData(getCashierTerminalShiftNo()) : escapeHtml(copy.openShiftFirst)}</span>
     <button type="button" class="network-pill network-${escapeHtml(cashierTerminalState.networkStatus)}" data-terminal-action="open-drawer" data-terminal-drawer="sync">
       <b>网络状态</b>${escapeHtml(getCashierTerminalNetworkLabel())}
     </button>
@@ -33453,15 +33453,15 @@ renderCashierTerminalStatusBar = function () {
   cashierTerminalStatusBar.innerHTML = `
     <div class="cashier-terminal-status-summary">
       <span><b>班次号</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
-      <span><b>班次状态</b>${escapeHtml(cashierTerminalState.currentShift?.shift_id ? "开班中" : "未开班")}</span>
-      <span><b>开班时间</b>${escapeHtml(cashierTerminalState.currentShift?.opened_at || "-")}</span>
-      <span><b>备用金</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.currentShift?.opening_float_cash || 0))}</span>
+      <span><b>班次状态</b>${escapeHtml(hasOpenCashierTerminalShift() ? "开班中" : "未开班")}</span>
+      <span><b>开班时间</b>${escapeHtml(formatCashierTerminalOpenedAt(cashierTerminalState.currentShift?.opened_at || cashierTerminalState.shiftOpenedAt || ""))}</span>
+      <span><b>开班现金</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.currentShift?.opening_float ?? cashierTerminalState.currentShift?.opening_float_cash ?? cashierTerminalState.openingFloatCash ?? 0))}</span>
       <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
       <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
     </div>
     <div class="cashier-terminal-strip-actions">
       <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="hold-list">${escapeHtml(copy.resumeHeldOrder)}</button>
-      <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(cashierTerminalState.currentShift?.shift_id ? copy.closeShift : copy.openNow)}</button>
+      <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(hasOpenCashierTerminalShift() ? copy.closeShift : copy.openNow)}</button>
       <button type="button" class="secondary-inline" data-terminal-action="open-drawer" data-terminal-drawer="recent-sales">销售记录 / 最近销售</button>
     </div>
     ${fullscreenHint}
@@ -33587,7 +33587,7 @@ renderCashierTerminalPaymentPanel = function () {
   const changeDue = getCashierTerminalChangeDue();
   const balance = Math.max(totals.totalAmount - paid, 0);
   const paymentGuidance = getCashierTerminalPaymentGuidance();
-  const saleDisabled = !cashierTerminalState.currentShift?.shift_id || !totals.totalItems || Boolean(paymentGuidance);
+  const saleDisabled = !hasOpenCashierTerminalShift() || !totals.totalItems || Boolean(paymentGuidance);
   const isMpesaMode = cashierTerminalState.activePaymentMode === "mpesa";
   const isMixedMode = cashierTerminalState.activePaymentMode === "mixed";
   cashierTerminalPaymentPanel.innerHTML = `
@@ -34703,6 +34703,32 @@ function applyCashierTerminalShift(shift = null) {
   return normalized;
 }
 
+function hasOpenCashierTerminalShift() {
+  const shiftId = String(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo || "").trim();
+  const status = String(cashierTerminalState.currentShift?.status || cashierTerminalState.shiftStatus || "").trim().toLowerCase();
+  if (!shiftId) {
+    return false;
+  }
+  return !["closed", "completed"].includes(status);
+}
+
+function formatCashierTerminalOpenedAt(openedAt = "") {
+  const value = String(openedAt || "").trim();
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
 function getCashierTerminalSaleSummaryKey(sale = {}) {
   return String(sale.sale_no || sale.sale_id || sale.order_no || "").trim();
 }
@@ -35528,7 +35554,7 @@ function markCashierTerminalSoldItemsLocally(sale) {
 
 async function submitCashierTerminalBackendSale() {
   ensureCashierTerminalPreviewState();
-  if (!cashierTerminalState.currentShift?.shift_id) {
+  if (!hasOpenCashierTerminalShift()) {
     cashierTerminalState.shiftFeedback = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst);
     renderCashierTerminalPaymentPanel();
     renderCashierTerminalStatusBar();
@@ -35739,7 +35765,7 @@ async function createCashierTerminalHold() {
   if (!totals.totalItems) {
     throw new Error("购物车为空，不能挂单");
   }
-  if (!cashierTerminalState.currentShift?.shift_id) {
+  if (!hasOpenCashierTerminalShift()) {
     throw new Error(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst));
   }
   const storeCode = getCashierTerminalStoreCode();
@@ -35748,7 +35774,7 @@ async function createCashierTerminalHold() {
     method: "POST",
     body: JSON.stringify({
       cashier_id: getCashierTerminalCashierName(),
-      shift_id: cashierTerminalState.currentShift.shift_id,
+      shift_id: cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo,
       terminal_id: getCashierTerminalTerminalId(),
       reason: cashierTerminalState.holdReason || "顾客继续挑选",
       customer_name: cashierTerminalState.holdCustomerName || "",

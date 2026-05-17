@@ -270,10 +270,10 @@ test("POS cashier terminal separates top status and shift-only strip metrics", (
   assert.match(headerSource, /getCashierTerminalCashierDisplayName\(\)/);
   assert.match(headerSource, /getCashierTerminalShiftNo\(\) \? renderCashierTerminalHeaderData\(getCashierTerminalShiftNo\(\)\) : escapeHtml\(copy\.openShiftFirst\)/);
   assert.match(infoStripSource, /cashier-terminal-status-summary/);
-  ["班次号", "班次状态", "开班时间", "备用金", "本班销售额", "本班订单数"].forEach((label) => assert.match(infoStripSource, new RegExp(label)));
+  ["班次号", "班次状态", "开班时间", "开班现金", "本班销售额", "本班订单数"].forEach((label) => assert.match(infoStripSource, new RegExp(label)));
   assert.match(infoStripSource, /getCashierTerminalShiftNo\(\) \|\| copy\.openShiftFirst/);
-  assert.match(infoStripSource, /cashierTerminalState\.currentShift\?\.opened_at/);
-  assert.match(infoStripSource, /cashierTerminalState\.currentShift\?\.opening_float_cash/);
+  assert.match(infoStripSource, /formatCashierTerminalOpenedAt\(/);
+  assert.match(infoStripSource, /cashierTerminalState\.currentShift\?\.opening_float \?\?/);
   assert.doesNotMatch(infoStripSource, /copy\.posStoreItemOnly/);
   assert.doesNotMatch(infoStripSource, /todaySalesAmount/);
   assert.doesNotMatch(infoStripSource, /todayOrderCount/);
@@ -1021,7 +1021,7 @@ test("POS shift flow blocks sale until open shift and sends shift_id", () => {
   const currentSource = extractAsyncFunctionSource(appJs, "fetchCashierTerminalCurrentShift");
   const summarySource = extractAsyncFunctionSource(appJs, "loadCashierTerminalShiftSummary");
 
-  assert.match(submitSource, /if \(!cashierTerminalState\.currentShift\?\.shift_id\)/);
+  assert.match(submitSource, /if \(!hasOpenCashierTerminalShift\(\)\)/);
   assert.match(submitSource, /POS_CASHIER_TERMINOLOGY_KEYS\.openShiftFirst/);
   assert.match(submitSource, /await loadCashierTerminalShiftSummary\(sale\.shift_id \|\| payload\.shift_id\)/);
   assert.match(payloadSource, /shift_id:\s*cashierTerminalState\.currentShift\?\.shift_id \|\| cashierTerminalState\.shiftNo/);
@@ -1173,7 +1173,7 @@ test("POS hold flow uses real hold APIs and blocks empty cart or missing shift",
 
   assert.match(createSource, /if \(!totals\.totalItems\)/);
   assert.match(createSource, /购物车为空，不能挂单/);
-  assert.match(createSource, /if \(!cashierTerminalState\.currentShift\?\.shift_id\)/);
+  assert.match(createSource, /if \(!hasOpenCashierTerminalShift\(\)\)/);
   assert.match(createSource, /POS_CASHIER_TERMINOLOGY_KEYS\.openShiftFirst/);
   assert.match(createSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-holds`/);
   assert.match(createSource, /method:\s*"POST"/);
