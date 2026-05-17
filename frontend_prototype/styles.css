@@ -12749,7 +12749,7 @@ body.cashier-terminal-mode .cashier-terminal-strip-actions .secondary-inline {
 
 body.cashier-terminal-mode .cashier-terminal-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 350px;
+  grid-template-columns: minmax(0, 1fr) clamp(520px, 34vw, 580px);
   gap: 10px;
   height: calc(100vh - 132px);
   min-height: 0;
@@ -12767,9 +12767,9 @@ body.cashier-terminal-mode .payment-column {
 }
 
 body.cashier-terminal-mode .payment-column {
-  width: 350px;
-  min-width: 350px;
-  max-width: 350px;
+  width: clamp(520px, 34vw, 580px);
+  min-width: 520px;
+  max-width: 580px;
 }
 
 body.cashier-terminal-mode .cashier-terminal-card,
@@ -12980,7 +12980,7 @@ body.cashier-terminal-mode .cashier-terminal-receipt-panel {
   }
 
   body.cashier-terminal-mode .cashier-terminal-body {
-    grid-template-columns: minmax(0, 1fr) 350px;
+    grid-template-columns: minmax(0, 1fr) 500px;
   }
 
   body.cashier-terminal-mode .payment-column {
