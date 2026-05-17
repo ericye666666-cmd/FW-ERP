@@ -33590,7 +33590,7 @@ renderCashierTerminalPaymentPanel = function () {
   const isMixedMode = cashierTerminalState.activePaymentMode === "mixed";
   const completeSaleHint = !shiftOpen
     ? copy.openShiftFirst
-    : (saleDisabled ? escapeHtml(copy.openShiftFirst) : "Complete Sale");
+    : (saleDisabled ? (paymentGuidance || copy.openShiftFirst) : chooseI18nLabel("点击完成销售", "Complete sale"));
   cashierTerminalPaymentPanel.innerHTML = `
     <div class="panel-head payment-head cashier-terminal-card-head">
       <div>
@@ -33607,7 +33607,7 @@ renderCashierTerminalPaymentPanel = function () {
       <article class="summary-box"><span>小计</span><strong data-terminal-live="subtotal">${escapeHtml(formatCashierPreviewMoney(totals.subtotal))}</strong></article>
       <article class="summary-box"><span>折扣</span><strong data-terminal-live="discount">${escapeHtml(formatCashierPreviewMoney(totals.discount))}</strong></article>
       <article class="summary-box"><span>实收</span><strong data-terminal-live="paid">${escapeHtml(formatCashierPreviewMoney(paid))}</strong></article>
-      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" || isMixedMode ? "找零" : "余额"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" || isMixedMode ? changeDue : balance))}</strong></article>
+      <article class="summary-box summary-box-strong"><span>${cashierTerminalState.activePaymentMode === "cash" || isMixedMode ? "找零" : "还差"}</span><strong data-terminal-live="change">${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.activePaymentMode === "cash" || isMixedMode ? changeDue : balance))}</strong></article>
     </div>
     <label class="field cashier-discount-field">
       <span>整单折扣</span>
@@ -33615,7 +33615,7 @@ renderCashierTerminalPaymentPanel = function () {
     </label>
     <div class="payment-methods" role="tablist" aria-label="${escapeHtml(chooseI18nLabel("支付方式", "Payment methods"))}">
       <button type="button" class="method-btn${cashierTerminalState.activePaymentMode === "cash" ? " is-active" : ""}" data-terminal-payment-mode="cash"><span>${escapeHtml(chooseI18nLabel("现金", "Cash"))}</span><small>${escapeHtml(chooseI18nLabel("现金收款", "Cash payment"))}</small></button>
-      <button type="button" class="method-btn${isMpesaMode ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>${escapeHtml(chooseI18nLabel("M-Pesa", "M-Pesa"))}</span><small>${escapeHtml(chooseI18nLabel("手动输入参考号", "Enter reference manually"))}</small></button>
+      <button type="button" class="method-btn${isMpesaMode ? " is-active" : ""}" data-terminal-payment-mode="mpesa"><span>${escapeHtml(chooseI18nLabel("M-Pesa", "M-Pesa"))}</span><small>${escapeHtml(chooseI18nLabel("参考号", "Enter reference manually"))}</small></button>
       <button type="button" class="method-btn${isMixedMode ? " is-active" : ""}" data-terminal-payment-mode="mixed"><span>${escapeHtml(chooseI18nLabel("混合支付", "Mixed"))}</span><small>${escapeHtml(chooseI18nLabel("现金 + M-Pesa", "Cash + M-Pesa"))}</small></button>
     </div>
     <div class="payment-body cashier-terminal-payment-editor">
@@ -34688,8 +34688,8 @@ function applyCashierTerminalShift(shift = null) {
   const normalized = shift?.shift_id ? normalizeCashierTerminalShift(shift) : null;
   cashierTerminalState.currentShift = normalized;
   cashierTerminalState.shiftNo = normalized?.shift_id || "";
-  cashierTerminalState.shiftStatus = normalized?.status || "not_opened";
-  cashierTerminalState.shiftOpen = Boolean(normalized?.shift_id) && normalized.status === "open";
+  cashierTerminalState.shiftStatus = String(normalized?.status || "not_opened").trim().toLowerCase();
+  cashierTerminalState.shiftOpen = hasOpenCashierTerminalShift();
   cashierTerminalState.shiftOpenedAt = normalized?.opened_at || "";
   if (normalized?.opening_float != null) {
     cashierTerminalState.openingFloatCash = String(normalized.opening_float);
@@ -34698,12 +34698,14 @@ function applyCashierTerminalShift(shift = null) {
 }
 
 function hasOpenCashierTerminalShift() {
-  const shiftId = String(cashierTerminalState.currentShift?.shift_id || cashierTerminalState.shiftNo || "").trim();
-  const status = String(cashierTerminalState.currentShift?.status || cashierTerminalState.shiftStatus || "").trim().toLowerCase();
+  const shiftId = String(getCashierTerminalShiftNo() || "").trim();
+  const stateStatus = String(cashierTerminalState.shiftStatus || "").trim().toLowerCase();
+  const currentStatus = String(cashierTerminalState.currentShift?.status || "").trim().toLowerCase();
+  const status = currentStatus || stateStatus || (shiftId ? "open" : "not_opened");
   if (!shiftId) {
     return false;
   }
-  return !["closed", "completed"].includes(status);
+  return !["closed", "completed", "not_opened"].includes(status);
 }
 
 function formatCashierTerminalOpenedAt(openedAt = "") {

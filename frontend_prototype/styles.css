@@ -1005,7 +1005,7 @@ body.pda-runtime-mode .pda-runtime-error {
 
 .cashier-terminal-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(460px, 1.1fr);
   gap: 16px;
   align-items: start;
 }
@@ -1101,9 +1101,9 @@ body.pda-runtime-mode .pda-runtime-error {
 }
 
 .cashier-terminal-lookup-grid,
-.cashier-terminal-total-grid {
+ .cashier-terminal-total-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1129,11 +1129,58 @@ body.pda-runtime-mode .pda-runtime-error {
 }
 
 .cashier-terminal-cart {
-  display: grid;
-  gap: 12px;
+  display: block;
   max-height: 56vh;
   overflow: auto;
   padding-right: 2px;
+  min-height: 0;
+}
+
+.cashier-cart-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 280px 130px 170px 110px 90px 90px 120px 56px;
+  gap: 10px;
+  min-width: 1066px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cashier-cart-row {
+  display: grid;
+  grid-template-columns: 280px 130px 170px 110px 90px 90px 120px 56px;
+  gap: 10px;
+  align-items: center;
+  min-width: 1066px;
+  min-height: 60px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.cashier-cart-row .remove-btn {
+  justify-self: center;
+}
+
+.cart-code {
+  display: grid;
+  gap: 2px;
+}
+
+.cart-cell-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cart-cell-num {
+  text-align: right;
+  white-space: nowrap;
 }
 
 .cashier-terminal-cart-row {
@@ -1231,7 +1278,7 @@ body.pda-runtime-mode .pda-runtime-error {
 
 .cashier-terminal-payment-actions {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   gap: 10px;
   margin-top: 16px;
 }
