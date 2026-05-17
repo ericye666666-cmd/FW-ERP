@@ -33597,13 +33597,6 @@ renderCashierTerminalPaymentPanel = function () {
         <h3>结账</h3>
       </div>
     </div>
-    ${saleDisabled ? `
-      <div class="cashier-no-shift-card">
-        <strong>POS 暂不可收银</strong>
-        <span>${escapeHtml(copy.openShiftFirst)}</span>
-        <button type="button" class="primary-inline" data-terminal-action="open-drawer" data-terminal-drawer="shift">${escapeHtml(copy.openNow)}</button>
-      </div>
-    ` : ""}
     <div class="cashier-terminal-grand-total">
       <span>应收金额</span>
       <strong data-terminal-live="receivable">${escapeHtml(formatCashierPreviewMoney(totals.totalAmount))}</strong>
