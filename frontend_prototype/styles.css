@@ -11829,15 +11829,16 @@ body.cashier-terminal-mode .primary-action {
 body.cashier-terminal-mode .cashier-cart-header,
 body.cashier-terminal-mode .cashier-cart-row {
   display: grid;
-  grid-template-columns: minmax(160px, 2fr) minmax(72px, 0.9fr) minmax(72px, 0.9fr) minmax(72px, 0.8fr) minmax(56px, 0.55fr) minmax(64px, 0.65fr) minmax(78px, 0.8fr) 40px;
-  gap: 6px;
+  grid-template-columns: minmax(120px, 1.9fr) minmax(50px, 0.7fr) minmax(54px, 0.8fr) minmax(60px, 0.8fr) minmax(42px, 0.56fr) minmax(50px, 0.72fr) minmax(64px, 0.9fr) 32px;
+  gap: 4px;
   align-items: center;
   width: 100%;
+  min-width: 0;
 }
 
 body.cashier-terminal-mode .cashier-cart-row {
-  min-height: 60px;
-  padding: 8px;
+  min-height: 58px;
+  padding: 6px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
@@ -11864,6 +11865,11 @@ body.cashier-terminal-mode .cart-cell-num {
   white-space: nowrap;
 }
 
+body.cashier-terminal-mode .cashier-cart-row > div:nth-child(5) {
+  text-align: right;
+  white-space: nowrap;
+}
+
 body.cashier-terminal-mode .cashier-cart-header > span:nth-child(n + 4):nth-child(-n + 7) {
   text-align: right;
 }
@@ -11873,9 +11879,9 @@ body.cashier-terminal-mode .cashier-cart-header > span:last-child {
 }
 
 body.cashier-terminal-mode .cart-action-remove {
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -13133,5 +13139,5 @@ body.cashier-terminal-mode .cashier-cart-header {
 }
 body.cashier-terminal-mode .cashier-cart-row > div,
 body.cashier-terminal-mode .cashier-cart-header > span {
-  font-size: 12px;
+  font-size: 11px;
 }
