@@ -33511,9 +33511,9 @@ renderCashierTerminalCart = function () {
   cashierTerminalCart.className = "basket-list cashier-terminal-cart";
   cashierTerminalCart.innerHTML = `
     <div class="cashier-cart-header">
-      <span>STORE_ITEM 商品码</span>
+      <span>商品/编码</span>
       <span>品类</span>
-      <span>货架 / 原因</span>
+      <span>货架/原因</span>
       <span>价格</span>
       <span>数量</span>
       <span>折扣</span>
