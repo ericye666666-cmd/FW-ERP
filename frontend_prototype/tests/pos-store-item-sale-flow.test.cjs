@@ -1056,8 +1056,10 @@ test("POS shift close uses real API, records variance, and clears closed shift",
   assert.match(updateFieldSource, /field === "countedCash"/);
   assert.match(updateFieldSource, /cashierTerminalState\.shiftSummary\?\.expected_cash/);
   assert.match(closeSource, /request\(`\/stores\/\$\{encodeURIComponent\(storeCode\)\}\/pos-shifts\/\$\{encodeURIComponent\(shiftId\)\}\/close`/);
-  assert.match(closeSource, /cashierTerminalState\.currentShift\s*=\s*null/);
-  assert.match(closeSource, /cashierTerminalState\.shiftOpen\s*=\s*false/);
+  assert.match(closeSource, /resetCashierTerminalShiftState\(\)/);
+  assert.match(closeSource, /renderCashierTerminalSessionStrip\(\)/);
+  assert.match(closeSource, /renderCashierTerminalStatusBar\(\)/);
+  assert.match(closeSource, /renderCashierTerminalPaymentPanel\(\)/);
   assert.match(closeSource, /POS_CASHIER_TERMINOLOGY_KEYS\.openShiftFirst/);
   assert.match(actionSource, /case "open-shift":/);
   assert.match(actionSource, /await openCashierTerminalShift\(\)/);
