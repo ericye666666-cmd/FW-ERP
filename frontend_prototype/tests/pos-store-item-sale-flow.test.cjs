@@ -1005,7 +1005,7 @@ test("POS recent sales drawer stays list-only and only supports reprint action",
   const loadListSource = extractAsyncFunctionSource(appJs, "loadCashierTerminalRecentSales");
   assert.match(appJs, /data-terminal-drawer="recent-sales"/);
   assert.match(drawerSource, /drawer === "recent-sales"/);
-  assert.match(drawerSource, /最近销售/);
+  assert.match(drawerSource, /小票打印/);
   assert.match(drawerSource, /data-terminal-action="reprint-sale"/);
   assert.doesNotMatch(drawerSource, /data-terminal-action="view-sale-detail"/);
   assert.match(loadListSource, /fetchCashierTerminalRecentSales\(limit\)/);
