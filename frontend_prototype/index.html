@@ -3467,19 +3467,10 @@
           <section id="cashierTerminalStatusBar" class="status-grid cashier-terminal-status cashier-terminal-context-strip"></section>
 
           <main class="workspace-grid cashier-terminal-body cashier-terminal-touch-layout">
-            <section class="flow-column cashier-terminal-scan-column">
+            <section class="flow-column cashier-terminal-main-column">
               <article class="panel panel-scan cashier-terminal-card cashier-terminal-scan-card">
-                <div class="panel-head cashier-terminal-card-head">
-                  <div>
-                    <p class="panel-kicker">SCAN</p>
-                    <h3 data-terminal-copy="scanTitle">扫描商品</h3>
-                    <small>SCAN STORE_ITEM</small>
-                  </div>
-                  <span class="cashier-terminal-scan-rule">仅支持 STORE_ITEM 商品码</span>
-                </div>
                 <form id="cashierTerminalScanForm" class="scan-grid cashier-terminal-scan-form">
                   <label class="field scan-field main-field">
-                    <span data-terminal-copy="barcodeField">扫描 STORE_ITEM 商品码</span>
                     <div class="field-row">
                       <button type="button" class="secondary-inline cashier-manual-icon-button" data-terminal-action="open-drawer" data-terminal-drawer="manual-item" aria-label="无码商品" title="无码商品">
                         <span aria-hidden="true">🏷️</span>
@@ -3509,9 +3500,7 @@
                   仅支持 STORE_ITEM 商品码。非商品码会在扫码框下方提示，不能进入购物车。
                 </div>
               </article>
-            </section>
 
-            <section class="flow-column cashier-terminal-cart-column">
               <article class="panel panel-basket cashier-terminal-card cashier-terminal-cart-card">
                 <div class="panel-head basket-head cashier-terminal-card-head">
                   <div>
