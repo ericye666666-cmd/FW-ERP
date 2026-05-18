@@ -719,42 +719,39 @@
       <div id="balePrintModal" class="modal-shell hidden-screen" role="dialog" aria-modal="true" aria-labelledby="balePrintModalTitle">
         <div class="modal-card modal-card-wide bale-print-modal-card">
           <div class="modal-head bale-print-modal-head">
-            <div>
-              <h3 id="balePrintModalTitle">打印 RAW_BALE 标签</h3>
-              <div id="balePrintModalSubhead" class="subtle small">连接本地打印助手后即可开始本批打印。</div>
-            </div>
+            <h3 id="balePrintModalTitle">Bale 条码打印</h3>
+            <div id="balePrintModalSubhead" class="subtle small hidden-screen"></div>
             <button id="closeBalePrintModalButton" type="button" class="ghost-button mini-button bale-print-close-button" aria-label="关闭">✕</button>
           </div>
-          <div id="balePrintModalSummary" class="candidate-summary empty-state hidden-screen">当前还没有待打印的 bale 标签。</div>
-          <div class="bale-print-top-settings" id="balePrintModalSettingsBar"></div>
-          <div id="balePrintModalTopActions" class="bale-print-top-actions">
-            <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button bale-print-check-button">检测打印机与代理</button>
-            <a id="balePrintModalDownloadAgentLink" class="ghost-button mini-button bale-print-download-button" href="/downloads/fw-erp-print-agent-windows.zip" download="fw-erp-print-agent-windows.zip">下载稳定版打印助手 ZIP</a>
-            <a id="balePrintModalDownloadZipToolLink" class="ghost-button mini-button bale-print-download-button" href="https://www.7-zip.org/download.html" target="_blank" rel="noopener noreferrer">下载 ZIP 解压器 / 解压工具</a>
+          <div class="bale-print-top-workbench">
+            <div id="balePrintModalLocalAgentStatus" class="bale-print-status-bar"></div>
+            <div id="balePrintModalTopActions" class="bale-print-top-actions">
+              <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button bale-print-check-button">⌕ 检测</button>
+              <a id="balePrintModalDownloadAgentLink" class="ghost-button mini-button bale-print-download-button" href="/downloads/fw-erp-print-agent-windows.zip" download="fw-erp-print-agent-windows.zip">⇩ 下载打印代理</a>
+            </div>
           </div>
-          <div id="balePrintModalLocalAgentStatus" class="bale-print-status-bar"></div>
           <div class="bale-print-modal-layout">
             <div class="bale-print-modal-preview-card">
               <div class="bale-print-preview-head">
                 <strong>标签预览</strong>
-                <span id="balePrintModalPageIndicator">第 1 / 共 1 张</span>
-                <div class="button-row">
-                  <button id="balePrintModalPrevButton" type="button" class="ghost-button mini-button">上一张</button>
-                  <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button">下一张</button>
-                </div>
               </div>
               <div class="bale-print-modal-preview"><iframe id="balePrintPreviewFrame" title="Bale 打印预览" src="about:blank"></iframe></div>
-              <div class="subtle small bale-preview-note">ℹ 预览仅供核对，实际打印以 60x40 标签纸为准</div>
+              <div class="bale-print-preview-pager" aria-label="标签预览分页">
+                <button id="balePrintModalPrevButton" type="button" class="ghost-button mini-button" aria-label="上一张">‹</button>
+                <span id="balePrintModalPageIndicator">1 / 1</span>
+                <button id="balePrintModalNextButton" type="button" class="ghost-button mini-button" aria-label="下一张">›</button>
+              </div>
             </div>
             <div class="bale-print-modal-side">
+              <div id="balePrintModalSummary" class="bale-print-settings-card">当前还没有待打印的 bale 标签。</div>
               <div id="balePrintModalAgentFallback" class="flow-summary-note warning hidden-screen">打印助手未连接，请先启动 Windows 打印助手。</div>
-              <div class="bale-print-batch-card" id="balePrintModalScopeNote"></div>
+              <div class="bale-print-batch-card hidden-screen" id="balePrintModalScopeNote"></div>
               <div class="bale-print-batch-card" id="balePrintModalQueueList"></div>
               <div class="bale-print-primary-actions">
-                <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">打印本批标签</button>
-                <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button bale-print-reprint-button">重打当前标签</button>
-                <button id="balePrintModalCompleteButton" type="button" class="ghost-button bale-print-complete-button">确认本批已全部粘贴完成（完成 RB 入库）</button>
-                <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button bale-print-back-button">返回</button>
+                <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">▣ 打印本批标签</button>
+                <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button bale-print-reprint-button">↻ 重打当前标签</button>
+                <button id="balePrintModalCompleteButton" type="button" class="ghost-button bale-print-complete-button">✓ 确认本批已全部粘贴完成（完成 RB 入库）</button>
+                <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button bale-print-back-button">关闭</button>
               </div>
             </div>
           </div>

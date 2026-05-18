@@ -282,7 +282,7 @@ const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
   zh: Object.freeze({
     "pda.work.today": "我的今日工作",
     "pda.package.scan": "扫包码",
-    "pda.label.print": "打印标签",
+    "pda.label.print": "▣ 打印标签",
     "pda.label.printed": "标签已打印",
     "pda.label.printFailed": "打印失败",
     "pda.location.select": "选择位置",
@@ -507,8 +507,7 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "结账区", en: "Checkout" },
   { zh: "完成销售", en: "Complete Sale" },
   { zh: "打印助手", en: "Print Agent" },
-  { zh: "下载稳定版打印助手 ZIP", en: "Download Stable Print Agent ZIP" },
-  { zh: "下载 ZIP 解压器 / 解压工具", en: "Download ZIP Extractor / Tool" },
+  { zh: "下载打印代理", en: "Download Print Agent" },
   { zh: "下载 ZIP 后先解压", en: "Download the ZIP and extract it first" },
   { zh: "解压后双击 start.cmd", en: "After extracting, double-click start.cmd" },
   { zh: "保持黑色窗口不要关闭", en: "Keep the black window open" },
@@ -23475,11 +23474,22 @@ function renderBaleLocalPrintAgentStatus() {
   const printerStatus = String(localPrintAgentState.printerStatus || "unknown");
   const printerMsg = localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "未检测";
   const agentBadge = agentStatus === "checking" ? "检测中" : (agentStatus === "connected" ? "已连接" : (agentStatus === "disconnected" ? "未连接" : "未检测"));
-  const printerBadge = printerStatus === "checking" ? "检测中" : (printerStatus === "available" ? "可用" : (printerStatus === "unavailable" ? "不可用" : "未检测"));
-  const statusTitle = agentStatus === "connected" && printerStatus === "available" ? "可以打印" : ((agentStatus === "checking" || printerStatus === "checking") ? "等待检测" : "暂不能打印");
-  statusArea.innerHTML = `<div class="bale-print-status-grid"><div class="bale-print-status-item"><strong>本地打印代理</strong> <span class="status-badge">${escapeHtml(agentBadge)}</span><div class="subtle small">地址：${escapeHtml(agentUrl)}</div></div>
-  <div class="bale-print-status-item"><strong>打印机状态</strong> <span class="status-badge">${escapeHtml(printerBadge)}</span><div class="subtle small">${escapeHtml(String(document.querySelector('[data-bale-modal-printer-select]')?.value || 'Deli DL-720C'))}</div></div>
-  <div class="bale-print-status-item"><strong>${escapeHtml(statusTitle)}</strong><div class="subtle small">点击“检测打印机与代理”后可同步刷新状态。</div></div></div>`;
+  const printerBadge = printerStatus === "checking" ? "检测中" : (printerStatus === "available" ? "就绪" : (printerStatus === "unavailable" ? "不可用" : "未检测"));
+  const agentTone = agentStatus === "connected" ? "success" : (agentStatus === "disconnected" ? "danger" : (agentStatus === "checking" ? "warning" : "neutral"));
+  const printerTone = printerStatus === "available" ? "success" : (printerStatus === "unavailable" ? "danger" : (printerStatus === "checking" ? "warning" : "neutral"));
+  const selectedPrinterName = String(document.querySelector('[data-bale-modal-printer-select]')?.value || 'Deli DL-720C');
+  statusArea.innerHTML = `<div class="bale-print-status-grid">
+    <div class="bale-print-status-item">
+      <div class="bale-print-status-icon" aria-hidden="true">▣</div>
+      <div class="bale-print-status-copy"><strong>打印机</strong><div class="subtle small">${escapeHtml(selectedPrinterName)}</div></div>
+      <span class="status-badge ${printerTone}">${escapeHtml(printerBadge)}</span>
+    </div>
+    <div class="bale-print-status-item">
+      <div class="bale-print-status-icon" aria-hidden="true">▤</div>
+      <div class="bale-print-status-copy"><strong>本地代理</strong><div class="subtle small">${escapeHtml(agentUrl)}</div></div>
+      <span class="status-badge ${agentTone}">${escapeHtml(agentBadge)}</span>
+    </div>
+  </div>`;
   if (diagnostics instanceof HTMLElement) {
     diagnostics.textContent = [
       `template_code: ${String(document.querySelector('[data-bale-modal-template-select]')?.value || '')}`,
@@ -23615,7 +23625,7 @@ async function downloadWindowsPrintAgentPackage() {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  setLocalPrintAgentMessage("success", "已开始下载稳定版打印助手 ZIP。下载 ZIP 后先解压，解压后双击 start.cmd，保持黑色窗口不要关闭，再点击检测打印机与代理。");
+  setLocalPrintAgentMessage("success", "已开始下载打印代理。下载后请先解压，解压后双击 start.cmd，保持黑色窗口不要关闭，再点击检测。");
   renderBalePrintModal();
 }
 
@@ -23923,6 +23933,7 @@ function renderBalePrintModal() {
   const frame = document.querySelector("#balePrintPreviewFrame");
   const prevButton = document.querySelector("#balePrintModalPrevButton");
   const nextButton = document.querySelector("#balePrintModalNextButton");
+  const pageIndicator = document.querySelector("#balePrintModalPageIndicator");
   const refreshButton = document.querySelector("#balePrintModalRefreshButton");
   const primaryPrintButton = document.querySelector("#balePrintModalPrimaryPrintButton");
   const primaryPrintAllButton = document.querySelector("#balePrintModalPrimaryPrintAllButton");
@@ -23942,6 +23953,9 @@ function renderBalePrintModal() {
   const currentIndex = Math.max(0, Math.min(Number(balePrintModalState.currentIndex || 0), Math.max(jobs.length - 1, 0)));
   balePrintModalState.currentIndex = currentIndex;
   const currentJob = jobs[currentIndex] || null;
+  if (pageIndicator instanceof HTMLElement) {
+    pageIndicator.textContent = jobs.length ? `${currentIndex + 1} / ${jobs.length}` : "0 / 0";
+  }
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
   const isLpkPrint = templateScope === "warehouseout_bale" && activeTaskType === "lpk_shortage_pick";
@@ -24003,12 +24017,14 @@ function renderBalePrintModal() {
       : `${balePrintModalState.supplierName || "-"} · ${balePrintModalState.categoryDisplay || "-"} · 当前类别已经全部打印完成`;
   }
   if (title) {
-    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : (isSdoPrint ? "SDO 实体包标签打印" : "Bale 条码打印窗"));
+    title.textContent = isLpkPrint ? "LPK 补差工单条码打印" : (isSdbPrint ? "SDB 标签打印 / 贴标确认" : (isSdoPrint ? "SDO 实体包标签打印" : "Bale 条码打印"));
   }
-  if (scopeNote) {
-    scopeNote.textContent = isLpkPrint
+  if (scopeNote instanceof HTMLElement) {
+    const scopeText = isLpkPrint
       ? "LPK 只用于仓库补差拣货和打包。门店收货请扫描后续生成的 SDO 正式送货执行码。"
       : (isSdbPrint ? "SDB 只用于仓库压缩后待送店 / 待售卖来源包；不是门店正式收货码。" : (isSdoPrint ? "SDO_PACKAGE 是门店送货实体包码；条码编码 6 开头实体包 machine_code，父级 SDO 只作关联信息。" : ""));
+    scopeNote.textContent = scopeText;
+    scopeNote.classList.toggle("hidden-screen", !scopeText);
   }
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
@@ -24026,14 +24042,9 @@ function renderBalePrintModal() {
   }
 
   if (summary) {
-    summary.className = "candidate-summary";
+    summary.className = "bale-print-settings-card";
     summary.innerHTML = `
-      <div class="bale-modal-toolbar bale-modal-toolbar-clean">
-        <div class="bale-modal-title-block">
-          <strong>${escapeHtml(displayParts?.primaryIdentity || currentJob?.barcode || balePrintModalState.categoryDisplay || "当前类别")}</strong>
-          <div class="subtle small">${currentJob ? `Code128 一维码 · ${escapeHtml(displayParts?.packageCompact || `第 ${currentIndex + 1} 包 / 共 ${jobs.length} 包`)}${displayParts?.shipmentDate ? ` · ${escapeHtml(displayParts.shipmentDate)}` : ""}` : "这一类已经全部打印完成，可以关闭弹层并继续下一类。"}</div>
-        </div>
-        <div class="bale-modal-inline-grid">
+      <div class="bale-modal-inline-grid bale-print-setting-grid">
           ${isSdoPrint ? `
             <div class="field-stack compact-select" data-bale-modal-template-locked>
               <span>打印模板</span>
@@ -24067,56 +24078,35 @@ function renderBalePrintModal() {
             </select>
           </label>
         </div>
-        <div class="button-row bale-modal-status-row">
-          ${renderStatusBadge(`${selectedTemplate.barcode_type || "Code128"} 一维码`, "neutral")}
-          ${renderStatusBadge(`当前测试 ${selectedTemplate.width_mm || 60}x${selectedTemplate.height_mm || 40}`, "neutral")}
-          ${renderStatusBadge(selectedPrinter ? getPrinterConnectionStatusLabel(selectedPrinter) : "未检测打印机", selectedPrinter ? "success" : "warning")}
-          ${renderStatusBadge(usesTsplMode ? "本机直打" : (supportsTemplate ? `本机直打 ${getSelectedBaleTemplateSizeLabel(selectedTemplate)}` : `${getSelectedBaleTemplateSizeLabel(selectedTemplate)} 高级备用`), supportsTemplate || usesTsplMode ? "success" : "warning", supportsTemplate ? "" : "warning-pill")}
-          ${
-            balePrinterConsoleNotice
-              ? renderStatusBadge(balePrinterConsoleNotice.message, balePrinterConsoleNotice.type === "error" ? "danger" : (balePrinterConsoleNotice.type || "info"))
-              : ""
-          }
-        </div>
-        ${selectedPrinter && !supportsTemplate && !usesTsplMode
-          ? renderStatusAlert("此模板尺寸请在高级选项使用浏览器备用打印。", "warning")
+        ${balePrinterConsoleNotice
+          ? `<div class="bale-print-inline-alert ${escapeHtml(balePrinterConsoleNotice.type || "info")}">${escapeHtml(balePrinterConsoleNotice.message)}</div>`
           : ""}
-        ${selectedPrinter && usesTsplMode
-          ? renderStatusBlock("TSPL 直打已启用。点击主按钮测试出纸。", "success")
-          : ""}
-        ${closeAction.action !== "allow_close"
-          ? renderStatusBlock("核对出纸后再确认已贴标。", "warning")
-          : ""}
-      </div>
     `;
   }
 
   if (queue) {
-    queue.className = jobs.length ? "candidate-list" : "candidate-summary empty-state";
+    queue.className = jobs.length ? "bale-print-batch-card candidate-list" : "bale-print-batch-card candidate-summary empty-state";
     queue.innerHTML = jobs.length
-      ? jobs
-          .map((job, index) => `
-            <article class="candidate-row ${index === currentIndex ? "selected-bale-row" : ""}">
-              <div class="selected-bale-body">
-                ${(() => {
-                  const queueLabel = String(job.print_payload?.package_position_label || job.print_payload?.package_position || `第 ${index + 1} 包 / 共 ${jobs.length} 包`).trim();
-                  const queueParts = deriveBaleLabelDisplayParts(
-                    job.barcode || job.print_payload?.barcode_value || "",
-                    job.print_payload?.supplier_name || balePrintModalState.supplierName || "",
-                    job.print_payload?.category_display || balePrintModalState.categoryDisplay || job.product_name || "",
-                    queueLabel,
-                  );
-                  return `
-                    <strong>${escapeHtml(queueParts.primaryIdentity || job.barcode || "-")}</strong>
-                    <div class="subtle small">${escapeHtml(queueParts.packageCompact || `第 ${index + 1} 包`)}${queueParts.shipmentDate ? ` · ${escapeHtml(queueParts.shipmentDate)}` : ""}</div>
-                  `;
-                })()}
-              </div>
-            </article>
-          `)
-          .join("")
+      ? `<div class="bale-print-queue-title">标签列表（共 ${jobs.length} 张）</div><div class="bale-print-queue-scroll">${jobs
+          .map((job, index) => {
+            const queueLabel = String(job.print_payload?.package_position_label || job.print_payload?.package_position || `第 ${index + 1} 包 / 共 ${jobs.length} 包`).trim();
+            const queueParts = deriveBaleLabelDisplayParts(
+              job.barcode || job.print_payload?.barcode_value || "",
+              job.print_payload?.supplier_name || balePrintModalState.supplierName || "",
+              job.print_payload?.category_display || balePrintModalState.categoryDisplay || job.product_name || "",
+              queueLabel,
+            );
+            const compactLabel = queueParts.primaryIdentity || job.print_payload?.category_main || balePrintModalState.categoryDisplay || job.barcode || "MA";
+            return `
+              <button type="button" class="candidate-row bale-print-queue-row ${index === currentIndex ? "selected-bale-row" : ""}" data-bale-print-queue-index="${index}">
+                <strong>${escapeHtml(compactLabel)}</strong>
+                <span>${index + 1} / ${jobs.length}</span>
+              </button>
+            `;
+          })
+          .join("")}</div>`
       : alreadyComplete
-        ? "当前类别已经全部打印完成。可以点击“关闭并返回当前页”，或继续下一类待贴码。"
+        ? "当前类别已经全部打印完成。可以点击“关闭”，或继续下一类待贴码。"
         : "当前类别下没有待打印任务。";
   }
 
@@ -24145,16 +24135,16 @@ function renderBalePrintModal() {
   if (primaryPrintButton instanceof HTMLButtonElement) {
     primaryPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
     primaryPrintButton.textContent = isSdoPrint
-      ? "打印 SDO 实体包标签"
+      ? "▣ 打印 SDO 实体包标签"
       : (isLpkPrint
-        ? "打印 LPK 条码"
+        ? "▣ 打印 LPK 条码"
         : (isSdbPrint
-          ? "打印 SDB 标签"
+          ? "▣ 打印 SDB 标签"
             : (isStoreItemPrint
-              ? "打印 STORE_ITEM 标签"
+              ? "▣ 打印 STORE_ITEM 标签"
               : (isRawBalePrint
-                ? (jobs.length ? `打印本批标签（共 ${jobs.length} 张）` : "打印本批标签")
-                : "打印标签"))));
+                ? (jobs.length ? `▣ 打印本批标签（共 ${jobs.length} 张）` : "▣ 打印本批标签")
+                : "▣ 打印标签"))));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
@@ -24163,6 +24153,7 @@ function renderBalePrintModal() {
   }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
     checkLocalAgentButton.disabled = false;
+    checkLocalAgentButton.textContent = "⌕ 检测";
   }
   if (checkLocalPrintersButton instanceof HTMLButtonElement) {
     checkLocalPrintersButton.disabled = Boolean(localPrintAgentState.printerChecking);
@@ -24175,7 +24166,7 @@ function renderBalePrintModal() {
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
-    localAgentPrintButton.textContent = currentJob ? `重打当前标签（第 ${currentIndex + 1} 张）` : "重打当前标签";
+    localAgentPrintButton.textContent = currentJob ? `↻ 重打当前标签（第 ${currentIndex + 1} 张）` : "↻ 重打当前标签";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
@@ -24195,14 +24186,14 @@ function renderBalePrintModal() {
   }
   if (completeButton instanceof HTMLButtonElement) {
     completeButton.disabled = !["complete_group", "complete_current"].includes(completionAction.action) && !alreadyComplete;
-    completeButton.textContent = alreadyComplete ? "当前标签已贴标，关闭弹窗" : "确认本批已全部粘贴完成（完成 RB 入库）";
+    completeButton.textContent = alreadyComplete ? "✓ 当前标签已贴标，关闭弹窗" : "✓ 确认本批已全部粘贴完成（完成 RB 入库）";
   }
   if (closeBalePrintModalButton instanceof HTMLButtonElement) {
     closeBalePrintModalButton.disabled = false;
   }
   if (closeAndRefreshButton instanceof HTMLButtonElement) {
     closeAndRefreshButton.disabled = false;
-    closeAndRefreshButton.textContent = "返回";
+    closeAndRefreshButton.textContent = "关闭";
   }
   renderBaleLocalPrintAgentStatus();
 }
@@ -48267,6 +48258,15 @@ document.querySelector("#balePrintModalPrevButton")?.addEventListener("click", (
 document.querySelector("#balePrintModalNextButton")?.addEventListener("click", () => {
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   balePrintModalState.currentIndex = Math.min(jobs.length - 1, Number(balePrintModalState.currentIndex || 0) + 1);
+  renderBalePrintModal();
+});
+document.querySelector("#balePrintModalQueueList")?.addEventListener("click", (event) => {
+  const target = event.target instanceof HTMLElement ? event.target.closest("[data-bale-print-queue-index]") : null;
+  if (!(target instanceof HTMLElement)) return;
+  const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
+  const index = Number(target.getAttribute("data-bale-print-queue-index"));
+  if (!Number.isInteger(index) || index < 0 || index >= jobs.length) return;
+  balePrintModalState.currentIndex = index;
   renderBalePrintModal();
 });
 document.querySelector("#balePrintModalRefreshButton")?.addEventListener("click", () => {
