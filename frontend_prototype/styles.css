@@ -13226,3 +13226,15 @@ body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-car
 .bale-print-diagnostics-pre{font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:12px}
 .bale-print-advanced{margin-top:16px;background:#f8fafc}.bale-print-advanced summary{padding:12px 14px;font-size:14px;color:#475569}
 @media (max-width:900px){.bale-print-top-settings{grid-template-columns:1fr}.bale-print-top-actions{grid-template-columns:1fr 1fr}.bale-print-modal-layout{grid-template-columns:1fr}}
+
+/* RAW_BALE print modal queue + status compaction follow-up */
+.bale-print-status-bar{padding:10px 12px}
+.bale-print-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.bale-print-status-item{display:grid;gap:2px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff}
+.bale-print-status-item strong{font-size:12px;color:#334155}
+.bale-print-status-item .subtle.small{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#balePrintModalQueueList{padding:10px;max-height:250px;overflow:auto}
+#balePrintModalQueueList .candidate-row{padding:8px 10px;min-height:auto}
+#balePrintModalQueueList strong{font-size:13px;line-height:1.2}
+#balePrintModalQueueList .subtle.small{font-size:12px;line-height:1.25}
+@media (max-width:900px){.bale-print-status-grid{grid-template-columns:1fr}}
