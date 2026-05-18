@@ -24160,9 +24160,11 @@ function renderBalePrintModal() {
         ? "打印 LPK 条码"
         : (isSdbPrint
           ? "打印 SDB 标签"
-          : (isStoreItemPrint
-            ? "打印 STORE_ITEM 标签"
-            : (isRawBalePrint ? "打印 RAW_BALE 标签" : "打印标签"))));
+            : (isStoreItemPrint
+              ? "打印 STORE_ITEM 标签"
+              : (isRawBalePrint
+                ? (jobs.length ? `打印本批标签（共 ${jobs.length} 张）` : "打印本批标签")
+                : "打印标签"))));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
@@ -24183,7 +24185,7 @@ function renderBalePrintModal() {
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
-    localAgentPrintButton.textContent = "打印当前标签";
+    localAgentPrintButton.textContent = currentJob ? `重打当前标签（第 ${currentIndex + 1} 张）` : "重打当前标签";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
@@ -24203,14 +24205,14 @@ function renderBalePrintModal() {
   }
   if (completeButton instanceof HTMLButtonElement) {
     completeButton.disabled = !["complete_group", "complete_current"].includes(completionAction.action) && !alreadyComplete;
-    completeButton.textContent = alreadyComplete ? "当前标签已贴标，关闭弹窗" : "确认当前标签已贴标";
+    completeButton.textContent = alreadyComplete ? "当前标签已贴标，关闭弹窗" : "确认本批已全部粘贴完成（完成 RB 入库）";
   }
   if (closeBalePrintModalButton instanceof HTMLButtonElement) {
     closeBalePrintModalButton.disabled = false;
   }
   if (closeAndRefreshButton instanceof HTMLButtonElement) {
     closeAndRefreshButton.disabled = false;
-    closeAndRefreshButton.textContent = "取消并返回";
+    closeAndRefreshButton.textContent = "返回";
   }
   renderBaleLocalPrintAgentStatus();
 }

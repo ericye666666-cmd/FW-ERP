@@ -103,7 +103,7 @@ test("0.1 start print opens the bale print modal before creating backend print j
 test("completed inbound print modal keeps close and completion actions clickable", () => {
   assert.match(appJs, /function isBalePrintModalAlreadyComplete/);
   assert.match(appJs, /completeButton\.disabled = !\["complete_group", "complete_current"\]\.includes\(completionAction\.action\) && !alreadyComplete/);
-  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "当前标签已贴标，关闭弹窗" : "确认当前标签已贴标"/);
+  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "当前标签已贴标，关闭弹窗" : "确认本批已全部粘贴完成（完成 RB 入库）"/);
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
 
@@ -249,7 +249,7 @@ test("print modal labels primary print button by barcode type without changing b
   assert.match(appJs, /isLpkPrint[\s\S]*?\? "打印 LPK 条码"/);
   assert.match(appJs, /isSdbPrint[\s\S]*?\? "打印 SDB 标签"/);
   assert.match(appJs, /isStoreItemPrint[\s\S]*?\? "打印 STORE_ITEM 标签"/);
-  assert.match(appJs, /isRawBalePrint[\s\S]*?\? "打印 RAW_BALE 标签"/);
+  assert.match(appJs, /isRawBalePrint[\s\S]*?\? \(jobs\.length \? `打印本批标签（共 \$\{jobs\.length\} 张）` : "打印本批标签"\)/);
   assert.match(appJs, /barcode_value:\s*barcodeValue/);
   assert.doesNotMatch(appJs, /barcode_value:\s*displayCode/);
 });
