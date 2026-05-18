@@ -108,9 +108,9 @@ test("completed inbound print modal keeps close and completion actions clickable
 });
 
 test("bale print modal keeps field operators on primary print actions", () => {
-  assert.match(indexHtml, /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
-  assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认当前标签已贴标/);
-  assert.match(indexHtml, /id="balePrintModalCloseAndRefreshButton"[\s\S]*?取消并返回/);
+  assert.match(indexHtml, /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印本批标签/);
+  assert.match(indexHtml, /id="balePrintModalCompleteButton"[\s\S]*?确认本批已全部粘贴完成/);
+  assert.match(indexHtml, /id="balePrintModalCloseAndRefreshButton"[\s\S]*?返回/);
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
   assert.ok(primaryActions, "primary print actions should exist");
   assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
@@ -132,18 +132,20 @@ test("bale print modal moves technical print controls into collapsed advanced op
   const advancedHtml = advancedOptions[0];
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
   assert.ok(primaryActions, "primary print actions should exist");
-  assert.match(advancedHtml, /<summary>高级打印选项<\/summary>/);
+  assert.match(advancedHtml, /<summary>测试诊断信息（仅测试环境使用）<\/summary>/);
   assert.doesNotMatch(indexHtml, /<details id="balePrintModalAdvancedOptions"[^>]*open/);
-  assert.match(advancedHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印助手/);
-  assert.match(advancedHtml, /id="balePrintModalCheckLocalPrintersButton"[\s\S]*?检测打印机队列/);
-  assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?高级：重试本张/);
-  assert.match(advancedHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?高级：打印全部/);
-  assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?高级：批量重试/);
-  assert.match(advancedHtml, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedHtml, /download="fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedHtml, /下载 Windows 打印助手（双击运行）/);
-  assert.match(advancedHtml, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalCheckLocalAgentButton/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印机与代理/);
+  assert.match(advancedHtml, /id="balePrintModalCheckLocalPrintersButton"[\s\S]*?重新检测/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalLocalAgentPrintButton/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?重打当前标签/);
+  assert.match(advancedHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?打印本批全部标签/);
+  assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?打印本批全部标签/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalDownloadAgentLink/);
+  
+  
+  
+  
   assert.doesNotMatch(advancedHtml, /\.zip|\.exe|\.ps1/);
   assert.doesNotMatch(primaryActions[0], /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedHtml, /查看安装步骤/);
@@ -158,7 +160,7 @@ test("primary bale print action requires local agent and keeps browser print in 
   assert.match(appJs, /document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click"/);
   assert.match(appJs, /selectedPrinterName = "Deli DL-720C"/);
   assert.match(appJs, /打印助手未连接，请先启动 Windows 打印助手。/);
-  assert.match(appJs, /浏览器打印仅作高级备用。/);
+  assert.match(appJs, /浏览器打印仅作备用。/);
   assert.doesNotMatch(appJs, /待安装打印机/);
   assert.doesNotMatch(appJs, /当前队列不支持/);
   assert.match(appJs, /function browserPrintCurrentBaleModalJob\(\)/);
@@ -166,10 +168,10 @@ test("primary bale print action requires local agent and keeps browser print in 
 });
 
 test("bale print modal includes local print agent status and controls", () => {
-  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*FW-ERP 打印助手/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*本地地址：http:\/\/127\.0\.0\.1:8719/);
-  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印助手/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*高级：重试本张/);
+  
+  
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印机与代理/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*重打当前标签/);
   assert.match(appJs, /async function checkLocalPrintAgentConnection/);
   assert.match(appJs, /#balePrintModalCheckLocalAgentButton[\s\S]{0,260}checkLocalPrintAgentConnection\(\)/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
@@ -182,14 +184,16 @@ test("field advanced print controls stay limited to safe operator actions", () =
   const advancedOptions = indexHtml.match(/<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<\/details>/);
   assert.ok(advancedOptions, "advanced print options should exist");
   const advancedHtml = advancedOptions[0];
-  assert.match(advancedHtml, /检测打印助手/);
-  assert.match(advancedHtml, /检测打印机队列/);
-  assert.match(advancedHtml, /高级：重试本张/);
-  assert.match(advancedHtml, /高级：打印全部/);
-  assert.match(advancedHtml, /高级：批量重试/);
-  assert.match(advancedHtml, /下载 Windows 打印助手（双击运行）/);
-  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedHtml, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手/);
+  assert.doesNotMatch(advancedHtml, /检测打印机与代理/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印机与代理/);
+  assert.match(advancedHtml, /重新检测/);
+  assert.doesNotMatch(advancedHtml, /重打当前标签/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*重打当前标签/);
+  assert.match(advancedHtml, /打印本批全部标签/);
+  assert.match(advancedHtml, /打印本批全部标签/);
+  
+  
+  
   assert.doesNotMatch(advancedHtml, /\.zip|\.exe|\.ps1/);
   assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
@@ -199,7 +203,7 @@ test("field advanced print controls stay limited to safe operator actions", () =
 test("SDO modal primary action has one clear main print button and local-agent offline error", () => {
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
   assert.ok(primaryActions, "primary print actions should exist");
-  assert.match(primaryActions[0], /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印标签/);
+  assert.match(primaryActions[0], /id="balePrintModalPrimaryPrintButton"[\s\S]*?打印本批标签/);
   assert.doesNotMatch(primaryActions[0], /balePrintModalPrimaryPrintAllButton/);
   assert.doesNotMatch(primaryActions[0], /打印本轮全部标签/);
   assert.match(appJs, /const isSdoPrint = templateScope === "warehouseout_bale" && isSDOPrintModalTaskType\(activeTaskType\)/);

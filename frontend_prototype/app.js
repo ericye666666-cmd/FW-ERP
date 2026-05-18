@@ -510,7 +510,7 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
   { zh: "下载 Windows 打印助手（无需解压）", en: "Download Windows Print Agent (no unzip required)" },
   { zh: "下载 Windows 打印助手（双击运行）", en: "Download Windows Print Agent (double-click to run)" },
-  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
+  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印机与代理。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -2168,6 +2168,8 @@ let localPrintAgentState = {
   printerChecking: false,
   printers: [],
   installStepsVisible: false,
+  agentStatus: "unknown",
+  printerStatus: "unknown",
   lastMessage: "",
   printerMessage: "",
 };
@@ -22738,7 +22740,7 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
     </section>
 
     <details class="store-pda-mobile-advanced">
-      <summary>高级：打印和批量设置</summary>
+      <summary>打印操作</summary>
       <div class="store-pda-category-strip">
         ${groups
           .map((group) => `
@@ -23468,37 +23470,36 @@ function renderLocalPrinterQueueList(printers = []) {
 
 function renderBaleLocalPrintAgentStatus() {
   const statusArea = document.querySelector("#balePrintModalLocalAgentStatus");
-  if (!(statusArea instanceof HTMLElement)) {
-    return;
-  }
+  const diagnostics = document.querySelector("#balePrintModalDiagnosticsPayload");
+  if (!(statusArea instanceof HTMLElement)) return;
   const agentUrl = getLocalPrintAgentUrl();
-  const statusText = localPrintAgentState.checking
-    ? "检测中"
-    : (localPrintAgentState.connected ? "已连接" : "未启动");
-  const modeText = localPrintAgentState.connected ? "已连接" : "未连接";
-  const agentClass = localPrintAgentState.connected ? "flow-summary-note success" : "flow-summary-note warning";
   const printers = Array.isArray(localPrintAgentState.printers) ? localPrintAgentState.printers : [];
-  const printerText = localPrintAgentState.printerChecking
-    ? "正在检测本机打印队列..."
-    : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印队列");
-  const helperMessage = localPrintAgentState.connected
-    ? "可以点击主按钮打印。"
-    : "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。";
-  const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
-  const printerListHtml = renderLocalPrinterQueueList(printers);
-  statusArea.className = "candidate-summary";
-  statusArea.innerHTML = `
-    <div class="${agentClass} status-block status-block--${localPrintAgentState.connected ? "success" : "warning"}">
-      <strong>FW-ERP 打印助手</strong>
-      <div>打印助手：${renderStatusBadge(statusText, localPrintAgentState.connected ? "success" : "warning")}</div>
-      <div>本地地址：${escapeHtml(agentUrl)}</div>
-      <div>状态：${renderStatusBadge(modeText, localPrintAgentState.connected ? "success" : "warning")}</div>
-      <div>${escapeHtml(helperMessage)}</div>
-      ${suffix}
-    </div>
-    <div class="subtle small">${escapeHtml(printerText)}</div>
-    ${printerListHtml}
-  `;
+  const agentStatus = String(localPrintAgentState.agentStatus || "unknown");
+  const printerStatus = String(localPrintAgentState.printerStatus || "unknown");
+  const printerMsg = localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "未检测";
+  const agentBadge = agentStatus === "checking" ? "检测中" : (agentStatus === "connected" ? "已连接" : (agentStatus === "disconnected" ? "未连接" : "未检测"));
+  const printerBadge = printerStatus === "checking" ? "检测中" : (printerStatus === "available" ? "可用" : (printerStatus === "unavailable" ? "不可用" : "未检测"));
+  const statusTitle = agentStatus === "connected" && printerStatus === "available" ? "可以打印" : ((agentStatus === "checking" || printerStatus === "checking") ? "等待检测" : "暂不能打印");
+  statusArea.innerHTML = `<div><strong>本地打印代理</strong> <span class="status-badge">${escapeHtml(agentBadge)}</span><div class="subtle small">地址：${escapeHtml(agentUrl)}</div></div>
+  <div><strong>打印机状态</strong> <span class="status-badge">${escapeHtml(printerBadge)}</span><div class="subtle small">${escapeHtml(String(document.querySelector('[data-bale-modal-printer-select]')?.value || 'Deli DL-720C'))}</div></div>
+  <div><strong>${escapeHtml(statusTitle)}</strong><div class="subtle small">点击“检测打印机与代理”后可同步刷新状态。</div></div>`;
+  if (diagnostics instanceof HTMLElement) {
+    diagnostics.textContent = [
+      `template_code: ${String(document.querySelector('[data-bale-modal-template-select]')?.value || '')}`,
+      `template_scope: ${String(getActiveBaleTemplateScope() || '')}`,
+      `label_type: ${String(document.querySelector('#balePrintModalTitle')?.textContent || '')}`,
+      `display_code: ${String(balePrintModalState.jobs?.[balePrintModalState.currentIndex]?.print_payload?.display_code || '')}`,
+      `machine_code: ${String(balePrintModalState.jobs?.[balePrintModalState.currentIndex]?.print_payload?.machine_code || '')}`,
+      `barcode_value: ${String(balePrintModalState.jobs?.[balePrintModalState.currentIndex]?.print_payload?.barcode_value || '')}`,
+      `selectedPrinterName: ${String(document.querySelector('[data-bale-modal-printer-select]')?.value || '')}`,
+      `agentUrl: ${agentUrl}`,
+      `local agent status: ${agentStatus}`,
+      `printer status: ${printerStatus}`,
+      `last detection result: ${String(localPrintAgentState.printerMessage || '')}`,
+      `last print response: ${String(localPrintAgentState.lastMessage || '')}`,
+      `last error: ${String(balePrinterConsoleNotice?.type === 'error' ? balePrinterConsoleNotice.message : '')}`,
+    ].join('\n');
+  }
 }
 
 function renderBalePrintMethodStatus({
@@ -23527,6 +23528,8 @@ async function checkLocalPrintAgentHealth() {
   const agentUrl = getLocalPrintAgentUrl();
   localPrintAgentState.url = agentUrl;
   localPrintAgentState.checking = true;
+  localPrintAgentState.agentStatus = "checking";
+  localPrintAgentState.printerStatus = "checking";
   localPrintAgentState.lastMessage = "";
   renderBaleLocalPrintAgentStatus();
   try {
@@ -23539,6 +23542,7 @@ async function checkLocalPrintAgentHealth() {
       throw new Error("agent returned unexpected health status");
     }
     localPrintAgentState.connected = true;
+    localPrintAgentState.agentStatus = "connected";
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = "health ok";
     setLocalPrintAgentMessage("success", `本地打印代理可用：${agentUrl}`);
@@ -23548,6 +23552,8 @@ async function checkLocalPrintAgentHealth() {
   } catch (error) {
     const message = formatLocalPrintAgentConnectionError(error);
     localPrintAgentState.connected = false;
+    localPrintAgentState.agentStatus = "disconnected";
+    localPrintAgentState.printerStatus = "unknown";
     localPrintAgentState.checking = false;
     localPrintAgentState.lastMessage = message;
     setLocalPrintAgentMessage("error", message);
@@ -23560,6 +23566,7 @@ async function checkLocalPrintAgentPrinters() {
   const agentUrl = getLocalPrintAgentUrl();
   localPrintAgentState.printers = [];
   localPrintAgentState.printerChecking = true;
+  localPrintAgentState.printerStatus = "checking";
   localPrintAgentState.printerMessage = "";
   renderBaleLocalPrintAgentStatus();
   try {
@@ -23573,6 +23580,7 @@ async function checkLocalPrintAgentPrinters() {
     localPrintAgentState.printerChecking = false;
     const detection = getLocalPrinterDetectionMessage(printers);
     localPrintAgentState.printerMessage = String(payload?.warning || detection.message || "").trim();
+    localPrintAgentState.printerStatus = detection.type === "success" ? "available" : "unavailable";
     setLocalPrintAgentMessage(detection.type, localPrintAgentState.printerMessage);
     renderBalePrintModal();
     return payload;
@@ -23581,6 +23589,7 @@ async function checkLocalPrintAgentPrinters() {
     localPrintAgentState.printers = [];
     localPrintAgentState.printerChecking = false;
     localPrintAgentState.printerMessage = message;
+    localPrintAgentState.printerStatus = "unavailable";
     setLocalPrintAgentMessage("error", localPrintAgentState.printerMessage);
     renderBalePrintModal();
     throw new Error(message);
@@ -23616,7 +23625,7 @@ async function downloadWindowsPrintAgentPackage() {
   if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
-  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。");
+  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印机与代理。");
   renderBalePrintModal();
 }
 
@@ -23854,6 +23863,8 @@ async function printCurrentBaleModalPrimaryAction() {
     }
   } catch (error) {
     localPrintAgentState.connected = false;
+    localPrintAgentState.agentStatus = "disconnected";
+    localPrintAgentState.printerStatus = "unknown";
     localPrintAgentState.lastMessage = "agent not running";
   }
   balePrinterConsoleNotice = {
@@ -23874,6 +23885,8 @@ async function printAllBaleModalPrimaryAction() {
       await checkLocalPrintAgentHealth();
     } catch (error) {
       localPrintAgentState.connected = false;
+    localPrintAgentState.agentStatus = "disconnected";
+    localPrintAgentState.printerStatus = "unknown";
       localPrintAgentState.lastMessage = "agent not running";
     }
   }
@@ -23911,7 +23924,7 @@ function renderBalePrintModal() {
     return;
   }
   const summary = document.querySelector("#balePrintModalSummary");
-  const queue = document.querySelector("#balePrintModalQueue");
+  const queue = document.querySelector("#balePrintModalSettingsBar");
   const subhead = document.querySelector("#balePrintModalSubhead");
   const title = document.querySelector("#balePrintModalTitle");
   const scopeNote = document.querySelector("#balePrintModalScopeNote");
@@ -24010,7 +24023,7 @@ function renderBalePrintModal() {
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
       ? "浏览器打印仅作 LPK 留档备用。"
-      : "浏览器打印仅作高级备用。";
+      : "浏览器打印仅作备用。";
   }
   if (agentFallback instanceof HTMLElement) {
     agentFallback.className = `flow-summary-note ${localPrintAgentState.connected ? "success" : "warning"}${currentJob ? "" : " hidden-screen"}`;
@@ -24140,7 +24153,7 @@ function renderBalePrintModal() {
     refreshButton.disabled = !currentJob && !alreadyComplete;
   }
   if (primaryPrintButton instanceof HTMLButtonElement) {
-    primaryPrintButton.disabled = !currentJob;
+    primaryPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
     primaryPrintButton.textContent = isSdoPrint
       ? "打印 SDO 实体包标签"
       : (isLpkPrint
@@ -24153,11 +24166,11 @@ function renderBalePrintModal() {
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
-    primaryPrintAllButton.textContent = "高级：打印全部";
+    primaryPrintAllButton.textContent = "打印本批全部标签";
     primaryPrintAllButton.classList.toggle("hidden-screen", jobs.length <= 1);
   }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
-    checkLocalAgentButton.disabled = Boolean(localPrintAgentState.checking);
+    checkLocalAgentButton.disabled = false;
   }
   if (checkLocalPrintersButton instanceof HTMLButtonElement) {
     checkLocalPrintersButton.disabled = Boolean(localPrintAgentState.printerChecking);
@@ -24169,8 +24182,8 @@ function renderBalePrintModal() {
     installSteps.classList.toggle("hidden-screen", !localPrintAgentState.installStepsVisible);
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
-    localAgentPrintButton.disabled = !currentJob;
-    localAgentPrintButton.textContent = "高级：重试本张";
+    localAgentPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
+    localAgentPrintButton.textContent = "打印当前标签";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
@@ -24180,7 +24193,7 @@ function renderBalePrintModal() {
   }
   if (printAllButton instanceof HTMLButtonElement) {
     printAllButton.disabled = !jobs.length;
-    printAllButton.textContent = jobs.length ? "高级：批量重试" : "当前类别没有待打印条码";
+    printAllButton.textContent = jobs.length ? "打印本批全部标签" : "当前类别没有待打印条码";
   }
   if (sendToStationButton instanceof HTMLButtonElement) {
     sendToStationButton.disabled = !currentJob;
@@ -48274,7 +48287,7 @@ document.querySelector("#balePrintModalCheckLocalAgentButton")?.addEventListener
   });
 });
 document.querySelector("#balePrintModalCheckLocalPrintersButton")?.addEventListener("click", () => {
-  checkLocalPrintAgentPrinters().catch((error) => {
+  checkLocalPrintAgentConnection().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
@@ -48289,6 +48302,10 @@ document.querySelector("#balePrintModalDownloadAgentLink")?.addEventListener("cl
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
+});
+document.querySelector("#balePrintModalCopyDiagnosticsButton")?.addEventListener("click", async () => {
+  const text = String(document.querySelector("#balePrintModalDiagnosticsPayload")?.textContent || "");
+  try { await navigator.clipboard.writeText(text); } catch (_) {}
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {
@@ -48307,6 +48324,8 @@ document.querySelector("#balePrintModalPrimaryPrintAllButton")?.addEventListener
 document.querySelector("#balePrintModalLocalAgentPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalViaLocalAgent().catch((error) => {
     localPrintAgentState.connected = false;
+    localPrintAgentState.agentStatus = "disconnected";
+    localPrintAgentState.printerStatus = "unknown";
     localPrintAgentState.lastMessage = "print failed";
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
