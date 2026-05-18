@@ -21,8 +21,21 @@ class WindowsLocalPrintAgentTest(unittest.TestCase):
         self.assertIn("https://directlooperp.com", agent.ALLOWED_ORIGINS)
         self.assertIn("https://fw-erp-staging.onrender.com", agent.ALLOWED_ORIGINS)
         self.assertIn("https://fw-erp-34-35-52-250.nip.io", agent.ALLOWED_ORIGINS)
+        self.assertIn("http://localhost", agent.ALLOWED_ORIGINS)
+        self.assertIn("http://127.0.0.1", agent.ALLOWED_ORIGINS)
         self.assertIn("http://localhost:8000", agent.ALLOWED_ORIGINS)
         self.assertIn("http://127.0.0.1:8000", agent.ALLOWED_ORIGINS)
+
+    def test_build_cors_headers_returns_private_network_headers_for_whitelisted_origin(self):
+        headers = agent._build_cors_headers("https://staging.directlooperp.com")
+        self.assertEqual(headers.get("Access-Control-Allow-Origin"), "https://staging.directlooperp.com")
+        self.assertEqual(headers.get("Access-Control-Allow-Methods"), "GET,POST,OPTIONS")
+        self.assertEqual(headers.get("Access-Control-Allow-Headers"), "Content-Type")
+        self.assertEqual(headers.get("Access-Control-Allow-Private-Network"), "true")
+
+    def test_build_cors_headers_returns_empty_for_missing_or_untrusted_origin(self):
+        self.assertEqual(agent._build_cors_headers(None), {})
+        self.assertEqual(agent._build_cors_headers("https://evil.example"), {})
 
     def _tspl_text_y_values(self, tspl):
         return [int(match.group(1)) for match in re.finditer(r"^TEXT\s+\d+,(\d+),", tspl, re.MULTILINE)]
