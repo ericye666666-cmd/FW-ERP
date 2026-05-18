@@ -23480,9 +23480,9 @@ function renderBaleLocalPrintAgentStatus() {
   const agentBadge = agentStatus === "checking" ? "检测中" : (agentStatus === "connected" ? "已连接" : (agentStatus === "disconnected" ? "未连接" : "未检测"));
   const printerBadge = printerStatus === "checking" ? "检测中" : (printerStatus === "available" ? "可用" : (printerStatus === "unavailable" ? "不可用" : "未检测"));
   const statusTitle = agentStatus === "connected" && printerStatus === "available" ? "可以打印" : ((agentStatus === "checking" || printerStatus === "checking") ? "等待检测" : "暂不能打印");
-  statusArea.innerHTML = `<div><strong>本地打印代理</strong> <span class="status-badge">${escapeHtml(agentBadge)}</span><div class="subtle small">地址：${escapeHtml(agentUrl)}</div></div>
-  <div><strong>打印机状态</strong> <span class="status-badge">${escapeHtml(printerBadge)}</span><div class="subtle small">${escapeHtml(String(document.querySelector('[data-bale-modal-printer-select]')?.value || 'Deli DL-720C'))}</div></div>
-  <div><strong>${escapeHtml(statusTitle)}</strong><div class="subtle small">点击“检测打印机与代理”后可同步刷新状态。</div></div>`;
+  statusArea.innerHTML = `<div class="bale-print-status-grid"><div class="bale-print-status-item"><strong>本地打印代理</strong> <span class="status-badge">${escapeHtml(agentBadge)}</span><div class="subtle small">地址：${escapeHtml(agentUrl)}</div></div>
+  <div class="bale-print-status-item"><strong>打印机状态</strong> <span class="status-badge">${escapeHtml(printerBadge)}</span><div class="subtle small">${escapeHtml(String(document.querySelector('[data-bale-modal-printer-select]')?.value || 'Deli DL-720C'))}</div></div>
+  <div class="bale-print-status-item"><strong>${escapeHtml(statusTitle)}</strong><div class="subtle small">点击“检测打印机与代理”后可同步刷新状态。</div></div></div>`;
   if (diagnostics instanceof HTMLElement) {
     diagnostics.textContent = [
       `template_code: ${String(document.querySelector('[data-bale-modal-template-select]')?.value || '')}`,
@@ -23924,7 +23924,7 @@ function renderBalePrintModal() {
     return;
   }
   const summary = document.querySelector("#balePrintModalSummary");
-  const queue = document.querySelector("#balePrintModalSettingsBar");
+  const queue = document.querySelector("#balePrintModalQueueList");
   const subhead = document.querySelector("#balePrintModalSubhead");
   const title = document.querySelector("#balePrintModalTitle");
   const scopeNote = document.querySelector("#balePrintModalScopeNote");
