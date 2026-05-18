@@ -13238,3 +13238,385 @@ body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-car
 #balePrintModalQueueList strong{font-size:13px;line-height:1.2}
 #balePrintModalQueueList .subtle.small{font-size:12px;line-height:1.25}
 @media (max-width:900px){.bale-print-status-grid{grid-template-columns:1fr}}
+
+/* Bale print modal UI consolidation follow-up */
+#balePrintModal .bale-print-modal-card {
+  width: min(1500px, calc(100vw - 32px));
+  max-height: 92vh;
+  overflow: auto;
+  border-radius: 16px;
+  padding: 24px 28px 22px;
+  background: #ffffff;
+}
+
+#balePrintModal .bale-print-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 18px;
+}
+
+#balePrintModal .bale-print-modal-head h3 {
+  margin: 0;
+  font-size: clamp(28px, 2.1vw, 32px);
+  line-height: 1.12;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+#closeBalePrintModalButton.bale-print-close-button {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+}
+
+.bale-print-top-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+#balePrintModal .bale-print-status-bar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#balePrintModal .bale-print-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+  height: 100%;
+}
+
+#balePrintModal .bale-print-status-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.bale-print-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.bale-print-status-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+#balePrintModal .bale-print-status-item strong {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+#balePrintModal .bale-print-status-item .subtle.small {
+  font-size: 14px;
+  line-height: 1.25;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#balePrintModal .status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
+#balePrintModal .status-badge.success { border-color: #86efac; background: #dcfce7; color: #15803d; }
+#balePrintModal .status-badge.warning { border-color: #fed7aa; background: #fffbeb; color: #b45309; }
+#balePrintModal .status-badge.danger { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+#balePrintModal .status-badge.neutral { border-color: #e2e8f0; background: #f8fafc; color: #64748b; }
+
+#balePrintModal .bale-print-top-actions {
+  display: grid;
+  grid-template-columns: 132px 168px;
+  gap: 12px;
+  align-content: center;
+  justify-content: end;
+}
+
+#balePrintModal .bale-print-check-button,
+#balePrintModal .bale-print-download-button {
+  height: 46px;
+  min-height: 46px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #2563eb;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#balePrintModal .bale-print-download-button {
+  background: #eff6ff;
+}
+
+#balePrintModal .bale-print-modal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 45fr) minmax(420px, 55fr);
+  gap: 18px;
+  align-items: start;
+  min-height: 0;
+}
+
+#balePrintModal .bale-print-modal-preview-card,
+#balePrintModal .bale-print-settings-card,
+#balePrintModal .bale-print-batch-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+#balePrintModal .bale-print-modal-preview-card {
+  display: grid;
+  grid-template-rows: auto minmax(360px, 1fr) auto;
+  gap: 12px;
+  max-height: 640px;
+}
+
+#balePrintModal .bale-print-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 0;
+  padding: 0;
+}
+
+#balePrintModal .bale-print-preview-head strong,
+.bale-print-queue-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+#balePrintModal .bale-print-modal-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(360px, 46vh, 540px);
+  min-height: 360px;
+  max-height: 540px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+#balePrintModal .bale-print-modal-preview iframe {
+  width: 78%;
+  height: 78%;
+  min-height: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  transform: none;
+}
+
+.bale-print-preview-pager {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.bale-print-preview-pager .mini-button {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+#balePrintModal .bale-print-modal-side {
+  display: grid;
+  gap: 14px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+#balePrintModal .bale-print-setting-grid,
+#balePrintModal .bale-modal-inline-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+#balePrintModal .field-stack.compact-select select,
+#balePrintModal .field-stack.compact-select .meta-pill {
+  min-height: 46px;
+}
+
+#balePrintModalQueueList {
+  padding: 14px;
+  max-height: none;
+  overflow: hidden;
+}
+
+.bale-print-queue-scroll {
+  display: grid;
+  gap: 8px;
+  height: 284px;
+  margin-top: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#balePrintModalQueueList .bale-print-queue-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  text-align: left;
+  cursor: pointer;
+}
+
+#balePrintModalQueueList .bale-print-queue-row strong,
+#balePrintModalQueueList .bale-print-queue-row span {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+#balePrintModalQueueList .bale-print-queue-row.selected-bale-row {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+#balePrintModal .bale-print-primary-actions {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  position: static;
+  background: transparent;
+}
+
+#balePrintModal .bale-print-primary-button,
+#balePrintModal .bale-print-reprint-button,
+#balePrintModal .bale-print-complete-button,
+#balePrintModal .bale-print-back-button {
+  width: 100%;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+#balePrintModal .bale-print-primary-button {
+  min-height: 56px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#balePrintModal .bale-print-reprint-button {
+  min-height: 54px;
+  border: 1px solid #fdba74;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+#balePrintModal .bale-print-complete-button {
+  min-height: 54px;
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+#balePrintModal .bale-print-back-button {
+  justify-self: end;
+  width: auto;
+  min-width: 96px;
+  min-height: 38px;
+  padding: 0 18px;
+}
+
+.bale-print-inline-alert {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bale-print-inline-alert.error { background: #fef2f2; color: #b91c1c; }
+.bale-print-inline-alert.success { background: #f0fdf4; color: #15803d; }
+.bale-print-inline-alert.warning { background: #fffbeb; color: #b45309; }
+
+@media (max-width: 980px) {
+  #balePrintModal .bale-print-modal-card {
+    width: min(1000px, calc(100vw - 16px));
+    padding: 20px;
+  }
+
+  .bale-print-top-workbench,
+  #balePrintModal .bale-print-modal-layout,
+  #balePrintModal .bale-print-setting-grid,
+  #balePrintModal .bale-modal-inline-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #balePrintModal .bale-print-status-grid,
+  #balePrintModal .bale-print-top-actions {
+    grid-template-columns: 1fr;
+  }
+
+  #balePrintModal .bale-print-check-button,
+  #balePrintModal .bale-print-download-button {
+    width: 100%;
+  }
+
+  #balePrintModal .bale-print-modal-preview-card {
+    max-height: none;
+  }
+
+  #balePrintModal .bale-print-modal-preview iframe {
+    width: 86%;
+    height: 76%;
+  }
+}

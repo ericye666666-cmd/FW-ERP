@@ -100,16 +100,17 @@ test("print modal advanced options expose only field-safe print helper controls"
   
   
   
-  assert.match(indexHtml, /检测打印机与代理/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?>⌕ 检测<\/button>/);
   assert.match(indexHtml, /重新检测/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>重打当前标签<\/button>/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>↻ 重打当前标签<\/button>/);
   assert.match(indexHtml, /id="balePrintModalPrintAllButton"[^>]*>打印本批全部标签<\/button>/);
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
   assert.match(indexHtml, /id="balePrintModalDownloadAgentLink"/);
   assert.match(indexHtml, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
   assert.match(indexHtml, /download="fw-erp-print-agent-windows\.zip"/);
-  assert.match(indexHtml, /下载稳定版打印助手 ZIP/);
+  assert.match(indexHtml, /下载打印代理/);
+  assert.doesNotMatch(indexHtml, /下载 ZIP 解压器 \/ 解压工具/);
   
   assert.doesNotMatch(advancedSection, /\.zip|\.exe|\.ps1/);
   assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
@@ -291,10 +292,11 @@ test("print helper exposes a static Windows agent download link in advanced opti
   assert.match(indexHtml, /id="balePrintModalDownloadAgentLink"/);
   assert.match(indexHtml, /href="\/downloads\/fw-erp-print-agent-windows\.zip"/);
   assert.match(indexHtml, /download="fw-erp-print-agent-windows\.zip"/);
-  assert.match(indexHtml, /下载稳定版打印助手 ZIP/);
+  assert.match(indexHtml, /下载打印代理/);
+  assert.doesNotMatch(indexHtml, /下载 ZIP 解压器 \/ 解压工具/);
   
   assert.doesNotMatch(advancedSection, /\.zip|\.exe|\.ps1/);
-  assert.match(appJs, /Download Stable Print Agent ZIP/);
+  assert.match(appJs, /Download Print Agent/);
   assert.match(appJs, /const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows\.zip"/);
   assert.doesNotMatch(appJs, /WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT/);
   assert.doesNotMatch(primaryActions, /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
