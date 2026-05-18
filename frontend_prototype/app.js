@@ -507,10 +507,12 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "结账区", en: "Checkout" },
   { zh: "完成销售", en: "Complete Sale" },
   { zh: "打印助手", en: "Print Agent" },
-  { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
-  { zh: "下载 Windows 打印助手（无需解压）", en: "Download Windows Print Agent (no unzip required)" },
-  { zh: "下载 Windows 打印助手（双击运行）", en: "Download Windows Print Agent (double-click to run)" },
-  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印机与代理。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
+  { zh: "下载稳定版打印助手 ZIP", en: "Download Stable Print Agent ZIP" },
+  { zh: "下载 ZIP 解压器 / 解压工具", en: "Download ZIP Extractor / Tool" },
+  { zh: "下载 ZIP 后先解压", en: "Download the ZIP and extract it first" },
+  { zh: "解压后双击 start.cmd", en: "After extracting, double-click start.cmd" },
+  { zh: "保持黑色窗口不要关闭", en: "Keep the black window open" },
+  { zh: "再点击检测打印机与代理", en: "Then click Detect Printer & Agent" },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -2174,42 +2176,9 @@ let localPrintAgentState = {
   printerMessage: "",
 };
 const SDO_PRINT_TASK_TYPE = "store_delivery_execution";
-const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows.cmd";
+const WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME = "fw-erp-print-agent-windows.zip";
 const WINDOWS_PRINT_AGENT_DOWNLOAD_URL = `/downloads/${WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME}`;
 const LOCAL_PRINT_AGENT_CONNECTION_HELP = "打印助手未连接：请确认 Windows 打印助手已启动、端口 8719 未被占用、浏览器允许访问本机 127.0.0.1。";
-const WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT = String.raw`@echo off
-setlocal
-title FW-ERP Windows Print Agent
-
-echo FW-ERP Windows Print Agent
-echo.
-echo Keep this black window open while printing from ERP.
-echo After the agent starts, return to ERP and click Detect Print Agent.
-echo Local agent URL: http://127.0.0.1:8719
-echo.
-
-set "SCRIPT_URL=https://raw.githubusercontent.com/ericye666666-cmd/FW-ERP/main/ops/local_print_agent/start_fwerp_print_agent_windows.ps1"
-set "SCRIPT_PATH=%TEMP%\fw-erp-print-agent-windows.ps1"
-
-echo Downloading startup logic...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%SCRIPT_URL%' -OutFile '%SCRIPT_PATH%' } catch { Write-Host $_; exit 1 }"
-if errorlevel 1 goto download_failed
-
-echo Starting Print Agent through PowerShell...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_PATH%"
-set "EXIT_CODE=%ERRORLEVEL%"
-echo.
-echo Print Agent exited with code %EXIT_CODE%.
-pause
-exit /b %EXIT_CODE%
-
-:download_failed
-echo.
-echo Could not download FW-ERP Print Agent startup logic.
-echo Check the internet connection, then double-click this file again.
-pause
-exit /b 1
-`;
 let baleBarcodeDirectoryNotice = null;
 let balePrinterConsoleNotice = null;
 let balePrinterJobState = [];
@@ -23613,19 +23582,12 @@ function getWindowsPrintAgentDownloadUrl() {
 async function downloadWindowsPrintAgentPackage() {
   const downloadUrl = getWindowsPrintAgentDownloadUrl();
   const link = document.createElement("a");
-  const scriptBlob = typeof Blob === "function" && typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
-    ? new Blob([WINDOWS_PRINT_AGENT_LAUNCHER_SCRIPT], { type: "text/plain;charset=utf-8" })
-    : null;
-  const objectUrl = scriptBlob ? URL.createObjectURL(scriptBlob) : "";
-  link.href = objectUrl || downloadUrl;
+  link.href = downloadUrl;
   link.download = WINDOWS_PRINT_AGENT_DOWNLOAD_FILENAME;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-  }
-  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印机与代理。");
+  setLocalPrintAgentMessage("success", "已开始下载稳定版打印助手 ZIP。下载 ZIP 后先解压，解压后双击 start.cmd，保持黑色窗口不要关闭，再点击检测打印机与代理。");
   renderBalePrintModal();
 }
 
