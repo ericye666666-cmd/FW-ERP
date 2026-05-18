@@ -138,6 +138,44 @@ class PosSaleListResponse(BaseModel):
     sales: List[PosSaleSummaryResponse]
 
 
+class PosSalesOverviewRecordResponse(BaseModel):
+    sale_no: str
+    order_no: str
+    store_code: str
+    cashier: str
+    shift_id: str = ""
+    status: str = "completed"
+    payment_method: str
+    total_amount: float
+    item_count: int
+    created_at: str
+
+
+class PosSalesOverviewStoreSummaryResponse(BaseModel):
+    store_code: str
+    store_name: str = ""
+    sales_amount: float
+    order_count: int
+    cash_amount: float
+    mpesa_amount: float
+    mixed_amount: float
+
+
+class PosSalesOverviewSummaryResponse(BaseModel):
+    today_sales_amount: float
+    today_order_count: int
+    last_30_days_sales_amount: float
+    total_sales_amount: float
+    total_order_count: int
+    average_ticket: float
+
+
+class PosSalesOverviewResponse(BaseModel):
+    summary: PosSalesOverviewSummaryResponse
+    stores: List[PosSalesOverviewStoreSummaryResponse]
+    records: List[PosSalesOverviewRecordResponse]
+
+
 class SaleItemResponse(BaseModel):
     identity_id: str = ""
     barcode: str

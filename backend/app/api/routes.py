@@ -122,6 +122,7 @@ from app.schemas.refunds import (
 from app.schemas.sales import (
     PosSaleCreate,
     PosSaleListResponse,
+    PosSalesOverviewResponse,
     PosSaleResponse,
     RecentStoreSalesSimulationRequest,
     RecentStoreSalesSimulationResponse,
@@ -4914,6 +4915,23 @@ def get_store_pos_sale(
 ) -> PosSaleResponse:
     _require_current_user(authorization=authorization)
     return PosSaleResponse(**state.get_pos_sale(store_code, sale_no))
+
+
+@router.get("/reports/pos-sales-overview", response_model=PosSalesOverviewResponse, tags=["sales", "pos", "reports"])
+def get_pos_sales_overview(
+    store_code: Optional[str] = Query(default=None),
+    date_range: str = Query(default="all"),
+    payment_method: str = Query(default="all"),
+    limit: int = Query(default=100, ge=1, le=500),
+    authorization: Optional[str] = Header(default=None),
+) -> PosSalesOverviewResponse:
+    _require_current_user(authorization=authorization)
+    return PosSalesOverviewResponse(**state.get_pos_sales_overview(
+        store_code=store_code or "",
+        date_range=date_range,
+        payment_method=payment_method,
+        limit=limit,
+    ))
 
 
 @router.post("/stores/{store_code}/pos-holds", response_model=PosHoldResponse, tags=["pos"])

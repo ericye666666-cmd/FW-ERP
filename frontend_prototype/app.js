@@ -2270,6 +2270,7 @@ let storePackageLastGeneratedTokenState = {};
 let storePackagePrintJobState = {};
 let storePackageGenerateIdempotencyKeyState = {};
 let posStoreItemSaleRecordState = safeParse(localStorage.getItem(STORAGE_KEYS.posStoreItemSaleRecords), []);
+let operationsRealPosSalesOverviewState = null;
 let storeDefaultSalePrices = safeParse(localStorage.getItem(STORAGE_KEYS.storeDefaultSalePrices), {});
 let warehouseDispatchHistoryState = [];
 let warehouseSoldPackageHistoryState = [];
@@ -32426,6 +32427,7 @@ function completeCashierTerminalStoreItemSale() {
   cashierTerminalState.latestCompletedSale = result;
   renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
   renderOperationsAllSalesData(posStoreItemSaleRecordState);
+  loadOperationsRealPosSalesOverview();
   return result;
 }
 
@@ -38776,10 +38778,15 @@ function renderPosSalesAnalyticsSummary(records = posStoreItemSaleRecordState) {
 }
 
 function summarizeAllPosStoreItemSalesForOperations(records = []) {
-  const list = Array.isArray(records) ? records : [];
+  const sourceRecords = Array.isArray(records) ? records : [];
+  const list = sourceRecords.map((row) => ({
+    ...row,
+    price: Number(row?.price ?? row?.total_amount ?? 0),
+    sold_at: row?.sold_at || row?.created_at || row?.sale_time || "",
+  }));
   const now = new Date();
   const todayKey = getLocalDateKey(now.toISOString());
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).getTime();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).getTime();
   const totalSalesAmount = list.reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const totalItemCount = list.length;
   const totalOrderCount = new Set(list.map((row) => row.sale_no).filter(Boolean)).size;
@@ -38788,7 +38795,7 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
     .filter((row) => getLocalDateKey(row?.sold_at || "") === todayKey)
     .reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const last7DaysSalesAmount = list
-    .filter((row) => new Date(row?.sold_at || 0).getTime() >= sevenDaysAgo)
+    .filter((row) => new Date(row?.sold_at || 0).getTime() >= thirtyDaysAgo)
     .reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const cashSalesAmount = list.filter((row) => String(row?.payment_method || "cash").toLowerCase() === "cash").reduce((sum, row) => sum + Number(row?.price || 0), 0);
   const mpesaSalesAmount = list.filter((row) => String(row?.payment_method || "").toLowerCase() === "mpesa").reduce((sum, row) => sum + Number(row?.price || 0), 0);
@@ -38807,8 +38814,8 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   });
   const categorySummaries = [...categoryMap.entries()].map(([category_summary, sales_amount]) => ({ category_summary, sales_amount }));
   const analysisLines = [
-    totalItemCount ? `共售出 ${totalItemCount} 个 STORE_ITEM，销售额 ${formatKesAmount(totalSalesAmount, "KES 0.00")}。` : "当前没有生成销售记录。",
-    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "等待 POS 完成第一笔 STORE_ITEM 销售。",
+    totalItemCount ? `共记录 ${totalItemCount} 条真实销售，销售额 ${formatKesAmount(totalSalesAmount, "KES 0.00")}。` : "当前暂无真实销售记录。",
+    storeCount ? `涉及 ${storeCount} 家门店，平均客单价 ${formatKesAmount(totalOrderCount ? totalSalesAmount / totalOrderCount : 0, "KES 0.00")}。` : "当前暂无真实销售记录。",
     marginPendingRecordCount ? `${marginPendingRecordCount} 条销售记录毛利待确认，原因是上游成本仍未确认。` : `已知成本销售毛利 ${formatKesAmount(knownGrossMarginAmount, "KES 0.00")}。`,
   ];
   return {
@@ -38832,18 +38839,41 @@ function summarizeAllPosStoreItemSalesForOperations(records = []) {
   };
 }
 
+function normalizeOperationsPosSaleOverviewRecords(records = []) {
+  if (!Array.isArray(records)) {
+    return [];
+  }
+  return records.map((record) => {
+    const normalized = record && typeof record === "object" ? { ...record } : {};
+    const categorySummary = String(
+      normalized.category_summary
+        || normalized.category
+        || normalized.category_name
+        || normalized.category_display
+        || normalized.content_summary
+        || ""
+    ).trim();
+    return {
+      ...normalized,
+      category: String(normalized.category || categorySummary).trim(),
+      category_summary: categorySummary || "未分类",
+    };
+  });
+}
+
 function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
-  const summary = summarizeAllPosStoreItemSalesForOperations(records);
+  const normalizedRecords = normalizeOperationsPosSaleOverviewRecords(records);
+  const summary = summarizeAllPosStoreItemSalesForOperations(normalizedRecords);
   const overviewTarget = document.querySelector("#operationsAllSalesOverview");
   if (overviewTarget instanceof HTMLElement) {
     overviewTarget.className = "report-summary-grid";
     overviewTarget.innerHTML = `
-      <article class="store-metric"><strong>全部销售额</strong><span>${escapeHtml(formatKesAmount(summary.totalSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>总销售额</strong><span>${escapeHtml(formatKesAmount(summary.totalSalesAmount, "KES 0.00"))}</span></article>
       <article class="store-metric"><strong>今日销售额</strong><span>${escapeHtml(formatKesAmount(summary.todaySalesAmount, "KES 0.00"))}</span></article>
-      <article class="store-metric"><strong>销售件数</strong><span>${summary.totalItemCount}</span></article>
-      <article class="store-metric"><strong>订单数</strong><span>${summary.totalOrderCount}</span></article>
+      <article class="store-metric"><strong>今日订单数</strong><span>${summary.storeSummaries.reduce((sum, row) => sum + Number(row.todayOrderCount || 0), 0)}</span></article>
+      <article class="store-metric"><strong>总订单数</strong><span>${summary.totalOrderCount}</span></article>
       <article class="store-metric"><strong>客单价</strong><span>${escapeHtml(formatKesAmount(summary.averageTicket, "KES 0.00"))}</span></article>
-      <article class="store-metric"><strong>近 7 天</strong><span>${escapeHtml(formatKesAmount(summary.last7DaysSalesAmount, "KES 0.00"))}</span></article>
+      <article class="store-metric"><strong>近30天销售额</strong><span>${escapeHtml(formatKesAmount(summary.last7DaysSalesAmount, "KES 0.00"))}</span></article>
       <article class="store-metric"><strong>成本已知件数</strong><span>${summary.costKnownItemCount}</span></article>
       <article class="store-metric"><strong>成本待确认件数</strong><span>${summary.costUnknownItemCount}</span></article>
       <article class="store-metric"><strong>已知成本销售毛利</strong><span>${escapeHtml(formatKesAmount(summary.knownGrossMarginAmount, "KES 0.00"))}</span></article>
@@ -38868,26 +38898,41 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
           <div class="candidate-side"><span class="meta-pill">${escapeHtml(row.lastSaleAt ? formatLocalDateTime(row.lastSaleAt) : "-")}</span></div>
         </article>
       `).join("")
-      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+      : `<div class="empty-state">当前暂无真实销售记录。</div>`;
   }
   const recordsTarget = document.querySelector("#operationsAllSalesRecords");
   if (recordsTarget instanceof HTMLElement) {
     recordsTarget.className = "candidate-list";
-    recordsTarget.innerHTML = (Array.isArray(records) && records.length)
-      ? records.slice(0, 50).map((record) => `
+    recordsTarget.innerHTML = normalizedRecords.length
+      ? normalizedRecords.slice(0, 50).map((record) => `
         <article class="candidate-row">
           <div class="candidate-main">
             <strong>${escapeHtml(record.sale_no || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${record.store_item_display_code || "-"} · ${record.store_item_machine_code || "-"} · ${formatKesAmount(record.price || 0, "KES 0.00")}`)}</div>
+            <div class="subtle small">${escapeHtml(`${record.order_no || record.sale_no || "-"} · ${record.store_code || "-"} · ${formatKesAmount(record.total_amount ?? record.price ?? 0, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · source_type ${record.source_type || "-"}`)}</div>
-            <div class="subtle small">${escapeHtml(`assigned_employee ${record.assigned_employee || "-"} · store_rack_code ${record.store_rack_code || "-"} · cashier ${record.cashier || "-"}`)}</div>
-            <div class="subtle small">${escapeHtml(`category_summary ${record.category_summary || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`assigned_employee ${record.assigned_employee || "-"} · category_summary ${record.category_summary || record.category || "未分类"} · store_rack_code ${record.store_rack_code || "-"} · cashier ${record.cashier || "-"} · shift ${record.shift_id || "-"} · status ${record.status || "-"}`)}</div>
+            <div class="subtle small">${escapeHtml(`item_count ${record.item_count || 0} · sale_time ${record.created_at ? formatLocalDateTime(record.created_at) : "-"}`)}</div>
           </div>
           <div class="candidate-side"><span class="meta-pill">${escapeHtml(record.payment_method || "-")}</span></div>
         </article>
       `).join("")
-      : `<div class="empty-state">当前没有生成销售记录。</div>`;
+      : `<div class="empty-state">当前暂无真实销售记录。</div>`;
+  }
+}
+
+async function loadOperationsRealPosSalesOverview() {
+  try {
+    const response = await request("/reports/pos-sales-overview?date_range=all&payment_method=all&limit=100");
+    operationsRealPosSalesOverviewState = response;
+    const records = normalizeOperationsPosSaleOverviewRecords(response?.records);
+    renderOperationsAllSalesData(records);
+  } catch (error) {
+    const target = document.querySelector("#operationsAllSalesAnalysis");
+    if (target instanceof HTMLElement) {
+      target.className = "candidate-summary";
+      target.innerHTML = `<div>${escapeHtml(formatErrorMessage(error) || "销售数据接口不可用，请稍后重试。")}</div>`;
+    }
   }
 }
 
@@ -52717,6 +52762,7 @@ renderTableSummary(null, null);
 renderSaleResultSummary(null);
 renderPosSalesAnalyticsSummary(posStoreItemSaleRecordState);
 renderOperationsAllSalesData(posStoreItemSaleRecordState);
+loadOperationsRealPosSalesOverview();
 renderSaleVoidResultSummary(null);
 renderSaleRefundResultSummary(null);
 renderPaymentAnomalyResultSummary(null);

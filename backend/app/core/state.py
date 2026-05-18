@@ -18906,6 +18906,101 @@ class InMemoryState:
             return self._normalize_pos_sale_detail(row)
         raise HTTPException(status_code=404, detail="未找到该销售单。")
 
+    def get_pos_sales_overview(
+        self,
+        *,
+        store_code: str = "",
+        date_range: str = "all",
+        payment_method: str = "all",
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        today_key = self._nairobi_day_key()
+        now = datetime.now(NAIROBI_TZ)
+        last_30_days_threshold = now - timedelta(days=30)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        normalized_store_code = str(store_code or "").strip().upper()
+        normalized_payment = str(payment_method or "all").strip().lower()
+        normalized_date_range = str(date_range or "all").strip().lower()
+
+        rows = [row for row in self.sales_transactions if self._is_pos_sale_transaction(row)]
+        if normalized_store_code:
+            rows = [row for row in rows if str(row.get("store_code") or "").strip().upper() == normalized_store_code]
+        if normalized_payment in {"cash", "mpesa", "mixed"}:
+            rows = [row for row in rows if str(row.get("payment_method") or "").strip().lower() == normalized_payment]
+
+        def _in_date_range(row: dict[str, Any]) -> bool:
+            row_time = (self._parse_datetime(str(row.get("sale_time") or row.get("created_at") or row.get("sold_at") or "")) or datetime.fromtimestamp(0, tz=NAIROBI_TZ))
+            if normalized_date_range == "today":
+                return self._nairobi_day_key(row.get("sale_time") or row.get("created_at") or row.get("sold_at")) == today_key
+            if normalized_date_range == "last30":
+                return row_time >= last_30_days_threshold
+            if normalized_date_range == "month":
+                return row_time >= month_start
+            return True
+
+        filtered = [row for row in rows if _in_date_range(row)]
+        filtered.sort(key=lambda row: str(row.get("sale_time") or row.get("created_at") or row.get("sold_at") or ""), reverse=True)
+
+        total_sales_amount = round(sum(float(row.get("total_amount") or 0) for row in rows), 2)
+        total_order_count = len(rows)
+        today_rows = [row for row in rows if self._nairobi_day_key(row.get("sale_time") or row.get("created_at") or row.get("sold_at")) == today_key]
+        last_30_rows = [row for row in rows if (self._parse_datetime(str(row.get("sale_time") or row.get("created_at") or row.get("sold_at") or "")) or datetime.fromtimestamp(0, tz=NAIROBI_TZ)) >= last_30_days_threshold]
+
+        store_map: dict[str, dict[str, Any]] = {}
+        for row in filtered:
+            code = str(row.get("store_code") or "").strip().upper() or "UNKNOWN"
+            store_entry = store_map.setdefault(code, {
+                "store_code": code,
+                "store_name": str(self.stores.get(code, {}).get("name") or ""),
+                "sales_amount": 0.0,
+                "order_count": 0,
+                "cash_amount": 0.0,
+                "mpesa_amount": 0.0,
+                "mixed_amount": 0.0,
+            })
+            amount = float(row.get("total_amount") or 0)
+            method = str(row.get("payment_method") or "").strip().lower()
+            store_entry["sales_amount"] += amount
+            store_entry["order_count"] += 1
+            if method == "mpesa":
+                store_entry["mpesa_amount"] += amount
+            elif method == "mixed":
+                store_entry["mixed_amount"] += amount
+            else:
+                store_entry["cash_amount"] += amount
+
+        records = []
+        for row in filtered[: max(1, min(int(limit or 100), 500))]:
+            detail = self._normalize_pos_sale_detail(row)
+            records.append({
+                "sale_no": detail["sale_no"],
+                "order_no": detail["sale_no"],
+                "store_code": detail["store_code"],
+                "cashier": detail["cashier_id"],
+                "shift_id": detail["shift_id"],
+                "status": detail["status"],
+                "payment_method": detail["payment_method"],
+                "total_amount": detail["total_amount"],
+                "item_count": sum(int(item.get("qty") or 1) for item in detail["items"]),
+                "created_at": detail["sale_time"],
+            })
+        return {
+            "summary": {
+                "today_sales_amount": round(sum(float(row.get("total_amount") or 0) for row in today_rows), 2),
+                "today_order_count": len(today_rows),
+                "last_30_days_sales_amount": round(sum(float(row.get("total_amount") or 0) for row in last_30_rows), 2),
+                "total_sales_amount": total_sales_amount,
+                "total_order_count": total_order_count,
+                "average_ticket": round(total_sales_amount / total_order_count, 2) if total_order_count else 0.0,
+            },
+            "stores": sorted(
+                [{**entry, "sales_amount": round(entry["sales_amount"], 2), "cash_amount": round(entry["cash_amount"], 2), "mpesa_amount": round(entry["mpesa_amount"], 2), "mixed_amount": round(entry["mixed_amount"], 2)} for entry in store_map.values()],
+                key=lambda item: item["sales_amount"],
+                reverse=True,
+            ),
+            "records": records,
+        }
+
     def get_dashboard_summary(self) -> list[dict[str, Any]]:
         today_key = self._nairobi_day_key()
         open_transfer_count = sum(
