@@ -510,7 +510,7 @@ const GLOBAL_I18N_GLOSSARY = [
   { zh: "下载 Windows 打印助手", en: "Download Windows Print Agent" },
   { zh: "下载 Windows 打印助手（无需解压）", en: "Download Windows Print Agent (no unzip required)" },
   { zh: "下载 Windows 打印助手（双击运行）", en: "Download Windows Print Agent (double-click to run)" },
-  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
+  { zh: "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手和打印机。", en: "After downloading, double-click to run it, keep the black window open, then click Detect Print Agent." },
   { zh: "仓库执行单 / 出库打印", en: "Warehouse Execution / Dispatch Print" },
   { zh: "补差拣货单", en: "LPK Shortage Pick Task" },
   { zh: "我的当前 bale", en: "My Current Bales" },
@@ -22738,7 +22738,7 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
     </section>
 
     <details class="store-pda-mobile-advanced">
-      <summary>高级：打印和批量设置</summary>
+      <summary>打印操作</summary>
       <div class="store-pda-category-strip">
         ${groups
           .map((group) => `
@@ -23483,7 +23483,7 @@ function renderBaleLocalPrintAgentStatus() {
     : (localPrintAgentState.printerMessage || getLocalPrinterDetectionMessage(printers).message || "尚未检测本机打印队列");
   const helperMessage = localPrintAgentState.connected
     ? "可以点击主按钮打印。"
-    : "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。";
+    : "下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手和打印机。";
   const suffix = localPrintAgentState.lastMessage ? `<div class="subtle small">${escapeHtml(localPrintAgentState.lastMessage)}</div>` : "";
   const printerListHtml = renderLocalPrinterQueueList(printers);
   statusArea.className = "candidate-summary";
@@ -23616,7 +23616,7 @@ async function downloadWindowsPrintAgentPackage() {
   if (objectUrl && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   }
-  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手。");
+  setLocalPrintAgentMessage("success", "已开始下载 Windows 打印助手（双击运行）。下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印助手和打印机。");
   renderBalePrintModal();
 }
 
@@ -24010,7 +24010,7 @@ function renderBalePrintModal() {
   if (browserPrintHint) {
     browserPrintHint.textContent = isLpkPrint
       ? "浏览器打印仅作 LPK 留档备用。"
-      : "浏览器打印仅作高级备用。";
+      : "浏览器打印仅作备用。";
   }
   if (agentFallback instanceof HTMLElement) {
     agentFallback.className = `flow-summary-note ${localPrintAgentState.connected ? "success" : "warning"}${currentJob ? "" : " hidden-screen"}`;
@@ -24153,7 +24153,7 @@ function renderBalePrintModal() {
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
-    primaryPrintAllButton.textContent = "高级：打印全部";
+    primaryPrintAllButton.textContent = "打印本批全部标签";
     primaryPrintAllButton.classList.toggle("hidden-screen", jobs.length <= 1);
   }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
@@ -24170,7 +24170,7 @@ function renderBalePrintModal() {
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob;
-    localAgentPrintButton.textContent = "高级：重试本张";
+    localAgentPrintButton.textContent = "打印当前标签";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
@@ -24180,7 +24180,7 @@ function renderBalePrintModal() {
   }
   if (printAllButton instanceof HTMLButtonElement) {
     printAllButton.disabled = !jobs.length;
-    printAllButton.textContent = jobs.length ? "高级：批量重试" : "当前类别没有待打印条码";
+    printAllButton.textContent = jobs.length ? "打印本批全部标签" : "当前类别没有待打印条码";
   }
   if (sendToStationButton instanceof HTMLButtonElement) {
     sendToStationButton.disabled = !currentJob;
@@ -48274,7 +48274,7 @@ document.querySelector("#balePrintModalCheckLocalAgentButton")?.addEventListener
   });
 });
 document.querySelector("#balePrintModalCheckLocalPrintersButton")?.addEventListener("click", () => {
-  checkLocalPrintAgentPrinters().catch((error) => {
+  checkLocalPrintAgentConnection().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
