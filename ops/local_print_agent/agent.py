@@ -30,7 +30,21 @@ ALLOWED_ORIGINS = {
     "http://fw-erp-34-35-52-250.nip.io",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "http://localhost",
+    "http://127.0.0.1",
 }
+
+
+def _build_cors_headers(origin: str | None) -> dict[str, str]:
+    if origin not in ALLOWED_ORIGINS:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Vary": "Origin",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Access-Control-Allow-Private-Network": "true",
+    }
 
 _PRINTER_STATUS_MARKERS = [
     "正在接受请求",
@@ -1213,13 +1227,9 @@ class PrintAgentHandler(BaseHTTPRequestHandler):
     def _set_headers(self, status_code: int = 200):
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
-        origin = self.headers.get("Origin")
-        if origin in ALLOWED_ORIGINS:
-            self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-            self.send_header("Access-Control-Allow-Private-Network", "true")
+        cors_headers = _build_cors_headers(self.headers.get("Origin"))
+        for header_name, header_value in cors_headers.items():
+            self.send_header(header_name, header_value)
         self.end_headers()
 
     def _send_json(self, payload: dict, status_code: int = 200):

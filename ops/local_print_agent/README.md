@@ -222,6 +222,24 @@ The agent uses PowerShell `Get-Printer` and should return Windows queues such as
 }
 ```
 
+### CORS / Private Network Access (PNA)
+
+`local-api` mode now returns CORS headers for the ERP web origins so browser JavaScript can call `http://127.0.0.1:8719` from HTTPS pages:
+
+- `https://staging.directlooperp.com`
+- `https://directlooperp.com`
+- `http://localhost`
+- `http://127.0.0.1`
+
+For whitelisted origins, agent responses include:
+
+- `Access-Control-Allow-Origin` (echoed origin, no wildcard)
+- `Access-Control-Allow-Methods: GET,POST,OPTIONS`
+- `Access-Control-Allow-Headers: Content-Type`
+- `Access-Control-Allow-Private-Network: true`
+
+The agent also responds to `OPTIONS` preflight requests for `/health`, `/printers`, `/print/label`, `/print/html`, and `/print/tspl`.
+
 Printer name matching is best-effort: `Deli DL-720C`, `Deli_DL_720C`, and spacing/case variants are normalized before printing.
 
 ### Print 60x40 TSPL labels
