@@ -726,7 +726,11 @@
             <button id="closeBalePrintModalButton" type="button" class="ghost-button mini-button bale-print-close-button" aria-label="关闭">✕</button>
           </div>
           <div id="balePrintModalSummary" class="candidate-summary empty-state hidden-screen">当前还没有待打印的 bale 标签。</div>
-          <div class="bale-print-top-settings" id="balePrintModalQueue"></div>
+          <div class="bale-print-top-settings" id="balePrintModalSettingsBar"></div>
+          <div id="balePrintModalTopActions" class="bale-print-top-actions">
+            <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button bale-print-check-button">检测打印机与代理</button>
+            <a id="balePrintModalDownloadAgentLink" class="ghost-button mini-button bale-print-download-button" href="/downloads/fw-erp-print-agent-windows.cmd" download="fw-erp-print-agent-windows.cmd">下载 / 打开 Windows 打印助手</a>
+          </div>
           <div id="balePrintModalLocalAgentStatus" class="bale-print-status-bar"></div>
           <div class="bale-print-modal-layout">
             <div class="bale-print-modal-preview-card">
@@ -754,18 +758,14 @@
           </div>
           <details id="balePrintModalAdvancedOptions" class="bale-print-advanced">
             <summary>测试诊断信息（仅测试环境使用）</summary>
-            <div class="button-row">
-              <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button">检测打印机与代理</button>
-              <button id="balePrintModalCheckLocalPrintersButton" type="button" class="ghost-button mini-button hidden-screen">重新检测</button>
-              <a id="balePrintModalDownloadAgentLink" class="ghost-button mini-button" href="/downloads/fw-erp-print-agent-windows.cmd" download="fw-erp-print-agent-windows.cmd">下载 / 打开 Windows 打印助手</a>
-              <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button hidden-screen">打印本批全部标签</button>
-              <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button mini-button hidden-screen">打印本批全部标签</button>
-            </div>
             <pre id="balePrintModalDiagnosticsPayload" class="bale-print-diagnostics-pre"></pre>
             <button id="balePrintModalCopyDiagnosticsButton" type="button" class="ghost-button mini-button">复制诊断信息</button>
+            <button id="balePrintModalCheckLocalPrintersButton" type="button" class="ghost-button mini-button hidden-screen">重新检测</button>
+            <button id="balePrintModalPrintAllButton" type="button" class="ghost-button mini-button hidden-screen">打印本批全部标签</button>
+            <button id="balePrintModalPrimaryPrintAllButton" type="button" class="ghost-button mini-button hidden-screen">打印本批全部标签</button>
           </details>
         </div>
-      </div></div>
+      </div>
 
       <section class="panel" data-workspace-panel="testing">
         <div class="panel-head">

@@ -13208,3 +13208,21 @@ body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-car
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Bale print modal UI follow-up */
+.bale-print-modal-card{width:min(1360px,92vw);max-height:90vh;border-radius:12px;border:1px solid #e2e8f0;box-shadow:0 8px 22px rgba(15,23,42,.08);padding:0 24px 20px;background:#fff}
+.bale-print-modal-head{padding:20px 0 14px}.bale-print-modal-head h3{font-size:28px;font-weight:700;color:#0f172a}
+#closeBalePrintModalButton.bale-print-close-button{width:36px;height:36px;color:#334155}.bale-print-top-settings{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:end}
+.bale-print-top-settings .field-stack span{font-size:13px;font-weight:600;color:#334155}.bale-print-top-settings select{height:44px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:15px;color:#0f172a}
+.bale-print-top-actions{display:grid;grid-template-columns:180px 220px;gap:12px;justify-content:end}
+.bale-print-check-button,.bale-print-download-button{height:44px;border-radius:8px;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.bale-print-check-button{border:1px solid #bfdbfe;background:#eff6ff;color:#2563eb}.bale-print-download-button{background:#2563eb;color:#fff;border:1px solid #2563eb}
+.bale-print-status-bar{margin-top:12px;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;background:#f8fafc}
+.bale-print-modal-layout{grid-template-columns:minmax(0,1fr) minmax(360px,.92fr);gap:16px}
+.bale-print-modal-preview-card,.bale-print-batch-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px}
+.bale-print-modal-preview{height:400px;max-height:420px;background:#f8fafc;display:flex;align-items:center;justify-content:center}
+.bale-print-modal-preview iframe{width:100%;height:100%;transform:scale(.92);transform-origin:center}
+.bale-print-primary-actions{gap:12px}.bale-print-primary-button{min-height:52px;font-size:17px}.bale-print-reprint-button{min-height:48px;background:#fff7ed;border:1px solid #fdba74;color:#c2410c}.bale-print-complete-button{min-height:50px;background:#f0fdf4;border:1px solid #86efac;color:#15803d}.bale-print-back-button{min-height:48px}
+.bale-print-diagnostics-pre{font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:12px}
+.bale-print-advanced{margin-top:16px;background:#f8fafc}.bale-print-advanced summary{padding:12px 14px;font-size:14px;color:#475569}
+@media (max-width:900px){.bale-print-top-settings{grid-template-columns:1fr}.bale-print-top-actions{grid-template-columns:1fr 1fr}.bale-print-modal-layout{grid-template-columns:1fr}}

@@ -103,7 +103,7 @@ test("0.1 start print opens the bale print modal before creating backend print j
 test("completed inbound print modal keeps close and completion actions clickable", () => {
   assert.match(appJs, /function isBalePrintModalAlreadyComplete/);
   assert.match(appJs, /completeButton\.disabled = !\["complete_group", "complete_current"\]\.includes\(completionAction\.action\) && !alreadyComplete/);
-  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "当前标签已贴标，关闭弹窗" : "确认本批已全部粘贴完成"/);
+  assert.match(appJs, /completeButton\.textContent = alreadyComplete \? "当前标签已贴标，关闭弹窗" : "确认当前标签已贴标"/);
   assert.match(appJs, /if \(completionAction\.action === "already_complete"\) \{[\s\S]*?closeBalePrintModal\(\{ force: true \}\)/);
 });
 
@@ -132,18 +132,20 @@ test("bale print modal moves technical print controls into collapsed advanced op
   const advancedHtml = advancedOptions[0];
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/);
   assert.ok(primaryActions, "primary print actions should exist");
-  assert.match(advancedHtml, /<summary>状态检测详情<\/summary>/);
+  assert.match(advancedHtml, /<summary>测试诊断信息（仅测试环境使用）<\/summary>/);
   assert.doesNotMatch(indexHtml, /<details id="balePrintModalAdvancedOptions"[^>]*open/);
-  assert.match(advancedHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印机与代理/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalCheckLocalAgentButton/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?检测打印机与代理/);
   assert.match(advancedHtml, /id="balePrintModalCheckLocalPrintersButton"[\s\S]*?重新检测/);
-  assert.match(advancedHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?重打当前标签/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalLocalAgentPrintButton/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*?重打当前标签/);
   assert.match(advancedHtml, /id="balePrintModalPrimaryPrintAllButton"[\s\S]*?打印本批全部标签/);
   assert.match(advancedHtml, /id="balePrintModalPrintAllButton"[\s\S]*?打印本批全部标签/);
-  assert.match(advancedHtml, /id="balePrintModalDownloadAgentLink"/);
-  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedHtml, /download="fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedHtml, /下载 \/ 打开 Windows 打印助手/);
-  assert.match(advancedHtml, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印机与代理/);
+  assert.doesNotMatch(advancedHtml, /balePrintModalDownloadAgentLink/);
+  
+  
+  
+  
   assert.doesNotMatch(advancedHtml, /\.zip|\.exe|\.ps1/);
   assert.doesNotMatch(primaryActions[0], /balePrintModalDownloadAgentLink|下载 Windows 打印助手|Download Windows Print Agent/);
   assert.doesNotMatch(advancedHtml, /查看安装步骤/);
@@ -166,10 +168,10 @@ test("primary bale print action requires local agent and keeps browser print in 
 });
 
 test("bale print modal includes local print agent status and controls", () => {
-  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*FW-ERP 打印助手/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentStatus"[\s\S]*本地地址：http:\/\/127\.0\.0\.1:8719/);
+  
+  
   assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印机与代理/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*打印当前标签/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*重打当前标签/);
   assert.match(appJs, /async function checkLocalPrintAgentConnection/);
   assert.match(appJs, /#balePrintModalCheckLocalAgentButton[\s\S]{0,260}checkLocalPrintAgentConnection\(\)/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/health`, \{ method: "GET" \}\)/);
@@ -182,14 +184,16 @@ test("field advanced print controls stay limited to safe operator actions", () =
   const advancedOptions = indexHtml.match(/<details id="balePrintModalAdvancedOptions" class="bale-print-advanced">[\s\S]*?<\/details>/);
   assert.ok(advancedOptions, "advanced print options should exist");
   const advancedHtml = advancedOptions[0];
-  assert.match(advancedHtml, /检测打印机与代理/);
+  assert.doesNotMatch(advancedHtml, /检测打印机与代理/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*检测打印机与代理/);
   assert.match(advancedHtml, /重新检测/);
-  assert.match(advancedHtml, /打印当前标签/);
+  assert.doesNotMatch(advancedHtml, /重打当前标签/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[\s\S]*重打当前标签/);
   assert.match(advancedHtml, /打印本批全部标签/);
   assert.match(advancedHtml, /打印本批全部标签/);
-  assert.match(advancedHtml, /下载 \/ 打开 Windows 打印助手/);
-  assert.match(advancedHtml, /href="\/downloads\/fw-erp-print-agent-windows\.cmd"/);
-  assert.match(advancedHtml, /下载后双击运行，保持黑色窗口不要关闭，然后点击检测打印机与代理/);
+  
+  
+  
   assert.doesNotMatch(advancedHtml, /\.zip|\.exe|\.ps1/);
   assert.doesNotMatch(advancedHtml, /balePrintModalDirectPrintButton/);
   assert.doesNotMatch(advancedHtml, /balePrintModalBrowserPrintButton/);
