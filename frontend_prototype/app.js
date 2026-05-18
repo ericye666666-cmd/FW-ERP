@@ -23387,27 +23387,55 @@ function isDeliLocalPrinter(printer) {
   return normalizedName.includes("deli") && (normalizedName.includes("720") || normalizedName.includes("dl720c"));
 }
 
+function getSelectedLocalPrinterName() {
+  const modalPrinterName = String(document.querySelector("[data-bale-modal-printer-select]")?.value || "").trim();
+  const consolePrinterName = String(document.querySelector("#balePrinterConsoleForm [name='printer_name']")?.value || "").trim();
+  return modalPrinterName || consolePrinterName || "Deli DL-720C";
+}
+
+function findLocalPrinterBySelectedName(printers = [], selectedName = "") {
+  const rows = Array.isArray(printers) ? printers : [];
+  const normalizedSelected = normalizePrinterName(selectedName || "Deli DL-720C");
+  if (!normalizedSelected) {
+    return null;
+  }
+  return (
+    rows.find((printer) => normalizePrinterName(printer?.name || printer?.printer_name || "") === normalizedSelected)
+    || rows.find((printer) => normalizePrinterName(printer?.name || printer?.printer_name || "").includes(normalizedSelected))
+    || rows.find((printer) => normalizedSelected.includes(normalizePrinterName(printer?.name || printer?.printer_name || "")))
+    || null
+  );
+}
+
 function isLocalPrinterAvailable(printer) {
-  const status = String(printer?.status || "").trim().toLowerCase();
+  if (!printer || printer?.work_offline === true) {
+    return false;
+  }
   if (printer?.available === true) {
     return true;
   }
-  if (printer?.available === false || printer?.work_offline === true) {
+  if (printer?.available === false) {
     return false;
   }
-  return status === "available";
+  const status = String(printer?.status || "").trim().toLowerCase();
+  const rawStatus = String(printer?.raw_status || "").trim().toLowerCase();
+  return status === "available" || status === "ready" || status === "可用" || rawStatus === "normal";
 }
 
-function getLocalPrinterDetectionMessage(printers = []) {
+function getLocalPrinterDetectionMessage(printers = [], selectedName = "") {
   const rows = Array.isArray(printers) ? printers : [];
+  const targetPrinterName = String(selectedName || "Deli DL-720C").trim() || "Deli DL-720C";
   if (!rows.length) {
-    return { type: "warning", message: "当前未检测到本机打印队列。" };
+    return { type: "warning", status: "unavailable", message: "当前未检测到本机打印队列。" };
   }
-  const deliPrinter = rows.find((printer) => isDeliLocalPrinter(printer));
-  if (!deliPrinter) {
-    return { type: "warning", message: `已检测到 ${rows.length} 个打印队列，未发现 Deli DL-720C。` };
+  const matchedPrinter = findLocalPrinterBySelectedName(rows, targetPrinterName) || (normalizePrinterName(targetPrinterName) === normalizePrinterName("Deli DL-720C") ? rows.find((printer) => isDeliLocalPrinter(printer)) : null);
+  if (!matchedPrinter) {
+    return { type: "warning", status: "unavailable", message: `已检测到 ${rows.length} 个打印队列，未发现 ${targetPrinterName}。` };
   }
-  return { type: "warning", message: "已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。" };
+  if (isLocalPrinterAvailable(matchedPrinter)) {
+    return { type: "success", status: "available", message: `${targetPrinterName} 打印机状态：可用。` };
+  }
+  return { type: "warning", status: "unavailable", message: `已发现 ${targetPrinterName} 打印队列，但打印机状态不可用。请确认打印机电源、USB 连接和 Windows 队列未离线。` };
 }
 
 function formatLocalPrintAgentConnectionError(error) {
@@ -23547,9 +23575,9 @@ async function checkLocalPrintAgentPrinters() {
     const printers = Array.isArray(payload?.printers) ? payload.printers : [];
     localPrintAgentState.printers = printers;
     localPrintAgentState.printerChecking = false;
-    const detection = getLocalPrinterDetectionMessage(printers);
+    const detection = getLocalPrinterDetectionMessage(printers, getSelectedLocalPrinterName());
     localPrintAgentState.printerMessage = String(payload?.warning || detection.message || "").trim();
-    localPrintAgentState.printerStatus = detection.type === "success" ? "available" : "unavailable";
+    localPrintAgentState.printerStatus = detection.status === "available" ? "available" : "unavailable";
     setLocalPrintAgentMessage(detection.type, localPrintAgentState.printerMessage);
     renderBalePrintModal();
     return payload;

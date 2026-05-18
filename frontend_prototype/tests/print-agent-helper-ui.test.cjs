@@ -53,6 +53,22 @@ function extractConstSource(source, constName) {
   return match[0];
 }
 
+
+function loadLocalPrinterDetectionHelpers() {
+  return Function(`
+    ${extractFunctionSource(appJs, "normalizePrinterName")}
+    ${extractFunctionSource(appJs, "isDeliLocalPrinter")}
+    ${extractFunctionSource(appJs, "findLocalPrinterBySelectedName")}
+    ${extractFunctionSource(appJs, "isLocalPrinterAvailable")}
+    ${extractFunctionSource(appJs, "getLocalPrinterDetectionMessage")}
+    return {
+      findLocalPrinterBySelectedName,
+      getLocalPrinterDetectionMessage,
+      isLocalPrinterAvailable,
+    };
+  `)();
+}
+
 function loadLocalAgentValidationHelpers() {
   const optionalEntityPrefix = appJs.includes("function getLocalAgentEntityMachinePrefix")
     ? extractFunctionSource(appJs, "getLocalAgentEntityMachinePrefix")
@@ -140,12 +156,52 @@ test("print helper detection checks local health and local printers without open
   assert.match(appJs, /async function checkLocalPrintAgentPrinters/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/printers`/);
   assert.match(appJs, /打印机队列/);
-  assert.match(appJs, /已发现 Deli DL-720C 打印队列，请确认打印机电源和 USB 已连接。/);
+  assert.match(appJs, /\$\{targetPrinterName\} 打印机状态：可用。/);
+  assert.match(appJs, /已发现 \$\{targetPrinterName\} 打印队列，但打印机状态不可用。/);
   assert.match(appJs, /当前未检测到本机打印队列。/);
-  assert.match(appJs, /已检测到 \$\{rows\.length\} 个打印队列，未发现 Deli DL-720C。/);
+  assert.match(appJs, /已检测到 \$\{rows\.length\} 个打印队列，未发现 \$\{targetPrinterName\}。/);
+  assert.match(appJs, /localPrintAgentState\.printerStatus\s*=\s*detection\.status === "available" \? "available" : "unavailable"/);
   assert.doesNotMatch(appJs, /Deli DL-720C 当前在线/);
-  assert.doesNotMatch(appJs, /已检测到 Deli DL-720C/);
   assert.doesNotMatch(appJs, /checkLocalPrintAgentPrinters[\s\S]{0,1200}browserPrintCurrentBaleModalJob/);
+});
+
+
+test("printer detection treats selected Deli queue as available from /printers status fields", () => {
+  const { getLocalPrinterDetectionMessage, isLocalPrinterAvailable } = loadLocalPrinterDetectionHelpers();
+  const printers = [
+    { name: "HPRT D25(TSPL)", is_default: true, status: "available", raw_status: "Normal", work_offline: false, available: true },
+    { name: "Deli DL-720C", is_default: false, status: "available", raw_status: "Normal", work_offline: false, available: true },
+  ];
+
+  const detection = getLocalPrinterDetectionMessage(printers, "Deli DL-720C");
+
+  assert.equal(detection.type, "success");
+  assert.equal(detection.status, "available");
+  assert.match(detection.message, /Deli DL-720C 打印机状态：可用。/);
+  assert.equal(isLocalPrinterAvailable({ name: "Deli DL-720C", status: "ready", work_offline: false }), true);
+  assert.equal(isLocalPrinterAvailable({ name: "Deli DL-720C", status: "可用", work_offline: false }), true);
+  assert.equal(isLocalPrinterAvailable({ name: "Deli DL-720C", raw_status: "Normal", work_offline: false }), true);
+});
+
+test("printer detection keeps agent connected state separate from unavailable Deli queue", () => {
+  const { getLocalPrinterDetectionMessage } = loadLocalPrinterDetectionHelpers();
+
+  assert.deepEqual(
+    getLocalPrinterDetectionMessage([], "Deli DL-720C"),
+    { type: "warning", status: "unavailable", message: "当前未检测到本机打印队列。" },
+  );
+
+  const missingDeli = getLocalPrinterDetectionMessage([
+    { name: "HPRT D25(TSPL)", status: "available", work_offline: false, available: true },
+  ], "Deli DL-720C");
+  assert.equal(missingDeli.status, "unavailable");
+  assert.match(missingDeli.message, /未发现 Deli DL-720C。/);
+
+  const offlineDeli = getLocalPrinterDetectionMessage([
+    { name: "Deli DL-720C", status: "available", raw_status: "Normal", work_offline: true, available: true },
+  ], "Deli DL-720C");
+  assert.equal(offlineDeli.status, "unavailable");
+  assert.match(offlineDeli.message, /打印机状态不可用/);
 });
 
 test("local agent connection failures explain Windows startup, port, and browser localhost access", () => {
