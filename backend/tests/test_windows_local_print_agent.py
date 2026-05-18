@@ -16,13 +16,34 @@ spec.loader.exec_module(agent)
 
 
 class WindowsLocalPrintAgentTest(unittest.TestCase):
-    def test_cors_allowed_origins_include_directlooperp_hosts_without_dropping_legacy_hosts(self):
-        self.assertIn("https://staging.directlooperp.com", agent.ALLOWED_ORIGINS)
-        self.assertIn("https://directlooperp.com", agent.ALLOWED_ORIGINS)
-        self.assertIn("https://fw-erp-staging.onrender.com", agent.ALLOWED_ORIGINS)
-        self.assertIn("https://fw-erp-34-35-52-250.nip.io", agent.ALLOWED_ORIGINS)
-        self.assertIn("http://localhost:8000", agent.ALLOWED_ORIGINS)
-        self.assertIn("http://127.0.0.1:8000", agent.ALLOWED_ORIGINS)
+    def _capture_headers(self, origin="https://staging.directlooperp.com", status_code=204):
+        handler = object.__new__(agent.PrintAgentHandler)
+        handler.headers = {"Origin": origin} if origin else {}
+        captured = []
+        handler.send_response = lambda code: captured.append(("status", str(code)))
+        handler.send_header = lambda name, value: captured.append((name, value))
+        handler.end_headers = lambda: captured.append(("end", ""))
+
+        handler._set_headers(status_code)
+
+        return dict(captured)
+
+    def test_cors_reflects_any_origin_and_allows_private_network_preflight(self):
+        headers = self._capture_headers("https://staging.directlooperp.com")
+
+        self.assertEqual(headers["status"], "204")
+        self.assertEqual(headers["Access-Control-Allow-Origin"], "https://staging.directlooperp.com")
+        self.assertEqual(headers["Access-Control-Allow-Headers"], "Content-Type")
+        self.assertEqual(headers["Access-Control-Allow-Methods"], "GET,POST,OPTIONS")
+        self.assertEqual(headers["Access-Control-Allow-Private-Network"], "true")
+        self.assertEqual(headers["Vary"], "Origin")
+
+        arbitrary_headers = self._capture_headers("https://warehouse-console.example")
+        self.assertEqual(arbitrary_headers["Access-Control-Allow-Origin"], "https://warehouse-console.example")
+
+    def test_agent_still_listens_on_loopback_only(self):
+        self.assertEqual(agent.HOST, "127.0.0.1")
+        self.assertEqual(agent.PORT, 8719)
 
     def _tspl_text_y_values(self, tspl):
         return [int(match.group(1)) for match in re.finditer(r"^TEXT\s+\d+,(\d+),", tspl, re.MULTILINE)]
