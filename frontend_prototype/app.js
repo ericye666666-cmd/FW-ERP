@@ -40342,10 +40342,15 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   const pBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
   const sBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
   const customBaselineSelect = [...document.querySelectorAll("[data-mobile-pricing-custom-baseline]")].find((input) => {
-    const isSelect = typeof HTMLSelectElement !== "undefined" ? input instanceof HTMLSelectElement : true;
+    const isSelect = typeof HTMLSelectElement !== "undefined"
+      ? input instanceof HTMLSelectElement
+      : input && typeof input.value === "string";
     return isSelect && String(input?.dataset?.mobilePricingCustomBaseline || "") === sourceLineKey;
   });
-  const explicitBaselineGrade = String(rawBaselineGrade || (customBaselineSelect instanceof HTMLSelectElement ? customBaselineSelect.value : "")).trim().toUpperCase();
+  const isSelectElement = typeof HTMLSelectElement !== "undefined"
+    ? customBaselineSelect instanceof HTMLSelectElement
+    : customBaselineSelect && typeof customBaselineSelect.value === "string";
+  const explicitBaselineGrade = String(rawBaselineGrade || (isSelectElement ? customBaselineSelect.value : "")).trim().toUpperCase();
   const baselinePrice = explicitBaselineGrade === "S" ? sBaselinePrice : pBaselinePrice;
   const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
     (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey,
@@ -42386,6 +42391,9 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
     category_short: group.category_short || group.category_sub || group.category || group.category_main || "",
     grade: group.grade || "",
     pricing_type: pricingType,
+    baseline_grade: group.baseline_grade || group.grade || "",
+    default_sale_price_kes: Number(group.baseline_default_sale_price_kes || group.default_sale_price_kes || 0),
+    baseline_default_sale_price_kes: Number(group.baseline_default_sale_price_kes || group.default_sale_price_kes || 0),
     quantity: groupQuantity,
     pricing_batch_id: group.pricing_batch_id || group.group_id,
     source_line_key: group.source_line_key,

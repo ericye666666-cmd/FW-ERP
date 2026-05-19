@@ -1816,10 +1816,10 @@ test("incremental pricing batches track allocated, generated, and remaining quan
   assert.equal(sBatch.price_kes, 312);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 20);
 
-  helpers.setMockInputs(20, 275, "S");
+  helpers.setMockInputs(20, 320, "S");
   const customBatch = helpers.createStoreMobilePricingBatch(state, "line-100||CUSTOM");
   assert.equal(customBatch.quantity, 20);
-  assert.equal(customBatch.price_kes, 275);
+  assert.equal(customBatch.price_kes, 320);
   assert.equal(customBatch.baseline_grade, "S");
   assert.equal(customBatch.baseline_default_sale_price_kes, 312);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 0);
@@ -1999,8 +1999,10 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
         this.dataset = dataset || {};
       }
     }
+    class HTMLSelectElement extends HTMLInputElement {}
     var mockQuantity = 20;
     var mockCustomPrice = 0;
+    var mockCustomBaseline = "S";
     var capturedRequests = [];
     var currentSession = { user: { username: "Austin", store_code: "UTAWALA" } };
     var document = {
@@ -2060,6 +2062,12 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
       setMockQuantity(value) {
         mockQuantity = value;
       },
+      setMockCustomBaseline(value) {
+        mockCustomBaseline = value;
+      },
+      setMockCustomPrice(value) {
+        mockCustomPrice = value;
+      },
       capturedRequests,
       createStoreMobilePricingBatch,
       generateStoreMobileBatchStoreItems,
@@ -2092,6 +2100,7 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   };
 
   helpers.setMockQuantity(20);
+  helpers.setMockCustomBaseline("S");
   const pBatch = helpers.createStoreMobilePricingBatch(state, "line-100||P");
   assert.equal(pBatch.quantity, 20);
   assert.notEqual(pBatch.quantity, 100);
@@ -2106,6 +2115,9 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   assert.equal(helpers.capturedRequests[0].payload.quantity, 20);
   assert.equal(helpers.capturedRequests[0].payload.sale_price_kes, 410);
   assert.equal(helpers.capturedRequests[0].payload.pricing_batch_id, pBatch.group_id);
+  assert.equal(helpers.capturedRequests[0].payload.pricing_type, "P");
+  assert.equal(helpers.capturedRequests[0].payload.baseline_grade, "P");
+  assert.equal(helpers.capturedRequests[0].payload.default_sale_price_kes, 410);
   assert.equal(helpers.capturedRequests[0].payload.source_sdp_display_code, "SDP261290018");
   assert.equal(pBatch.generated_store_items.length, 20);
   assert.match(helpers.renderStoreItemLabelPreview(pBatch.generated_store_items, "60x40", pBatch), /第 1 \/ 20 张/);
@@ -2116,9 +2128,20 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   assert.equal(sBatch.quantity, 30);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 50);
   await helpers.generateStoreMobileBatchStoreItems(state, sBatch.group_id);
+  helpers.setMockCustomPrice(420);
+  const customBatch = helpers.createStoreMobilePricingBatch(state, "line-100||CUSTOM");
+  await helpers.generateStoreMobileBatchStoreItems(state, customBatch.group_id);
   assert.equal(helpers.capturedRequests[1].payload.quantity, 30);
   assert.equal(helpers.capturedRequests[1].payload.sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[1].payload.baseline_grade, "S");
+  assert.equal(helpers.capturedRequests[1].payload.default_sale_price_kes, 312);
   assert.equal(sBatch.generated_store_items.length, 30);
+  assert.equal(helpers.capturedRequests[2].payload.pricing_type, "CUSTOM");
+  assert.equal(helpers.capturedRequests[2].payload.baseline_grade, "S");
+  assert.equal(helpers.capturedRequests[2].payload.default_sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[2].payload.baseline_default_sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[2].payload.sale_price_kes, 420);
+  assert.equal(helpers.capturedRequests[2].payload.source_line_key, "line-100");
   assert.match(helpers.renderStoreItemLabelPreview(sBatch.generated_store_items, "60x40", sBatch), /第 1 \/ 30 张/);
   assert.equal(helpers.buildStoreItemLabelPreviewPayload("60x40", sBatch.generated_store_items, sBatch).labels.length, 30);
 });
