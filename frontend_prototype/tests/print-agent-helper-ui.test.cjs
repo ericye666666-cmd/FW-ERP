@@ -220,6 +220,13 @@ test("printer detection clears stale Deli state before each request and on failu
   assert.doesNotMatch(printerFunction, /catch \(error\)[\s\S]*已检测到 Deli DL-720C/);
 });
 
+test("single print button stays bound to single-job print action", () => {
+  const handlerBlock = appJs.match(/document\.querySelector\("#balePrintModalSinglePrintButton"\)\?\.addEventListener\("click",[\s\S]*?\}\);/);
+  assert.ok(handlerBlock, "missing single print button click handler");
+  assert.match(handlerBlock[0], /printCurrentBaleModalViaLocalAgent\(\)/);
+  assert.doesNotMatch(handlerBlock[0], /printAllBaleModalPrimaryAction\(\)/);
+});
+
 test("primary print button triggers batch print action instead of single print action", () => {
   const handlerBlock = appJs.match(/document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click",[\s\S]*?\}\);/);
   assert.ok(handlerBlock, "missing primary print button click handler");
@@ -235,7 +242,7 @@ test("printAllBaleModalPrimaryAction prints every job in current modal batch", a
     let rendered = 0;
     const baleBatchCompletionReadyKeys = new Set();
     let balePrinterConsoleNotice = null;
-    const localPrintAgentState = { connected: true, printerStatus: "available" };
+    const localPrintAgentState = { agentStatus: "connected", printerStatus: "available", connected: true };
     const balePrintModalState = {
       jobs: [{ id: "job-1" }, { id: "job-2" }, { id: "job-3" }],
       currentIndex: 1,
