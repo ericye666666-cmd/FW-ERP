@@ -726,8 +726,8 @@
           <div class="bale-print-top-workbench">
             <div id="balePrintModalLocalAgentStatus" class="bale-print-status-bar"></div>
             <div id="balePrintModalTopActions" class="bale-print-top-actions">
-              <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button bale-print-check-button">⌕ 检测</button>
-              <a id="balePrintModalDownloadAgentLink" class="ghost-button mini-button bale-print-download-button" href="/downloads/fw-erp-print-agent-windows.zip" download="fw-erp-print-agent-windows.zip">⇩ 下载打印代理</a>
+              <button id="balePrintModalCheckLocalAgentButton" type="button" class="ghost-button mini-button bale-print-check-button">检测</button>
+              <a id="balePrintModalDownloadAgentLink" class="ghost-button mini-button bale-print-download-button" href="/downloads/fw-erp-print-agent-windows.zip" download="fw-erp-print-agent-windows.zip">下载打印代理</a>
             </div>
           </div>
           <div class="bale-print-modal-layout">
@@ -748,8 +748,11 @@
               <div class="bale-print-batch-card hidden-screen" id="balePrintModalScopeNote"></div>
               <div class="bale-print-batch-card" id="balePrintModalQueueList"></div>
               <div class="bale-print-primary-actions">
-                <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">▣ 打印本批标签</button>
-                <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button bale-print-reprint-button">↻ 重打当前标签</button>
+                <div class="bale-print-primary-row">
+                  <button id="balePrintModalSinglePrintButton" type="button" class="primary-button bale-print-primary-button">打印当前标签</button>
+                  <button id="balePrintModalPrimaryPrintButton" type="button" class="primary-button bale-print-primary-button">打印本批标签</button>
+                </div>
+                <button id="balePrintModalLocalAgentPrintButton" type="button" class="ghost-button mini-button bale-print-reprint-button">重打当前标签</button>
                 <button id="balePrintModalCompleteButton" type="button" class="ghost-button bale-print-complete-button">✓ 确认本批已全部粘贴完成（完成 RB 入库）</button>
                 <button id="balePrintModalCloseAndRefreshButton" type="button" class="ghost-button bale-print-back-button">关闭</button>
               </div>

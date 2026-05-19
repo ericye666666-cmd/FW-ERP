@@ -6201,6 +6201,10 @@ body.area-supervisor-workspace-mode .workspace-page-bar {
 }
 
 @media (max-width: 980px) {
+  #balePrintModal .bale-print-primary-row {
+    grid-template-columns: 1fr;
+  }
+
   .modal-card-wide {
     width: calc(100vw - 16px);
     max-height: calc(100vh - 16px);
@@ -13532,6 +13536,12 @@ body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-car
   background: transparent;
 }
 
+#balePrintModal .bale-print-primary-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 #balePrintModal .bale-print-primary-button,
 #balePrintModal .bale-print-reprint-button,
 #balePrintModal .bale-print-complete-button,
@@ -13545,6 +13555,7 @@ body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-car
   min-height: 56px;
   font-size: 18px;
   font-weight: 700;
+  border-radius: 12px;
 }
 
 #balePrintModal .bale-print-reprint-button {
@@ -13589,6 +13600,10 @@ body.cashier-terminal-mode .cashier-terminal-cart:not(.empty-state) .cashier-car
 .bale-print-inline-alert.warning { background: #fffbeb; color: #b45309; }
 
 @media (max-width: 980px) {
+  #balePrintModal .bale-print-primary-row {
+    grid-template-columns: 1fr;
+  }
+
   #balePrintModal .bale-print-modal-card {
     width: min(1000px, calc(100vw - 16px));
     padding: 20px;

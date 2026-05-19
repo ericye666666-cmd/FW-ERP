@@ -282,7 +282,7 @@ const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
   zh: Object.freeze({
     "pda.work.today": "我的今日工作",
     "pda.package.scan": "扫包码",
-    "pda.label.print": "▣ 打印标签",
+    "pda.label.print": "打印标签",
     "pda.label.printed": "标签已打印",
     "pda.label.printFailed": "打印失败",
     "pda.location.select": "选择位置",
@@ -23935,6 +23935,7 @@ function renderBalePrintModal() {
   const nextButton = document.querySelector("#balePrintModalNextButton");
   const pageIndicator = document.querySelector("#balePrintModalPageIndicator");
   const refreshButton = document.querySelector("#balePrintModalRefreshButton");
+  const singlePrintButton = document.querySelector("#balePrintModalSinglePrintButton");
   const primaryPrintButton = document.querySelector("#balePrintModalPrimaryPrintButton");
   const primaryPrintAllButton = document.querySelector("#balePrintModalPrimaryPrintAllButton");
   const checkLocalAgentButton = document.querySelector("#balePrintModalCheckLocalAgentButton");
@@ -24135,16 +24136,16 @@ function renderBalePrintModal() {
   if (primaryPrintButton instanceof HTMLButtonElement) {
     primaryPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
     primaryPrintButton.textContent = isSdoPrint
-      ? "▣ 打印 SDO 实体包标签"
+      ? "打印 SDO 实体包标签"
       : (isLpkPrint
-        ? "▣ 打印 LPK 条码"
+        ? "打印 LPK 条码"
         : (isSdbPrint
-          ? "▣ 打印 SDB 标签"
+          ? "打印 SDB 标签"
             : (isStoreItemPrint
-              ? "▣ 打印 STORE_ITEM 标签"
+              ? "打印 STORE_ITEM 标签"
               : (isRawBalePrint
-                ? (jobs.length ? `▣ 打印本批标签（共 ${jobs.length} 张）` : "▣ 打印本批标签")
-                : "▣ 打印标签"))));
+                ? (jobs.length ? `打印本批标签（共 ${jobs.length} 张）` : "打印本批标签")
+                : "打印标签"))));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
     primaryPrintAllButton.disabled = !jobs.length;
@@ -24153,7 +24154,7 @@ function renderBalePrintModal() {
   }
   if (checkLocalAgentButton instanceof HTMLButtonElement) {
     checkLocalAgentButton.disabled = false;
-    checkLocalAgentButton.textContent = "⌕ 检测";
+    checkLocalAgentButton.textContent = "检测";
   }
   if (checkLocalPrintersButton instanceof HTMLButtonElement) {
     checkLocalPrintersButton.disabled = Boolean(localPrintAgentState.printerChecking);
@@ -24166,7 +24167,7 @@ function renderBalePrintModal() {
   }
   if (localAgentPrintButton instanceof HTMLButtonElement) {
     localAgentPrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
-    localAgentPrintButton.textContent = currentJob ? `↻ 重打当前标签（第 ${currentIndex + 1} 张）` : "↻ 重打当前标签";
+    localAgentPrintButton.textContent = currentJob ? `重打当前标签（第 ${currentIndex + 1} 张）` : "重打当前标签";
   }
   if (connectButton instanceof HTMLButtonElement) {
     connectButton.disabled = false;
@@ -24184,9 +24185,13 @@ function renderBalePrintModal() {
   if (browserPrintButton instanceof HTMLButtonElement) {
     browserPrintButton.disabled = !currentJob;
   }
+  if (singlePrintButton instanceof HTMLButtonElement) {
+    singlePrintButton.disabled = !currentJob || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
+    singlePrintButton.textContent = currentJob ? `打印当前标签（第 ${currentIndex + 1} 张）` : "打印当前标签";
+  }
   if (completeButton instanceof HTMLButtonElement) {
     completeButton.disabled = !["complete_group", "complete_current"].includes(completionAction.action) && !alreadyComplete;
-    completeButton.textContent = alreadyComplete ? "✓ 当前标签已贴标，关闭弹窗" : "✓ 确认本批已全部粘贴完成（完成 RB 入库）";
+    completeButton.textContent = alreadyComplete ? "当前标签已贴标，关闭弹窗" : "确认本批已全部粘贴完成（完成 RB 入库）";
   }
   if (closeBalePrintModalButton instanceof HTMLButtonElement) {
     closeBalePrintModalButton.disabled = false;
@@ -48298,6 +48303,16 @@ document.querySelector("#balePrintModalDownloadAgentLink")?.addEventListener("cl
 document.querySelector("#balePrintModalCopyDiagnosticsButton")?.addEventListener("click", async () => {
   const text = String(document.querySelector("#balePrintModalDiagnosticsPayload")?.textContent || "");
   try { await navigator.clipboard.writeText(text); } catch (_) {}
+});
+document.querySelector("#balePrintModalSinglePrintButton")?.addEventListener("click", () => {
+  printCurrentBaleModalViaLocalAgent().catch((error) => {
+    localPrintAgentState.connected = false;
+    localPrintAgentState.agentStatus = "disconnected";
+    localPrintAgentState.printerStatus = "unknown";
+    localPrintAgentState.lastMessage = "print failed";
+    balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
+    renderBalePrintModal();
+  });
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
   printCurrentBaleModalPrimaryAction().catch((error) => {
