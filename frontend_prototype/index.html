@@ -23,7 +23,7 @@
         </p>
         <div class="test-home-grid">
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0. 运输 / 关单主档">1. Warehouse main flow</button>
-          <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="4.2 中方来源 Bale 录入">2. China source / inbound</button>
+          <button type="button" class="test-home-link" data-test-home-workspace="chinaProcurement" data-test-home-panel-prefix="4.2 中方来源 Bale 录入">2. China source / inbound</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1 创建分拣任务">3. Sorting tasks</button>
           <button type="button" class="test-home-link" data-test-home-workspace="warehouse" data-test-home-panel-prefix="0.1.2 压缩工单管理">4. Sorted stock / compression</button>
           <button type="button" class="test-home-link" data-test-home-workspace="store" data-test-home-panel-prefix="店长 PDA 工作台">5. Store manager PDA preview</button>
@@ -89,9 +89,13 @@
           </div>
           <div class="workspace-tabs">
             <button class="workspace-tab" data-workspace-target="testing" type="button">测试工具</button>
+            <button class="workspace-tab" data-workspace-target="chinaProcurement" type="button">中方采购管理</button>
             <button class="workspace-tab active" data-workspace-target="warehouse" type="button">仓库功能区</button>
-            <button class="workspace-tab" data-workspace-target="operations" type="button">运营中心</button>
+            <button class="workspace-tab" data-workspace-target="operations" type="button">品牌门店运营中心</button>
+            <button class="workspace-tab" data-workspace-target="contentCenter" type="button">商品内容中心</button>
             <button class="workspace-tab" data-workspace-target="store" type="button">门店功能区</button>
+            <button class="workspace-tab" data-workspace-target="finance" type="button">财务部门</button>
+            <button class="workspace-tab" data-workspace-target="auditRisk" type="button">审计/风控部门</button>
             <button class="workspace-tab" data-workspace-target="admin" type="button">系统管理</button>
           </div>
           <div class="workspace-session-strip">
@@ -104,7 +108,7 @@
             <button id="logoutButton" type="button" class="ghost-button mini-button" data-action="logout">退出登录</button>
           </div>
         </div>
-        <div id="workspaceHint" class="workspace-top-hint">当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理和中方管理七条线组织仓库页面。</div>
+        <div id="workspaceHint" class="workspace-top-hint">当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。</div>
       </section>
 
       <div class="workspace-shell">
@@ -967,6 +971,26 @@
           这里会显示支付异常处理后的中文结果。
         </div>
         <pre id="paymentAnomalyOutput" class="output hidden-output"></pre>
+      </section>
+
+      <section class="panel" data-workspace-panel="chinaProcurement">
+        <h2>中方管理</h2>
+        <div class="subtle small">中方采购管理入口：用于查看中方管理总览，并进入服装整柜录入与船单三段成本补齐页面。</div>
+      </section>
+
+      <section class="panel" data-workspace-panel="contentCenter">
+        <h2>商品内容中心</h2>
+        <div class="subtle small">当前为独立入口占位页。后续将在此接入商品资料、内容标准与素材管理流程。</div>
+      </section>
+
+      <section class="panel" data-workspace-panel="finance">
+        <h2>财务部门</h2>
+        <div class="subtle small">当前为独立入口占位页。后续将在此接入财务流程与对账审批能力。</div>
+      </section>
+
+      <section class="panel" data-workspace-panel="auditRisk">
+        <h2>审计/风控部门</h2>
+        <div class="subtle small">当前为独立入口占位页。后续将在此接入审计检查、风险预警与闭环处理流程。</div>
       </section>
 
       <section class="panel" data-workspace-panel="admin">
@@ -2258,7 +2282,7 @@
         <pre id="labelTemplateOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel" data-workspace-panel="warehouse">
+      <section class="panel" data-workspace-panel="chinaProcurement">
         <div class="panel-head">
           <h2>4.2 中方来源 Bale 录入</h2>
         </div>
@@ -2342,7 +2366,7 @@
         <pre id="chinaSourceBaleOutput" class="output hidden-output"></pre>
       </section>
 
-      <section class="panel china-source-cost-panel" data-workspace-panel="warehouse">
+      <section class="panel china-source-cost-panel" data-workspace-panel="chinaProcurement">
         <div class="panel-head">
           <h2>4.3 中方来源列表 / 补填成本</h2>
         </div>

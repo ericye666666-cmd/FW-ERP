@@ -519,9 +519,13 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "仓库主管", en: "Warehouse Manager" },
   { zh: "今日总览", en: "Today Overview" },
   { zh: "测试工具", en: "Test Tools" },
+  { zh: "中方采购管理", en: "China Procurement" },
   { zh: "仓库功能区", en: "Warehouse" },
-  { zh: "运营中心", en: "Operations Center" },
+  { zh: "品牌门店运营中心", en: "Brand Store Operations" },
+  { zh: "商品内容中心", en: "Product Content Center" },
   { zh: "门店功能区", en: "Store Operations" },
+  { zh: "财务部门", en: "Finance Department" },
+  { zh: "审计/风控部门", en: "Audit/Risk Control" },
   { zh: "收银功能区", en: "Cashier Area" },
   { zh: "商品入仓", en: "Inbound" },
   { zh: "服装入仓", en: "Garment Inbound" },
@@ -1971,20 +1975,40 @@ const WORKSPACE_META = {
     zh: "当前显示：测试工具。这里集中放演练样本、模拟销售和一键重置，不再挂在店长工作台里。",
     en: "Current View: Test Tools. Use this area for demo samples, simulated sales, and safe test resets."
   },
+  chinaProcurement: {
+    titleEn: "China Procurement",
+    zh: "当前显示：中方采购管理。这里包含中方管理、服装整柜录入、船单三段成本补齐。",
+    en: "Current View: China Procurement. This workspace includes China management, garment container entry, and three-stage shipment cost completion.",
+  },
   warehouse: {
     titleEn: "Warehouse",
-    zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理和中方管理七条线组织仓库页面。",
-    en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management."
+    zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。",
+    en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, and Warehouse General Management."
   },
   operations: {
-    titleEn: "Operations Center",
-    zh: "当前显示：运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
+    titleEn: "Brand Store Operations Center",
+    zh: "当前显示：品牌门店运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
     en: "Current View: Operations Center. Pages are grouped by Business Analytics, Operations, and Risk Management."
   },
   store: {
     titleEn: "Store Operations",
     zh: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。",
     en: "Current View: Store Operations. Pages are grouped by Store Manager, Store Clerk, Cashier Area, and Store Admin."
+  },
+  contentCenter: {
+    titleEn: "Content Center",
+    zh: "当前显示：商品内容中心。这里是独立入口占位页。",
+    en: "Current View: Content Center. This is an independent placeholder workspace.",
+  },
+  finance: {
+    titleEn: "Finance",
+    zh: "当前显示：财务部门。这里是独立入口占位页。",
+    en: "Current View: Finance. This is an independent placeholder workspace.",
+  },
+  auditRisk: {
+    titleEn: "Audit / Risk",
+    zh: "当前显示：审计/风控部门。这里是独立入口占位页。",
+    en: "Current View: Audit / Risk. This is an independent placeholder workspace.",
   },
   admin: {
     titleEn: "System Admin",
@@ -2949,7 +2973,11 @@ const LEGACY_WORKSPACE_MAP = {
 };
 const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
+  chinaProcurement: ["china"],
+  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
+  contentCenter: ["default"],
+  finance: ["default"],
+  auditRisk: ["default"],
   operations: ["insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"]
@@ -3002,8 +3030,8 @@ function getRoleAccessProfile(user = currentSession.user) {
   }
   const warehouseManagerRoles = /* @__PURE__ */ new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "warehouse"], {
-      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"]
+    return createRoleAccessProfile(["warehouse"], {
+      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"]
     });
   }
   const warehouseWorkerRoles = /* @__PURE__ */ new Set(["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"]);
@@ -12293,7 +12321,7 @@ function renderAuthResultSummary(kind, data) {
     if (workspace === "overview") return "今日总览";
     if (workspace === "testing") return "测试工具";
     if (workspace === "warehouse") return "仓库功能区";
-    if (workspace === "operations") return "运营中心";
+    if (workspace === "operations") return "品牌门店运营中心";
     if (workspace === "store") return "门店功能区";
     if (workspace === "admin") return "系统管理";
     return workspace;
@@ -25094,7 +25122,7 @@ function getDevModuleLabel(module = "") {
     return "门店";
   }
   if (value === "operations") {
-    return "运营中心";
+    return "品牌门店运营中心";
   }
   if (value === "ai") {
     return "AI 看板";
@@ -42373,7 +42401,7 @@ document.addEventListener("click", async (event) => {
     populateChinaSourceCostRecordSelect(sourcePoolToken);
     hydrateChinaSourceCostForm(record);
     renderChinaSourceCostSummary(sourcePoolToken);
-    const panelKey = getPanelKeyByTitle("warehouse", "4.3 中方来源列表 / 补填成本");
+    const panelKey = getPanelKeyByTitle("chinaProcurement", "4.3 中方来源列表 / 补填成本");
     if (panelKey) {
       setActivePanel(panelKey);
     }
@@ -43728,7 +43756,7 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     }
   }
   renderChinaSourceCostSummary(sourcePoolToken);
-  const panelKey = getPanelKeyByTitle("warehouse", "4.3 中方来源列表 / 补填成本");
+  const panelKey = getPanelKeyByTitle("chinaProcurement", "4.3 中方来源列表 / 补填成本");
   if (panelKey) {
     setActivePanel(panelKey);
   }
