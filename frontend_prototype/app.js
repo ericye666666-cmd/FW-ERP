@@ -23898,6 +23898,10 @@ async function printAllBaleModalPrimaryAction() {
     renderBalePrintModal();
     throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
   }
+  if (localPrintAgentState.printerStatus !== "available") {
+    const targetPrinterName = String(document.querySelector("[data-bale-modal-printer-select]")?.value || "Deli DL-720C").trim() || "Deli DL-720C";
+    throw new Error(`请先确认 ${targetPrinterName} 可用，再执行“打印本批标签”。`);
+  }
   const originalIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0));
   let printedCount = 0;
   for (let index = 0; index < jobs.length; index += 1) {
@@ -24148,7 +24152,7 @@ function renderBalePrintModal() {
                 : "打印标签"))));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
-    primaryPrintAllButton.disabled = !jobs.length;
+    primaryPrintAllButton.disabled = !jobs.length || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
     primaryPrintAllButton.textContent = "打印本批全部标签";
     primaryPrintAllButton.classList.toggle("hidden-screen", jobs.length <= 1);
   }
@@ -48315,7 +48319,7 @@ document.querySelector("#balePrintModalSinglePrintButton")?.addEventListener("cl
   });
 });
 document.querySelector("#balePrintModalPrimaryPrintButton")?.addEventListener("click", () => {
-  printCurrentBaleModalPrimaryAction().catch((error) => {
+  printAllBaleModalPrimaryAction().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
