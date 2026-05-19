@@ -1975,13 +1975,18 @@ const WORKSPACE_META = {
     zh: "当前显示：测试工具。这里集中放演练样本、模拟销售和一键重置，不再挂在店长工作台里。",
     en: "Current View: Test Tools. Use this area for demo samples, simulated sales, and safe test resets."
   },
+  chinaProcurement: {
+    titleEn: "China Procurement",
+    zh: "当前显示：中方采购管理。这里包含中方管理、服装整柜录入、船单三段成本补齐。",
+    en: "Current View: China Procurement. This workspace includes China management, garment container entry, and three-stage shipment cost completion.",
+  },
   warehouse: {
     titleEn: "Warehouse",
     zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。",
     en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management."
   },
   operations: {
-    titleEn: "Operations Center",
+    titleEn: "Brand Store Operations Center",
     zh: "当前显示：品牌门店运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
     en: "Current View: Operations Center. Pages are grouped by Business Analytics, Operations, and Risk Management."
   },
@@ -1989,6 +1994,21 @@ const WORKSPACE_META = {
     titleEn: "Store Operations",
     zh: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。",
     en: "Current View: Store Operations. Pages are grouped by Store Manager, Store Clerk, Cashier Area, and Store Admin."
+  },
+  contentCenter: {
+    titleEn: "Content Center",
+    zh: "当前显示：商品内容中心。这里是独立入口占位页。",
+    en: "Current View: Content Center. This is an independent placeholder workspace.",
+  },
+  finance: {
+    titleEn: "Finance",
+    zh: "当前显示：财务部门。这里是独立入口占位页。",
+    en: "Current View: Finance. This is an independent placeholder workspace.",
+  },
+  auditRisk: {
+    titleEn: "Audit / Risk",
+    zh: "当前显示：审计/风控部门。这里是独立入口占位页。",
+    en: "Current View: Audit / Risk. This is an independent placeholder workspace.",
   },
   admin: {
     titleEn: "System Admin",
@@ -2953,7 +2973,11 @@ const LEGACY_WORKSPACE_MAP = {
 };
 const WORKSPACE_ORDER = ["overview", "warehouse", "operations", "store", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
+  chinaProcurement: ["china"],
+  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
+  contentCenter: ["default"],
+  finance: ["default"],
+  auditRisk: ["default"],
   operations: ["insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"]
