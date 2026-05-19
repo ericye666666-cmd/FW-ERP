@@ -1809,6 +1809,8 @@ test("incremental pricing batches track allocated, generated, and remaining quan
   const customBatch = helpers.createStoreMobilePricingBatch(state, "line-100||CUSTOM");
   assert.equal(customBatch.quantity, 20);
   assert.equal(customBatch.price_kes, 275);
+  assert.equal(customBatch.baseline_grade, "S");
+  assert.equal(customBatch.baseline_default_sale_price_kes, 312);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 0);
 });
 

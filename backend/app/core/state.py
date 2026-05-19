@@ -15425,7 +15425,23 @@ class InMemoryState:
 
         pricing_type = str(payload.get("pricing_type") or "").strip().upper()
         if pricing_type not in {"P", "S", "CUSTOM"}:
-            pricing_type = "CUSTOM"
+            explicit_grade = str(payload.get("grade") or "").strip().upper()
+            pricing_type = explicit_grade if explicit_grade in {"P", "S"} else "CUSTOM"
+
+        if pricing_type == "CUSTOM":
+            baseline_grade = str(payload.get("baseline_grade") or "").strip().upper()
+            if baseline_grade not in {"P", "S"}:
+                raise HTTPException(status_code=400, detail="CUSTOM 定价必须绑定 baseline_grade=P 或 S。")
+            baseline = self._find_apparel_default_sale_price(
+                str(payload.get("category_main") or "").strip(),
+                str(payload.get("category_sub") or "").strip(),
+                baseline_grade,
+            )
+            baseline_price = round(float((baseline or {}).get("default_sale_price_kes") or 0), 2)
+            if baseline_price <= 0:
+                raise HTTPException(status_code=409, detail="请先配置对应品类 baseline 默认售价。")
+            if sale_price_kes < baseline_price:
+                raise HTTPException(status_code=409, detail="自定义售价不能低于当前 P/S 默认售价")
 
         timestamp = now_iso()
         category_main = str(payload.get("category_main") or "").strip()

@@ -1148,6 +1148,28 @@ class MainSortingFlowStateTest(unittest.TestCase):
             self.assertEqual(token["pricing_batch_id"], "BATCH-SDP-PANTS-P")
             self.assertEqual(token["source_line_key"], "SDB260503AAG:pants:cargo pant")
 
+
+    def test_store_item_generation_rejects_custom_price_below_default_baseline(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=2)
+        with self.assertRaises(HTTPException) as cm:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "PDA-CUS-001",
+                    "selected_price": 120,
+                    "category_main": "pants",
+                    "category_sub": "jeans pant",
+                    "grade": "P",
+                    "pricing_type": "CUSTOM",
+                    "baseline_grade": "S",
+                    "quantity": 1,
+                },
+            )
+        self.assertEqual(cm.exception.status_code, 409)
+        self.assertIn("自定义售价不能低于当前 P/S 默认售价", str(cm.exception.detail))
     def test_store_item_generation_inherits_sdo_package_token_and_cost_lineage(self):
         order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
             item_count=2,

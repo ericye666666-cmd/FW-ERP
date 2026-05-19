@@ -2390,7 +2390,7 @@ const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = apparelDefaultCostFlow.DEFAULT_APPAR
   category_sub: row.category_sub,
   grade: row.grade,
   default_sale_price_kes: roundToTwo(Number(row.default_sale_price_kes || row.default_cost_kes || 0)),
-  note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；参考售价 = 默认成本 × 2`,
+  note: row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认售价`,
 }));
 const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SORTING_RACKS || [
   { category_main: "tops", category_sub: "lady tops", grade: "P", default_cost_kes: 185, rack_code: "A-TS-P-01", note: "女装上衣 P 档默认分拣库位" },
@@ -3145,7 +3145,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     order: 139.9,
     icon: "价",
     navTitle: "服装默认售价规则",
-    navTitleEn: "Default Cost Management",
+    navTitleEn: "Apparel Default Sale Price Rules",
   },
   {
     match: "5. 耗材管理",
@@ -11741,7 +11741,7 @@ function renderApparelDefaultSalePriceSummary(record = null) {
         <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
         <article class="store-metric"><strong>P 档默认售价</strong><span>${escapeHtml(String(summary.gradeCounts?.P || 0))}</span></article>
         <article class="store-metric"><strong>S 档默认售价</strong><span>${escapeHtml(String(summary.gradeCounts?.S || 0))}</span></article>
-        <article class="store-metric"><strong>说明</strong><span>参考售价 = 默认成本 × 2</span></article>
+        <article class="store-metric"><strong>说明</strong><span>按 P/S 默认售价配置</span></article>
       </div>
       <div class="subtle small">后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
     `;
@@ -40339,6 +40339,10 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     return null;
   }
   const defaultPrice = grade === "CUSTOM" ? 0 : getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, grade);
+  const pBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
+  const sBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
+  const baselineGrade = sBaselinePrice > 0 && (pBaselinePrice <= 0 || sBaselinePrice <= pBaselinePrice) ? "S" : "P";
+  const baselinePrice = baselineGrade === "S" ? sBaselinePrice : pBaselinePrice;
   const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
     (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey,
   );
@@ -40352,6 +40356,14 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     return null;
   }
   const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
+  if (grade === "CUSTOM" && !(baselinePrice > 0)) {
+    state.pricingSourceLineMessage = "请先在服装默认售价规则配置当前品类的 P/S 默认售价。";
+    return null;
+  }
+  if (grade === "CUSTOM" && priceKes < baselinePrice) {
+    state.pricingSourceLineMessage = "自定义售价不能低于当前 P/S 默认售价";
+    return null;
+  }
   if (!(priceKes > 0)) {
     state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在服装默认售价规则配置 P/S 默认售价。";
     return null;
@@ -40364,6 +40376,8 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     category: `${line.category_main} / ${line.category_sub}`,
     grade,
     tier: grade === "CUSTOM" ? "自定义" : `${grade}档`,
+    baseline_grade: grade === "CUSTOM" ? baselineGrade : grade,
+    baseline_default_sale_price_kes: grade === "CUSTOM" ? baselinePrice : defaultPrice,
     price_kes: priceKes,
     sale_price_kes: priceKes,
     quantity,
