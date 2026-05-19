@@ -47,24 +47,14 @@ export const navigationGroups: NavigationGroup[] = [
         ],
       },
       {
-        label: "仓库功能区",
-        href: "/bale-inbound",
-        description: "仓库入仓、分拣与库位库存",
-      },
-      {
         label: "品牌门店运营中心",
-        href: "/sorting-tasks",
-        description: "品牌门店运营工作入口",
+        href: "/brand-operations-center",
+        description: "品牌门店运营工作入口（占位）",
       },
       {
         label: "商品内容中心",
         href: "/content-center",
         description: "TikTok / Jumia / WhatsApp 商品内容运营（占位）",
-      },
-      {
-        label: "门店功能区",
-        href: "/location-inventory",
-        description: "门店库存与执行页面入口",
       },
       {
         label: "财务部门",
@@ -81,6 +71,52 @@ export const navigationGroups: NavigationGroup[] = [
         href: "http://127.0.0.1:8000/app/",
         description: "系统配置与管理入口",
         external: true,
+      },
+    ],
+  },
+  {
+    title: "仓库功能区",
+    items: [
+      {
+        label: "仓库功能区",
+        description: "仓库入仓、分拣与库位库存执行入口",
+        children: [
+          {
+            label: "包裹入仓",
+            href: "/bale-inbound",
+            description: "跟踪海运与本地采购总单并确认入仓包裹",
+          },
+          {
+            label: "分拣任务",
+            href: "/sorting-tasks",
+            description: "创建并管理仓库分拣执行任务",
+          },
+          {
+            label: "分拣工位样稿",
+            href: "/sorting-station-preview",
+            description: "查看分拣工位页面样稿与流程示意",
+          },
+          {
+            label: "库位库存",
+            href: "/location-inventory",
+            description: "查看库位库存与异常区域",
+          },
+          {
+            label: "Bales销售",
+            href: "/bale-sales/pricing",
+            description: "进入 Bales 销售成本与待售包裹页面",
+          },
+          {
+            label: "待售包裹",
+            href: "/bale-sales/pricing",
+            description: "按成本池查看候选 bale 并编辑毛利",
+          },
+          {
+            label: "真实出库",
+            href: "/bale-sales/outbound",
+            description: "执行扫码核销并登记真实出库",
+          },
+        ],
       },
     ],
   },
@@ -137,6 +173,11 @@ export const pageMeta = {
     eyebrow: "中方采购管理",
     title: "船单三段成本补齐",
     description: "补录船单三段成本信息。",
+  },
+  "/brand-operations-center": {
+    eyebrow: "品牌门店运营中心",
+    title: "品牌门店运营中心",
+    description: "品牌门店运营中心占位页面，后续按独立运营流程补充。",
   },
   "/content-center": {
     eyebrow: "商品内容中心",
