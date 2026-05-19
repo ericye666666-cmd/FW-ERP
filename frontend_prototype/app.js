@@ -2684,13 +2684,18 @@ const WORKSPACE_META = {
     zh: "当前显示：测试工具。这里集中放演练样本、模拟销售和一键重置，不再挂在店长工作台里。",
     en: "Current View: Test Tools. Use this area for demo samples, simulated sales, and safe test resets.",
   },
+  chinaProcurement: {
+    titleEn: "China Procurement",
+    zh: "当前显示：中方采购管理。这里包含中方管理、服装整柜录入、船单三段成本补齐。",
+    en: "Current View: China Procurement. This workspace includes China management, garment container entry, and three-stage shipment cost completion.",
+  },
   warehouse: {
     titleEn: "Warehouse",
     zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。",
     en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management.",
   },
   operations: {
-    titleEn: "Operations Center",
+    titleEn: "Brand Store Operations Center",
     zh: "当前显示：品牌门店运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
     en: "Current View: Operations Center. Pages are grouped by Business Analytics, Operations, and Risk Management.",
   },
@@ -2698,6 +2703,21 @@ const WORKSPACE_META = {
     titleEn: "Store Operations",
     zh: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。",
     en: "Current View: Store Operations. Pages are grouped by Store Manager, Store Clerk, Cashier Area, and Store Admin.",
+  },
+  contentCenter: {
+    titleEn: "Content Center",
+    zh: "当前显示：商品内容中心。这里是独立入口占位页。",
+    en: "Current View: Content Center. This is an independent placeholder workspace.",
+  },
+  finance: {
+    titleEn: "Finance",
+    zh: "当前显示：财务部门。这里是独立入口占位页。",
+    en: "Current View: Finance. This is an independent placeholder workspace.",
+  },
+  auditRisk: {
+    titleEn: "Audit / Risk",
+    zh: "当前显示：审计/风控部门。这里是独立入口占位页。",
+    en: "Current View: Audit / Risk. This is an independent placeholder workspace.",
   },
   admin: {
     titleEn: "System Admin",
@@ -3587,16 +3607,24 @@ const ADMIN_PANEL_NAV_META = [
 ];
 
 const WORKSPACE_NAV_SECTIONS_MAP = {
-  warehouse: WAREHOUSE_NAV_SECTIONS,
+  chinaProcurement: [{ id: "china", title: "中方管理", titleEn: "China Management", iconSvg: WAREHOUSE_NAV_SECTIONS.find((s) => s.id === "china")?.iconSvg || "" }],
+  warehouse: WAREHOUSE_NAV_SECTIONS.filter((section) => section.id !== "china"),
   operations: OPERATIONS_NAV_SECTIONS,
+  contentCenter: [{ id: "default", title: "商品内容中心", titleEn: "Content Center", iconSvg: "" }],
   store: STORE_NAV_SECTIONS,
+  finance: [{ id: "default", title: "财务部门", titleEn: "Finance", iconSvg: "" }],
+  auditRisk: [{ id: "default", title: "审计/风控部门", titleEn: "Audit / Risk", iconSvg: "" }],
   admin: ADMIN_NAV_SECTIONS,
 };
 
 const WORKSPACE_PANEL_NAV_META_MAP = {
-  warehouse: WAREHOUSE_PANEL_NAV_META,
+  chinaProcurement: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section === "china"),
+  warehouse: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section !== "china"),
   operations: OPERATIONS_PANEL_NAV_META,
+  contentCenter: [{ match: "商品内容中心", section: "default", order: 1, icon: "内", navTitle: "商品内容中心", navTitleEn: "Content Center" }],
   store: STORE_PANEL_NAV_META,
+  finance: [{ match: "财务部门", section: "default", order: 1, icon: "财", navTitle: "财务部门", navTitleEn: "Finance" }],
+  auditRisk: [{ match: "审计/风控部门", section: "default", order: 1, icon: "审", navTitle: "审计/风控部门", navTitleEn: "Audit / Risk" }],
   admin: ADMIN_PANEL_NAV_META,
 };
 const storeCommandCenterState = {
@@ -3770,9 +3798,13 @@ const LEGACY_WORKSPACE_MAP = {
   sync: "store",
 };
 
-const WORKSPACE_ORDER = ["warehouse", "operations", "store", "admin"];
+const WORKSPACE_ORDER = ["chinaProcurement", "warehouse", "operations", "contentCenter", "store", "finance", "auditRisk", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
+  chinaProcurement: ["china"],
+  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
+  contentCenter: ["default"],
+  finance: ["default"],
+  auditRisk: ["default"],
   operations: ["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings", "insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"],
@@ -3782,7 +3814,11 @@ function createRoleAccessProfile(workspaces = WORKSPACE_ORDER, sections = FULL_S
   return {
     workspaces: [...workspaces],
     sections: {
+      chinaProcurement: [...(sections.chinaProcurement || [])],
       warehouse: [...(sections.warehouse || [])],
+      contentCenter: [...(sections.contentCenter || [])],
+      finance: [...(sections.finance || [])],
+      auditRisk: [...(sections.auditRisk || [])],
       operations: [...(sections.operations || [])],
       store: [...(sections.store || [])],
       admin: [...(sections.admin || [])],
@@ -3798,21 +3834,24 @@ function getRoleAccessProfile(user = currentSession.user) {
 
   const superRoles = new Set(["admin", "super_admin", "owner", "boss", "headquarters", "head_office"]);
   if (superRoles.has(roleCode)) {
-    return createRoleAccessProfile(["testing", "warehouse", "operations", "store", "admin"]);
+    return createRoleAccessProfile(["testing", "chinaProcurement", "warehouse", "operations", "contentCenter", "store", "finance", "auditRisk", "admin"]);
   }
 
   const chinaEntryRoles = new Set(["china_entry", "china_operator", "procurement", "buyer"]);
   if (chinaEntryRoles.has(roleCode)) {
-    return createRoleAccessProfile(["warehouse"], {
-      warehouse: ["inbound", "departmentInbound", "general", "china"],
+    return createRoleAccessProfile(["chinaProcurement", "warehouse"], {
+      chinaProcurement: ["china"],
+      warehouse: ["inbound", "departmentInbound", "general"],
     });
   }
 
   const chinaFinanceRoles = new Set(["china_finance", "finance", "accountant"]);
   if (chinaFinanceRoles.has(roleCode)) {
-    return createRoleAccessProfile(["warehouse", "operations", "admin"], {
-      warehouse: ["general", "china"],
-      operations: ["governance", "insight"],
+    return createRoleAccessProfile(["chinaProcurement", "warehouse", "finance", "auditRisk", "admin"], {
+      chinaProcurement: ["china"],
+      warehouse: ["general"],
+      finance: ["default"],
+      auditRisk: ["default"],
       admin: ["governance"],
     });
   }
@@ -3840,7 +3879,11 @@ function getRoleAccessProfile(user = currentSession.user) {
   const warehouseManagerRoles = new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
     return createRoleAccessProfile(["warehouse"], {
-      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
+      chinaProcurement: ["china"],
+  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
+  contentCenter: ["default"],
+  finance: ["default"],
+  auditRisk: ["default"],
     });
   }
 

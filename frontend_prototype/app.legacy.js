@@ -24,7 +24,7 @@
   }
 })();
 
-var _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua, _va, _wa, _xa, _ya, _za, _Aa, _Ba;
+var _a, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A, _B, _C, _D, _E, _F, _G, _H, _I, _J, _K, _L, _M, _N, _O, _P, _Q, _R, _S, _T, _U, _V, _W, _X, _Y, _Z, __, _$, _aa, _ba, _ca, _da, _ea, _fa, _ga, _ha, _ia, _ja, _ka, _la, _ma, _na, _oa, _pa, _qa, _ra, _sa, _ta, _ua, _va, _wa, _xa, _ya, _za, _Aa, _Ba, _Ca;
 const STORAGE_KEYS = {
   apiBase: "retail_ops_api_base",
   loginUsername: "retail_ops_login_username",
@@ -271,9 +271,9 @@ const POS_CASHIER_TERMINOLOGY_DICTIONARY = Object.freeze({
   })
 });
 function cashierTerminalTerm(key, language = currentLanguage) {
-  var _a;
+  var _a2;
   const locale = language === "en" ? "en" : "zh";
-  return ((_a = POS_CASHIER_TERMINOLOGY_DICTIONARY[locale]) == null ? void 0 : _a[key]) || key;
+  return ((_a2 = POS_CASHIER_TERMINOLOGY_DICTIONARY[locale]) == null ? void 0 : _a2[key]) || key;
 }
 const CLERK_PDA_TERMINOLOGY_KEYS = Object.freeze({
   myWorkToday: "pda.work.today",
@@ -326,9 +326,9 @@ const CLERK_PDA_TERMINOLOGY_DICTIONARY = Object.freeze({
   })
 });
 function clerkPdaTerm(key, language = currentLanguage) {
-  var _a;
+  var _a2;
   const locale = language === "en" ? "en" : "zh";
-  return ((_a = CLERK_PDA_TERMINOLOGY_DICTIONARY[locale]) == null ? void 0 : _a[key]) || key;
+  return ((_a2 = CLERK_PDA_TERMINOLOGY_DICTIONARY[locale]) == null ? void 0 : _a2[key]) || key;
 }
 function getClerkPdaCopy(language = currentLanguage) {
   const keys = CLERK_PDA_TERMINOLOGY_KEYS;
@@ -412,9 +412,9 @@ const STORE_INVENTORY_TERMINOLOGY_DICTIONARY = Object.freeze({
   })
 });
 function storeInventoryTerm(key, language = currentLanguage) {
-  var _a;
+  var _a2;
   const locale = language === "en" ? "en" : "zh";
-  return ((_a = STORE_INVENTORY_TERMINOLOGY_DICTIONARY[locale]) == null ? void 0 : _a[key]) || key;
+  return ((_a2 = STORE_INVENTORY_TERMINOLOGY_DICTIONARY[locale]) == null ? void 0 : _a2[key]) || key;
 }
 function getStoreInventoryCopy(language = currentLanguage) {
   const keys = STORE_INVENTORY_TERMINOLOGY_KEYS;
@@ -479,10 +479,10 @@ function getFrontendErrorLocale(language = currentLanguage) {
   return language === "en" ? "en" : "zh";
 }
 function translateErrorCode(errorCode = "", language = currentLanguage) {
-  var _a;
+  var _a2;
   const locale = getFrontendErrorLocale(language);
   const normalizedCode = String(errorCode || "").trim().toUpperCase();
-  return ((_a = HIGH_RISK_ERROR_CODE_MESSAGES[locale]) == null ? void 0 : _a[normalizedCode]) || "";
+  return ((_a2 = HIGH_RISK_ERROR_CODE_MESSAGES[locale]) == null ? void 0 : _a2[normalizedCode]) || "";
 }
 const GLOBAL_I18N_GLOSSARY = [
   { zh: "门店收货主控台", en: "Store Receiving Command Center" },
@@ -1369,7 +1369,7 @@ const EMPLOYEE_LAUNCH_LATIN_TOKEN_FALLBACK = [
   ["Retail Ops Workspace", "店铺进销存工作台"],
   ["Test Tools", "测试工具"],
   ["Warehouse", "仓库功能区"],
-  ["Operations Center", "运营中心"],
+  ["Brand Store Operations", "品牌门店运营中心"],
   ["Store Operations", "门店功能区"],
   ["System Admin", "系统管理"],
   ["Store Manager", "店长"],
@@ -2582,16 +2582,16 @@ const PARCEL_CATEGORY_TREE = {
   others: ["others"]
 };
 function getBaseCategoryMainForSubCategory(subCategory = "") {
-  var _a;
+  var _a2;
   const normalizedSub = String(subCategory || "").trim().toLowerCase();
   if (!normalizedSub) {
     return "";
   }
-  return ((_a = Object.entries(PARCEL_CATEGORY_TREE).find(
+  return ((_a2 = Object.entries(PARCEL_CATEGORY_TREE).find(
     ([, subCategories]) => (Array.isArray(subCategories) ? subCategories : []).some(
       (value) => String(value || "").trim().toLowerCase() === normalizedSub
     )
-  )) == null ? void 0 : _a[0]) || "";
+  )) == null ? void 0 : _a2[0]) || "";
 }
 function canAttachSubCategoryToMain(mainCategory = "", subCategory = "") {
   const mainValue = String(mainCategory || "").trim();
@@ -2622,13 +2622,18 @@ const WORKSPACE_META = {
     zh: "当前显示：测试工具。这里集中放演练样本、模拟销售和一键重置，不再挂在店长工作台里。",
     en: "Current View: Test Tools. Use this area for demo samples, simulated sales, and safe test resets."
   },
+  chinaProcurement: {
+    titleEn: "China Procurement",
+    zh: "当前显示：中方采购管理。这里包含中方管理、服装整柜录入、船单三段成本补齐。",
+    en: "Current View: China Procurement. This workspace includes China management, garment container entry, and three-stage shipment cost completion."
+  },
   warehouse: {
     titleEn: "Warehouse",
     zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。",
     en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management."
   },
   operations: {
-    titleEn: "Operations Center",
+    titleEn: "Brand Store Operations Center",
     zh: "当前显示：品牌门店运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
     en: "Current View: Operations Center. Pages are grouped by Business Analytics, Operations, and Risk Management."
   },
@@ -2636,6 +2641,21 @@ const WORKSPACE_META = {
     titleEn: "Store Operations",
     zh: "当前显示：门店功能区。这里按店长端、店员端、收银功能区和门店综合管理四条线组织门店页面。",
     en: "Current View: Store Operations. Pages are grouped by Store Manager, Store Clerk, Cashier Area, and Store Admin."
+  },
+  contentCenter: {
+    titleEn: "Content Center",
+    zh: "当前显示：商品内容中心。这里是独立入口占位页。",
+    en: "Current View: Content Center. This is an independent placeholder workspace."
+  },
+  finance: {
+    titleEn: "Finance",
+    zh: "当前显示：财务部门。这里是独立入口占位页。",
+    en: "Current View: Finance. This is an independent placeholder workspace."
+  },
+  auditRisk: {
+    titleEn: "Audit / Risk",
+    zh: "当前显示：审计/风控部门。这里是独立入口占位页。",
+    en: "Current View: Audit / Risk. This is an independent placeholder workspace."
   },
   admin: {
     titleEn: "System Admin",
@@ -3494,15 +3514,23 @@ const ADMIN_PANEL_NAV_META = [
   }
 ];
 const WORKSPACE_NAV_SECTIONS_MAP = {
-  warehouse: WAREHOUSE_NAV_SECTIONS,
+  chinaProcurement: [{ id: "china", title: "中方管理", titleEn: "China Management", iconSvg: ((_a = WAREHOUSE_NAV_SECTIONS.find((s) => s.id === "china")) == null ? void 0 : _a.iconSvg) || "" }],
+  warehouse: WAREHOUSE_NAV_SECTIONS.filter((section) => section.id !== "china"),
   operations: OPERATIONS_NAV_SECTIONS,
+  contentCenter: [{ id: "default", title: "商品内容中心", titleEn: "Content Center", iconSvg: "" }],
   store: STORE_NAV_SECTIONS,
+  finance: [{ id: "default", title: "财务部门", titleEn: "Finance", iconSvg: "" }],
+  auditRisk: [{ id: "default", title: "审计/风控部门", titleEn: "Audit / Risk", iconSvg: "" }],
   admin: ADMIN_NAV_SECTIONS
 };
 const WORKSPACE_PANEL_NAV_META_MAP = {
-  warehouse: WAREHOUSE_PANEL_NAV_META,
+  chinaProcurement: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section === "china"),
+  warehouse: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section !== "china"),
   operations: OPERATIONS_PANEL_NAV_META,
+  contentCenter: [{ match: "商品内容中心", section: "default", order: 1, icon: "内", navTitle: "商品内容中心", navTitleEn: "Content Center" }],
   store: STORE_PANEL_NAV_META,
+  finance: [{ match: "财务部门", section: "default", order: 1, icon: "财", navTitle: "财务部门", navTitleEn: "Finance" }],
+  auditRisk: [{ match: "审计/风控部门", section: "default", order: 1, icon: "审", navTitle: "审计/风控部门", navTitleEn: "Audit / Risk" }],
   admin: ADMIN_PANEL_NAV_META
 };
 const storeCommandCenterState = {
@@ -3671,9 +3699,13 @@ const LEGACY_WORKSPACE_MAP = {
   cashier: "store",
   sync: "store"
 };
-const WORKSPACE_ORDER = ["warehouse", "operations", "store", "admin"];
+const WORKSPACE_ORDER = ["chinaProcurement", "warehouse", "operations", "contentCenter", "store", "finance", "auditRisk", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"],
+  chinaProcurement: ["china"],
+  warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
+  contentCenter: ["default"],
+  finance: ["default"],
+  auditRisk: ["default"],
   operations: ["areaHome", "areaStores", "areaStaff", "areaOverview", "areaSettings", "insight", "action", "governance"],
   store: ["manager", "clerk", "cashier", "general"],
   admin: ["master", "governance", "expansion"]
@@ -3682,7 +3714,11 @@ function createRoleAccessProfile(workspaces = WORKSPACE_ORDER, sections = FULL_S
   return {
     workspaces: [...workspaces],
     sections: {
+      chinaProcurement: [...sections.chinaProcurement || []],
       warehouse: [...sections.warehouse || []],
+      contentCenter: [...sections.contentCenter || []],
+      finance: [...sections.finance || []],
+      auditRisk: [...sections.auditRisk || []],
       operations: [...sections.operations || []],
       store: [...sections.store || []],
       admin: [...sections.admin || []]
@@ -3696,19 +3732,22 @@ function getRoleAccessProfile(user = currentSession.user) {
   }
   const superRoles = /* @__PURE__ */ new Set(["admin", "super_admin", "owner", "boss", "headquarters", "head_office"]);
   if (superRoles.has(roleCode)) {
-    return createRoleAccessProfile(["testing", "warehouse", "operations", "store", "admin"]);
+    return createRoleAccessProfile(["testing", "chinaProcurement", "warehouse", "operations", "contentCenter", "store", "finance", "auditRisk", "admin"]);
   }
   const chinaEntryRoles = /* @__PURE__ */ new Set(["china_entry", "china_operator", "procurement", "buyer"]);
   if (chinaEntryRoles.has(roleCode)) {
-    return createRoleAccessProfile(["warehouse"], {
-      warehouse: ["inbound", "departmentInbound", "general", "china"]
+    return createRoleAccessProfile(["chinaProcurement", "warehouse"], {
+      chinaProcurement: ["china"],
+      warehouse: ["inbound", "departmentInbound", "general"]
     });
   }
   const chinaFinanceRoles = /* @__PURE__ */ new Set(["china_finance", "finance", "accountant"]);
   if (chinaFinanceRoles.has(roleCode)) {
-    return createRoleAccessProfile(["warehouse", "operations", "admin"], {
-      warehouse: ["general", "china"],
-      operations: ["governance", "insight"],
+    return createRoleAccessProfile(["chinaProcurement", "warehouse", "finance", "auditRisk", "admin"], {
+      chinaProcurement: ["china"],
+      warehouse: ["general"],
+      finance: ["default"],
+      auditRisk: ["default"],
       admin: ["governance"]
     });
   }
@@ -3732,7 +3771,11 @@ function getRoleAccessProfile(user = currentSession.user) {
   const warehouseManagerRoles = /* @__PURE__ */ new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
     return createRoleAccessProfile(["warehouse"], {
-      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"]
+      chinaProcurement: ["china"],
+      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
+      contentCenter: ["default"],
+      finance: ["default"],
+      auditRisk: ["default"]
     });
   }
   const warehouseWorkerRoles = /* @__PURE__ */ new Set(["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"]);
@@ -3771,9 +3814,9 @@ function isWorkspaceAccessible(workspace, user = currentSession.user) {
   return getAccessibleWorkspaces(user).includes(workspace);
 }
 function getAccessibleSectionsForWorkspace(workspace, user = currentSession.user) {
-  var _a;
+  var _a2;
   const profile = getRoleAccessProfile(user);
-  return [...((_a = profile.sections) == null ? void 0 : _a[workspace]) || []];
+  return [...((_a2 = profile.sections) == null ? void 0 : _a2[workspace]) || []];
 }
 function getLocationHostname(locationLike = window.location) {
   return String((locationLike == null ? void 0 : locationLike.hostname) || "").trim().toLowerCase();
@@ -4150,11 +4193,11 @@ function ensurePdaRuntimeContent(target) {
   return true;
 }
 function renderActivePdaRuntimeSurface(panel = null) {
-  var _a;
+  var _a2;
   if (!isPdaRuntimeMode(currentSession.user)) {
     return;
   }
-  const title = String(((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.panelTitle) || "");
+  const title = String(((_a2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a2.panelTitle) || "");
   const roleCode = getNormalizedRoleCode(currentSession.user);
   if (title.startsWith("PDA 现场分堆标价 UI Preview") || roleCode === "store_clerk") {
     renderStoreMobilePricingPreview();
@@ -4220,11 +4263,11 @@ function applyUserDefaultLanding(user = currentSession.user, options = {}) {
   return true;
 }
 function getCurrentStoreWorkerFallback() {
-  var _a, _b;
+  var _a2, _b;
   if (storeExecutionFlow && typeof storeExecutionFlow.getStoreWorkerDefault === "function") {
     return storeExecutionFlow.getStoreWorkerDefault(
       getNormalizedRoleCode(),
-      String(((_a = currentSession.user) == null ? void 0 : _a.username) || "").trim()
+      String(((_a2 = currentSession.user) == null ? void 0 : _a2.username) || "").trim()
     );
   }
   const roleCode = getNormalizedRoleCode();
@@ -4235,9 +4278,9 @@ function getCurrentStoreWorkerFallback() {
   return "";
 }
 function getCurrentWarehouseCodeFallback() {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   return String(
-    ((_a = currentSession.user) == null ? void 0 : _a.warehouse_code) || ((_b = document.querySelector("#sortingTaskForm [name='warehouse_code']")) == null ? void 0 : _b.value) || ((_c = document.querySelector("#sortingRackUpdateForm [name='warehouse_code']")) == null ? void 0 : _c.value) || ((_d2 = document.querySelector("#apparelSortingRackForm [name='warehouse_code']")) == null ? void 0 : _d2.value) || "WH1"
+    ((_a2 = currentSession.user) == null ? void 0 : _a2.warehouse_code) || ((_b = document.querySelector("#sortingTaskForm [name='warehouse_code']")) == null ? void 0 : _b.value) || ((_c = document.querySelector("#sortingRackUpdateForm [name='warehouse_code']")) == null ? void 0 : _c.value) || ((_d = document.querySelector("#apparelSortingRackForm [name='warehouse_code']")) == null ? void 0 : _d.value) || "WH1"
   ).trim().toUpperCase();
 }
 function getAssignableUserRows() {
@@ -4342,8 +4385,8 @@ function getDefaultStoreClerkValue(storeCode = getCurrentStoreCodeFallback()) {
   return getAssignableUserValue(clerks[0] || {});
 }
 function getDefaultCashierNameForStore(storeCode = getCurrentStoreCodeFallback()) {
-  var _a;
-  if (isCashierTerminalRole(currentSession.user) && ((_a = currentSession.user) == null ? void 0 : _a.username)) {
+  var _a2;
+  if (isCashierTerminalRole(currentSession.user) && ((_a2 = currentSession.user) == null ? void 0 : _a2.username)) {
     return String(currentSession.user.username).trim();
   }
   return getAssignableUserValue(getActiveCashiers(storeCode)[0] || {});
@@ -4542,12 +4585,12 @@ function renderPdaRuntimeRefreshIndicator() {
   return `<span class="pda-runtime-refresh-indicator subtle small">${escapeHtml(refreshText + warningText)}</span>`;
 }
 function isPdaRuntimeInputFocused() {
-  var _a;
+  var _a2;
   const active = document.activeElement;
-  return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement || Boolean((_a = active == null ? void 0 : active.closest) == null ? void 0 : _a.call(active, "[data-scan-input], [data-store-manager-pda-sdo-search-form]"));
+  return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement || Boolean((_a2 = active == null ? void 0 : active.closest) == null ? void 0 : _a2.call(active, "[data-scan-input], [data-store-manager-pda-sdo-search-form]"));
 }
 function getPdaRuntimeScrollPageKey() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const roleCode = getNormalizedRoleCode(currentSession.user);
   if (roleCode === "store_manager") {
     const state = ensureStoreManagerPdaTaskState();
@@ -4555,7 +4598,7 @@ function getPdaRuntimeScrollPageKey() {
       roleCode,
       state.activeTab || "receiving",
       state.activePage || "tasks",
-      ((_a = state.sdoTask) == null ? void 0 : _a.display_code) || "",
+      ((_a2 = state.sdoTask) == null ? void 0 : _a2.display_code) || "",
       state.sdoSearchQuery || ""
     ].join("|");
   }
@@ -4654,8 +4697,8 @@ function shouldPollClerkTasks() {
   return activePage !== "my";
 }
 async function refreshStoreManagerPdaReceivingForPolling(state = ensureStoreManagerPdaTaskState(), options = {}) {
-  var _a, _b;
-  const selectedSdoCode = String(options.selectedSdoCode || ((_a = state.sdoTask) == null ? void 0 : _a.display_code) || "").trim().toUpperCase();
+  var _a2, _b;
+  const selectedSdoCode = String(options.selectedSdoCode || ((_a2 = state.sdoTask) == null ? void 0 : _a2.display_code) || "").trim().toUpperCase();
   const previousTab = state.activeTab || "receiving";
   const previousPage = state.activePage || "tasks";
   const previousSearchQuery = state.sdoSearchQuery || "";
@@ -4672,10 +4715,10 @@ async function refreshStoreManagerPdaReceivingForPolling(state = ensureStoreMana
   return state;
 }
 async function loadClerkPdaAssignedTasksForPolling(options = {}) {
-  var _a, _b;
+  var _a2, _b;
   const state = storeMobilePricingPreviewState;
   const sdp = state.selectedSdp || {};
-  const storeCode = String(((_a = currentSession.user) == null ? void 0 : _a.store_code) || sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const storeCode = String(((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const assignedClerk = String(((_b = currentSession.user) == null ? void 0 : _b.username) || sdp.assigned_clerk || getCurrentStoreWorkerFallback()).trim();
   if (!assignedClerk) {
     state.assignedBackendTasks = [];
@@ -4832,7 +4875,7 @@ function getClerkBluetoothPrinterOnlineStatusValue(value = "") {
   return "unknown";
 }
 function normalizeClerkBluetoothPrinterStatus(raw = {}) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const status = getClerkBluetoothPrinterStatusObject(raw);
   const printers = Array.isArray(status.paired_printers) ? status.paired_printers : [];
   const discoveredPrinters = Array.isArray(status.discovered_printers) ? status.discovered_printers : [];
@@ -4843,9 +4886,9 @@ function normalizeClerkBluetoothPrinterStatus(raw = {}) {
     bridge_available: Boolean(status.bridge_available),
     bluetooth_enabled: Boolean(status.bluetooth_enabled),
     discovery_status: String(status.discovery_status || "idle").trim() || "idle",
-    discovered_printer_count: Number((_b = (_a = status.discovered_printer_count) != null ? _a : discoveredPrinters.length) != null ? _b : 0),
+    discovered_printer_count: Number((_b = (_a2 = status.discovered_printer_count) != null ? _a2 : discoveredPrinters.length) != null ? _b : 0),
     discovered_printers: normalizeClerkBluetoothPrinterRows(discoveredPrinters),
-    paired_printer_count: Number((_d2 = (_c = status.paired_printer_count) != null ? _c : printers.length) != null ? _d2 : 0),
+    paired_printer_count: Number((_d = (_c = status.paired_printer_count) != null ? _c : printers.length) != null ? _d : 0),
     paired_printers: normalizeClerkBluetoothPrinterRows(printers),
     selected_printer_name: selectedPrinterName,
     selected_printer_address: String(status.selected_printer_address || "").trim(),
@@ -5547,7 +5590,7 @@ function getClerkK300RetailClothingStoreItemTemplateMapping({
   return null;
 }
 function buildClerkK300RetailClothingStoreItemPreviewPayload(label = {}, options = {}) {
-  var _a;
+  var _a2;
   const templateMapping = getClerkK300RetailClothingStoreItemTemplateMapping({
     printer_profile: options.printer_profile || "UROVO_K300",
     printer_name: options.printer_name || "K300",
@@ -5559,7 +5602,7 @@ function buildClerkK300RetailClothingStoreItemPreviewPayload(label = {}, options
   }
   const machineCode = String(label.machine_code || "").replace(/[^0-9]/g, "").trim();
   const barcodeValue2 = String(label.barcode_value || "").replace(/[^0-9]/g, "").trim();
-  const priceKes = Number((_a = label.price_kes) != null ? _a : label.sale_price_kes);
+  const priceKes = Number((_a2 = label.price_kes) != null ? _a2 : label.sale_price_kes);
   if (!/^5[0-9]{7,31}$/.test(machineCode)) {
     throw new Error("K300 正式标签只支持以 5 开头的 STORE_ITEM machine_code。");
   }
@@ -5610,7 +5653,7 @@ function buildClerkK300RetailClothingStoreItemBatchPayload(labels = [], options 
   };
 }
 function buildClerkK300StoreItemPreviewCpclCommand(label = {}) {
-  var _a, _b;
+  var _a2, _b;
   const machineCode = String(label.barcode_value || label.machine_code || "").replace(/[^0-9]/g, "").trim();
   if (!/^5[0-9]{7,31}$/.test(machineCode)) {
     throw new Error("K300 CPCL STORE_ITEM machine_code 必须是以 5 开头的数字。");
@@ -5619,7 +5662,7 @@ function buildClerkK300StoreItemPreviewCpclCommand(label = {}) {
   if (expectedMachineCode && expectedMachineCode !== machineCode) {
     throw new Error("K300 CPCL STORE_ITEM barcode_value 必须等于 machine_code。");
   }
-  const rawPriceKes = Number((_b = (_a = label.price_kes) != null ? _a : label.sale_price_kes) != null ? _b : 0);
+  const rawPriceKes = Number((_b = (_a2 = label.price_kes) != null ? _a2 : label.sale_price_kes) != null ? _b : 0);
   const priceKes = Math.max(0, Number.isFinite(rawPriceKes) ? rawPriceKes : 0);
   const categoryShort = sanitizeClerkK300CpclText(label.category_short || "STORE ITEM", 24);
   const grade = sanitizeClerkK300CpclText(label.grade || label.pricing_type || "", 8);
@@ -6382,7 +6425,7 @@ function getStoreManagerPdaPackageStatus(pkg = {}) {
   return "待收货";
 }
 function normalizeStoreManagerPdaReceivingEligibilityStatus(row = {}) {
-  var _a;
+  var _a2;
   const candidates = [
     row == null ? void 0 : row.store_receipt_status,
     row == null ? void 0 : row.receiving_status,
@@ -6392,7 +6435,7 @@ function normalizeStoreManagerPdaReceivingEligibilityStatus(row = {}) {
     row == null ? void 0 : row.delivery_status,
     row == null ? void 0 : row.lifecycle_status,
     row == null ? void 0 : row.status,
-    (_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.status
+    (_a2 = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a2.status
   ];
   return candidates.map((value) => String(value || "").trim().toLowerCase()).find(Boolean) || "";
 }
@@ -6461,7 +6504,7 @@ function normalizeStoreManagerPdaPackage(row = {}) {
   return packageRow;
 }
 function normalizeStoreManagerPdaSdoTask(row = {}) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   if (!row || typeof row !== "object") {
     return null;
   }
@@ -6471,7 +6514,7 @@ function normalizeStoreManagerPdaSdoTask(row = {}) {
     return null;
   }
   const machineCode = String(row.machine_code || row.sdo_machine_code || row.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim();
-  const storeCode = String(row.store_code || row.to_store_code || ((_a = packages[0]) == null ? void 0 : _a.store_code) || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const storeCode = String(row.store_code || row.to_store_code || ((_a2 = packages[0]) == null ? void 0 : _a2.store_code) || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const sourceCodes = [
     row.source_code,
     row.source_codes,
@@ -6500,22 +6543,22 @@ function getStoreManagerPdaSdoTasksForStore(storeCode = getCurrentStoreCodeFallb
   const normalizedStore = String(storeCode || "").trim().toUpperCase();
   const packageRows = getStoreReceivingPackageRows(storeCode);
   return groupStoreReceivingPackagesBySdo(packageRows).filter((group) => isStoreManagerPdaSdoReceivingEligible(group)).map((group) => {
-    var _a;
+    var _a2;
     return normalizeStoreManagerPdaSdoTask({
       display_code: group.sdo_display_code,
       machine_code: group.sdo_machine_code,
       store_code: group.store_code,
       dispatch_status: normalizeStoreManagerPdaReceivingEligibilityStatus(group),
       source_code: [...new Set((group.packages || []).map((pkg) => pkg.source_code).filter(Boolean))].join(" / "),
-      package_count: ((_a = group.packages) == null ? void 0 : _a.length) || 0,
+      package_count: ((_a2 = group.packages) == null ? void 0 : _a2.length) || 0,
       total_item_count: group.item_count || 0,
       packages: group.packages || []
     });
   }).filter((task) => task && (!normalizedStore || String(task.store_code || "").trim().toUpperCase() === normalizedStore));
 }
 function selectStoreManagerPdaTask(state = ensureStoreManagerPdaTaskState(), sdoCode = "") {
-  var _a;
-  const normalizedCode = String(sdoCode || ((_a = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a.display_code) || "").trim().toUpperCase();
+  var _a2;
+  const normalizedCode = String(sdoCode || ((_a2 = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a2.display_code) || "").trim().toUpperCase();
   const digits = normalizedCode.replace(/[^0-9]/g, "");
   const tasks = Array.isArray(state == null ? void 0 : state.sdoTasks) ? state.sdoTasks : [];
   const task = tasks.find((row) => {
@@ -6536,7 +6579,7 @@ function syncStoreManagerPdaBackendSnapshot(state = ensureStoreManagerPdaTaskSta
   return state;
 }
 async function loadStoreManagerPdaBackendState({ force = false, keepActivePage = true, background = false } = {}) {
-  var _a;
+  var _a2;
   const state = ensureStoreManagerPdaTaskState();
   if (state.loading) {
     return state;
@@ -6553,7 +6596,7 @@ async function loadStoreManagerPdaBackendState({ force = false, keepActivePage =
     const storeCode = getCurrentStoreCodeFallback();
     state.sdoTasks = getStoreManagerPdaSdoTasksForStore(getCurrentStoreCodeFallback());
     state.availableClerks = buildAssignableUserOptionRows(getAssignableStoreClerks(storeCode));
-    selectStoreManagerPdaTask(state, ((_a = state.sdoTask) == null ? void 0 : _a.display_code) || "");
+    selectStoreManagerPdaTask(state, ((_a2 = state.sdoTask) == null ? void 0 : _a2.display_code) || "");
     updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
     state.loaded = true;
     state.loading = false;
@@ -6570,8 +6613,8 @@ async function loadStoreManagerPdaBackendState({ force = false, keepActivePage =
   return state;
 }
 function getStoreManagerPdaTaskTotals(state = ensureStoreManagerPdaTaskState()) {
-  var _a;
-  const packages = Array.isArray((_a = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a.packages) ? state.sdoTask.packages : [];
+  var _a2;
+  const packages = Array.isArray((_a2 = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a2.packages) ? state.sdoTask.packages : [];
   const totalPackages = packages.length;
   const totalItems = packages.reduce((sum, pkg) => sum + Number(pkg.item_count || 0), 0);
   const receivedCount = packages.filter((pkg) => pkg.status !== "待收货").length;
@@ -6589,45 +6632,45 @@ function getStoreManagerPdaStatusTone(status = "") {
   return "warning";
 }
 function findStoreManagerPdaPackage(state = ensureStoreManagerPdaTaskState(), packageCode = "") {
-  var _a;
+  var _a2;
   const normalizedCode = String(packageCode || "").trim().toUpperCase();
   const digits = normalizedCode.replace(/[^0-9]/g, "");
-  return (((_a = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a.packages) || []).find((pkg) => {
+  return (((_a2 = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a2.packages) || []).find((pkg) => {
     const displayCode = String(pkg.display_code || "").trim().toUpperCase();
     const machineCode = String(pkg.machine_code || "").replace(/[^0-9]/g, "").trim();
     return displayCode === normalizedCode || digits && machineCode === digits;
   }) || null;
 }
 async function receiveStoreManagerPdaPackage(state = ensureStoreManagerPdaTaskState(), packageCode = "") {
-  var _a, _b;
+  var _a2, _b;
   const pkg = findStoreManagerPdaPackage(state, packageCode);
   if (!pkg || pkg.status === "异常" || pkg.status === "已分配") {
     return state;
   }
   await receiveStoreReceivingPackage(pkg.display_code || packageCode, pkg);
   await loadTransferOrders();
-  syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: ((_a = state.sdoTask) == null ? void 0 : _a.display_code) || "" });
+  syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: ((_a2 = state.sdoTask) == null ? void 0 : _a2.display_code) || "" });
   await refreshStoreManagerPdaReceivingForPolling(state, { force: true, selectedSdoCode: ((_b = state.sdoTask) == null ? void 0 : _b.display_code) || "" });
   state.notice = `${pkg.display_code} 已收货，待分配店员。`;
   updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
   return state;
 }
 async function markStoreManagerPdaPackageException(state = ensureStoreManagerPdaTaskState(), packageCode = "") {
-  var _a, _b;
+  var _a2, _b;
   const pkg = findStoreManagerPdaPackage(state, packageCode);
   if (!pkg) {
     return state;
   }
   await markStoreReceivingPackageException(pkg.display_code || packageCode, pkg);
   await loadTransferOrders();
-  syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: ((_a = state.sdoTask) == null ? void 0 : _a.display_code) || "" });
+  syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: ((_a2 = state.sdoTask) == null ? void 0 : _a2.display_code) || "" });
   await refreshStoreManagerPdaReceivingForPolling(state, { force: true, selectedSdoCode: ((_b = state.sdoTask) == null ? void 0 : _b.display_code) || "" });
   state.notice = `${pkg.display_code} 已标记异常，暂不可分配。`;
   updateStoreManagerPdaTaskCompletion(state, { stayOnCurrentPage: true });
   return state;
 }
 async function assignStoreManagerPdaPackageToClerk(state = ensureStoreManagerPdaTaskState(), packageCode = "", clerkName = "") {
-  var _a, _b;
+  var _a2, _b;
   const pkg = findStoreManagerPdaPackage(state, packageCode);
   if (!pkg) {
     return state;
@@ -6646,15 +6689,15 @@ async function assignStoreManagerPdaPackageToClerk(state = ensureStoreManagerPda
     store_code: getCurrentStoreCodeFallback(),
     assigned_clerk: clerkName
   }, { render: false });
-  syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: ((_a = state.sdoTask) == null ? void 0 : _a.display_code) || "" });
+  syncStoreManagerPdaBackendSnapshot(state, { selectedSdoCode: ((_a2 = state.sdoTask) == null ? void 0 : _a2.display_code) || "" });
   await refreshStoreManagerPdaReceivingForPolling(state, { force: true, selectedSdoCode: ((_b = state.sdoTask) == null ? void 0 : _b.display_code) || "" });
   state.notice = `已分配给 ${clerkName}`;
   updateStoreManagerPdaTaskCompletion(state);
   return state;
 }
 function updateStoreManagerPdaTaskCompletion(state = ensureStoreManagerPdaTaskState(), { stayOnCurrentPage = false } = {}) {
-  var _a;
-  const packages = Array.isArray((_a = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a.packages) ? state.sdoTask.packages : [];
+  var _a2;
+  const packages = Array.isArray((_a2 = state == null ? void 0 : state.sdoTask) == null ? void 0 : _a2.packages) ? state.sdoTask.packages : [];
   if (!packages.length) {
     return state;
   }
@@ -6978,12 +7021,12 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
           </div>
           <div class="store-manager-pda-sdp-list">
             ${packages.map((pkg) => {
-      var _a;
+      var _a2;
       return `
               <article class="store-manager-pda-row ${getStatusCardClass(getStoreManagerPdaStatusTone(pkg.status))}">
                 <div>
                   <strong>${escapeHtml(pkg.display_code || "-")}</strong>
-                  <span>${escapeHtml(pkg.category || "-")} / ${escapeHtml((_a = pkg.item_count) != null ? _a : "-")} 件</span>
+                  <span>${escapeHtml(pkg.category || "-")} / ${escapeHtml((_a2 = pkg.item_count) != null ? _a2 : "-")} 件</span>
                 </div>
                 <b>${escapeHtml(pkg.status || "待收货")}</b>
               </article>
@@ -6998,7 +7041,7 @@ function renderStoreManagerPdaTaskList(state = ensureStoreManagerPdaTaskState())
   `;
 }
 function renderStoreManagerPdaPackageCard(pkg = {}, state = ensureStoreManagerPdaTaskState()) {
-  var _a;
+  var _a2;
   const status = String(pkg.status || "待收货");
   const tone = getStoreManagerPdaStatusTone(status);
   const availableClerks = Array.isArray(state.availableClerks) ? state.availableClerks : [];
@@ -7033,7 +7076,7 @@ function renderStoreManagerPdaPackageCard(pkg = {}, state = ensureStoreManagerPd
       </div>
       <div class="store-manager-pda-sdp-facts">
         <span><b>品类</b>${escapeHtml(pkg.category || "-")}</span>
-        <span><b>件数</b>${escapeHtml((_a = pkg.item_count) != null ? _a : "-")} 件</span>
+        <span><b>件数</b>${escapeHtml((_a2 = pkg.item_count) != null ? _a2 : "-")} 件</span>
         <span><b>来源类型</b>${escapeHtml(pkg.source_type || "-")}</span>
         <span><b>来源</b>${escapeHtml(pkg.source_code || "-")}</span>
         <span><b>来源规则</b>SDB / LPK 只作为来源参考</span>
@@ -7108,8 +7151,8 @@ function renderStoreManagerPdaCompletionSummary(state = ensureStoreManagerPdaTas
   `;
 }
 function renderStoreManagerPdaMyTab(state = ensureStoreManagerPdaTaskState()) {
-  var _a, _b;
-  const username = String(((_a = currentSession.user) == null ? void 0 : _a.username) || "store_manager_1").trim();
+  var _a2, _b;
+  const username = String(((_a2 = currentSession.user) == null ? void 0 : _a2.username) || "store_manager_1").trim();
   const roleCode = String(((_b = currentSession.user) == null ? void 0 : _b.role_code) || "store_manager").trim();
   return `
     <section class="store-manager-pda-card store-manager-pda-my-tab">
@@ -7169,7 +7212,7 @@ function renderStoreManagerPdaBottomTabs(state = ensureStoreManagerPdaTaskState(
   `).join("");
 }
 function renderStoreManagerPdaRuntimeScreen(state = ensureStoreManagerPdaTaskState()) {
-  var _a;
+  var _a2;
   return `
     <div class="store-manager-pda-shell store-manager-pda-runtime-shell" data-pda-runtime-surface="store-manager">
       <div class="store-manager-pda-screen">
@@ -7179,7 +7222,7 @@ function renderStoreManagerPdaRuntimeScreen(state = ensureStoreManagerPdaTaskSta
             <h3>${escapeHtml(getStoreManagerPdaRuntimeTitle(state))}</h3>
           </div>
           <small aria-label="最近刷新 / 自动刷新中">
-            ${escapeHtml(((_a = state.sdoTask) == null ? void 0 : _a.store_code) || getCurrentStoreCodeFallback())}
+            ${escapeHtml(((_a2 = state.sdoTask) == null ? void 0 : _a2.store_code) || getCurrentStoreCodeFallback())}
             ${renderPdaRuntimeRefreshIndicator()}
           </small>
         </header>
@@ -7300,7 +7343,7 @@ function validateStoreManagerPdaSdoScanCode(value = "") {
   return { ok: false, error: "请扫描 STORE_DELIVERY_EXECUTION / SDO 主单码。" };
 }
 function handleStoreManagerPdaSdoQuickSearchSubmit(event) {
-  var _a, _b;
+  var _a2, _b;
   event.preventDefault();
   event.stopPropagation();
   const state = ensureStoreManagerPdaTaskState();
@@ -7325,7 +7368,7 @@ function handleStoreManagerPdaSdoQuickSearchSubmit(event) {
   state.activePage = "detail";
   state.verified = true;
   state.sdoTask = validation.task;
-  state.sdoSearchQuery = ((_a = validation.task) == null ? void 0 : _a.display_code) || value;
+  state.sdoSearchQuery = ((_a2 = validation.task) == null ? void 0 : _a2.display_code) || value;
   state.notice = `${((_b = validation.task) == null ? void 0 : _b.display_code) || value} 已定位。`;
   persistStoreManagerPdaTaskState(state);
   renderStoreManagerPdaPreview();
@@ -7432,22 +7475,22 @@ function getWorkspaceSectionTitle(section = {}, language = currentLanguage) {
   );
 }
 function getWorkspaceNavTitle(panel, language = currentLanguage) {
-  var _a;
+  var _a2;
   const meta = getWorkspacePanelNavMeta(panel);
-  const zh = meta.navTitle || ((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.panelTitle) || "未命名页面";
+  const zh = meta.navTitle || ((_a2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a2.panelTitle) || "未命名页面";
   const en = meta.navTitleEn || meta.titleEn || translateI18nText(zh, "en");
   return getI18nText({ zh, en }, "", language);
 }
 function getWorkspacePanelTitle(panel, language = currentLanguage) {
-  var _a;
+  var _a2;
   const meta = getWorkspacePanelNavMeta(panel);
-  const zh = meta.navTitle || ((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.panelTitle) || "当前页面";
+  const zh = meta.navTitle || ((_a2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a2.panelTitle) || "当前页面";
   const en = meta.navTitleEn || meta.pageTitleEn || meta.titleEn || translateI18nText(zh, "en");
   return getI18nText({ zh, en }, "", language);
 }
 function isPanelAccessible(panel, user = currentSession.user) {
-  var _a;
-  const workspace = ((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.workspacePanel) || "";
+  var _a2;
+  const workspace = ((_a2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a2.workspacePanel) || "";
   if (!workspace) {
     return false;
   }
@@ -7465,7 +7508,7 @@ function isPanelAccessible(panel, user = currentSession.user) {
   return allowedSections.includes(meta.section || "default");
 }
 function setActiveWorkspace(name) {
-  var _a;
+  var _a2;
   const mappedName = LEGACY_WORKSPACE_MAP[name] || name;
   const requestedWorkspace = WORKSPACE_META[mappedName] ? mappedName : getFirstAccessibleWorkspace();
   activeWorkspace = isWorkspaceAccessible(requestedWorkspace) ? requestedWorkspace : getFirstAccessibleWorkspace();
@@ -7488,7 +7531,7 @@ function setActiveWorkspace(name) {
   }
   const panels = getOrderedPanelsForWorkspace(activeWorkspace);
   const storedPanelKey = localStorage.getItem(`retail_ops_active_panel_${activeWorkspace}`);
-  const nextPanelKey = panels.some((panel) => panel.dataset.panelKey === storedPanelKey) ? storedPanelKey : (_a = panels[0]) == null ? void 0 : _a.dataset.panelKey;
+  const nextPanelKey = panels.some((panel) => panel.dataset.panelKey === storedPanelKey) ? storedPanelKey : (_a2 = panels[0]) == null ? void 0 : _a2.dataset.panelKey;
   setActivePanel(nextPanelKey, { skipWorkspaceUpdate: true });
 }
 function getHashPanelKey() {
@@ -7499,7 +7542,7 @@ function getHashPanelKey() {
   return decodeURIComponent(rawHash);
 }
 function resolveRoutePanelKey(rawHash = getHashPanelKey()) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const normalizedHash = String(rawHash || "").replace(/^#/, "").trim();
   if (!normalizedHash) {
     return "";
@@ -7513,7 +7556,7 @@ function resolveRoutePanelKey(rawHash = getHashPanelKey()) {
     return "";
   }
   const exactPanel = workspacePanelsList.find((panel) => panel.dataset.panelKey === normalizedHash);
-  if ((_a = exactPanel == null ? void 0 : exactPanel.dataset) == null ? void 0 : _a.panelKey) {
+  if ((_a2 = exactPanel == null ? void 0 : exactPanel.dataset) == null ? void 0 : _a2.panelKey) {
     return exactPanel.dataset.panelKey;
   }
   const targetWorkspace = LEGACY_WORKSPACE_MAP[normalizedHash] || normalizedHash;
@@ -7525,7 +7568,7 @@ function resolveRoutePanelKey(rawHash = getHashPanelKey()) {
     const panelTitleKey = slugifyText(panel.dataset.panelTitle || "");
     return panelKey.startsWith(normalizedKey) || panelTitleKey.startsWith(normalizedKey);
   });
-  return ((_d2 = matchedPanel == null ? void 0 : matchedPanel.dataset) == null ? void 0 : _d2.panelKey) || "";
+  return ((_d = matchedPanel == null ? void 0 : matchedPanel.dataset) == null ? void 0 : _d.panelKey) || "";
 }
 function getPendingRedirect() {
   return localStorage.getItem(STORAGE_KEYS.pendingRedirect) || "";
@@ -7555,7 +7598,7 @@ function replaceRouteHash(panelKey = "") {
   }
 }
 function redirectToRoleDefaultWorkspace(user = currentSession.user, options = {}) {
-  var _a, _b;
+  var _a2, _b;
   const { replaceRoute = true, notice = "" } = options;
   const landing = getUserRoleLanding(user);
   const landingWorkspace = (landing == null ? void 0 : landing.workspace) && isWorkspaceAccessible(landing.workspace, user) ? landing.workspace : "";
@@ -7565,7 +7608,7 @@ function redirectToRoleDefaultWorkspace(user = currentSession.user, options = {}
     if (activeWorkspace !== workspace) {
       setActiveWorkspace(workspace);
     }
-    panelKey = ((_b = (_a = getOrderedPanelsForWorkspace(workspace)[0]) == null ? void 0 : _a.dataset) == null ? void 0 : _b.panelKey) || "";
+    panelKey = ((_b = (_a2 = getOrderedPanelsForWorkspace(workspace)[0]) == null ? void 0 : _a2.dataset) == null ? void 0 : _b.panelKey) || "";
   }
   if (!panelKey) {
     return false;
@@ -7647,8 +7690,8 @@ function applyHashRoute() {
   return true;
 }
 function ensureWorkspaceVisibleForElement(target) {
-  var _a, _b, _c;
-  const panel = (_a = target == null ? void 0 : target.closest) == null ? void 0 : _a.call(target, "[data-workspace-panel]");
+  var _a2, _b, _c;
+  const panel = (_a2 = target == null ? void 0 : target.closest) == null ? void 0 : _a2.call(target, "[data-workspace-panel]");
   const workspace = (_b = panel == null ? void 0 : panel.dataset) == null ? void 0 : _b.workspacePanel;
   const panelKey = (_c = panel == null ? void 0 : panel.dataset) == null ? void 0 : _c.panelKey;
   if (workspace) {
@@ -7665,9 +7708,9 @@ function slugifyText(value) {
 }
 function initWorkspacePageRegistry() {
   workspacePanelsList.forEach((panel, index) => {
-    var _a, _b, _c, _d2, _e2, _f2;
+    var _a2, _b, _c, _d, _e2, _f2;
     const workspace = panel.dataset.workspacePanel || "warehouse";
-    const title = ((_b = (_a = panel.querySelector(".panel-head h2")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) || ((_d2 = (_c = panel.querySelector(".area-supervisor-page-head h3")) == null ? void 0 : _c.textContent) == null ? void 0 : _d2.trim()) || ((_f2 = (_e2 = panel.querySelector(".area-supervisor-topbar h2")) == null ? void 0 : _e2.textContent) == null ? void 0 : _f2.trim()) || `页面 ${index + 1}`;
+    const title = ((_b = (_a2 = panel.querySelector(".panel-head h2")) == null ? void 0 : _a2.textContent) == null ? void 0 : _b.trim()) || ((_d = (_c = panel.querySelector(".area-supervisor-page-head h3")) == null ? void 0 : _c.textContent) == null ? void 0 : _d.trim()) || ((_f2 = (_e2 = panel.querySelector(".area-supervisor-topbar h2")) == null ? void 0 : _e2.textContent) == null ? void 0 : _f2.trim()) || `页面 ${index + 1}`;
     panel.dataset.panelTitle = title;
     panel.dataset.panelIndex = String(index + 1);
     panel.dataset.panelKey = `${workspace}-${slugifyText(title)}-${index + 1}`;
@@ -7686,8 +7729,8 @@ function getPanelsForWorkspace(workspace) {
   return workspacePanelsList.filter((panel) => panel.dataset.workspacePanel === workspace);
 }
 function getWorkspacePanelNavMeta(panel) {
-  var _a, _b, _c, _d2;
-  const workspace = ((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.workspacePanel) || "";
+  var _a2, _b, _c, _d;
+  const workspace = ((_a2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a2.workspacePanel) || "";
   const title = String(((_b = panel == null ? void 0 : panel.dataset) == null ? void 0 : _b.panelTitle) || "");
   const metaList = WORKSPACE_PANEL_NAV_META_MAP[workspace];
   if (metaList == null ? void 0 : metaList.length) {
@@ -7701,7 +7744,7 @@ function getWorkspacePanelNavMeta(panel) {
   }
   return {
     section: "default",
-    order: Number(((_d2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _d2.panelIndex) || 999),
+    order: Number(((_d = panel == null ? void 0 : panel.dataset) == null ? void 0 : _d.panelIndex) || 999),
     icon: "页",
     navTitle: title || "未命名页面"
   };
@@ -7731,8 +7774,8 @@ function expandOnlyWorkspaceSection(workspace, sectionId) {
   });
 }
 function ensureWorkspaceSectionVisibleForPanel(panel) {
-  var _a;
-  const workspace = ((_a = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a.workspacePanel) || "";
+  var _a2;
+  const workspace = ((_a2 = panel == null ? void 0 : panel.dataset) == null ? void 0 : _a2.workspacePanel) || "";
   if (!panel || !getWorkspaceNavSections(workspace).length) {
     return;
   }
@@ -7761,14 +7804,14 @@ function getFilteredPanelsForWorkspace(workspace) {
   });
 }
 function getPanelKeyByTitle(workspace, panelTitlePrefix) {
-  var _a;
+  var _a2;
   const target = getPanelsForWorkspace(workspace).find(
     (panel) => String(panel.dataset.panelTitle || "").startsWith(panelTitlePrefix)
   );
-  return ((_a = target == null ? void 0 : target.dataset) == null ? void 0 : _a.panelKey) || "";
+  return ((_a2 = target == null ? void 0 : target.dataset) == null ? void 0 : _a2.panelKey) || "";
 }
 function openTestHomeTarget(workspace, panelTitlePrefix) {
-  var _a;
+  var _a2;
   const panelKey = panelTitlePrefix ? getPanelKeyByTitle(workspace, panelTitlePrefix) : "";
   if (currentSession == null ? void 0 : currentSession.token) {
     if (panelKey) {
@@ -7787,7 +7830,7 @@ function openTestHomeTarget(workspace, panelTitlePrefix) {
   renderAuthResultSummary("notice", {
     message: `已选择测试入口：${workspace} / ${panelTitlePrefix || "默认页"}。请先登录后进入。`
   });
-  (_a = document.querySelector("#loginForm")) == null ? void 0 : _a.scrollIntoView({ behavior: "smooth", block: "center" });
+  (_a2 = document.querySelector("#loginForm")) == null ? void 0 : _a2.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 function applyPendingTestHomeTarget() {
   const raw = localStorage.getItem(TEST_HOME_TARGET_STORAGE_KEY);
@@ -7894,7 +7937,7 @@ function renderWorkspacePageNav() {
   }
 }
 function setActivePanel(panelKey, options = {}) {
-  var _a;
+  var _a2;
   const { skipWorkspaceUpdate = false, syncHash = true } = options;
   if (!panelKey) {
     return;
@@ -7906,7 +7949,7 @@ function setActivePanel(panelKey, options = {}) {
   if (!isPanelAccessible(targetPanel)) {
     const fallbackWorkspace = getFirstAccessibleWorkspace();
     const fallbackPanel = getOrderedPanelsForWorkspace(fallbackWorkspace)[0];
-    if (((_a = fallbackPanel == null ? void 0 : fallbackPanel.dataset) == null ? void 0 : _a.panelKey) && fallbackPanel.dataset.panelKey !== panelKey) {
+    if (((_a2 = fallbackPanel == null ? void 0 : fallbackPanel.dataset) == null ? void 0 : _a2.panelKey) && fallbackPanel.dataset.panelKey !== panelKey) {
       setActiveWorkspace(fallbackWorkspace);
     }
     return;
@@ -8220,8 +8263,8 @@ function humanizeFieldName(name) {
   return name.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 function getFieldLabelText(control) {
-  var _a, _b;
-  const explicit = (_a = control.dataset.fieldLabel) == null ? void 0 : _a.trim();
+  var _a2, _b;
+  const explicit = (_a2 = control.dataset.fieldLabel) == null ? void 0 : _a2.trim();
   if (explicit) {
     return translateI18nText(explicit, currentLanguage);
   }
@@ -8237,8 +8280,8 @@ function getFieldLabelText(control) {
   return humanizeFieldName(name);
 }
 function getFieldHelpText(control) {
-  var _a, _b;
-  const explicit = (_a = control.dataset.fieldHelp) == null ? void 0 : _a.trim();
+  var _a2, _b;
+  const explicit = (_a2 = control.dataset.fieldHelp) == null ? void 0 : _a2.trim();
   if (explicit) {
     return translateI18nText(explicit, currentLanguage);
   }
@@ -8510,10 +8553,10 @@ const JSON_BUILDERS = {
     fieldSelector: "#mpesaImportForm [name='items_json']",
     bodySelector: "#mpesaImportItemsBuilder",
     emptyRow: () => {
-      var _a;
+      var _a2;
       return {
         receipt_no: "",
-        store_code: ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA",
+        store_code: ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA",
         amount: 0,
         collected_at: "",
         customer_id: "",
@@ -8539,11 +8582,11 @@ const JSON_BUILDERS = {
     fieldSelector: "#offlineSyncForm [name='sales_json']",
     bodySelector: "#offlineSalesBuilder",
     emptyRow: () => {
-      var _a, _b;
+      var _a2, _b;
       return {
         client_sale_id: "",
         order_no: "",
-        store_code: ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA",
+        store_code: ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA",
         cashier_name: getDefaultCashierNameForStore(((_b = currentSession.user) == null ? void 0 : _b.store_code) || "UTAWALA"),
         shift_no: "",
         power_mode: "offline",
@@ -8603,11 +8646,11 @@ const JSON_BUILDERS = {
       { key: "note", label: "这一笔备注", type: "text", placeholder: "例如 synced after blackout" }
     ],
     toOutputValue: (rows) => rows.map((row) => {
-      var _a, _b;
+      var _a2, _b;
       return {
         client_sale_id: row.client_sale_id || "",
         order_no: row.order_no || "",
-        store_code: row.store_code || ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA",
+        store_code: row.store_code || ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA",
         cashier_name: row.cashier_name || getDefaultCashierNameForStore(row.store_code || ((_b = currentSession.user) == null ? void 0 : _b.store_code) || "UTAWALA"),
         shift_no: row.shift_no || "",
         power_mode: row.power_mode || "offline",
@@ -8632,16 +8675,16 @@ const JSON_BUILDERS = {
       };
     }),
     fromOutputValue: (value) => Array.isArray(value) ? value.map((sale) => {
-      var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2;
+      var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2;
       return {
         client_sale_id: sale.client_sale_id || "",
         order_no: sale.order_no || "",
-        store_code: sale.store_code || ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA",
+        store_code: sale.store_code || ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA",
         cashier_name: sale.cashier_name || "",
         shift_no: sale.shift_no || "",
         power_mode: sale.power_mode || "offline",
         barcode: ((_c = (_b = sale.items) == null ? void 0 : _b[0]) == null ? void 0 : _c.barcode) || "",
-        qty: Number(((_e2 = (_d2 = sale.items) == null ? void 0 : _d2[0]) == null ? void 0 : _e2.qty) || 1),
+        qty: Number(((_e2 = (_d = sale.items) == null ? void 0 : _d[0]) == null ? void 0 : _e2.qty) || 1),
         selling_price: Number(((_g2 = (_f2 = sale.items) == null ? void 0 : _f2[0]) == null ? void 0 : _g2.selling_price) || 0),
         override_reason: ((_i2 = (_h2 = sale.items) == null ? void 0 : _h2[0]) == null ? void 0 : _i2.override_reason) || "",
         payment_method: ((_k2 = (_j2 = sale.payments) == null ? void 0 : _j2[0]) == null ? void 0 : _k2.method) || "cash",
@@ -8685,8 +8728,8 @@ function renderJsonBuilder(builderId) {
   container.innerHTML = rows.map((row, rowIndex) => {
     const isTransferItemsBuilder = builderId === "transfer-items";
     const fields = config.fields.map((field) => {
-      var _a;
-      const value = typeof field.getValue === "function" ? field.getValue(row, rowIndex) : (_a = row[field.key]) != null ? _a : "";
+      var _a2;
+      const value = typeof field.getValue === "function" ? field.getValue(row, rowIndex) : (_a2 = row[field.key]) != null ? _a2 : "";
       const fieldClass = [
         "line-builder-field",
         isTransferItemsBuilder ? "transfer-items-table-cell" : "",
@@ -8769,7 +8812,7 @@ function getBuilderRowsFromDom(builderId) {
     const row = {};
     let hasContent = false;
     config.fields.forEach((field) => {
-      var _a;
+      var _a2;
       if (field.type === "display") {
         return;
       }
@@ -8777,7 +8820,7 @@ function getBuilderRowsFromDom(builderId) {
       if (!control) {
         return;
       }
-      const rawValue = (_a = control.value) != null ? _a : "";
+      const rawValue = (_a2 = control.value) != null ? _a2 : "";
       if (field.type === "number") {
         if (rawValue !== "") {
           row[field.key] = Number(rawValue);
@@ -8889,7 +8932,7 @@ function humanizeFieldLabel(fieldName) {
   return ERROR_FIELD_LABELS[fieldName] || fieldName.replace(/_/g, " ");
 }
 function formatValidationDetail(detail) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   if (!detail || typeof detail !== "object") {
     return "";
   }
@@ -8907,9 +8950,9 @@ function formatValidationDetail(detail) {
     case "int_parsing":
       return `请检查${label}的格式。`;
     case "greater_than_equal":
-      return `${label}不能小于 ${(_b = (_a = detail.ctx) == null ? void 0 : _a.ge) != null ? _b : 0}。`;
+      return `${label}不能小于 ${(_b = (_a2 = detail.ctx) == null ? void 0 : _a2.ge) != null ? _b : 0}。`;
     case "less_than_equal":
-      return `${label}不能大于 ${(_d2 = (_c = detail.ctx) == null ? void 0 : _c.le) != null ? _d2 : 0}。`;
+      return `${label}不能大于 ${(_d = (_c = detail.ctx) == null ? void 0 : _c.le) != null ? _d : 0}。`;
     case "literal_error":
       return `请选择有效的${label}。`;
     default:
@@ -8930,7 +8973,7 @@ function parseApiErrorPayload(payload) {
   return payload;
 }
 function extractApiErrorCode(payload) {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   const parsedPayload = parseApiErrorPayload(payload);
   if (!parsedPayload || typeof parsedPayload !== "object") {
     return "";
@@ -8939,10 +8982,10 @@ function extractApiErrorCode(payload) {
     parsedPayload.error_code,
     parsedPayload.errorCode,
     parsedPayload.code,
-    (_a = parsedPayload.detail) == null ? void 0 : _a.error_code,
+    (_a2 = parsedPayload.detail) == null ? void 0 : _a2.error_code,
     (_b = parsedPayload.detail) == null ? void 0 : _b.errorCode,
     (_c = parsedPayload.detail) == null ? void 0 : _c.code,
-    (_d2 = parsedPayload.error) == null ? void 0 : _d2.error_code,
+    (_d = parsedPayload.error) == null ? void 0 : _d.error_code,
     (_e2 = parsedPayload.error) == null ? void 0 : _e2.errorCode,
     (_f2 = parsedPayload.error) == null ? void 0 : _f2.code
   ];
@@ -9492,19 +9535,19 @@ function setSupplierScopedCategoryLabels(supplierName = "", categoryMain = "", c
   persistSupplierCategoryLabelState();
 }
 function getSupplierScopedCategoryMainZh(supplierName = "", categoryMain = "") {
-  var _a;
+  var _a2;
   const supplierKey = normalizeSupplierCategoryKey(supplierName);
   const mainValue = String(categoryMain || "").trim();
   const supplierTree = ensureSupplierCategoryLabelState()[supplierKey];
-  return String(((_a = supplierTree == null ? void 0 : supplierTree[mainValue]) == null ? void 0 : _a.zh) || getDefaultCategoryMainZh(mainValue) || "").trim();
+  return String(((_a2 = supplierTree == null ? void 0 : supplierTree[mainValue]) == null ? void 0 : _a2.zh) || getDefaultCategoryMainZh(mainValue) || "").trim();
 }
 function getSupplierScopedCategorySubZh(supplierName = "", categoryMain = "", categorySub = "") {
-  var _a, _b;
+  var _a2, _b;
   const supplierKey = normalizeSupplierCategoryKey(supplierName);
   const mainValue = String(categoryMain || "").trim();
   const subValue = String(categorySub || "").trim();
   const supplierTree = ensureSupplierCategoryLabelState()[supplierKey];
-  return String(((_b = (_a = supplierTree == null ? void 0 : supplierTree[mainValue]) == null ? void 0 : _a.subs) == null ? void 0 : _b[subValue]) || getDefaultCategorySubZh(mainValue, subValue) || "").trim();
+  return String(((_b = (_a2 = supplierTree == null ? void 0 : supplierTree[mainValue]) == null ? void 0 : _a2.subs) == null ? void 0 : _b[subValue]) || getDefaultCategorySubZh(mainValue, subValue) || "").trim();
 }
 function getCategoryMainDisplayLabel(categoryMain = "", { supplierName = "", bilingual = false } = {}) {
   const englishLabel = String(categoryMain || "").trim();
@@ -9851,7 +9894,7 @@ function normalizeOpsDataTopics(rows = []) {
   const defaults = [...DEFAULT_OPS_DATA_TOPICS];
   const merged = defaults.map((row) => ({ ...row }));
   (Array.isArray(rows) ? rows : []).forEach((row) => {
-    var _a, _b;
+    var _a2, _b;
     const topicCode = String((row == null ? void 0 : row.topic_code) || "").trim();
     if (!topicCode) {
       return;
@@ -9859,7 +9902,7 @@ function normalizeOpsDataTopics(rows = []) {
     const index = merged.findIndex((item) => item.topic_code === topicCode);
     const normalized = {
       topic_code: topicCode,
-      topic_name: String((row == null ? void 0 : row.topic_name) || ((_a = merged[index]) == null ? void 0 : _a.topic_name) || topicCode).trim(),
+      topic_name: String((row == null ? void 0 : row.topic_name) || ((_a2 = merged[index]) == null ? void 0 : _a2.topic_name) || topicCode).trim(),
       source_system: String((row == null ? void 0 : row.source_system) || "").trim(),
       update_frequency: String((row == null ? void 0 : row.update_frequency) || "").trim(),
       use_case: String((row == null ? void 0 : row.use_case) || ((_b = merged[index]) == null ? void 0 : _b.use_case) || "").trim(),
@@ -10178,9 +10221,9 @@ function getChinaSourceExtraCostTotals(record) {
   const costEntries = (record == null ? void 0 : record.cost_entries) || {};
   return buildCurrencyTotals(
     ["head_transport", "customs_clearance", "tail_transport"].map((key) => {
-      var _a, _b;
+      var _a2, _b;
       return {
-        currency: String(((_a = costEntries[key]) == null ? void 0 : _a.currency) || "").trim().toUpperCase(),
+        currency: String(((_a2 = costEntries[key]) == null ? void 0 : _a2.currency) || "").trim().toUpperCase(),
         amount: Number(((_b = costEntries[key]) == null ? void 0 : _b.amount) || 0)
       };
     })
@@ -10238,8 +10281,8 @@ function getChinaSourceFinanceCompletion(record) {
   const costEntries = (record == null ? void 0 : record.cost_entries) || {};
   const stageKeys = ["head_transport", "customs_clearance", "tail_transport"];
   const completedCount = stageKeys.filter((key) => {
-    var _a;
-    return Number(((_a = costEntries[key]) == null ? void 0 : _a.amount) || 0) > 0;
+    var _a2;
+    return Number(((_a2 = costEntries[key]) == null ? void 0 : _a2.amount) || 0) > 0;
   }).length;
   const statusLabel = completedCount === 3 ? "三段成本已补齐" : completedCount > 0 ? "成本补填中" : "待补三段成本";
   return { completedCount, stageKeys, statusLabel };
@@ -10352,13 +10395,13 @@ function getChinaSourceCategoryTree() {
   return merged;
 }
 function renderProductCategoryScopeSummary(message = "") {
-  var _a;
+  var _a2;
   const target = document.querySelector("#productCategoryScopeSummary");
   const form = document.querySelector("#productForm");
   if (!(target instanceof HTMLElement) || !(form instanceof HTMLFormElement)) {
     return;
   }
-  const supplierName = String(((_a = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
+  const supplierName = String(((_a2 = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a2.value) || "").trim();
   if (!supplierName || supplierName === "__new__") {
     target.className = "candidate-summary empty-state";
     target.textContent = "先锁供应商。这里会显示当前供应商可用的大类 / 小类，并支持直接编辑。";
@@ -10380,13 +10423,13 @@ function renderProductCategoryScopeSummary(message = "") {
   `;
 }
 function renderProductCategoryScopeList() {
-  var _a;
+  var _a2;
   const target = document.querySelector("#productCategoryScopeList");
   const form = document.querySelector("#productForm");
   if (!(target instanceof HTMLElement) || !(form instanceof HTMLFormElement)) {
     return;
   }
-  const supplierName = String(((_a = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
+  const supplierName = String(((_a2 = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a2.value) || "").trim();
   if (!supplierName || supplierName === "__new__") {
     target.className = "candidate-summary empty-state";
     target.textContent = "当前还没有选择供应商，无法显示这个供应商的品类范围。";
@@ -10429,12 +10472,12 @@ function renderProductCategoryScopeList() {
     `).join("");
 }
 function refreshProductCategoryControls({ selectedMain = "", selectedSub = "", notice = "" } = {}) {
-  var _a;
+  var _a2;
   const form = document.querySelector("#productForm");
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  const supplierName = String(((_a = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
+  const supplierName = String(((_a2 = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a2.value) || "").trim();
   const mainSelect = form.querySelector("[data-product-category-main]");
   const subSelect = form.querySelector("[data-product-category-sub]");
   const inlinePanel = document.querySelector("#productCategoryInline");
@@ -10619,10 +10662,10 @@ function getSortingResultCategorySubOptions(categoryMain = "") {
   return options;
 }
 function getSortingResultDefaultCostDisplay(row = {}) {
-  var _a;
+  var _a2;
   const resolver = sortingResultFlow.resolveSortingResultDefaultCost;
   const matched = typeof resolver === "function" ? resolver(ensureApparelDefaultCostState(), row) : getApparelDefaultCostByCategoryGrade((row == null ? void 0 : row.category_main) || "", (row == null ? void 0 : row.category_sub) || "", (row == null ? void 0 : row.grade) || "");
-  const value = (_a = matched == null ? void 0 : matched.default_cost_kes) != null ? _a : Number((row == null ? void 0 : row.default_cost_kes) || 0);
+  const value = (_a2 = matched == null ? void 0 : matched.default_cost_kes) != null ? _a2 : Number((row == null ? void 0 : row.default_cost_kes) || 0);
   return value > 0 ? formatKesAmount(value, "KES 0.00") : "待配置";
 }
 function getSortingResultDefaultCostValue(row = {}) {
@@ -10635,8 +10678,8 @@ function getSortingResultDefaultCostValue(row = {}) {
   return Number((row == null ? void 0 : row.default_cost_kes) || 0) || 0;
 }
 function getSortingResultCostEstimateForRow(rowIndex = 0) {
-  var _a;
-  const taskNo = String(((_a = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a.value) || "").trim();
+  var _a2;
+  const taskNo = String(((_a2 = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a2.value) || "").trim();
   const task = getSortingTaskByNo(taskNo);
   if (!task) {
     return null;
@@ -10685,12 +10728,12 @@ function getSortingResultDefaultRackDisplay(row = {}) {
   return (matched == null ? void 0 : matched.rack_code) || String((row == null ? void 0 : row.rack_code) || "").trim().toUpperCase() || "待配置";
 }
 function populateApparelWeightSubSelect(selectedValue = "") {
-  var _a;
+  var _a2;
   const form = document.querySelector("#apparelWeightForm");
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  const mainValue = String(((_a = form.querySelector("[name='category_main']")) == null ? void 0 : _a.value) || "").trim();
+  const mainValue = String(((_a2 = form.querySelector("[name='category_main']")) == null ? void 0 : _a2.value) || "").trim();
   const subSelect = form.querySelector("[name='category_sub']");
   if (!(subSelect instanceof HTMLSelectElement)) {
     return;
@@ -10706,12 +10749,12 @@ function populateApparelWeightSubSelect(selectedValue = "") {
   }
 }
 function populateApparelDefaultCostSubSelect(selectedValue = "") {
-  var _a;
+  var _a2;
   const form = document.querySelector("#apparelDefaultCostForm");
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  const mainValue = String(((_a = form.querySelector("[name='category_main']")) == null ? void 0 : _a.value) || "").trim();
+  const mainValue = String(((_a2 = form.querySelector("[name='category_main']")) == null ? void 0 : _a2.value) || "").trim();
   const subSelect = form.querySelector("[name='category_sub']");
   if (!(subSelect instanceof HTMLSelectElement)) {
     return;
@@ -10727,12 +10770,12 @@ function populateApparelDefaultCostSubSelect(selectedValue = "") {
   }
 }
 function populateApparelDefaultSalePriceSubSelect(selectedValue = "") {
-  var _a;
+  var _a2;
   const form = document.querySelector("#apparelDefaultSalePriceForm");
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  const mainValue = String(((_a = form.querySelector("[name='category_main']")) == null ? void 0 : _a.value) || "").trim();
+  const mainValue = String(((_a2 = form.querySelector("[name='category_main']")) == null ? void 0 : _a2.value) || "").trim();
   const subSelect = form.querySelector("[name='category_sub']");
   if (!(subSelect instanceof HTMLSelectElement)) {
     return;
@@ -10748,12 +10791,12 @@ function populateApparelDefaultSalePriceSubSelect(selectedValue = "") {
   }
 }
 function populateApparelSortingRackSubSelect(selectedValue = "") {
-  var _a;
+  var _a2;
   const form = document.querySelector("#apparelSortingRackForm");
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
-  const mainValue = String(((_a = form.querySelector("[name='category_main']")) == null ? void 0 : _a.value) || "").trim();
+  const mainValue = String(((_a2 = form.querySelector("[name='category_main']")) == null ? void 0 : _a2.value) || "").trim();
   const subSelect = form.querySelector("[name='category_sub']");
   if (!(subSelect instanceof HTMLSelectElement)) {
     return;
@@ -10820,7 +10863,7 @@ function renderApparelPieceWeightSummary(record = null) {
       `).join("") : "先新增一条标准克重配置。";
 }
 function renderApparelDefaultCostSummary(record = null) {
-  var _a, _b;
+  var _a2, _b;
   const summaryTarget = document.querySelector("#apparelDefaultCostSummary");
   const listTarget = document.querySelector("#apparelDefaultCostList");
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
@@ -10858,7 +10901,7 @@ function renderApparelDefaultCostSummary(record = null) {
     summaryTarget.innerHTML = `
       <div class="report-summary-grid">
         <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
-        <article class="store-metric"><strong>P 档</strong><span>${escapeHtml(String(((_a = summary.gradeCounts) == null ? void 0 : _a.P) || 0))}</span></article>
+        <article class="store-metric"><strong>P 档</strong><span>${escapeHtml(String(((_a2 = summary.gradeCounts) == null ? void 0 : _a2.P) || 0))}</span></article>
         <article class="store-metric"><strong>S 档</strong><span>${escapeHtml(String(((_b = summary.gradeCounts) == null ? void 0 : _b.S) || 0))}</span></article>
         <article class="store-metric"><strong>说明</strong><span>当前先做默认成本价底表</span></article>
       </div>
@@ -10889,7 +10932,7 @@ function renderApparelDefaultCostSummary(record = null) {
       `).join("") : "先新增一条默认成本价配置。";
 }
 function renderApparelDefaultSalePriceSummary(record = null) {
-  var _a, _b;
+  var _a2, _b;
   const summaryTarget = document.querySelector("#apparelDefaultSalePriceSummary");
   const listTarget = document.querySelector("#apparelDefaultSalePriceList");
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
@@ -10927,7 +10970,7 @@ function renderApparelDefaultSalePriceSummary(record = null) {
     summaryTarget.innerHTML = `
       <div class="report-summary-grid">
         <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
-        <article class="store-metric"><strong>P 档默认售价</strong><span>${escapeHtml(String(((_a = summary.gradeCounts) == null ? void 0 : _a.P) || 0))}</span></article>
+        <article class="store-metric"><strong>P 档默认售价</strong><span>${escapeHtml(String(((_a2 = summary.gradeCounts) == null ? void 0 : _a2.P) || 0))}</span></article>
         <article class="store-metric"><strong>S 档默认售价</strong><span>${escapeHtml(String(((_b = summary.gradeCounts) == null ? void 0 : _b.S) || 0))}</span></article>
         <article class="store-metric"><strong>说明</strong><span>按 P/S 默认售价配置</span></article>
       </div>
@@ -10960,7 +11003,7 @@ function renderApparelDefaultSalePriceSummary(record = null) {
       `).join("") : "先新增一条默认售价配置。";
 }
 function renderApparelSortingRackSummary(record = null) {
-  var _a, _b;
+  var _a2, _b;
   const summaryTarget = document.querySelector("#apparelSortingRackSummary");
   const listTarget = document.querySelector("#apparelSortingRackList");
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
@@ -10999,7 +11042,7 @@ function renderApparelSortingRackSummary(record = null) {
     summaryTarget.innerHTML = `
       <div class="report-summary-grid">
         <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
-        <article class="store-metric"><strong>P 档</strong><span>${escapeHtml(String(((_a = summary.gradeCounts) == null ? void 0 : _a.P) || 0))}</span></article>
+        <article class="store-metric"><strong>P 档</strong><span>${escapeHtml(String(((_a2 = summary.gradeCounts) == null ? void 0 : _a2.P) || 0))}</span></article>
         <article class="store-metric"><strong>S 档</strong><span>${escapeHtml(String(((_b = summary.gradeCounts) == null ? void 0 : _b.S) || 0))}</span></article>
         <article class="store-metric"><strong>说明</strong><span>当前模式未贴码，同库位不能混不同档案</span></article>
       </div>
@@ -11050,10 +11093,10 @@ function syncChinaSourceContainerRowsFromDom() {
     return [];
   }
   const rows = [...container.querySelectorAll("[data-china-source-row-index]")].map((rowNode) => {
-    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2, _z2, _A2;
+    var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2, _z2, _A2;
     return {
-      package_code: ((_c = (_b = (_a = rowNode.querySelector("[data-china-source-field='package_code']")) == null ? void 0 : _a.value) == null ? void 0 : _b.trim) == null ? void 0 : _c.call(_b)) || "",
-      supplier_name: ((_f2 = (_e2 = (_d2 = rowNode.querySelector("[data-china-source-field='supplier_name']")) == null ? void 0 : _d2.value) == null ? void 0 : _e2.trim) == null ? void 0 : _f2.call(_e2)) || "",
+      package_code: ((_c = (_b = (_a2 = rowNode.querySelector("[data-china-source-field='package_code']")) == null ? void 0 : _a2.value) == null ? void 0 : _b.trim) == null ? void 0 : _c.call(_b)) || "",
+      supplier_name: ((_f2 = (_e2 = (_d = rowNode.querySelector("[data-china-source-field='supplier_name']")) == null ? void 0 : _d.value) == null ? void 0 : _e2.trim) == null ? void 0 : _f2.call(_e2)) || "",
       supplier_name_zh: ((_i2 = (_h2 = (_g2 = rowNode.querySelector("[data-china-source-field='supplier_name_zh']")) == null ? void 0 : _g2.value) == null ? void 0 : _h2.trim) == null ? void 0 : _i2.call(_h2)) || "",
       category_main: ((_l2 = (_k2 = (_j2 = rowNode.querySelector("[data-china-source-field='category_main']")) == null ? void 0 : _j2.value) == null ? void 0 : _k2.trim) == null ? void 0 : _l2.call(_k2)) || "",
       category_main_zh: ((_o2 = (_n2 = (_m2 = rowNode.querySelector("[data-china-source-field='category_main_zh']")) == null ? void 0 : _m2.value) == null ? void 0 : _n2.trim) == null ? void 0 : _o2.call(_n2)) || "",
@@ -11174,12 +11217,12 @@ function renderChinaSourceContainerRows() {
   ).join("");
 }
 function applySupplierSelectionToChinaSourceRows(supplierName) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   syncChinaSourceContainerRowsFromDom();
   const targetRow = chinaSourceContainerRowState.find((row) => !row.supplier_name || row.supplier_name === "__new__");
   if (targetRow) {
     targetRow.supplier_name = supplierName;
-    targetRow.supplier_name_zh = ((_a = getSupplierDirectoryRowByName(supplierName)) == null ? void 0 : _a.name_zh) || "";
+    targetRow.supplier_name_zh = ((_a2 = getSupplierDirectoryRowByName(supplierName)) == null ? void 0 : _a2.name_zh) || "";
     targetRow.category_main = "";
     targetRow.category_main_zh = "";
     targetRow.category_sub = "";
@@ -11267,7 +11310,7 @@ function getChinaSourceBalePreviewData() {
   );
   const sourcePoolToken = String(payload.source_pool_token || "").trim() || buildChinaSourcePoolToken(payload.customs_notice_no);
   const lines = rows.map((row, index) => {
-    var _a;
+    var _a2;
     const packageCount = Number(row.package_count || 0);
     const unitWeightKg = Number(row.unit_weight_kg || 0);
     const packageCode = String(row.package_code || "").trim();
@@ -11280,7 +11323,7 @@ function getChinaSourceBalePreviewData() {
       supplier_name: supplierName,
       category_main: categoryMain,
       category_sub: categorySub,
-      supplier_name_zh: ((_a = getSupplierDirectoryRowByName(supplierName)) == null ? void 0 : _a.name_zh) || String(row.supplier_name_zh || "").trim(),
+      supplier_name_zh: ((_a2 = getSupplierDirectoryRowByName(supplierName)) == null ? void 0 : _a2.name_zh) || String(row.supplier_name_zh || "").trim(),
       category_main_zh: getSupplierScopedCategoryMainZh(supplierName, categoryMain) || String(row.category_main_zh || "").trim(),
       category_sub_zh: getSupplierScopedCategorySubZh(supplierName, categoryMain, categorySub) || String(row.category_sub_zh || "").trim(),
       package_count: packageCount,
@@ -11405,12 +11448,12 @@ function renderChinaSourceBalePreview(record = null) {
   `;
 }
 function getChinaSourceReceiptSheetData() {
-  var _a;
+  var _a2;
   const preview = getChinaSourceBalePreviewData();
   if ((preview == null ? void 0 : preview.customs_notice_no) && Array.isArray(preview.lines) && preview.lines.length) {
     return preview;
   }
-  const customsNoticeNo = String(((_a = document.querySelector("#chinaSourceBaleForm [name='customs_notice_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+  const customsNoticeNo = String(((_a2 = document.querySelector("#chinaSourceBaleForm [name='customs_notice_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   if (!customsNoticeNo) {
     return null;
   }
@@ -11481,7 +11524,7 @@ function getChinaSourceRecordByPoolToken(sourcePoolToken = "") {
   return ensureChinaSourceBaleState().find((row) => String((row == null ? void 0 : row.source_pool_token) || "").trim() === normalized) || null;
 }
 function getChinaSourceLineByToken(sourceBaleToken = "") {
-  var _a;
+  var _a2;
   const normalized = String(sourceBaleToken || "").trim();
   if (!normalized) {
     return null;
@@ -11499,7 +11542,7 @@ function getChinaSourceLineByToken(sourceBaleToken = "") {
         supplier_name: supplierName,
         category_main: categoryMain,
         category_sub: categorySub,
-        supplier_name_zh: matchedLine.supplier_name_zh || ((_a = getSupplierDirectoryRowByName(supplierName)) == null ? void 0 : _a.name_zh) || "",
+        supplier_name_zh: matchedLine.supplier_name_zh || ((_a2 = getSupplierDirectoryRowByName(supplierName)) == null ? void 0 : _a2.name_zh) || "",
         category_main_zh: matchedLine.category_main_zh || getSupplierScopedCategoryMainZh(supplierName, categoryMain),
         category_sub_zh: matchedLine.category_sub_zh || getSupplierScopedCategorySubZh(supplierName, categoryMain, categorySub),
         source_pool_token: record.source_pool_token || "",
@@ -11800,16 +11843,16 @@ function renderDirectHangUnpackSummary(record = null) {
   `;
 }
 function hydrateChinaSourceCostForm(record) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2;
   if (!record) {
     return;
   }
   const costEntries = record.cost_entries || {};
   setInputValue("#chinaSourceCostForm [name='source_pool_token']", record.source_pool_token || "");
-  setInputValue("#chinaSourceCostForm [name='head_transport_amount']", ((_a = costEntries.head_transport) == null ? void 0 : _a.amount) || "");
+  setInputValue("#chinaSourceCostForm [name='head_transport_amount']", ((_a2 = costEntries.head_transport) == null ? void 0 : _a2.amount) || "");
   setInputValue("#chinaSourceCostForm [name='head_transport_currency']", ((_b = costEntries.head_transport) == null ? void 0 : _b.currency) || "CNY");
   setInputValue("#chinaSourceCostForm [name='head_transport_payment_method']", ((_c = costEntries.head_transport) == null ? void 0 : _c.payment_method) || "");
-  setInputValue("#chinaSourceCostForm [name='head_transport_payer']", ((_d2 = costEntries.head_transport) == null ? void 0 : _d2.payer) || "");
+  setInputValue("#chinaSourceCostForm [name='head_transport_payer']", ((_d = costEntries.head_transport) == null ? void 0 : _d.payer) || "");
   setInputValue("#chinaSourceCostForm [name='head_transport_reference']", ((_e2 = costEntries.head_transport) == null ? void 0 : _e2.payment_reference) || "");
   setInputValue("#chinaSourceCostForm [name='customs_clearance_amount']", ((_f2 = costEntries.customs_clearance) == null ? void 0 : _f2.amount) || "");
   setInputValue("#chinaSourceCostForm [name='customs_clearance_currency']", ((_g2 = costEntries.customs_clearance) == null ? void 0 : _g2.currency) || "KES");
@@ -12319,7 +12362,7 @@ function renderIdentityLedgerLocationRows(rows = []) {
   `;
 }
 function renderItemIdentityLedgerSummary(result) {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const target = document.querySelector("#itemIdentityLedgerSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -12341,7 +12384,7 @@ function renderItemIdentityLedgerSummary(result) {
   target.innerHTML = `
     <div class="report-summary-grid">
       <article class="store-metric"><strong>身份证 ID</strong><span>${escapeHtml(result.identity_no || "-")}</span></article>
-      <article class="store-metric"><strong>当前状态</strong><span>${escapeHtml(((_a = result.location) == null ? void 0 : _a.current_stage) || "-")}</span></article>
+      <article class="store-metric"><strong>当前状态</strong><span>${escapeHtml(((_a2 = result.location) == null ? void 0 : _a2.current_stage) || "-")}</span></article>
       <article class="store-metric"><strong>当前门店</strong><span>${escapeHtml(result.store_code || ((_b = result.location) == null ? void 0 : _b.latest_location_code) || "待分配")}</span></article>
       <article class="store-metric"><strong>当前货架位</strong><span>${escapeHtml(result.store_rack_code || ((_c = result.location) == null ? void 0 : _c.latest_rack_code) || "待上架")}</span></article>
       <article class="store-metric"><strong>成本价</strong><span>${escapeHtml(formatKesAmount(result.unit_cost_kes, "待分摊"))}</span></article>
@@ -12394,7 +12437,7 @@ function renderItemIdentityLedgerSummary(result) {
     <div class="split-grid">
       <div class="candidate-summary">
         <strong>仓库位置</strong>
-        ${renderIdentityLedgerLocationRows(((_d2 = result.location) == null ? void 0 : _d2.warehouse_locations) || [])}
+        ${renderIdentityLedgerLocationRows(((_d = result.location) == null ? void 0 : _d.warehouse_locations) || [])}
       </div>
       <div class="candidate-summary">
         <strong>门店位置</strong>
@@ -12784,7 +12827,7 @@ function getShipmentReconciliationSummary(shipmentNo = "") {
       statusLabel
     };
   }).sort((left, right) => {
-    var _a, _b;
+    var _a2, _b;
     const order = {
       mismatch: 0,
       "package-diff": 1,
@@ -12793,7 +12836,7 @@ function getShipmentReconciliationSummary(shipmentNo = "") {
       "expected-only": 4,
       match: 5
     };
-    return ((_a = order[left.statusCode]) != null ? _a : 99) - ((_b = order[right.statusCode]) != null ? _b : 99) || right.actual_packages - left.actual_packages || right.expected_packages - left.expected_packages || left.supplier_name.localeCompare(right.supplier_name, "zh-CN");
+    return ((_a2 = order[left.statusCode]) != null ? _a2 : 99) - ((_b = order[right.statusCode]) != null ? _b : 99) || right.actual_packages - left.actual_packages || right.expected_packages - left.expected_packages || left.supplier_name.localeCompare(right.supplier_name, "zh-CN");
   });
   const exactMatchCount = compareRows.filter((row) => row.statusCode === "match").length;
   const expectedOnlyCount = compareRows.filter((row) => row.statusCode === "expected-only").length;
@@ -13061,8 +13104,8 @@ function buildParcelShipmentDirectory(shipments = inboundShipmentState, parcelRo
     }, 0);
     return { shipment, rows, bales, totalPackages, totalWeight };
   }).sort((left, right) => {
-    var _a, _b;
-    return String(((_a = right.shipment) == null ? void 0 : _a.created_at) || "").localeCompare(String(((_b = left.shipment) == null ? void 0 : _b.created_at) || ""));
+    var _a2, _b;
+    return String(((_a2 = right.shipment) == null ? void 0 : _a2.created_at) || "").localeCompare(String(((_b = left.shipment) == null ? void 0 : _b.created_at) || ""));
   });
   return shipmentGroups.map(({ shipment, rows, bales, totalPackages, totalWeight }) => {
     const docs = Array.isArray(shipment.coc_documents) ? shipment.coc_documents : [];
@@ -13191,7 +13234,7 @@ function renderAuthResultSummary(kind, data) {
   `;
 }
 function hydrateProductForms(product) {
-  var _a, _b;
+  var _a2, _b;
   if (!product) {
     return;
   }
@@ -13247,7 +13290,7 @@ function hydrateProductForms(product) {
       {
         client_sale_id: "OFF-001",
         order_no: "SO-OFFLINE-001",
-        store_code: ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA",
+        store_code: ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA",
         cashier_name: getDefaultCashierNameForStore(((_b = currentSession.user) == null ? void 0 : _b.store_code) || "UTAWALA"),
         shift_no: "",
         power_mode: "offline",
@@ -13302,8 +13345,8 @@ function normalizeShipmentNo(value = "") {
   return String(value || "").trim();
 }
 function resolveCurrentInboundShipmentNo(preferredShipmentNo = "") {
-  var _a, _b, _c, _d2, _e2, _f2;
-  return normalizeShipmentNo(preferredShipmentNo) || normalizeShipmentNo(currentInboundShipmentNo) || normalizeShipmentNo((_a = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a.value) || normalizeShipmentNo((_b = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _b.value) || normalizeShipmentNo((_c = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _c.value) || normalizeShipmentNo((_d2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _d2.value) || normalizeShipmentNo((_e2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _e2.value) || normalizeShipmentNo((_f2 = inboundShipmentState[0]) == null ? void 0 : _f2.shipment_no);
+  var _a2, _b, _c, _d, _e2, _f2;
+  return normalizeShipmentNo(preferredShipmentNo) || normalizeShipmentNo(currentInboundShipmentNo) || normalizeShipmentNo((_a2 = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a2.value) || normalizeShipmentNo((_b = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _b.value) || normalizeShipmentNo((_c = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _c.value) || normalizeShipmentNo((_d = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _d.value) || normalizeShipmentNo((_e2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _e2.value) || normalizeShipmentNo((_f2 = inboundShipmentState[0]) == null ? void 0 : _f2.shipment_no);
 }
 function getInboundFlowSteps(shipmentNo = "") {
   const normalizedShipmentNo = normalizeShipmentNo(shipmentNo);
@@ -13340,8 +13383,8 @@ function getInboundFlowSteps(shipmentNo = "") {
   ];
 }
 function getInboundPanelStepKey(target) {
-  var _a, _b, _c;
-  const directStep = String(((_a = target == null ? void 0 : target.dataset) == null ? void 0 : _a.inboundStep) || "").trim();
+  var _a2, _b, _c;
+  const directStep = String(((_a2 = target == null ? void 0 : target.dataset) == null ? void 0 : _a2.inboundStep) || "").trim();
   if (directStep) {
     return directStep;
   }
@@ -13443,8 +13486,8 @@ function renderInboundFlowContext(preferredShipmentNo = "") {
   const steps = getInboundFlowSteps(normalizedShipmentNo);
   const nextHint = bales.length ? printedCount === bales.length ? "这张船单的条码已全部打印，可以直接去建分拣任务。" : "这张船单已经出条码了，建议直接继续看条码和打印。" : String((shipment == null ? void 0 : shipment.intake_status) || "").trim().toLowerCase() === "confirmed" ? "包裹总确认已经完成，现在直接生成 bale barcode。" : recorded.totalPackages > 0 ? "当前重点是做总确认，然后一包一码生成 bale barcode。" : "当前重点是继续录包裹，不要切散到别的辅助页面。";
   targets.forEach((target) => {
-    var _a, _b, _c;
-    const currentStepKey = getInboundPanelStepKey(target) || ((_a = steps.find((step) => step.status === "active")) == null ? void 0 : _a.key) || ((_b = [...steps].reverse().find((step) => step.status === "completed")) == null ? void 0 : _b.key) || ((_c = steps[0]) == null ? void 0 : _c.key) || "create";
+    var _a2, _b, _c;
+    const currentStepKey = getInboundPanelStepKey(target) || ((_a2 = steps.find((step) => step.status === "active")) == null ? void 0 : _a2.key) || ((_b = [...steps].reverse().find((step) => step.status === "completed")) == null ? void 0 : _b.key) || ((_c = steps[0]) == null ? void 0 : _c.key) || "create";
     const currentStep = steps.find((step) => step.key === currentStepKey) || steps.find((step) => step.status === "active") || [...steps].reverse().find((step) => step.status === "completed") || steps[0];
     const stepsHtml = steps.map(
       (step, index) => `
@@ -13484,13 +13527,13 @@ function renderInboundFlowContext(preferredShipmentNo = "") {
   });
 }
 function renderBaleShipmentLockSummary(shipmentNo = "") {
-  var _a;
+  var _a2;
   const target = document.querySelector("#baleBarcodeLockSummary");
   if (!target) {
     return;
   }
   const normalizedShipmentNo = normalizeShipmentNo(
-    shipmentNo || ((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || ""
+    shipmentNo || ((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || ""
   );
   if (!normalizedShipmentNo) {
     target.className = "candidate-summary empty-state";
@@ -13592,13 +13635,13 @@ function openInboundFlowStep(step = "", shipmentNo = "") {
   }
 }
 function populateInboundShipmentSelects(shipments, selectedValue = "") {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const rows = Array.isArray(shipments) ? shipments : [];
   const preferredShipmentNo = resolveCurrentInboundShipmentNo(selectedValue);
   document.querySelectorAll("select[data-shipment-select]").forEach((select) => {
-    var _a2, _b2, _c2, _d2;
+    var _a3, _b2, _c2, _d;
     const parentForm = select.closest("form");
-    const intakeType = ((_b2 = (_a2 = parentForm == null ? void 0 : parentForm.querySelector("[name='intake_type']")) == null ? void 0 : _a2.value) == null ? void 0 : _b2.trim()) || ((_d2 = (_c2 = parentForm == null ? void 0 : parentForm.querySelector("[name='shipment_type']")) == null ? void 0 : _c2.value) == null ? void 0 : _d2.trim()) || "";
+    const intakeType = ((_b2 = (_a3 = parentForm == null ? void 0 : parentForm.querySelector("[name='intake_type']")) == null ? void 0 : _a3.value) == null ? void 0 : _b2.trim()) || ((_d = (_c2 = parentForm == null ? void 0 : parentForm.querySelector("[name='shipment_type']")) == null ? void 0 : _c2.value) == null ? void 0 : _d.trim()) || "";
     const filteredRows = intakeType ? rows.filter((row) => String(row.shipment_type || "").trim() === intakeType) : rows;
     const preferredValue = preferredShipmentNo || select.value || "";
     const options = ['<option value="">请选择入库主档</option>'].concat(
@@ -13615,7 +13658,7 @@ function populateInboundShipmentSelects(shipments, selectedValue = "") {
     }
   });
   applySortingShipmentSelectState(preferredShipmentNo);
-  const confirmShipmentNo = normalizeShipmentNo((_a = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _a.value) || normalizeShipmentNo((_b = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _b.value) || preferredShipmentNo || normalizeShipmentNo((_c = rows[0]) == null ? void 0 : _c.shipment_no);
+  const confirmShipmentNo = normalizeShipmentNo((_a2 = document.querySelector("#shipmentIntakeConfirmForm [name='shipment_no']")) == null ? void 0 : _a2.value) || normalizeShipmentNo((_b = document.querySelector("#generateBaleBarcodesForm [name='shipment_no']")) == null ? void 0 : _b.value) || preferredShipmentNo || normalizeShipmentNo((_c = rows[0]) == null ? void 0 : _c.shipment_no);
   if (confirmShipmentNo) {
     currentInboundShipmentNo = confirmShipmentNo;
     syncInboundShipmentFormValues(confirmShipmentNo);
@@ -14033,7 +14076,7 @@ function getSortingBatchOptions(shipmentNo) {
   }));
 }
 function refreshSortingShipmentOptions() {
-  var _a, _b;
+  var _a2, _b;
   const flowSummary = document.querySelector("#sortingTaskFlowSummary");
   const selectedSummary = document.querySelector("#sortingSelectedBatchSummary");
   const baleContainer = document.querySelector("#sortingBaleSelectorList");
@@ -14064,7 +14107,7 @@ function refreshSortingShipmentOptions() {
     parcelLookup.set(batchNo, row);
     parcelLookup.set(batchNo.toUpperCase(), row);
   });
-  const searchValue = String(((_a = document.querySelector("#sortingTaskForm [name='bale_search']")) == null ? void 0 : _a.value) || "").trim();
+  const searchValue = String(((_a2 = document.querySelector("#sortingTaskForm [name='bale_search']")) == null ? void 0 : _a2.value) || "").trim();
   const selectedRows = readyRows.filter((row) => selectedSortingBales.has(row.bale_barcode));
   const selectedRowsWithoutSourceCost = selectedRows.filter((row) => !hasCompletedSourceCostForBale(row));
   const selectedShipmentCount = new Set(selectedRows.map((row) => String(row.shipment_no || "").trim()).filter(Boolean)).size;
@@ -14164,7 +14207,7 @@ function hydrateInboundShipmentForms(shipmentOrRows) {
   refreshSortingShipmentOptions();
 }
 function hydrateParcelBatchForms(batchOrRows) {
-  var _a;
+  var _a2;
   const rows = Array.isArray(batchOrRows) ? batchOrRows : [batchOrRows];
   const firstRow = rows.find((row) => row && row.batch_no);
   if (!firstRow) {
@@ -14179,7 +14222,7 @@ function hydrateParcelBatchForms(batchOrRows) {
       source_bale_token: inferChinaSourceTokenForRow(firstRow.inbound_shipment_no || "", firstRow),
       supplier_name: firstRow.supplier_name || "",
       package_count: Number(firstRow.package_count || 1),
-      total_weight: (_a = firstRow.total_weight) != null ? _a : "",
+      total_weight: (_a2 = firstRow.total_weight) != null ? _a2 : "",
       category_main: firstRow.category_main || "",
       category_sub: firstRow.category_sub || "",
       note: firstRow.note || "一整批原始包裹入仓，等待分拣"
@@ -14250,8 +14293,8 @@ function getSortingTaskSourceWeightKg(task = {}) {
   }, 0));
 }
 function getActiveSortingResultTask() {
-  var _a;
-  return getSortingTaskByNo(((_a = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a.value) || "");
+  var _a2;
+  return getSortingTaskByNo(((_a2 = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a2.value) || "");
 }
 function syncSortingLossWeightLimit(task = getActiveSortingResultTask()) {
   const input = document.querySelector("#sortingResultForm [name='loss_weight_kg']");
@@ -14309,17 +14352,17 @@ function getSortingSellableWeightKg(totalSourceWeightKg = 0, lossRecord = null) 
   return Math.max(0, roundToTwo(Number(totalSourceWeightKg || 0) - Number(normalizedLoss.loss_weight_kg || 0)));
 }
 function getSortingLossRecordFromDom() {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const form = document.querySelector("#sortingResultForm");
   if (!(form instanceof HTMLFormElement)) {
     return getNormalizedSortingLossRecord();
   }
-  const lossQty = ((_a = form.querySelector("[name='loss_qty']")) == null ? void 0 : _a.value) || 0;
+  const lossQty = ((_a2 = form.querySelector("[name='loss_qty']")) == null ? void 0 : _a2.value) || 0;
   const lossWeightKg = ((_b = form.querySelector("[name='loss_weight_kg']")) == null ? void 0 : _b.value) || 0;
   const lossNote = ((_c = form.querySelector("[name='loss_note']")) == null ? void 0 : _c.value) || "";
   const hasLossInput = Number(lossQty || 0) > 0 || Number(lossWeightKg || 0) > 0 || String(lossNote || "").trim().length > 0 || sortingLossPhotoState.length > 0;
   return getNormalizedSortingLossRecord({
-    has_loss: String(((_d2 = form.querySelector("[name='has_loss_record']")) == null ? void 0 : _d2.value) || "").trim() === "true" || hasLossInput,
+    has_loss: String(((_d = form.querySelector("[name='has_loss_record']")) == null ? void 0 : _d.value) || "").trim() === "true" || hasLossInput,
     loss_qty: lossQty,
     loss_weight_kg: lossWeightKg,
     note: lossNote,
@@ -14358,11 +14401,11 @@ function hydrateSortingLossRecord(record = null) {
   renderSortingLossRecordSummary(normalized);
 }
 async function buildSortingLossRecordPayload(form) {
-  var _a, _b, _c, _d2;
-  const lossQty = ((_a = form.querySelector("[name='loss_qty']")) == null ? void 0 : _a.value) || 0;
+  var _a2, _b, _c, _d;
+  const lossQty = ((_a2 = form.querySelector("[name='loss_qty']")) == null ? void 0 : _a2.value) || 0;
   const lossWeightKg = ((_b = form.querySelector("[name='loss_weight_kg']")) == null ? void 0 : _b.value) || 0;
   const lossNote = ((_c = form.querySelector("[name='loss_note']")) == null ? void 0 : _c.value) || "";
-  const hasLoss = String(((_d2 = form.querySelector("[name='has_loss_record']")) == null ? void 0 : _d2.value) || "").trim() === "true" || Number(lossQty || 0) > 0 || Number(lossWeightKg || 0) > 0 || String(lossNote || "").trim().length > 0 || sortingLossPhotoState.length > 0;
+  const hasLoss = String(((_d = form.querySelector("[name='has_loss_record']")) == null ? void 0 : _d.value) || "").trim() === "true" || Number(lossQty || 0) > 0 || Number(lossWeightKg || 0) > 0 || String(lossNote || "").trim().length > 0 || sortingLossPhotoState.length > 0;
   if (!hasLoss) {
     sortingLossPhotoState = [];
     return getNormalizedSortingLossRecord();
@@ -14570,8 +14613,8 @@ function getSortingTaskCostStatusMeta(task = {}) {
   return getSortingTaskFormalCostPayload(task, Array.isArray(task == null ? void 0 : task.result_items) ? task.result_items : []);
 }
 function renderSortingResultRowCostHint(row = {}, rowIndex = 0) {
-  var _a;
-  const taskNo = String(((_a = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a.value) || "").trim();
+  var _a2;
+  const taskNo = String(((_a2 = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a2.value) || "").trim();
   const task = getSortingTaskByNo(taskNo);
   if (!task) {
     return '<div class="line-builder-meta">先从上一步选定一张分拣任务，系统再判断这一组货的来源成本池是否已经关联。</div>';
@@ -14589,12 +14632,12 @@ function renderSortingResultRowCostHint(row = {}, rowIndex = 0) {
   return `<div class="line-builder-meta">${escapeHtml(`${categoryName}${qtyLabel}：${lineCostLabel} · 成本档位 ${defaultCostLabel} · 锁定库位 ${defaultRackLabel} · ${lineWeightLabel}。${costMeta.detail}`)}</div>`;
 }
 function renderSortingResultTaskSummary(taskNo = "") {
-  var _a;
+  var _a2;
   const target = document.querySelector("#sortingResultTaskSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const task = getSortingTaskByNo(taskNo || ((_a = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a.value) || "");
+  const task = getSortingTaskByNo(taskNo || ((_a2 = document.querySelector("#sortingResultForm [name='task_no']")) == null ? void 0 : _a2.value) || "");
   if (!task) {
     target.className = "candidate-summary empty-state";
     target.textContent = "先从上一步“分拣任务管理”里点进一张任务。这里会显示分拣时间、分拣人、包裹数量、总重和当前正在分拣的 bale 详情。";
@@ -14722,11 +14765,11 @@ function buildTransferDemandDraftRows(rows = []) {
   }
   const grouped = /* @__PURE__ */ new Map();
   (Array.isArray(rows) ? rows : []).forEach((row) => {
-    var _a, _b;
+    var _a2, _b;
     const categoryMain = String((row == null ? void 0 : row.category_main) || "").trim();
     const categorySub = String((row == null ? void 0 : row.category_sub) || "").trim();
     const grade = String((row == null ? void 0 : row.grade) || "P").trim().toUpperCase() || "P";
-    const requestedQty = Number((_b = (_a = row == null ? void 0 : row.requested_qty) != null ? _a : row == null ? void 0 : row.suggested_qty) != null ? _b : 0);
+    const requestedQty = Number((_b = (_a2 = row == null ? void 0 : row.requested_qty) != null ? _a2 : row == null ? void 0 : row.suggested_qty) != null ? _b : 0);
     if (!categoryMain || !categorySub || requestedQty <= 0) {
       return;
     }
@@ -14788,13 +14831,13 @@ function getManualReplenishmentStoreOptions() {
   return Array.from(/* @__PURE__ */ new Set([...fromDirectory.length ? fromDirectory : [], ...fallback]));
 }
 function renderManualReplenishmentStoreOptions(preferredStoreCode = "") {
-  var _a;
+  var _a2;
   const target = getManualReplenishmentContextControl("to_store_code");
   if (!(target instanceof HTMLSelectElement)) {
     return;
   }
   const options = getManualReplenishmentStoreOptions();
-  const normalizedPreferred = String(preferredStoreCode || ((_a = getManualReplenishmentFormInput("to_store_code")) == null ? void 0 : _a.value) || "UTAWALA").trim().toUpperCase() || "UTAWALA";
+  const normalizedPreferred = String(preferredStoreCode || ((_a2 = getManualReplenishmentFormInput("to_store_code")) == null ? void 0 : _a2.value) || "UTAWALA").trim().toUpperCase() || "UTAWALA";
   target.innerHTML = options.map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`).join("");
   const nextValue = options.includes(normalizedPreferred) ? normalizedPreferred : options[0] || "UTAWALA";
   target.value = nextValue;
@@ -14826,10 +14869,10 @@ function syncManualReplenishmentContextFromForm() {
   });
 }
 function getManualReplenishmentFormMeta() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   syncManualReplenishmentContextToForm();
   return {
-    fromWarehouseCode: String(((_a = getManualReplenishmentFormInput("from_warehouse_code")) == null ? void 0 : _a.value) || "WH1").trim() || "WH1",
+    fromWarehouseCode: String(((_a2 = getManualReplenishmentFormInput("from_warehouse_code")) == null ? void 0 : _a2.value) || "WH1").trim() || "WH1",
     toStoreCode: String(((_b = getManualReplenishmentFormInput("to_store_code")) == null ? void 0 : _b.value) || "UTAWALA").trim() || "UTAWALA",
     requiredArrivalDate: String(((_c = getManualReplenishmentFormInput("required_arrival_date")) == null ? void 0 : _c.value) || "2026-05-03").trim() || "2026-05-03"
   };
@@ -14853,7 +14896,7 @@ function updateManualReplenishmentActionPanel(rows = []) {
   }
 }
 function renderTransferDraftSummary() {
-  var _a;
+  var _a2;
   const target = document.querySelector("#transferDraftSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -14862,7 +14905,7 @@ function renderTransferDraftSummary() {
   renderManualReplenishmentContext("草稿");
   syncJsonBuilderToField("transfer-items");
   const rows = buildTransferDemandDraftRows(
-    parseJsonField(((_a = document.querySelector("#transferForm [name='items_json']")) == null ? void 0 : _a.value) || "[]", [])
+    parseJsonField(((_a2 = document.querySelector("#transferForm [name='items_json']")) == null ? void 0 : _a2.value) || "[]", [])
   );
   if (!rows.length) {
     updateManualReplenishmentActionPanel(rows);
@@ -14914,10 +14957,10 @@ function buildTransferPreparationPlan(rows = []) {
   };
 }
 function getCurrentTransferDraftRows() {
-  var _a;
+  var _a2;
   syncJsonBuilderToField("transfer-items");
   return buildTransferDemandDraftRows(
-    parseJsonField(((_a = document.querySelector("#transferForm [name='items_json']")) == null ? void 0 : _a.value) || "[]", [])
+    parseJsonField(((_a2 = document.querySelector("#transferForm [name='items_json']")) == null ? void 0 : _a2.value) || "[]", [])
   );
 }
 function getTransferPreparationOrder(transferNo = activeTransferPreparationNo) {
@@ -14964,8 +15007,8 @@ function getTransferPreparationPlanRows(transferOrNo = null) {
   return cachedDemandLines.length ? cachedDemandLines : fallbackDraftRows;
 }
 function getLoosePackingPackageLimitQty(fallback = 200) {
-  var _a;
-  const selected = Number(((_a = document.querySelector("#loosePackingTaskPlanForm [name='package_limit_qty']")) == null ? void 0 : _a.value) || 0);
+  var _a2;
+  const selected = Number(((_a2 = document.querySelector("#loosePackingTaskPlanForm [name='package_limit_qty']")) == null ? void 0 : _a2.value) || 0);
   if ([50, 100, 200].includes(selected)) {
     return selected;
   }
@@ -14982,11 +15025,11 @@ function formatLoosePickSheetPackingLinesForTask(task = {}) {
     return [];
   }
   return task.lines.map((line) => {
-    var _a, _b, _c, _d2, _e2, _f2, _g2;
+    var _a2, _b, _c, _d, _e2, _f2, _g2;
     const categoryMain = String((line == null ? void 0 : line.categoryMain) || "").trim();
     const categorySub = String((line == null ? void 0 : line.categorySub) || "").trim();
-    const qty = Number((_c = (_b = (_a = line == null ? void 0 : line.pickedQty) != null ? _a : line == null ? void 0 : line.picked_qty) != null ? _b : line == null ? void 0 : line.qty) != null ? _c : 0);
-    const requestedQty = Math.max(qty, Number((_e2 = (_d2 = line == null ? void 0 : line.requestedQty) != null ? _d2 : line == null ? void 0 : line.requested_qty) != null ? _e2 : qty));
+    const qty = Number((_c = (_b = (_a2 = line == null ? void 0 : line.pickedQty) != null ? _a2 : line == null ? void 0 : line.picked_qty) != null ? _b : line == null ? void 0 : line.qty) != null ? _c : 0);
+    const requestedQty = Math.max(qty, Number((_e2 = (_d = line == null ? void 0 : line.requestedQty) != null ? _d : line == null ? void 0 : line.requested_qty) != null ? _e2 : qty));
     const shortageQty = Math.max(0, Number((_g2 = (_f2 = line == null ? void 0 : line.shortageQty) != null ? _f2 : line == null ? void 0 : line.shortage_qty) != null ? _g2 : 0));
     if (!categoryMain && !categorySub && qty <= 0) {
       return "";
@@ -14995,9 +15038,9 @@ function formatLoosePickSheetPackingLinesForTask(task = {}) {
   }).filter(Boolean);
 }
 function getLoosePickLineStatusLabel(line = {}) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2;
-  const requestedQty = Math.max(0, Number((_c = (_b = (_a = line.requestedQty) != null ? _a : line.requested_qty) != null ? _b : line.qty) != null ? _c : 0));
-  const pickedQty = Math.max(0, Number((_f2 = (_e2 = (_d2 = line.pickedQty) != null ? _d2 : line.picked_qty) != null ? _e2 : line.qty) != null ? _f2 : 0));
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2;
+  const requestedQty = Math.max(0, Number((_c = (_b = (_a2 = line.requestedQty) != null ? _a2 : line.requested_qty) != null ? _b : line.qty) != null ? _c : 0));
+  const pickedQty = Math.max(0, Number((_f2 = (_e2 = (_d = line.pickedQty) != null ? _d : line.picked_qty) != null ? _e2 : line.qty) != null ? _f2 : 0));
   const shortageQty = Math.max(0, Number((_h2 = (_g2 = line.shortageQty) != null ? _g2 : line.shortage_qty) != null ? _h2 : 0));
   if (String(line.statusLabel || "").trim()) {
     return String(line.statusLabel).trim();
@@ -15017,12 +15060,12 @@ function getLoosePickLineStatusLabel(line = {}) {
   return "待处理";
 }
 function getLoosePickTaskPickedQty(task = {}) {
-  var _a, _b, _c, _d2;
-  return Number((_d2 = (_c = (_b = (_a = task.pickedQty) != null ? _a : task.picked_qty) != null ? _b : task.totalQty) != null ? _c : task.qty) != null ? _d2 : 0);
+  var _a2, _b, _c, _d;
+  return Number((_d = (_c = (_b = (_a2 = task.pickedQty) != null ? _a2 : task.picked_qty) != null ? _b : task.totalQty) != null ? _c : task.qty) != null ? _d : 0);
 }
 function getLoosePickTaskShortageQty(task = {}) {
-  var _a, _b;
-  return Math.max(0, Number((_b = (_a = task.shortageQty) != null ? _a : task.shortage_qty) != null ? _b : 0));
+  var _a2, _b;
+  return Math.max(0, Number((_b = (_a2 = task.shortageQty) != null ? _a2 : task.shortage_qty) != null ? _b : 0));
 }
 function buildLoosePickSheetLabelForTask(task = {}, transfer = {}) {
   if (typeof operationsFulfillmentFlow.buildLoosePickSheetLabel === "function") {
@@ -15123,7 +15166,7 @@ function buildWarehouseoutModalPrintJobFromPayload(payload = {}, {
   documentNo = "",
   productName = ""
 } = {}) {
-  var _a;
+  var _a2;
   const templateCode = String(payload.template_code || getActiveBaleTemplateCode()).trim().toLowerCase();
   const entityType = String(payload.entity_type || "").trim().toUpperCase();
   const barcodeValue2 = String(
@@ -15144,7 +15187,7 @@ function buildWarehouseoutModalPrintJobFromPayload(payload = {}, {
     label_size: "60x40",
     copies: Number(payload.copies || 1) || 1,
     printer_name: String(payload.printer_name || "").trim(),
-    requested_by: ((_a = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _a.username) || "",
+    requested_by: ((_a2 = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _a2.username) || "",
     display_code: displayCode,
     machine_code: barcodeValue2,
     barcode_value: barcodeValue2,
@@ -15189,14 +15232,14 @@ function buildTransferDispatchPrinterPayloadForRow(row = {}, transfer = {}, {
   rowIndex = 0,
   totalRows = 0
 } = {}) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const sourceBales = Array.isArray(row.source_bales) ? row.source_bales.filter(Boolean) : [];
   const packageIndex = Math.max(1, Number(row.package_index || row.packageIndex || rowIndex + 1) || 1);
   const packageCount = Math.max(packageIndex, Number(row.package_total || row.package_count || row.packageCount || totalRows || 1) || 1);
   const entityType = String(row.entity_type || "").trim().toUpperCase();
   const isSdoPackage = entityType === "STORE_DELIVERY_PACKAGE" || /^SDP\d{9}$/.test(String(row.display_code || row.package_id || "").trim().toUpperCase()) || /^6\d{9}$/.test(String(row.machine_code || row.barcode_value || "").replace(/[^0-9]/g, "").trim());
   const parentSdoDisplayCode = String(
-    row.parent_sdo_display_code || row.parent_sdo_order_no || (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || ((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.official_delivery_barcode) || (transfer == null ? void 0 : transfer.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
+    row.parent_sdo_display_code || row.parent_sdo_order_no || (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a2.execution_order_no) || ((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.official_delivery_barcode) || (transfer == null ? void 0 : transfer.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
   ).trim().toUpperCase();
   const parentSdoMachineCode = String(
     row.parent_sdo_machine_code || ((_c = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _c.machine_code) || (transfer == null ? void 0 : transfer.machine_code) || ""
@@ -15279,8 +15322,8 @@ function buildSDOPrintJobs({
   transfer = {},
   displayRows = []
 } = {}) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2;
-  const packageRows = Array.isArray((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.packages) && transfer.store_delivery_execution_order.packages.length ? transfer.store_delivery_execution_order.packages : Array.isArray(displayRows) ? displayRows : [];
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2;
+  const packageRows = Array.isArray((_a2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a2.packages) && transfer.store_delivery_execution_order.packages.length ? transfer.store_delivery_execution_order.packages : Array.isArray(displayRows) ? displayRows : [];
   const sourceDisplayRows = Array.isArray(displayRows) ? displayRows : [];
   const rows = packageRows;
   if (!rows.length) {
@@ -15291,7 +15334,7 @@ function buildSDOPrintJobs({
     (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.execution_order_no) || ((_c = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _c.official_delivery_barcode) || (transfer == null ? void 0 : transfer.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
   ).trim().toUpperCase();
   const sdoMachineCodeFromTransfer = String(
-    (transfer == null ? void 0 : transfer.machine_code) || ((_d2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _d2.machine_code) || ((_f2 = (_e2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _e2.print_payload) == null ? void 0 : _f2.machine_code) || ((_h2 = (_g2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _g2.print_payload) == null ? void 0 : _h2.barcode_value) || ""
+    (transfer == null ? void 0 : transfer.machine_code) || ((_d = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _d.machine_code) || ((_f2 = (_e2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _e2.print_payload) == null ? void 0 : _f2.machine_code) || ((_h2 = (_g2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _g2.print_payload) == null ? void 0 : _h2.barcode_value) || ""
   ).replace(/[^0-9]/g, "").trim();
   const sdoMachineCode = sdoMachineCodeFromTransfer || (/^SDO(\d{2})(\d{2})(\d{2})(\d{3})$/.test(sdoDisplayCode) ? `4${sdoDisplayCode.slice(3)}` : "");
   if (!/^SDO\d{9}$/.test(sdoDisplayCode)) {
@@ -15419,10 +15462,10 @@ function openTransferDispatchPrintTemplateModal({
   transfer = {},
   displayRows = []
 } = {}) {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const rows = Array.isArray(displayRows) ? displayRows : [];
   const jobs = buildSDOPrintJobs({ transferNo, transfer, displayRows: rows });
-  const sdoDisplayCode = String(((_b = (_a = jobs[0]) == null ? void 0 : _a.print_payload) == null ? void 0 : _b.parent_sdo_display_code) || ((_d2 = (_c = jobs[0]) == null ? void 0 : _c.print_payload) == null ? void 0 : _d2.store_delivery_execution_order_no) || "").trim().toUpperCase();
+  const sdoDisplayCode = String(((_b = (_a2 = jobs[0]) == null ? void 0 : _a2.print_payload) == null ? void 0 : _b.parent_sdo_display_code) || ((_d = (_c = jobs[0]) == null ? void 0 : _c.print_payload) == null ? void 0 : _d.store_delivery_execution_order_no) || "").trim().toUpperCase();
   const templateCode = getTransferDispatchTemplateCode();
   balePrinterConsoleNotice = {
     type: "success",
@@ -15480,7 +15523,7 @@ function buildLoosePackingTasksForTransfer(transferNo = "", plan = null, { packa
   return [];
 }
 function getTransferExecutionRecord(transferNo = "", { create = false, plan = null } = {}) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const normalizedTransferNo = String(transferNo || "").trim().toUpperCase();
   if (!normalizedTransferNo) {
     return {
@@ -15508,7 +15551,7 @@ function getTransferExecutionRecord(transferNo = "", { create = false, plan = nu
     looseTasks: Array.isArray(record.looseTasks) ? record.looseTasks : [],
     lastUpdatedAt: String(record.lastUpdatedAt || "").trim()
   };
-  const hasLegacyLooseTasks = nextRecord.looseTasks.length > 1 || nextRecord.looseTasks.length === 1 && ((_a = nextRecord.looseTasks[0]) == null ? void 0 : _a.taskType) !== "loose_pick_sheet";
+  const hasLegacyLooseTasks = nextRecord.looseTasks.length > 1 || nextRecord.looseTasks.length === 1 && ((_a2 = nextRecord.looseTasks[0]) == null ? void 0 : _a2.taskType) !== "loose_pick_sheet";
   if (hasLegacyLooseTasks && ((_b = effectivePlan.loosePickRows) == null ? void 0 : _b.length)) {
     const wasCompleted = nextRecord.looseTasks.length > 0 && nextRecord.looseTasks.every((task) => String((task == null ? void 0 : task.status) || "").trim().toLowerCase() === "packed");
     nextRecord.looseTasks = buildLoosePackingTasksForTransfer(normalizedTransferNo, effectivePlan, {
@@ -15523,7 +15566,7 @@ function getTransferExecutionRecord(transferNo = "", { create = false, plan = nu
     }
     setTransferPrepExecutionRecord(normalizedTransferNo, nextRecord);
   }
-  if (!nextRecord.looseTasks.length && ((_d2 = effectivePlan.loosePickRows) == null ? void 0 : _d2.length)) {
+  if (!nextRecord.looseTasks.length && ((_d = effectivePlan.loosePickRows) == null ? void 0 : _d.length)) {
     nextRecord.looseTasks = buildLoosePackingTasksForTransfer(normalizedTransferNo, effectivePlan, {
       packageLimitQty: nextRecord.packageLimitQty
     });
@@ -15564,7 +15607,7 @@ function getTransferExecutionAnchor(transferOrNo = activeTransferPreparationNo) 
   return Array.isArray(transferOrderState) && transferOrderState.length ? transferOrderState[0] : null;
 }
 function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparationNo) {
-  var _a, _b;
+  var _a2, _b;
   const target = document.querySelector("#replenishmentFlowSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -15620,7 +15663,7 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
     },
     {
       title: "最终送店打印",
-      status: ((_a = normalized.dispatch_bales) == null ? void 0 : _a.length) ? "completed" : readiness.canPrint ? "active" : "pending",
+      status: ((_a2 = normalized.dispatch_bales) == null ? void 0 : _a2.length) ? "completed" : readiness.canPrint ? "active" : "pending",
       detail: ((_b = normalized.dispatch_bales) == null ? void 0 : _b.length) ? `${normalized.dispatch_bales.length} 个 dispatch bale` : readiness.canPrint ? "条件已满足，可打印" : "还没满足打印前置条件"
     }
   ];
@@ -15652,7 +15695,7 @@ function renderReplenishmentFlowSummary(transferOrNo = activeTransferPreparation
   `;
 }
 function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparationNo) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2;
   const summaryTarget = document.querySelector("#loosePackingTaskPlanSummary");
   const listTarget = document.querySelector("#loosePackingTaskList");
   if (!(summaryTarget instanceof HTMLElement) || !(listTarget instanceof HTMLElement)) {
@@ -15670,9 +15713,9 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
   const executionRecord = getTransferExecutionRecord(transfer.transfer_no, { create: false, plan });
   const tasks = Array.isArray(executionRecord.looseTasks) ? executionRecord.looseTasks : [];
   const readiness = summarizeTransferExecutionState(transfer.transfer_no, plan);
-  const packageLimitQty = ((_a = tasks[0]) == null ? void 0 : _a.packageLimitQty) || getLoosePackingPackageLimitQty(executionRecord.packageLimitQty);
+  const packageLimitQty = ((_a2 = tasks[0]) == null ? void 0 : _a2.packageLimitQty) || getLoosePackingPackageLimitQty(executionRecord.packageLimitQty);
   const plannedPackageCount = ((_b = tasks[0]) == null ? void 0 : _b.plannedPackageCount) || (((_c = plan.summary) == null ? void 0 : _c.looseQtyToPick) ? Math.max(1, Math.ceil(Number(plan.summary.looseQtyToPick || 0) / packageLimitQty)) : 0);
-  const unresolvedShortageQty = Number(readiness.unresolvedShortageQty || ((_d2 = plan.summary) == null ? void 0 : _d2.shortageQty) || 0);
+  const unresolvedShortageQty = Number(readiness.unresolvedShortageQty || ((_d = plan.summary) == null ? void 0 : _d.shortageQty) || 0);
   const looseTaskStatusLabel = unresolvedShortageQty > 0 ? "库存不足" : readiness.pendingLooseTaskCount ? "待完成" : "已完成";
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
@@ -15768,9 +15811,9 @@ function renderLoosePackingTaskWorkbench(transferOrNo = activeTransferPreparatio
                 </thead>
                 <tbody>
                   ${taskLines.map((line) => {
-      var _a2, _b2, _c2, _d3, _e3, _f3, _g3;
-      const pickedQty = Number((_c2 = (_b2 = (_a2 = line.pickedQty) != null ? _a2 : line.picked_qty) != null ? _b2 : line.qty) != null ? _c2 : 0);
-      const requestedQty = Number((_e3 = (_d3 = line.requestedQty) != null ? _d3 : line.requested_qty) != null ? _e3 : pickedQty);
+      var _a3, _b2, _c2, _d2, _e3, _f3, _g3;
+      const pickedQty = Number((_c2 = (_b2 = (_a3 = line.pickedQty) != null ? _a3 : line.picked_qty) != null ? _b2 : line.qty) != null ? _c2 : 0);
+      const requestedQty = Number((_e3 = (_d2 = line.requestedQty) != null ? _d2 : line.requested_qty) != null ? _e3 : pickedQty);
       const shortageQty = Number((_g3 = (_f3 = line.shortageQty) != null ? _f3 : line.shortage_qty) != null ? _g3 : 0);
       const sourceLabel = Array.isArray(line.rackCodes) && line.rackCodes.length ? line.rackCodes.join("、") : line.baleLabel || "待定位库位";
       return `
@@ -15844,7 +15887,7 @@ function renderTransferPreparationPlanSummary(rows = getCurrentTransferDraftRows
   `;
 }
 function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparationNo) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const summaryTarget = document.querySelector("#transferWorkbenchSummary");
   const preparedProgressTarget = document.querySelector("#transferPreparedBaleProgressSummary");
   const preparedTarget = document.querySelector("#transferPreparedBaleQueue");
@@ -15912,7 +15955,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>补差工单</strong><span>${renderStatusBadge(`${readiness.completedLooseTaskCount || 0} / ${readiness.requiredLooseTaskCount || 0} 已完成`, readiness.pendingLooseTaskCount ? "warning" : "success")}</span></article>
       <article class="store-metric"><strong>正式送货执行码</strong><span>${renderBarcodeEntityBadge("SDO", officialDeliveryCodeLabel)}</span></article>
       <article class="store-metric"><strong>预计送店 bale</strong><span>${escapeHtml(dispatchRows.length || 0)} 个</span></article>
-      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(((_a = normalized.dispatch_bales) == null ? void 0 : _a.length) || 0, ((_b = normalized.dispatch_bales) == null ? void 0 : _b.length) ? "success" : "warning")}</span></article>
+      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(((_a2 = normalized.dispatch_bales) == null ? void 0 : _a2.length) || 0, ((_b = normalized.dispatch_bales) == null ? void 0 : _b.length) ? "success" : "warning")}</span></article>
     </div>
   `;
   preparedProgressTarget.className = "report-summary";
@@ -16027,7 +16070,7 @@ function renderTransferExecutionWorkbench(transferOrNo = activeTransferPreparati
       <article class="store-metric"><strong>最终送店 bale</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", `${dispatchRows.length || 0} 个`)}</span></article>
       <article class="store-metric"><strong>现成包裹直转</strong><span>${renderBarcodeEntityBadge("SDB", `${summary.selectedPreparedBaleCount || 0} 个`)}</span></article>
       <article class="store-metric"><strong>补差拣货单</strong><span>${renderBarcodeEntityBadge("LPK", `${looseDispatchRows.length || 0} 张`)}</span></article>
-      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(((_c = normalized.dispatch_bales) == null ? void 0 : _c.length) || 0, ((_d2 = normalized.dispatch_bales) == null ? void 0 : _d2.length) ? "success" : "warning")}</span></article>
+      <article class="store-metric"><strong>已生成 dispatch bale</strong><span>${renderStatusBadge(((_c = normalized.dispatch_bales) == null ? void 0 : _c.length) || 0, ((_d = normalized.dispatch_bales) == null ? void 0 : _d.length) ? "success" : "warning")}</span></article>
     </div>
     ${renderStatusBlock(verificationHint, verificationPending ? "warning" : "success")}
     <div class="candidate-list transfer-draft-list">
@@ -16519,8 +16562,8 @@ function productImportCategorySubOptionsHtml(mainCategory = "", selectedValue = 
 }
 function syncProductImportRowsFromDom() {
   const rows = [...document.querySelectorAll("#productImportRowsBuilder [data-product-import-row]")].map((rowNode, index) => {
-    var _a, _b, _c;
-    const supplierName = String(((_a = rowNode.querySelector("[data-product-import-field='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
+    var _a2, _b, _c;
+    const supplierName = String(((_a2 = rowNode.querySelector("[data-product-import-field='supplier_name']")) == null ? void 0 : _a2.value) || "").trim();
     const categoryMain = String(((_b = rowNode.querySelector("[data-product-import-field='category_main']")) == null ? void 0 : _b.value) || "").trim();
     const categorySub = String(((_c = rowNode.querySelector("[data-product-import-field='category_sub']")) == null ? void 0 : _c.value) || "").trim();
     const issues = [];
@@ -16683,9 +16726,9 @@ async function loadChinaSourceImportPreviewFromFile(file) {
   return result;
 }
 async function triggerChinaSourceImportPreview() {
-  var _a;
+  var _a2;
   const fileInput = document.querySelector("#chinaSourceImportFile");
-  if (!(fileInput instanceof HTMLInputElement) || !((_a = fileInput.files) == null ? void 0 : _a.length)) {
+  if (!(fileInput instanceof HTMLInputElement) || !((_a2 = fileInput.files) == null ? void 0 : _a2.length)) {
     throw new Error("请先选择要上传的 Excel 或 CSV 文件。");
   }
   await loadChinaSourceImportPreviewFromFile(fileInput.files[0]);
@@ -16695,7 +16738,7 @@ async function submitChinaSourceImportPreview(event) {
   await triggerChinaSourceImportPreview();
 }
 function renderProductBulkCreateSummary(rows = []) {
-  var _a, _b;
+  var _a2, _b;
   const target = document.querySelector("#productResultSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -16717,20 +16760,20 @@ function renderProductBulkCreateSummary(rows = []) {
       <article class="store-metric"><strong>创建条数</strong><span>${list.length}</span></article>
       <article class="store-metric"><strong>涉及供应商</strong><span>${supplierCount}</span></article>
       <article class="store-metric"><strong>涉及品类</strong><span>${categoryCount}</span></article>
-      <article class="store-metric"><strong>最新商品</strong><span>${escapeHtml(((_a = list[list.length - 1]) == null ? void 0 : _a.product_name) || ((_b = list[list.length - 1]) == null ? void 0 : _b.category_sub) || "-")}</span></article>
+      <article class="store-metric"><strong>最新商品</strong><span>${escapeHtml(((_a2 = list[list.length - 1]) == null ? void 0 : _a2.product_name) || ((_b = list[list.length - 1]) == null ? void 0 : _b.category_sub) || "-")}</span></article>
     </div>
     <div class="subtle small">已创建：${escapeHtml(preview)}${list.length > 4 ? " 等" : ""}。成本和售价继续走后面的成本绑定与门店编辑流程。</div>
   `;
 }
 async function submitProductImportPreview(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) {
     return;
   }
   const fileInput = form.querySelector("[name='import_file']");
-  if (!(fileInput instanceof HTMLInputElement) || !((_a = fileInput.files) == null ? void 0 : _a.length)) {
+  if (!(fileInput instanceof HTMLInputElement) || !((_a2 = fileInput.files) == null ? void 0 : _a2.length)) {
     throw new Error("请先选择要上传的 Excel 或 CSV 文件。");
   }
   const payload = new FormData();
@@ -16863,7 +16906,7 @@ function renderParcelBatchStepSummary(shipmentNo = "", overrideMessage = "") {
   `;
 }
 function renderParcelBatchResultSummary(kind, data) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const target = document.querySelector("#parcelBatchResultSummary");
   if (!target) {
     return;
@@ -16876,7 +16919,7 @@ function renderParcelBatchResultSummary(kind, data) {
   const rows = Array.isArray(data) ? data : [data].filter(Boolean);
   if (kind === "list") {
     const pendingCount = rows.filter((row) => row.status === "pending_sorting").length;
-    const latestShipment = getInboundShipmentRecord((_a = rows[0]) == null ? void 0 : _a.inbound_shipment_no);
+    const latestShipment = getInboundShipmentRecord((_a2 = rows[0]) == null ? void 0 : _a2.inbound_shipment_no);
     target.className = "report-summary";
     target.innerHTML = `
       <div class="alert-banner">当前包裹批次已经读取完成。</div>
@@ -16897,7 +16940,7 @@ function renderParcelBatchResultSummary(kind, data) {
     <div class="report-summary-grid">
       <article class="store-metric"><strong>批次号</strong><span>${escapeHtml(data.batch_no || "-")}</span></article>
       <article class="store-metric"><strong>包裹数</strong><span>${escapeHtml(data.package_count || 0)}</span></article>
-      <article class="store-metric"><strong>单包重量</strong><span>${escapeHtml((_d2 = data.total_weight) != null ? _d2 : "-")}</span></article>
+      <article class="store-metric"><strong>单包重量</strong><span>${escapeHtml((_d = data.total_weight) != null ? _d : "-")}</span></article>
       <article class="store-metric"><strong>供应商</strong><span>${escapeHtml(data.supplier_name || "-")}</span></article>
       <article class="store-metric"><strong>关联主档</strong><span>${escapeHtml(data.inbound_shipment_no || "-")}</span></article>
       <article class="store-metric"><strong>大类 / 小类</strong><span>${escapeHtml(`${data.category_main || "-"} / ${data.category_sub || "-"}`)}</span></article>
@@ -16907,7 +16950,7 @@ function renderParcelBatchResultSummary(kind, data) {
     `;
 }
 function renderParcelDirectorySummary(data) {
-  var _a;
+  var _a2;
   const target = document.querySelector("#parcelDirectorySummary");
   if (!target) {
     return;
@@ -16931,7 +16974,7 @@ function renderParcelDirectorySummary(data) {
       <article class="store-metric"><strong>待分拣批次</strong><span>${pendingCount}</span></article>
       <article class="store-metric"><strong>总包裹数</strong><span>${escapeHtml(totalPackages || 0)}</span></article>
       <article class="store-metric"><strong>已生成 bale</strong><span>${escapeHtml(totalBales || 0)}</span></article>
-      <article class="store-metric"><strong>最新船单</strong><span>${escapeHtml(((_a = inboundShipmentState[0]) == null ? void 0 : _a.shipment_no) || "-")}</span></article>
+      <article class="store-metric"><strong>最新船单</strong><span>${escapeHtml(((_a2 = inboundShipmentState[0]) == null ? void 0 : _a2.shipment_no) || "-")}</span></article>
     </div>
     <div class="parcel-directory-grid">
       ${buildParcelShipmentDirectory(inboundShipmentState, rows)}
@@ -17113,8 +17156,8 @@ function renderBaleScannerTestPanel(shipmentNo = "", rows = []) {
   `;
 }
 function commitBaleScannerTestScan(submittedBy = "button") {
-  var _a;
-  const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim() || resolveCurrentInboundShipmentNo();
+  var _a2;
+  const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim() || resolveCurrentInboundShipmentNo();
   if (!shipmentNo) {
     throw new Error("请先锁定一张船单，再测试扫码枪。");
   }
@@ -17160,7 +17203,7 @@ function commitBaleScannerTestScan(submittedBy = "button") {
   requestAnimationFrame(() => focusBaleScannerTestInput());
   return scanResult;
 }
-function renderBaleBarcodeDirectorySummary(shipmentNo = ((_a) => (_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value)() || "") {
+function renderBaleBarcodeDirectorySummary(shipmentNo = ((_b) => (_b = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _b.value)() || "") {
   const target = document.querySelector("#baleBarcodeDirectorySummary");
   const nextButton = document.querySelector("#balePrintConfirmButton");
   renderBaleShipmentLockSummary(shipmentNo);
@@ -17451,8 +17494,8 @@ function syncSystemPrinterSelectOptions() {
     select.value = String(deliMatch.name || "");
   }
 }
-function renderBalePrinterConsoleSummary(shipmentNo = ((_b) => (_b = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _b.value)() || "") {
-  var _a;
+function renderBalePrinterConsoleSummary(shipmentNo = ((_c) => (_c = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _c.value)() || "") {
+  var _a2;
   const target = document.querySelector("#balePrinterConsoleSummary");
   if (!target) {
     return;
@@ -17461,7 +17504,7 @@ function renderBalePrinterConsoleSummary(shipmentNo = ((_b) => (_b = document.qu
   if (normalizedShipmentNo) {
     setCurrentInboundShipment(normalizedShipmentNo);
   }
-  const selectedPrinterName = String(((_a = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a.value) || "Deli DL-720C").trim();
+  const selectedPrinterName = String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a2.value) || "Deli DL-720C").trim();
   const selectedPrinter = findSystemPrinterBySelectedName(selectedPrinterName);
   const hasInstalledPrinters = systemPrinterState.length > 0;
   const isPrinterConnected = Boolean(selectedPrinter);
@@ -17507,8 +17550,8 @@ function renderBalePrinterConsoleSummary(shipmentNo = ((_b) => (_b = document.qu
   `;
 }
 async function loadBalePrinterConsole(shipmentNo = "") {
-  var _a, _b;
-  const fallbackShipmentNo = String(((_a = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim() || String(((_b = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _b.value) || "").trim();
+  var _a2, _b;
+  const fallbackShipmentNo = String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim() || String(((_b = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _b.value) || "").trim();
   const normalizedShipmentNo = String(shipmentNo || fallbackShipmentNo).trim();
   if (normalizedShipmentNo) {
     setInputValue("#balePrinterConsoleForm [name='shipment_no']", normalizedShipmentNo);
@@ -17521,8 +17564,8 @@ async function loadBalePrinterConsole(shipmentNo = "") {
   return balePrinterJobState;
 }
 function jumpToBalePrinterConsole(shipmentNo = "") {
-  var _a, _b;
-  const normalizedShipmentNo = String(shipmentNo || "").trim() || String(((_a = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim() || String(((_b = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _b.value) || "").trim();
+  var _a2, _b;
+  const normalizedShipmentNo = String(shipmentNo || "").trim() || String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim() || String(((_b = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _b.value) || "").trim();
   openInboundFlowStep("barcodes", normalizedShipmentNo);
 }
 async function reloadBaleShipmentPrintRows(shipmentNo = "") {
@@ -17835,7 +17878,7 @@ async function openSortingCompressionCreator({ groupKey = "", taskType = "store_
   }
 }
 function updateInlineSaleCompressionEstimate(form) {
-  var _a, _b;
+  var _a2, _b;
   if (!(form instanceof HTMLFormElement) || !form.matches("[data-sale-bale-estimate-form]")) {
     return;
   }
@@ -17847,7 +17890,7 @@ function updateInlineSaleCompressionEstimate(form) {
     form.dataset.saleBaleCategoryMain || "",
     form.dataset.saleBaleCategorySub || ""
   );
-  const ratioPreset = getSaleBaleRatioPreset(String(((_a = form.querySelector("[name='ratio_label']")) == null ? void 0 : _a.value) || "").trim());
+  const ratioPreset = getSaleBaleRatioPreset(String(((_a2 = form.querySelector("[name='ratio_label']")) == null ? void 0 : _a2.value) || "").trim());
   const estimateSaleMix = storePrepBaleFlow.estimateSaleBaleGradeMix || (() => ({ targetQty: 0, gradeRequirements: [] }));
   const estimate = estimateSaleMix({
     targetWeightKg: Number(((_b = form.querySelector("[name='target_weight_kg']")) == null ? void 0 : _b.value) || 0),
@@ -17857,7 +17900,7 @@ function updateInlineSaleCompressionEstimate(form) {
   summaryTarget.textContent = estimate.targetQty ? `预估 ${estimate.targetQty} 件 · ${estimate.gradeRequirements.map((row) => `${row.grade} ${row.qty} 件`).join(" / ")}` : "先补 4.7/4.8 关联的小类标准克重，再生成待售卖 bale。";
 }
 function updateInlineStoreDispatchCompressionRatio(form) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   if (!(form instanceof HTMLFormElement) || !form.matches("[data-store-dispatch-ratio-form]")) {
     return;
   }
@@ -17866,7 +17909,7 @@ function updateInlineStoreDispatchCompressionRatio(form) {
     return;
   }
   const estimate = buildStoreDispatchCompressionGradeRequirements({
-    piecesPerBale: Number(((_a = form.querySelector("[name='pieces_per_bale']")) == null ? void 0 : _a.value) || 0),
+    piecesPerBale: Number(((_a2 = form.querySelector("[name='pieces_per_bale']")) == null ? void 0 : _a2.value) || 0),
     baleCount: Number(((_b = form.querySelector("[name='bale_count']")) == null ? void 0 : _b.value) || 1),
     ratioLabel: String(((_c = form.querySelector("[name='store_dispatch_ratio_label']")) == null ? void 0 : _c.value) || "").trim()
   });
@@ -18874,7 +18917,7 @@ function renderSortingStockSummary(data) {
             </div>
           </div>
           ${activeSortingCompressionGroupKey && activeSortingCompressionGroupKey === group.groupKey ? (() => {
-        var _a;
+        var _a2;
         const currentOpenTasks = Array.isArray(group.openTasks) ? group.openTasks : [];
         const employeeOptions = renderCompressionEmployeeOptions();
         const creatorTaskType = activeSortingCompressionTaskType || "store_dispatch";
@@ -18885,7 +18928,7 @@ function renderSortingStockSummary(data) {
         const defaultStoreDispatchRatio = buildStoreDispatchCompressionGradeRequirements({
           piecesPerBale: 100,
           baleCount: 1,
-          ratioLabel: ((_a = storeDispatchRatioPresets[0]) == null ? void 0 : _a.label) || ""
+          ratioLabel: ((_a2 = storeDispatchRatioPresets[0]) == null ? void 0 : _a2.label) || ""
         });
         const standardPieceWeightKg = findCompressionStandardPieceWeightKg(group.categoryMain || "", group.categorySub || "");
         const estimateSaleMix = storePrepBaleFlow.estimateSaleBaleGradeMix || (() => ({ targetQty: 0, ratioSummary: "", gradeRequirements: [] }));
@@ -19087,7 +19130,7 @@ function renderSortingStockSummary(data) {
                 <div class="subtle small">${escapeHtml(chooseI18nLabel("成品包先按用途汇总，再展开到具体 bale。", "Finished packages are summarized by use first, then expanded to each bale."))}</div>
               </div>
               ${packedTaskCards.length ? packedTaskCards.map((taskCard) => {
-        var _a;
+        var _a2;
         return `
                     <article class="sorting-stock-inline-card sorting-stock-packed-summary-card ${getStatusCardClass(taskCard.taskType === "sale" ? "neutral" : "info")}">
                       <div class="sorting-stock-row-head">
@@ -19100,7 +19143,7 @@ function renderSortingStockSummary(data) {
                       <div class="sorting-stock-metric-row">
                         ${renderStatusBadge(formatSortingStockMetric("成品包", "Finished Packages", taskCard.baleCount || 0, "包", "packages"), taskCard.baleCount ? "success" : "neutral", "sorting-stock-summary-pill")}
                         ${renderStatusBadge(formatSortingStockMetric("总件数", "Total Items", taskCard.qty || 0), taskCard.qty ? "success" : "neutral", "sorting-stock-summary-pill")}
-                        ${renderStatusBadge(`${chooseI18nLabel("等级结构", "Grade Mix")} ${(taskCard.gradeSummaries || []).join(" / ") || chooseI18nLabel("待补录", "Not Set")}`, ((_a = taskCard.gradeSummaries) == null ? void 0 : _a.length) ? "neutral" : "warning", "sorting-stock-summary-pill")}
+                        ${renderStatusBadge(`${chooseI18nLabel("等级结构", "Grade Mix")} ${(taskCard.gradeSummaries || []).join(" / ") || chooseI18nLabel("待补录", "Not Set")}`, ((_a2 = taskCard.gradeSummaries) == null ? void 0 : _a2.length) ? "neutral" : "warning", "sorting-stock-summary-pill")}
                         ${renderStatusBadge(`${chooseI18nLabel("总成本", "Total Cost")} ${formatKesAmount(taskCard.totalCostKes || 0, chooseI18nLabel("待补录", "Not Set"))}`, taskCard.totalCostKes ? "neutral" : "warning", "sorting-stock-summary-pill")}
                       </div>
                       <div class="sorting-stock-secondary-list">
@@ -19362,13 +19405,13 @@ function getDirectHangItemsByBale(baleNo = "", assignedEmployee = "") {
   return normalizedEmployee ? rows.filter((row) => String(row.assigned_employee || "").trim() === normalizedEmployee) : rows;
 }
 function getPreferredItemTokenTemplateCode(preferredValue = "") {
-  var _a, _b;
+  var _a2, _b;
   const preferred = String(preferredValue || "").trim().toLowerCase();
   const productTemplates = getLabelTemplatesByScope("product");
   if (preferred && productTemplates.some((row) => String((row == null ? void 0 : row.template_code) || "").trim().toLowerCase() === preferred)) {
     return preferred;
   }
-  const currentValue = String(((_a = document.querySelector("#itemTokenPrintQueueForm [name='template_code']")) == null ? void 0 : _a.value) || "").trim().toLowerCase();
+  const currentValue = String(((_a2 = document.querySelector("#itemTokenPrintQueueForm [name='template_code']")) == null ? void 0 : _a2.value) || "").trim().toLowerCase();
   if (currentValue && productTemplates.some((row) => String((row == null ? void 0 : row.template_code) || "").trim().toLowerCase() === currentValue)) {
     return currentValue;
   }
@@ -19583,12 +19626,12 @@ function getStoreTokenReceivingSessionStatusLabel(status = "") {
   return labels[normalized] || String(status || "-").trim() || "-";
 }
 function renderStoreDispatchBaleSummary(rows = [], context = {}) {
-  var _a;
+  var _a2;
   const target = document.querySelector("#storeDispatchBaleSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const currentTransferNo = String(context.transfer_no || ((_a = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+  const currentTransferNo = String(context.transfer_no || ((_a2 = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   if (currentTransferNo && !context.lastAccepted && !context.scanned_bale_no && !context.matchedBale) {
     renderStoreReceiptTransferBaleList(currentTransferNo, rows);
     return;
@@ -20338,7 +20381,7 @@ function renderStoreReceivingPackageDetail(rowOrCode = "", context = {}) {
   `;
 }
 function renderStoreReceiptTransferPackageList(transferNo = "", rows = null) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = document.querySelector("#storeDispatchBaleSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -20366,7 +20409,7 @@ function renderStoreReceiptTransferPackageList(transferNo = "", rows = null) {
     ${renderStatusAlert(`SDO ${normalizedSdoCode} 的 SDP 实体包列表。请按包确认收到、标记异常或分配店员。`, "info")}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>SDO 显示码</strong><span>${renderBarcodeEntityBadge("SDO", normalizedSdoCode)}</span></article>
-      <article class="store-metric"><strong>SDO 机报码</strong><span>${renderBarcodeEntityBadge("SDO", ((_a = packageRows[0]) == null ? void 0 : _a.parent_sdo_machine_code) || "-")}</span></article>
+      <article class="store-metric"><strong>SDO 机报码</strong><span>${renderBarcodeEntityBadge("SDO", ((_a2 = packageRows[0]) == null ? void 0 : _a2.parent_sdo_machine_code) || "-")}</span></article>
       <article class="store-metric"><strong>调拨参考</strong><span>${escapeHtml(((_b = packageRows[0]) == null ? void 0 : _b.transfer_no) || "-")}</span></article>
       <article class="store-metric"><strong>目标门店</strong><span>${escapeHtml(((_c = packageRows[0]) == null ? void 0 : _c.store_code) || getCurrentStoreCodeFallback() || "-")}</span></article>
       <article class="store-metric"><strong>SDP 包数</strong><span>${renderBarcodeEntityBadge("SDO_PACKAGE", packageRows.length)}</span></article>
@@ -20481,7 +20524,7 @@ async function assignStoreReceivingPackagesToClerk(packageRows = [], clerkName =
   }));
 }
 function renderStoreDispatchAssignmentOverview(target) {
-  var _a;
+  var _a2;
   const storeCode = getCurrentStoreCodeFallback();
   const packageRows = getStoreReceivingPackageRows(storeCode);
   const sdoGroups = groupStoreReceivingPackagesBySdo(packageRows);
@@ -20499,7 +20542,7 @@ function renderStoreDispatchAssignmentOverview(target) {
     target.textContent = "当前没有已收货且可分配的 SDP 包。未收货或异常 SDP 不能分配给店员。";
     return;
   }
-  const selectedSdo = String(((_a = document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")) == null ? void 0 : _a.value) || acceptedGroups[0].sdo_display_code || "").trim().toUpperCase();
+  const selectedSdo = String(((_a2 = document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")) == null ? void 0 : _a2.value) || acceptedGroups[0].sdo_display_code || "").trim().toUpperCase();
   const group = acceptedGroups.find((row) => row.sdo_display_code === selectedSdo) || acceptedGroups[0];
   const assignedCount = group.packages.filter((row) => String((row == null ? void 0 : row.assigned_clerk) || "").trim()).length;
   target.className = "report-summary";
@@ -20673,14 +20716,14 @@ function renderDirectHangStoreWorkbenchSummary(rows = [], context = {}) {
   `;
 }
 function renderStoreTokenEditSummary(rows = [], context = {}) {
-  var _a, _b;
+  var _a2, _b;
   const target = document.querySelector("#storeTokenEditSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) {
-    const storeCode = String(context.store_code || ((_a = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
+    const storeCode = String(context.store_code || ((_a2 = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
     const assignedEmployee = String(context.assigned_employee || ((_b = document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")) == null ? void 0 : _b.value) || getCurrentStoreWorkerFallback() || "").trim();
     const assignedPackages = getStorePdaAssignedPackageRows(storeCode, assignedEmployee);
     if (assignedPackages.length) {
@@ -20908,7 +20951,7 @@ function renderStoreTokenEditSummary(rows = [], context = {}) {
   `;
 }
 function renderItemTokenDirectorySummary(rows = [], context = {}) {
-  var _a, _b;
+  var _a2, _b;
   const target = document.querySelector("#itemTokenDirectorySummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -20929,7 +20972,7 @@ function renderItemTokenDirectorySummary(rows = [], context = {}) {
   const relatedJobs = itemTokenPrintJobState.filter((job) => tokenSet.has(String(job.barcode || "").trim().toUpperCase()));
   const sample = list[0] || {};
   const printerNameValue = String(
-    ((_a = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _b.value) || "Deli DL-720C"
+    ((_a2 = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _a2.value) || ((_b = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _b.value) || "Deli DL-720C"
   ).trim();
   const printerStatusCard = renderStorePrinterStatusCard({
     title: "门店蓝牙打印状态",
@@ -21020,9 +21063,9 @@ function buildStoreDispatchBaleQuery(payload = {}) {
   return params.toString();
 }
 function getCurrentStoreCodeFallback() {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   return String(
-    ((_a = currentSession.user) == null ? void 0 : _a.store_code) || ((_b = document.querySelector("#storeDispatchBaleForm [name='store_code']")) == null ? void 0 : _b.value) || ((_c = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _c.value) || ((_d2 = document.querySelector("#startReceivingSessionForm [name='store_code']")) == null ? void 0 : _d2.value) || "UTAWALA"
+    ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || ((_b = document.querySelector("#storeDispatchBaleForm [name='store_code']")) == null ? void 0 : _b.value) || ((_c = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _c.value) || ((_d = document.querySelector("#startReceivingSessionForm [name='store_code']")) == null ? void 0 : _d.value) || "UTAWALA"
   ).trim().toUpperCase();
 }
 function populateStoreFlowFormsFromContext(context = {}) {
@@ -21565,8 +21608,8 @@ function isDeliLocalPrinter(printer) {
   return normalizedName.includes("deli") && (normalizedName.includes("720") || normalizedName.includes("dl720c"));
 }
 function getSelectedLocalPrinterName() {
-  var _a, _b;
-  const modalPrinterName = String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || "").trim();
+  var _a2, _b;
+  const modalPrinterName = String(((_a2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a2.value) || "").trim();
   const consolePrinterName = String(((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim();
   return modalPrinterName || consolePrinterName || "Deli DL-720C";
 }
@@ -21631,7 +21674,7 @@ function renderLocalPrinterQueueList(printers = []) {
   `;
 }
 function renderBaleLocalPrintAgentStatus() {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2;
   const statusArea = document.querySelector("#balePrintModalLocalAgentStatus");
   const diagnostics = document.querySelector("#balePrintModalDiagnosticsPayload");
   if (!(statusArea instanceof HTMLElement)) return;
@@ -21644,7 +21687,7 @@ function renderBaleLocalPrintAgentStatus() {
   const printerBadge = printerStatus === "checking" ? "检测中" : printerStatus === "available" ? "就绪" : printerStatus === "unavailable" ? "不可用" : "未检测";
   const agentTone = agentStatus === "connected" ? "success" : agentStatus === "disconnected" ? "danger" : agentStatus === "checking" ? "warning" : "neutral";
   const printerTone = printerStatus === "available" ? "success" : printerStatus === "unavailable" ? "danger" : printerStatus === "checking" ? "warning" : "neutral";
-  const selectedPrinterName = String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || "Deli DL-720C");
+  const selectedPrinterName = String(((_a2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a2.value) || "Deli DL-720C");
   statusArea.innerHTML = `<div class="bale-print-status-grid">
     <div class="bale-print-status-item">
       <div class="bale-print-status-icon" aria-hidden="true">▣</div>
@@ -21662,7 +21705,7 @@ function renderBaleLocalPrintAgentStatus() {
       `template_code: ${String(((_b = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _b.value) || "")}`,
       `template_scope: ${String(getActiveBaleTemplateScope() || "")}`,
       `label_type: ${String(((_c = document.querySelector("#balePrintModalTitle")) == null ? void 0 : _c.textContent) || "")}`,
-      `display_code: ${String(((_f2 = (_e2 = (_d2 = balePrintModalState.jobs) == null ? void 0 : _d2[balePrintModalState.currentIndex]) == null ? void 0 : _e2.print_payload) == null ? void 0 : _f2.display_code) || "")}`,
+      `display_code: ${String(((_f2 = (_e2 = (_d = balePrintModalState.jobs) == null ? void 0 : _d[balePrintModalState.currentIndex]) == null ? void 0 : _e2.print_payload) == null ? void 0 : _f2.display_code) || "")}`,
       `machine_code: ${String(((_i2 = (_h2 = (_g2 = balePrintModalState.jobs) == null ? void 0 : _g2[balePrintModalState.currentIndex]) == null ? void 0 : _h2.print_payload) == null ? void 0 : _i2.machine_code) || "")}`,
       `barcode_value: ${String(((_l2 = (_k2 = (_j2 = balePrintModalState.jobs) == null ? void 0 : _j2[balePrintModalState.currentIndex]) == null ? void 0 : _k2.print_payload) == null ? void 0 : _l2.barcode_value) || "")}`,
       `selectedPrinterName: ${String(((_m2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _m2.value) || "")}`,
@@ -21890,7 +21933,7 @@ function validateLocalAgentLabelPayload(labelPayload = {}, { templateCode = "" }
   return "";
 }
 function buildLocalAgentLabelPayload(job, directPayload = {}) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2;
   const payload = (job == null ? void 0 : job.print_payload) || {};
   const machineCode = [
     payload.barcode_value,
@@ -21916,8 +21959,8 @@ function buildLocalAgentLabelPayload(job, directPayload = {}) {
     parent_sdo_display_code: String(directPayload.parent_sdo_display_code || payload.parent_sdo_display_code || "").trim().toUpperCase(),
     parent_sdo_machine_code: String(directPayload.parent_sdo_machine_code || payload.parent_sdo_machine_code || "").replace(/[^0-9]/g, "").trim(),
     store_code: String(directPayload.store_code || payload.store_code || payload.store_name || "").trim().toUpperCase(),
-    package_no: (_c = (_b = (_a = directPayload.package_no) != null ? _a : payload.package_no) != null ? _b : payload.serial_no) != null ? _c : "",
-    package_total: (_g2 = (_f2 = (_e2 = (_d2 = directPayload.package_total) != null ? _d2 : payload.package_total) != null ? _e2 : payload.total_packages) != null ? _f2 : payload.package_count) != null ? _g2 : "",
+    package_no: (_c = (_b = (_a2 = directPayload.package_no) != null ? _a2 : payload.package_no) != null ? _b : payload.serial_no) != null ? _c : "",
+    package_total: (_g2 = (_f2 = (_e2 = (_d = directPayload.package_total) != null ? _d : payload.package_total) != null ? _e2 : payload.total_packages) != null ? _f2 : payload.package_count) != null ? _g2 : "",
     source_type: String(directPayload.source_type || payload.source_type || "").trim().toUpperCase(),
     source_code: String(directPayload.source_code || payload.source_code || "").trim().toUpperCase(),
     source_machine_code: String(directPayload.source_machine_code || payload.source_machine_code || "").replace(/[^0-9]/g, "").trim(),
@@ -21926,14 +21969,14 @@ function buildLocalAgentLabelPayload(job, directPayload = {}) {
   };
 }
 async function printCurrentBaleModalViaLocalAgent() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   const currentIndex = Number(balePrintModalState.currentIndex || 0);
   const currentJob = jobs[currentIndex] || null;
   if (!currentJob) {
     throw new Error("当前没有可打印的标签。");
   }
-  const printerName = String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "Deli DL-720C").trim();
+  const printerName = String(((_a2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a2.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "Deli DL-720C").trim();
   if (!printerName) {
     throw new Error("请先选择打印机。");
   }
@@ -22008,7 +22051,7 @@ async function printCurrentBaleModalPrimaryAction() {
   throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
 }
 async function printAllBaleModalPrimaryAction() {
-  var _a;
+  var _a2;
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   if (!jobs.length) {
     return;
@@ -22032,7 +22075,7 @@ async function printAllBaleModalPrimaryAction() {
     throw new Error("打印助手未连接，请先启动 Windows 打印助手。");
   }
   if (localPrintAgentState.printerStatus !== "available") {
-    const targetPrinterName = String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || "Deli DL-720C").trim() || "Deli DL-720C";
+    const targetPrinterName = String(((_a2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a2.value) || "Deli DL-720C").trim() || "Deli DL-720C";
     throw new Error(`请先确认 ${targetPrinterName} 可用，再执行“打印本批标签”。`);
   }
   const originalIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0));
@@ -22056,7 +22099,7 @@ async function printAllBaleModalPrimaryAction() {
   renderBalePrintModal();
 }
 function renderBalePrintModal() {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2;
   if (!(balePrintModal instanceof HTMLElement)) {
     return;
   }
@@ -22110,7 +22153,7 @@ function renderBalePrintModal() {
   };
   const closeAction = getBalePrintModalCloseAction();
   const alreadyComplete = isBalePrintModalAlreadyComplete(completionAction);
-  const selectedTemplateCode = getActiveBaleTemplateCode(balePrintModalState.preferredTemplateCode || (currentJob == null ? void 0 : currentJob.template_code) || ((_a = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _a.template_code) || "");
+  const selectedTemplateCode = getActiveBaleTemplateCode(balePrintModalState.preferredTemplateCode || (currentJob == null ? void 0 : currentJob.template_code) || ((_a2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _a2.template_code) || "");
   const isSdoPrint = templateScope === "warehouseout_bale" && isSDOPrintModalTaskType(activeTaskType);
   const isSdbPrint = isStorePrepCompressionPrint && selectedTemplateCode === "store_prep_bale_60x40";
   const isStoreItemPrint = templateScope === "product" || selectedTemplateCode === "store_item_60x40";
@@ -22127,7 +22170,7 @@ function renderBalePrintModal() {
     return `<option value="${escapeHtml(name)}" ${normalizePrinterName(name) === normalizePrinterName(selectedPrinterName) ? "selected" : ""}>${escapeHtml(name.replace(/_/g, " "))}</option>`;
   }).join("");
   const currentPackageLabel = String(
-    ((_c = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c.package_position_label) || ((_d2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d2.package_position) || `第 ${((_e2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _e2.serial_no) || currentIndex + 1} 包 / 共 ${((_f2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _f2.total_packages) || jobs.length || 1} 包`
+    ((_c = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c.package_position_label) || ((_d = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d.package_position) || `第 ${((_e2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _e2.serial_no) || currentIndex + 1} 包 / 共 ${((_f2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _f2.total_packages) || jobs.length || 1} 包`
   ).trim();
   const displayParts = currentJob ? deriveBaleLabelDisplayParts(
     currentJob.barcode || ((_g2 = currentJob.print_payload) == null ? void 0 : _g2.barcode_value) || "",
@@ -22199,11 +22242,11 @@ function renderBalePrintModal() {
   if (queue) {
     queue.className = jobs.length ? "bale-print-batch-card candidate-list" : "bale-print-batch-card candidate-summary empty-state";
     queue.innerHTML = jobs.length ? `<div class="bale-print-queue-title">标签列表（共 ${jobs.length} 张）</div><div class="bale-print-queue-scroll">${jobs.map((job, index) => {
-      var _a2, _b2, _c2, _d3, _e3, _f3;
-      const queueLabel = String(((_a2 = job.print_payload) == null ? void 0 : _a2.package_position_label) || ((_b2 = job.print_payload) == null ? void 0 : _b2.package_position) || `第 ${index + 1} 包 / 共 ${jobs.length} 包`).trim();
+      var _a3, _b2, _c2, _d2, _e3, _f3;
+      const queueLabel = String(((_a3 = job.print_payload) == null ? void 0 : _a3.package_position_label) || ((_b2 = job.print_payload) == null ? void 0 : _b2.package_position) || `第 ${index + 1} 包 / 共 ${jobs.length} 包`).trim();
       const queueParts = deriveBaleLabelDisplayParts(
         job.barcode || ((_c2 = job.print_payload) == null ? void 0 : _c2.barcode_value) || "",
-        ((_d3 = job.print_payload) == null ? void 0 : _d3.supplier_name) || balePrintModalState.supplierName || "",
+        ((_d2 = job.print_payload) == null ? void 0 : _d2.supplier_name) || balePrintModalState.supplierName || "",
         ((_e3 = job.print_payload) == null ? void 0 : _e3.category_display) || balePrintModalState.categoryDisplay || job.product_name || "",
         queueLabel
       );
@@ -22297,8 +22340,8 @@ function renderBalePrintModal() {
   renderBaleLocalPrintAgentStatus();
 }
 async function getBaleModalPrintContext() {
-  var _a, _b, _c;
-  const printerName = String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim();
+  var _a2, _b, _c;
+  const printerName = String(((_a2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a2.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim();
   if (!printerName) {
     throw new Error("请先选择打印机。");
   }
@@ -22325,13 +22368,13 @@ async function getBaleModalPrintContext() {
   };
 }
 function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = {}) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
   const templateScope = getActiveBaleTemplateScope();
   const activeTaskType = getActiveBaleModalTaskType();
   const helper = balePrintFlow && typeof balePrintFlow.buildBaleDirectPrintPayload === "function" ? balePrintFlow.buildBaleDirectPrintPayload : null;
   if (helper && templateScope === "bale") {
     return helper(job, {
-      printerName: String(((_a = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim(),
+      printerName: String(((_a2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _a2.value) || ((_b = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _b.value) || "").trim(),
       templateCode: String(((_c = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _c.value) || getPreferredBaleTemplateCode()).trim() || getPreferredBaleTemplateCode(),
       supplierName: balePrintModalState.supplierName,
       categoryDisplay: balePrintModalState.categoryDisplay,
@@ -22345,7 +22388,7 @@ function buildBaleModalDirectPayload(job, { currentIndex = 0, totalJobs = 0 } = 
   ).replace(/[^0-9]/g, "").trim();
   const displayCode = String(printPayload.display_code || printPayload.bale_barcode || (job == null ? void 0 : job.barcode) || "").trim();
   return {
-    printer_name: String(((_d2 = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _d2.value) || ((_e2 = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _e2.value) || "").trim(),
+    printer_name: String(((_d = document.querySelector("[data-bale-modal-printer-select]")) == null ? void 0 : _d.value) || ((_e2 = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _e2.value) || "").trim(),
     template_code: String(((_f2 = document.querySelector("[data-bale-modal-template-select]")) == null ? void 0 : _f2.value) || getActiveBaleTemplateCode()).trim() || getActiveBaleTemplateCode(),
     copies: Number((job == null ? void 0 : job.copies) || 1) || 1,
     barcode_value: machineCode,
@@ -22442,7 +22485,7 @@ async function directPrintCurrentBaleModalJob() {
   });
 }
 async function sendCurrentBaleModalJobToPrintStation() {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2;
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   const currentIndex = Number(balePrintModalState.currentIndex || 0);
   const currentJob = jobs[currentIndex] || null;
@@ -22456,9 +22499,9 @@ async function sendCurrentBaleModalJobToPrintStation() {
     shipmentNo: balePrintModalState.shipmentNo
   }) : {
     code: String(
-      ((_a = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _a.machine_code) || ((_b = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _b.barcode_value) || ((_c = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c.scan_token) || (currentJob == null ? void 0 : currentJob.barcode) || ""
+      ((_a2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _a2.machine_code) || ((_b = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _b.barcode_value) || ((_c = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _c.scan_token) || (currentJob == null ? void 0 : currentJob.barcode) || ""
     ).replace(/[^0-9]/g, "").trim(),
-    supplier: String(((_d2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d2.supplier_name) || balePrintModalState.supplierName || "").trim(),
+    supplier: String(((_d = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _d.supplier_name) || balePrintModalState.supplierName || "").trim(),
     category: String(((_e2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _e2.category_main) || "").trim(),
     subcategory: String(((_f2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _f2.category_sub) || "").trim(),
     batch: String(((_g2 = currentJob == null ? void 0 : currentJob.print_payload) == null ? void 0 : _g2.parcel_batch_no) || "").trim(),
@@ -22617,14 +22660,14 @@ function openBalePrintModal(state = {}) {
   renderBalePrintModal();
 }
 function getBaleModalJobReference(job = {}) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   return String(
-    ((_a = job == null ? void 0 : job.print_payload) == null ? void 0 : _a.bale_barcode) || ((_b = job == null ? void 0 : job.print_payload) == null ? void 0 : _b.display_code) || ((_c = job == null ? void 0 : job.print_payload) == null ? void 0 : _c.legacy_bale_barcode) || (job == null ? void 0 : job.barcode) || ""
+    ((_a2 = job == null ? void 0 : job.print_payload) == null ? void 0 : _a2.bale_barcode) || ((_b = job == null ? void 0 : job.print_payload) == null ? void 0 : _b.display_code) || ((_c = job == null ? void 0 : job.print_payload) == null ? void 0 : _c.legacy_bale_barcode) || (job == null ? void 0 : job.barcode) || ""
   ).trim().toUpperCase();
 }
 async function handleConnectBalePrinter() {
-  var _a, _b;
-  const printerName = String(((_a = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a.value) || "Deli DL-720C").trim();
+  var _a2, _b;
+  const printerName = String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a2.value) || "Deli DL-720C").trim();
   const shipmentNo = String(((_b = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _b.value) || "").trim();
   await loadSystemPrinters();
   const matched = findSystemPrinterBySelectedName(printerName);
@@ -22915,8 +22958,8 @@ function renderRecommendationResultSummary(result) {
   }
   const items = Array.isArray(result.items) ? result.items : [];
   const totalQty = items.reduce((sum, row) => {
-    var _a, _b;
-    return sum + Number((_b = (_a = row.requested_qty) != null ? _a : row.suggested_qty) != null ? _b : 0);
+    var _a2, _b;
+    return sum + Number((_b = (_a2 = row.requested_qty) != null ? _a2 : row.suggested_qty) != null ? _b : 0);
   }, 0);
   const analysis = result.analysis_summary || {};
   target.className = "report-summary";
@@ -22948,7 +22991,7 @@ function renderRecommendationCandidates() {
     return;
   }
   target.innerHTML = recommendationCandidatesState.map((item) => {
-    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2;
+    var _a2, _b, _c, _d, _e2, _f2, _g2, _h2;
     const recommendationKey = getRecommendationRowKey(item);
     const selected = selectedRecommendationKeys.has(recommendationKey);
     const categoryLabel = [item.category_main, item.category_sub].filter(Boolean).join(" / ") || "未命名类目";
@@ -22957,11 +23000,11 @@ function renderRecommendationCandidates() {
           <div>
             <div class="candidate-head">
               <div class="candidate-title">${escapeHtml(categoryLabel)}</div>
-              <div class="candidate-qty">建议 ${escapeHtml((_b = (_a = item.requested_qty) != null ? _a : item.suggested_qty) != null ? _b : 0)} 件</div>
+              <div class="candidate-qty">建议 ${escapeHtml((_b = (_a2 = item.requested_qty) != null ? _a2 : item.suggested_qty) != null ? _b : 0)} 件</div>
             </div>
             <div class="meta-row">
               <span class="meta-pill">14 天销量: ${escapeHtml((_c = item.recent_14d_sales_qty) != null ? _c : 0)}</span>
-              <span class="meta-pill">门店现货: ${escapeHtml((_d2 = item.current_store_qty) != null ? _d2 : 0)}</span>
+              <span class="meta-pill">门店现货: ${escapeHtml((_d = item.current_store_qty) != null ? _d : 0)}</span>
               <span class="meta-pill">待上架: ${escapeHtml((_e2 = item.pending_shelving_qty) != null ? _e2 : 0)}</span>
               <span class="meta-pill">在途: ${escapeHtml((_f2 = item.in_transit_qty) != null ? _f2 : 0)}</span>
               <span class="meta-pill">有效库存: ${escapeHtml((_g2 = item.effective_store_qty) != null ? _g2 : 0)}</span>
@@ -22982,7 +23025,7 @@ function syncRecommendationSelection() {
   applyRecommendationSelectionToTransferDraft();
 }
 function renderTransferResultSummary(result) {
-  var _a;
+  var _a2;
   const target = document.querySelector("#transferResultSummary");
   if (!target) {
     return;
@@ -23005,7 +23048,7 @@ function renderTransferResultSummary(result) {
   const storeLabel = String(result.to_store_code || normalized.to_store_code || "-").trim().toUpperCase() || "-";
   const statusLabel = getTransferOrderStatusLabel(result.status || normalized.lifecycle || "");
   renderManualReplenishmentContext(statusLabel || "已生成");
-  const createdBy = String(result.created_by || result.requested_by || ((_a = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _a.username) || "-").trim() || "-";
+  const createdBy = String(result.created_by || result.requested_by || ((_a2 = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _a2.username) || "-").trim() || "-";
   const createdAt = String(result.created_at || result.updated_at || (/* @__PURE__ */ new Date()).toISOString()).trim();
   const detailRows = plan.categoryCards.length ? plan.categoryCards : demandLines.map((row) => ({
     categoryMain: row.category_main,
@@ -23044,13 +23087,13 @@ function renderTransferResultSummary(result) {
         </thead>
         <tbody>
           ${detailRows.map((row) => {
-    var _a2, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+    var _a3, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2;
     return `
             <tr>
               <td>${escapeHtml(row.categoryMain || row.category_main || "-")}</td>
               <td>${escapeHtml(row.categorySub || row.category_sub || "-")}</td>
-              <td>${escapeHtml((_b = (_a2 = row.requestedQty) != null ? _a2 : row.requested_qty) != null ? _b : 0)}</td>
-              <td>${escapeHtml((_d2 = (_c = row.availableQty) != null ? _c : row.available_qty) != null ? _d2 : 0)}</td>
+              <td>${escapeHtml((_b = (_a3 = row.requestedQty) != null ? _a3 : row.requested_qty) != null ? _b : 0)}</td>
+              <td>${escapeHtml((_d = (_c = row.availableQty) != null ? _c : row.available_qty) != null ? _d : 0)}</td>
               <td>${escapeHtml((_f2 = (_e2 = row.pickableQty) != null ? _e2 : row.pickable_qty) != null ? _f2 : 0)}</td>
               <td>${escapeHtml((_h2 = (_g2 = row.shortageQty) != null ? _g2 : row.shortage_qty) != null ? _h2 : 0)}</td>
               <td><span class="meta-pill">${escapeHtml(row.suggestedAction || row.stockBadgeLabel || (Number((_j2 = (_i2 = row.shortageQty) != null ? _i2 : row.shortage_qty) != null ? _j2 : 0) > 0 ? "部分拣货" : "可全拣"))}</span></td>
@@ -23066,7 +23109,7 @@ function renderTransferResultSummary(result) {
   `;
 }
 function renderTransferActionResultSummary(result) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const target = document.querySelector("#transferActionResultSummary");
   if (!target) {
     return;
@@ -23080,7 +23123,7 @@ function renderTransferActionResultSummary(result) {
     const normalized = normalizeTransferForOperationsSummary(result);
     const mainDeliveryStatus = getTransferDeliveryMainDispatchStatus(normalized);
     const storeDispatchRows = Array.isArray(result.display_store_dispatch_bales) ? result.display_store_dispatch_bales : Array.isArray(result.store_dispatch_bales) ? result.store_dispatch_bales : [];
-    const groupingLabel = String(storeDispatchRows.length || 0) ? storeDispatchRows.some((row) => (row == null ? void 0 : row.source_type) === "loose_pick_sheet") ? "按来源单" : String(((_a = storeDispatchRows == null ? void 0 : storeDispatchRows[0]) == null ? void 0 : _a.category_count) || 0) > 1 ? "混装" : "按大类" : "-";
+    const groupingLabel = String(storeDispatchRows.length || 0) ? storeDispatchRows.some((row) => (row == null ? void 0 : row.source_type) === "loose_pick_sheet") ? "按来源单" : String(((_a2 = storeDispatchRows == null ? void 0 : storeDispatchRows[0]) == null ? void 0 : _a2.category_count) || 0) > 1 ? "混装" : "按大类" : "-";
     target.className = "report-summary";
     const officialBarcode = String(result.official_delivery_barcode || result.store_delivery_execution_order_no || "").trim();
     target.innerHTML = `
@@ -23091,7 +23134,7 @@ function renderTransferActionResultSummary(result) {
         <article class="store-metric"><strong>调拨单打印任务</strong><span>#${escapeHtml(result.transfer_print_job.id)}</span></article>
         <article class="store-metric"><strong>标签任务数</strong><span>${escapeHtml((result.label_print_jobs || []).length)}</span></article>
         <article class="store-metric"><strong>标签总份数</strong><span>${escapeHtml(result.total_label_copies || 0)}</span></article>
-        <article class="store-metric"><strong>送店来源入口</strong><span>${escapeHtml((_d2 = (_c = result.display_generated_bale_count) != null ? _c : storeDispatchRows.length) != null ? _d2 : 0)}</span></article>
+        <article class="store-metric"><strong>送店来源入口</strong><span>${escapeHtml((_d = (_c = result.display_generated_bale_count) != null ? _c : storeDispatchRows.length) != null ? _d : 0)}</span></article>
         <article class="store-metric"><strong>后台生成 bale</strong><span>${escapeHtml(result.generated_bale_count || 0)}</span></article>
         <article class="store-metric"><strong>汇总规则</strong><span>${escapeHtml(storeDispatchRows.length ? groupingLabel : "-")}</span></article>
         <article class="store-metric"><strong>正式送货执行单号</strong><span>${escapeHtml(result.store_delivery_execution_order_no || "-")}</span></article>
@@ -23246,8 +23289,8 @@ function summarizeOperationsTransferRows(rows = []) {
     received_count: normalizedRows.filter((row) => row.lifecycle_status === "received").length,
     pending_receipt_count: normalizedRows.filter((row) => row.store_receipt_status === "pending_receipt").length,
     total_dispatch_bales: normalizedRows.reduce((sum, row) => {
-      var _a;
-      return sum + Number(((_a = row.delivery_batch) == null ? void 0 : _a.bale_count) || 0);
+      var _a2;
+      return sum + Number(((_a2 = row.delivery_batch) == null ? void 0 : _a2.bale_count) || 0);
     }, 0)
   };
 }
@@ -23281,7 +23324,7 @@ function getShipmentBatchProgressLabel(row = {}) {
   return chooseI18nLabel("待发车", "Pending Dispatch");
 }
 function renderTransferTrackingResultSummary(result) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = document.querySelector("#transferTrackingResultSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -23296,7 +23339,7 @@ function renderTransferTrackingResultSummary(result) {
   const batchLabel = orders.some((row) => getShipmentBatchProgressLabel(row) === chooseI18nLabel("异常 / 退回", "Exception / Return")) ? chooseI18nLabel("异常 / 退回", "Exception / Return") : orders.every((row) => getShipmentBatchProgressLabel(row) === chooseI18nLabel("全部收货完成", "Receiving Complete")) ? chooseI18nLabel("全部收货完成", "Receiving Complete") : chooseI18nLabel("运输中", "In Transit");
   const packageTotal = orders.reduce((sum, row) => sum + getTransferShipmentPackageCount(row), 0);
   const storeCodes = Array.from(new Set(orders.map((row) => String(row.to_store_code || row.store_code || "").trim().toUpperCase()).filter(Boolean)));
-  const driverName = String(result.driver_name || ((_a = orders[0]) == null ? void 0 : _a.driver_name) || "Driver A").trim() || "Driver A";
+  const driverName = String(result.driver_name || ((_a2 = orders[0]) == null ? void 0 : _a2.driver_name) || "Driver A").trim() || "Driver A";
   const driverPhone = String(result.driver_phone || ((_b = orders[0]) == null ? void 0 : _b.driver_phone) || "").trim();
   const vehicleNo = String(result.vehicle_no || ((_c = orders[0]) == null ? void 0 : _c.vehicle_no) || "KDM-001A").trim().toUpperCase() || "KDM-001A";
   target.className = `store-delivery-task-card ${getStatusCardClass(batchLabel)}`;
@@ -23386,12 +23429,12 @@ function renderTransferShipTargetHint(transferNo = "") {
   `;
 }
 function getTransferShipmentPackageCount(transfer = {}) {
-  var _a, _b;
+  var _a2, _b;
   const directPackages = getStoreDeliveryShipmentSdpPackages(transfer);
   if (directPackages.length) {
     return directPackages.length;
   }
-  const sdoPackages = (_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.packages;
+  const sdoPackages = (_a2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a2.packages;
   if (Array.isArray(sdoPackages) && sdoPackages.length) {
     return sdoPackages.length;
   }
@@ -23428,10 +23471,10 @@ function upsertTransferOrderStateRow(transfer) {
   return transfer;
 }
 async function loadTransferShipTargetHint(transferNo = "") {
-  var _a;
+  var _a2;
   const target = document.querySelector("#transferShipTargetHint");
   const normalizedTransferNo = String(
-    transferNo || ((_a = document.querySelector("#transferShipForm [name='transfer_no']")) == null ? void 0 : _a.value) || ""
+    transferNo || ((_a2 = document.querySelector("#transferShipForm [name='transfer_no']")) == null ? void 0 : _a2.value) || ""
   ).trim().toUpperCase();
   const requestSeq = ++transferShipTargetHintRequestSeq;
   renderTransferShipTargetHint(normalizedTransferNo);
@@ -23471,15 +23514,15 @@ function getSelectedTransferShipmentNos(form = document.querySelector("#transfer
   return Array.from(new Set(getTransferShipmentSelectValues(form)));
 }
 function getStoreDeliverySdoMachineCode(row = {}) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   return String(
-    (row == null ? void 0 : row.sdo_machine_code) || ((_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.machine_code) || (row == null ? void 0 : row.machine_code) || ((_c = (_b = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _b.print_payload) == null ? void 0 : _c.barcode_value) || ""
+    (row == null ? void 0 : row.sdo_machine_code) || ((_a2 = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a2.machine_code) || (row == null ? void 0 : row.machine_code) || ((_c = (_b = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _b.print_payload) == null ? void 0 : _c.barcode_value) || ""
   ).trim().toUpperCase();
 }
 function getStoreDeliverySdoDisplayCode(row = {}) {
-  var _a;
+  var _a2;
   return String(
-    (row == null ? void 0 : row.sdo_display_code) || (row == null ? void 0 : row.store_delivery_execution_order_no) || ((_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || (row == null ? void 0 : row.official_delivery_barcode) || ""
+    (row == null ? void 0 : row.sdo_display_code) || (row == null ? void 0 : row.store_delivery_execution_order_no) || ((_a2 = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a2.execution_order_no) || (row == null ? void 0 : row.official_delivery_barcode) || ""
   ).trim().toUpperCase();
 }
 function getSelectedStoreDeliveryShipmentPayloads(form = document.querySelector("#transferShipForm")) {
@@ -23493,9 +23536,9 @@ function getSelectedStoreDeliveryShipmentPayloads(form = document.querySelector(
   });
 }
 function getStoreDeliveryShipmentSdpPackages(row = {}) {
-  var _a;
+  var _a2;
   const directPackages = Array.isArray(row == null ? void 0 : row.packages) ? row.packages : [];
-  const nestedPackages = Array.isArray((_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.packages) ? row.store_delivery_execution_order.packages : [];
+  const nestedPackages = Array.isArray((_a2 = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a2.packages) ? row.store_delivery_execution_order.packages : [];
   return (directPackages.length ? directPackages : nestedPackages).filter((packageRow) => {
     const displayCode = String((packageRow == null ? void 0 : packageRow.display_code) || (packageRow == null ? void 0 : packageRow.package_code) || "").trim().toUpperCase();
     const machineCode = String((packageRow == null ? void 0 : packageRow.machine_code) || (packageRow == null ? void 0 : packageRow.barcode_value) || "").trim().toUpperCase();
@@ -23547,9 +23590,9 @@ function formatDateTime(value = "") {
   return formatLocalDateTime(value);
 }
 function getStoreDeliveryShipmentItemCount(row = {}) {
-  var _a, _b;
+  var _a2, _b;
   const executionOrder = (row == null ? void 0 : row.store_delivery_execution_order) || {};
-  const explicit = (_b = (_a = executionOrder.total_item_count) != null ? _a : row.total_item_count) != null ? _b : row.item_count;
+  const explicit = (_b = (_a2 = executionOrder.total_item_count) != null ? _a2 : row.total_item_count) != null ? _b : row.item_count;
   if (explicit !== null && explicit !== void 0 && explicit !== "") {
     return Number(explicit) || 0;
   }
@@ -23561,8 +23604,8 @@ function getStoreDeliveryShipmentItemCount(row = {}) {
   return getTransferRequestedQtyForDisplay(row);
 }
 function getStoreDeliveryShipmentCreatedAt(row = {}) {
-  var _a;
-  return ((_a = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a.created_at) || (row == null ? void 0 : row.store_delivery_execution_created_at) || (row == null ? void 0 : row.created_at) || "";
+  var _a2;
+  return ((_a2 = row == null ? void 0 : row.store_delivery_execution_order) == null ? void 0 : _a2.created_at) || (row == null ? void 0 : row.store_delivery_execution_created_at) || (row == null ? void 0 : row.created_at) || "";
 }
 function getStoreDeliveryShipmentCardData(row = {}) {
   const normalized = normalizeTransferForOperationsSummary(row);
@@ -23894,9 +23937,9 @@ function renderPickingWaveTaskSummary() {
   const hasRequests = requestNos.length > 0;
   const transfers = requestNos.map((requestNo) => getTransferPreparationOrder(requestNo)).filter(Boolean);
   const totals = transfers.reduce((acc, transfer) => {
-    var _a, _b, _c;
+    var _a2, _b, _c;
     const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer));
-    acc.totalQty += Number(((_a = plan.summary) == null ? void 0 : _a.totalRequestedQty) || getTransferRequestedQtyForDisplay(transfer) || 0);
+    acc.totalQty += Number(((_a2 = plan.summary) == null ? void 0 : _a2.totalRequestedQty) || getTransferRequestedQtyForDisplay(transfer) || 0);
     acc.categoryCount += Number(plan.demandLineCount || ((_b = plan.categoryCards) == null ? void 0 : _b.length) || 0);
     acc.shortageQty += Number(((_c = plan.summary) == null ? void 0 : _c.shortageQty) || 0);
     return acc;
@@ -23920,11 +23963,11 @@ function buildWaveRequestRows(wave = null) {
   if (!wave) return [];
   const requestNos = Array.isArray(wave.selected_replenishment_request_nos) ? wave.selected_replenishment_request_nos : Array.isArray(wave.replenishment_request_nos) ? wave.replenishment_request_nos : [];
   return requestNos.map((requestNoRaw) => {
-    var _a;
+    var _a2;
     const requestNo = String(requestNoRaw || "").trim().toUpperCase();
     const transfer = transferOrderState.find((row) => String((row == null ? void 0 : row.transfer_no) || "").trim().toUpperCase() === requestNo) || {};
     const total = Number(transfer.requested_qty || getTransferRequestedQtyForDisplay(transfer));
-    const shortage = Number(((_a = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer)).summary) == null ? void 0 : _a.looseQtyToPick) || 0);
+    const shortage = Number(((_a2 = buildTransferPreparationPlan(getTransferPreparationPlanRows(transfer)).summary) == null ? void 0 : _a2.looseQtyToPick) || 0);
     return { requestNo, transfer, total, shortage };
   }).filter((row) => row.requestNo);
 }
@@ -23946,11 +23989,11 @@ function renderWaveExecutionEntrySummary(selectedValue = "", mode = "") {
     <div class="subtle small">${escapeHtml(currentLanguage === "en" ? `${waveNo} / ${((wave == null ? void 0 : wave.stores_included) || []).length} stores / ${Number((wave == null ? void 0 : wave.total_requested_qty) || 0)} items` : `${waveNo} / ${((wave == null ? void 0 : wave.stores_included) || []).length} 个门店 / ${Number((wave == null ? void 0 : wave.total_requested_qty) || 0)} 件`)}</div>
     <div class="candidate-list transfer-draft-list">
       ${rows.map((row) => {
-    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
-    const required = String(((_a = row.transfer) == null ? void 0 : _a.required_arrival_date) || ((_b = row.transfer) == null ? void 0 : _b.required_arrival_on) || "-");
+    var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
+    const required = String(((_a2 = row.transfer) == null ? void 0 : _a2.required_arrival_date) || ((_b = row.transfer) == null ? void 0 : _b.required_arrival_on) || "-");
     const sdo = String(((_c = row.transfer) == null ? void 0 : _c.store_delivery_execution_order_no) || "").trim();
     if (mode === "ship") {
-      return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || chooseI18nLabel("SDO 未生成", "SDO Not Generated"))} / ${escapeHtml(((_d2 = row.transfer) == null ? void 0 : _d2.to_store_code) || "-")} / ${escapeHtml(formatI18nCount(((_f2 = (_e2 = row.transfer) == null ? void 0 : _e2.delivery_batch) == null ? void 0 : _f2.bale_count) || 0, "包", "packages"))} / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : chooseI18nLabel("待生成", "Pending"))}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? chooseI18nLabel("可进入发运", "Ready to dispatch") : chooseI18nLabel("SDO 未生成，请先去 6 仓库执行核对", "SDO not generated. Check Warehouse Execution first.")}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">${escapeHtml(chooseI18nLabel("查看 SDO", "View SDO"))}</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${escapeHtml(chooseI18nLabel("进入该申请仓库执行", "Open Warehouse Execution"))}</button>`}</div></article>`;
+      return `<article class="candidate-row transfer-draft-row"><div><strong>${escapeHtml(sdo || chooseI18nLabel("SDO 未生成", "SDO Not Generated"))} / ${escapeHtml(((_d = row.transfer) == null ? void 0 : _d.to_store_code) || "-")} / ${escapeHtml(formatI18nCount(((_f2 = (_e2 = row.transfer) == null ? void 0 : _e2.delivery_batch) == null ? void 0 : _f2.bale_count) || 0, "包", "packages"))} / ${escapeHtml(sdo ? getShipmentBatchProgressLabel(row.transfer) : chooseI18nLabel("待生成", "Pending"))}</strong><div class="subtle small">${escapeHtml(`${row.requestNo} / ${sdo ? chooseI18nLabel("可进入发运", "Ready to dispatch") : chooseI18nLabel("SDO 未生成，请先去 6 仓库执行核对", "SDO not generated. Check Warehouse Execution first.")}`)}</div></div><div class="candidate-side-actions">${sdo ? `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="ship">${escapeHtml(chooseI18nLabel("查看 SDO", "View SDO"))}</button>` : `<button type="button" class="ghost-button mini-button" data-wave-transfer-open="${escapeHtml(row.requestNo)}" data-wave-mode="exec">${escapeHtml(chooseI18nLabel("进入该申请仓库执行", "Open Warehouse Execution"))}</button>`}</div></article>`;
     }
     if (mode === "exec") {
       const detail2 = currentLanguage === "en" ? `required ${required} / total ${row.total} items / shortage ${row.shortage} items` : `到货 ${required} / 总量 ${row.total} 件 / 缺货 ${row.shortage} 件`;
@@ -23978,12 +24021,12 @@ function populateTransferOrderSelectors() {
       const previousValue = String(select.value || "").trim().toUpperCase();
       const sourceRows = mode === "ship" ? getStoreDeliveryShipmentOptionRows(rows) : rows;
       const options = sourceRows.map((row) => {
-        var _a;
+        var _a2;
         const plan = buildTransferPreparationPlan(getTransferPreparationPlanRows(row));
         const summary = plan.summary || {};
         const total = Number(summary.totalRequestedQty || row.requested_qty || 0);
         const shortage = Number(summary.looseQtyToPick || 0);
-        const sdbCount = Number(summary.selectedPreparedBaleCount || ((_a = row.delivery_batch) == null ? void 0 : _a.bale_count) || 0);
+        const sdbCount = Number(summary.selectedPreparedBaleCount || ((_a2 = row.delivery_batch) == null ? void 0 : _a2.bale_count) || 0);
         const requiredDate = String(row.required_arrival_date || row.required_arrival_on || "-").trim() || "-";
         if (mode === "ship") {
           return getStoreDeliveryShipmentOptionLabel(row);
@@ -24060,15 +24103,15 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   const uniqueStores = new Set(list.map((row) => String(row.to_store_code || "").trim().toUpperCase()).filter(Boolean));
   const pendingBales = list.reduce(
     (sum, row) => {
-      var _a;
-      return sum + Math.max(Number(((_a = row.delivery_batch) == null ? void 0 : _a.bale_count) || 0) - Number(row.accepted_dispatch_bale_count || 0), 0);
+      var _a2;
+      return sum + Math.max(Number(((_a2 = row.delivery_batch) == null ? void 0 : _a2.bale_count) || 0) - Number(row.accepted_dispatch_bale_count || 0), 0);
     },
     0
   );
   const exceptionCount = list.filter((row) => getShipmentBatchProgressLabel(row) === "异常 / 退回").length;
   const batchRowsByNo = list.reduce((acc, row) => {
-    var _a, _b;
-    const batchNo = String(((_a = row.delivery_batch) == null ? void 0 : _a.delivery_batch_no) || ((_b = row.delivery_batch) == null ? void 0 : _b.shipment_session_no) || "").trim().toUpperCase();
+    var _a2, _b;
+    const batchNo = String(((_a2 = row.delivery_batch) == null ? void 0 : _a2.delivery_batch_no) || ((_b = row.delivery_batch) == null ? void 0 : _b.shipment_session_no) || "").trim().toUpperCase();
     const key = batchNo || `TEMP-${String(row.transfer_no || "").trim().toUpperCase()}`;
     if (!acc[key]) {
       acc[key] = {
@@ -24111,13 +24154,13 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
                     <div class="subtle small">路线：${escapeHtml(group.route || "-")}</div>
                     <div class="candidate-list transfer-draft-list">
                       ${group.rows.map((row) => {
-    var _a;
+    var _a2;
     return `
                         <article class="candidate-row transfer-draft-row">
                           <div>
                             <strong>门店站点：${escapeHtml(String(row.to_store_code || "-").toUpperCase() || "-")}</strong>
                             <div class="subtle small">- 执行单：${escapeHtml(row.transfer_no || "-")}</div>
-                            <div class="subtle small">- 包数：${escapeHtml(((_a = row.delivery_batch) == null ? void 0 : _a.bale_count) || 0)}</div>
+                            <div class="subtle small">- 包数：${escapeHtml(((_a2 = row.delivery_batch) == null ? void 0 : _a2.bale_count) || 0)}</div>
                             <div class="subtle small">- 状态：${escapeHtml(getShipmentBatchProgressLabel(row))}</div>
                           </div>
                         </article>
@@ -24183,7 +24226,7 @@ function renderTransferDispatchSummary(rows = transferOrderState) {
   renderTransferShipTargetHint();
 }
 function renderReceivingResultSummary(result) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = document.querySelector("#receivingResultSummary");
   if (!target) {
     return;
@@ -24222,7 +24265,7 @@ function renderReceivingResultSummary(result) {
         <article class="store-metric"><strong>任务号</strong><span>${escapeHtml(result.task_no || "-")}</span></article>
         <article class="store-metric"><strong>船单</strong><span>${escapeHtml(result.shipment_no || "-")}</span></article>
         <article class="store-metric"><strong>门店</strong><span>${escapeHtml(result.store_code || "-")}</span></article>
-        <article class="store-metric"><strong>token 总数</strong><span>${escapeHtml((_a = analysis.token_count) != null ? _a : 0)}</span></article>
+        <article class="store-metric"><strong>token 总数</strong><span>${escapeHtml((_a2 = analysis.token_count) != null ? _a2 : 0)}</span></article>
         <article class="store-metric"><strong>已上架</strong><span>${escapeHtml((_b = analysis.placed_count) != null ? _b : 0)}</span></article>
         <article class="store-metric"><strong>待上架</strong><span>${escapeHtml((_c = analysis.pending_count) != null ? _c : 0)}</span></article>
         <article class="store-metric"><strong>状态</strong><span>${escapeHtml(result.status || "-")}</span></article>
@@ -24286,7 +24329,7 @@ function renderReturnResultSummary(result) {
   target.innerHTML = `<div class="alert-banner">${escapeHtml(result.message || "退仓动作已完成。")}</div>`;
 }
 function renderRackResultSummary(kind, data) {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const target = document.querySelector("#rackResultSummary");
   if (!target) {
     return;
@@ -24303,7 +24346,7 @@ function renderRackResultSummary(kind, data) {
       <div class="alert-banner">这是当前门店货架模板，后面新开门店会按这套模板初始化。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>模板架位数</strong><span>${rows.length}</span></article>
-        <article class="store-metric"><strong>示例架位</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.rack_code) || "-")}</span></article>
+        <article class="store-metric"><strong>示例架位</strong><span>${escapeHtml(((_a2 = rows[0]) == null ? void 0 : _a2.rack_code) || "-")}</span></article>
         <article class="store-metric"><strong>对应品类</strong><span>${escapeHtml(((_b = rows[0]) == null ? void 0 : _b.category_hint) || "-")}</span></article>
       </div>
     `;
@@ -24317,7 +24360,7 @@ function renderRackResultSummary(kind, data) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>门店</strong><span>${escapeHtml(((_c = rows[0]) == null ? void 0 : _c.store_code) || "-")}</span></article>
         <article class="store-metric"><strong>货架位总数</strong><span>${rows.length}</span></article>
-        <article class="store-metric"><strong>示例架位</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.rack_code) || "-")}</span></article>
+        <article class="store-metric"><strong>示例架位</strong><span>${escapeHtml(((_d = rows[0]) == null ? void 0 : _d.rack_code) || "-")}</span></article>
         <article class="store-metric"><strong>状态</strong><span>${escapeHtml(((_e2 = rows[0]) == null ? void 0 : _e2.status) || "-")}</span></article>
       </div>
     `;
@@ -24360,9 +24403,9 @@ let storeInventoryOverviewState = {
   unconfirmedMessage: ""
 };
 function getStoreInventoryOverviewStoreCode() {
-  var _a;
+  var _a2;
   return String(
-    ((_a = document.querySelector("#storeInventoryOverviewForm [name='store_code']")) == null ? void 0 : _a.value) || storeInventoryOverviewState.storeCode || getCurrentStoreCodeFallback() || "UTAWALA"
+    ((_a2 = document.querySelector("#storeInventoryOverviewForm [name='store_code']")) == null ? void 0 : _a2.value) || storeInventoryOverviewState.storeCode || getCurrentStoreCodeFallback() || "UTAWALA"
   ).trim().toUpperCase();
 }
 function formatInventoryDate(value) {
@@ -24370,7 +24413,7 @@ function formatInventoryDate(value) {
   return text || "-";
 }
 function renderStoreInventoryOverviewMetrics(overview = {}) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2;
   const target = document.querySelector("#storeInventoryOverviewSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -24382,13 +24425,13 @@ function renderStoreInventoryOverviewMetrics(overview = {}) {
     <div class="report-summary-grid">
       <article class="store-metric problem-card">
         <strong>${escapeHtml(copy.pendingStockIn)}</strong>
-        <span>${escapeHtml((_a = overview.unconfirmed_items) != null ? _a : 0)}</span>
+        <span>${escapeHtml((_a2 = overview.unconfirmed_items) != null ? _a2 : 0)}</span>
         <small>已生成或已打印${escapeHtml(copy.storeItem)}，但还没有${escapeHtml(copy.stockInCompleted)}。</small>
         <button type="button" class="ghost-button mini-button" data-store-inventory-unconfirmed-detail="true">查看${escapeHtml(copy.pendingStockIn)}</button>
       </article>
       <article class="store-metric problem-card"><strong>${escapeHtml(copy.unassignedLocation)}</strong><span>${escapeHtml((_b = overview.unassigned_location_items) != null ? _b : 0)}</span><small>已入库但没有有效位置。</small></article>
       <article class="store-metric"><strong>${escapeHtml(copy.backroom)}</strong><span>${escapeHtml((_c = overview.backroom_items) != null ? _c : 0)}</span></article>
-      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml((_d2 = overview.shelf_items) != null ? _d2 : 0)}</span></article>
+      <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml((_d = overview.shelf_items) != null ? _d : 0)}</span></article>
       <article class="store-metric"><strong>门店总库存</strong><span>${escapeHtml((_e2 = overview.total_items) != null ? _e2 : 0)}</span></article>
       <article class="store-metric"><strong>今日新增入库</strong><span>${escapeHtml((_f2 = overview.today_new_items) != null ? _f2 : 0)}</span></article>
       <article class="store-metric"><strong>今日${escapeHtml(copy.sold)}</strong><span>${escapeHtml((_g2 = overview.sold_today_items) != null ? _g2 : 0)} 件</span><small>POS 销售成功后从库存扣减</small></article>
@@ -24416,14 +24459,14 @@ function renderStoreInventoryOverviewCategoryRows(rows = []) {
         </thead>
         <tbody>
           ${rows.map((row) => {
-    var _a, _b, _c, _d2;
+    var _a2, _b, _c, _d;
     return `
             <tr>
               <td>${escapeHtml(row.category_name || "unknown")}</td>
-              <td>${escapeHtml((_a = row.total_items) != null ? _a : 0)}</td>
+              <td>${escapeHtml((_a2 = row.total_items) != null ? _a2 : 0)}</td>
               <td>${escapeHtml((_b = row.shelf_items) != null ? _b : 0)}</td>
               <td>${escapeHtml((_c = row.backroom_items) != null ? _c : 0)}</td>
-              <td>${escapeHtml((_d2 = row.unassigned_location_items) != null ? _d2 : 0)}</td>
+              <td>${escapeHtml((_d = row.unassigned_location_items) != null ? _d : 0)}</td>
               <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
               <td><button type="button" class="ghost-button mini-button" data-store-inventory-category-detail="${escapeHtml(row.category_name || "unknown")}">查看商品</button></td>
             </tr>
@@ -24454,14 +24497,14 @@ function renderStoreInventoryOverviewLocationRows(rows = []) {
         </thead>
         <tbody>
           ${rows.map((row) => {
-    var _a;
+    var _a2;
     const locationTypeLabel = row.location_code === "UNASSIGNED" ? copy.unassignedLocation : row.location_type === "BACKROOM" ? copy.backroom : copy.shelf;
     return `
             <tr class="${row.location_type === "BACKROOM" ? "inventory-location-special" : row.location_code === "UNASSIGNED" ? "inventory-location-warning" : ""}">
               <td>${escapeHtml(row.location_code || "-")} · ${escapeHtml(locationTypeLabel)}</td>
               <td>${escapeHtml(row.location_name || "-")}</td>
               <td>${escapeHtml(row.category_name || "-")}</td>
-              <td>${escapeHtml((_a = row.item_count) != null ? _a : 0)}</td>
+              <td>${escapeHtml((_a2 = row.item_count) != null ? _a2 : 0)}</td>
               <td>${escapeHtml(formatInventoryDate(row.last_inbound_at))}</td>
               <td><button type="button" class="ghost-button mini-button" data-store-inventory-location-detail="${escapeHtml(row.location_code || "UNASSIGNED")}">查看商品</button></td>
             </tr>
@@ -24507,22 +24550,22 @@ function renderStoreInventorySoldSummary(overview = {}) {
     return;
   }
   const renderSoldCategoryRows = () => categoryRows.length ? categoryRows.map((row) => {
-    var _a;
+    var _a2;
     return `
     <tr>
       <td>${escapeHtml(row.category_name || "unknown")}</td>
-      <td>${escapeHtml((_a = row.sold_items) != null ? _a : 0)}</td>
+      <td>${escapeHtml((_a2 = row.sold_items) != null ? _a2 : 0)}</td>
       <td>${escapeHtml(formatKesAmount(row.sold_amount || 0, "KES 0.00"))}</td>
     </tr>
   `;
   }).join("") : `<tr><td colspan="3">今天还没有 POS 销售出库。</td></tr>`;
   const renderSoldLocationRows = () => locationRows.length ? locationRows.map((row) => {
-    var _a;
+    var _a2;
     return `
     <tr>
       <td>${escapeHtml(row.location_code || "-")}</td>
       <td>${escapeHtml(row.location_name || "-")}</td>
-      <td>${escapeHtml((_a = row.sold_items) != null ? _a : 0)}</td>
+      <td>${escapeHtml((_a2 = row.sold_items) != null ? _a2 : 0)}</td>
       <td>${escapeHtml(formatKesAmount(row.sold_amount || 0, "KES 0.00"))}</td>
     </tr>
   `;
@@ -24587,12 +24630,12 @@ function renderStoreInventoryOverviewDetail(items = [], title = "商品明细") 
         </thead>
         <tbody>
           ${items.map((item) => {
-    var _a, _b;
+    var _a2, _b;
     return `
             <tr>
               <td>${escapeHtml(item.machine_code || item.barcode_value || "-")}</td>
               <td>${escapeHtml(item.category_name || item.category_short || "-")}</td>
-              <td>${escapeHtml((_b = (_a = item.price_kes) != null ? _a : item.sale_price_kes) != null ? _b : "-")}</td>
+              <td>${escapeHtml((_b = (_a2 = item.price_kes) != null ? _a2 : item.sale_price_kes) != null ? _b : "-")}</td>
               <td>${escapeHtml(item.current_location_code || item.location_code || "-")}</td>
               <td>${escapeHtml(item.source_sdp_display_code || "-")}</td>
               <td>${escapeHtml(item.parent_sdo_display_code || "-")}</td>
@@ -24660,14 +24703,14 @@ function renderStoreInventoryUnconfirmedItems(items = [], message = "") {
         </thead>
         <tbody>
           ${rows.map((item) => {
-    var _a, _b;
+    var _a2, _b;
     const machineCode = String(item.machine_code || item.barcode_value || "").trim();
     const suggestedLocationCode = String(item.suggested_location_code || item.current_location_code || getDefaultStoreMobileStockInLocationCode(item, locations) || "").trim().toUpperCase();
     return `
               <tr>
                 <td>${escapeHtml(machineCode || "-")}</td>
                 <td>${escapeHtml(item.category_name || item.category_short || "-")}</td>
-                <td>${escapeHtml((_b = (_a = item.price_kes) != null ? _a : item.sale_price_kes) != null ? _b : "-")}</td>
+                <td>${escapeHtml((_b = (_a2 = item.price_kes) != null ? _a2 : item.sale_price_kes) != null ? _b : "-")}</td>
                 <td>
                   <strong>${escapeHtml(item.suggested_location_name || suggestedLocationCode || "-")}</strong>
                 </td>
@@ -24715,7 +24758,7 @@ async function loadStoreInventoryUnconfirmedItems(message = "") {
   return storeInventoryOverviewState.unconfirmedItems;
 }
 async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
-  var _a;
+  var _a2;
   const storeCode = storeInventoryOverviewState.storeCode || getStoreInventoryOverviewStoreCode();
   const selectedElement = document.querySelector(`[data-store-inventory-unconfirmed-location="${machineCode}"]`);
   const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
@@ -24730,7 +24773,7 @@ async function confirmStoreInventoryUnconfirmedItemStockIn(machineCode = "") {
     method: "POST",
     body: JSON.stringify({
       location_code: selectedLocation,
-      confirmed_by: String(((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback() || "").trim()
+      confirmed_by: String(((_a2 = currentSession.user) == null ? void 0 : _a2.username) || getCurrentStoreWorkerFallback() || "").trim()
     })
   });
   const status = String(result.status || "confirmed").trim();
@@ -24759,7 +24802,7 @@ async function loadStoreInventoryCategoryDetail(categoryName = "") {
   return items;
 }
 function renderStoreItemTraceLookupResult(trace = {}) {
-  var _a;
+  var _a2;
   const target = document.querySelector("#storeItemTraceLookupResult");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -24787,7 +24830,7 @@ function renderStoreItemTraceLookupResult(trace = {}) {
     ${operationHint ? `<div class="flow-summary-note">${escapeHtml(operationHint)}</div>` : ""}
     <div class="report-summary-grid">
       <article class="store-metric"><strong>${escapeHtml(copy.storeItem)}</strong><span>${escapeHtml(trace.machine_code || "-")}</span><small>${escapeHtml(trace.display_code || "")}</small></article>
-      <article class="store-metric"><strong>品类</strong><span>${escapeHtml(trace.category_name || trace.category_short || "-")}</span><small>KES ${escapeHtml((_a = trace.price_kes) != null ? _a : 0)}</small></article>
+      <article class="store-metric"><strong>品类</strong><span>${escapeHtml(trace.category_name || trace.category_short || "-")}</span><small>KES ${escapeHtml((_a2 = trace.price_kes) != null ? _a2 : 0)}</small></article>
       <article class="store-metric"><strong>${escapeHtml(copy.shelf)}</strong><span>${escapeHtml(locationText)}</span><small>${escapeHtml(locationTypeText)}</small></article>
       <article class="store-metric"><strong>${escapeHtml(copy.sourcePackage)}</strong><span>${escapeHtml(sourcePackageText)}</span><small>${escapeHtml(copy.storeDeliveryOrder)}：${escapeHtml(storeDeliveryOrderText)}</small></article>
       <article class="store-metric"><strong>${escapeHtml(copy.stockInCompleted)}</strong><span>${escapeHtml(trace.stock_in_confirmed ? copy.stockInCompleted : copy.pendingStockIn)}</span><small>${escapeHtml(copy.stockInTime)}：${escapeHtml([trace.stock_in_confirmed_by, trace.stock_in_confirmed_at].filter(Boolean).join(" / ") || "-")}</small></article>
@@ -24821,7 +24864,7 @@ let storeShelfFloorPlanState = {
   displayObjects: []
 };
 function parseStoreShelfLayout(row = {}, fallbackIndex = 0) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   let layout = row.layout_json || {};
   if (typeof layout === "string") {
     try {
@@ -24844,10 +24887,10 @@ function parseStoreShelfLayout(row = {}, fallbackIndex = 0) {
   return {
     ...defaultLayout,
     ...layout,
-    x: coerceNumber((_a = row.layout_x) != null ? _a : layout.x, defaultLayout.x),
+    x: coerceNumber((_a2 = row.layout_x) != null ? _a2 : layout.x, defaultLayout.x),
     y: coerceNumber((_b = row.layout_y) != null ? _b : layout.y, defaultLayout.y),
     width: Math.max(40, coerceNumber((_c = row.layout_width) != null ? _c : layout.width, defaultLayout.width)),
-    height: Math.max(32, coerceNumber((_d2 = row.layout_height) != null ? _d2 : layout.height, defaultLayout.height))
+    height: Math.max(32, coerceNumber((_d = row.layout_height) != null ? _d : layout.height, defaultLayout.height))
   };
 }
 function getStoreShelfDisplayObjects() {
@@ -24877,7 +24920,7 @@ function getStoreShelfLocationRowsFromOutput() {
   return Array.isArray(rows) ? rows : Array.isArray(rows == null ? void 0 : rows.racks) ? rows.racks : [];
 }
 function updateStoreShelfLayoutPreviewFromForm() {
-  var _a;
+  var _a2;
   const form = document.querySelector("#storeShelfLocationForm");
   if (!(form instanceof HTMLFormElement)) {
     return;
@@ -24898,7 +24941,7 @@ function updateStoreShelfLayoutPreviewFromForm() {
     category_name: String(data.category_name || "").trim(),
     active: String(data.active || "true") === "true",
     sort_order: Number(data.sort_order || 0),
-    item_count: Number(((_a = document.querySelector("[data-store-shelf-item-count]")) == null ? void 0 : _a.textContent) || 0),
+    item_count: Number(((_a2 = document.querySelector("[data-store-shelf-item-count]")) == null ? void 0 : _a2.textContent) || 0),
     layout_x: draftLayout.x,
     layout_y: draftLayout.y,
     layout_width: draftLayout.width,
@@ -24927,7 +24970,7 @@ function handleStoreShelfFloorPlanUpload(input) {
   reader.readAsDataURL(file);
 }
 function hydrateStoreShelfLocationForm(row = {}) {
-  var _a, _b;
+  var _a2, _b;
   const layout = parseStoreShelfLayout(row);
   const locationType = row.location_type || "SHELF";
   setInputValue("#storeShelfLocationForm [name='store_code']", row.store_code || getCurrentStoreCodeFallback() || "UTAWALA");
@@ -24937,7 +24980,7 @@ function hydrateStoreShelfLocationForm(row = {}) {
   setInputValue("#storeShelfLocationForm [name='location_type_label']", getStoreInventoryLocationTypeLabel(locationType));
   setInputValue("#storeShelfLocationForm [name='category_name']", row.category_name || row.category_hint || "");
   setInputValue("#storeShelfLocationForm [name='active']", row.active === false ? "false" : "true");
-  setInputValue("#storeShelfLocationForm [name='sort_order']", String((_a = row.sort_order) != null ? _a : 0));
+  setInputValue("#storeShelfLocationForm [name='sort_order']", String((_a2 = row.sort_order) != null ? _a2 : 0));
   setInputValue("#storeShelfLocationForm [name='layout_x']", String(Math.round(layout.x)));
   setInputValue("#storeShelfLocationForm [name='layout_y']", String(Math.round(layout.y)));
   setInputValue("#storeShelfLocationForm [name='layout_width']", String(Math.round(layout.width)));
@@ -24953,7 +24996,7 @@ function hydrateStoreShelfLocationForm(row = {}) {
   }
 }
 function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
-  var _a, _b;
+  var _a2, _b;
   const canvasTarget = document.querySelector("#storeShelfFloorPlanCanvas");
   const detailTarget = document.querySelector("#storeShelfLocationDetailPanel");
   if (!(canvasTarget instanceof HTMLElement) || !(detailTarget instanceof HTMLElement)) {
@@ -24962,7 +25005,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
   const copy = getStoreInventoryCopy();
   const locationRows = Array.isArray(rows) ? rows : [];
   if (locationRows.length && !storeShelfFloorPlanState.selectedLocationCode) {
-    storeShelfFloorPlanState.selectedLocationCode = String(((_a = locationRows[0]) == null ? void 0 : _a.location_code) || ((_b = locationRows[0]) == null ? void 0 : _b.rack_code) || "").trim().toUpperCase();
+    storeShelfFloorPlanState.selectedLocationCode = String(((_a2 = locationRows[0]) == null ? void 0 : _a2.location_code) || ((_b = locationRows[0]) == null ? void 0 : _b.rack_code) || "").trim().toUpperCase();
   }
   const backgroundStyle = storeShelfFloorPlanState.backgroundImageDataUrl ? ` style="background-image: linear-gradient(rgba(248,250,252,0.86), rgba(248,250,252,0.92)), url('${escapeHtml(storeShelfFloorPlanState.backgroundImageDataUrl)}');"` : "";
   if (!locationRows.length) {
@@ -24986,7 +25029,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
       </button>
     `).join("");
   const shelfObjects = locationRows.map((row, index) => {
-    var _a2;
+    var _a3;
     const code = String(row.location_code || row.rack_code || "").trim().toUpperCase();
     const layout = parseStoreShelfLayout(row, index);
     const selectedClass = code && code === storeShelfFloorPlanState.selectedLocationCode ? " is-selected" : "";
@@ -24997,7 +25040,7 @@ function renderStoreShelfFloorPlanCanvas(rows = [], message = "") {
           <span class="map-object-badge">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
           <strong>${escapeHtml(code || "-")}</strong>
           <span>${escapeHtml(row.location_name || "-")}</span>
-          <small>${escapeHtml(row.category_name || row.category_hint || typeLabel || "-")} · ${escapeHtml((_a2 = row.item_count) != null ? _a2 : 0)} 件</small>
+          <small>${escapeHtml(row.category_name || row.category_hint || typeLabel || "-")} · ${escapeHtml((_a3 = row.item_count) != null ? _a3 : 0)} 件</small>
         </button>
       `;
   }).join("");
@@ -25053,7 +25096,7 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
     return;
   }
   listTarget.innerHTML = locationRows.map((row) => {
-    var _a, _b;
+    var _a2, _b;
     const typeLabel = getStoreInventoryLocationTypeLabel(row.location_type);
     return `
       <article class="candidate-row">
@@ -25062,7 +25105,7 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
           <div class="subtle small">${escapeHtml(typeLabel)} · 绑定品类：${escapeHtml(row.category_name || row.category_hint || "-")}</div>
           <div class="chip-row">
             <span class="meta-pill">${escapeHtml(getStoreShelfLocationStatusLabel(row))}</span>
-            <span class="meta-pill">排序 ${escapeHtml((_a = row.sort_order) != null ? _a : 0)}</span>
+            <span class="meta-pill">排序 ${escapeHtml((_a2 = row.sort_order) != null ? _a2 : 0)}</span>
             <span class="meta-pill">商品 ${escapeHtml((_b = row.item_count) != null ? _b : 0)}</span>
           </div>
         </div>
@@ -25072,8 +25115,8 @@ function renderStoreShelfLocationSummary(rows = [], message = "") {
   }).join("");
 }
 async function loadStoreShelfLocations(storeCode = "") {
-  var _a;
-  const normalizedStoreCode = String(storeCode || ((_a = document.querySelector("#storeShelfLocationLoadForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+  var _a2;
+  const normalizedStoreCode = String(storeCode || ((_a2 = document.querySelector("#storeShelfLocationLoadForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
   const rows = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/rack-locations`);
   writeOutput("#storeShelfLocationOutput", rows);
   setInputValue("#storeShelfLocationLoadForm [name='store_code']", normalizedStoreCode);
@@ -25088,8 +25131,8 @@ async function submitStoreShelfLocationLoad(event) {
   return loadStoreShelfLocations(payload.store_code);
 }
 async function initializeStoreShelfLocations(storeCode = "") {
-  var _a;
-  const normalizedStoreCode = String(storeCode || ((_a = document.querySelector("#storeShelfLocationLoadForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
+  var _a2;
+  const normalizedStoreCode = String(storeCode || ((_a2 = document.querySelector("#storeShelfLocationLoadForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "UTAWALA").trim().toUpperCase();
   const result = await request(`/stores/${encodeURIComponent(normalizedStoreCode)}/rack-locations/initialize`, {
     method: "POST"
   });
@@ -25247,7 +25290,7 @@ function getBaleTemplateOptionLabel(row = {}) {
   return labelTemplateFlow.formatBaleTemplateOptionLabel ? labelTemplateFlow.formatBaleTemplateOptionLabel(row) : `${String((row == null ? void 0 : row.name) || "Bale Label").trim()} · ${String((row == null ? void 0 : row.template_code) || "").trim().toLowerCase()} · ${String((row == null ? void 0 : row.width_mm) || 60)}x${String((row == null ? void 0 : row.height_mm) || 40)}`;
 }
 function getPreferredBaleTemplateCode(preferredValue = "") {
-  var _a;
+  var _a2;
   const baleTemplates = getSelectableLabelTemplatesByScope("bale");
   const persistedValue = String(preferredBaleTemplateCode || "").trim().toLowerCase();
   if (labelTemplateFlow.pickPreferredTemplateCode) {
@@ -25267,10 +25310,10 @@ function getPreferredBaleTemplateCode(preferredValue = "") {
   if (baleTemplates.some((row) => String((row == null ? void 0 : row.template_code) || "").trim().toLowerCase() === "warehouse_in")) {
     return "warehouse_in";
   }
-  return String(((_a = baleTemplates[0]) == null ? void 0 : _a.template_code) || "warehouse_in").trim().toLowerCase();
+  return String(((_a2 = baleTemplates[0]) == null ? void 0 : _a2.template_code) || "warehouse_in").trim().toLowerCase();
 }
 function getPreferredWarehouseoutTemplateCode(preferredValue = "", taskType = "store_dispatch") {
-  var _a;
+  var _a2;
   const normalizedTaskType = String(taskType || "store_dispatch").trim().toLowerCase() || "store_dispatch";
   if (normalizedTaskType === SDO_PRINT_TASK_TYPE) {
     return getTransferDispatchTemplateCode();
@@ -25300,7 +25343,7 @@ function getPreferredWarehouseoutTemplateCode(preferredValue = "", taskType = "s
   if (warehouseoutTemplates.some((row) => String((row == null ? void 0 : row.template_code) || "").trim().toLowerCase() === defaultCode)) {
     return defaultCode;
   }
-  return String(((_a = warehouseoutTemplates[0]) == null ? void 0 : _a.template_code) || defaultCode).trim().toLowerCase();
+  return String(((_a2 = warehouseoutTemplates[0]) == null ? void 0 : _a2.template_code) || defaultCode).trim().toLowerCase();
 }
 function populateBaleLabelTemplateSelects(preferredValue = "") {
   const rows = getSelectableLabelTemplatesByScope("bale");
@@ -25340,7 +25383,7 @@ function getActiveBaleTemplateCode(preferredValue = "") {
   return getPreferredBaleTemplateCode(preferredValue);
 }
 function populateItemTokenTemplateSelects(preferredValue = "") {
-  var _a;
+  var _a2;
   const rows = getSelectableLabelTemplatesByScope("product");
   const select = document.querySelector("#itemTokenPrintQueueForm [name='template_code']");
   if (!(select instanceof HTMLSelectElement)) {
@@ -25349,7 +25392,7 @@ function populateItemTokenTemplateSelects(preferredValue = "") {
   const options = rows.length ? rows.map((row) => `<option value="${escapeHtml(row.template_code)}">${escapeHtml(row.name)} · ${escapeHtml(`${row.width_mm}x${row.height_mm}`)}</option>`) : [`<option value="apparel_40x30">Apparel Label 40x30 · 40x30</option>`];
   select.innerHTML = options.join("");
   const normalizedPreferred = String(preferredValue || "").trim().toLowerCase();
-  const fallbackValue = normalizedPreferred && rows.some((row) => String(row.template_code || "").trim().toLowerCase() === normalizedPreferred) ? normalizedPreferred : String(((_a = rows[0]) == null ? void 0 : _a.template_code) || "apparel_40x30").trim().toLowerCase();
+  const fallbackValue = normalizedPreferred && rows.some((row) => String(row.template_code || "").trim().toLowerCase() === normalizedPreferred) ? normalizedPreferred : String(((_a2 = rows[0]) == null ? void 0 : _a2.template_code) || "apparel_40x30").trim().toLowerCase();
   select.value = fallbackValue;
 }
 function getBaleTemplatePaperPresets() {
@@ -25390,27 +25433,27 @@ function buildBaleTemplateDraft(row = null) {
   };
 }
 function ensureLabelTemplateEditorDraft(row = null) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   if (row || !labelTemplateEditorState.draft) {
     labelTemplateEditorState.draft = buildBaleTemplateDraft(row);
   }
   const selectedId = String(labelTemplateEditorState.selectedComponentId || "").trim();
-  const components = Array.isArray((_b = (_a = labelTemplateEditorState.draft) == null ? void 0 : _a.layout) == null ? void 0 : _b.components) ? labelTemplateEditorState.draft.layout.components : [];
+  const components = Array.isArray((_b = (_a2 = labelTemplateEditorState.draft) == null ? void 0 : _a2.layout) == null ? void 0 : _b.components) ? labelTemplateEditorState.draft.layout.components : [];
   if (!components.some((component) => component.id === selectedId)) {
     labelTemplateEditorState.selectedComponentId = String(((_c = components[0]) == null ? void 0 : _c.id) || "headline");
   }
   return labelTemplateEditorState.draft;
 }
 function getSelectedLabelTemplateComponent() {
-  var _a;
+  var _a2;
   const draft = ensureLabelTemplateEditorDraft();
-  const components = Array.isArray((_a = draft == null ? void 0 : draft.layout) == null ? void 0 : _a.components) ? draft.layout.components : [];
+  const components = Array.isArray((_a2 = draft == null ? void 0 : draft.layout) == null ? void 0 : _a2.components) ? draft.layout.components : [];
   return components.find((component) => component.id === labelTemplateEditorState.selectedComponentId) || components[0] || null;
 }
 function getLabelTemplateComponentSourceLabel(componentId, sourceValue) {
-  var _a;
+  var _a2;
   const options = labelTemplateFlow.getComponentSourceOptions ? labelTemplateFlow.getComponentSourceOptions(componentId) : [];
-  return String(((_a = options.find((item) => item.value === sourceValue)) == null ? void 0 : _a.label) || sourceValue || "-");
+  return String(((_a2 = options.find((item) => item.value === sourceValue)) == null ? void 0 : _a2.label) || sourceValue || "-");
 }
 function getBaleTemplateSampleTextMap() {
   return {
@@ -25428,13 +25471,13 @@ function getBaleTemplateSampleTextMap() {
   };
 }
 function renderBaleTemplateComponentList() {
-  var _a;
+  var _a2;
   const target = document.querySelector("#baleTemplateComponentList");
   if (!(target instanceof HTMLElement)) {
     return;
   }
   const draft = ensureLabelTemplateEditorDraft();
-  const components = Array.isArray((_a = draft == null ? void 0 : draft.layout) == null ? void 0 : _a.components) ? draft.layout.components : [];
+  const components = Array.isArray((_a2 = draft == null ? void 0 : draft.layout) == null ? void 0 : _a2.components) ? draft.layout.components : [];
   target.innerHTML = components.map((component) => `
       <button
         type="button"
@@ -25449,7 +25492,7 @@ function renderBaleTemplateComponentList() {
     `).join("");
 }
 function renderBaleTemplateCanvas() {
-  var _a;
+  var _a2;
   const target = document.querySelector("#baleTemplateCanvas");
   const stageSummary = document.querySelector("#baleTemplateStageSummary");
   if (!(target instanceof HTMLElement)) {
@@ -25466,7 +25509,7 @@ function renderBaleTemplateCanvas() {
   target.dataset.heightMm = String(heightMm);
   target.style.width = `${Math.round(widthMm * scale)}px`;
   target.style.height = `${Math.round(heightMm * scale)}px`;
-  target.innerHTML = (Array.isArray((_a = draft.layout) == null ? void 0 : _a.components) ? draft.layout.components : []).map((component) => {
+  target.innerHTML = (Array.isArray((_a2 = draft.layout) == null ? void 0 : _a2.components) ? draft.layout.components : []).map((component) => {
     const left = Number(component.x_mm || 0) / Math.max(widthMm, 1) * 100;
     const top = Number(component.y_mm || 0) / Math.max(heightMm, 1) * 100;
     const width = Number(component.w_mm || 0) / Math.max(widthMm, 1) * 100;
@@ -25514,13 +25557,13 @@ function renderBaleTemplateCanvas() {
   }
 }
 function renderBaleTemplateQuickControls() {
-  var _a;
+  var _a2;
   const target = document.querySelector("#baleTemplateQuickControls");
   if (!(target instanceof HTMLElement)) {
     return;
   }
   const draft = ensureLabelTemplateEditorDraft();
-  const rows = labelTemplateFlow.listEditableTextComponents ? labelTemplateFlow.listEditableTextComponents(draft.layout || {}) : Array.isArray((_a = draft.layout) == null ? void 0 : _a.components) ? draft.layout.components.filter((component) => component.type === "text") : [];
+  const rows = labelTemplateFlow.listEditableTextComponents ? labelTemplateFlow.listEditableTextComponents(draft.layout || {}) : Array.isArray((_a2 = draft.layout) == null ? void 0 : _a2.components) ? draft.layout.components.filter((component) => component.type === "text") : [];
   target.innerHTML = `
     <div class="candidate-summary">
       <div class="bale-template-meta-row">
@@ -25696,8 +25739,8 @@ function getLabelTemplateContentSourceLabel(source = "") {
   return labels[normalized] || (normalized ? normalized : "未标注字段");
 }
 function getLabelTemplateComponentSummaryRows(row = {}) {
-  var _a;
-  const components = Array.isArray((_a = row.layout) == null ? void 0 : _a.components) ? row.layout.components : [];
+  var _a2;
+  const components = Array.isArray((_a2 = row.layout) == null ? void 0 : _a2.components) ? row.layout.components : [];
   return components.filter((component) => component && component.enabled !== false).map((component) => {
     const rawLabel = String(component.label || "").trim();
     const contentLabel = getLabelTemplateContentSourceLabel(component.content_source || "");
@@ -25851,8 +25894,8 @@ function renderLabelTemplateManagerSummary(kind = "", data = labelTemplateState)
         </div>
         <div class="template-card-grid">
           ${group.rows.map((row) => {
-    var _a, _b, _c;
-    const components = Array.isArray((_a = row.layout) == null ? void 0 : _a.components) ? row.layout.components : [];
+    var _a2, _b, _c;
+    const components = Array.isArray((_a2 = row.layout) == null ? void 0 : _a2.components) ? row.layout.components : [];
     const enabledCount = components.filter((component) => component.enabled !== false).length;
     const detailRows = getLabelTemplateComponentSummaryRows(row);
     const demoEntry = getLabelTemplateDemoEntry(row);
@@ -25917,12 +25960,12 @@ function refreshLabelTemplateDemo(templateCode = "") {
   return getLabelTemplateDemoEntry(row, { refresh: true });
 }
 async function printLabelTemplateDemo(templateCode = "") {
-  var _a;
+  var _a2;
   const row = getLabelTemplateByCode(templateCode);
   if (!row) {
     throw new Error("没有找到要测试的模板。");
   }
-  const hasFormalLayout = labelTemplateFlow.hasSavedTemplateLayout ? labelTemplateFlow.hasSavedTemplateLayout(row) : Array.isArray((_a = row.layout) == null ? void 0 : _a.components) && row.layout.components.length > 0;
+  const hasFormalLayout = labelTemplateFlow.hasSavedTemplateLayout ? labelTemplateFlow.hasSavedTemplateLayout(row) : Array.isArray((_a2 = row.layout) == null ? void 0 : _a2.components) && row.layout.components.length > 0;
   if (!hasFormalLayout) {
     throw new Error("当前模板还没有保存正式布局，不能打印正式版测试。");
   }
@@ -25956,16 +25999,16 @@ async function printLabelTemplateDemo(templateCode = "") {
   focusElement("#labelTemplateManagerSummary");
 }
 function syncLabelTemplateDraftFromForm() {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   const form = document.querySelector("#labelTemplateForm");
   if (!(form instanceof HTMLFormElement)) {
     return ensureLabelTemplateEditorDraft();
   }
   const draft = ensureLabelTemplateEditorDraft();
-  draft.template_code = String(((_a = form.querySelector("[name='template_code']")) == null ? void 0 : _a.value) || draft.template_code || "").trim().toLowerCase();
+  draft.template_code = String(((_a2 = form.querySelector("[name='template_code']")) == null ? void 0 : _a2.value) || draft.template_code || "").trim().toLowerCase();
   draft.name = String(((_b = form.querySelector("[name='name']")) == null ? void 0 : _b.value) || draft.name || "").trim();
   draft.description = String(((_c = form.querySelector("[name='description']")) == null ? void 0 : _c.value) || draft.description || "").trim();
-  draft.paper_preset = String(((_d2 = form.querySelector("[name='paper_preset']")) == null ? void 0 : _d2.value) || draft.paper_preset || "60x40").trim().toLowerCase();
+  draft.paper_preset = String(((_d = form.querySelector("[name='paper_preset']")) == null ? void 0 : _d.value) || draft.paper_preset || "60x40").trim().toLowerCase();
   draft.width_mm = Number(((_e2 = form.querySelector("[name='width_mm']")) == null ? void 0 : _e2.value) || draft.width_mm || 60);
   draft.height_mm = Number(((_f2 = form.querySelector("[name='height_mm']")) == null ? void 0 : _f2.value) || draft.height_mm || 40);
   const normalizeLayout = labelTemplateFlow.normalizeBaleTemplateLayout || ((layout) => layout || {});
@@ -26236,7 +26279,7 @@ function populateStoreSelects(stores) {
   const rows = Array.isArray(stores) ? stores : [];
   storeDirectoryState = rows;
   document.querySelectorAll("select[data-store-select]").forEach((select) => {
-    var _a, _b;
+    var _a2, _b;
     const currentValue = select.value;
     const required = select.dataset.storeSelect === "required";
     const blankLabel = select.dataset.storeBlankLabel || "请选择门店";
@@ -26250,7 +26293,7 @@ function populateStoreSelects(stores) {
       );
     });
     select.innerHTML = options.join("");
-    const fallbackValue = currentValue || ((_a = currentSession.user) == null ? void 0 : _a.store_code) || ((_b = rows.find((row) => row.status === "active")) == null ? void 0 : _b.code) || "";
+    const fallbackValue = currentValue || ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || ((_b = rows.find((row) => row.status === "active")) == null ? void 0 : _b.code) || "";
     if (fallbackValue) {
       select.value = fallbackValue;
     }
@@ -26264,7 +26307,7 @@ function populateSupplierSelects(suppliers, preferredValue = "") {
   supplierDirectoryState = rows;
   syncParcelBatchRowsFromDom();
   document.querySelectorAll("select[data-supplier-select]").forEach((select) => {
-    var _a, _b;
+    var _a2, _b;
     const currentValue = preferredValue || select.value;
     const required = select.dataset.supplierSelect === "required";
     const bilingual = select.dataset.displayLanguage === "bilingual";
@@ -26285,7 +26328,7 @@ function populateSupplierSelects(suppliers, preferredValue = "") {
     });
     options.push(`<option value="__new__">+ 当前页新建供应商</option>`);
     select.innerHTML = options.join("");
-    const fallbackValue = currentValue || ((_a = rows.find((row) => row.status === "active")) == null ? void 0 : _a.name) || ((_b = rows[0]) == null ? void 0 : _b.name) || "";
+    const fallbackValue = currentValue || ((_a2 = rows.find((row) => row.status === "active")) == null ? void 0 : _a2.name) || ((_b = rows[0]) == null ? void 0 : _b.name) || "";
     if (fallbackValue) {
       select.value = fallbackValue;
     }
@@ -26353,15 +26396,15 @@ function renderSupplierResultSummary(kind, data) {
   `;
 }
 function getInlineSupplierPayload(formElement) {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   if (!(formElement instanceof HTMLFormElement)) {
     throw new Error("当前页面找不到可用的表单。");
   }
   const payload = {
-    name: ((_a = formElement.querySelector("[name='supplier_name_new']")) == null ? void 0 : _a.value.trim()) || "",
+    name: ((_a2 = formElement.querySelector("[name='supplier_name_new']")) == null ? void 0 : _a2.value.trim()) || "",
     name_zh: ((_b = formElement.querySelector("[name='supplier_name_zh_new']")) == null ? void 0 : _b.value.trim()) || "",
     code: ((_c = formElement.querySelector("[name='supplier_code_new']")) == null ? void 0 : _c.value.trim()) || "",
-    contact_person: ((_d2 = formElement.querySelector("[name='supplier_contact_person_new']")) == null ? void 0 : _d2.value.trim()) || "",
+    contact_person: ((_d = formElement.querySelector("[name='supplier_contact_person_new']")) == null ? void 0 : _d.value.trim()) || "",
     phone: ((_e2 = formElement.querySelector("[name='supplier_phone_new']")) == null ? void 0 : _e2.value.trim()) || "",
     note: ((_f2 = formElement.querySelector("[name='supplier_note_new']")) == null ? void 0 : _f2.value.trim()) || "",
     status: "active"
@@ -26403,7 +26446,7 @@ function populateCargoTypeSelects(cargoTypes, preferredValue = "") {
   cargoTypeDirectoryState = rows;
   syncParcelBatchRowsFromDom();
   document.querySelectorAll("select[data-cargo-type-select]").forEach((select) => {
-    var _a, _b;
+    var _a2, _b;
     const currentValue = preferredValue || select.value;
     const required = select.dataset.cargoTypeSelect === "required";
     const options = [];
@@ -26419,7 +26462,7 @@ function populateCargoTypeSelects(cargoTypes, preferredValue = "") {
     });
     options.push(`<option value="__new__">+ 当前页新建货物类型</option>`);
     select.innerHTML = options.join("");
-    const fallbackValue = currentValue || ((_a = rows.find((row) => row.status === "active")) == null ? void 0 : _a.name) || ((_b = rows[0]) == null ? void 0 : _b.name) || "";
+    const fallbackValue = currentValue || ((_a2 = rows.find((row) => row.status === "active")) == null ? void 0 : _a2.name) || ((_b = rows[0]) == null ? void 0 : _b.name) || "";
     if (fallbackValue) {
       select.value = fallbackValue;
     }
@@ -26480,12 +26523,12 @@ function renderCargoTypeResultSummary(kind, data) {
   `;
 }
 function getInlineCargoTypePayload(formElement) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   if (!(formElement instanceof HTMLFormElement)) {
     throw new Error("当前页面找不到可用的表单。");
   }
   const payload = {
-    name: ((_a = formElement.querySelector("[name='cargo_type_name_new']")) == null ? void 0 : _a.value.trim()) || "",
+    name: ((_a2 = formElement.querySelector("[name='cargo_type_name_new']")) == null ? void 0 : _a2.value.trim()) || "",
     code: ((_b = formElement.querySelector("[name='cargo_type_code_new']")) == null ? void 0 : _b.value.trim()) || "",
     note: ((_c = formElement.querySelector("[name='cargo_type_note_new']")) == null ? void 0 : _c.value.trim()) || "",
     status: "active"
@@ -26564,19 +26607,19 @@ function parcelSourceOptionsHtml(shipmentNo = "", selectedValue = "") {
   return options.join("");
 }
 function syncParcelBatchRowsFromDom() {
-  var _a;
+  var _a2;
   const container = document.querySelector("#parcelBatchItemsBuilder");
   if (!(container instanceof HTMLElement)) {
     return [];
   }
-  const shipmentNo = normalizeShipmentNo(((_a = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a.value) || currentInboundShipmentNo);
+  const shipmentNo = normalizeShipmentNo(((_a2 = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a2.value) || currentInboundShipmentNo);
   const rows = [...container.querySelectorAll("[data-parcel-batch-row-index]")].map((rowNode) => {
-    var _a2, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2;
-    const sourceBaleToken = ((_c = (_b = (_a2 = rowNode.querySelector("[data-parcel-batch-field='source_bale_token']")) == null ? void 0 : _a2.value) == null ? void 0 : _b.trim) == null ? void 0 : _c.call(_b)) || "";
+    var _a3, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2;
+    const sourceBaleToken = ((_c = (_b = (_a3 = rowNode.querySelector("[data-parcel-batch-field='source_bale_token']")) == null ? void 0 : _a3.value) == null ? void 0 : _b.trim) == null ? void 0 : _c.call(_b)) || "";
     const sourceLine = getChinaSourceLineForShipment(shipmentNo, sourceBaleToken);
     return {
       source_bale_token: sourceBaleToken,
-      supplier_name: (sourceLine == null ? void 0 : sourceLine.supplier_name) || ((_f2 = (_e2 = (_d2 = rowNode.querySelector("[data-parcel-batch-field='supplier_name_hidden']")) == null ? void 0 : _d2.value) == null ? void 0 : _e2.trim) == null ? void 0 : _f2.call(_e2)) || "",
+      supplier_name: (sourceLine == null ? void 0 : sourceLine.supplier_name) || ((_f2 = (_e2 = (_d = rowNode.querySelector("[data-parcel-batch-field='supplier_name_hidden']")) == null ? void 0 : _d.value) == null ? void 0 : _e2.trim) == null ? void 0 : _f2.call(_e2)) || "",
       package_count: Number(((_g2 = rowNode.querySelector("[data-parcel-batch-field='package_count']")) == null ? void 0 : _g2.value) || 0),
       total_weight: ((_h2 = rowNode.querySelector("[data-parcel-batch-field='total_weight']")) == null ? void 0 : _h2.value) || "",
       category_main: (sourceLine == null ? void 0 : sourceLine.category_main) || ((_k2 = (_j2 = (_i2 = rowNode.querySelector("[data-parcel-batch-field='category_main_hidden']")) == null ? void 0 : _i2.value) == null ? void 0 : _j2.trim) == null ? void 0 : _k2.call(_j2)) || "",
@@ -26639,14 +26682,14 @@ function categorySubOptionsHtml(mainCategory = "", selectedValue = "", { supplie
   return options.join("");
 }
 function renderParcelBatchRows() {
-  var _a;
+  var _a2;
   const container = document.querySelector("#parcelBatchItemsBuilder");
   if (!(container instanceof HTMLElement)) {
     return;
   }
   const rows = parcelBatchRowState.length ? parcelBatchRowState : [emptyParcelBatchRow()];
   parcelBatchRowState = rows;
-  const shipmentNo = normalizeShipmentNo(((_a = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a.value) || currentInboundShipmentNo);
+  const shipmentNo = normalizeShipmentNo(((_a2 = document.querySelector("#parcelBatchForm [name='inbound_shipment_no']")) == null ? void 0 : _a2.value) || currentInboundShipmentNo);
   container.innerHTML = rows.map(
     (row, index) => {
       const selectedToken = row.source_bale_token || inferChinaSourceTokenForRow(shipmentNo, row);
@@ -26717,7 +26760,7 @@ function applyCargoTypeSelectionToParcelBatchRows(cargoTypeName) {
   renderParcelBatchRows();
 }
 function renderStoreResultSummary(kind, data) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = document.querySelector("#storeResultSummary");
   if (!target) {
     return;
@@ -26736,7 +26779,7 @@ function renderStoreResultSummary(kind, data) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>总门店数</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>在营门店</strong><span>${activeCount}</span></article>
-        <article class="store-metric"><strong>示例门店</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.name) || ((_b = rows[0]) == null ? void 0 : _b.code) || "-")}</span></article>
+        <article class="store-metric"><strong>示例门店</strong><span>${escapeHtml(((_a2 = rows[0]) == null ? void 0 : _a2.name) || ((_b = rows[0]) == null ? void 0 : _b.code) || "-")}</span></article>
         <article class="store-metric"><strong>地图链接</strong><span>${((_c = rows[0]) == null ? void 0 : _c.google_maps_url) ? "已配置" : "待配置"}</span></article>
       </div>
     `;
@@ -27170,10 +27213,10 @@ function renderAreaSupervisorUserList(users = areaSupervisorLaunchUsers) {
   `;
 }
 function renderAreaSupervisorLaunchConsole(stores = areaSupervisorLaunchStores, users = areaSupervisorLaunchUsers) {
-  var _a;
+  var _a2;
   areaSupervisorLaunchStores = Array.isArray(stores) ? stores : [];
   areaSupervisorLaunchUsers = Array.isArray(users) ? users : [];
-  if (!areaSupervisorSelectedStoreCode && ((_a = areaSupervisorLaunchStores[0]) == null ? void 0 : _a.code)) {
+  if (!areaSupervisorSelectedStoreCode && ((_a2 = areaSupervisorLaunchStores[0]) == null ? void 0 : _a2.code)) {
     areaSupervisorSelectedStoreCode = String(areaSupervisorLaunchStores[0].code || "").trim().toUpperCase();
   }
   renderAreaSupervisorStoreOptions(areaSupervisorLaunchStores);
@@ -27506,8 +27549,8 @@ function renderUserBindingTags(user = {}) {
   return visibleTags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
 }
 function isCurrentUserAdmin() {
-  var _a;
-  return String(((_a = currentSession.user) == null ? void 0 : _a.role_code) || "").trim().toLowerCase() === "admin";
+  var _a2;
+  return String(((_a2 = currentSession.user) == null ? void 0 : _a2.role_code) || "").trim().toLowerCase() === "admin";
 }
 function getUserActionId(user = {}) {
   return String((user == null ? void 0 : user.id) || (user == null ? void 0 : user.username) || "").trim();
@@ -27527,10 +27570,10 @@ function getUserStatusValue(user = {}) {
   return (user == null ? void 0 : user.is_active) === false ? "inactive" : "active";
 }
 function isProtectedUserAccount(user = {}) {
-  var _a;
+  var _a2;
   const username = String((user == null ? void 0 : user.username) || "").trim();
   return Boolean(
-    username === "admin_1" || ((_a = currentSession.user) == null ? void 0 : _a.username) && username === currentSession.user.username
+    username === "admin_1" || ((_a2 = currentSession.user) == null ? void 0 : _a2.username) && username === currentSession.user.username
   );
 }
 function setUserFormMode(isEdit = false) {
@@ -27804,7 +27847,7 @@ function buildUserPayloadFromForm(formElement, options = {}) {
   return payload;
 }
 async function deactivateUserFromList(userId) {
-  var _a;
+  var _a2;
   const normalizedId = String(userId || "").trim();
   const user = findUserDirectoryRow(normalizedId);
   if (!normalizedId || !user) {
@@ -27813,7 +27856,7 @@ async function deactivateUserFromList(userId) {
   if (!isCurrentUserAdmin()) {
     throw new Error("只有 admin 可以停用用户。");
   }
-  if (isProtectedUserAccount(user) && ((_a = currentSession.user) == null ? void 0 : _a.username) && user.username === currentSession.user.username) {
+  if (isProtectedUserAccount(user) && ((_a2 = currentSession.user) == null ? void 0 : _a2.username) && user.username === currentSession.user.username) {
     throw new Error("不能停用当前登录账号。");
   }
   if (user.username === "admin_1") {
@@ -27866,7 +27909,7 @@ async function activateUserFromList(userId) {
   renderUserResultSummary("activate", result);
 }
 async function deleteUserFromList(userId) {
-  var _a;
+  var _a2;
   const normalizedId = String(userId || "").trim();
   const user = findUserDirectoryRow(normalizedId);
   if (!normalizedId || !user) {
@@ -27875,7 +27918,7 @@ async function deleteUserFromList(userId) {
   if (!isCurrentUserAdmin()) {
     throw new Error("只有 admin 可以删除用户。");
   }
-  if (((_a = currentSession.user) == null ? void 0 : _a.username) && user.username === currentSession.user.username) {
+  if (((_a2 = currentSession.user) == null ? void 0 : _a2.username) && user.username === currentSession.user.username) {
     throw new Error("当前登录账号不能删除自己。");
   }
   if (user.username === "admin_1") {
@@ -27905,7 +27948,7 @@ async function deleteUserFromList(userId) {
   renderUserResultSummary("delete", { ...user, ...result });
 }
 function renderUserResultSummary(kind, data) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const target = document.querySelector("#userResultSummary");
   if (!target) {
     return;
@@ -27922,7 +27965,7 @@ function renderUserResultSummary(kind, data) {
       <div class="alert-banner">这是当前系统支持的角色。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>角色数量</strong><span>${rows.length}</span></article>
-        <article class="store-metric"><strong>示例角色</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.code) || "-")}</span></article>
+        <article class="store-metric"><strong>示例角色</strong><span>${escapeHtml(((_a2 = rows[0]) == null ? void 0 : _a2.code) || "-")}</span></article>
         <article class="store-metric"><strong>角色说明</strong><span>${escapeHtml(((_b = rows[0]) == null ? void 0 : _b.name) || "-")}</span></article>
       </div>
     `;
@@ -27936,7 +27979,7 @@ function renderUserResultSummary(kind, data) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>账号数量</strong><span>${rows.length}</span></article>
         <article class="store-metric"><strong>示例账号</strong><span>${escapeHtml(((_c = rows[0]) == null ? void 0 : _c.username) || "-")}</span></article>
-        <article class="store-metric"><strong>默认门店</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.store_code) || "全局")}</span></article>
+        <article class="store-metric"><strong>默认门店</strong><span>${escapeHtml(((_d = rows[0]) == null ? void 0 : _d.store_code) || "全局")}</span></article>
       </div>
     `;
     return;
@@ -27954,7 +27997,7 @@ function renderUserResultSummary(kind, data) {
   `;
 }
 function renderPriceRuleResultSummary(kind, data) {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const target = document.querySelector("#priceRuleResultSummary");
   if (!target) {
     return;
@@ -27971,9 +28014,9 @@ function renderPriceRuleResultSummary(kind, data) {
       <div class="alert-banner">当前限价规则已经读取完成。</div>
       <div class="report-summary-grid">
         <article class="store-metric"><strong>规则数量</strong><span>${rows.length}</span></article>
-        <article class="store-metric"><strong>示例对象</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.target_value) || "-")}</span></article>
+        <article class="store-metric"><strong>示例对象</strong><span>${escapeHtml(((_a2 = rows[0]) == null ? void 0 : _a2.target_value) || "-")}</span></article>
         <article class="store-metric"><strong>最高限价</strong><span>${escapeHtml((_c = (_b = rows[0]) == null ? void 0 : _b.max_price) != null ? _c : "-")}</span></article>
-        <article class="store-metric"><strong>门店</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.store_code) || "全店通用")}</span></article>
+        <article class="store-metric"><strong>门店</strong><span>${escapeHtml(((_d = rows[0]) == null ? void 0 : _d.store_code) || "全店通用")}</span></article>
       </div>
     `;
     return;
@@ -27990,7 +28033,7 @@ function renderPriceRuleResultSummary(kind, data) {
   `;
 }
 function renderLookupResultSummary(result) {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const target = document.querySelector("#lookupResultSummary");
   if (!target) {
     return;
@@ -28005,17 +28048,17 @@ function renderLookupResultSummary(result) {
     <div class="alert-banner">扫码结果已读取，可以直接给顾客报价或继续收银。</div>
     <div class="report-summary-grid">
       <article class="store-metric"><strong>商品</strong><span>${escapeHtml(result.product_name || result.barcode || "-")}</span></article>
-      <article class="store-metric"><strong>门店库存</strong><span>${escapeHtml((_a = result.qty_on_hand) != null ? _a : 0)}</span></article>
+      <article class="store-metric"><strong>门店库存</strong><span>${escapeHtml((_a2 = result.qty_on_hand) != null ? _a2 : 0)}</span></article>
       <article class="store-metric"><strong>建议售价</strong><span>${escapeHtml((_b = result.expected_price) != null ? _b : "-")}</span></article>
       <article class="store-metric"><strong>限价</strong><span>${escapeHtml((_c = result.price_cap) != null ? _c : "未设置")}</span></article>
       <article class="store-metric"><strong>门店架位</strong><span>${escapeHtml(result.store_rack_code || "未录入")}</span></article>
-      <article class="store-metric"><strong>成本价</strong><span>${escapeHtml((_e2 = (_d2 = result.average_cost_price) != null ? _d2 : result.cost_price) != null ? _e2 : "-")}</span></article>
+      <article class="store-metric"><strong>成本价</strong><span>${escapeHtml((_e2 = (_d = result.average_cost_price) != null ? _d : result.cost_price) != null ? _e2 : "-")}</span></article>
     </div>
     ${renderIdentityJumpButtons([result.barcode], "查看这件货台账")}
   `;
 }
 function renderMpesaResultSummary(kind, result) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
   const target = document.querySelector("#mpesaResultSummary");
   if (!target) {
     return;
@@ -28032,9 +28075,9 @@ function renderMpesaResultSummary(kind, result) {
         <div class="alert-banner">M-Pesa 流水已经读取完成。</div>
         <div class="report-summary-grid">
           <article class="store-metric"><strong>流水数量</strong><span>${rows.length}</span></article>
-          <article class="store-metric"><strong>第一笔收据</strong><span>${escapeHtml(((_a = rows[0]) == null ? void 0 : _a.receipt_no) || "-")}</span></article>
+          <article class="store-metric"><strong>第一笔收据</strong><span>${escapeHtml(((_a2 = rows[0]) == null ? void 0 : _a2.receipt_no) || "-")}</span></article>
           <article class="store-metric"><strong>第一笔金额</strong><span>${escapeHtml((_c = (_b = rows[0]) == null ? void 0 : _b.amount) != null ? _c : "-")}</span></article>
-          <article class="store-metric"><strong>匹配状态</strong><span>${escapeHtml(((_d2 = rows[0]) == null ? void 0 : _d2.match_status) || "-")}</span></article>
+          <article class="store-metric"><strong>匹配状态</strong><span>${escapeHtml(((_d = rows[0]) == null ? void 0 : _d.match_status) || "-")}</span></article>
         </div>
       ` : "当前还没有 M-Pesa 数据。";
     return;
@@ -28051,7 +28094,7 @@ function renderMpesaResultSummary(kind, result) {
   `;
 }
 function renderOfflineSyncResultSummary(result) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = document.querySelector("#offlineSyncResultSummary");
   if (!target) {
     return;
@@ -28067,7 +28110,7 @@ function renderOfflineSyncResultSummary(result) {
     <div class="report-summary-grid">
       <article class="store-metric"><strong>批次号</strong><span>${escapeHtml(result.sync_batch_no || "-")}</span></article>
       <article class="store-metric"><strong>设备号</strong><span>${escapeHtml(result.device_id || "-")}</span></article>
-      <article class="store-metric"><strong>成功行</strong><span>${escapeHtml((_a = result.accepted_count) != null ? _a : 0)}</span></article>
+      <article class="store-metric"><strong>成功行</strong><span>${escapeHtml((_a2 = result.accepted_count) != null ? _a2 : 0)}</span></article>
       <article class="store-metric"><strong>重复行</strong><span>${escapeHtml((_b = result.duplicate_count) != null ? _b : 0)}</span></article>
       <article class="store-metric"><strong>失败行</strong><span>${escapeHtml((_c = result.failed_count) != null ? _c : 0)}</span></article>
     </div>
@@ -28097,9 +28140,9 @@ function renderWarehouseMainflowDemoToolSummary(result = safeParse(localStorage.
     <div class="report-summary-grid">
       ${summary.metrics.map(
     (row) => {
-      var _a;
+      var _a2;
       return `
-            <article class="store-metric"><strong>${escapeHtml(row.label || "-")}</strong><span>${escapeHtml((_a = row.value) != null ? _a : "-")}</span></article>
+            <article class="store-metric"><strong>${escapeHtml(row.label || "-")}</strong><span>${escapeHtml((_a2 = row.value) != null ? _a2 : "-")}</span></article>
           `;
     }
   ).join("")}
@@ -28146,9 +28189,9 @@ function renderStoreReplenishmentDemoSummary(result = safeParse(localStorage.get
     <div class="report-summary-grid">
       ${summary.metrics.map(
     (row) => {
-      var _a;
+      var _a2;
       return `
-            <article class="store-metric"><strong>${escapeHtml(row.label || "-")}</strong><span>${escapeHtml((_a = row.value) != null ? _a : "-")}</span></article>
+            <article class="store-metric"><strong>${escapeHtml(row.label || "-")}</strong><span>${escapeHtml((_a2 = row.value) != null ? _a2 : "-")}</span></article>
           `;
     }
   ).join("")}
@@ -28392,8 +28435,8 @@ function renderPriceAlerts(rows) {
   }).join("");
 }
 function getReturnSelectionMode() {
-  var _a;
-  return ((_a = document.querySelector("input[name='selection_mode']:checked")) == null ? void 0 : _a.value) || "all";
+  var _a2;
+  return ((_a2 = document.querySelector("input[name='selection_mode']:checked")) == null ? void 0 : _a2.value) || "all";
 }
 function syncReturnSelectionSummary() {
   const summaryTarget = document.querySelector("#returnCandidateSummary");
@@ -28529,9 +28572,9 @@ function clearLoginPasswordField() {
   }
 }
 function ensureLoginPasswordCleared() {
-  var _a;
+  var _a2;
   clearLoginPasswordField();
-  (_a = window.requestAnimationFrame) == null ? void 0 : _a.call(window, clearLoginPasswordField);
+  (_a2 = window.requestAnimationFrame) == null ? void 0 : _a2.call(window, clearLoginPasswordField);
   window.setTimeout(clearLoginPasswordField, 0);
   window.setTimeout(clearLoginPasswordField, 120);
   window.setTimeout(clearLoginPasswordField, 500);
@@ -28620,8 +28663,8 @@ function renderSessionState() {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 function hydrateStoreDefaults() {
-  var _a;
-  const storeCode = (_a = currentSession.user) == null ? void 0 : _a.store_code;
+  var _a2;
+  const storeCode = (_a2 = currentSession.user) == null ? void 0 : _a2.store_code;
   if (!storeCode) {
     return;
   }
@@ -28728,9 +28771,9 @@ function getCashierTerminalCopy() {
   return CASHIER_TERMINAL_LOCALE_COPY[cashierTerminalState.locale] || CASHIER_TERMINAL_LOCALE_COPY.zh;
 }
 function cashierTerminalText(key) {
-  var _a;
+  var _a2;
   const copy = getCashierTerminalCopy();
-  return (_a = copy[key]) != null ? _a : key;
+  return (_a2 = copy[key]) != null ? _a2 : key;
 }
 function getCashierTerminalSalesPanelKey() {
   return getPanelKeyByTitle("store", "9. 收银销售");
@@ -28894,11 +28937,11 @@ function clearCashierTerminalLookupInputs() {
   }
 }
 function syncCashierTerminalDraftsFromForms() {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2;
-  cashierTerminalState.note = String(((_a = document.querySelector("#saleForm [name='note']")) == null ? void 0 : _a.value) || cashierTerminalState.note || "正常销售").trim() || "正常销售";
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2;
+  cashierTerminalState.note = String(((_a2 = document.querySelector("#saleForm [name='note']")) == null ? void 0 : _a2.value) || cashierTerminalState.note || "正常销售").trim() || "正常销售";
   cashierTerminalState.openingFloatCash = String(((_b = document.querySelector("#openShiftForm [name='opening_float_cash']")) == null ? void 0 : _b.value) || cashierTerminalState.openingFloatCash || "1000").trim() || "1000";
   cashierTerminalState.openingNote = String(((_c = document.querySelector("#openShiftForm [name='note']")) == null ? void 0 : _c.value) || cashierTerminalState.openingNote || "早班开始").trim() || "早班开始";
-  cashierTerminalState.voidOrderNo = String(((_d2 = document.querySelector("#saleVoidRequestForm [name='order_no']")) == null ? void 0 : _d2.value) || cashierTerminalState.voidOrderNo || ((_e2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _e2.order_no) || "").trim();
+  cashierTerminalState.voidOrderNo = String(((_d = document.querySelector("#saleVoidRequestForm [name='order_no']")) == null ? void 0 : _d.value) || cashierTerminalState.voidOrderNo || ((_e2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _e2.order_no) || "").trim();
   cashierTerminalState.voidReason = String(((_f2 = document.querySelector("#saleVoidRequestForm [name='reason']")) == null ? void 0 : _f2.value) || cashierTerminalState.voidReason || "").trim();
   cashierTerminalState.voidNote = String(((_g2 = document.querySelector("#saleVoidRequestForm [name='note']")) == null ? void 0 : _g2.value) || cashierTerminalState.voidNote || "").trim();
   cashierTerminalState.refundOrderNo = String(((_h2 = document.querySelector("#saleRefundRequestForm [name='order_no']")) == null ? void 0 : _h2.value) || cashierTerminalState.refundOrderNo || ((_i2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _i2.order_no) || "").trim();
@@ -28925,9 +28968,9 @@ function syncCashierTerminalDraftsFromForms() {
   }
 }
 function syncCashierTerminalShift(shift = null) {
-  var _a, _b;
+  var _a2, _b;
   const shiftNo = String(
-    (shift == null ? void 0 : shift.shift_id) || (shift == null ? void 0 : shift.shift_no) || ((_a = document.querySelector("#saleForm [name='shift_no']")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#shiftReportForm [name='shift_no']")) == null ? void 0 : _b.value) || ""
+    (shift == null ? void 0 : shift.shift_id) || (shift == null ? void 0 : shift.shift_no) || ((_a2 = document.querySelector("#saleForm [name='shift_no']")) == null ? void 0 : _a2.value) || ((_b = document.querySelector("#shiftReportForm [name='shift_no']")) == null ? void 0 : _b.value) || ""
   ).trim();
   const status = String((shift == null ? void 0 : shift.status) || (shiftNo ? "open" : "not_opened")).trim() || "not_opened";
   cashierTerminalState.shiftNo = shiftNo;
@@ -28972,16 +29015,16 @@ function applyCashierTerminalChromeCopy() {
   const copy = getCashierTerminalCopy();
   document.documentElement.lang = cashierTerminalState.locale === "en" ? "en" : "zh-CN";
   cashierTerminalShell.querySelectorAll("[data-terminal-copy]").forEach((node) => {
-    var _a;
+    var _a2;
     const key = node.dataset.terminalCopy;
     if (key) {
-      node.textContent = (_a = copy[key]) != null ? _a : node.textContent;
+      node.textContent = (_a2 = copy[key]) != null ? _a2 : node.textContent;
     }
   });
   cashierTerminalShell.querySelectorAll("[data-terminal-locale]").forEach((button) => {
-    var _a;
+    var _a2;
     button.classList.toggle("is-active", button.dataset.terminalLocale === cashierTerminalState.locale);
-    const label = (_a = copy.localeButtons) == null ? void 0 : _a[button.dataset.terminalLocale];
+    const label = (_a2 = copy.localeButtons) == null ? void 0 : _a2[button.dataset.terminalLocale];
     if (label) {
       button.textContent = label;
     }
@@ -29054,7 +29097,7 @@ function renderCashierTerminalStatusBar() {
   `;
 }
 function renderCashierTerminalLookupPanel() {
-  var _a;
+  var _a2;
   if (!(cashierTerminalLookupCard instanceof HTMLElement)) {
     return;
   }
@@ -29084,7 +29127,7 @@ function renderCashierTerminalLookupPanel() {
       </div>
       <div>
         <span class="metric-label">${escapeHtml(copy.storeStock)}</span>
-        <strong>${escapeHtml((_a = result.qty_on_hand) != null ? _a : 0)}</strong>
+        <strong>${escapeHtml((_a2 = result.qty_on_hand) != null ? _a2 : 0)}</strong>
       </div>
       <button type="button" class="primary-inline cashier-terminal-preview-action" data-terminal-action="add-current-lookup">${escapeHtml(copy.addCurrentLookup)}</button>
     </div>
@@ -29314,14 +29357,14 @@ function renderCashierTerminalPaymentPanel() {
   `;
 }
 function renderCashierTerminalQuickActions() {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   if (!(cashierTerminalQuickActions instanceof HTMLElement)) {
     return;
   }
   const copy = getCashierTerminalCopy();
   const offlineCount = Array.isArray(offlineSyncBatchState) ? offlineSyncBatchState.length : 0;
   const anomalyCount = Array.isArray(paymentAnomalyState) ? paymentAnomalyState.filter((row) => String((row == null ? void 0 : row.status) || "").trim().toLowerCase() === "open").length : 0;
-  const cashierName = ((_a = currentSession.user) == null ? void 0 : _a.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || "cashier";
+  const cashierName = ((_a2 = currentSession.user) == null ? void 0 : _a2.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || "cashier";
   const syncText = cashierTerminalState.networkStatus === "online" ? `${copy.online} · ${offlineCount || 0}` : `${copy.offline} · ${offlineCount || 0}`;
   cashierTerminalQuickActions.innerHTML = `
     <div class="cashier-terminal-status-metrics" aria-label="${escapeHtml(chooseI18nLabel("收银状态", "Cashier status"))}">
@@ -29336,14 +29379,14 @@ function renderCashierTerminalQuickActions() {
       <button type="button" class="quick-action-button" disabled><span>${escapeHtml(copy.holdAction)}</span><strong>-</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="clear-cart"><span>${escapeHtml(copy.clearBasket)}</span><strong>${escapeHtml(getCashierTerminalTotals().totalItems)}</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="void" data-drawer="voidDrawer"><span>F7</span><strong>${escapeHtml(copy.voidAction)}</strong></button>
-      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(((_d2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _d2.order_no) || "-")}</strong></button>
+      <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="receipt" data-drawer="receiptDrawer"><span>${escapeHtml(copy.receiptReprint)}</span><strong>${escapeHtml(((_d = cashierTerminalState.latestCompletedSale) == null ? void 0 : _d.order_no) || "-")}</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="offline" data-drawer="offlineDrawer"><span>${escapeHtml(copy.offlineAction)}</span><strong>${escapeHtml(offlineCount || 0)}</strong></button>
       <button type="button" class="quick-action-button" data-terminal-action="open-drawer" data-terminal-drawer="anomaly" data-drawer="anomalyDrawer"><span>${escapeHtml(copy.paymentAnomaly)}</span><strong>${escapeHtml(anomalyCount || 0)}</strong></button>
     </div>
   `;
 }
 function renderCashierTerminalDrawer() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   if (!(cashierTerminalDrawer instanceof HTMLElement)) {
     return;
   }
@@ -29455,7 +29498,7 @@ function renderCashierTerminalDrawer() {
         </label>
         <label class="field">
           <span>${escapeHtml(copy.refundBarcode)}</span>
-          <input type="text" value="${escapeHtml(cashierTerminalState.refundBarcode || ((_b = (_a = latestSale == null ? void 0 : latestSale.items) == null ? void 0 : _a[0]) == null ? void 0 : _b.barcode) || "")}" data-terminal-drawer-field="refundBarcode" />
+          <input type="text" value="${escapeHtml(cashierTerminalState.refundBarcode || ((_b = (_a2 = latestSale == null ? void 0 : latestSale.items) == null ? void 0 : _a2[0]) == null ? void 0 : _b.barcode) || "")}" data-terminal-drawer-field="refundBarcode" />
         </label>
         <label class="field">
           <span>${escapeHtml(copy.refundQty)}</span>
@@ -29685,7 +29728,7 @@ function resolvePosStoreItemTokenByMachineCode(value = "") {
   };
 }
 function upsertCashierTerminalCartItem(result) {
-  var _a;
+  var _a2;
   const barcode = String((result == null ? void 0 : result.barcode) || "").trim();
   if (!barcode) {
     return;
@@ -29700,7 +29743,7 @@ function upsertCashierTerminalCartItem(result) {
       selling_price: normalizeCashierTerminalNumber(result.expected_price),
       expected_price: normalizeCashierTerminalNumber(result.expected_price),
       price_cap: result.price_cap == null ? null : normalizeCashierTerminalNumber(result.price_cap),
-      qty_on_hand: (_a = result.qty_on_hand) != null ? _a : 0,
+      qty_on_hand: (_a2 = result.qty_on_hand) != null ? _a2 : 0,
       store_rack_code: result.store_rack_code || "",
       store_item_display_code: result.store_item_display_code || result.display_code || "",
       store_item_machine_code: result.store_item_machine_code || result.machine_code || barcode,
@@ -29751,8 +29794,8 @@ function getCashierTerminalPaymentMethodForSale() {
   return "cash";
 }
 function buildPosStoreItemMargin(token = {}) {
-  var _a, _b, _c;
-  const selectedPrice = Number((_c = (_b = (_a = token.selected_price) != null ? _a : token.selling_price) != null ? _b : token.expected_price) != null ? _c : 0);
+  var _a2, _b, _c;
+  const selectedPrice = Number((_c = (_b = (_a2 = token.selected_price) != null ? _a2 : token.selling_price) != null ? _b : token.expected_price) != null ? _c : 0);
   const rawCostPrice = token.cost_price;
   const costPrice = rawCostPrice == null || rawCostPrice === "" ? null : Number(rawCostPrice);
   const costStatus = String(token.cost_status || "").trim().toLowerCase();
@@ -29775,14 +29818,14 @@ function buildPosStoreItemMargin(token = {}) {
   };
 }
 function buildPosStoreItemSaleRecord(token = {}, saleNo = buildPosStoreItemSaleNo(), paymentMethod = getCashierTerminalPaymentMethodForSale()) {
-  var _a, _b;
+  var _a2, _b;
   const storeCode = String(token.store_code || getCashierTerminalStoreCode()).trim().toUpperCase();
   const soldAt = (/* @__PURE__ */ new Date()).toISOString();
   const margin = buildPosStoreItemMargin(token);
   return {
     sale_no: saleNo,
     store_code: storeCode,
-    cashier: ((_a = currentSession.user) == null ? void 0 : _a.username) || ((_b = currentSession.user) == null ? void 0 : _b.full_name) || "cashier",
+    cashier: ((_a2 = currentSession.user) == null ? void 0 : _a2.username) || ((_b = currentSession.user) == null ? void 0 : _b.full_name) || "cashier",
     store_item_display_code: token.display_code || token.store_item_display_code || "",
     store_item_machine_code: token.machine_code || token.store_item_machine_code || "",
     price: margin.selected_price,
@@ -29802,7 +29845,7 @@ function buildPosStoreItemSaleRecord(token = {}, saleNo = buildPosStoreItemSaleN
   };
 }
 function completeCashierTerminalStoreItemSale() {
-  var _a, _b;
+  var _a2, _b;
   const rows = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
   if (!rows.length) {
     throw new Error("购物篮还是空的，请先扫码加购。");
@@ -29813,7 +29856,7 @@ function completeCashierTerminalStoreItemSale() {
   const machineCodes = rows.map((row) => String(row.store_item_machine_code || row.barcode || "").replace(/[^0-9]/g, "").trim()).filter(Boolean);
   const records = [];
   storeSdoPackageItemTokenState = storeSdoPackageItemTokenState.map((token) => {
-    var _a2, _b2;
+    var _a3, _b2;
     const tokenMachineCode = String((token == null ? void 0 : token.machine_code) || "").trim();
     if (!machineCodes.includes(tokenMachineCode)) {
       return token;
@@ -29824,7 +29867,7 @@ function completeCashierTerminalStoreItemSale() {
       selected_price: Number(cartRow.selling_price || token.selected_price || 0),
       sale_status: "sold",
       sold_at: soldAt,
-      cashier: ((_a2 = currentSession.user) == null ? void 0 : _a2.username) || ((_b2 = currentSession.user) == null ? void 0 : _b2.full_name) || "cashier",
+      cashier: ((_a3 = currentSession.user) == null ? void 0 : _a3.username) || ((_b2 = currentSession.user) == null ? void 0 : _b2.full_name) || "cashier",
       payment_method: paymentMethod
     };
     records.push(buildPosStoreItemSaleRecord(soldToken, saleNo, paymentMethod));
@@ -29840,7 +29883,7 @@ function completeCashierTerminalStoreItemSale() {
     order_no: saleNo,
     sale_no: saleNo,
     store_code: getCashierTerminalStoreCode(),
-    cashier: ((_a = currentSession.user) == null ? void 0 : _a.username) || ((_b = currentSession.user) == null ? void 0 : _b.full_name) || "cashier",
+    cashier: ((_a2 = currentSession.user) == null ? void 0 : _a2.username) || ((_b = currentSession.user) == null ? void 0 : _b.full_name) || "cashier",
     payment_method: paymentMethod,
     sold_at: soldAt,
     total_amount: records.reduce((sum, row) => sum + Number(row.price || 0), 0),
@@ -29907,8 +29950,8 @@ function syncCashierTerminalSaleForm() {
   };
 }
 function syncCashierTerminalVoidRequestForm() {
-  var _a;
-  const orderNo = String(cashierTerminalState.voidOrderNo || ((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.order_no) || "").trim();
+  var _a2;
+  const orderNo = String(cashierTerminalState.voidOrderNo || ((_a2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a2.order_no) || "").trim();
   if (!orderNo) {
     throw new Error("请先填写要作废的订单号。");
   }
@@ -29918,12 +29961,12 @@ function syncCashierTerminalVoidRequestForm() {
   return orderNo;
 }
 function syncCashierTerminalRefundRequestForm() {
-  var _a, _b, _c, _d2;
-  const orderNo = String(cashierTerminalState.refundOrderNo || ((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.order_no) || "").trim();
+  var _a2, _b, _c, _d;
+  const orderNo = String(cashierTerminalState.refundOrderNo || ((_a2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a2.order_no) || "").trim();
   if (!orderNo) {
     throw new Error("请先填写要退款的订单号。");
   }
-  const barcode = String(cashierTerminalState.refundBarcode || ((_d2 = (_c = (_b = cashierTerminalState.latestCompletedSale) == null ? void 0 : _b.items) == null ? void 0 : _c[0]) == null ? void 0 : _d2.barcode) || "").trim();
+  const barcode = String(cashierTerminalState.refundBarcode || ((_d = (_c = (_b = cashierTerminalState.latestCompletedSale) == null ? void 0 : _b.items) == null ? void 0 : _c[0]) == null ? void 0 : _d.barcode) || "").trim();
   if (!barcode) {
     throw new Error("请先填写要退款的商品 barcode。");
   }
@@ -30063,7 +30106,7 @@ function handleCashierTerminalNetworkChange() {
   renderCashierTerminal();
 }
 async function handleCashierTerminalAction(action, target) {
-  var _a, _b;
+  var _a2, _b;
   switch (action) {
     case "logout":
       await submitLogout();
@@ -30097,7 +30140,7 @@ async function handleCashierTerminalAction(action, target) {
         await loadCashierTerminalRecentSales(20);
       } else if (cashierTerminalState.activeDrawer === "hold-list") {
         await loadCashierTerminalHoldList(20);
-      } else if (cashierTerminalState.activeDrawer === "shift" && ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id)) {
+      } else if (cashierTerminalState.activeDrawer === "shift" && ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id)) {
         await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
       }
       return;
@@ -30312,9 +30355,9 @@ function normalizeCashierPreviewScan(value = "") {
   return String(value || "").trim().toUpperCase();
 }
 function getCashierTerminalSessionStoreCode(user = currentSession.user) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const directCode = String(
-    (user == null ? void 0 : user.store_code) || (user == null ? void 0 : user.storeCode) || ((_a = user == null ? void 0 : user.store) == null ? void 0 : _a.code) || ((_b = user == null ? void 0 : user.store) == null ? void 0 : _b.store_code) || ""
+    (user == null ? void 0 : user.store_code) || (user == null ? void 0 : user.storeCode) || ((_a2 = user == null ? void 0 : user.store) == null ? void 0 : _a2.code) || ((_b = user == null ? void 0 : user.store) == null ? void 0 : _b.store_code) || ""
   ).trim();
   if (directCode) {
     return directCode.toUpperCase();
@@ -30347,9 +30390,9 @@ getCashierTerminalStoreCode = function() {
   return getCashierTerminalSessionStoreCode(currentSession.user) || getCurrentStoreCodeFallback();
 };
 function getCashierTerminalStoreDisplayName() {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const userStoreName = String(
-    ((_a = currentSession.user) == null ? void 0 : _a.store_name) || ((_b = currentSession.user) == null ? void 0 : _b.store_label) || ((_d2 = (_c = currentSession.user) == null ? void 0 : _c.store) == null ? void 0 : _d2.name) || ""
+    ((_a2 = currentSession.user) == null ? void 0 : _a2.store_name) || ((_b = currentSession.user) == null ? void 0 : _b.store_label) || ((_d = (_c = currentSession.user) == null ? void 0 : _c.store) == null ? void 0 : _d.name) || ""
   ).trim();
   if (userStoreName) {
     return userStoreName;
@@ -30359,8 +30402,8 @@ function getCashierTerminalStoreDisplayName() {
   return String((storeRow == null ? void 0 : storeRow.name) || (storeRow == null ? void 0 : storeRow.store_name) || "").trim() || formatCashierTerminalStoreNameFromCode(storeCode);
 }
 function getCashierTerminalCashierName() {
-  var _a, _b;
-  return String(((_a = currentSession.user) == null ? void 0 : _a.username) || ((_b = currentSession.user) == null ? void 0 : _b.cashier_id) || "").trim() || "cashier";
+  var _a2, _b;
+  return String(((_a2 = currentSession.user) == null ? void 0 : _a2.username) || ((_b = currentSession.user) == null ? void 0 : _b.cashier_id) || "").trim() || "cashier";
 }
 function getCashierTerminalCashierDisplayName() {
   const user = currentSession.user || {};
@@ -30370,14 +30413,14 @@ function renderCashierTerminalHeaderData(value = "") {
   return `<em data-i18n-skip>${escapeHtml(value || "-")}</em>`;
 }
 function getCashierTerminalTerminalId() {
-  var _a;
+  var _a2;
   const storeCode = getCashierTerminalStoreCode();
   const prefix = storeCode === "UTAWALA" ? "UTW" : storeCode.slice(0, 3).toUpperCase();
-  return ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.terminal_id) || `POS-${prefix}-01`;
+  return ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.terminal_id) || `POS-${prefix}-01`;
 }
 function getCashierTerminalShiftNo() {
-  var _a;
-  return ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo || "";
+  var _a2;
+  return ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) || cashierTerminalState.shiftNo || "";
 }
 function getCashierTerminalReceiptPanel() {
   return document.querySelector("#cashierTerminalReceiptPanel");
@@ -30443,7 +30486,7 @@ function ensureCashierTerminalPreviewCopy() {
   });
 }
 function ensureCashierTerminalPreviewState() {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2;
   ensureCashierTerminalPreviewCopy();
   if (!Array.isArray(cashierTerminalState.cartItems)) {
     cashierTerminalState.cartItems = [];
@@ -30470,10 +30513,10 @@ function ensureCashierTerminalPreviewState() {
   if (!cashierTerminalState.activePaymentMode) {
     cashierTerminalState.activePaymentMode = "cash";
   }
-  cashierTerminalState.discountAmount = String((_a = cashierTerminalState.discountAmount) != null ? _a : "");
+  cashierTerminalState.discountAmount = String((_a2 = cashierTerminalState.discountAmount) != null ? _a2 : "");
   cashierTerminalState.cashReceived = String((_b = cashierTerminalState.cashReceived) != null ? _b : "");
   cashierTerminalState.mpesaAmount = String((_c = cashierTerminalState.mpesaAmount) != null ? _c : "");
-  cashierTerminalState.mpesaReference = String((_d2 = cashierTerminalState.mpesaReference) != null ? _d2 : "");
+  cashierTerminalState.mpesaReference = String((_d = cashierTerminalState.mpesaReference) != null ? _d : "");
   cashierTerminalState.mixedCashAmount = String((_e2 = cashierTerminalState.mixedCashAmount) != null ? _e2 : "");
   cashierTerminalState.mixedMpesaAmount = String((_f2 = cashierTerminalState.mixedMpesaAmount) != null ? _f2 : "");
   cashierTerminalState.mixedMpesaReference = String((_g2 = cashierTerminalState.mixedMpesaReference) != null ? _g2 : "");
@@ -30537,7 +30580,7 @@ syncCashierTerminalMode = function() {
   focusCashierTerminalScanInput({ select: false });
 };
 function syncCashierTerminalFullscreenState({ renderStatus = true } = {}) {
-  var _a;
+  var _a2;
   if (!(cashierTerminalShell instanceof HTMLElement) || typeof document === "undefined") {
     return false;
   }
@@ -30545,7 +30588,7 @@ function syncCashierTerminalFullscreenState({ renderStatus = true } = {}) {
   const active = Boolean(fullscreenElement && (fullscreenElement === cashierTerminalShell || cashierTerminalShell.contains(fullscreenElement)));
   cashierTerminalState.fullscreenActive = active;
   cashierTerminalShell.classList.toggle("is-fullscreen", active);
-  (_a = document.body) == null ? void 0 : _a.classList.toggle("cashier-terminal-fullscreen-active", active);
+  (_a2 = document.body) == null ? void 0 : _a2.classList.toggle("cashier-terminal-fullscreen-active", active);
   const fullscreenButton = cashierTerminalShell.querySelector('[data-terminal-action="toggle-fullscreen"]');
   if (fullscreenButton instanceof HTMLElement) {
     fullscreenButton.textContent = active ? "退出全屏 / Exit Fullscreen" : "全屏收银 / Enter Fullscreen";
@@ -30795,7 +30838,7 @@ renderCashierTerminalSessionStrip = function() {
   syncGlobalLanguageButtons();
 };
 renderCashierTerminalStatusBar = function() {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   if (!(cashierTerminalStatusBar instanceof HTMLElement)) {
     return;
   }
@@ -30807,8 +30850,8 @@ renderCashierTerminalStatusBar = function() {
     <div class="cashier-terminal-status-summary">
       <span><b>班次号</b>${escapeHtml(getCashierTerminalShiftNo() || copy.openShiftFirst)}</span>
       <span><b>班次状态</b>${escapeHtml(hasOpenCashierTerminalShift() ? "开班中" : "未开班")}</span>
-      <span><b>开班时间</b>${escapeHtml(formatCashierTerminalOpenedAt(((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.opened_at) || cashierTerminalState.shiftOpenedAt || ""))}</span>
-      <span><b>开班现金</b>${escapeHtml(formatCashierPreviewMoney((_f2 = (_e2 = (_d2 = (_b = cashierTerminalState.currentShift) == null ? void 0 : _b.opening_float) != null ? _d2 : (_c = cashierTerminalState.currentShift) == null ? void 0 : _c.opening_float_cash) != null ? _e2 : cashierTerminalState.openingFloatCash) != null ? _f2 : 0))}</span>
+      <span><b>开班时间</b>${escapeHtml(formatCashierTerminalOpenedAt(((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.opened_at) || cashierTerminalState.shiftOpenedAt || ""))}</span>
+      <span><b>开班现金</b>${escapeHtml(formatCashierPreviewMoney((_f2 = (_e2 = (_d = (_b = cashierTerminalState.currentShift) == null ? void 0 : _b.opening_float) != null ? _d : (_c = cashierTerminalState.currentShift) == null ? void 0 : _c.opening_float_cash) != null ? _e2 : cashierTerminalState.openingFloatCash) != null ? _f2 : 0))}</span>
       <span><b>本班销售额</b>${escapeHtml(formatCashierPreviewMoney(cashierTerminalState.shiftSalesAmount))}</span>
       <span><b>本班订单数</b>${escapeHtml(cashierTerminalState.shiftOrderCount)}</span>
     </div>
@@ -31000,7 +31043,7 @@ renderCashierTerminalQuickActions = function() {
   `;
 };
 renderCashierTerminalDrawer = function() {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   if (!(cashierTerminalDrawer instanceof HTMLElement)) {
     return;
   }
@@ -31079,11 +31122,11 @@ renderCashierTerminalDrawer = function() {
       <div class="drawer-body hold-list-body">
         ${cashierTerminalState.holdFeedback ? `<div class="drawer-hint">${escapeHtml(cashierTerminalState.holdFeedback)}</div>` : ""}
         ${holds.length ? holds.map((hold) => {
-      var _a2;
+      var _a3;
       return `
           <article class="hold-card status-${escapeHtml(hold.status)}">
             <div><strong>${escapeHtml(hold.hold_no)}</strong><span>${escapeHtml(hold.time || hold.created_at || "-")} · ${escapeHtml(hold.cashier || hold.cashier_id || "-")}</span></div>
-            <div class="hold-meta"><span>${escapeHtml(hold.item_count || 0)} 件</span><span>${escapeHtml(formatCashierPreviewMoney((_a2 = hold.total) != null ? _a2 : hold.total_amount))}</span><span>${escapeHtml(hold.reason || "-")}</span><span>${escapeHtml(hold.status || "-")}</span></div>
+            <div class="hold-meta"><span>${escapeHtml(hold.item_count || 0)} 件</span><span>${escapeHtml(formatCashierPreviewMoney((_a3 = hold.total) != null ? _a3 : hold.total_amount))}</span><span>${escapeHtml(hold.reason || "-")}</span><span>${escapeHtml(hold.status || "-")}</span></div>
             <div class="hold-meta"><span>${escapeHtml(hold.customer_name || "-")}</span><span>${escapeHtml(hold.customer_phone || "-")}</span></div>
             <div class="hold-actions">
               <button type="button" class="secondary-inline" data-terminal-action="resume-hold" data-terminal-hold-no="${escapeHtml(hold.hold_no || "")}"${hold.status !== "held" ? " disabled" : ""}>${escapeHtml(copy.resumeHeldOrder)}</button>
@@ -31098,7 +31141,7 @@ renderCashierTerminalDrawer = function() {
     return;
   }
   if (drawer === "reprint-confirm") {
-    const saleNo = String(cashierTerminalState.pendingReprintSaleNo || ((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.sale_no) || "").trim();
+    const saleNo = String(cashierTerminalState.pendingReprintSaleNo || ((_a2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a2.sale_no) || "").trim();
     const selectedSale = cashierTerminalState.selectedSaleDetail;
     const previewHtml = selectedSale ? buildCashierTerminal57mmReceiptHtml(selectedSale) : "";
     cashierTerminalDrawer.innerHTML = `
@@ -31150,7 +31193,7 @@ renderCashierTerminalDrawer = function() {
     const expectedCash = Number((_c = summary.expected_cash) != null ? _c : 0);
     const countedCash = normalizeCashierTerminalNumber(cashierTerminalState.countedCash);
     const variance = cashierTerminalState.countedCash === "" ? 0 : countedCash - expectedCash;
-    const activeHoldCount = Number((_d2 = summary.hold_count) != null ? _d2 : (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length);
+    const activeHoldCount = Number((_d = summary.hold_count) != null ? _d : (cashierTerminalState.holdOrders || []).filter((hold) => hold.status === "held").length);
     const reportShiftId = (currentShift == null ? void 0 : currentShift.shift_id) || summary.shift_id || cashierTerminalState.shiftNo || "";
     const zReportReady = String(summary.status || cashierTerminalState.shiftStatus || "").toLowerCase() === "closed";
     cashierTerminalDrawer.innerHTML = `
@@ -31551,8 +31594,8 @@ function resolveCashierTerminalPreviewScan(query) {
   return fallback;
 }
 function formatCashierTerminalScanError(error) {
-  var _a, _b;
-  const reject_reason = String((error == null ? void 0 : error.reject_reason) || ((_a = error == null ? void 0 : error.payload) == null ? void 0 : _a.reject_reason) || (error == null ? void 0 : error.detail) || formatErrorMessage(error) || "").trim();
+  var _a2, _b;
+  const reject_reason = String((error == null ? void 0 : error.reject_reason) || ((_a2 = error == null ? void 0 : error.payload) == null ? void 0 : _a2.reject_reason) || (error == null ? void 0 : error.detail) || formatErrorMessage(error) || "").trim();
   const barcodeType = String((error == null ? void 0 : error.barcode_type) || ((_b = error == null ? void 0 : error.payload) == null ? void 0 : _b.barcode_type) || "").trim().toUpperCase();
   const normalized = `${barcodeType} ${reject_reason}`.toUpperCase();
   const posRule = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.storeItemOnlyRule);
@@ -31716,7 +31759,7 @@ function buildCashierTerminalPosSaleItemPayload(row = {}) {
   };
 }
 function buildCashierTerminalPosSalePayload(payment) {
-  var _a;
+  var _a2;
   ensureCashierTerminalPreviewState();
   const totals = getCashierTerminalTotals();
   const cartItems = Array.isArray(cashierTerminalState.cartItems) ? cashierTerminalState.cartItems : [];
@@ -31727,7 +31770,7 @@ function buildCashierTerminalPosSalePayload(payment) {
   return {
     idempotency_key: getCashierTerminalSaleIdempotencyKey(),
     cashier_id: getCashierTerminalCashierName(),
-    shift_id: ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo,
+    shift_id: ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) || cashierTerminalState.shiftNo,
     terminal_id: getCashierTerminalTerminalId(),
     hold_no: cashierTerminalState.activeHoldNo || "",
     payment_method: cashierTerminalState.activePaymentMode,
@@ -31774,7 +31817,7 @@ function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
     terminal_id: sale.terminal_id || `POS-${getCashierTerminalStoreCode().slice(0, 3).toUpperCase()}-01`,
     time: sale.sale_time || cashierTerminalState.currentTime || (/* @__PURE__ */ new Date()).toLocaleString("zh-CN", { hour12: false }),
     items: items.map((item) => {
-      var _a, _b;
+      var _a2, _b;
       if (isCashierTerminalManualUnbarcodedLine(item)) {
         const quantity = Math.max(1, Number(item.quantity || item.qty || 1) || 1);
         const unitPrice = normalizeCashierTerminalNumber(item.unit_price || item.final_price || item.original_price || 0);
@@ -31809,7 +31852,7 @@ function normalizeCashierTerminalBackendSale(sale = {}, options = {}) {
         barcode: item.machine_code || "",
         category: item.category || "未分类",
         shelf_location: item.shelf_location || "",
-        price: normalizeCashierTerminalNumber((_a = item.final_price) != null ? _a : item.original_price),
+        price: normalizeCashierTerminalNumber((_a2 = item.final_price) != null ? _a2 : item.original_price),
         selling_price: normalizeCashierTerminalNumber((_b = item.final_price) != null ? _b : item.original_price),
         qty: 1
       };
@@ -31917,9 +31960,9 @@ async function loadCashierTerminalSaleReceiptForReprint(saleNo, { reprint = true
   }
 }
 async function loadCashierTerminalLatestReceiptForReprint() {
-  var _a;
+  var _a2;
   ensureCashierTerminalPreviewState();
-  const latestSaleNo = String(((_a = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a.sale_no) || "").trim();
+  const latestSaleNo = String(((_a2 = cashierTerminalState.latestCompletedSale) == null ? void 0 : _a2.sale_no) || "").trim();
   if (latestSaleNo) {
     return await loadCashierTerminalSaleReceiptForReprint(latestSaleNo);
   }
@@ -31951,20 +31994,20 @@ function openCashierTerminalReprintConfirmation(saleNo = "") {
   renderCashierTerminalDrawer();
 }
 function normalizeCashierTerminalShift(shift = {}) {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const normalized = {
     shift_id: String(shift.shift_id || shift.shift_no || "").trim(),
     store_code: String(shift.store_code || getCashierTerminalStoreCode()).trim().toUpperCase(),
     cashier_id: String(shift.cashier_id || shift.cashier_name || getCashierTerminalCashierName()).trim(),
     terminal_id: String(shift.terminal_id || getCashierTerminalTerminalId()).trim(),
-    opening_float: normalizeCashierTerminalNumber((_a = shift.opening_float) != null ? _a : shift.opening_float_cash),
+    opening_float: normalizeCashierTerminalNumber((_a2 = shift.opening_float) != null ? _a2 : shift.opening_float_cash),
     opened_at: String(shift.opened_at || "").trim(),
     opened_by: String(shift.opened_by || "").trim(),
     status: String(shift.status || "open").trim().toLowerCase(),
     closed_at: shift.closed_at || null,
     closed_by: shift.closed_by || null,
     counted_cash: (_c = (_b = shift.counted_cash) != null ? _b : shift.closing_cash_counted) != null ? _c : null,
-    expected_cash: (_d2 = shift.expected_cash) != null ? _d2 : null,
+    expected_cash: (_d = shift.expected_cash) != null ? _d : null,
     cash_variance: (_e2 = shift.cash_variance) != null ? _e2 : null,
     manager_confirmed_by: String(shift.manager_confirmed_by || "").trim(),
     note: String(shift.note || "").trim()
@@ -31999,10 +32042,10 @@ function applyCashierTerminalShift(shift = null) {
   return normalized;
 }
 function hasOpenCashierTerminalShift() {
-  var _a;
+  var _a2;
   const shiftId = String(getCashierTerminalShiftNo() || "").trim();
   const stateStatus = String(cashierTerminalState.shiftStatus || "").trim().toLowerCase();
-  const currentStatus = String(((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.status) || "").trim().toLowerCase();
+  const currentStatus = String(((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.status) || "").trim().toLowerCase();
   const status = currentStatus || stateStatus || (shiftId ? "open" : "not_opened");
   if (!shiftId) {
     return false;
@@ -32085,11 +32128,11 @@ function applyCashierTerminalTodaySalesSummaryFromSales(sales = []) {
   };
 }
 async function loadCashierTerminalTodaySalesSummary({ render = true, limit = 100 } = {}) {
-  var _a;
+  var _a2;
   ensureCashierTerminalPreviewState();
   const response = await fetchCashierTerminalRecentSales(limit);
   const sales = Array.isArray(response == null ? void 0 : response.sales) ? response.sales : [];
-  if (!((_a = cashierTerminalState.recentSales) == null ? void 0 : _a.length)) {
+  if (!((_a2 = cashierTerminalState.recentSales) == null ? void 0 : _a2.length)) {
     cashierTerminalState.recentSales = sales;
   }
   const summary = applyCashierTerminalTodaySalesSummaryFromSales(sales);
@@ -32109,7 +32152,7 @@ async function fetchStorePosShiftList() {
   return await request(`/stores/${encodeURIComponent(storeCode)}/pos-shifts`);
 }
 function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
-  var _a;
+  var _a2;
   const target = document.querySelector("#cashierShiftLookupSummary");
   if (!target) return;
   const user = (currentSession == null ? void 0 : currentSession.user) || {};
@@ -32123,7 +32166,7 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
   const currentShift = (shift == null ? void 0 : shift.shift_id) ? normalizeCashierTerminalShift(shift) : null;
   const normalizedRows = Array.isArray(shiftRows) ? shiftRows.map((row) => normalizeCashierTerminalShift(row)).filter((row) => row == null ? void 0 : row.shift_id) : [];
   const openShiftRows = normalizedRows.filter((row) => String(row.status || "").trim().toLowerCase() === "open").map((row) => {
-    var _a2;
+    var _a3;
     const knownUser = Array.isArray(userDirectoryState) ? userDirectoryState.find((user2) => String((user2 == null ? void 0 : user2.username) || "").trim() === String(row.cashier_id || row.cashier_name || "").trim()) : null;
     const fallbackCashier = String(row.cashier_id || row.cashier_name || "-").trim() || "-";
     const displayName = knownUser ? String(knownUser.full_name || knownUser.display_name || knownUser.name || knownUser.username || fallbackCashier).trim() : `${fallbackCashier}（历史/未知账号，不在当前用户表）`;
@@ -32133,7 +32176,7 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
       cashier_name: displayName,
       status: row.status || "open",
       opened_at: row.opened_at || "-",
-      opening_float: (_a2 = row.opening_float) != null ? _a2 : "-",
+      opening_float: (_a3 = row.opening_float) != null ? _a3 : "-",
       terminal_id: row.terminal_id || "-"
     };
   });
@@ -32157,7 +32200,7 @@ function renderCashierShiftLookupSummary(shift = null, shiftRows = []) {
          <article class="store-metric"><strong>status</strong><span>${escapeHtml(currentShift.status || "-")}</span></article>
          <article class="store-metric"><strong>cashier</strong><span>${escapeHtml(currentShift.cashier_id || "-")} / ${escapeHtml(currentShift.cashier_name || "-")}</span></article>
          <article class="store-metric"><strong>opening_time</strong><span>${escapeHtml(currentShift.opened_at || "-")}</span></article>
-         <article class="store-metric"><strong>opening_float</strong><span>${escapeHtml(String((_a = currentShift.opening_float) != null ? _a : "-"))}</span></article>` : `<div class="empty-state">当前收银员在本店暂无 open shift.</div>`}
+         <article class="store-metric"><strong>opening_float</strong><span>${escapeHtml(String((_a2 = currentShift.opening_float) != null ? _a2 : "-"))}</span></article>` : `<div class="empty-state">当前收银员在本店暂无 open shift.</div>`}
     </div>
     <div class="table-scroll">
       <table class="data-table">
@@ -32200,10 +32243,10 @@ async function refreshCashierShiftLookupSummary() {
   renderCashierShiftLookupSummary(shift, shiftRows);
 }
 async function openCashierTerminalShift() {
-  var _a, _b;
+  var _a2, _b;
   ensureCashierTerminalPreviewState();
   const storeCode = getCashierTerminalStoreCode();
-  const existingShift = ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) && String(((_b = cashierTerminalState.currentShift) == null ? void 0 : _b.status) || "open").toLowerCase() === "open" ? cashierTerminalState.currentShift : null;
+  const existingShift = ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) && String(((_b = cashierTerminalState.currentShift) == null ? void 0 : _b.status) || "open").toLowerCase() === "open" ? cashierTerminalState.currentShift : null;
   if (existingShift) {
     cashierTerminalState.shiftFeedback = `当前已有开班：${existingShift.shift_id}`;
     renderCashierTerminal();
@@ -32282,7 +32325,7 @@ async function openCashierTerminalShift() {
     renderCashierTerminalDrawer();
   }
 }
-async function loadCashierTerminalShiftSummary(shiftId = ((_c) => (_c = cashierTerminalState.currentShift) == null ? void 0 : _c.shift_id)() || cashierTerminalState.shiftNo) {
+async function loadCashierTerminalShiftSummary(shiftId = ((_d) => (_d = cashierTerminalState.currentShift) == null ? void 0 : _d.shift_id)() || cashierTerminalState.shiftNo) {
   ensureCashierTerminalPreviewState();
   if (!String(shiftId || "").trim()) {
     cashierTerminalState.shiftSummary = null;
@@ -32308,7 +32351,7 @@ function normalizeCashierTerminalSignedNumber(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 function normalizeCashierTerminalShiftReport(report = {}) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const paymentBreakdown = Array.isArray(report.payment_breakdown) ? report.payment_breakdown : [];
   const categoryBreakdown = Array.isArray(report.category_breakdown) ? report.category_breakdown : [];
   return {
@@ -32328,7 +32371,7 @@ function normalizeCashierTerminalShiftReport(report = {}) {
     total_sales: normalizeCashierTerminalNumber(report.total_sales),
     order_count: Number(report.order_count || 0),
     item_count: Number(report.item_count || 0),
-    discount_amount: normalizeCashierTerminalNumber((_a = report.discount_amount) != null ? _a : report.discount),
+    discount_amount: normalizeCashierTerminalNumber((_a2 = report.discount_amount) != null ? _a2 : report.discount),
     cash_sales: normalizeCashierTerminalNumber(report.cash_sales),
     mpesa_sales: normalizeCashierTerminalNumber(report.mpesa_sales),
     card_sales: normalizeCashierTerminalNumber(report.card_sales),
@@ -32411,8 +32454,8 @@ function getCashierTerminalFirstNumber(source = {}, keys = []) {
 }
 function getCashierTerminalReceiptItemPrintRows(items = []) {
   return (Array.isArray(items) ? items : []).map((item) => {
-    var _a, _b;
-    const quantity = Math.max(1, Number((_b = (_a = item.quantity) != null ? _a : item.qty) != null ? _b : 1) || 1);
+    var _a2, _b;
+    const quantity = Math.max(1, Number((_b = (_a2 = item.quantity) != null ? _a2 : item.qty) != null ? _b : 1) || 1);
     const unitPrice = getCashierTerminalFirstNumber(item, ["unit_price", "selling_price", "selected_price", "price", "final_price"]);
     const discount = getCashierTerminalFirstNumber(item, ["discount_amount", "discount"]);
     const lineTotal = getCashierTerminalFirstNumber(item, ["subtotal", "line_total", "total", "final_price", "price"]) || Math.max(unitPrice * quantity - discount, 0);
@@ -32427,7 +32470,7 @@ function getCashierTerminalReceiptItemPrintRows(items = []) {
   });
 }
 function buildCashierTerminal57mmReceiptHtml(sale = {}) {
-  var _a;
+  var _a2;
   const safeSale = sale || {};
   const storeCode = safeSale.store_code || getCashierTerminalStoreCode();
   const itemRows = getCashierTerminalReceiptItemPrintRows(safeSale.items);
@@ -32444,7 +32487,7 @@ function buildCashierTerminal57mmReceiptHtml(sale = {}) {
   const change = getCashierTerminalFirstNumber(safeSale, ["change", "change_amount", "change_due"]) || Math.max(paid - total, 0);
   const saleNo = safeSale.sale_no || safeSale.sale_id || safeSale.order_no || "-";
   const orderNo = safeSale.order_no || safeSale.sale_no || "-";
-  const totalItems = Number((_a = safeSale.total_items) != null ? _a : itemRows.reduce((sum, item) => sum + item.quantity, 0));
+  const totalItems = Number((_a2 = safeSale.total_items) != null ? _a2 : itemRows.reduce((sum, item) => sum + item.quantity, 0));
   return `
     <article class="cashier-thermal-paper-57mm cashier-receipt-57mm" data-print-kind="receipt">
       <div class="thermal-center">
@@ -32502,7 +32545,7 @@ function getCashierTerminalPaymentBreakdownAmount(report = {}, matcher) {
   return 0;
 }
 function normalizeCashierTerminalShiftReportForPrint(report = {}) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2;
   const rawReportType = String(report.report_type || report.report_kind || "").trim().toUpperCase();
   const reportType = rawReportType.includes("Z") ? "Z_REPORT" : rawReportType.includes("T") ? "T_REPORT" : "X_REPORT";
   const cashSales = getCashierTerminalFirstNumber(report, ["cash_sales", "cash_total"]) || getCashierTerminalPaymentBreakdownAmount(report, (method) => method === "cash");
@@ -32524,8 +32567,8 @@ function normalizeCashierTerminalShiftReportForPrint(report = {}) {
     status: String(report.status || "").trim() || "N/A",
     total_sales: getCashierTerminalFirstNumber(report, ["total_sales", "total_amount", "net_sales"]),
     discount_amount: getCashierTerminalFirstNumber(report, ["discount_amount", "discount", "discount_total"]),
-    order_count: Number((_b = (_a = report.order_count) != null ? _a : report.transaction_count) != null ? _b : 0),
-    item_count: Number((_e2 = (_d2 = (_c = report.item_count) != null ? _c : report.total_items) != null ? _d2 : report.sales_item_count) != null ? _e2 : 0),
+    order_count: Number((_b = (_a2 = report.order_count) != null ? _a2 : report.transaction_count) != null ? _b : 0),
+    item_count: Number((_e2 = (_d = (_c = report.item_count) != null ? _c : report.total_items) != null ? _d : report.sales_item_count) != null ? _e2 : 0),
     cash_sales: cashSales,
     mpesa_sales: mpesaSales,
     card_sales: cardSales,
@@ -32542,7 +32585,7 @@ function normalizeCashierTerminalShiftReportForPrint(report = {}) {
   };
 }
 function buildCashierTerminalShiftReportFromCurrentState(reportType = "X_REPORT") {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2, _z2, _A2, _B2, _C2, _D2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2, _m2, _n2, _o2, _p2, _q2, _r2, _s2, _t2, _u2, _v2, _w2, _x2, _y2, _z2, _A2, _B2, _C2, _D2;
   ensureCashierTerminalPreviewState();
   const summary = cashierTerminalState.shiftSummary || {};
   const latestCompletedSale = cashierTerminalState.latestCompletedSale || {};
@@ -32561,8 +32604,8 @@ function buildCashierTerminalShiftReportFromCurrentState(reportType = "X_REPORT"
     opened_at: currentShift.opened_at || summary.opened_at || "",
     closed_at: currentShift.closed_at || summary.closed_at || "",
     status: currentShift.status || summary.status || cashierTerminalState.shiftStatus || "open",
-    opening_float: (_b = (_a = currentShift.opening_float) != null ? _a : summary.opening_float) != null ? _b : cashierTerminalState.openingFloatCash,
-    total_sales: (_d2 = (_c = summary.total_sales) != null ? _c : cashierTerminalState.shiftSalesAmount) != null ? _d2 : latestTotal,
+    opening_float: (_b = (_a2 = currentShift.opening_float) != null ? _a2 : summary.opening_float) != null ? _b : cashierTerminalState.openingFloatCash,
+    total_sales: (_d = (_c = summary.total_sales) != null ? _c : cashierTerminalState.shiftSalesAmount) != null ? _d : latestTotal,
     discount_amount: (_f2 = (_e2 = summary.discount_amount) != null ? _e2 : summary.discount) != null ? _f2 : latestDiscount,
     order_count: (_h2 = (_g2 = summary.order_count) != null ? _g2 : cashierTerminalState.shiftOrderCount) != null ? _h2 : latestSaleBelongsToShift ? 1 : 0,
     item_count: (_j2 = (_i2 = summary.item_count) != null ? _i2 : summary.total_items) != null ? _j2 : latestItems,
@@ -32628,7 +32671,7 @@ function buildCashierTerminal57mmShiftReportHtml(report = {}) {
   `;
 }
 function finishCashierTerminal57mmPrint() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   if (cashierTerminalPrintCleanupTimer && typeof window !== "undefined" && typeof window.clearTimeout === "function") {
     window.clearTimeout(cashierTerminalPrintCleanupTimer);
   }
@@ -32636,7 +32679,7 @@ function finishCashierTerminal57mmPrint() {
   if (typeof document === "undefined") {
     return;
   }
-  (_a = document.body) == null ? void 0 : _a.classList.remove("cashier-terminal-printing");
+  (_a2 = document.body) == null ? void 0 : _a2.classList.remove("cashier-terminal-printing");
   (_b = document.body) == null ? void 0 : _b.removeAttribute("data-cashier-print-mode");
   const root = document.querySelector("#cashierTerminalPrintRoot");
   if (root) {
@@ -32704,12 +32747,12 @@ function printCashierTerminalReceipt() {
   return printCashierTerminal57mmHtml(buildCashierTerminal57mmReceiptHtml(sale), "receipt");
 }
 async function loadCashierTerminalShiftReport(reportType = "x") {
-  var _a, _b;
+  var _a2, _b;
   ensureCashierTerminalPreviewState();
   const normalizedReportType = String(reportType || "x").trim().toLowerCase();
   const reportSlug = normalizedReportType.startsWith("z") ? "z" : "x";
   const shiftId = String(
-    ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || ((_b = cashierTerminalState.shiftSummary) == null ? void 0 : _b.shift_id) || cashierTerminalState.shiftNo || ""
+    ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) || ((_b = cashierTerminalState.shiftSummary) == null ? void 0 : _b.shift_id) || cashierTerminalState.shiftNo || ""
   ).trim();
   if (!shiftId) {
     cashierTerminalState.shiftReportFeedback = "请先选择班次后再查看报表。";
@@ -32730,9 +32773,9 @@ async function loadCashierTerminalShiftReport(reportType = "x") {
   return cashierTerminalState.shiftReport;
 }
 function printCashierTerminalShiftReport() {
-  var _a;
+  var _a2;
   ensureCashierTerminalPreviewState();
-  const report = ((_a = cashierTerminalState.shiftReport) == null ? void 0 : _a.shift_id) ? normalizeCashierTerminalShiftReportForPrint(cashierTerminalState.shiftReport) : buildCashierTerminalShiftReportFromCurrentState("X_REPORT");
+  const report = ((_a2 = cashierTerminalState.shiftReport) == null ? void 0 : _a2.shift_id) ? normalizeCashierTerminalShiftReportForPrint(cashierTerminalState.shiftReport) : buildCashierTerminalShiftReportFromCurrentState("X_REPORT");
   if (!(report == null ? void 0 : report.shift_id)) {
     throw new Error("请先加载班次报表。");
   }
@@ -32742,9 +32785,9 @@ function printCashierTerminalShiftReport() {
   return printCashierTerminal57mmHtml(buildCashierTerminal57mmShiftReportHtml(report), "shift-report");
 }
 async function closeCashierTerminalShiftBackend() {
-  var _a;
+  var _a2;
   ensureCashierTerminalPreviewState();
-  const shiftId = ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo;
+  const shiftId = ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) || cashierTerminalState.shiftNo;
   if (!shiftId) {
     throw new Error(cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst));
   }
@@ -32800,7 +32843,7 @@ function showCashierTerminalPaymentError(error) {
   return message;
 }
 async function submitCashierTerminalBackendSale() {
-  var _a, _b;
+  var _a2, _b;
   ensureCashierTerminalPreviewState();
   if (!hasOpenCashierTerminalShift()) {
     cashierTerminalState.shiftFeedback = cashierTerminalTerm(POS_CASHIER_TERMINOLOGY_KEYS.openShiftFirst);
@@ -32832,7 +32875,7 @@ async function submitCashierTerminalBackendSale() {
   cashierTerminalState.latestCompletedSale = sale;
   cashierTerminalState.voidOrderNo = sale.order_no || cashierTerminalState.voidOrderNo;
   cashierTerminalState.refundOrderNo = sale.order_no || cashierTerminalState.refundOrderNo;
-  cashierTerminalState.refundBarcode = ((_b = (_a = sale.items) == null ? void 0 : _a[0]) == null ? void 0 : _b.barcode) || cashierTerminalState.refundBarcode;
+  cashierTerminalState.refundBarcode = ((_b = (_a2 = sale.items) == null ? void 0 : _a2[0]) == null ? void 0 : _b.barcode) || cashierTerminalState.refundBarcode;
   markCashierTerminalSoldItemsLocally(sale);
   cashierTerminalState.todaySalesAmount += sale.total || totals.totalAmount;
   cashierTerminalState.todayOrderCount += 1;
@@ -32874,10 +32917,10 @@ updateCashierTerminalPaymentField = function(field, value, index = null) {
   syncCashierTerminalPaymentPreview();
 };
 updateCashierTerminalDrawerField = function(field, value) {
-  var _a, _b;
+  var _a2, _b;
   cashierTerminalState[field] = String(value || "");
   if (field === "countedCash") {
-    const expectedCash = Number((_b = (_a = cashierTerminalState.shiftSummary) == null ? void 0 : _a.expected_cash) != null ? _b : 0);
+    const expectedCash = Number((_b = (_a2 = cashierTerminalState.shiftSummary) == null ? void 0 : _a2.expected_cash) != null ? _b : 0);
     const variance = normalizeCashierTerminalNumber(value) - expectedCash;
     const target = document.querySelector("#cashierTerminalCashVariance");
     if (target) {
@@ -32955,7 +32998,7 @@ function normalizeCashierTerminalBackendHold(hold = {}) {
     status: String(hold.status || "held").trim().toLowerCase(),
     cancel_reason: hold.cancel_reason || "",
     items: items.map((item) => {
-      var _a, _b;
+      var _a2, _b;
       if (isCashierTerminalManualUnbarcodedLine(item)) {
         const quantity = Math.max(1, Number(item.quantity || item.qty || 1) || 1);
         const unitPrice = normalizeCashierTerminalNumber(item.unit_price || item.final_price || item.original_price || 0);
@@ -32994,7 +33037,7 @@ function normalizeCashierTerminalBackendHold(hold = {}) {
         type: "STORE_ITEM",
         category: item.category || "未分类",
         shelf_location: item.shelf_location || "",
-        price: normalizeCashierTerminalNumber((_a = item.final_price) != null ? _a : item.original_price),
+        price: normalizeCashierTerminalNumber((_a2 = item.final_price) != null ? _a2 : item.original_price),
         selling_price: normalizeCashierTerminalNumber((_b = item.final_price) != null ? _b : item.original_price),
         qty: 1,
         quantity: 1,
@@ -33014,7 +33057,7 @@ async function loadCashierTerminalHoldList(limit = 20) {
   return cashierTerminalState.holdOrders;
 }
 async function createCashierTerminalHold() {
-  var _a, _b;
+  var _a2, _b;
   ensureCashierTerminalPreviewState();
   const totals = getCashierTerminalTotals();
   if (!totals.totalItems) {
@@ -33029,7 +33072,7 @@ async function createCashierTerminalHold() {
     method: "POST",
     body: JSON.stringify({
       cashier_id: getCashierTerminalCashierName(),
-      shift_id: ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) || cashierTerminalState.shiftNo,
+      shift_id: ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) || cashierTerminalState.shiftNo,
       terminal_id: getCashierTerminalTerminalId(),
       reason: cashierTerminalState.holdReason || "顾客继续挑选",
       customer_name: cashierTerminalState.holdCustomerName || "",
@@ -33099,7 +33142,7 @@ async function resumeCashierTerminalHold(holdNo) {
   return hold;
 }
 async function cancelCashierTerminalHold(holdNo) {
-  var _a;
+  var _a2;
   const normalizedHoldNo = String(holdNo || "").trim();
   if (!normalizedHoldNo) {
     return null;
@@ -33121,7 +33164,7 @@ async function cancelCashierTerminalHold(holdNo) {
     cashierTerminalState.activeHoldNo = "";
   }
   cashierTerminalState.holdFeedback = "挂单已取消，商品已释放";
-  if ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id) {
+  if ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id) {
     await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
   }
   renderCashierTerminal();
@@ -33139,9 +33182,9 @@ function closeCashierTerminalShift() {
   renderCashierTerminal();
 }
 function exitCashierTerminalPreview() {
-  var _a;
+  var _a2;
   const fallbackPanel = getOrderedPanelsForWorkspace("store").find((panel) => panel.dataset.panelKey !== getCashierTerminalSalesPanelKey());
-  const targetPanelKey = cashierTerminalReturnPanelKey || ((_a = fallbackPanel == null ? void 0 : fallbackPanel.dataset) == null ? void 0 : _a.panelKey) || "";
+  const targetPanelKey = cashierTerminalReturnPanelKey || ((_a2 = fallbackPanel == null ? void 0 : fallbackPanel.dataset) == null ? void 0 : _a2.panelKey) || "";
   if (targetPanelKey) {
     setActivePanel(targetPanelKey);
   } else {
@@ -33151,7 +33194,7 @@ function exitCashierTerminalPreview() {
   appShell == null ? void 0 : appShell.classList.remove("cashier-terminal-mode");
 }
 handleCashierTerminalAction = async function(action, target) {
-  var _a, _b;
+  var _a2, _b;
   switch (action) {
     case "logout":
       await submitLogout();
@@ -33179,7 +33222,7 @@ handleCashierTerminalAction = async function(action, target) {
       }
       if (cashierTerminalState.activeDrawer === "recent-sales") {
         await loadCashierTerminalRecentSales(20);
-      } else if (cashierTerminalState.activeDrawer === "shift" && ((_a = cashierTerminalState.currentShift) == null ? void 0 : _a.shift_id)) {
+      } else if (cashierTerminalState.activeDrawer === "shift" && ((_a2 = cashierTerminalState.currentShift) == null ? void 0 : _a2.shift_id)) {
         await loadCashierTerminalShiftSummary(cashierTerminalState.currentShift.shift_id);
       }
       return;
@@ -33465,9 +33508,9 @@ function getOfflineSyncBatchDateKey(row = {}) {
   return timestamp ? getLocalDateKey(timestamp) : "";
 }
 function getOfflineSyncFilteredBatches(batches = offlineSyncBatchState) {
-  var _a;
+  var _a2;
   const rows = Array.isArray(batches) ? batches : [];
-  const filterDate = String(((_a = document.querySelector("#offlineSyncDateFilter")) == null ? void 0 : _a.value) || "").trim();
+  const filterDate = String(((_a2 = document.querySelector("#offlineSyncDateFilter")) == null ? void 0 : _a2.value) || "").trim();
   return filterDate ? rows.filter((row) => getOfflineSyncBatchDateKey(row) === filterDate) : rows;
 }
 function renderOfflineSyncBatchList(batches = offlineSyncBatchState) {
@@ -33707,9 +33750,9 @@ function getOpsExceptionTypeLabel(value = "") {
   return labels[String(value || "").trim()] || value || "-";
 }
 function getOpsExceptionFilters() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   return {
-    status: String(((_a = document.querySelector("#opsExceptionStatusFilter")) == null ? void 0 : _a.value) || "").trim(),
+    status: String(((_a2 = document.querySelector("#opsExceptionStatusFilter")) == null ? void 0 : _a2.value) || "").trim(),
     domain: String(((_b = document.querySelector("#opsExceptionDomainFilter")) == null ? void 0 : _b.value) || "").trim(),
     severity: String(((_c = document.querySelector("#opsExceptionSeverityFilter")) == null ? void 0 : _c.value) || "").trim()
   };
@@ -33940,10 +33983,10 @@ function buildBaleSalesOutboundSaleDraftFromRow(row = {}) {
   return resolver(row);
 }
 function getBaleSalesPricingFilters() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const form = document.querySelector("#baleSalesPricingFilterForm");
   return {
-    shipment_no: String(((_a = form == null ? void 0 : form.querySelector("[name='shipment_no']")) == null ? void 0 : _a.value) || "").trim(),
+    shipment_no: String(((_a2 = form == null ? void 0 : form.querySelector("[name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim(),
     status: String(((_b = form == null ? void 0 : form.querySelector("[name='status']")) == null ? void 0 : _b.value) || "").trim(),
     source_type: String(((_c = form == null ? void 0 : form.querySelector("[name='source_type']")) == null ? void 0 : _c.value) || "").trim()
   };
@@ -34129,7 +34172,7 @@ function summarizeSelectedBaleSalesOutboundRows(rows = getSelectedBaleSalesOutbo
   return resolver(rows, baleSalesOutboundSalePriceDraftState);
 }
 function renderBaleSalesOutboundSummaryPanel(message = "") {
-  var _a, _b;
+  var _a2, _b;
   const summaryTarget = document.querySelector("#baleSalesOutboundSummary");
   if (!(summaryTarget instanceof HTMLElement)) {
     return;
@@ -34142,7 +34185,7 @@ function renderBaleSalesOutboundSummaryPanel(message = "") {
   const latestOrder = baleSalesLatestOutboundOrderState || baleSalesOutboundOrderState[0] || null;
   const soldByInput = document.querySelector("#baleSalesOutboundForm [name='sold_by']");
   if (soldByInput instanceof HTMLInputElement && !String(soldByInput.value || "").trim()) {
-    soldByInput.value = ((_a = currentSession.user) == null ? void 0 : _a.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || "";
+    soldByInput.value = ((_a2 = currentSession.user) == null ? void 0 : _a2.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || "";
   }
   summaryTarget.className = "report-summary";
   summaryTarget.innerHTML = `
@@ -34529,7 +34572,7 @@ function renderConsignmentBundleWorkbench(message = "") {
     return;
   }
   listTarget.innerHTML = rows.slice(0, 8).map((row) => {
-    var _a;
+    var _a2;
     return `
     <article class="template-card oa-record-item ${row.status === "settled" ? "is-done" : row.status === "packed" ? "is-current" : ""}">
       <div class="template-card-head">
@@ -34551,7 +34594,7 @@ function renderConsignmentBundleWorkbench(message = "") {
         <span class="meta-pill">${escapeHtml(formatKesAmount(row.market_sell_price_per_kg_kes || 0, "KES 0.00"))}/KG</span>
       </div>
       ${row.source_type_summary ? `<div class="subtle small">来源：${escapeHtml(row.source_type_summary)}</div>` : ""}
-      ${((_a = row.selected_pool_entry_ids) == null ? void 0 : _a.length) ? `<div class="subtle small">销售池 bale：${escapeHtml(`${row.selected_pool_entry_ids.length} 包`)}</div>` : ""}
+      ${((_a2 = row.selected_pool_entry_ids) == null ? void 0 : _a2.length) ? `<div class="subtle small">销售池 bale：${escapeHtml(`${row.selected_pool_entry_ids.length} 包`)}</div>` : ""}
       <div class="subtle small">A 类 ${escapeHtml(`${formatCurrency(row.grade_a_weight_kg || 0)} KG (${row.grade_a_ratio || 0}%)`)} · B 类 ${escapeHtml(`${formatCurrency(row.grade_b_weight_kg || 0)} KG (${row.grade_b_ratio || 0}%)`)}</div>
       <div class="subtle small">规则：${escapeHtml(row.source_rule || "待补充")}</div>
     </article>
@@ -34642,7 +34685,7 @@ function hydrateOaAttendanceForm(record = null) {
   setInputValue("#oaAttendanceForm [name='note']", row.note || "");
 }
 function hydrateOaPayrollForm(record = null) {
-  var _a, _b;
+  var _a2, _b;
   const monthValue = getLocalDateKey((/* @__PURE__ */ new Date()).toISOString()).slice(0, 7);
   const row = record || {
     payroll_no: "",
@@ -34654,7 +34697,7 @@ function hydrateOaPayrollForm(record = null) {
     allowance_total: "",
     deduction_total: "",
     status: "draft",
-    prepared_by: ((_a = currentSession.user) == null ? void 0 : _a.username) || ""
+    prepared_by: ((_a2 = currentSession.user) == null ? void 0 : _a2.username) || ""
   };
   setInputValue("#oaPayrollForm [name='payroll_no']", row.payroll_no || "");
   setInputValue("#oaPayrollForm [name='payroll_month']", row.payroll_month || monthValue);
@@ -34668,11 +34711,11 @@ function hydrateOaPayrollForm(record = null) {
   setInputValue("#oaPayrollForm [name='prepared_by']", row.prepared_by || ((_b = currentSession.user) == null ? void 0 : _b.username) || "");
 }
 function hydrateOaFinanceApprovalForm(record = null) {
-  var _a, _b;
+  var _a2, _b;
   const row = record || {
     approval_no: "",
     form_type: "payment",
-    requester: ((_a = currentSession.user) == null ? void 0 : _a.username) || "",
+    requester: ((_a2 = currentSession.user) == null ? void 0 : _a2.username) || "",
     approver: "",
     amount: "",
     currency: "KES",
@@ -35203,9 +35246,9 @@ function getTransferDerivedStoreDispatchRows() {
     (Array.isArray(storeDispatchBaleState) ? storeDispatchBaleState : []).map((row) => String((row == null ? void 0 : row.store_delivery_execution_order_no) || (row == null ? void 0 : row.execution_order_no) || (row == null ? void 0 : row.official_delivery_barcode) || "").trim().toUpperCase()).filter(Boolean)
   );
   (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
-    var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
+    var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2, _l2;
     const sdoCode = String(
-      (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
+      (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a2.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
     ).trim().toUpperCase();
     if (!sdoCode || existingSdoCodes.has(sdoCode)) return;
     const targetStoreCode = String((transfer == null ? void 0 : transfer.to_store_code) || (transfer == null ? void 0 : transfer.store_code) || "").trim().toUpperCase();
@@ -35214,7 +35257,7 @@ function getTransferDerivedStoreDispatchRows() {
       ...Array.isArray(transfer == null ? void 0 : transfer.display_store_dispatch_bales) ? transfer.display_store_dispatch_bales : [],
       ...Array.isArray(transfer == null ? void 0 : transfer.store_dispatch_bales) ? transfer.store_dispatch_bales : [],
       ...Array.isArray((_c = transfer == null ? void 0 : transfer.delivery_batch) == null ? void 0 : _c.store_dispatch_bales) ? transfer.delivery_batch.store_dispatch_bales : [],
-      ...Array.isArray((_d2 = transfer == null ? void 0 : transfer.shipment_session) == null ? void 0 : _d2.packages) ? transfer.shipment_session.packages : []
+      ...Array.isArray((_d = transfer == null ? void 0 : transfer.shipment_session) == null ? void 0 : _d.packages) ? transfer.shipment_session.packages : []
     ];
     const explicitItemCounts = upstreamPackageRows.map((row) => parseKnownDispatchItemCount(row)).filter((count) => count !== null);
     const packageCount = getTransferShipmentPackageCount(transfer);
@@ -35254,9 +35297,9 @@ function getStoreManagerConsoleRows(storeCode = "") {
   ];
   const packageMetaBySdoAndBale = /* @__PURE__ */ new Map();
   (Array.isArray(transferOrderState) ? transferOrderState : []).forEach((transfer) => {
-    var _a, _b;
+    var _a2, _b;
     const sdoCode = String(
-      (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
+      (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a2.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
     ).trim().toUpperCase();
     if (!sdoCode) return;
     const packageRows = Array.isArray((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.packages) ? transfer.store_delivery_execution_order.packages : [];
@@ -35388,7 +35431,7 @@ function getStoreManagerOperatingMeta(storeCode = "") {
   ) || null;
 }
 function buildStoreReceivingCommandCenterViewModel(storeCode = "", preferredSdoCode = "") {
-  var _a;
+  var _a2;
   const packageRows = getStoreReceivingPackageRows(storeCode);
   const sdoGroups = groupStoreReceivingPackagesBySdo(packageRows).map((group) => {
     const packages = group.packages.map((row, index) => ({
@@ -35414,7 +35457,7 @@ function buildStoreReceivingCommandCenterViewModel(storeCode = "", preferredSdoC
   }
   const validSteps = /* @__PURE__ */ new Set(["list", "sdo_packages", "package_detail", "assignment", "completed"]);
   storeCommandCenterState.step = selected && validSteps.has(storeCommandCenterState.step) ? storeCommandCenterState.step : "list";
-  const selectedClerk = selected ? String(((_a = storeCommandCenterState.selected_clerk_by_sdo) == null ? void 0 : _a[selected.sdo_display_code]) || "").trim() : "";
+  const selectedClerk = selected ? String(((_a2 = storeCommandCenterState.selected_clerk_by_sdo) == null ? void 0 : _a2[selected.sdo_display_code]) || "").trim() : "";
   const clerkOptions = getStoreCommandCenterClerkOptions(storeCode);
   const fallbackClerk = clerkOptions[0] || "";
   const validSelectedClerk = selectedClerk && clerkOptions.includes(selectedClerk) ? selectedClerk : "";
@@ -35430,12 +35473,12 @@ function getStoreCommandCenterClerkOptions(storeCode = getCurrentStoreCodeFallba
   return getAssignableStoreClerks(storeCode).map((user) => getAssignableUserValue(user)).filter(Boolean);
 }
 function renderStoreManagerConsoleSummary(context = {}) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = document.querySelector("#storeManagerConsoleSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const storeCode = String(context.store_code || ((_a = document.querySelector("#storeManagerConsoleForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
+  const storeCode = String(context.store_code || ((_a2 = document.querySelector("#storeManagerConsoleForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
   if (storeCode) {
     setInputValue("#storeManagerConsoleForm [name='store_code']", storeCode);
     setInputValue("#storeRecentSalesSimulationForm [name='store_code']", storeCode);
@@ -35773,10 +35816,10 @@ function renderPosSalesAnalyticsSummary(records = posStoreItemSaleRecordState) {
 function summarizeAllPosStoreItemSalesForOperations(records = []) {
   const sourceRecords = Array.isArray(records) ? records : [];
   const list = sourceRecords.map((row) => {
-    var _a, _b;
+    var _a2, _b;
     return {
       ...row,
-      price: Number((_b = (_a = row == null ? void 0 : row.price) != null ? _a : row == null ? void 0 : row.total_amount) != null ? _b : 0),
+      price: Number((_b = (_a2 = row == null ? void 0 : row.price) != null ? _a2 : row == null ? void 0 : row.total_amount) != null ? _b : 0),
       sold_at: (row == null ? void 0 : row.sold_at) || (row == null ? void 0 : row.created_at) || (row == null ? void 0 : row.sale_time) || ""
     };
   });
@@ -35885,12 +35928,12 @@ function renderOperationsAllSalesData(records = posStoreItemSaleRecordState) {
   if (recordsTarget instanceof HTMLElement) {
     recordsTarget.className = "candidate-list";
     recordsTarget.innerHTML = normalizedRecords.length ? normalizedRecords.slice(0, 50).map((record) => {
-      var _a, _b;
+      var _a2, _b;
       return `
         <article class="candidate-row">
           <div class="candidate-main">
             <strong>${escapeHtml(record.sale_no || "-")}</strong>
-            <div class="subtle small">${escapeHtml(`${record.order_no || record.sale_no || "-"} · ${record.store_code || "-"} · ${formatKesAmount((_b = (_a = record.total_amount) != null ? _a : record.price) != null ? _b : 0, "KES 0.00")}`)}</div>
+            <div class="subtle small">${escapeHtml(`${record.order_no || record.sale_no || "-"} · ${record.store_code || "-"} · ${formatKesAmount((_b = (_a2 = record.total_amount) != null ? _a2 : record.price) != null ? _b : 0, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`cost_status ${record.cost_status || "unknown"} · cost ${record.cost_status === "known" ? formatKesAmount(record.cost_price, "KES 0.00") : "成本待确认"} · gross_margin ${record.gross_margin == null ? "毛利待确认" : formatKesAmount(record.gross_margin, "KES 0.00")}`)}</div>
             <div class="subtle small">${escapeHtml(`source_sdo ${record.source_sdo || "-"} · source_package ${record.source_package || "-"} · source_type ${record.source_type || "-"}`)}</div>
             <div class="subtle small">${escapeHtml(`assigned_employee ${record.assigned_employee || "-"} · category_summary ${record.category_summary || record.category || "未分类"} · store_rack_code ${record.store_rack_code || "-"} · cashier ${record.cashier || "-"} · shift ${record.shift_id || "-"} · status ${record.status || "-"}`)}</div>
@@ -35970,8 +36013,8 @@ function getBarcodeResolverBusinessSummary(barcodeType = "") {
   return "系统暂时无法识别这个码。";
 }
 function renderBarcodeResolverSingleResult(result = {}, context = "") {
-  var _a, _b, _c;
-  const businessObjectKind = ((_a = result == null ? void 0 : result.business_object) == null ? void 0 : _a.kind) || "";
+  var _a2, _b, _c;
+  const businessObjectKind = ((_a2 = result == null ? void 0 : result.business_object) == null ? void 0 : _a2.kind) || "";
   const businessObjectId = ((_b = result == null ? void 0 : result.business_object) == null ? void 0 : _b.id) || "";
   const allowedContexts = Array.isArray(result == null ? void 0 : result.allowed_contexts) ? result.allowed_contexts.join(", ") : "";
   const rejectedContexts = Array.isArray(result == null ? void 0 : result.rejected_contexts) ? result.rejected_contexts.join(", ") : "";
@@ -36087,12 +36130,12 @@ function findStorePackageByActionKey(actionKey = "", rows = null) {
   return sourceRows.find((row) => getStorePackageActionKey(row) === normalizedKey) || null;
 }
 function getStorePackageItemCount(row = {}) {
-  var _a, _b;
+  var _a2, _b;
   const known = parseKnownDispatchItemCount(row);
   if (known !== null && known !== void 0) {
     return Number(known);
   }
-  const fallback = Number((_b = (_a = row == null ? void 0 : row.item_count) != null ? _a : row == null ? void 0 : row.qty) != null ? _b : row == null ? void 0 : row.piece_count);
+  const fallback = Number((_b = (_a2 = row == null ? void 0 : row.item_count) != null ? _a2 : row == null ? void 0 : row.qty) != null ? _b : row == null ? void 0 : row.piece_count);
   return Number.isFinite(fallback) && fallback > 0 ? fallback : null;
 }
 function getStorePackageCostPrice(row = {}) {
@@ -36135,10 +36178,10 @@ function getStorePackageTokens(actionKey = "") {
   return storeSdoPackageItemTokenState.filter((token) => String((token == null ? void 0 : token.source_package_key) || "").trim() === normalizedKey);
 }
 function getStorePackageTokenCounts(row = {}) {
-  var _a, _b;
+  var _a2, _b;
   const actionKey = getStorePackageActionKey(row);
   const tokens = getStorePackageTokens(actionKey);
-  const backendGenerated = Number((row == null ? void 0 : row.generated_store_item_count) || ((_a = row == null ? void 0 : row.package_progress) == null ? void 0 : _a.generated_store_item_count) || 0);
+  const backendGenerated = Number((row == null ? void 0 : row.generated_store_item_count) || ((_a2 = row == null ? void 0 : row.package_progress) == null ? void 0 : _a2.generated_store_item_count) || 0);
   const backendRemaining = Number((row == null ? void 0 : row.remaining_store_item_count) || ((_b = row == null ? void 0 : row.package_progress) == null ? void 0 : _b.remaining_store_item_count) || 0);
   return {
     generated: Math.max(tokens.length, Number.isFinite(backendGenerated) ? backendGenerated : 0),
@@ -36168,12 +36211,12 @@ function getDefaultStoreSalePriceChoices(costPrice = null) {
   };
 }
 function getStorePackagePriceChoices(row = {}) {
-  var _a;
+  var _a2;
   const costPrice = getStorePackageCostPrice(row);
   const defaults = getDefaultStoreSalePriceChoices(costPrice);
   const storeCode = String((row == null ? void 0 : row.store_code) || (row == null ? void 0 : row.to_store_code) || (row == null ? void 0 : row.target_store_code) || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const categoryKey = getStorePackageCategoryLabel(row).toLowerCase();
-  const override = ((_a = storeDefaultSalePrices == null ? void 0 : storeDefaultSalePrices[storeCode]) == null ? void 0 : _a[categoryKey]) || null;
+  const override = ((_a2 = storeDefaultSalePrices == null ? void 0 : storeDefaultSalePrices[storeCode]) == null ? void 0 : _a2[categoryKey]) || null;
   return {
     default_price_1: Number((override == null ? void 0 : override.default_price_1) || defaults.default_price_1),
     default_price_2: Number((override == null ? void 0 : override.default_price_2) || defaults.default_price_2)
@@ -36605,12 +36648,12 @@ function renderStorePackageShelvingStep(row = {}, context = {}) {
   `;
 }
 function renderStoreClerkHomeSummary(context = {}) {
-  var _a, _b;
+  var _a2, _b;
   const target = document.querySelector("#storeClerkHomeSummary");
   if (!(target instanceof HTMLElement)) {
     return;
   }
-  const storeCode = String(context.store_code || ((_a = document.querySelector("#storeClerkHomeForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
+  const storeCode = String(context.store_code || ((_a2 = document.querySelector("#storeClerkHomeForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
   const assignedEmployee = String(context.assigned_employee || ((_b = document.querySelector("#storeClerkHomeForm [name='assigned_employee']")) == null ? void 0 : _b.value) || getCurrentStoreWorkerFallback() || "").trim();
   if (storeCode) {
     setInputValue("#storeClerkHomeForm [name='store_code']", storeCode);
@@ -36917,10 +36960,10 @@ function getStoreMobileLineGeneratedQty(state = storeMobilePricingPreviewState, 
   }, 0);
 }
 function getStoreMobileSourceLineProgress(state = storeMobilePricingPreviewState, sourceLineKey = "") {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
   const totalQty = Number(
-    (_d2 = (_c = (_b = (_a = line == null ? void 0 : line.total_qty) != null ? _a : line == null ? void 0 : line.item_count) != null ? _b : line == null ? void 0 : line.quantity) != null ? _c : line == null ? void 0 : line.remaining_qty) != null ? _d2 : 0
+    (_d = (_c = (_b = (_a2 = line == null ? void 0 : line.total_qty) != null ? _a2 : line == null ? void 0 : line.item_count) != null ? _b : line == null ? void 0 : line.quantity) != null ? _c : line == null ? void 0 : line.remaining_qty) != null ? _d : 0
   );
   const allocatedQty = getStoreMobileLineAllocatedQty(state, sourceLineKey);
   const generatedQty = getStoreMobileLineGeneratedQty(state, sourceLineKey);
@@ -36933,15 +36976,15 @@ function getStoreMobileSourceLineProgress(state = storeMobilePricingPreviewState
   };
 }
 function getStoreMobileTaskTotals(state = storeMobilePricingPreviewState) {
-  var _a, _b;
+  var _a2, _b;
   const groups = getStoreMobileTaskGroups(state);
   const groupedTotal = groups.reduce((sum, group) => sum + Number(group.quantity || 0), 0);
   const sourceLines = getStoreMobilePricingSourceLines(state);
   const sourceTotal = sourceLines.reduce((sum, line) => {
-    var _a2, _b2, _c, _d2;
-    return sum + Number((_d2 = (_c = (_b2 = (_a2 = line.total_qty) != null ? _a2 : line.item_count) != null ? _b2 : line.quantity) != null ? _c : line.remaining_qty) != null ? _d2 : 0);
+    var _a3, _b2, _c, _d;
+    return sum + Number((_d = (_c = (_b2 = (_a3 = line.total_qty) != null ? _a3 : line.item_count) != null ? _b2 : line.quantity) != null ? _c : line.remaining_qty) != null ? _d : 0);
   }, 0);
-  const selectedSdpTotal = Number(((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.total_count) || ((_b = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _b.item_count) || 0);
+  const selectedSdpTotal = Number(((_a2 = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a2.total_count) || ((_b = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _b.item_count) || 0);
   const total = selectedSdpTotal || sourceTotal || groupedTotal;
   const allocated = groupedTotal;
   const generated = groups.reduce((sum, group) => sum + getStoreMobileGroupGeneratedQty(group), 0);
@@ -37031,14 +37074,14 @@ function getStoreMobileAssignedTaskMachineCode(row = {}) {
   return /^SDP\d{9}$/.test(displayCode) && /^\d{9}$/.test(displayDigits) ? `6${displayDigits}` : "";
 }
 function createStoreMobileSelectedSdpFromBackendTask(row = {}, state = storeMobilePricingPreviewState) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2, _k2;
   const displayCode = getStoreMobileAssignedTaskCode(row);
   const machineCode = getStoreMobileAssignedTaskMachineCode(row);
   const parentSdoDisplayCode = String((row == null ? void 0 : row.parent_sdo_display_code) || (row == null ? void 0 : row.parent_sdo_order_no) || (row == null ? void 0 : row.sdo_code) || (row == null ? void 0 : row.source_sdo) || "").trim().toUpperCase();
   const parentSdoMachineCode = String((row == null ? void 0 : row.parent_sdo_machine_code) || (row == null ? void 0 : row.sdo_machine_code) || "").replace(/[^0-9]/g, "").trim();
-  const storeCode = String((row == null ? void 0 : row.store_code) || (row == null ? void 0 : row.store_name) || ((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.store_name) || ((_b = currentSession.user) == null ? void 0 : _b.store_code) || getCurrentStoreCodeFallback()).trim().toUpperCase();
+  const storeCode = String((row == null ? void 0 : row.store_code) || (row == null ? void 0 : row.store_name) || ((_a2 = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a2.store_name) || ((_b = currentSession.user) == null ? void 0 : _b.store_code) || getCurrentStoreCodeFallback()).trim().toUpperCase();
   const packageNo = (row == null ? void 0 : row.package_total) ? `${(row == null ? void 0 : row.package_no) || 1}/${row.package_total}` : String((row == null ? void 0 : row.package_no) || (row == null ? void 0 : row.package_index) || ((_c = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _c.package_no) || "").trim();
-  const itemCount = (row == null ? void 0 : row.item_count) === null || (row == null ? void 0 : row.item_count) === void 0 || (row == null ? void 0 : row.item_count) === "" ? Number(((_d2 = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _d2.total_count) || 0) : Number(row.item_count || 0);
+  const itemCount = (row == null ? void 0 : row.item_count) === null || (row == null ? void 0 : row.item_count) === void 0 || (row == null ? void 0 : row.item_count) === "" ? Number(((_d = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _d.total_count) || 0) : Number(row.item_count || 0);
   return {
     ...(state == null ? void 0 : state.selectedSdp) || {},
     display_code: displayCode,
@@ -37128,12 +37171,12 @@ function buildStoreMobilePricingSourceLines(row = {}, selectedSdp = null) {
   return [];
 }
 function getStoreMobilePricingSourceLines(state = storeMobilePricingPreviewState) {
-  var _a;
+  var _a2;
   const pricingSourceLines = Array.isArray(state == null ? void 0 : state.pricingSourceLines) ? state.pricingSourceLines : [];
   if (pricingSourceLines.length) {
     return pricingSourceLines;
   }
-  if ((_a = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a.backend_task) {
+  if ((_a2 = state == null ? void 0 : state.selectedSdp) == null ? void 0 : _a2.backend_task) {
     return buildStoreMobilePricingSourceLines(state.selectedSdp, state.selectedSdp);
   }
   return [];
@@ -37144,12 +37187,12 @@ function getStoreMobileSuggestedSalePrice(categoryMain = "", categorySub = "", g
   return Number((record == null ? void 0 : record.default_sale_price_kes) || 0);
 }
 function getStoreMobileLineRemainingQty(state = storeMobilePricingPreviewState, sourceLineKey = "", currentGroupId = "") {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === String(sourceLineKey || ""));
   if (!line) {
     return 0;
   }
-  const totalQty = Number((_d2 = (_c = (_b = (_a = line.total_qty) != null ? _a : line.item_count) != null ? _b : line.quantity) != null ? _c : line.remaining_qty) != null ? _d2 : 0);
+  const totalQty = Number((_d = (_c = (_b = (_a2 = line.total_qty) != null ? _a2 : line.item_count) != null ? _b : line.quantity) != null ? _c : line.remaining_qty) != null ? _d : 0);
   const allocatedQty = getStoreMobileLineAllocatedQty(state, sourceLineKey, currentGroupId);
   return Math.max(0, (Number.isFinite(totalQty) ? totalQty : 0) - allocatedQty);
 }
@@ -37165,7 +37208,7 @@ function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPrevi
   return { ok: true, message: "" };
 }
 function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, value = "") {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const [sourceLineKey = "", rawGrade = "", rawBaselineGrade = ""] = String(value || "").split("||");
   const grade = String(rawGrade || "P").trim().toUpperCase();
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === sourceLineKey);
@@ -37177,9 +37220,9 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   const pBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
   const sBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
   const customBaselineSelect = [...document.querySelectorAll("[data-mobile-pricing-custom-baseline]")].find((input) => {
-    var _a2;
+    var _a3;
     const isSelect = typeof HTMLSelectElement !== "undefined" ? input instanceof HTMLSelectElement : input && typeof input.value === "string";
-    return isSelect && String(((_a2 = input == null ? void 0 : input.dataset) == null ? void 0 : _a2.mobilePricingCustomBaseline) || "") === sourceLineKey;
+    return isSelect && String(((_a3 = input == null ? void 0 : input.dataset) == null ? void 0 : _a3.mobilePricingCustomBaseline) || "") === sourceLineKey;
   });
   const isSelectElement = typeof HTMLSelectElement !== "undefined" ? customBaselineSelect instanceof HTMLSelectElement : customBaselineSelect && typeof customBaselineSelect.value === "string";
   const explicitBaselineGrade = String(rawBaselineGrade || (isSelectElement ? customBaselineSelect.value : "")).trim().toUpperCase();
@@ -37228,10 +37271,10 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     quantity,
     requested_quantity: quantity,
     rack_code: `PDA-${grade === "CUSTOM" ? "CUS" : grade}-001`,
-    source_sdp_display_code: line.source_sdp_display_code || ((_a = state.selectedSdp) == null ? void 0 : _a.display_code) || "",
+    source_sdp_display_code: line.source_sdp_display_code || ((_a2 = state.selectedSdp) == null ? void 0 : _a2.display_code) || "",
     source_sdp_machine_code: line.source_sdp_machine_code || ((_b = state.selectedSdp) == null ? void 0 : _b.machine_code) || "",
     source_type: line.source_type || ((_c = state.selectedSdp) == null ? void 0 : _c.source_type) || "",
-    source_code: line.source_code || ((_d2 = state.selectedSdp) == null ? void 0 : _d2.source_code) || "",
+    source_code: line.source_code || ((_d = state.selectedSdp) == null ? void 0 : _d.source_code) || "",
     status: "待生成商品码",
     workflow_status: "draft"
   };
@@ -37261,7 +37304,7 @@ function deleteStoreMobilePricingBatch(state = storeMobilePricingPreviewState, g
   return syncStoreMobileTaskCounters(state);
 }
 function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, taskCode = "") {
-  var _a;
+  var _a2;
   const normalizedCode = String(taskCode || "").trim().toUpperCase();
   const normalizedDigits = normalizedCode.replace(/[^0-9]/g, "");
   const task = getStoreMobileAssignedBackendTasks(state).find((row) => {
@@ -37294,7 +37337,7 @@ function selectStoreMobileBackendTask(state = storeMobilePricingPreviewState, ta
     tier: "P",
     grade: "P",
     price_kes: pricingSourceLines[0] ? getStoreMobileSuggestedSalePrice(pricingSourceLines[0].category_main, pricingSourceLines[0].category_sub, "P") : 0,
-    quantity: ((_a = pricingSourceLines[0]) == null ? void 0 : _a.remaining_qty) || 1,
+    quantity: ((_a2 = pricingSourceLines[0]) == null ? void 0 : _a2.remaining_qty) || 1,
     category: pricingSourceLines[0] ? `${pricingSourceLines[0].category_main} / ${pricingSourceLines[0].category_sub}` : selectedSdp.category,
     rack_code: "PDA-P-001"
   };
@@ -37465,7 +37508,7 @@ function renderStoreMobileSdpCard(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const groups = Array.isArray(state.priceGroups) ? state.priceGroups : [];
   const pricingSourceLines = getStoreMobilePricingSourceLines(state);
   const getGroupTierText = (group = {}) => {
@@ -37476,7 +37519,7 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
     if (normalizedTier.includes("CUSTOM") || rawTier.includes("自定义")) return "自定义";
     return rawTier || "-";
   };
-  if ((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) {
+  if ((_a2 = state.selectedSdp) == null ? void 0 : _a2.backend_task) {
     const renderCreatedGroupCards = (lineGroups = []) => {
       if (!lineGroups.length) {
         return '<div class="subtle small">还没有价格组。请先输入数量并选择售价。</div>';
@@ -37733,10 +37776,10 @@ function getStoreMobilePricingTypeForGroup(group = {}) {
   return "CUSTOM";
 }
 function normalizeStoreItemForLabelPreview(item = {}, group = {}) {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   const machineCode = String(item.machine_code || item.barcode_value || "").replace(/[^0-9]/g, "").trim();
   const priceKes = Number(
-    (_f2 = (_e2 = (_d2 = (_c = (_b = (_a = item.price_kes) != null ? _a : item.sale_price_kes) != null ? _b : item.selling_price_kes) != null ? _c : item.selected_price) != null ? _d2 : group.sale_price_kes) != null ? _e2 : group.price_kes) != null ? _f2 : 0
+    (_f2 = (_e2 = (_d = (_c = (_b = (_a2 = item.price_kes) != null ? _a2 : item.sale_price_kes) != null ? _b : item.selling_price_kes) != null ? _c : item.selected_price) != null ? _d : group.sale_price_kes) != null ? _e2 : group.price_kes) != null ? _f2 : 0
   );
   const categoryShort = String(
     item.category_short || group.category_short || item.category_sub || group.category_sub || item.category_main || group.category_main || group.category || ""
@@ -37799,9 +37842,9 @@ function renderStoreMobileGeneratedStoreItemList(group = {}) {
   `;
 }
 function getStoreMobileStoreCode(state = storeMobilePricingPreviewState) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   return String(
-    ((_a = state.selectedSdp) == null ? void 0 : _a.store_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.store_name) || ((_c = currentSession.user) == null ? void 0 : _c.store_code) || getCurrentStoreCodeFallback() || "UTAWALA"
+    ((_a2 = state.selectedSdp) == null ? void 0 : _a2.store_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.store_name) || ((_c = currentSession.user) == null ? void 0 : _c.store_code) || getCurrentStoreCodeFallback() || "UTAWALA"
   ).trim().toUpperCase();
 }
 function getStoreMobileActiveStockInLocations(state = storeMobilePricingPreviewState) {
@@ -37971,7 +38014,7 @@ function renderStoreMobileUnconfirmedStockInList(state = storeMobilePricingPrevi
   `;
 }
 async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePricingPreviewState, machineCode = "") {
-  var _a;
+  var _a2;
   const normalizedMachineCode = String(machineCode || "").trim();
   const selectedElement = document.querySelector(`[data-mobile-unconfirmed-stock-in-location="${normalizedMachineCode}"]`);
   const selectedLocation = String(selectedElement instanceof HTMLSelectElement ? selectedElement.value : "").trim().toUpperCase();
@@ -37986,7 +38029,7 @@ async function confirmStoreMobileUnconfirmedStockInItem(state = storeMobilePrici
     method: "POST",
     body: JSON.stringify({
       location_code: selectedLocation,
-      confirmed_by: String(((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback() || "").trim()
+      confirmed_by: String(((_a2 = currentSession.user) == null ? void 0 : _a2.username) || getCurrentStoreWorkerFallback() || "").trim()
     })
   });
   const status = String(result.status || "confirmed").trim();
@@ -38058,11 +38101,11 @@ function renderStoreItemLabelPreview(storeItems = [], labelTemplateSize = "60x40
   `;
 }
 function renderPriceGroupGenerationResult(state = storeMobilePricingPreviewState) {
-  var _a;
+  var _a2;
   const group = getStoreMobilePricingActiveGroup(state);
   const generatedItems = getStoreMobileGeneratedStoreItems(group);
   const labelConfig = getStoreItemLabelSizeConfig(group.label_template_size || state.label_template_size || state.labelSize || "60x40");
-  const generated = ((_a = state.generatedRanges) == null ? void 0 : _a[group.group_id]) || {
+  const generated = ((_a2 = state.generatedRanges) == null ? void 0 : _a2[group.group_id]) || {
     generated_count: generatedItems.length,
     pending_print_count: getStoreMobilePendingPrintCount(generatedItems),
     demo_only: true
@@ -38215,7 +38258,7 @@ function renderPriceGroupPrintQueue(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const pdaCopy = getClerkPdaCopy();
   const backendTasks = getStoreMobileAssignedBackendTasks(state);
   const sdp = state.selectedSdp || {};
@@ -38320,16 +38363,16 @@ function renderStoreMobileTaskList(state = storeMobilePricingPreviewState) {
   `;
   if (backendTasks.length) {
     const selectedCode = String(
-      state.selectedBackendTaskCode || (((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) ? ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c = state.selectedSdp) == null ? void 0 : _c.sdp_code) : "") || ""
+      state.selectedBackendTaskCode || (((_a2 = state.selectedSdp) == null ? void 0 : _a2.backend_task) ? ((_b = state.selectedSdp) == null ? void 0 : _b.display_code) || ((_c = state.selectedSdp) == null ? void 0 : _c.sdp_code) : "") || ""
     ).trim().toUpperCase();
     return renderDailyWorkbenchShell(`
         <div class="subtle small">Package tasks are sorted by latest assignment time.</div>
         ${backendTasks.map((task) => {
-      var _a2;
+      var _a3;
       const displayCode2 = getStoreMobileAssignedTaskCode(task);
       const machineCode = getStoreMobileAssignedTaskMachineCode(task);
       const parentSdoDisplayCode = String(task.parent_sdo_display_code || task.sdo_code || task.source_sdo || "-").trim().toUpperCase();
-      const storeCode = String(task.store_code || task.store_name || ((_a2 = state.selectedSdp) == null ? void 0 : _a2.store_name) || "-").trim().toUpperCase();
+      const storeCode = String(task.store_code || task.store_name || ((_a3 = state.selectedSdp) == null ? void 0 : _a3.store_name) || "-").trim().toUpperCase();
       const contentSummary = String(task.content_summary || task.category || task.category_name || "未填品类").trim();
       const itemCount = task.item_count === null || task.item_count === void 0 || task.item_count === "" ? "-" : `${task.item_count} 件`;
       const assignedAt = String(task.assigned_at || "-").trim();
@@ -38906,9 +38949,9 @@ function getStoreMobilePageOptions() {
   ];
 }
 function getStoreMobileActivePageLabel(state = storeMobilePricingPreviewState) {
-  var _a;
+  var _a2;
   const activePage = normalizeStoreMobilePdaPage(state.activePage || "pricing_split");
-  return ((_a = getStoreMobilePageOptions().find((page) => page.key === activePage)) == null ? void 0 : _a.label) || "分批定价";
+  return ((_a2 = getStoreMobilePageOptions().find((page) => page.key === activePage)) == null ? void 0 : _a2.label) || "分批定价";
 }
 function renderStoreMobileBottomTabs(state = storeMobilePricingPreviewState) {
   const bottomTabs = ["任务", "我的"];
@@ -38967,7 +39010,7 @@ function renderStoreMobileDeviceFrame(state = storeMobilePricingPreviewState) {
   `;
 }
 function renderStoreMobilePricingPreview() {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   const target = document.querySelector("#storeMobilePricingPreviewSummary");
   if (!(target instanceof HTMLElement)) {
     return;
@@ -39008,9 +39051,9 @@ function renderStoreMobilePricingPreview() {
         <div class="mobile-preview-control-block">
           <strong>当前 mock Package</strong>
           <div class="mobile-preview-sdp-mini">
-            <b>${escapeHtml(((_a = state.selectedSdp) == null ? void 0 : _a.display_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.sdp_code) || "-")}</b>
+            <b>${escapeHtml(((_a2 = state.selectedSdp) == null ? void 0 : _a2.display_code) || ((_b = state.selectedSdp) == null ? void 0 : _b.sdp_code) || "-")}</b>
             <small>${escapeHtml(((_c = state.selectedSdp) == null ? void 0 : _c.machine_code) ? `Scanned Code: ${state.selectedSdp.machine_code}` : "")}</small>
-            <span>${escapeHtml(((_d2 = state.selectedSdp) == null ? void 0 : _d2.store_name) || "-")}</span>
+            <span>${escapeHtml(((_d = state.selectedSdp) == null ? void 0 : _d.store_name) || "-")}</span>
             <span>${escapeHtml(`${((_e2 = state.selectedSdp) == null ? void 0 : _e2.category) || "-"} · ${((_f2 = state.selectedSdp) == null ? void 0 : _f2.total_count) || 0} 件`)}</span>
           </div>
         </div>
@@ -39029,7 +39072,7 @@ function renderStoreMobilePricingPreviewPreservingScroll() {
   restoreClerkPrinterDiagnosticsJsonScrollState(printerDiagnosticsJsonScrollState);
 }
 async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPreviewState, groupId = "") {
-  var _a, _b;
+  var _a2, _b;
   const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || ""));
   const sdp = state.selectedSdp || {};
   if (!group || !sdp.backend_task) {
@@ -39066,7 +39109,7 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
   }
   const payload = {
     store_code: sdp.store_code || sdp.store_name || getCurrentStoreCodeFallback(),
-    assigned_clerk: sdp.assigned_clerk || ((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback(),
+    assigned_clerk: sdp.assigned_clerk || ((_a2 = currentSession.user) == null ? void 0 : _a2.username) || getCurrentStoreWorkerFallback(),
     clerk: sdp.assigned_clerk || ((_b = currentSession.user) == null ? void 0 : _b.username) || getCurrentStoreWorkerFallback(),
     rack_code: group.rack_code || "PDA-P-001",
     selected_price: Number(group.sale_price_kes || group.price_kes || 0),
@@ -39220,7 +39263,7 @@ async function printStoreMobileStoreItemLabelPreview(state = storeMobilePricingP
   return syncStoreMobileTaskCounters(state);
 }
 async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPreviewState, groupId = "", machineCode = "") {
-  var _a, _b;
+  var _a2, _b;
   const group = getStoreMobileTaskGroups(state).find((item) => String(item.group_id || "") === String(groupId || state.activeGroupId || ""));
   if (!group) {
     throw new Error("找不到当前价格组。");
@@ -39250,7 +39293,7 @@ async function confirmStoreMobileStoreItemStockIn(state = storeMobilePricingPrev
     method: "POST",
     body: JSON.stringify({
       location_code: selectedLocation,
-      confirmed_by: String(((_a = currentSession.user) == null ? void 0 : _a.username) || getCurrentStoreWorkerFallback() || "").trim()
+      confirmed_by: String(((_a2 = currentSession.user) == null ? void 0 : _a2.username) || getCurrentStoreWorkerFallback() || "").trim()
     })
   });
   const status = String(result.status || "confirmed").trim();
@@ -39320,7 +39363,7 @@ function handleStoreMobileScanSubmit(inputValue = "") {
   renderStoreMobilePricingPreview();
 }
 function handleStoreMobilePricingPreviewAction(button) {
-  var _a, _b;
+  var _a2, _b;
   if (!(button instanceof HTMLElement)) {
     return;
   }
@@ -39496,7 +39539,7 @@ function handleStoreMobilePricingPreviewAction(button) {
     setStoreMobileActivePage(state, "pricing_split", { source: "delete_batch" });
   }
   if (generateGroup) {
-    if ((_a = state.selectedSdp) == null ? void 0 : _a.backend_task) {
+    if ((_a2 = state.selectedSdp) == null ? void 0 : _a2.backend_task) {
       generateStoreMobileBatchStoreItems(state, generateGroup).then(() => {
         storeMobilePricingPreviewState = syncStoreMobileTaskCounters(state);
         renderStoreMobilePricingPreview();
@@ -39585,8 +39628,8 @@ function handleStoreMobilePricingPreviewAction(button) {
   renderStoreMobilePricingPreview();
 }
 function refreshStoreClerkHomeWithContext(context = {}) {
-  var _a, _b;
-  const storeCode = String(context.store_code || ((_a = document.querySelector("#storeClerkHomeForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
+  var _a2, _b;
+  const storeCode = String(context.store_code || ((_a2 = document.querySelector("#storeClerkHomeForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "").trim().toUpperCase();
   const assignedEmployee = String(context.assigned_employee || ((_b = document.querySelector("#storeClerkHomeForm [name='assigned_employee']")) == null ? void 0 : _b.value) || getCurrentStoreWorkerFallback() || "").trim();
   if (storeCode) {
     setInputValue("#storeClerkHomeForm [name='store_code']", storeCode);
@@ -39602,7 +39645,7 @@ function refreshStoreClerkHomeWithContext(context = {}) {
   });
 }
 function renderStoreClosingChecklist(data) {
-  var _a;
+  var _a2;
   const target = document.querySelector("#storeClosingChecklistSummary");
   if (!target) {
     return;
@@ -39741,7 +39784,7 @@ function renderStoreClosingChecklist(data) {
     setInputValue("#shiftReportForm [name='shift_no']", data.z_report_shift_no);
     setInputValue("#closeBusinessReportForm [name='shift_no']", data.z_report_shift_no);
   }
-  if ((_a = pendingHandovers[0]) == null ? void 0 : _a.handover_no) {
+  if ((_a2 = pendingHandovers[0]) == null ? void 0 : _a2.handover_no) {
     setInputValue("#handoverReviewForm [name='handover_no']", pendingHandovers[0].handover_no);
   }
 }
@@ -39868,8 +39911,8 @@ async function runRawBaleMachineCodeRepair({ dryRun = true } = {}) {
   renderRawBaleMachineCodeRepairReport(report);
 }
 async function loadStoreClosingChecklist(storeCode) {
-  var _a;
-  const normalizedStore = (storeCode || ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA").trim().toUpperCase();
+  var _a2;
+  const normalizedStore = (storeCode || ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA").trim().toUpperCase();
   applyStoreContext(normalizedStore);
   const [data, anomalies, voids, refunds] = await Promise.all([
     request(`/dashboard/store-closing-checklist/${encodeURIComponent(normalizedStore)}`),
@@ -40031,7 +40074,7 @@ async function loadBaleSalesWorkbench(notice = "") {
   return poolRows;
 }
 async function loadTable(kind) {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2, _i2, _j2;
   if (kind === "load-price-alerts") {
     const rows = await request("/audit-events");
     const alerts = rows.filter(
@@ -40043,7 +40086,7 @@ async function loadTable(kind) {
     return;
   }
   if (kind === "load-store-closing-checklist") {
-    const storeCode = ((_a = document.querySelector("#storeClosingChecklistForm [name='store_code']")) == null ? void 0 : _a.value.trim()) || ((_b = currentSession.user) == null ? void 0 : _b.store_code) || "UTAWALA";
+    const storeCode = ((_a2 = document.querySelector("#storeClosingChecklistForm [name='store_code']")) == null ? void 0 : _a2.value.trim()) || ((_b = currentSession.user) == null ? void 0 : _b.store_code) || "UTAWALA";
     await loadStoreClosingChecklist(storeCode);
     return;
   }
@@ -40200,7 +40243,7 @@ async function loadTable(kind) {
     renderInboundShipmentSummary("list", data);
     renderInboundShipmentHistorySummary(data);
     renderParcelDirectorySummary(parcelBatchState);
-    renderBaleBarcodeDirectorySummary(((_d2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _d2.value) || "");
+    renderBaleBarcodeDirectorySummary(((_d = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _d.value) || "");
     focusElement("#inboundShipmentHistorySummary");
     renderTableSummary(kind, data);
     return;
@@ -40437,14 +40480,14 @@ async function submitLogout() {
   renderAuthResultSummary("logout");
 }
 async function handleGlobalLogoutClick(event) {
-  var _a;
+  var _a2;
   const target = event.target instanceof HTMLElement ? event.target.closest('[data-action="logout"]') : null;
   if (!(target instanceof HTMLElement)) {
     return;
   }
   event.preventDefault();
   event.stopPropagation();
-  (_a = event.stopImmediatePropagation) == null ? void 0 : _a.call(event);
+  (_a2 = event.stopImmediatePropagation) == null ? void 0 : _a2.call(event);
   await submitLogout();
 }
 async function refreshSession() {
@@ -40499,11 +40542,11 @@ async function submitProduct(event) {
   await loadDashboard();
 }
 async function submitInboundShipment(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const files = Array.from(((_a = event.currentTarget.querySelector("[name='coc_documents_files']")) == null ? void 0 : _a.files) || []);
+  const files = Array.from(((_a2 = event.currentTarget.querySelector("[name='coc_documents_files']")) == null ? void 0 : _a2.files) || []);
   payload.coc_documents = await Promise.all(files.map((file) => fileToDataUrl(file)));
   delete payload.coc_documents_files;
   const result = await request("/warehouse/inbound-shipments", {
@@ -40708,8 +40751,8 @@ async function submitGenerateBaleBarcodes(event) {
   }
 }
 async function confirmBalePrintFlowAndContinue() {
-  var _a;
-  const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim() || resolveCurrentInboundShipmentNo();
+  var _a2;
+  const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim() || resolveCurrentInboundShipmentNo();
   if (!shipmentNo) {
     throw new Error("请先锁定一张已经完成总确认的船单。");
   }
@@ -40769,8 +40812,8 @@ async function confirmBaleBatchLabelled(parcelBatchNo = "") {
   });
 }
 async function confirmBalePrintGroup(groupKey = "") {
-  var _a;
-  const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim() || resolveCurrentInboundShipmentNo();
+  var _a2;
+  const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim() || resolveCurrentInboundShipmentNo();
   if (!shipmentNo) {
     throw new Error("请先选择船单。");
   }
@@ -40815,8 +40858,8 @@ async function confirmBalePrintGroup(groupKey = "") {
   renderBaleBarcodeDirectorySummary(shipmentNo);
 }
 async function openBalePrintModalForGroup(groupKey = "") {
-  var _a, _b;
-  const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim() || resolveCurrentInboundShipmentNo();
+  var _a2, _b;
+  const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim() || resolveCurrentInboundShipmentNo();
   if (!shipmentNo) {
     throw new Error("请先选择船单。");
   }
@@ -40898,8 +40941,8 @@ async function openBalePrintModalForGroup(groupKey = "") {
   });
 }
 async function submitSelectedBalePrintJobs() {
-  var _a;
-  const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim();
+  var _a2;
+  const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim();
   if (!shipmentNo) {
     throw new Error("请先选择船单，再确认打印。");
   }
@@ -40947,7 +40990,7 @@ async function submitRawBaleStockFilter(event) {
   focusElement("#rawBaleStockSummary");
 }
 async function addSortingLookupBaleToSelection() {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const baleLookupInput = document.querySelector("#sortingTaskForm [name='bale_lookup']");
   const baleCode = String((baleLookupInput == null ? void 0 : baleLookupInput.value) || "").trim();
   await resolveBarcodeForContext(baleCode, "warehouse_sorting_create", ["RAW_BALE"]);
@@ -41007,7 +41050,7 @@ async function addSortingLookupBaleToSelection() {
   }
   setInputValue("#sortingTaskForm [name='bale_lookup']", "");
   refreshSortingShipmentOptions();
-  const successMessage = result.duplicate ? `${((_a = result.matchedRow) == null ? void 0 : _a.bale_barcode) || baleCode} 已经在当前任务里。` : result.approximate ? `${baleCode} 疑似扫码丢字，已按 ${((_b = result.matchedRow) == null ? void 0 : _b.bale_barcode) || baleCode} 加入当前任务。` : `${((_c = result.matchedRow) == null ? void 0 : _c.bale_barcode) || baleCode} 已加入当前任务。`;
+  const successMessage = result.duplicate ? `${((_a2 = result.matchedRow) == null ? void 0 : _a2.bale_barcode) || baleCode} 已经在当前任务里。` : result.approximate ? `${baleCode} 疑似扫码丢字，已按 ${((_b = result.matchedRow) == null ? void 0 : _b.bale_barcode) || baleCode} 加入当前任务。` : `${((_c = result.matchedRow) == null ? void 0 : _c.bale_barcode) || baleCode} 已加入当前任务。`;
   const hasSourceCostWarning = Boolean(result.warning && !result.duplicate);
   showTransientInlineNotice(
     "#sortingTaskNotice",
@@ -41044,7 +41087,7 @@ async function routeRawBaleFromWorkbench(baleBarcode, destination) {
   }
 }
 async function submitSortingTask(event) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   event.preventDefault();
   syncJsonBuilderToField("sorting-handler-names");
   const form = new FormData(event.currentTarget);
@@ -41060,7 +41103,7 @@ async function submitSortingTask(event) {
   );
   payload.bale_barcodes = selectedRows.map((row) => row.bale_barcode).filter(Boolean);
   payload.task_status = "assigned";
-  payload.source_raw_bale_display_code = ((_a = selectedRows[0]) == null ? void 0 : _a.bale_barcode) || "";
+  payload.source_raw_bale_display_code = ((_a2 = selectedRows[0]) == null ? void 0 : _a2.bale_barcode) || "";
   payload.source_raw_bale_machine_code = ((_b = selectedRows[0]) == null ? void 0 : _b.machine_code) || ((_c = selectedRows[0]) == null ? void 0 : _c.barcode_value) || "";
   payload.assigned_worker = payload.handler_names[0] || "";
   payload.sorter_name = payload.handler_names[0] || "";
@@ -41093,13 +41136,13 @@ async function submitSortingTask(event) {
   showTransientInlineNotice("#sortingTaskNotice", `分拣任务 ${result.task_no || ""} 已创建成功。`, "success", 1800);
 }
 async function submitSortingResults(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   syncJsonBuilderToField("sorting-result-items");
   const formElement = event.currentTarget;
   const form = new FormData(formElement);
   const payload = Object.fromEntries(form.entries());
-  const taskNo = (_a = payload.task_no) == null ? void 0 : _a.trim();
+  const taskNo = (_a2 = payload.task_no) == null ? void 0 : _a2.trim();
   if (!taskNo) {
     throw new Error("请先创建或读取一张分拣任务。");
   }
@@ -41230,7 +41273,7 @@ async function submitStorePrepBaleTask(event) {
   await loadTable("load-sorting-stock");
 }
 async function queueCompressionTaskPrintJob(resultRow = {}) {
-  var _a;
+  var _a2;
   const baleNo = String((resultRow == null ? void 0 : resultRow.prepared_bale_no) || "").trim().toUpperCase();
   if (!baleNo) {
     throw new Error("当前压缩任务还没有生成 bale 编号，不能准备打印任务。");
@@ -41240,7 +41283,7 @@ async function queueCompressionTaskPrintJob(resultRow = {}) {
   return request(`/warehouse/store-prep-bales/${encodeURIComponent(baleNo)}/print-jobs`, {
     method: "POST",
     body: JSON.stringify({
-      printer_name: String(((_a = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a.value) || "Deli DL-720C").trim() || "Deli DL-720C",
+      printer_name: String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a2.value) || "Deli DL-720C").trim() || "Deli DL-720C",
       template_code: templateCode,
       copies: 1
     })
@@ -41259,7 +41302,7 @@ async function queueCompressionTaskPrintJobs(resultRow = {}) {
   return jobs;
 }
 async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const baleNo = String((row == null ? void 0 : row.bale_no) || "").trim().toUpperCase();
   if (!baleNo) {
     throw new Error("当前这张 SDB bale 缺少 bale_no，不能补打 barcode。");
@@ -41268,7 +41311,7 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
     throw new Error("当前页面缺少 SDB 补打工具，请刷新页面后再试。");
   }
   await loadSystemPrinters();
-  const printerName = String(((_a = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a.value) || "Deli DL-720C").trim() || "Deli DL-720C";
+  const printerName = String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _a2.value) || "Deli DL-720C").trim() || "Deli DL-720C";
   const job = storePrepBaleFlow.buildStorePrepBaleReprintPrintJob(row, {
     printerName,
     templateCode: "store_prep_bale_60x40"
@@ -41277,7 +41320,7 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
     action: "open_store_prep_bale_barcode_reprint",
     bale_no: baleNo,
     display_code: ((_b = job.print_payload) == null ? void 0 : _b.display_code) || job.barcode || "",
-    barcode: ((_c = job.print_payload) == null ? void 0 : _c.barcode_value) || ((_d2 = job.print_payload) == null ? void 0 : _d2.machine_code) || "",
+    barcode: ((_c = job.print_payload) == null ? void 0 : _c.barcode_value) || ((_d = job.print_payload) == null ? void 0 : _d.machine_code) || "",
     printer_name: printerName,
     template_code: "store_prep_bale_60x40"
   });
@@ -41291,14 +41334,14 @@ async function directPrintStorePrepBaleHistoricalBarcode(row = {}) {
   return job;
 }
 function openCompressionTaskPrintModal(resultRow = {}, printJobs = []) {
-  var _a, _b;
+  var _a2, _b;
   const jobs = Array.isArray(printJobs) ? printJobs.filter(Boolean) : [printJobs].filter(Boolean);
   if (!jobs.length) {
     return;
   }
   const taskType = String((resultRow == null ? void 0 : resultRow.task_type) || "store_dispatch").trim().toLowerCase() || "store_dispatch";
   const templateCode = getPreferredWarehouseoutTemplateCode(
-    String(((_a = jobs[0]) == null ? void 0 : _a.template_code) || "").trim().toLowerCase(),
+    String(((_a2 = jobs[0]) == null ? void 0 : _a2.template_code) || "").trim().toLowerCase(),
     taskType
   );
   const categoryDisplay = [String((resultRow == null ? void 0 : resultRow.category_main) || "").trim(), String((resultRow == null ? void 0 : resultRow.category_sub) || "").trim()].filter(Boolean).join(" / ");
@@ -41468,8 +41511,8 @@ async function submitBarcodeResolverTest(event) {
   renderBarcodeResolverTestSummary(barcodeResolverTestState);
 }
 async function testBarcodeResolverAllContexts() {
-  var _a;
-  const barcode = String(((_a = document.querySelector("#barcodeResolverTestForm [name='barcode']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+  var _a2;
+  const barcode = String(((_a2 = document.querySelector("#barcodeResolverTestForm [name='barcode']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   if (!barcode) {
     throw new Error("请先输入或扫描要识别的条码。");
   }
@@ -41519,7 +41562,7 @@ async function submitStoreClerkHome(event) {
   });
 }
 async function submitStoreDispatchBaleAccept(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -41570,7 +41613,7 @@ async function submitStoreDispatchBaleAccept(event) {
       writeOutput("#storeDispatchBaleOutput", { ...resolved, packages: packageRows });
       renderStoreReceiptTransferPackageList(sdoCode, packageRows);
       renderStoreManagerConsoleSummary({
-        store_code: ((_a = packageRows[0]) == null ? void 0 : _a.store_code) || getCurrentStoreCodeFallback(),
+        store_code: ((_a2 = packageRows[0]) == null ? void 0 : _a2.store_code) || getCurrentStoreCodeFallback(),
         selected_sdo_code: sdoCode,
         last_action_message: `已展开 SDO ${sdoCode} 下的 ${packageRows.length} 个 SDP 实体包。`
       });
@@ -41684,7 +41727,7 @@ async function assignOneStoreDispatchBaleToClerk(row = {}, payload = {}) {
   });
 }
 async function submitStoreTokenEditDirectory(event) {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -41716,7 +41759,7 @@ async function submitStoreTokenEditDirectory(event) {
   await loadItemTokenPrintJobs();
   populateStoreFlowFormsFromContext({
     bale_no: scanCode || getStoreReceivingPackageCode(assignedRows[0]) || "",
-    assigned_employee: assignedEmployee || ((_a = assignedRows[0]) == null ? void 0 : _a.assigned_clerk) || "",
+    assigned_employee: assignedEmployee || ((_a2 = assignedRows[0]) == null ? void 0 : _a2.assigned_clerk) || "",
     task_no: ((_b = assignedRows[0]) == null ? void 0 : _b.parent_sdo_display_code) || "",
     shipment_no: ((_c = assignedRows[0]) == null ? void 0 : _c.transfer_no) || "",
     store_code: storeCode
@@ -41807,7 +41850,7 @@ async function refreshDirectHangWorkbench(context = {}) {
   }
 }
 async function submitItemTokenDirectory(event) {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -41826,10 +41869,10 @@ async function submitItemTokenDirectory(event) {
   await loadItemTokenPrintJobs();
   populateStoreFlowFormsFromContext({
     bale_no: baleNo,
-    assigned_employee: assignedEmployee || ((_a = rows[0]) == null ? void 0 : _a.assigned_employee) || "",
+    assigned_employee: assignedEmployee || ((_a2 = rows[0]) == null ? void 0 : _a2.assigned_employee) || "",
     task_no: ((_b = rows[0]) == null ? void 0 : _b.task_no) || "",
     shipment_no: ((_c = rows[0]) == null ? void 0 : _c.shipment_no) || "",
-    store_code: ((_d2 = rows[0]) == null ? void 0 : _d2.store_code) || getCurrentStoreCodeFallback()
+    store_code: ((_d = rows[0]) == null ? void 0 : _d.store_code) || getCurrentStoreCodeFallback()
   });
   if (String(payload.template_code || "").trim()) {
     setInputValue("#itemTokenPrintQueueForm [name='template_code']", String(payload.template_code || "").trim());
@@ -41969,7 +42012,7 @@ async function submitCargoType(event) {
   await loadConfig();
 }
 async function submitLabelTemplate(event) {
-  var _a, _b;
+  var _a2, _b;
   event.preventDefault();
   const formElement = event.currentTarget;
   const form = new FormData(formElement);
@@ -41985,7 +42028,7 @@ async function submitLabelTemplate(event) {
   const normalizeLayout = labelTemplateFlow.normalizeBaleTemplateLayout || ((layout) => layout || {});
   payload.layout = normalizeLayout(draft.layout || {}, payload.width_mm, payload.height_mm);
   payload.fields = labelTemplateFlow.getEnabledTemplateFields ? labelTemplateFlow.getEnabledTemplateFields(payload.layout) : ["barcode_value"];
-  const barcodeComponent = (Array.isArray((_a = payload.layout) == null ? void 0 : _a.components) ? payload.layout.components : []).find((component) => component.id === "barcode");
+  const barcodeComponent = (Array.isArray((_a2 = payload.layout) == null ? void 0 : _a2.components) ? payload.layout.components : []).find((component) => component.id === "barcode");
   if (!(barcodeComponent == null ? void 0 : barcodeComponent.enabled)) {
     throw new Error("bale 模版的中间条码必须保留，不能关闭。");
   }
@@ -42014,10 +42057,10 @@ async function submitLabelTemplate(event) {
   renderBalePrintModal();
 }
 async function submitChinaSourceBale(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const pendingImportFileInput = document.querySelector("#chinaSourceImportFile");
-  if (pendingImportFileInput instanceof HTMLInputElement && ((_a = pendingImportFileInput.files) == null ? void 0 : _a.length)) {
+  if (pendingImportFileInput instanceof HTMLInputElement && ((_a2 = pendingImportFileInput.files) == null ? void 0 : _a2.length)) {
     const currentRows = syncChinaSourceContainerRowsFromDom();
     if (!hasMeaningfulChinaSourceContainerRows(currentRows)) {
       await loadChinaSourceImportPreviewFromFile(pendingImportFileInput.files[0]);
@@ -42101,8 +42144,8 @@ async function submitChinaSourceCost(event) {
     throw new Error("当前选中的中方来源记录不存在，请重新选择。");
   }
   const buildStageEntry = async (stageKey) => {
-    var _a, _b, _c;
-    const files = Array.from(((_a = formElement.querySelector(`[name='${stageKey}_files']`)) == null ? void 0 : _a.files) || []);
+    var _a2, _b, _c;
+    const files = Array.from(((_a2 = formElement.querySelector(`[name='${stageKey}_files']`)) == null ? void 0 : _a2.files) || []);
     const previousDocs = Array.isArray((_c = (_b = current.cost_entries) == null ? void 0 : _b[stageKey]) == null ? void 0 : _c.documents) ? current.cost_entries[stageKey].documents : [];
     return {
       currency: String(payload[`${stageKey}_currency`] || "").trim(),
@@ -42912,11 +42955,11 @@ async function submitSiteRecommendation(event) {
   renderSiteRecommendationSummary(result);
 }
 async function submitPriceRule(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  if (!((_a = payload.store_code) == null ? void 0 : _a.trim())) {
+  if (!((_a2 = payload.store_code) == null ? void 0 : _a2.trim())) {
     delete payload.store_code;
   }
   payload.max_price = Number(payload.max_price);
@@ -42979,8 +43022,8 @@ async function submitMpesaCallback(event) {
   await Promise.all([loadDashboard(), loadTable("load-mpesa-collections"), loadTable("load-mpesa-customer-insights")]);
 }
 async function loadReturnCandidatesForStore(storeCode) {
-  var _a;
-  const normalizedStore = (storeCode || ((_a = currentSession.user) == null ? void 0 : _a.store_code) || "UTAWALA").trim().toUpperCase();
+  var _a2;
+  const normalizedStore = (storeCode || ((_a2 = currentSession.user) == null ? void 0 : _a2.store_code) || "UTAWALA").trim().toUpperCase();
   applyStoreContext(normalizedStore);
   const result = await request(`/stores/${encodeURIComponent(normalizedStore)}/return-candidates`);
   setInputValue("#returnSelectionForm [name='from_store_code']", normalizedStore);
@@ -43118,7 +43161,7 @@ async function submitTransfer(event) {
   await loadDashboard();
 }
 async function submitPickingWave(event) {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   event.preventDefault();
   const form = event.currentTarget;
   const requestNos = getPickingWaveRequestNos(form);
@@ -43126,9 +43169,9 @@ async function submitPickingWave(event) {
     throw new Error("请先选择或创建一张补货申请单。");
   }
   const defaultWaveName = buildDefaultPickingWaveName(requestNos);
-  const defaultWarehouseCode = String(((_a = form.querySelector("[name='warehouse_code']")) == null ? void 0 : _a.value) || ((_b = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _b.warehouse_code) || "WH1").trim() || "WH1";
+  const defaultWarehouseCode = String(((_a2 = form.querySelector("[name='warehouse_code']")) == null ? void 0 : _a2.value) || ((_b = currentSession == null ? void 0 : currentSession.user) == null ? void 0 : _b.warehouse_code) || "WH1").trim() || "WH1";
   const defaultPlannedDate = String(((_c = form.querySelector("[name='planned_picking_date']")) == null ? void 0 : _c.value) || getTodayInputValue()).trim();
-  const defaultRequiredArrivalDate = String(((_d2 = form.querySelector("[name='required_arrival_date']")) == null ? void 0 : _d2.value) || getDefaultPickingWaveRequiredArrivalDate(requestNos)).trim();
+  const defaultRequiredArrivalDate = String(((_d = form.querySelector("[name='required_arrival_date']")) == null ? void 0 : _d.value) || getDefaultPickingWaveRequiredArrivalDate(requestNos)).trim();
   const payload = {
     wave_name: String(((_e2 = form.querySelector("[name='wave_name']")) == null ? void 0 : _e2.value) || defaultWaveName).trim(),
     warehouse_code: String(defaultWarehouseCode || "WH1").trim(),
@@ -43334,10 +43377,10 @@ async function hydrateTransferOrdersWithStoreDeliveryExecutionOrders(rows = []) 
     return [];
   }
   return Promise.all(rows.map(async (transfer) => {
-    var _a, _b;
+    var _a2, _b;
     const transferNo = String((transfer == null ? void 0 : transfer.transfer_no) || "").trim().toUpperCase();
     const sdoCode = String(
-      (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
+      (transfer == null ? void 0 : transfer.store_delivery_execution_order_no) || ((_a2 = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _a2.execution_order_no) || (transfer == null ? void 0 : transfer.official_delivery_barcode) || ""
     ).trim().toUpperCase();
     if (!transferNo || !sdoCode || Array.isArray((_b = transfer == null ? void 0 : transfer.store_delivery_execution_order) == null ? void 0 : _b.packages)) {
       return transfer;
@@ -43404,7 +43447,7 @@ async function loadStoreDeliveryShipmentRecords() {
   return transferOrderState;
 }
 async function submitStartReceivingSession(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -43413,7 +43456,7 @@ async function submitStartReceivingSession(event) {
     setInputValue("#startReceivingSessionForm [name='store_code']", payload.store_code);
   }
   if (!String(payload.bale_no || "").trim()) {
-    payload.bale_no = String(((_a = document.querySelector("#storeBluetoothPrinterForm [name='bale_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+    payload.bale_no = String(((_a2 = document.querySelector("#storeBluetoothPrinterForm [name='bale_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
     if (payload.bale_no) {
       setInputValue("#startReceivingSessionForm [name='bale_no']", payload.bale_no);
     }
@@ -43437,7 +43480,7 @@ async function submitStartReceivingSession(event) {
   await loadDashboard();
 }
 async function submitReceivingSuggestion(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -43448,7 +43491,7 @@ async function submitReceivingSuggestion(event) {
   );
   writeOutput("#receivingOutput", result);
   renderReceivingResultSummary(result);
-  if ((_a = result.suggested_rack_codes) == null ? void 0 : _a.length) {
+  if ((_a2 = result.suggested_rack_codes) == null ? void 0 : _a2.length) {
     setInputValue("#receivingBatchForm [name='rack_code']", result.suggested_rack_codes[0]);
   } else if (result.previous_rack_code) {
     setInputValue("#receivingBatchForm [name='rack_code']", result.previous_rack_code);
@@ -43512,7 +43555,7 @@ async function submitTransferPrint(event) {
   await loadTransferOrders();
 }
 async function submitTransferBundle(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
@@ -43608,7 +43651,7 @@ async function submitTransferBundle(event) {
     machine_code: storeDeliveryExecutionOrder.machine_code,
     to_store_code: storeDeliveryExecutionOrder.to_store_code || (latestTransfer == null ? void 0 : latestTransfer.to_store_code) || (transfer == null ? void 0 : transfer.to_store_code) || "",
     package_count: storeDeliveryExecutionOrder.package_count || (latestTransfer == null ? void 0 : latestTransfer.package_count) || 0,
-    total_item_count: (_a = storeDeliveryExecutionOrder.total_item_count) != null ? _a : latestTransfer == null ? void 0 : latestTransfer.total_item_count
+    total_item_count: (_a2 = storeDeliveryExecutionOrder.total_item_count) != null ? _a2 : latestTransfer == null ? void 0 : latestTransfer.total_item_count
   };
   openTransferDispatchPrintTemplateModal({
     transferNo,
@@ -43693,11 +43736,11 @@ async function submitOpenShift(event) {
   return result;
 }
 async function submitShiftReport(event) {
-  var _a, _b;
+  var _a2, _b;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const reportKind = ((_b = (_a = event.submitter) == null ? void 0 : _a.dataset) == null ? void 0 : _b.reportKind) || "t";
+  const reportKind = ((_b = (_a2 = event.submitter) == null ? void 0 : _a2.dataset) == null ? void 0 : _b.reportKind) || "t";
   const path = reportKind === "z" ? "z-report" : "t-report";
   const result = await request(`/pos/shifts/${payload.shift_no}/${path}`);
   writeOutput("#shiftOutput", result);
@@ -43748,11 +43791,11 @@ async function submitHandoverReview(event) {
   return result;
 }
 async function submitCloseBusinessReport(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const shiftNo = (_a = payload.shift_no) == null ? void 0 : _a.trim();
+  const shiftNo = (_a2 = payload.shift_no) == null ? void 0 : _a2.trim();
   if (!shiftNo) {
     throw new Error("请先开班并完成交班审核。");
   }
@@ -43861,11 +43904,11 @@ async function submitSaleRefundReview(event) {
   return result;
 }
 async function submitPaymentAnomalyResolve(event) {
-  var _a, _b;
+  var _a2, _b;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const anomalyNo = (_a = payload.anomaly_no) == null ? void 0 : _a.trim();
+  const anomalyNo = (_a2 = payload.anomaly_no) == null ? void 0 : _a2.trim();
   if (!anomalyNo) {
     throw new Error("请先读取支付异常单，或先完成一笔带异常的销售。");
   }
@@ -43891,11 +43934,11 @@ async function submitPaymentAnomalyResolve(event) {
   return result;
 }
 async function submitSaleVoidRequest(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const orderNo = (_a = payload.order_no) == null ? void 0 : _a.trim();
+  const orderNo = (_a2 = payload.order_no) == null ? void 0 : _a2.trim();
   if (!orderNo) {
     throw new Error("请先做一笔销售，或者手动填入要作废的订单号。");
   }
@@ -43912,11 +43955,11 @@ async function submitSaleVoidRequest(event) {
   return result;
 }
 async function submitSaleVoidReview(event) {
-  var _a;
+  var _a2;
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const payload = Object.fromEntries(form.entries());
-  const voidNo = (_a = payload.void_no) == null ? void 0 : _a.trim();
+  const voidNo = (_a2 = payload.void_no) == null ? void 0 : _a2.trim();
   if (!voidNo) {
     throw new Error("请先读取作废单，或先发起一张作废申请。");
   }
@@ -44132,12 +44175,12 @@ renderDirectHangUnpackSummary();
 setInputValue("#directHangUnpackForm [name='opened_at']", getLocalDateKey((/* @__PURE__ */ new Date()).toISOString()));
 renderDirectHangStoreWorkbenchSummary();
 loadSystemPrinters().then(() => {
-  var _a, _b;
+  var _a2, _b;
   renderItemTokenDirectorySummary(filteredItemBarcodeTokenState);
   renderStoreTokenEditSummary(filteredItemBarcodeTokenState);
   renderDirectHangStoreWorkbenchSummary(
     getDirectHangItemsByBale(
-      String(((_a = document.querySelector("#directHangStoreWorkbenchForm [name='bale_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase(),
+      String(((_a2 = document.querySelector("#directHangStoreWorkbenchForm [name='bale_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase(),
       String(((_b = document.querySelector("#directHangStoreWorkbenchForm [name='assigned_employee']")) == null ? void 0 : _b.value) || "").trim()
     )
   );
@@ -44192,8 +44235,8 @@ bindForm("#apparelDefaultCostForm", submitApparelDefaultCost, "#apparelDefaultCo
 bindForm("#apparelDefaultSalePriceForm", submitApparelDefaultSalePrice, "#apparelDefaultSalePriceOutput");
 bindForm("#apparelSortingRackForm", submitApparelSortingRack, "#apparelSortingRackOutput");
 ["has_loss_record", "loss_qty", "loss_weight_kg", "loss_note"].forEach((fieldName) => {
-  var _a, _b;
-  (_a = document.querySelector(`#sortingResultForm [name='${fieldName}']`)) == null ? void 0 : _a.addEventListener("input", () => {
+  var _a2, _b;
+  (_a2 = document.querySelector(`#sortingResultForm [name='${fieldName}']`)) == null ? void 0 : _a2.addEventListener("input", () => {
     if (fieldName === "loss_weight_kg") {
       syncSortingLossWeightLimit();
     }
@@ -44222,9 +44265,9 @@ bindForm("#apparelSortingRackForm", submitApparelSortingRack, "#apparelSortingRa
     renderJsonBuilder("sorting-result-items");
   });
 });
-(_d = document.querySelector("#sortingResultForm [name='loss_photo_files']")) == null ? void 0 : _d.addEventListener("change", async (event) => {
-  var _a;
-  const files = Array.from(((_a = event.currentTarget) == null ? void 0 : _a.files) || []);
+(_e = document.querySelector("#sortingResultForm [name='loss_photo_files']")) == null ? void 0 : _e.addEventListener("change", async (event) => {
+  var _a2;
+  const files = Array.from(((_a2 = event.currentTarget) == null ? void 0 : _a2.files) || []);
   if (files.length) {
     sortingLossPhotoState = await Promise.all(files.map((file) => fileToDataUrl(file)));
   } else {
@@ -44243,7 +44286,7 @@ bindForm("#areaSupervisorPasswordResetForm", submitAreaSupervisorPasswordReset, 
 bindForm("#mpesaImportForm", submitMpesaImport, "#mpesaOutput");
 bindForm("#mpesaCallbackForm", submitMpesaCallback, "#mpesaOutput");
 bindForm("#offlineSyncForm", submitOfflineSync, "#offlineSyncOutput");
-(_e = document.querySelector("#offlineSyncDateFilter")) == null ? void 0 : _e.addEventListener("change", () => {
+(_f = document.querySelector("#offlineSyncDateFilter")) == null ? void 0 : _f.addEventListener("change", () => {
   renderOfflineSyncSummary();
 });
 bindForm("#saleVoidRequestForm", submitSaleVoidRequest, "#saleVoidOutput");
@@ -44313,9 +44356,9 @@ bindForm("#receiptForm", submitReceipt, "#receiptOutput");
 bindForm("#recommendationForm", submitTransferRecommendation, "#recommendationOutput");
 bindForm("#transferForm", submitTransfer, "#transferOutput");
 bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
-(_f = document.querySelector("#pickingWaveForm")) == null ? void 0 : _f.addEventListener("change", renderPickingWaveTaskSummary);
+(_g = document.querySelector("#pickingWaveForm")) == null ? void 0 : _g.addEventListener("change", renderPickingWaveTaskSummary);
 ["input", "change"].forEach((eventName) => {
-  var _a;
+  var _a2;
   document.addEventListener(eventName, (event) => {
     const target = event.target instanceof HTMLElement ? event.target.closest("[data-manual-context-field]") : null;
     if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
@@ -44323,7 +44366,7 @@ bindForm("#pickingWaveForm", submitPickingWave, "#transferOutput");
       renderTransferDraftSummary();
     }
   });
-  (_a = document.querySelector("#transferForm")) == null ? void 0 : _a.addEventListener(eventName, (event) => {
+  (_a2 = document.querySelector("#transferForm")) == null ? void 0 : _a2.addEventListener(eventName, (event) => {
     const target = event.target instanceof HTMLElement ? event.target.closest("[name='from_warehouse_code'], [name='to_store_code'], [name='required_arrival_date']") : null;
     if (target) {
       renderTransferDraftSummary();
@@ -44373,7 +44416,7 @@ bindForm("#consignmentBundleForm", submitConsignmentBundle, "#consignmentBundleO
 bindForm("#baleSalesOutboundScanForm", submitBaleSalesOutboundScan, "#baleSalesOutboundOutput");
 bindForm("#baleSalesOutboundForm", submitBaleSalesOutbound, "#baleSalesOutboundOutput");
 bindForm("#productImportPreviewForm", submitProductImportPreview, "#productOutput");
-(_g = document.querySelector("#cashierShiftLookupRefreshButton")) == null ? void 0 : _g.addEventListener("click", async () => {
+(_h = document.querySelector("#cashierShiftLookupRefreshButton")) == null ? void 0 : _h.addEventListener("click", async () => {
   try {
     await refreshCashierShiftLookupSummary();
   } catch (error) {
@@ -44381,10 +44424,10 @@ bindForm("#productImportPreviewForm", submitProductImportPreview, "#productOutpu
   }
 });
 cashierTerminalScanForm == null ? void 0 : cashierTerminalScanForm.addEventListener("submit", async (event) => {
-  var _a, _b;
+  var _a2, _b;
   event.preventDefault();
   try {
-    const action = ((_b = (_a = event.submitter) == null ? void 0 : _a.dataset) == null ? void 0 : _b.terminalSubmit) || "add";
+    const action = ((_b = (_a2 = event.submitter) == null ? void 0 : _a2.dataset) == null ? void 0 : _b.terminalSubmit) || "add";
     await submitCashierTerminalLookup({ addToCart: action !== "lookup" });
   } catch (error) {
     showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
@@ -44425,7 +44468,7 @@ cashierTerminalShell == null ? void 0 : cashierTerminalShell.addEventListener("c
     showTransientInlineNotice("#cashierTerminalInlineNotice", formatErrorMessage(error), "error", 2200);
   }
 });
-(_h = document.querySelector("#userList")) == null ? void 0 : _h.addEventListener("click", async (event) => {
+(_i = document.querySelector("#userList")) == null ? void 0 : _i.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-user-edit-id], [data-user-deactivate-id], [data-user-activate-id], [data-user-delete-id]") : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -44477,7 +44520,7 @@ function handleAreaSupervisorStoreAction(target) {
   }
   return Promise.resolve();
 }
-(_i = document.querySelector("#areaSupervisorStoreList")) == null ? void 0 : _i.addEventListener("click", async (event) => {
+(_j = document.querySelector("#areaSupervisorStoreList")) == null ? void 0 : _j.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-area-supervisor-store-view], [data-area-supervisor-store-edit], [data-area-supervisor-store-pause], [data-area-supervisor-store-close]") : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -44488,7 +44531,7 @@ function handleAreaSupervisorStoreAction(target) {
     renderAreaSupervisorLaunchError(error);
   }
 });
-(_j = document.querySelector("#areaSupervisorStoreDetail")) == null ? void 0 : _j.addEventListener("click", async (event) => {
+(_k = document.querySelector("#areaSupervisorStoreDetail")) == null ? void 0 : _k.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-area-supervisor-store-edit], [data-area-supervisor-store-pause], [data-area-supervisor-store-close]") : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -44499,7 +44542,7 @@ function handleAreaSupervisorStoreAction(target) {
     renderAreaSupervisorLaunchError(error);
   }
 });
-(_k = document.querySelector("#areaSupervisorUserList")) == null ? void 0 : _k.addEventListener("click", async (event) => {
+(_l = document.querySelector("#areaSupervisorUserList")) == null ? void 0 : _l.addEventListener("click", async (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-area-supervisor-user-reset], [data-area-supervisor-user-deactivate]") : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -44546,35 +44589,35 @@ document.addEventListener("click", async (event) => {
   }
 });
 ["input", "change"].forEach((eventName) => {
-  var _a, _b, _c, _d2, _e2, _f2;
-  (_a = document.querySelector("#areaSupervisorStoreSearch")) == null ? void 0 : _a.addEventListener(eventName, (event) => {
-    var _a2;
-    areaSupervisorStoreSearchQuery = String(((_a2 = event.currentTarget) == null ? void 0 : _a2.value) || "");
+  var _a2, _b, _c, _d, _e2, _f2;
+  (_a2 = document.querySelector("#areaSupervisorStoreSearch")) == null ? void 0 : _a2.addEventListener(eventName, (event) => {
+    var _a3;
+    areaSupervisorStoreSearchQuery = String(((_a3 = event.currentTarget) == null ? void 0 : _a3.value) || "");
     renderAreaSupervisorStoreList();
   });
   (_b = document.querySelector("#areaSupervisorStoreStatusFilter")) == null ? void 0 : _b.addEventListener(eventName, (event) => {
-    var _a2;
-    areaSupervisorStoreStatusFilter = String(((_a2 = event.currentTarget) == null ? void 0 : _a2.value) || "all");
+    var _a3;
+    areaSupervisorStoreStatusFilter = String(((_a3 = event.currentTarget) == null ? void 0 : _a3.value) || "all");
     renderAreaSupervisorStoreList();
   });
   (_c = document.querySelector("#areaSupervisorStaffSearch")) == null ? void 0 : _c.addEventListener(eventName, (event) => {
-    var _a2;
-    areaSupervisorStaffSearchQuery = String(((_a2 = event.currentTarget) == null ? void 0 : _a2.value) || "");
+    var _a3;
+    areaSupervisorStaffSearchQuery = String(((_a3 = event.currentTarget) == null ? void 0 : _a3.value) || "");
     renderAreaSupervisorUserList();
   });
-  (_d2 = document.querySelector("#areaSupervisorStaffStoreFilter")) == null ? void 0 : _d2.addEventListener(eventName, (event) => {
-    var _a2;
-    areaSupervisorStaffStoreFilter = String(((_a2 = event.currentTarget) == null ? void 0 : _a2.value) || "all");
+  (_d = document.querySelector("#areaSupervisorStaffStoreFilter")) == null ? void 0 : _d.addEventListener(eventName, (event) => {
+    var _a3;
+    areaSupervisorStaffStoreFilter = String(((_a3 = event.currentTarget) == null ? void 0 : _a3.value) || "all");
     renderAreaSupervisorUserList();
   });
   (_e2 = document.querySelector("#areaSupervisorStaffRoleFilter")) == null ? void 0 : _e2.addEventListener(eventName, (event) => {
-    var _a2;
-    areaSupervisorStaffRoleFilter = String(((_a2 = event.currentTarget) == null ? void 0 : _a2.value) || "all");
+    var _a3;
+    areaSupervisorStaffRoleFilter = String(((_a3 = event.currentTarget) == null ? void 0 : _a3.value) || "all");
     renderAreaSupervisorUserList();
   });
   (_f2 = document.querySelector("#areaSupervisorStaffStatusFilter")) == null ? void 0 : _f2.addEventListener(eventName, (event) => {
-    var _a2;
-    areaSupervisorStaffStatusFilter = String(((_a2 = event.currentTarget) == null ? void 0 : _a2.value) || "all");
+    var _a3;
+    areaSupervisorStaffStatusFilter = String(((_a3 = event.currentTarget) == null ? void 0 : _a3.value) || "all");
     renderAreaSupervisorUserList();
   });
 });
@@ -44621,20 +44664,20 @@ cashierTerminalShell == null ? void 0 : cashierTerminalShell.addEventListener("c
     return;
   }
 });
-(_l = document.querySelector("#chinaSourceImportPreviewButton")) == null ? void 0 : _l.addEventListener("click", async () => {
+(_m = document.querySelector("#chinaSourceImportPreviewButton")) == null ? void 0 : _m.addEventListener("click", async () => {
   try {
     await triggerChinaSourceImportPreview();
   } catch (error) {
     renderErrorSummary("#chinaSourceImportPreviewSummary", formatErrorMessage(error));
   }
 });
-(_m = document.querySelector("#chinaSourceImportFile")) == null ? void 0 : _m.addEventListener("change", (event) => {
-  var _a;
+(_n = document.querySelector("#chinaSourceImportFile")) == null ? void 0 : _n.addEventListener("change", (event) => {
+  var _a2;
   const input = event.currentTarget;
   if (!(input instanceof HTMLInputElement)) {
     return;
   }
-  if (!((_a = input.files) == null ? void 0 : _a.length)) {
+  if (!((_a2 = input.files) == null ? void 0 : _a2.length)) {
     return;
   }
   triggerChinaSourceImportPreview().catch((error) => {
@@ -44680,16 +44723,16 @@ document.addEventListener("keydown", (event) => {
   }
   closeBalePrintModal();
 });
-(_n = document.querySelector("#balePrintModalPrevButton")) == null ? void 0 : _n.addEventListener("click", () => {
+(_o = document.querySelector("#balePrintModalPrevButton")) == null ? void 0 : _o.addEventListener("click", () => {
   balePrintModalState.currentIndex = Math.max(0, Number(balePrintModalState.currentIndex || 0) - 1);
   renderBalePrintModal();
 });
-(_o = document.querySelector("#balePrintModalNextButton")) == null ? void 0 : _o.addEventListener("click", () => {
+(_p = document.querySelector("#balePrintModalNextButton")) == null ? void 0 : _p.addEventListener("click", () => {
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
   balePrintModalState.currentIndex = Math.min(jobs.length - 1, Number(balePrintModalState.currentIndex || 0) + 1);
   renderBalePrintModal();
 });
-(_p = document.querySelector("#balePrintModalQueueList")) == null ? void 0 : _p.addEventListener("click", (event) => {
+(_q = document.querySelector("#balePrintModalQueueList")) == null ? void 0 : _q.addEventListener("click", (event) => {
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-bale-print-queue-index]") : null;
   if (!(target instanceof HTMLElement)) return;
   const jobs = Array.isArray(balePrintModalState.jobs) ? balePrintModalState.jobs : [];
@@ -44698,41 +44741,41 @@ document.addEventListener("keydown", (event) => {
   balePrintModalState.currentIndex = index;
   renderBalePrintModal();
 });
-(_q = document.querySelector("#balePrintModalRefreshButton")) == null ? void 0 : _q.addEventListener("click", () => {
+(_r = document.querySelector("#balePrintModalRefreshButton")) == null ? void 0 : _r.addEventListener("click", () => {
   renderBalePrintModal();
 });
-(_r = document.querySelector("#balePrintModalCheckLocalAgentButton")) == null ? void 0 : _r.addEventListener("click", () => {
+(_s = document.querySelector("#balePrintModalCheckLocalAgentButton")) == null ? void 0 : _s.addEventListener("click", () => {
   checkLocalPrintAgentConnection().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_s = document.querySelector("#balePrintModalCheckLocalPrintersButton")) == null ? void 0 : _s.addEventListener("click", () => {
+(_t = document.querySelector("#balePrintModalCheckLocalPrintersButton")) == null ? void 0 : _t.addEventListener("click", () => {
   checkLocalPrintAgentConnection().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_t = document.querySelector("#balePrintModalInstallStepsButton")) == null ? void 0 : _t.addEventListener("click", () => {
+(_u = document.querySelector("#balePrintModalInstallStepsButton")) == null ? void 0 : _u.addEventListener("click", () => {
   localPrintAgentState.installStepsVisible = !localPrintAgentState.installStepsVisible;
   renderBalePrintModal();
 });
-(_u = document.querySelector("#balePrintModalDownloadAgentLink")) == null ? void 0 : _u.addEventListener("click", (event) => {
+(_v = document.querySelector("#balePrintModalDownloadAgentLink")) == null ? void 0 : _v.addEventListener("click", (event) => {
   event.preventDefault();
   downloadWindowsPrintAgentPackage().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_v = document.querySelector("#balePrintModalCopyDiagnosticsButton")) == null ? void 0 : _v.addEventListener("click", async () => {
-  var _a;
-  const text = String(((_a = document.querySelector("#balePrintModalDiagnosticsPayload")) == null ? void 0 : _a.textContent) || "");
+(_w = document.querySelector("#balePrintModalCopyDiagnosticsButton")) == null ? void 0 : _w.addEventListener("click", async () => {
+  var _a2;
+  const text = String(((_a2 = document.querySelector("#balePrintModalDiagnosticsPayload")) == null ? void 0 : _a2.textContent) || "");
   try {
     await navigator.clipboard.writeText(text);
   } catch (_) {
   }
 });
-(_w = document.querySelector("#balePrintModalSinglePrintButton")) == null ? void 0 : _w.addEventListener("click", () => {
+(_x = document.querySelector("#balePrintModalSinglePrintButton")) == null ? void 0 : _x.addEventListener("click", () => {
   printCurrentBaleModalViaLocalAgent().catch((error) => {
     localPrintAgentState.connected = false;
     localPrintAgentState.agentStatus = "disconnected";
@@ -44742,13 +44785,13 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_x = document.querySelector("#balePrintModalPrimaryPrintButton")) == null ? void 0 : _x.addEventListener("click", () => {
+(_y = document.querySelector("#balePrintModalPrimaryPrintButton")) == null ? void 0 : _y.addEventListener("click", () => {
   printAllBaleModalPrimaryAction().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_y = document.querySelector("#balePrintModalPrimaryPrintAllButton")) == null ? void 0 : _y.addEventListener("click", () => {
+(_z = document.querySelector("#balePrintModalPrimaryPrintAllButton")) == null ? void 0 : _z.addEventListener("click", () => {
   printAllBaleModalPrimaryAction().catch((error) => {
     balePrintModalState.hasSuccessfulBatchPrint = false;
     baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
@@ -44756,7 +44799,7 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_z = document.querySelector("#balePrintModalLocalAgentPrintButton")) == null ? void 0 : _z.addEventListener("click", () => {
+(_A = document.querySelector("#balePrintModalLocalAgentPrintButton")) == null ? void 0 : _A.addEventListener("click", () => {
   printCurrentBaleModalViaLocalAgent().catch((error) => {
     localPrintAgentState.connected = false;
     localPrintAgentState.agentStatus = "disconnected";
@@ -44766,19 +44809,19 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_A = document.querySelector("#balePrintModalConnectButton")) == null ? void 0 : _A.addEventListener("click", () => {
+(_B = document.querySelector("#balePrintModalConnectButton")) == null ? void 0 : _B.addEventListener("click", () => {
   handleConnectBalePrinter().then(() => renderBalePrintModal()).catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_B = document.querySelector("#balePrintModalDirectPrintButton")) == null ? void 0 : _B.addEventListener("click", () => {
+(_C = document.querySelector("#balePrintModalDirectPrintButton")) == null ? void 0 : _C.addEventListener("click", () => {
   directPrintCurrentBaleModalJob().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_C = document.querySelector("#balePrintModalPrintAllButton")) == null ? void 0 : _C.addEventListener("click", () => {
+(_D = document.querySelector("#balePrintModalPrintAllButton")) == null ? void 0 : _D.addEventListener("click", () => {
   directPrintAllBaleModalJobs().catch((error) => {
     balePrintModalState.hasSuccessfulBatchPrint = false;
     baleBatchCompletionReadyKeys.delete(String(balePrintModalState.groupKey || "").trim().toUpperCase());
@@ -44786,13 +44829,13 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   });
 });
-(_D = document.querySelector("#balePrintModalSendToStationButton")) == null ? void 0 : _D.addEventListener("click", () => {
+(_E = document.querySelector("#balePrintModalSendToStationButton")) == null ? void 0 : _E.addEventListener("click", () => {
   sendCurrentBaleModalJobToPrintStation().catch((error) => {
     balePrinterConsoleNotice = { type: "error", message: formatErrorMessage(error) };
     renderBalePrintModal();
   });
 });
-(_E = document.querySelector("#balePrintModalBrowserPrintButton")) == null ? void 0 : _E.addEventListener("click", () => {
+(_F = document.querySelector("#balePrintModalBrowserPrintButton")) == null ? void 0 : _F.addEventListener("click", () => {
   try {
     browserPrintCurrentBaleModalJob();
   } catch (error) {
@@ -44800,14 +44843,14 @@ document.addEventListener("keydown", (event) => {
     renderBalePrintModal();
   }
 });
-(_F = document.querySelector("#balePrintModalCompleteButton")) == null ? void 0 : _F.addEventListener("click", () => {
+(_G = document.querySelector("#balePrintModalCompleteButton")) == null ? void 0 : _G.addEventListener("click", () => {
   completeCurrentBalePrintModalJob().catch((error) => {
     baleBarcodeDirectoryNotice = { type: "error", message: formatErrorMessage(error) };
     renderBaleBarcodeDirectorySummary(balePrintModalState.shipmentNo || "");
     renderBalePrintModal();
   });
 });
-(_G = document.querySelector("#balePrintModalCloseAndRefreshButton")) == null ? void 0 : _G.addEventListener("click", () => {
+(_H = document.querySelector("#balePrintModalCloseAndRefreshButton")) == null ? void 0 : _H.addEventListener("click", () => {
   const shipmentNo = balePrintModalState.shipmentNo || "";
   const templateScope = getActiveBaleTemplateScope();
   const closed = closeBalePrintModal();
@@ -44831,7 +44874,7 @@ testHomeLinks.forEach((button) => {
   });
 });
 async function handlePanelJumpEvent(event) {
-  var _a, _b;
+  var _a2, _b;
   const toggle = event.target instanceof HTMLElement ? event.target.closest("[data-section-toggle]") : null;
   if (toggle instanceof HTMLElement) {
     const sectionId = toggle.dataset.sectionToggle;
@@ -44862,7 +44905,7 @@ async function handlePanelJumpEvent(event) {
     const shipmentNo = intakeActionButton.dataset.shipmentNo || "";
     setCurrentInboundShipment(shipmentNo);
     if (action === "confirm") {
-      (_a = document.querySelector("#shipmentIntakeConfirmForm")) == null ? void 0 : _a.requestSubmit();
+      (_a2 = document.querySelector("#shipmentIntakeConfirmForm")) == null ? void 0 : _a2.requestSubmit();
       return;
     }
     if (action === "generate") {
@@ -44986,7 +45029,7 @@ appShell == null ? void 0 : appShell.addEventListener("click", async (event) => 
   }
   renderStoreManagerPdaPreview(tabButton.dataset.storeManagerPdaTab || "overview");
 });
-(_H = document.querySelector("#storeManagerPdaPreview")) == null ? void 0 : _H.addEventListener("submit", async (event) => {
+(_I = document.querySelector("#storeManagerPdaPreview")) == null ? void 0 : _I.addEventListener("submit", async (event) => {
   if (event.target instanceof HTMLFormElement && event.target.matches("[data-store-manager-pda-sdo-search-form]")) {
     handleStoreManagerPdaSdoQuickSearchSubmit(event);
     return;
@@ -45158,7 +45201,7 @@ document.addEventListener("change", (event) => {
   }
   storeCommandCenterState.selected_clerk_by_sdo[sdoCode] = String(select.value || "").trim();
 });
-(_I = document.querySelector("#recommendationCandidateList")) == null ? void 0 : _I.addEventListener("click", (event) => {
+(_J = document.querySelector("#recommendationCandidateList")) == null ? void 0 : _J.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-recommendation-toggle]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -45174,7 +45217,7 @@ document.addEventListener("change", (event) => {
   }
   renderRecommendationCandidates();
 });
-(_J = document.querySelector("#loadTransferDispatchButton")) == null ? void 0 : _J.addEventListener("click", async () => {
+(_K = document.querySelector("#loadTransferDispatchButton")) == null ? void 0 : _K.addEventListener("click", async () => {
   try {
     await loadStoreDeliveryShipmentRecords();
     focusElement(document.querySelector("[data-transfer-delivery-panel='history']:not(.hidden-screen)") ? "#transferDeliveryHistoryList" : "#transferShipTargetHint");
@@ -45188,12 +45231,12 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     setTransferDeliveryTab(button.getAttribute("data-transfer-delivery-tab") || "create");
   });
 });
-(_K = document.querySelector("#transferDeliveryHistorySearch")) == null ? void 0 : _K.addEventListener("input", (event) => {
-  var _a;
-  transferDeliveryHistorySearchQuery = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+(_L = document.querySelector("#transferDeliveryHistorySearch")) == null ? void 0 : _L.addEventListener("input", (event) => {
+  var _a2;
+  transferDeliveryHistorySearchQuery = String(((_a2 = event.target) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   renderTransferDeliveryHistory(transferOrderState);
 });
-(_L = document.querySelector("#transferForm")) == null ? void 0 : _L.addEventListener("input", (event) => {
+(_M = document.querySelector("#transferForm")) == null ? void 0 : _M.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
     return;
@@ -45202,7 +45245,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     renderTransferDraftSummary();
   }
 });
-(_M = document.querySelector("#transferDispatchSummary")) == null ? void 0 : _M.addEventListener("click", (event) => {
+(_N = document.querySelector("#transferDispatchSummary")) == null ? void 0 : _N.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-transfer-dispatch-fill], [data-transfer-ship-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -45236,7 +45279,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     focusElement("#approveTransferForm");
   }
 });
-(_N = document.querySelector("#loosePackingWaveSummary")) == null ? void 0 : _N.addEventListener("click", (event) => {
+(_O = document.querySelector("#loosePackingWaveSummary")) == null ? void 0 : _O.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
@@ -45247,7 +45290,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   renderLoosePackingTaskWorkbench(transferNo);
   renderTransferExecutionWorkbench(transferNo);
 });
-(_O = document.querySelector("#transferWaveSummary")) == null ? void 0 : _O.addEventListener("click", (event) => {
+(_P = document.querySelector("#transferWaveSummary")) == null ? void 0 : _P.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
@@ -45255,7 +45298,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   hydrateTransferForms({ transfer_no: transferNo });
   renderTransferExecutionWorkbench(transferNo);
 });
-(_P = document.querySelector("#transferShipWaveSummary")) == null ? void 0 : _P.addEventListener("click", (event) => {
+(_Q = document.querySelector("#transferShipWaveSummary")) == null ? void 0 : _Q.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-wave-transfer-open]") : null;
   if (!(button instanceof HTMLElement)) return;
   const transferNo = String(button.dataset.waveTransferOpen || "").trim().toUpperCase();
@@ -45264,7 +45307,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   queueTransferShipTargetHintLoad(transferNo);
   renderWaveExecutionEntrySummary("", "ship");
 });
-(_Q = document.querySelector("#transferShipForm")) == null ? void 0 : _Q.addEventListener("click", (event) => {
+(_R = document.querySelector("#transferShipForm")) == null ? void 0 : _R.addEventListener("click", (event) => {
   const addButton = event.target instanceof HTMLElement ? event.target.closest("[data-transfer-sdo-add]") : null;
   if (addButton instanceof HTMLElement) {
     addTransferShipmentSdoRow();
@@ -45275,7 +45318,7 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
     removeTransferShipmentSdoRow(removeButton);
   }
 });
-(_R = document.querySelector("#transferShipForm")) == null ? void 0 : _R.addEventListener("change", (event) => {
+(_S = document.querySelector("#transferShipForm")) == null ? void 0 : _S.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement) || target.name !== "transfer_no") {
     return;
@@ -45283,20 +45326,20 @@ document.querySelectorAll("[data-transfer-delivery-tab]").forEach((button) => {
   queueTransferShipTargetHintLoad(target.value || "");
   renderWaveExecutionEntrySummary(target.value || "", "ship");
 });
-(_S = document.querySelector("#transferShipForm")) == null ? void 0 : _S.addEventListener("input", (event) => {
+(_T = document.querySelector("#transferShipForm")) == null ? void 0 : _T.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || !["driver_name", "driver_phone", "vehicle_no"].includes(target.name)) {
     return;
   }
   renderTransferShipTargetHint();
 });
-const initialTransferShipNo = String(((_T = document.querySelector("#transferShipForm [name='transfer_no']")) == null ? void 0 : _T.value) || "").trim();
+const initialTransferShipNo = String(((_U = document.querySelector("#transferShipForm [name='transfer_no']")) == null ? void 0 : _U.value) || "").trim();
 if (initialTransferShipNo) {
   loadTransferShipTargetHint(initialTransferShipNo);
 }
-(_U = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _U.addEventListener("input", async (event) => {
-  var _a;
-  const transferNo = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+(_V = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _V.addEventListener("input", async (event) => {
+  var _a2;
+  const transferNo = String(((_a2 = event.target) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   if (!transferNo) {
     renderStoreReceiptTransferBaleList("");
     return;
@@ -45309,16 +45352,16 @@ if (initialTransferShipNo) {
     renderStoreReceiptTransferBaleList(transferNo);
   }
 });
-(_V = document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")) == null ? void 0 : _V.addEventListener("input", () => {
-  var _a;
-  const transferNo = String(((_a = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+(_W = document.querySelector("#storeDispatchBaleAcceptForm [name='bale_no']")) == null ? void 0 : _W.addEventListener("input", () => {
+  var _a2;
+  const transferNo = String(((_a2 = document.querySelector("#storeDispatchBaleAcceptForm [name='transfer_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   if (transferNo) {
     renderStoreReceiptTransferBaleList(transferNo, filteredStoreDispatchBaleState.length ? filteredStoreDispatchBaleState : storeDispatchBaleState);
   }
 });
-(_W = document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")) == null ? void 0 : _W.addEventListener("input", async (event) => {
-  var _a;
-  const transferNo = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+(_X = document.querySelector("#storeDispatchAssignmentForm [name='transfer_no']")) == null ? void 0 : _X.addEventListener("input", async (event) => {
+  var _a2;
+  const transferNo = String(((_a2 = event.target) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
   if (!transferNo) {
     renderStoreDispatchAssignmentResultSummary(null);
     return;
@@ -45332,14 +45375,14 @@ if (initialTransferShipNo) {
   }
 });
 ["#approveTransferForm", "#transferBundleForm", "#loosePackingTaskPlanForm", "#preparedBaleRegistrationForm"].forEach((selector) => {
-  var _a;
-  (_a = document.querySelector(selector)) == null ? void 0 : _a.addEventListener("change", (event) => {
-    var _a2;
+  var _a2;
+  (_a2 = document.querySelector(selector)) == null ? void 0 : _a2.addEventListener("change", (event) => {
+    var _a3;
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
       return;
     }
-    const transferNo = String(((_a2 = document.querySelector(`${selector} [name='transfer_no']`)) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
+    const transferNo = String(((_a3 = document.querySelector(`${selector} [name='transfer_no']`)) == null ? void 0 : _a3.value) || "").trim().toUpperCase();
     if (!transferNo) {
       return;
     }
@@ -45356,8 +45399,8 @@ if (initialTransferShipNo) {
     renderTransferExecutionWorkbench(transferNo);
   });
 });
-(_X = document.querySelector("#loosePackingTaskList")) == null ? void 0 : _X.addEventListener("click", async (event) => {
-  var _a;
+(_Y = document.querySelector("#loosePackingTaskList")) == null ? void 0 : _Y.addEventListener("click", async (event) => {
+  var _a2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-loose-task-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -45382,7 +45425,7 @@ if (initialTransferShipNo) {
         action: "open_loose_pick_sheet_template_selector",
         task_no: taskNo,
         template_code: job.template_code,
-        template_scope: ((_a = job.print_payload) == null ? void 0 : _a.template_scope) || "warehouseout_bale",
+        template_scope: ((_a2 = job.print_payload) == null ? void 0 : _a2.template_scope) || "warehouseout_bale",
         print_job: job
       });
       showTransientInlineNotice(
@@ -45454,7 +45497,7 @@ document.addEventListener("input", (event) => {
   renderChinaSourceBalePreview();
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const costLoadButton = event.target instanceof HTMLElement ? event.target.closest("[data-china-source-cost-load]") : null;
   if (costLoadButton instanceof HTMLElement) {
     const sourcePoolToken = String(costLoadButton.dataset.chinaSourceCostLoad || "").trim();
@@ -45507,10 +45550,10 @@ document.addEventListener("click", async (event) => {
         showTransientInlineNotice("#chinaSourceBaleNotice", "请先在这一行锁定供应商，再给这个供应商新增品类。", "error", 1800);
         return;
       }
-      const mainCategory = String(((_a = form.querySelector("[name='category_main_new']")) == null ? void 0 : _a.value) || "").trim();
+      const mainCategory = String(((_a2 = form.querySelector("[name='category_main_new']")) == null ? void 0 : _a2.value) || "").trim();
       const subCategory = String(((_b = form.querySelector("[name='category_sub_new']")) == null ? void 0 : _b.value) || "").trim();
       const mainCategoryZh = String(((_c = form.querySelector("[name='category_main_zh_new']")) == null ? void 0 : _c.value) || "").trim();
-      const subCategoryZh = String(((_d2 = form.querySelector("[name='category_sub_zh_new']")) == null ? void 0 : _d2.value) || "").trim();
+      const subCategoryZh = String(((_d = form.querySelector("[name='category_sub_zh_new']")) == null ? void 0 : _d.value) || "").trim();
       if (!mainCategory || !subCategory) {
         showTransientInlineNotice("#chinaSourceBaleNotice", "请先填写商品大类和商品小类。", "error", 1800);
         return;
@@ -45634,21 +45677,21 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  var _a, _b, _c, _d2, _e2, _f2, _g2, _h2;
+  var _a2, _b, _c, _d, _e2, _f2, _g2, _h2;
   const saveButton = event.target instanceof HTMLElement ? event.target.closest("[data-product-category-save]") : null;
   if (saveButton instanceof HTMLElement) {
     const form = document.querySelector("#productForm");
     if (!(form instanceof HTMLFormElement)) {
       return;
     }
-    const supplierName = String(((_a = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
+    const supplierName = String(((_a2 = form.querySelector("[name='supplier_name']")) == null ? void 0 : _a2.value) || "").trim();
     if (!supplierName || supplierName === "__new__") {
       renderProductCategoryScopeSummary("请先锁定供应商，再维护这个供应商自己的品类。");
       return;
     }
     const categoryMain = String(((_b = form.querySelector("[name='product_category_main_new']")) == null ? void 0 : _b.value) || "").trim();
     const categorySub = String(((_c = form.querySelector("[name='product_category_sub_new']")) == null ? void 0 : _c.value) || "").trim();
-    const categoryMainZh = String(((_d2 = form.querySelector("[name='product_category_main_zh_new']")) == null ? void 0 : _d2.value) || "").trim();
+    const categoryMainZh = String(((_d = form.querySelector("[name='product_category_main_zh_new']")) == null ? void 0 : _d.value) || "").trim();
     const categorySubZh = String(((_e2 = form.querySelector("[name='product_category_sub_zh_new']")) == null ? void 0 : _e2.value) || "").trim();
     const editingKey = String(((_f2 = form.querySelector("[name='product_category_editing_key']")) == null ? void 0 : _f2.value) || "").trim();
     if (!categoryMain || !categorySub) {
@@ -45806,7 +45849,7 @@ document.addEventListener("submit", (event) => {
   handleStoreMobileScanSubmit();
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-store-package-process], [data-store-package-back], [data-store-package-generate-items], [data-store-package-print-generated], [data-store-dispatch-fill], [data-store-dispatch-accept], [data-store-dispatch-edit], [data-direct-hang-edit], [data-token-edit-save], [data-store-dispatch-assignment-fill], [data-store-dispatch-progress-fill], [data-clerk-bale-open], [data-store-receipt-load-recent], [data-store-receipt-transfer-fill], [data-store-receipt-package-action], [data-store-receipt-complete-sdo], [data-store-receipt-step], [data-store-assignment-sdo-fill], [data-store-assignment-fill-selected], [data-store-assignment-fill-all]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -46099,7 +46142,7 @@ document.addEventListener("click", async (event) => {
     }
     if (button.dataset.storeAssignmentFillSelected || button.dataset.storeAssignmentFillAll) {
       const sdoCode = String(button.dataset.storeAssignmentFillSelected || button.dataset.storeAssignmentFillAll || "").trim().toUpperCase();
-      const rows = ((_a = groupStoreReceivingPackagesBySdo(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)) == null ? void 0 : _a.packages) || [];
+      const rows = ((_a2 = groupStoreReceivingPackagesBySdo(getStoreReceivingPackageRows(getCurrentStoreCodeFallback())).find((row) => row.sdo_display_code === sdoCode)) == null ? void 0 : _a2.packages) || [];
       const selected = button.dataset.storeAssignmentFillAll ? rows.filter((row) => isStoreReceivingPackageAssignable(row)).map((row) => getStoreReceivingPackageCode(row)) : Array.from(document.querySelectorAll("input[data-store-assignment-pkg]:checked")).map((el) => String(el.getAttribute("data-store-assignment-pkg") || "").trim().toUpperCase()).filter(Boolean);
       const clerkSelect = Array.from(document.querySelectorAll("[data-store-command-center-clerk]")).find((el) => String(el.getAttribute("data-store-command-center-clerk") || "").trim().toUpperCase() === sdoCode);
       const clerkName = String((clerkSelect == null ? void 0 : clerkSelect.value) || ((_b = storeCommandCenterState.selected_clerk_by_sdo) == null ? void 0 : _b[sdoCode]) || "").trim();
@@ -46271,7 +46314,7 @@ document.addEventListener("keydown", async (event) => {
   focusElement("#storePdaDefaultRack");
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-pda-scan-focus], [data-pda-skip-current], [data-pda-report-exception], [data-pda-category-select], [data-pda-start-session], [data-pda-apply-default], [data-pda-apply-premium], [data-pda-queue-group], [data-pda-complete-group], [data-pda-finalize-bale]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -46308,7 +46351,7 @@ document.addEventListener("click", async (event) => {
     }
     syncStorePdaWorkbenchStateFromDom();
     const { group, rows } = getCurrentStorePdaCategoryState();
-    const baleNo = String(((_a = document.querySelector("#storeTokenEditDirectoryForm [name='bale_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+    const baleNo = String(((_a2 = document.querySelector("#storeTokenEditDirectoryForm [name='bale_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
     const storeCode = String(((_b = document.querySelector("#storeTokenEditDirectoryForm [name='store_code']")) == null ? void 0 : _b.value) || getCurrentStoreCodeFallback()).trim().toUpperCase();
     if (!group || !rows.length) {
       throw new Error("请先读取一个已分配的门店配货 bale。");
@@ -46401,7 +46444,7 @@ document.addEventListener("click", async (event) => {
       });
       if (document.querySelector("#storeBluetoothPrinterForm [name='bale_no']")) {
         setInputValue("#storeBluetoothPrinterForm [name='bale_no']", baleNo);
-        setInputValue("#storeBluetoothPrinterForm [name='assigned_employee']", String(((_d2 = document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")) == null ? void 0 : _d2.value) || "").trim());
+        setInputValue("#storeBluetoothPrinterForm [name='assigned_employee']", String(((_d = document.querySelector("#storeTokenEditDirectoryForm [name='assigned_employee']")) == null ? void 0 : _d.value) || "").trim());
         setInputValue("#storeBluetoothPrinterForm [name='printer_name']", printerName);
         setInputValue("#itemTokenPrintQueueForm [name='template_code']", templateCode);
       }
@@ -46474,14 +46517,14 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-direct-hang-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
   try {
     syncDirectHangWorkbenchStateFromDom();
-    const baleNo = String(((_a = document.querySelector("#directHangStoreWorkbenchForm [name='bale_no']")) == null ? void 0 : _a.value) || "").trim().toUpperCase();
+    const baleNo = String(((_a2 = document.querySelector("#directHangStoreWorkbenchForm [name='bale_no']")) == null ? void 0 : _a2.value) || "").trim().toUpperCase();
     const storeCode = String(((_b = document.querySelector("#directHangStoreWorkbenchForm [name='store_code']")) == null ? void 0 : _b.value) || getCurrentStoreCodeFallback()).trim().toUpperCase();
     const assignedEmployee = String(((_c = document.querySelector("#directHangStoreWorkbenchForm [name='assigned_employee']")) == null ? void 0 : _c.value) || "").trim();
     const bale = ensureDirectHangDispatchBaleState().find(
@@ -46772,12 +46815,12 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     syncReturnSelectionSummary();
   });
 });
-(_Y = document.querySelector("#returnCandidateList")) == null ? void 0 : _Y.addEventListener("change", (event) => {
+(_Z = document.querySelector("#returnCandidateList")) == null ? void 0 : _Z.addEventListener("change", (event) => {
   if (event.target instanceof HTMLInputElement && event.target.matches("[data-return-barcode]")) {
     updateReturnSelectionFromDom();
   }
 });
-(_Z = document.querySelector("#sortingCompressionGroupList")) == null ? void 0 : _Z.addEventListener("click", (event) => {
+(__ = document.querySelector("#sortingCompressionGroupList")) == null ? void 0 : __.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-sorting-rack-edit]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -46790,28 +46833,28 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     qty_on_hand: button.dataset.sortingRackQty || "0"
   });
 });
-(__ = document.querySelector("#recommendationSelectAllButton")) == null ? void 0 : __.addEventListener("click", () => {
+(_$ = document.querySelector("#recommendationSelectAllButton")) == null ? void 0 : _$.addEventListener("click", () => {
   selectedRecommendationKeys = new Set(recommendationCandidatesState.map((item) => getRecommendationRowKey(item)).filter(Boolean));
   renderRecommendationCandidates();
 });
-(_$ = document.querySelector("#recommendationClearSelectionButton")) == null ? void 0 : _$.addEventListener("click", () => {
+(_aa = document.querySelector("#recommendationClearSelectionButton")) == null ? void 0 : _aa.addEventListener("click", () => {
   selectedRecommendationKeys = /* @__PURE__ */ new Set();
   renderRecommendationCandidates();
 });
-(_aa = document.querySelector("#returnSelectAllButton")) == null ? void 0 : _aa.addEventListener("click", () => {
+(_ba = document.querySelector("#returnSelectAllButton")) == null ? void 0 : _ba.addEventListener("click", () => {
   setAllReturnSelections(true);
 });
-(_ba = document.querySelector("#returnClearSelectionButton")) == null ? void 0 : _ba.addEventListener("click", () => {
+(_ca = document.querySelector("#returnClearSelectionButton")) == null ? void 0 : _ca.addEventListener("click", () => {
   setAllReturnSelections(false);
 });
-(_ca = document.querySelector("#parcelBatchAddRowButton")) == null ? void 0 : _ca.addEventListener("click", () => {
+(_da = document.querySelector("#parcelBatchAddRowButton")) == null ? void 0 : _da.addEventListener("click", () => {
   syncParcelBatchRowsFromDom();
   parcelBatchRowState.push(emptyParcelBatchRow());
   renderParcelBatchRows();
 });
-(_da = document.querySelector("#chinaSourceCostListButton")) == null ? void 0 : _da.addEventListener("click", () => {
-  var _a;
-  const sourcePoolToken = String(((_a = document.querySelector("#chinaSourceBaleForm [name='source_pool_token']")) == null ? void 0 : _a.value) || "").trim();
+(_ea = document.querySelector("#chinaSourceCostListButton")) == null ? void 0 : _ea.addEventListener("click", () => {
+  var _a2;
+  const sourcePoolToken = String(((_a2 = document.querySelector("#chinaSourceBaleForm [name='source_pool_token']")) == null ? void 0 : _a2.value) || "").trim();
   populateChinaSourceCostRecordSelect(sourcePoolToken);
   if (sourcePoolToken) {
     const record = getChinaSourceRecordByPoolToken(sourcePoolToken);
@@ -46825,10 +46868,10 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     setActivePanel(panelKey);
   }
 });
-(_ea = document.querySelector("#chinaSourceReceiptSheetPrintButton")) == null ? void 0 : _ea.addEventListener("click", () => {
+(_fa = document.querySelector("#chinaSourceReceiptSheetPrintButton")) == null ? void 0 : _fa.addEventListener("click", () => {
   printChinaSourceReceiptSheet();
 });
-(_fa = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _fa.addEventListener("change", (event) => {
+(_ga = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _ga.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) {
     return;
@@ -46837,23 +46880,23 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
   balePrinterConsoleNotice = null;
   renderBalePrinterConsoleSummary(target.value);
 });
-(_ga = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _ga.addEventListener("change", () => {
+(_ha = document.querySelector("#balePrinterConsoleForm [name='printer_name']")) == null ? void 0 : _ha.addEventListener("change", () => {
   renderBalePrinterConsoleSummary();
 });
-(_ha = document.querySelector("#lockBaleShipmentButton")) == null ? void 0 : _ha.addEventListener("click", () => {
-  var _a;
-  const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim();
+(_ia = document.querySelector("#lockBaleShipmentButton")) == null ? void 0 : _ia.addEventListener("click", () => {
+  var _a2;
+  const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim();
   setCurrentInboundShipment(shipmentNo);
   baleBarcodeDirectoryNotice = shipmentNo ? { type: "success", message: `已锁定船单 ${shipmentNo}。现在可以按任意类别顺序开始贴码。` } : { type: "error", message: "请先选择一张船单再锁定。" };
   renderBaleBarcodeDirectorySummary(shipmentNo);
 });
-(_ia = document.querySelector("#balePrintConfirmButton")) == null ? void 0 : _ia.addEventListener("click", () => {
+(_ja = document.querySelector("#balePrintConfirmButton")) == null ? void 0 : _ja.addEventListener("click", () => {
   confirmBalePrintFlowAndContinue().catch((error) => {
     baleBarcodeDirectoryNotice = { type: "error", message: formatErrorMessage(error) };
     renderBaleBarcodeDirectorySummary(resolveCurrentInboundShipmentNo());
   });
 });
-(_ja = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ja.addEventListener("keydown", (event) => {
+(_ka = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ka.addEventListener("keydown", (event) => {
   if (event.key !== "Enter" && event.key !== "Tab") {
     return;
   }
@@ -46875,10 +46918,10 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     setSortingScannerError(formatErrorMessage(error));
   });
 });
-(_ka = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ka.addEventListener("focus", () => {
+(_la = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _la.addEventListener("focus", () => {
   renderSortingScannerHealthSummary();
 });
-(_la = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _la.addEventListener("blur", () => {
+(_ma = document.querySelector("#sortingTaskForm [name='bale_lookup']")) == null ? void 0 : _ma.addEventListener("blur", () => {
   setTimeout(() => renderSortingScannerHealthSummary(), 0);
 });
 document.addEventListener("submit", (event) => {
@@ -46951,7 +46994,7 @@ document.addEventListener("click", (event) => {
   focusBaleScannerTestInput();
 });
 document.addEventListener("change", (event) => {
-  var _a;
+  var _a2;
   if (!(event.target instanceof HTMLSelectElement)) {
     return;
   }
@@ -46995,7 +47038,7 @@ document.addEventListener("change", (event) => {
       selectedSub: ""
     });
     if (selectedMain === "__new__") {
-      const supplierName = String(((_a = document.querySelector("#productForm [name='supplier_name']")) == null ? void 0 : _a.value) || "").trim();
+      const supplierName = String(((_a2 = document.querySelector("#productForm [name='supplier_name']")) == null ? void 0 : _a2.value) || "").trim();
       prefillProductCategoryInlineEditor({ supplierName });
     }
     return;
@@ -47081,7 +47124,7 @@ document.addEventListener("input", (event) => {
   }
 });
 document.addEventListener("change", (event) => {
-  var _a, _b, _c, _d2;
+  var _a2, _b, _c, _d;
   const target = event.target;
   if (target instanceof HTMLSelectElement && target.matches("#productImportRowsBuilder [data-product-import-field='supplier_name']")) {
     syncProductImportRowsFromDom();
@@ -47143,7 +47186,7 @@ document.addEventListener("change", (event) => {
     const rowIndex = Number((rowNode == null ? void 0 : rowNode.dataset.chinaSourceRowIndex) || -1);
     if (rowIndex >= 0 && chinaSourceContainerRowState[rowIndex]) {
       chinaSourceContainerRowState[rowIndex].supplier_name = target.value;
-      chinaSourceContainerRowState[rowIndex].supplier_name_zh = ((_a = getSupplierDirectoryRowByName(target.value || "")) == null ? void 0 : _a.name_zh) || "";
+      chinaSourceContainerRowState[rowIndex].supplier_name_zh = ((_a2 = getSupplierDirectoryRowByName(target.value || "")) == null ? void 0 : _a2.name_zh) || "";
       chinaSourceContainerRowState[rowIndex].category_main = "";
       chinaSourceContainerRowState[rowIndex].category_main_zh = "";
       chinaSourceContainerRowState[rowIndex].category_sub = "";
@@ -47183,7 +47226,7 @@ document.addEventListener("change", (event) => {
     const rowNode = target.closest("[data-china-source-row-index]");
     const rowIndex = Number((rowNode == null ? void 0 : rowNode.dataset.chinaSourceRowIndex) || -1);
     const supplierName = String(((_c = rowNode == null ? void 0 : rowNode.querySelector("[data-china-source-field='supplier_name']")) == null ? void 0 : _c.value) || "").trim();
-    const categoryMain = String(((_d2 = rowNode == null ? void 0 : rowNode.querySelector("[data-china-source-field='category_main']")) == null ? void 0 : _d2.value) || "").trim();
+    const categoryMain = String(((_d = rowNode == null ? void 0 : rowNode.querySelector("[data-china-source-field='category_main']")) == null ? void 0 : _d.value) || "").trim();
     if (rowIndex >= 0 && chinaSourceContainerRowState[rowIndex]) {
       chinaSourceContainerRowState[rowIndex].category_sub_zh = getSupplierScopedCategorySubZh(supplierName, categoryMain, target.value) || "";
     }
@@ -47475,7 +47518,7 @@ document.addEventListener("click", async (event) => {
   renderParcelBatchRows();
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b;
+  var _a2, _b;
   const connectPrinterButton = event.target instanceof HTMLElement ? event.target.closest("#connectBalePrinterButton") : null;
   if (connectPrinterButton instanceof HTMLElement) {
     try {
@@ -47499,7 +47542,7 @@ document.addEventListener("click", async (event) => {
   }
   const batchActionButton = event.target instanceof HTMLElement ? event.target.closest("[data-bale-batch-toggle], [data-bale-batch-toggle-all], [data-bale-batch-activate], [data-bale-batch-complete], [data-bale-batch-focus-next], [data-bale-batch-print]") : null;
   if (batchActionButton instanceof HTMLElement) {
-    const shipmentNo = String(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim();
+    const shipmentNo = String(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim();
     const rows = getBalesForShipment(shipmentNo);
     const batchGroups = groupBalesByBatch(rows);
     if (batchActionButton.dataset.baleBatchToggleAll !== void 0) {
@@ -47617,14 +47660,14 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b;
+  var _a2, _b;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-bale-printer-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
   }
   const action = button.dataset.balePrinterAction || "";
   const jobId = String(button.dataset.jobId || "").trim();
-  const shipmentNo = String(((_a = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _a.value) || "").trim();
+  const shipmentNo = String(((_a2 = document.querySelector("#balePrinterConsoleForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "").trim();
   if (!jobId) {
     return;
   }
@@ -47675,7 +47718,7 @@ document.addEventListener("click", async (event) => {
   }
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c, _d2, _e2;
+  var _a2, _b, _c, _d, _e2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-item-token-print-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -47690,7 +47733,7 @@ document.addEventListener("click", async (event) => {
       await loadSystemPrinters();
       const currentJob = itemTokenPrintJobState.find((job) => String((job == null ? void 0 : job.id) || "") === jobId);
       const printerName = String(
-        (currentJob == null ? void 0 : currentJob.printer_name) || ((_a = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _a.value) || ((_b = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _b.value) || "Deli DL-720C"
+        (currentJob == null ? void 0 : currentJob.printer_name) || ((_a2 = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _a2.value) || ((_b = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _b.value) || "Deli DL-720C"
       ).trim();
       const matchedPrinter = findSystemPrinterBySelectedName(printerName);
       if (!matchedPrinter) {
@@ -47708,7 +47751,7 @@ document.addEventListener("click", async (event) => {
         throw new Error(`找不到打印任务 #${jobId}。`);
       }
       const printerName = String(
-        currentJob.printer_name || ((_c = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _c.value) || ((_d2 = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _d2.value) || "Deli DL-720C"
+        currentJob.printer_name || ((_c = document.querySelector("#itemTokenPrintQueueForm [name='printer_name']")) == null ? void 0 : _c.value) || ((_d = document.querySelector("#storeBluetoothPrinterForm [name='printer_name']")) == null ? void 0 : _d.value) || "Deli DL-720C"
       ).trim();
       const matchedPrinter = findSystemPrinterBySelectedName(printerName);
       if (!matchedPrinter) {
@@ -47802,7 +47845,7 @@ document.addEventListener("click", (event) => {
     toggleSupplierInlineEditor(select);
   });
 });
-(_ma = document.querySelector("#refreshOpsAlertsButton")) == null ? void 0 : _ma.addEventListener("click", async () => {
+(_na = document.querySelector("#refreshOpsAlertsButton")) == null ? void 0 : _na.addEventListener("click", async () => {
   try {
     await refreshIntegrationSummaries();
     focusElement("#opsAlertSummary");
@@ -47810,14 +47853,14 @@ document.addEventListener("click", (event) => {
     writeOutput("#mpesaOutput", formatErrorMessage(error));
   }
 });
-(_na = document.querySelector("#openShiftPreviewButton")) == null ? void 0 : _na.addEventListener("click", () => {
+(_oa = document.querySelector("#openShiftPreviewButton")) == null ? void 0 : _oa.addEventListener("click", () => {
   try {
     openShiftReportPreview();
   } catch (error) {
     writeOutput("#shiftOutput", formatErrorMessage(error));
   }
 });
-(_oa = document.querySelector("#storeOperatingSummary")) == null ? void 0 : _oa.addEventListener("click", async (event) => {
+(_pa = document.querySelector("#storeOperatingSummary")) == null ? void 0 : _pa.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-store-summary-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -47842,7 +47885,7 @@ document.addEventListener("click", (event) => {
     writeOutput("#returnOutput", formatErrorMessage(error));
   }
 });
-(_pa = document.querySelector("#paymentAnomalyList")) == null ? void 0 : _pa.addEventListener("click", (event) => {
+(_qa = document.querySelector("#paymentAnomalyList")) == null ? void 0 : _qa.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-payment-anomaly-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -47855,7 +47898,7 @@ document.addEventListener("click", (event) => {
   hydratePaymentAnomalyForm(row);
   focusElement("#paymentAnomalyResolveForm");
 });
-(_qa = document.querySelector("#saleVoidList")) == null ? void 0 : _qa.addEventListener("click", (event) => {
+(_ra = document.querySelector("#saleVoidList")) == null ? void 0 : _ra.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-sale-void-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -47868,7 +47911,7 @@ document.addEventListener("click", (event) => {
   hydrateSaleVoidForms(row);
   focusElement("#saleVoidReviewForm");
 });
-(_ra = document.querySelector("#saleRefundList")) == null ? void 0 : _ra.addEventListener("click", (event) => {
+(_sa = document.querySelector("#saleRefundList")) == null ? void 0 : _sa.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-sale-refund-fill]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -47896,7 +47939,7 @@ document.addEventListener("click", (event) => {
   focusElement("#labelTemplateForm");
 });
 document.addEventListener("click", (event) => {
-  var _a;
+  var _a2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-bale-template-component-select]") : null;
   if (!(button instanceof HTMLElement)) {
     const fontStepButton = event.target instanceof HTMLElement ? event.target.closest("[data-template-font-component][data-template-font-step]") : null;
@@ -47906,7 +47949,7 @@ document.addEventListener("click", (event) => {
     const componentId = String(fontStepButton.dataset.templateFontComponent || "").trim();
     const step = Number(fontStepButton.dataset.templateFontStep || 0);
     const draft = ensureLabelTemplateEditorDraft();
-    const component = (Array.isArray((_a = draft.layout) == null ? void 0 : _a.components) ? draft.layout.components : []).find((row) => row.id === componentId);
+    const component = (Array.isArray((_a2 = draft.layout) == null ? void 0 : _a2.components) ? draft.layout.components : []).find((row) => row.id === componentId);
     if (!component || !Number.isFinite(step)) {
       return;
     }
@@ -47968,7 +48011,7 @@ document.addEventListener("input", (event) => {
   }
 });
 document.addEventListener("pointerdown", (event) => {
-  var _a;
+  var _a2;
   const resizeHandle = event.target instanceof HTMLElement ? event.target.closest("[data-bale-template-resize-handle]") : null;
   const block = event.target instanceof HTMLElement ? event.target.closest("[data-bale-template-canvas-component]") : null;
   if (!(block instanceof HTMLElement)) {
@@ -47980,7 +48023,7 @@ document.addEventListener("pointerdown", (event) => {
   if (!(canvas instanceof HTMLElement)) {
     return;
   }
-  const component = (Array.isArray((_a = draft.layout) == null ? void 0 : _a.components) ? draft.layout.components : []).find((item) => item.id === componentId);
+  const component = (Array.isArray((_a2 = draft.layout) == null ? void 0 : _a2.components) ? draft.layout.components : []).find((item) => item.id === componentId);
   if (!component) {
     return;
   }
@@ -48038,7 +48081,7 @@ document.addEventListener("pointercancel", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  var _a;
+  var _a2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-dev-edit], [data-dev-toggle-status], [data-dev-move], [data-dev-delete]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -48083,7 +48126,7 @@ document.addEventListener("click", (event) => {
       return;
     }
     deleteDevTask(row.id);
-    if (String(((_a = document.querySelector("#devTaskForm [name='task_id']")) == null ? void 0 : _a.value) || "").trim() === row.id) {
+    if (String(((_a2 = document.querySelector("#devTaskForm [name='task_id']")) == null ? void 0 : _a2.value) || "").trim() === row.id) {
       hydrateDevTaskForm(null);
     }
     renderDevTrackerSummary();
@@ -48091,7 +48134,7 @@ document.addEventListener("click", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
-  var _a, _b, _c, _d2, _e2, _f2;
+  var _a2, _b, _c, _d, _e2, _f2;
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-ops-exception-edit], [data-ops-exception-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
@@ -48113,7 +48156,7 @@ document.addEventListener("click", (event) => {
   }
   const now = (/* @__PURE__ */ new Date()).toISOString();
   if (action === "claim") {
-    row.owner_name = ((_a = currentSession.user) == null ? void 0 : _a.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || row.owner_name;
+    row.owner_name = ((_a2 = currentSession.user) == null ? void 0 : _a2.full_name) || ((_b = currentSession.user) == null ? void 0 : _b.username) || row.owner_name;
     row.owner_role = ((_c = currentSession.user) == null ? void 0 : _c.role_code) || row.owner_role;
     row.updated_at = now;
     persistOpsExceptionTicketState();
@@ -48123,7 +48166,7 @@ document.addEventListener("click", (event) => {
   if (action === "start") {
     row.status = "in_progress";
     row.acknowledged_at = row.acknowledged_at || now;
-    row.owner_name = row.owner_name || ((_d2 = currentSession.user) == null ? void 0 : _d2.full_name) || ((_e2 = currentSession.user) == null ? void 0 : _e2.username) || "";
+    row.owner_name = row.owner_name || ((_d = currentSession.user) == null ? void 0 : _d.full_name) || ((_e2 = currentSession.user) == null ? void 0 : _e2.username) || "";
     row.owner_role = row.owner_role || ((_f2 = currentSession.user) == null ? void 0 : _f2.role_code) || "";
     row.updated_at = now;
     persistOpsExceptionTicketState();
@@ -48160,7 +48203,7 @@ document.addEventListener("click", (event) => {
   focusElement("#opsDataTopicForm");
 });
 document.addEventListener("click", async (event) => {
-  var _a, _b, _c;
+  var _a2, _b, _c;
   const target = event.target instanceof HTMLElement ? event.target.closest("[data-store-shelf-initialize], [data-store-shelf-reset-demo], [data-store-shelf-save-layout], [data-store-shelf-edit], [data-store-shelf-locate], [data-store-shelf-canvas-select], [data-store-shelf-canvas-add], [data-store-shelf-canvas-blank], [data-store-shelf-deactivate], [data-store-shelf-delete]") : null;
   if (!(target instanceof HTMLElement)) {
     return;
@@ -48213,7 +48256,7 @@ document.addEventListener("click", async (event) => {
     if (addType === "BACKROOM") {
       const backroom = locationRows.find((row2) => String(row2.location_type || "").toUpperCase() === "BACKROOM");
       const backroomDraft = backroom || {
-        store_code: ((_a = document.querySelector("#storeShelfLocationLoadForm [name='store_code']")) == null ? void 0 : _a.value) || getCurrentStoreCodeFallback() || "UTAWALA",
+        store_code: ((_a2 = document.querySelector("#storeShelfLocationLoadForm [name='store_code']")) == null ? void 0 : _a2.value) || getCurrentStoreCodeFallback() || "UTAWALA",
         location_code: "UT-BACKROOM",
         location_name: "后仓",
         location_type: "BACKROOM",
@@ -48446,7 +48489,7 @@ document.addEventListener("click", (event) => {
   }
 });
 document.addEventListener("change", (event) => {
-  var _a;
+  var _a2;
   const target = event.target;
   if (!(target instanceof HTMLSelectElement)) {
     return;
@@ -48467,7 +48510,7 @@ document.addEventListener("change", (event) => {
     }
     setInputValue("#balePrinterConsoleForm [name='template_code']", target.value);
     if (templateScope === "bale") {
-      renderBaleBarcodeDirectorySummary(((_a = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a.value) || "");
+      renderBaleBarcodeDirectorySummary(((_a2 = document.querySelector("#baleBarcodeViewForm [name='shipment_no']")) == null ? void 0 : _a2.value) || "");
     }
     renderBalePrintModal();
     return;
@@ -48477,25 +48520,25 @@ document.addEventListener("change", (event) => {
     renderBalePrintModal();
   }
 });
-(_sa = document.querySelector("#rawBaleStockFilterForm")) == null ? void 0 : _sa.addEventListener("change", () => {
+(_ta = document.querySelector("#rawBaleStockFilterForm")) == null ? void 0 : _ta.addEventListener("change", () => {
   renderRawBaleStockSummary(rawBaleStockState);
 });
-(_ta = document.querySelector("#rawBaleStockFilterForm [name='search']")) == null ? void 0 : _ta.addEventListener("input", () => {
+(_ua = document.querySelector("#rawBaleStockFilterForm [name='search']")) == null ? void 0 : _ua.addEventListener("input", () => {
   renderRawBaleStockSummary(rawBaleStockState);
 });
-(_ua = document.querySelector("#sortingStockFilterForm [name='category_main']")) == null ? void 0 : _ua.addEventListener("change", (event) => {
-  var _a;
-  sortingStockCategoryMainFilter = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim();
+(_va = document.querySelector("#sortingStockFilterForm [name='category_main']")) == null ? void 0 : _va.addEventListener("change", (event) => {
+  var _a2;
+  sortingStockCategoryMainFilter = String(((_a2 = event.target) == null ? void 0 : _a2.value) || "").trim();
   renderSortingStockSummary(sortingStockState);
 });
-(_va = document.querySelector("#sortingStockFilterForm [name='search']")) == null ? void 0 : _va.addEventListener("input", (event) => {
-  var _a;
-  sortingStockSearchText = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim();
+(_wa = document.querySelector("#sortingStockFilterForm [name='search']")) == null ? void 0 : _wa.addEventListener("input", (event) => {
+  var _a2;
+  sortingStockSearchText = String(((_a2 = event.target) == null ? void 0 : _a2.value) || "").trim();
   renderSortingStockSummary(sortingStockState);
 });
-(_wa = document.querySelector("#sortingStockFilterForm [name='min_loose_qty']")) == null ? void 0 : _wa.addEventListener("change", (event) => {
-  var _a;
-  sortingStockMinLooseQtyFilter = String(((_a = event.target) == null ? void 0 : _a.value) || "").trim();
+(_xa = document.querySelector("#sortingStockFilterForm [name='min_loose_qty']")) == null ? void 0 : _xa.addEventListener("change", (event) => {
+  var _a2;
+  sortingStockMinLooseQtyFilter = String(((_a2 = event.target) == null ? void 0 : _a2.value) || "").trim();
   renderSortingStockSummary(sortingStockState);
 });
 document.addEventListener("change", (event) => {
@@ -48514,14 +48557,14 @@ document.addEventListener("change", (event) => {
   }
   updateSelectedBaleSalesPoolButton();
 });
-(_xa = document.querySelector("#openSelectedBaleSalesPoolButton")) == null ? void 0 : _xa.addEventListener("click", () => {
+(_ya = document.querySelector("#openSelectedBaleSalesPoolButton")) == null ? void 0 : _ya.addEventListener("click", () => {
   try {
     openConsignmentBundleFromPoolEntryIds([...selectedBaleSalesPoolEntryIds]);
   } catch (error) {
     renderErrorSummary("#consignmentBundleSummary", formatErrorMessage(error));
   }
 });
-(_ya = document.querySelector("#downloadBaleSalesPricingSheetButton")) == null ? void 0 : _ya.addEventListener("click", async () => {
+(_za = document.querySelector("#downloadBaleSalesPricingSheetButton")) == null ? void 0 : _za.addEventListener("click", async () => {
   try {
     await downloadBaleSalesPricingSheet();
   } catch (error) {
@@ -48618,10 +48661,10 @@ document.addEventListener("change", (event) => {
     }
   }
 });
-(_za = document.querySelector("#devTaskResetButton")) == null ? void 0 : _za.addEventListener("click", () => {
+(_Aa = document.querySelector("#devTaskResetButton")) == null ? void 0 : _Aa.addEventListener("click", () => {
   hydrateDevTaskForm(null);
 });
-(_Aa = document.querySelector("#labelTemplateManagerSummary")) == null ? void 0 : _Aa.addEventListener("click", async (event) => {
+(_Ba = document.querySelector("#labelTemplateManagerSummary")) == null ? void 0 : _Ba.addEventListener("click", async (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-template-demo-refresh], [data-template-demo-print]") : null;
   if (!(button instanceof HTMLButtonElement)) {
     return;
@@ -48647,7 +48690,7 @@ document.addEventListener("change", (event) => {
     writeOutput("#labelTemplateOutput", formatErrorMessage(error));
   }
 });
-(_Ba = document.querySelector("#storeClosingChecklistSummary")) == null ? void 0 : _Ba.addEventListener("click", (event) => {
+(_Ca = document.querySelector("#storeClosingChecklistSummary")) == null ? void 0 : _Ca.addEventListener("click", (event) => {
   const button = event.target instanceof HTMLElement ? event.target.closest("[data-closing-action]") : null;
   if (!(button instanceof HTMLElement)) {
     return;
