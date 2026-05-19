@@ -4615,6 +4615,7 @@ function refreshAssignableUserPickers({ rerenderPanels = true } = {}) {
 async function refreshUserDirectoryForPickers({ force = false } = {}) {
   if (!currentSession?.token) {
     refreshAssignableUserPickers({ rerenderPanels: false });
+renderManualReplenishmentStoreOptions();
     return [];
   }
   if (!force && userDirectoryState.length) {
@@ -15975,15 +15976,42 @@ function setManualReplenishmentFieldValue(name = "", value = "") {
     formInput.value = normalizedValue;
   }
   const contextControl = getManualReplenishmentContextControl(name);
-  if (contextControl instanceof HTMLInputElement) {
+  if (contextControl instanceof HTMLInputElement || contextControl instanceof HTMLSelectElement) {
     contextControl.value = normalizedValue;
+  }
+}
+
+function getManualReplenishmentStoreOptions() {
+  const rows = Array.isArray(storeDirectoryState) ? storeDirectoryState : [];
+  const fromDirectory = rows
+    .map((row) => String(row?.code || row?.store_code || "").trim().toUpperCase())
+    .filter(Boolean);
+  const fallback = ["UTAWALA", "KAWANGWARE", "KIKUYU", "KINOO"];
+  return Array.from(new Set([...(fromDirectory.length ? fromDirectory : []), ...fallback]));
+}
+
+function renderManualReplenishmentStoreOptions(preferredStoreCode = "") {
+  const target = getManualReplenishmentContextControl("to_store_code");
+  if (!(target instanceof HTMLSelectElement)) {
+    return;
+  }
+  const options = getManualReplenishmentStoreOptions();
+  const normalizedPreferred = String(preferredStoreCode || getManualReplenishmentFormInput("to_store_code")?.value || "UTAWALA").trim().toUpperCase() || "UTAWALA";
+  target.innerHTML = options
+    .map((code) => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`)
+    .join("");
+  const nextValue = options.includes(normalizedPreferred) ? normalizedPreferred : (options[0] || "UTAWALA");
+  target.value = nextValue;
+  const formInput = getManualReplenishmentFormInput("to_store_code");
+  if (formInput instanceof HTMLInputElement) {
+    formInput.value = nextValue;
   }
 }
 
 function syncManualReplenishmentContextToForm() {
   MANUAL_REPLENISHMENT_CONTEXT_FIELDS.forEach((name) => {
     const contextControl = getManualReplenishmentContextControl(name);
-    if (contextControl instanceof HTMLInputElement) {
+    if (contextControl instanceof HTMLInputElement || contextControl instanceof HTMLSelectElement) {
       const formInput = getManualReplenishmentFormInput(name);
       if (formInput instanceof HTMLInputElement) {
         formInput.value = String(contextControl.value || "").trim();
@@ -15997,7 +16025,7 @@ function syncManualReplenishmentContextFromForm() {
     const formInput = getManualReplenishmentFormInput(name);
     if (formInput instanceof HTMLInputElement) {
       const contextControl = getManualReplenishmentContextControl(name);
-      if (contextControl instanceof HTMLInputElement) {
+      if (contextControl instanceof HTMLInputElement || contextControl instanceof HTMLSelectElement) {
         contextControl.value = String(formInput.value || "").trim();
       }
     }
@@ -28560,6 +28588,7 @@ function populateStoreSelects(stores) {
     }
   });
   refreshAssignableUserPickers({ rerenderPanels: false });
+  renderManualReplenishmentStoreOptions();
 }
 
 function populateSupplierSelects(suppliers, preferredValue = "") {
@@ -31157,6 +31186,7 @@ function hydrateStoreDefaults() {
   });
   syncManualReplenishmentContextFromForm();
   refreshAssignableUserPickers({ rerenderPanels: false });
+  renderManualReplenishmentStoreOptions();
 }
 
 function createCashierTerminalPaymentLine(method = "cash") {
@@ -47878,7 +47908,7 @@ document.querySelector("#pickingWaveForm")?.addEventListener("change", renderPic
     const target = event.target instanceof HTMLElement
       ? event.target.closest("[data-manual-context-field]")
       : null;
-    if (target instanceof HTMLInputElement) {
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
       syncManualReplenishmentContextToForm();
       renderTransferDraftSummary();
     }

@@ -362,6 +362,8 @@ test("4.1 manual replenishment page uses compact warehouse workbench layout", ()
   assert.match(transferHtml, /class="manual-replenishment-meta manual-context-controls"/);
   assert.match(transferHtml, /data-manual-context-field="from_warehouse_code"/);
   assert.match(transferHtml, /data-manual-context-field="to_store_code"/);
+  assert.match(transferHtml, /<span>门店<\/span>/);
+  assert.match(transferHtml, /data-manual-context-field="to_store_code" aria-label="门店"/);
   assert.match(transferHtml, /data-manual-context-field="required_arrival_date"/);
   assert.match(transferHtml, /id="manualReplenishmentContextStatus"/);
   assert.match(transferHtml, /填写门店、品类和数量，生成补货申请。/);
@@ -369,6 +371,8 @@ test("4.1 manual replenishment page uses compact warehouse workbench layout", ()
   assert.match(transferHtml, /<input name="to_store_code" type="hidden" value="UTAWALA" \/>/);
   assert.match(transferHtml, /<input name="required_arrival_date" type="hidden" value="2026-05-03" \/>/);
   assert.match(appJs, /function syncManualReplenishmentContextToForm/);
+  assert.match(appJs, /const normalizedValue = String\(value \|\| ""\)\.trim\(\);[\s\S]*contextControl\.value = normalizedValue;/);
+  assert.match(appJs, /formInput\.value = String\(contextControl\.value \|\| ""\)\.trim\(\);/);
   assert.match(appJs, /syncManualReplenishmentContextToForm\(\);\n\s*const form = new FormData\(event\.currentTarget\);/);
 
   assert.match(transferHtml, /class="manual-replenishment-layout"/);
