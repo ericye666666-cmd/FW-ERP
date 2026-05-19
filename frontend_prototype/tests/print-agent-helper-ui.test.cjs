@@ -220,6 +220,13 @@ test("printer detection clears stale Deli state before each request and on failu
   assert.doesNotMatch(printerFunction, /catch \(error\)[\s\S]*已检测到 Deli DL-720C/);
 });
 
+test("batch print primary button is disabled when local agent or printer is unavailable", () => {
+  assert.match(
+    appJs,
+    /primaryPrintAllButton\.disabled\s*=\s*!jobs\.length\s*\|\|\s*localPrintAgentState\.agentStatus\s*!==\s*"connected"\s*\|\|\s*localPrintAgentState\.printerStatus\s*!==\s*"available"/,
+  );
+});
+
 test("local agent primary label printing uses raw label endpoint instead of browser HTML", () => {
   assert.match(appJs, /async function printCurrentBaleModalViaLocalAgent/);
   assert.match(appJs, /fetch\(`\$\{agentUrl\}\/print\/label`/);

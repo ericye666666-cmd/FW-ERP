@@ -24148,7 +24148,7 @@ function renderBalePrintModal() {
                 : "打印标签"))));
   }
   if (primaryPrintAllButton instanceof HTMLButtonElement) {
-    primaryPrintAllButton.disabled = !jobs.length;
+    primaryPrintAllButton.disabled = !jobs.length || localPrintAgentState.agentStatus !== "connected" || localPrintAgentState.printerStatus !== "available";
     primaryPrintAllButton.textContent = "打印本批全部标签";
     primaryPrintAllButton.classList.toggle("hidden-screen", jobs.length <= 1);
   }
