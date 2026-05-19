@@ -220,6 +220,49 @@ test("printer detection clears stale Deli state before each request and on failu
   assert.doesNotMatch(printerFunction, /catch \(error\)[\s\S]*已检测到 Deli DL-720C/);
 });
 
+test("primary print button triggers batch print action instead of single print action", () => {
+  const handlerBlock = appJs.match(/document\.querySelector\("#balePrintModalPrimaryPrintButton"\)\?\.addEventListener\("click",[\s\S]*?\}\);/);
+  assert.ok(handlerBlock, "missing primary print button click handler");
+  assert.match(handlerBlock[0], /printAllBaleModalPrimaryAction\(\)/);
+  assert.doesNotMatch(handlerBlock[0], /printCurrentBaleModalPrimaryAction\(\)/);
+});
+
+test("printAllBaleModalPrimaryAction prints every job in current modal batch", async () => {
+  const printAllSource = appJs.match(/async function printAllBaleModalPrimaryAction\(\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(printAllSource, "missing async printAllBaleModalPrimaryAction");
+  const run = Function(`
+    let calls = 0;
+    let rendered = 0;
+    const baleBatchCompletionReadyKeys = new Set();
+    let balePrinterConsoleNotice = null;
+    const localPrintAgentState = { connected: true, printerStatus: "available" };
+    const balePrintModalState = {
+      jobs: [{ id: "job-1" }, { id: "job-2" }, { id: "job-3" }],
+      currentIndex: 1,
+      hasSuccessfulBatchPrint: false,
+      groupKey: "grp-001",
+    };
+    async function checkLocalPrintAgentHealth() {}
+    async function printCurrentBaleModalViaLocalAgent() { calls += 1; }
+    function renderBalePrintModal() { rendered += 1; }
+    ${printAllSource}
+    return {
+      run: async () => printAllBaleModalPrimaryAction(),
+      state: balePrintModalState,
+      getCalls: () => calls,
+      getRendered: () => rendered,
+      readyKeys: baleBatchCompletionReadyKeys,
+      getNotice: () => balePrinterConsoleNotice,
+    };
+  `)();
+  await run.run();
+  assert.equal(run.getCalls(), 3);
+  assert.equal(run.state.hasSuccessfulBatchPrint, true);
+  assert.equal(run.readyKeys.has("GRP-001"), true);
+  assert.match(String(run.getNotice()?.message || ""), /3 张标签/);
+  assert.ok(run.getRendered() >= 3);
+});
+
 test("batch print primary button is disabled when local agent or printer is unavailable", () => {
   assert.match(
     appJs,
