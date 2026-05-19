@@ -42401,7 +42401,7 @@ document.addEventListener("click", async (event) => {
     populateChinaSourceCostRecordSelect(sourcePoolToken);
     hydrateChinaSourceCostForm(record);
     renderChinaSourceCostSummary(sourcePoolToken);
-    const panelKey = getPanelKeyByTitle("warehouse", "4.3 中方来源列表 / 补填成本");
+    const panelKey = getPanelKeyByTitle("chinaProcurement", "4.3 中方来源列表 / 补填成本");
     if (panelKey) {
       setActivePanel(panelKey);
     }
@@ -43756,7 +43756,7 @@ document.querySelectorAll("input[name='selection_mode']").forEach((input) => {
     }
   }
   renderChinaSourceCostSummary(sourcePoolToken);
-  const panelKey = getPanelKeyByTitle("warehouse", "4.3 中方来源列表 / 补填成本");
+  const panelKey = getPanelKeyByTitle("chinaProcurement", "4.3 中方来源列表 / 补填成本");
   if (panelKey) {
     setActivePanel(panelKey);
   }
