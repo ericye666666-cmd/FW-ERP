@@ -7,7 +7,7 @@ const indexHtml = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf
 
 const expectedEntries = [
   { label: "1. Warehouse main flow", workspace: "warehouse" },
-  { label: "2. China source / inbound", workspace: "warehouse" },
+  { label: "2. China source / inbound", workspace: "chinaProcurement" },
   { label: "3. Sorting tasks", workspace: "warehouse" },
   { label: "4. Sorted stock / compression", workspace: "warehouse" },
   { label: "5. Store manager PDA preview", workspace: "store" },
@@ -43,8 +43,8 @@ test("/app test home exposes all 11 module entries with test-home selectors", ()
   }
 });
 
-test("China source / inbound test-home entry points to warehouse workspace", () => {
-  const chinaSourceButtonPattern = /<button[^>]*class="test-home-link"[^>]*data-test-home-workspace="warehouse"[^>]*>\s*2\. China source \/ inbound\s*<\/button>/;
+test("China source / inbound test-home entry points to china procurement workspace", () => {
+  const chinaSourceButtonPattern = /<button[^>]*class="test-home-link"[^>]*data-test-home-workspace="chinaProcurement"[^>]*>\s*2\. China source \/ inbound\s*<\/button>/;
   assert.match(indexHtml, chinaSourceButtonPattern);
 
   const wrongWorkspacePattern = /<button[^>]*class="test-home-link"[^>]*data-test-home-workspace="store"[^>]*>\s*2\. China source \/ inbound\s*<\/button>/;
