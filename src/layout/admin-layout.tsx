@@ -27,6 +27,12 @@ const iconMap: Record<string, typeof LayoutGrid> = {
   "/location-inventory": Boxes,
   "/bale-sales/pricing": PackageSearch,
   "/bale-sales/outbound": ScanLine,
+  "/china-procurement": BriefcaseBusiness,
+  "/china-procurement/container-intake": BriefcaseBusiness,
+  "/china-procurement/shipping-cost": BriefcaseBusiness,
+  "/content-center": ClipboardList,
+  "/finance-department": Bell,
+  "/audit-risk-department": Search,
   "http://127.0.0.1:8000/app/": BriefcaseBusiness,
 };
 

@@ -18,68 +18,74 @@ export interface NavigationGroup {
 
 export const navigationGroups: NavigationGroup[] = [
   {
-    title: "指挥台",
+    title: "顶部导航",
     items: [
       {
-        label: "AI 指挥台",
+        label: "测试工具",
         href: "/",
-        description: "统一界面、任务看板与智库",
+        description: "系统测试入口与工作台",
       },
       {
-        label: "系统搭建",
+        label: "中方采购管理",
+        description: "中方管理与采购成本补录",
+        children: [
+          {
+            label: "中方管理",
+            href: "/china-procurement",
+            description: "中方采购总览与管理入口",
+          },
+          {
+            label: "服装整柜录入",
+            href: "/china-procurement/container-intake",
+            description: "录入服装整柜到港与基础信息",
+          },
+          {
+            label: "船单三段成本补齐",
+            href: "/china-procurement/shipping-cost",
+            description: "补录海运、清关、本地段三段成本",
+          },
+        ],
+      },
+      {
+        label: "仓库功能区",
+        href: "/bale-inbound",
+        description: "仓库入仓、分拣与库位库存",
+      },
+      {
+        label: "品牌门店运营中心",
+        href: "/sorting-tasks",
+        description: "品牌门店运营工作入口",
+      },
+      {
+        label: "商品内容中心",
+        href: "/content-center",
+        description: "TikTok / Jumia / WhatsApp 商品内容运营（占位）",
+      },
+      {
+        label: "门店功能区",
+        href: "/location-inventory",
+        description: "门店库存与执行页面入口",
+      },
+      {
+        label: "财务部门",
+        href: "/finance-department",
+        description: "财务入口（占位）",
+      },
+      {
+        label: "审计/风控部门",
+        href: "/audit-risk-department",
+        description: "审计与风控入口（占位）",
+      },
+      {
+        label: "系统管理",
         href: "http://127.0.0.1:8000/app/",
-        description: "跳转到仓库、运营中心和门店端业务页面",
+        description: "系统配置与管理入口",
         external: true,
       },
     ],
   },
-  {
-    title: "仓库",
-    items: [
-      {
-        label: "包裹入仓",
-        href: "/bale-inbound",
-        description: "运单总表、入仓明细与标签队列",
-      },
-      {
-        label: "分拣任务",
-        href: "/sorting-tasks",
-        description: "主管建任务、挑包复核、上架确认",
-      },
-      {
-        label: "分拣工位样稿",
-        href: "/sorting-station-preview",
-        description: "基于 SAP Horizon 的仓库工位提档预览",
-      },
-      {
-        label: "库位库存",
-        href: "/location-inventory",
-        description: "货架级库存与库位调整",
-      },
-    ],
-  },
-  {
-    title: "销售执行",
-    items: [
-      {
-        label: "Bales销售",
-        description: "独立于仓库工单流，处理待售包裹成本表、毛利编辑与真实出库。",
-        children: [
-          {
-            label: "待售包裹",
-            href: "/bale-sales/pricing",
-            description: "根据船单成本池查看待售 bale，并导出成本与毛利编辑表。",
-          },
-          {
-            label: "真实出库",
-            href: "/bale-sales/outbound",
-            description: "扫码核销、登记销售人和客户信息，并完成真实出库。",
-          },
-        ],
-      },
-    ],
-  },
 ];
+
 
 export const pageMeta = {
   "/": {
@@ -116,6 +122,36 @@ export const pageMeta = {
     eyebrow: "Bales 销售",
     title: "真实出库",
     description: "用扫码核销完成 bale 销售出库，并登记销售人、客户和付款信息。",
+  },
+  "/china-procurement": {
+    eyebrow: "中方采购管理",
+    title: "中方管理",
+    description: "查看中方采购管理入口与相关操作。",
+  },
+  "/china-procurement/container-intake": {
+    eyebrow: "中方采购管理",
+    title: "服装整柜录入",
+    description: "录入服装整柜到港与基础信息。",
+  },
+  "/china-procurement/shipping-cost": {
+    eyebrow: "中方采购管理",
+    title: "船单三段成本补齐",
+    description: "补录船单三段成本信息。",
+  },
+  "/content-center": {
+    eyebrow: "商品内容中心",
+    title: "商品内容中心",
+    description: "用于 TikTok / Jumia / WhatsApp 商品内容运营的占位入口。",
+  },
+  "/finance-department": {
+    eyebrow: "财务部门",
+    title: "财务部门",
+    description: "财务部门入口占位页面。",
+  },
+  "/audit-risk-department": {
+    eyebrow: "审计/风控部门",
+    title: "审计/风控部门",
+    description: "审计与风控入口占位页面。",
   },
 } as const;
 
