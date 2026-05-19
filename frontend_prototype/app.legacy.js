@@ -661,9 +661,13 @@ const GLOBAL_I18N_PHRASES = [
   { zh: "仓库经理", en: "Warehouse Manager" },
   { zh: "仓库主管", en: "Warehouse Supervisor" },
   { zh: "测试工具", en: "Test Tools" },
+  { zh: "中方采购管理", en: "China Procurement" },
   { zh: "仓库功能区", en: "Warehouse" },
-  { zh: "运营中心", en: "Operations Center" },
+  { zh: "品牌门店运营中心", en: "Brand Store Operations" },
+  { zh: "商品内容中心", en: "Product Content Center" },
   { zh: "门店功能区", en: "Store Operations" },
+  { zh: "财务部门", en: "Finance Department" },
+  { zh: "审计/风控部门", en: "Audit/Risk Control" },
   { zh: "收银功能区", en: "Cashier Area" },
   { zh: "商品入仓", en: "Inbound" },
   { zh: "服装入仓", en: "Garment Inbound" },
@@ -2620,12 +2624,12 @@ const WORKSPACE_META = {
   },
   warehouse: {
     titleEn: "Warehouse",
-    zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理和中方管理七条线组织仓库页面。",
+    zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。",
     en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management."
   },
   operations: {
     titleEn: "Operations Center",
-    zh: "当前显示：运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
+    zh: "当前显示：品牌门店运营中心。这里按经营分析、业务执行和风控管理三条线组织区域经理页面。",
     en: "Current View: Operations Center. Pages are grouped by Business Analytics, Operations, and Risk Management."
   },
   store: {
@@ -13168,7 +13172,7 @@ function renderAuthResultSummary(kind, data) {
   const visibleWorkspaces = getAccessibleWorkspaces(user).map((workspace) => {
     if (workspace === "testing") return "测试工具";
     if (workspace === "warehouse") return "仓库功能区";
-    if (workspace === "operations") return "运营中心";
+    if (workspace === "operations") return "品牌门店运营中心";
     if (workspace === "store") return "门店功能区";
     if (workspace === "admin") return "系统管理";
     return workspace;
@@ -26053,7 +26057,7 @@ function getDevModuleLabel(module = "") {
     return "门店";
   }
   if (value === "operations") {
-    return "运营中心";
+    return "品牌门店运营中心";
   }
   if (value === "ai") {
     return "AI 看板";
