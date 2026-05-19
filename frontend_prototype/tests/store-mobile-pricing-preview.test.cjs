@@ -1731,8 +1731,15 @@ test("incremental pricing batches track allocated, generated, and remaining quan
         this.dataset = dataset || {};
       }
     }
+    class HTMLSelectElement {
+      constructor(value, dataset) {
+        this.value = String(value);
+        this.dataset = dataset || {};
+      }
+    }
     var mockQuantity = 30;
     var mockCustomPrice = 999;
+    var mockCustomBaseline = "";
     var document = {
       querySelectorAll(selector) {
         if (selector === "[data-mobile-pricing-batch-qty]") {
@@ -1740,6 +1747,9 @@ test("incremental pricing batches track allocated, generated, and remaining quan
         }
         if (selector === "[data-mobile-pricing-custom-price]") {
           return [new HTMLInputElement(mockCustomPrice, { mobilePricingCustomPrice: "line-100" })];
+        }
+        if (selector === "[data-mobile-pricing-custom-baseline]") {
+          return [new HTMLSelectElement(mockCustomBaseline, { mobilePricingCustomBaseline: "line-100" })];
         }
         return [];
       },
@@ -1751,9 +1761,10 @@ test("incremental pricing batches track allocated, generated, and remaining quan
     }
     `,
     `({
-      setMockInputs(quantity, customPrice) {
+      setMockInputs(quantity, customPrice, customBaseline = "") {
         mockQuantity = quantity;
         mockCustomPrice = customPrice;
+        mockCustomBaseline = customBaseline;
       },
       getStoreMobileSourceLineProgress,
       createStoreMobilePricingBatch,
@@ -1805,11 +1816,90 @@ test("incremental pricing batches track allocated, generated, and remaining quan
   assert.equal(sBatch.price_kes, 312);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 20);
 
-  helpers.setMockInputs(20, 275);
+  helpers.setMockInputs(20, 320, "S");
   const customBatch = helpers.createStoreMobilePricingBatch(state, "line-100||CUSTOM");
   assert.equal(customBatch.quantity, 20);
-  assert.equal(customBatch.price_kes, 275);
+  assert.equal(customBatch.price_kes, 320);
+  assert.equal(customBatch.baseline_grade, "S");
+  assert.equal(customBatch.baseline_default_sale_price_kes, 312);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 0);
+});
+
+
+
+test("custom pricing requires explicit baseline grade and enforces P/S baseline floor", () => {
+  const helpers = getExecutableBundle(
+    [
+      "getStoreMobileTaskGroups",
+      "getStoreMobilePricingSourceLines",
+      "getStoreMobileLineAllocatedQty",
+      "getStoreMobileLineRemainingQty",
+      "validateStoreMobilePricingBatchQuantity",
+      "createStoreMobilePricingBatch",
+    ],
+    `
+    class HTMLInputElement {
+      constructor(value, dataset) {
+        this.value = String(value);
+        this.dataset = dataset || {};
+      }
+    }
+    class HTMLSelectElement {
+      constructor(value, dataset) {
+        this.value = String(value);
+        this.dataset = dataset || {};
+      }
+    }
+    var mockQuantity = 10;
+    var mockCustomPrice = 100;
+    var mockCustomBaseline = "";
+    var document = {
+      querySelectorAll(selector) {
+        if (selector === "[data-mobile-pricing-batch-qty]") return [new HTMLInputElement(mockQuantity, { mobilePricingBatchQty: "line-1" })];
+        if (selector === "[data-mobile-pricing-custom-price]") return [new HTMLInputElement(mockCustomPrice, { mobilePricingCustomPrice: "line-1" })];
+        if (selector === "[data-mobile-pricing-custom-baseline]") return [new HTMLSelectElement(mockCustomBaseline, { mobilePricingCustomBaseline: "line-1" })];
+        return [];
+      },
+    };
+    function getStoreMobileSuggestedSalePrice(categoryMain, categorySub, grade) {
+      if (grade === "P") return 410;
+      if (grade === "S") return 312;
+      return 0;
+    }
+    `,
+    `({
+      setMock(customPrice, baseline) {
+        mockCustomPrice = customPrice;
+        mockCustomBaseline = baseline;
+      },
+      createStoreMobilePricingBatch,
+    })`,
+  );
+  const state = { pricingSourceLines: [{ line_key: "line-1", category_main: "Pants", category_sub: "Cargo", item_count: 50 }], priceGroups: [] };
+
+  helpers.setMock(350, "");
+  assert.equal(helpers.createStoreMobilePricingBatch(state, "line-1||CUSTOM"), null);
+  assert.match(state.pricingSourceLineMessage, /请选择自定义售价基准档位 P 或 S/);
+
+  helpers.setMock(300, "P");
+  assert.equal(helpers.createStoreMobilePricingBatch(state, "line-1||CUSTOM"), null);
+  assert.match(state.pricingSourceLineMessage, /自定义售价不能低于当前 P\/S 默认售价/);
+
+  helpers.setMock(300, "S");
+  assert.equal(helpers.createStoreMobilePricingBatch(state, "line-1||CUSTOM"), null);
+  assert.match(state.pricingSourceLineMessage, /自定义售价不能低于当前 P\/S 默认售价/);
+
+  helpers.setMock(312, "S");
+  const sPass = helpers.createStoreMobilePricingBatch(state, "line-1||CUSTOM");
+  assert.equal(sPass.baseline_grade, "S");
+  assert.equal(sPass.baseline_default_sale_price_kes, 312);
+  assert.equal(sPass.sale_price_kes, 312);
+
+  helpers.setMock(420, "P");
+  const pPass = helpers.createStoreMobilePricingBatch(state, "line-1||CUSTOM");
+  assert.equal(pPass.baseline_grade, "P");
+  assert.equal(pPass.baseline_default_sale_price_kes, 410);
+  assert.equal(pPass.sale_price_kes, 420);
 });
 
 test("pricing batch creation refuses missing quantity input instead of using source line total", () => {
@@ -1909,8 +1999,10 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
         this.dataset = dataset || {};
       }
     }
+    class HTMLSelectElement extends HTMLInputElement {}
     var mockQuantity = 20;
     var mockCustomPrice = 0;
+    var mockCustomBaseline = "S";
     var capturedRequests = [];
     var currentSession = { user: { username: "Austin", store_code: "UTAWALA" } };
     var document = {
@@ -1920,6 +2012,9 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
         }
         if (selector === "[data-mobile-pricing-custom-price]") {
           return [new HTMLInputElement(mockCustomPrice, { mobilePricingCustomPrice: "line-100" })];
+        }
+        if (selector === "[data-mobile-pricing-custom-baseline]") {
+          return [new HTMLSelectElement(mockCustomBaseline, { mobilePricingCustomBaseline: "line-100" })];
         }
         return [];
       },
@@ -1967,6 +2062,12 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
       setMockQuantity(value) {
         mockQuantity = value;
       },
+      setMockCustomBaseline(value) {
+        mockCustomBaseline = value;
+      },
+      setMockCustomPrice(value) {
+        mockCustomPrice = value;
+      },
       capturedRequests,
       createStoreMobilePricingBatch,
       generateStoreMobileBatchStoreItems,
@@ -1999,6 +2100,7 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   };
 
   helpers.setMockQuantity(20);
+  helpers.setMockCustomBaseline("S");
   const pBatch = helpers.createStoreMobilePricingBatch(state, "line-100||P");
   assert.equal(pBatch.quantity, 20);
   assert.notEqual(pBatch.quantity, 100);
@@ -2013,6 +2115,9 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   assert.equal(helpers.capturedRequests[0].payload.quantity, 20);
   assert.equal(helpers.capturedRequests[0].payload.sale_price_kes, 410);
   assert.equal(helpers.capturedRequests[0].payload.pricing_batch_id, pBatch.group_id);
+  assert.equal(helpers.capturedRequests[0].payload.pricing_type, "P");
+  assert.equal(helpers.capturedRequests[0].payload.baseline_grade, "P");
+  assert.equal(helpers.capturedRequests[0].payload.default_sale_price_kes, 410);
   assert.equal(helpers.capturedRequests[0].payload.source_sdp_display_code, "SDP261290018");
   assert.equal(pBatch.generated_store_items.length, 20);
   assert.match(helpers.renderStoreItemLabelPreview(pBatch.generated_store_items, "60x40", pBatch), /第 1 \/ 20 张/);
@@ -2023,9 +2128,20 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   assert.equal(sBatch.quantity, 30);
   assert.equal(helpers.getStoreMobileSourceLineProgress(state, "line-100").remaining_qty, 50);
   await helpers.generateStoreMobileBatchStoreItems(state, sBatch.group_id);
+  helpers.setMockCustomPrice(420);
+  const customBatch = helpers.createStoreMobilePricingBatch(state, "line-100||CUSTOM");
+  await helpers.generateStoreMobileBatchStoreItems(state, customBatch.group_id);
   assert.equal(helpers.capturedRequests[1].payload.quantity, 30);
   assert.equal(helpers.capturedRequests[1].payload.sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[1].payload.baseline_grade, "S");
+  assert.equal(helpers.capturedRequests[1].payload.default_sale_price_kes, 312);
   assert.equal(sBatch.generated_store_items.length, 30);
+  assert.equal(helpers.capturedRequests[2].payload.pricing_type, "CUSTOM");
+  assert.equal(helpers.capturedRequests[2].payload.baseline_grade, "S");
+  assert.equal(helpers.capturedRequests[2].payload.default_sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[2].payload.baseline_default_sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[2].payload.sale_price_kes, 420);
+  assert.equal(helpers.capturedRequests[2].payload.source_line_key, "line-100");
   assert.match(helpers.renderStoreItemLabelPreview(sBatch.generated_store_items, "60x40", sBatch), /第 1 \/ 30 张/);
   assert.equal(helpers.buildStoreItemLabelPreviewPayload("60x40", sBatch.generated_store_items, sBatch).labels.length, 30);
 });

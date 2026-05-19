@@ -132,15 +132,15 @@ def _build_default_apparel_default_sale_prices() -> list[dict[str, Any]]:
                     "category_main": preset["category_main"],
                     "category_sub": preset["category_sub"],
                     "grade": "P",
-                    "default_sale_price_kes": round(float(preset["cost_p"]) * 2, 2),
-                    "note": f"{preset['label']} P 档参考售价 = 默认成本 × 2",
+                    "default_sale_price_kes": round(float(preset["cost_p"]), 2),
+                    "note": f"{preset['label']} P 档默认售价",
                 },
                 {
                     "category_main": preset["category_main"],
                     "category_sub": preset["category_sub"],
                     "grade": "S",
-                    "default_sale_price_kes": round(float(preset["cost_s"]) * 2, 2),
-                    "note": f"{preset['label']} S 档参考售价 = 默认成本 × 2",
+                    "default_sale_price_kes": round(float(preset["cost_s"]), 2),
+                    "note": f"{preset['label']} S 档默认售价",
                 },
             ]
         )
@@ -6210,7 +6210,7 @@ class InMemoryState:
             raise HTTPException(status_code=400, detail="rack_code is required")
         default_cost_row = self._find_apparel_default_cost(category_main, category_sub, grade)
         if not default_cost_row:
-            raise HTTPException(status_code=409, detail="请先在 4.7 默认成本价管理里配置对应默认成本价")
+            raise HTTPException(status_code=409, detail="请先在 4.7 服装默认售价规则里配置对应默认售价")
         configured_cost = round(float(default_cost_row.get("default_cost_kes") or 0), 2)
         if configured_cost != default_cost_kes:
             raise HTTPException(status_code=409, detail="分拣库位必须绑定当前默认成本价，请先按 4.7 当前口径保存")
@@ -9072,7 +9072,7 @@ class InMemoryState:
             if confirm_to_inventory and requires_default_cost_profile and default_cost_kes in {None, ""}:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"{category_name} / {normalized_grade} 还没有配置默认成本价，请先完成 4.7 默认成本价管理",
+                    detail=f"{category_name} / {normalized_grade} 还没有配置默认售价，请先完成 4.7 服装默认售价规则",
                 )
             rack_code = self._resolve_sorting_result_rack_code(
                 category_name,
@@ -15425,7 +15425,23 @@ class InMemoryState:
 
         pricing_type = str(payload.get("pricing_type") or "").strip().upper()
         if pricing_type not in {"P", "S", "CUSTOM"}:
-            pricing_type = "CUSTOM"
+            explicit_grade = str(payload.get("grade") or "").strip().upper()
+            pricing_type = explicit_grade if explicit_grade in {"P", "S"} else "CUSTOM"
+
+        if pricing_type == "CUSTOM":
+            baseline_grade = str(payload.get("baseline_grade") or "").strip().upper()
+            if baseline_grade not in {"P", "S"}:
+                raise HTTPException(status_code=400, detail="CUSTOM 定价必须绑定 baseline_grade=P 或 S。")
+            baseline = self._find_apparel_default_sale_price(
+                str(payload.get("category_main") or "").strip(),
+                str(payload.get("category_sub") or "").strip(),
+                baseline_grade,
+            )
+            baseline_price = round(float((baseline or {}).get("default_sale_price_kes") or 0), 2)
+            if baseline_price <= 0:
+                raise HTTPException(status_code=409, detail="请先配置对应品类 baseline 默认售价。")
+            if sale_price_kes < baseline_price:
+                raise HTTPException(status_code=409, detail="自定义售价不能低于当前 P/S 默认售价")
 
         timestamp = now_iso()
         category_main = str(payload.get("category_main") or "").strip()

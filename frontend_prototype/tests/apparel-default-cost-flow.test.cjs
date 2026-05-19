@@ -112,17 +112,17 @@ test("default sale price seeds derive P and S rows from every default cost prese
       "S",
     );
 
-    assert.equal(pRecord.default_sale_price_kes, preset.cost_p * 2);
-    assert.equal(sRecord.default_sale_price_kes, preset.cost_s * 2);
-    assert.match(pRecord.note, /参考售价 = 默认成本 × 2/);
-    assert.match(sRecord.note, /参考售价 = 默认成本 × 2/);
+    assert.equal(pRecord.default_sale_price_kes, preset.cost_p);
+    assert.equal(sRecord.default_sale_price_kes, preset.cost_s);
+    assert.match(pRecord.note, /默认售价/);
+    assert.match(sRecord.note, /默认售价/);
   });
 });
 
 test("default sale price seeds include expected reference examples", () => {
-  assert.equal(findApparelDefaultSalePriceRecord(DEFAULT_APPAREL_DEFAULT_SALE_PRICES, "tops", "lady tops", "P").default_sale_price_kes, 370);
-  assert.equal(findApparelDefaultSalePriceRecord(DEFAULT_APPAREL_DEFAULT_SALE_PRICES, "pants", "cargo pant", "P").default_sale_price_kes, 410);
-  assert.equal(findApparelDefaultSalePriceRecord(DEFAULT_APPAREL_DEFAULT_SALE_PRICES, "jacket", "jacket", "P").default_sale_price_kes, 520);
+  assert.equal(findApparelDefaultSalePriceRecord(DEFAULT_APPAREL_DEFAULT_SALE_PRICES, "tops", "lady tops", "P").default_sale_price_kes, 185);
+  assert.equal(findApparelDefaultSalePriceRecord(DEFAULT_APPAREL_DEFAULT_SALE_PRICES, "pants", "cargo pant", "P").default_sale_price_kes, 205);
+  assert.equal(findApparelDefaultSalePriceRecord(DEFAULT_APPAREL_DEFAULT_SALE_PRICES, "jacket", "jacket", "P").default_sale_price_kes, 260);
 });
 
 test("normalizeApparelDefaultSalePriceRows keeps valid rows and deduplicates by category plus grade", () => {
@@ -170,18 +170,16 @@ test("find and summarize default sale prices by category and P/S grade", () => {
   });
 });
 
-test("warehouse comprehensive UI shows default sale price management below default cost management", () => {
-  const costIndex = indexHtml.indexOf("默认成本价管理");
-  const saleIndex = indexHtml.indexOf("默认售价管理");
+test("warehouse comprehensive UI keeps only one apparel default sale price management section", () => {
+  const saleIndex = indexHtml.indexOf("服装默认售价规则");
 
-  assert.ok(costIndex > -1);
-  assert.ok(saleIndex > costIndex);
-  assert.match(indexHtml, /id="apparelDefaultSalePriceForm"/);
-  assert.match(indexHtml, /默认售价 KES/);
-  assert.match(indexHtml, /P 档默认售价/);
-  assert.match(indexHtml, /S 档默认售价/);
-  assert.match(indexHtml, /参考售价 = 默认成本 × 2/);
-  assert.match(indexHtml, /后续可作为店员分堆标价 \/ 默认售价建议使用；当前仅为配置参考。/);
+  assert.ok(saleIndex > -1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceForm"/g) || []).length, 1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceSummary"/g) || []).length, 1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceList"/g) || []).length, 1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceOutput"/g) || []).length, 1);
+  assert.match(indexHtml, /默认售价（KES）/);
+
   assert.match(appJs, /renderApparelDefaultSalePriceSummary/);
   assert.match(appJs, /data-apparel-default-sale-price-edit/);
   assert.match(appJs, /data-apparel-default-sale-price-delete/);
