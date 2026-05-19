@@ -170,16 +170,15 @@ test("find and summarize default sale prices by category and P/S grade", () => {
   });
 });
 
-test("warehouse comprehensive UI shows default sale price management below default cost management", () => {
-  const costIndex = indexHtml.indexOf("服装默认售价规则");
-  const saleIndex = indexHtml.indexOf("默认售价管理");
+test("warehouse comprehensive UI keeps only one apparel default sale price management section", () => {
+  const saleIndex = indexHtml.indexOf("服装默认售价规则");
 
-  assert.ok(costIndex > -1);
-  assert.ok(saleIndex > costIndex);
-  assert.match(indexHtml, /id="apparelDefaultSalePriceForm"/);
-  assert.match(indexHtml, /默认售价 KES/);
-  assert.match(indexHtml, /P 档默认售价/);
-  assert.match(indexHtml, /S 档默认售价/);
+  assert.ok(saleIndex > -1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceForm"/g) || []).length, 1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceSummary"/g) || []).length, 1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceList"/g) || []).length, 1);
+  assert.equal((indexHtml.match(/id="apparelDefaultSalePriceOutput"/g) || []).length, 1);
+  assert.match(indexHtml, /默认售价（KES）/);
 
   assert.match(appJs, /renderApparelDefaultSalePriceSummary/);
   assert.match(appJs, /data-apparel-default-sale-price-edit/);

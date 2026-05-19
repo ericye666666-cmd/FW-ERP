@@ -40331,7 +40331,7 @@ function validateStoreMobilePricingBatchQuantity(state = storeMobilePricingPrevi
 }
 
 function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, value = "") {
-  const [sourceLineKey = "", rawGrade = ""] = String(value || "").split("||");
+  const [sourceLineKey = "", rawGrade = "", rawBaselineGrade = ""] = String(value || "").split("||");
   const grade = String(rawGrade || "P").trim().toUpperCase();
   const line = getStoreMobilePricingSourceLines(state).find((candidate) => String(candidate.line_key || "") === sourceLineKey);
   if (!line) {
@@ -40341,8 +40341,12 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   const defaultPrice = grade === "CUSTOM" ? 0 : getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, grade);
   const pBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "P");
   const sBaselinePrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, "S");
-  const baselineGrade = sBaselinePrice > 0 && (pBaselinePrice <= 0 || sBaselinePrice <= pBaselinePrice) ? "S" : "P";
-  const baselinePrice = baselineGrade === "S" ? sBaselinePrice : pBaselinePrice;
+  const customBaselineSelect = [...document.querySelectorAll("[data-mobile-pricing-custom-baseline]")].find((input) => {
+    const isSelect = typeof HTMLSelectElement !== "undefined" ? input instanceof HTMLSelectElement : true;
+    return isSelect && String(input?.dataset?.mobilePricingCustomBaseline || "") === sourceLineKey;
+  });
+  const explicitBaselineGrade = String(rawBaselineGrade || (customBaselineSelect instanceof HTMLSelectElement ? customBaselineSelect.value : "")).trim().toUpperCase();
+  const baselinePrice = explicitBaselineGrade === "S" ? sBaselinePrice : pBaselinePrice;
   const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
     (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey,
   );
@@ -40356,6 +40360,10 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     return null;
   }
   const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
+  if (grade === "CUSTOM" && !["P", "S"].includes(explicitBaselineGrade)) {
+    state.pricingSourceLineMessage = "请选择自定义售价基准档位 P 或 S";
+    return null;
+  }
   if (grade === "CUSTOM" && !(baselinePrice > 0)) {
     state.pricingSourceLineMessage = "请先在服装默认售价规则配置当前品类的 P/S 默认售价。";
     return null;
@@ -40376,7 +40384,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     category: `${line.category_main} / ${line.category_sub}`,
     grade,
     tier: grade === "CUSTOM" ? "自定义" : `${grade}档`,
-    baseline_grade: grade === "CUSTOM" ? baselineGrade : grade,
+    baseline_grade: grade === "CUSTOM" ? explicitBaselineGrade : grade,
     baseline_default_sale_price_kes: grade === "CUSTOM" ? baselinePrice : defaultPrice,
     price_kes: priceKes,
     sale_price_kes: priceKes,
@@ -40740,6 +40748,14 @@ function renderPriceGroupCards(state = storeMobilePricingPreviewState) {
                 <label class="mobile-rack-input">
                   <span>自定义价格</span>
                   <input type="number" min="1" step="1" placeholder="请输入自定义价格" ${createDisabled ? "disabled" : ""} data-mobile-pricing-custom-price="${escapeHtml(line.line_key)}">
+                </label>
+                <label class="mobile-rack-input">
+                  <span>自定义基准档位</span>
+                  <select ${createDisabled ? "disabled" : ""} data-mobile-pricing-custom-baseline="${escapeHtml(line.line_key)}">
+                    <option value="">请选择 P 或 S</option>
+                    <option value="P">P 基准</option>
+                    <option value="S">S 基准</option>
+                  </select>
                 </label>
                 ${createDisabled ? '<div class="mobile-task-complete-note">本 source line 已全部分批。</div>' : ""}
                 <div class="mobile-field-group-actions">
