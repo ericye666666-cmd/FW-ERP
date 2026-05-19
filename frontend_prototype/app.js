@@ -1036,7 +1036,7 @@ const EMPLOYEE_LAUNCH_UI_TERMS = [
   { zh: "收货件数", en: "Received Quantity" },
   { zh: "单件成本", en: "Unit Cost" },
   { zh: "提交收货", en: "Submit Receiving" },
-  { zh: "默认售价管理", en: "Default Sale Price Management" },
+  { zh: "服装默认售价规则", en: "Apparel Default Sale Price Rules" },
   { zh: "请选择商品大类", en: "Select Category" },
   { zh: "请选择商品小类", en: "Select Subcategory" },
   { zh: "商品大类", en: "Category" },
@@ -2389,7 +2389,7 @@ const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = apparelDefaultCostFlow.DEFAULT_APPAR
   category_main: row.category_main,
   category_sub: row.category_sub,
   grade: row.grade,
-  default_sale_price_kes: roundToTwo(Number(row.default_cost_kes || 0) * 2),
+  default_sale_price_kes: roundToTwo(Number(row.default_sale_price_kes || row.default_cost_kes || 0)),
   note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；参考售价 = 默认成本 × 2`,
 }));
 const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SORTING_RACKS || [
@@ -3140,11 +3140,11 @@ const WAREHOUSE_PANEL_NAV_META = [
     hiddenInNav: true,
   },
   {
-    match: "4.7 默认成本价管理",
+    match: "4.7 服装默认售价规则",
     section: "general",
     order: 139.9,
     icon: "价",
-    navTitle: "默认成本价管理",
+    navTitle: "服装默认售价规则",
     navTitleEn: "Default Cost Management",
   },
   {
@@ -39234,7 +39234,7 @@ function getStoreRackOptionsForPackage(storeCode = "") {
 }
 
 function getDefaultStoreSalePriceChoices(costPrice = null) {
-  // 4.9 默认售价管理后续接真实配置；当前按包成本或前端 fallback 计算。
+  // 默认售价规则由仓库配置维护；此处仅消费配置值。
   if (costPrice != null && Number.isFinite(Number(costPrice)) && Number(costPrice) > 0) {
     return {
       default_price_1: Math.round(costPrice * 1.8),
@@ -40353,7 +40353,7 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   }
   const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
   if (!(priceKes > 0)) {
-    state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在默认售价管理配置 P/S 默认售价。";
+    state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在服装默认售价规则配置 P/S 默认售价。";
     return null;
   }
   const group = {
@@ -45874,7 +45874,7 @@ async function submitApparelSortingRack(event) {
     throw new Error("等级只支持 P 或 S。");
   }
   if (!(draftRecord.default_cost_kes > 0)) {
-    throw new Error("请先在 4.7 默认成本价管理里配置这条默认成本价。");
+    throw new Error("请先在 4.7 服装默认售价规则里配置这条默认售价。");
   }
   if (!draftRecord.rack_code) {
     throw new Error("请先填写锁定分拣库位。");

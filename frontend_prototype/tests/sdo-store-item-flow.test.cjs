@@ -171,7 +171,7 @@ test("clerk package shelving step creates STORE_ITEM print jobs without marking 
   assert.match(appJs, /默认售价 2/);
   assert.match(appJs, /自定义售价/);
   assert.match(appJs, /storeDefaultSalePrices/);
-  assert.match(appJs, /4\.9 默认售价管理/);
+  assert.match(appJs, /4\.7 服装默认售价规则/);
   assert.match(appJs, /function getDefaultStoreSalePriceChoices/);
   assert.match(priceChoiceSource, /getDefaultStoreSalePriceChoices/);
   assert.match(stepSource, /STORE_ITEM 生成区/);

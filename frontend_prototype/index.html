@@ -2493,9 +2493,9 @@
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>4.7 默认成本价管理</h2>
+          <h2>4.7 服装默认售价规则</h2>
         </div>
-        <div class="subtle small">这张表先作为主分拣流的默认成本价配置页。当前只维护大类 / 小类 / 等级 P/S 对应的默认成本价，先给仓库端一个统一口径。</div>
+        <div class="subtle small">用于店员端分拣 / 上架 / 打印 STORE_ITEM 标签时，根据商品大类、小类、P/S 分级自动带出默认售价。此价格不是采购成本，不是财务成本，不参与真实成本核算。</div>
         <div class="split-grid">
           <form id="apparelDefaultCostForm" class="form-grid compact">
             <select name="category_main">
@@ -2508,25 +2508,25 @@
               <option value="P">P</option>
               <option value="S">S</option>
             </select>
-            <input name="default_cost_kes" type="number" min="0.01" step="0.01" placeholder="默认成本价（KES），例如 185" />
-            <input name="note" placeholder="备注，例如 女装上衣 P 档默认成本" />
-            <button type="submit">保存默认成本价</button>
+            <input name="default_cost_kes" type="number" min="0.01" step="0.01" placeholder="默认售价（KES），例如 185" />
+            <input name="note" placeholder="备注，例如 女装上衣 P 档默认售价" />
+            <button type="submit">保存默认售价</button>
           </form>
           <div id="apparelDefaultCostSummary" class="candidate-summary empty-state">
-            这里会显示当前选中的默认成本价口径，以及现有 P/S 档配置数量。
+            这里会显示当前选中的默认售价口径，以及现有 P/S 档配置数量。
           </div>
         </div>
         <div id="apparelDefaultCostList" class="candidate-summary empty-state">
-          这里会显示已经保存的默认成本价配置，后面再接 0.2 分拣结果明细。
+          这里会显示已经保存的默认售价配置，后面再接 0.2 分拣结果明细。
         </div>
         <pre id="apparelDefaultCostOutput" class="output hidden-output"></pre>
       </section>
 
       <section class="panel" data-workspace-panel="warehouse">
         <div class="panel-head">
-          <h2>默认售价管理</h2>
+          <h2 class="hidden">默认售价管理（旧入口已隐藏）</h2>
         </div>
-        <div class="subtle small">参考售价 = 默认成本 × 2。后续可作为店员分堆标价 / 默认售价建议使用；当前仅为配置参考。</div>
+        <div class="subtle small">统一入口为 4.7 服装默认售价规则；此旧入口仅保留兼容结构并默认隐藏。</div>
         <div class="subtle small">字段：大类 category_main / 小类 category_sub / 档位 grade / 默认售价 default_sale_price_kes / 备注 note / 操作</div>
         <div class="split-grid">
           <form id="apparelDefaultSalePriceForm" class="form-grid compact">
@@ -2549,7 +2549,7 @@
           </div>
         </div>
         <div id="apparelDefaultSalePriceList" class="candidate-summary empty-state">
-          这里会显示已经保存的默认售价配置；参考售价 = 默认成本 × 2。
+          这里会显示已经保存的默认售价配置。
         </div>
         <pre id="apparelDefaultSalePriceOutput" class="output hidden-output"></pre>
       </section>
@@ -2558,7 +2558,7 @@
         <div class="panel-head">
           <h2>4.8 分拣库位管理</h2>
         </div>
-        <div class="subtle small">这张表锁在默认成本价管理后面。当前仓库分拣结果不贴码，所以同一库位不能混不同“大类 / 小类 / P-S 等级 / 默认成本价”档案；0.2 会直接按这里带出并锁定库位。</div>
+        <div class="subtle small">这张表锁在服装默认售价规则后面。当前仓库分拣结果不贴码，所以同一库位不能混不同“大类 / 小类 / P-S 等级 / 默认成本价”档案；0.2 会直接按这里带出并锁定库位。</div>
         <div class="split-grid">
           <form id="apparelSortingRackForm" class="form-grid compact">
             <select name="category_main">
@@ -2571,7 +2571,7 @@
               <option value="P">P</option>
               <option value="S">S</option>
             </select>
-            <input name="default_cost_kes" type="number" min="0.01" step="0.01" placeholder="默认成本价（跟 4.7 走）" readonly />
+            <input name="default_cost_kes" type="number" min="0.01" step="0.01" placeholder="默认售价（跟 4.7 走）" readonly />
             <input name="rack_code" placeholder="锁定分拣库位，例如 A-TS-P-01" />
             <input name="note" placeholder="备注，例如 女装上衣 P 档只放这格" />
             <button type="submit">保存分拣库位</button>
@@ -2765,7 +2765,7 @@
                 <div class="subtle small">仅用于内部估算，不影响 POS 售价 / 条码 / 实际库存</div>
                 <label class="field-control">
                   <span>默认成本价</span>
-                  <input type="text" value="由 4.7 默认成本价管理维护" readonly />
+                  <input type="text" value="由 4.7 服装默认售价规则维护" readonly />
                 </label>
               </details>
             </form>

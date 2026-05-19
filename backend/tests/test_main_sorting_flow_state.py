@@ -2273,7 +2273,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 row["category_main"] == "tops"
                 and row["category_sub"] == "lady tops"
                 and row["grade"] == "P"
-                and row["default_sale_price_kes"] == 370
+                and row["default_sale_price_kes"] == 185
                 for row in rows
             )
         )
@@ -2282,7 +2282,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 row["category_main"] == "pants"
                 and row["category_sub"] == "cargo pant"
                 and row["grade"] == "P"
-                and row["default_sale_price_kes"] == 410
+                and row["default_sale_price_kes"] == 205
                 for row in rows
             )
         )
@@ -2291,7 +2291,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 row["category_main"] == "jacket"
                 and row["category_sub"] == "jacket"
                 and row["grade"] == "S"
-                and row["default_sale_price_kes"] == 396
+                and row["default_sale_price_kes"] == 198
                 for row in rows
             )
         )
