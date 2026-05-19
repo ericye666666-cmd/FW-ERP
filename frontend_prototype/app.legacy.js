@@ -1983,7 +1983,7 @@ const WORKSPACE_META = {
   warehouse: {
     titleEn: "Warehouse",
     zh: "当前显示：仓库功能区。这里按服装入仓、百货入仓、工单管理、门店补货、Bales销售、仓库综合管理六条线组织仓库页面。",
-    en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, Warehouse General Management, and China Management."
+    en: "Current View: Warehouse. Pages are grouped by Garment Inbound, Department-Store Inbound, Work Orders, Store Replenishment, Bale Sales, and Warehouse General Management."
   },
   operations: {
     titleEn: "Brand Store Operations Center",
@@ -3030,8 +3030,8 @@ function getRoleAccessProfile(user = currentSession.user) {
   }
   const warehouseManagerRoles = /* @__PURE__ */ new Set(["warehouse_manager", "warehouse_supervisor"]);
   if (warehouseManagerRoles.has(roleCode)) {
-    return createRoleAccessProfile(["overview", "warehouse"], {
-      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general", "china"]
+    return createRoleAccessProfile(["warehouse"], {
+      warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"]
     });
   }
   const warehouseWorkerRoles = /* @__PURE__ */ new Set(["warehouse_clerk", "warehouse_staff", "sorter", "sorting_clerk", "dispatcher", "packer", "warehouse_dispatcher"]);
