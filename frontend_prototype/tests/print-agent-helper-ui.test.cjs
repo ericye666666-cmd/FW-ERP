@@ -100,9 +100,9 @@ test("print modal advanced options expose only field-safe print helper controls"
   
   
   
-  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?>⌕ 检测<\/button>/);
+  assert.match(indexHtml, /id="balePrintModalCheckLocalAgentButton"[\s\S]*?>检测<\/button>/);
   assert.match(indexHtml, /重新检测/);
-  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>↻ 重打当前标签<\/button>/);
+  assert.match(indexHtml, /id="balePrintModalLocalAgentPrintButton"[^>]*>重打当前标签<\/button>/);
   assert.match(indexHtml, /id="balePrintModalPrintAllButton"[^>]*>打印本批全部标签<\/button>/);
   const advancedSection = indexHtml.match(/<details id="balePrintModalAdvancedOptions"[\s\S]*?<\/details>/)?.[0] || "";
   const primaryActions = indexHtml.match(/<div class="bale-print-primary-actions">[\s\S]*?<\/div>/)?.[0] || "";
