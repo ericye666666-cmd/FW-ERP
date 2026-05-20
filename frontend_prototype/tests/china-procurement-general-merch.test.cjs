@@ -22,7 +22,7 @@ test('spu + sku table fields and summary are present', () => {
 });
 
 test('by-weight, carton, label and finance required copy exists', () => {
-  ['采购基础信息', '重量与金额', '采购重量 kg', '采购总价 RMB', '单公斤价格 RMB/kg', '后续处理规则', '箱规与体积', 'CBM = 长 × 宽 × 高 ÷ 1,000,000', '已关联内容预览', 'GM_CARTON 标签预览 / 打印', 'GM_CARTON 为箱码，不可用于 POS 销售；不是正式商品码；不是门店收货码。', '装箱摘要', '基础信息', '供应商与金额', '付款信息', '票据附件', '成本规则说明', '采购金额 \\+ 其他费用 = 应付合计'].forEach((t) => assert.match(indexHtml, new RegExp(t)));
+  ['采购基础信息', '重量与金额重点计算区', '采购图片上传卡片', '采购重量 kg', '采购总价 RMB', '单公斤价格 RMB/kg', '后续处理规则', '箱规与体积重点卡', 'CBM = 长 × 宽 × 高 ÷ 1,000,000', '已关联内容预览', 'GM_CARTON 标签预览 / 打印', 'GM_CARTON 为箱码，不可用于 POS 销售；不是正式商品码；不是门店收货码。', '装箱摘要', '基础信息', '供应商与金额', '付款信息', '票据附件', '成本规则说明', '应付合计高亮汇总区：采购金额 \\+ 其他费用 = 应付合计'].forEach((t) => assert.match(indexHtml, new RegExp(t)));
   ['gmWeightUnitPrice', 'gmCartonCbm', 'gmFinancePayableTotal'].forEach((id) => assert.match(indexHtml, new RegExp(id)));
   assert.match(appJs, /bindGeneralMerchPrototypeCalculations/);
 });
