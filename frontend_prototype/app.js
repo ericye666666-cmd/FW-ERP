@@ -2686,8 +2686,8 @@ const WORKSPACE_META = {
   },
   chinaProcurement: {
     titleEn: "China Procurement",
-    zh: "当前显示：中方采购管理。这里包含中方管理、服装整柜录入、船单三段成本补齐。",
-    en: "Current View: China Procurement. This workspace includes China management, garment container entry, and three-stage shipment cost completion.",
+    zh: "当前显示：中方采购管理。这里包含服装采购与百货采购录入、箱单、箱码打印与财务成本档案占位页面。",
+    en: "Current View: China Procurement. This workspace includes garment purchasing plus department-store purchasing entry, carton list, carton label preview, and finance cost archive placeholders.",
   },
   warehouse: {
     titleEn: "Warehouse",
@@ -3145,6 +3145,47 @@ const WAREHOUSE_PANEL_NAV_META = [
     icon: "费",
     navTitle: "船单三段成本补齐",
     navTitleEn: "Three-Stage Shipment Cost Completion",
+  },
+
+  {
+    match: "百货采购：整款 / 整杂款 SKU 录入",
+    section: "generalMerch",
+    order: 139,
+    icon: "百",
+    navTitle: "整款 / 整杂款 SKU 录入",
+    navTitleEn: "SKU / Mixed-SKU Entry",
+  },
+  {
+    match: "百货采购：尾货 / 按重量采购录入",
+    section: "generalMerch",
+    order: 140,
+    icon: "重",
+    navTitle: "尾货 / 按重量采购录入",
+    navTitleEn: "By-Weight Purchase Entry",
+  },
+  {
+    match: "百货采购：百货箱单录入",
+    section: "generalMerch",
+    order: 141,
+    icon: "箱",
+    navTitle: "百货箱单录入",
+    navTitleEn: "Carton List Entry",
+  },
+  {
+    match: "百货采购：百货箱码打印",
+    section: "generalMerch",
+    order: 142,
+    icon: "码",
+    navTitle: "百货箱码打印",
+    navTitleEn: "Carton Label Preview",
+  },
+  {
+    match: "百货采购：百货采购档案 / 财务成本",
+    section: "generalMerch",
+    order: 143,
+    icon: "财",
+    navTitle: "百货采购档案 / 财务成本",
+    navTitleEn: "Procurement Archive / Finance Cost",
   },
   {
     match: "4.4 商品身份证 ID 台账",
@@ -3607,7 +3648,7 @@ const ADMIN_PANEL_NAV_META = [
 ];
 
 const WORKSPACE_NAV_SECTIONS_MAP = {
-  chinaProcurement: [{ id: "china", title: "中方管理", titleEn: "China Management", iconSvg: WAREHOUSE_NAV_SECTIONS.find((s) => s.id === "china")?.iconSvg || "" }],
+  chinaProcurement: [{ id: "china", title: "服装采购", titleEn: "Garment Procurement", iconSvg: WAREHOUSE_NAV_SECTIONS.find((s) => s.id === "china")?.iconSvg || "" },{ id: "generalMerch", title: "百货采购", titleEn: "General Merchandise Procurement", iconSvg: "" }],
   warehouse: WAREHOUSE_NAV_SECTIONS.filter((section) => section.id !== "china"),
   operations: OPERATIONS_NAV_SECTIONS,
   contentCenter: [{ id: "default", title: "商品内容中心", titleEn: "Content Center", iconSvg: "" }],
@@ -52841,6 +52882,27 @@ document.querySelectorAll("[data-action]").forEach((button) => {
   });
 });
 
+
+function bindGeneralMerchPrototypeCalculations() {
+  const skuUnit = document.querySelector('#gmSkuUnitPrice');
+  const skuQty = document.querySelector('#gmSkuQty');
+  const skuSubtotal = document.querySelector('#gmSkuSubtotal');
+  const weightKg = document.querySelector('#gmWeightKg');
+  const weightTotal = document.querySelector('#gmWeightTotalPrice');
+  const weightUnit = document.querySelector('#gmWeightUnitPrice');
+  const cartonL = document.querySelector('#gmCartonLength');
+  const cartonW = document.querySelector('#gmCartonWidth');
+  const cartonH = document.querySelector('#gmCartonHeight');
+  const cartonCbm = document.querySelector('#gmCartonCbm');
+  const calc = () => {
+    if (skuSubtotal) skuSubtotal.value = ((Number(skuUnit?.value)||0)*(Number(skuQty?.value)||0)).toFixed(2);
+    if (weightUnit) { const kg=Number(weightKg?.value)||0; weightUnit.value = kg>0?((Number(weightTotal?.value)||0)/kg).toFixed(2):'0.00'; }
+    if (cartonCbm) cartonCbm.value = (((Number(cartonL?.value)||0)*(Number(cartonW?.value)||0)*(Number(cartonH?.value)||0))/1000000).toFixed(4);
+  };
+  [skuUnit,skuQty,weightKg,weightTotal,cartonL,cartonW,cartonH].forEach((el)=>el?.addEventListener('input',calc));
+  calc();
+}
+
 refreshSession().catch((error) => {
   authOutput.textContent = error.message;
   renderAuthResultSummary("error", error.message);
@@ -52957,6 +53019,7 @@ if (currentSession.token) {
 }
 setCurrentInboundShipment(resolveCurrentInboundShipmentNo());
 initializeGlobalI18n();
+bindGeneralMerchPrototypeCalculations();
 window.addEventListener("pageshow", ensureLoginPasswordCleared);
 
 window.setInterval(() => {
