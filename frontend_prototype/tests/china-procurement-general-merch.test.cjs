@@ -12,6 +12,8 @@ test('china procurement has garment/general merch nav sections and four pages', 
   assert.match(appJs, /chinaProcurement: WAREHOUSE_PANEL_NAV_META\.filter\(\(item\) => item\.section === "china" \|\| item\.section === "generalMerch"\)/);
   assert.match(appJs, /chinaProcurement: \["china", "generalMerch"\],\n      warehouse: \["inbound", "departmentInbound", "general"\],/);
   assert.match(appJs, /chinaProcurement: \["china", "generalMerch"\],\n      warehouse: \["general"\],/);
+  assert.match(appJs, /const superRoles = new Set\(\["admin", "super_admin", "system_admin", "owner", "boss", "headquarters", "head_office"\]\)/);
+  assert.match(appJs, /const FULL_SECTION_ACCESS = Object\.freeze\(\{\n  chinaProcurement: \["china", "generalMerch"\],/);
   [
     '百货采购：整款 / 整杂款商品录入',
     '百货采购：尾货 / 按重量采购录入',
