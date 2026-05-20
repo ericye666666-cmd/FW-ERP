@@ -52845,6 +52845,13 @@ function bindGeneralMerchPrototypeCalculations() {
   const cartonW = document.querySelector('#gmCartonWidth');
   const cartonH = document.querySelector('#gmCartonHeight');
   const cartonCbm = document.querySelector('#gmCartonCbm');
+  const cartonLMirror = document.querySelector('#gmCartonLengthMirror');
+  const cartonWMirror = document.querySelector('#gmCartonWidthMirror');
+  const cartonHMirror = document.querySelector('#gmCartonHeightMirror');
+  const cartonCbmMirror = document.querySelector('#gmCartonCbmMirror');
+  const financePurchaseAmount = document.querySelector('#gmFinancePurchaseAmount');
+  const financeOtherFee = document.querySelector('#gmFinanceOtherFee');
+  const financePayableTotal = document.querySelector('#gmFinancePayableTotal');
   const skuRows = [...document.querySelectorAll('#gmSkuTable tbody tr')];
   const skuRowsCount = document.querySelector('#gmSkuRows');
   const skuTotalQty = document.querySelector('#gmSkuTotalQty');
@@ -52871,8 +52878,17 @@ function bindGeneralMerchPrototypeCalculations() {
     if (cartonCbm) {
       cartonCbm.value = (((Number(cartonL?.value) || 0) * (Number(cartonW?.value) || 0) * (Number(cartonH?.value) || 0)) / 1000000).toFixed(4);
     }
+    if (cartonLMirror && cartonWMirror && cartonHMirror && cartonCbmMirror) {
+      const l = Number(cartonLMirror.value || cartonL?.value) || 0;
+      const w = Number(cartonWMirror.value || cartonW?.value) || 0;
+      const h = Number(cartonHMirror.value || cartonH?.value) || 0;
+      cartonCbmMirror.value = ((l * w * h) / 1000000).toFixed(4);
+    }
+    if (financePayableTotal) {
+      financePayableTotal.textContent = ((Number(financePurchaseAmount?.value) || 0) + (Number(financeOtherFee?.value) || 0)).toFixed(2);
+    }
   };
-  [...document.querySelectorAll('.gm-sku-unit, .gm-sku-qty'), weightKg, weightTotal, cartonL, cartonW, cartonH].forEach((el) => el?.addEventListener('input', calc));
+  [...document.querySelectorAll('.gm-sku-unit, .gm-sku-qty'), weightKg, weightTotal, cartonL, cartonW, cartonH, cartonLMirror, cartonWMirror, cartonHMirror, financePurchaseAmount, financeOtherFee].forEach((el) => el?.addEventListener('input', calc));
   calc();
 }
 

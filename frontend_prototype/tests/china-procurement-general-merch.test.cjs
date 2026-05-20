@@ -18,10 +18,11 @@ test('china procurement has garment/general merch nav sections and four pages', 
 });
 
 test('spu + sku table fields and summary are present', () => {
-  ['商品主信息 / SPU', 'SKU 明细表（手动多行）', 'SKU规格名称', '数量类型', '供应商原条码', '建议售价', '系统标签', 'SKU 行数', '总采购数量', '总采购金额 RMB'].forEach((t) => assert.match(indexHtml, new RegExp(t)));
+  ['商品主信息 / SPU', '采购图片', '商超三级类目', 'SKU 明细表', '新增 SKU 行', '采购汇总', 'SKU规格名称', '数量类型', '供应商原条码', '建议售价', '需要系统标签', 'SKU 行数', '总采购数量', '总采购金额\\(RMB\\)'].forEach((t) => assert.match(indexHtml, new RegExp(t)));
 });
 
 test('by-weight, carton, label and finance required copy exists', () => {
-  ['采购日期', '大类 / 商超一级类目', '预估品类描述', '现场照片（3-5张）', '是否需要肯尼亚拆分标准 SKU', '箱内类型', '关联商品或采购记录', 'GM_CARTON（仅箱码，不可用于 POS 销售，不可作为正式商品码，不可作为门店收货码）', '按箱体积 CBM 分摊', '不作为百货默认运清分摊依据'].forEach((t) => assert.match(indexHtml, new RegExp(t)));
+  ['采购基础信息', '重量与金额', '采购重量 kg', '采购总价 RMB', '单公斤价格 RMB/kg', '后续处理规则', '箱规与体积', 'CBM = 长 × 宽 × 高 ÷ 1,000,000', '已关联内容预览', 'GM_CARTON 标签预览 / 打印', 'GM_CARTON 为箱码，不可用于 POS 销售；不是正式商品码；不是门店收货码。', '装箱摘要', '基础信息', '供应商与金额', '付款信息', '票据附件', '成本规则说明', '采购金额 \\+ 其他费用 = 应付合计'].forEach((t) => assert.match(indexHtml, new RegExp(t)));
+  ['gmWeightUnitPrice', 'gmCartonCbm', 'gmFinancePayableTotal'].forEach((id) => assert.match(indexHtml, new RegExp(id)));
   assert.match(appJs, /bindGeneralMerchPrototypeCalculations/);
 });

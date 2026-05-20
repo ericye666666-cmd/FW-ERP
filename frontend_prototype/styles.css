@@ -7013,6 +7013,17 @@ textarea:focus-visible,
   line-height: 1.4;
 }
 
+.gm-card { display:grid; gap:10px; margin-top:12px; padding:12px; border:1px solid var(--fw-border); border-radius: var(--radius-panel); background:#fff; }
+.gm-upload-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:10px; }
+.gm-upload-tile { border:1px dashed #cbd5e1; border-radius:12px; padding:10px; font-size:12px; color:#334155; background:#f8fafc; line-height:1.5; }
+.gm-upload-tile span { color:#64748b; font-size:11px; }
+.gm-summary-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
+.gm-metric { display:grid; gap:6px; padding:10px; border-radius:12px; border:1px solid #dbeafe; background:#f8fbff; font-weight:700; color:#334155; }
+.gm-metric-highlight { border-color:#93c5fd; background:#eff6ff; box-shadow: inset 0 0 0 1px #bfdbfe; }
+.gm-label-card { border:1px solid #cbd5e1; border-radius:12px; padding:12px; background:#f8fafc; }
+.gm-warning { border-color:#fecaca; background:#fff1f2; color:#9f1239; font-weight:700; }
+.gm-payable-summary { border-color:#93c5fd; background:#eff6ff; color:#1e3a8a; font-weight:700; }
+
 .warehouse-prep-task-summary {
   padding: 12px;
   background: var(--fw-surface);

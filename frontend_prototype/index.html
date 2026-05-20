@@ -1980,58 +1980,53 @@
 
       <section class="panel" data-workspace-panel="chinaProcurement">
         <div class="panel-head"><h2>百货采购：整款 / 整杂款商品录入</h2></div>
-        <h3>商品主信息 / SPU</h3>
-        <div class="grid cols-3">
-          <label>商品中文名<input></label><label>商品英文名<input placeholder="可手填；后续自动翻译"></label><label>采购类型<select><option>整款 SKU</option><option>整杂款 SKU</option></select></label>
-          <label>供应商姓名<input></label><label>供应商联系方式<input></label><label>规格备注<input placeholder="材质、颜色混装、包装说明"></label>
-          <label>一级类目<select id="gmCategoryL1"><option>3C数码配件</option><option>厨房餐具</option><option>家居日用</option><option>玩具文具</option><option>美妆个护</option></select></label>
-          <label>二级类目<select id="gmCategoryL2"><option>数据线</option><option>餐具</option><option>收纳用品</option><option>玩具</option><option>个护</option></select></label>
-          <label>三级类目 / 搜索<select id="gmCategoryL3"><option>双C数据线</option><option>Type-C 数据线</option><option>三合一数据线</option><option>碗</option><option>盘子</option><option>勺子</option><option>杯子</option><option>收纳盒</option><option>衣架</option><option>挂钩</option><option>玩具车</option><option>娃娃</option><option>积木</option><option>梳子</option><option>镜子</option><option>发圈发夹</option></select></label>
-          <label>商品尺寸长 mm<input type="number"></label><label>商品尺寸宽 mm<input type="number"></label><label>商品尺寸高 mm<input type="number"></label>
-          <label>采购现场图（3-5张）<input type="file" multiple></label><label>备注<input></label>
-        </div>
-        <p class="subtle small">说明：采购现场图仅做上传占位，不在这里生成白底图；后续交由商品内容中心处理。</p>
-        <p class="subtle small">说明：商品尺寸不作为运费成本判断字段，仅记录商品尺寸。</p>
-        <h3>SKU 明细表（手动多行）</h3>
+        <p class="subtle">用于录入能识别的整款或整杂款商品。这里记录采购原图和 SKU 采购信息，白底图后续由商品内容中心处理。</p>
+        <div class="candidate-summary">此页面记录采购原图，不生成白底图；白底图后续由商品内容中心处理。</div>
+        <article class="gm-card"><h3>商品主信息 / SPU</h3><div class="grid cols-3"><label>商品中文名<input></label><label>商品英文名<input placeholder="可手填；后续自动翻译"></label><label>采购类型<select><option>整款 SKU</option><option>整杂款 SKU</option></select></label><label>供应商姓名<input></label><label>供应商联系方式<input></label><label>商品尺寸长 mm<input type="number"></label><label>商品尺寸宽 mm<input type="number"></label><label>商品尺寸高 mm<input type="number"></label><label>规格备注<input placeholder="材质、颜色混装、包装说明"></label><label>备注<input></label></div></article>
+        <article class="gm-card"><h3>采购图片</h3><p class="subtle small">采购现场图 3–5 张</p><div class="gm-upload-grid"><div class="gm-upload-tile">合照<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">代表 SKU 图 1<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">代表 SKU 图 2<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">供应商图<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">备用图<br>+ 上传图片<br><span>支持 JPG / PNG</span></div></div><p class="subtle small">这里仅保存采购现场原图，不在此生成白底图。</p></article>
+        <article class="gm-card"><h3>商超三级类目</h3><div class="grid cols-4"><label>关键词搜索类目<input placeholder="搜索关键词，如 双C 数据线"></label><label>一级类目<select id="gmCategoryL1"><option>3C数码配件</option><option>厨房餐具</option><option>家居日用</option><option>玩具文具</option><option>美妆个护</option></select></label><label>二级类目<select id="gmCategoryL2"><option>数据线</option><option>餐具</option><option>收纳用品</option><option>玩具</option><option>个护</option></select></label><label>三级类目<select id="gmCategoryL3"><option>双C数据线</option><option>Type-C 数据线</option><option>三合一数据线</option><option>碗</option><option>盘子</option><option>勺子</option><option>杯子</option><option>收纳盒</option><option>衣架</option><option>挂钩</option><option>玩具车</option><option>娃娃</option><option>积木</option><option>梳子</option><option>镜子</option><option>发圈发夹</option></select></label></div><p class="candidate-summary">已选类目路径：3C数码配件 → 数据线 → 双C数据线</p></article>
+        <article class="gm-card"><div class="panel-head"><h3>SKU 明细表</h3><button type="button" class="ghost-button mini-button">新增 SKU 行</button></div>
         <table class="table" id="gmSkuTable">
-          <thead><tr><th>SKU规格名称</th><th>采购单价 RMB</th><th>采购数量</th><th>数量类型</th><th>采购金额小计</th><th>供应商原条码</th><th>建议售价</th><th>系统标签</th></tr></thead>
+          <thead><tr><th>#</th><th>SKU规格名称</th><th>采购单价(RMB)</th><th>采购数量</th><th>数量类型</th><th>采购金额小计(RMB)</th><th>供应商原条码</th><th>建议售价(RMB)</th><th>需要系统标签</th><th>操作</th></tr></thead>
           <tbody>
-            <tr><td><input value="白色 / 1m / 单条装"></td><td><input class="gm-sku-unit" type="number" step="0.01"></td><td><input class="gm-sku-qty" type="number" step="1"></td><td><select><option>准确数量</option><option>预估数量</option><option>到仓复核</option></select></td><td><input class="gm-sku-subtotal" readonly></td><td><input></td><td><input type="number" step="0.01"></td><td><select><option>需要</option><option>不需要</option></select></td></tr>
-            <tr><td><input value="黑色 / 2m / 单条装"></td><td><input class="gm-sku-unit" type="number" step="0.01"></td><td><input class="gm-sku-qty" type="number" step="1"></td><td><select><option>准确数量</option><option>预估数量</option><option>到仓复核</option></select></td><td><input class="gm-sku-subtotal" readonly></td><td><input></td><td><input type="number" step="0.01"></td><td><select><option>需要</option><option>不需要</option></select></td></tr>
+            <tr><td>1</td><td><input value="白色 / 1m / 单条装"></td><td><input class="gm-sku-unit" type="number" step="0.01"></td><td><input class="gm-sku-qty" type="number" step="1"></td><td><select><option>准确数量</option><option>预估数量</option><option>到仓复核</option></select></td><td><input class="gm-sku-subtotal" readonly></td><td><input></td><td><input type="number" step="0.01"></td><td><select><option>需要</option><option>不需要</option></select></td><td><button type="button" class="ghost-button mini-button">删除</button></td></tr>
+            <tr><td>2</td><td><input value="黑色 / 1m / 单条装"></td><td><input class="gm-sku-unit" type="number" step="0.01"></td><td><input class="gm-sku-qty" type="number" step="1"></td><td><select><option>准确数量</option><option>预估数量</option><option>到仓复核</option></select></td><td><input class="gm-sku-subtotal" readonly></td><td><input></td><td><input type="number" step="0.01"></td><td><select><option>需要</option><option>不需要</option></select></td><td><button type="button" class="ghost-button mini-button">删除</button></td></tr>
+            <tr><td>3</td><td><input value="白色 / 2m / 单条装"></td><td><input class="gm-sku-unit" type="number" step="0.01"></td><td><input class="gm-sku-qty" type="number" step="1"></td><td><select><option>准确数量</option><option>预估数量</option><option>到仓复核</option></select></td><td><input class="gm-sku-subtotal" readonly></td><td><input></td><td><input type="number" step="0.01"></td><td><select><option>需要</option><option>不需要</option></select></td><td><button type="button" class="ghost-button mini-button">删除</button></td></tr>
           </tbody>
         </table>
-        <div class="grid cols-3">
-          <label>SKU 行数<input id="gmSkuRows" readonly></label>
-          <label>总采购数量<input id="gmSkuTotalQty" readonly></label>
-          <label>总采购金额 RMB<input id="gmSkuTotalAmount" readonly></label>
-        </div>
+        </article>
+        <article class="gm-card"><h3>采购汇总</h3><div class="gm-summary-grid"><label class="gm-metric">SKU 行数<input id="gmSkuRows" readonly></label><label class="gm-metric">总采购数量<input id="gmSkuTotalQty" readonly></label><label class="gm-metric">总采购金额(RMB)<input id="gmSkuTotalAmount" readonly></label></div></article>
       </section>
 
       <section class="panel" data-workspace-panel="chinaProcurement">
         <div class="panel-head"><h2>百货采购：尾货 / 按重量采购录入</h2></div>
-        <div class="grid cols-3">
-          <label>采购记录号<input value="GM-WGT-20260520-001" readonly></label><label>供应商姓名<input></label><label>供应商联系方式<input></label><label>采购日期<input type="date"></label><label>采购地点<input></label><label>大类 / 商超一级类目<select><option>3C数码配件</option><option>厨房餐具</option><option>家居日用</option><option>玩具文具</option><option>美妆个护</option></select></label><label>预估品类描述<input placeholder="例如 数据线混款、玩具尾货"></label><label>采购重量 kg<input id="gmWeightKg" type="number" step="0.01"></label><label>采购总价 RMB<input id="gmWeightTotalPrice" type="number" step="0.01"></label><label>单公斤价格 RMB/kg<input id="gmWeightUnitPrice" readonly></label><label>现场照片（3-5张）<input type="file" multiple></label><label>是否需要肯尼亚拆分标准 SKU<select><option selected>是</option><option>否</option></select></label><label>备注<input></label>
-        </div>
+        <p class="subtle">用于记录按斤/公斤采购、无法在中方逐 SKU 拆清的尾货或混装货。</p><div class="candidate-summary">适用于按斤/公斤采购的尾货、混装货；到肯尼亚分拣后再拆分标准 SKU。</div>
+        <article class="gm-card"><h3>采购基础信息</h3><div class="grid cols-3"><label>采购记录号<input value="GM-WGT-20260520-001" readonly></label><label>采购日期<input type="date"></label><label>采购地点<input></label><label>供应商姓名<input></label><label>供应商联系方式<input></label><label>大类 / 商超一级类目<select><option>3C数码配件</option><option>厨房餐具</option><option>家居日用</option><option>玩具文具</option><option>美妆个护</option></select></label><label>预估品类描述<input placeholder="例如 数据线混款、玩具尾货"></label><label>备注<input></label></div></article>
+        <article class="gm-card"><h3>重量与金额</h3><div class="gm-summary-grid"><label class="gm-metric">采购重量 kg<input id="gmWeightKg" type="number" step="0.01"></label><label class="gm-metric">采购总价 RMB<input id="gmWeightTotalPrice" type="number" step="0.01"></label><label class="gm-metric gm-metric-highlight">单公斤价格 RMB/kg<input id="gmWeightUnitPrice" readonly></label></div></article>
+        <article class="gm-card"><h3>采购图片</h3><div class="gm-upload-grid"><div class="gm-upload-tile">现场合照<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">尾货细节图 1<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">尾货细节图 2<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">供应商图<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">备用图<br>+ 上传图片<br><span>支持 JPG / PNG</span></div></div></article>
+        <article class="gm-card"><h3>后续处理规则</h3><div class="grid cols-2"><label>是否需要肯尼亚拆分标准 SKU<select><option selected>是</option><option>否</option></select></label><label>是否允许数量待确认<select><option selected>是</option><option>否</option></select></label><label>是否需要后续内容中心处理图片<select><option selected>是</option><option>否</option></select></label></div><p class="candidate-summary">该页面只记录采购事实，不要求中方拆清每个 SKU。</p></article>
       </section>
 
       <section class="panel" data-workspace-panel="chinaProcurement">
         <div class="panel-head"><h2>百货采购：百货箱单录入 / 打印</h2></div>
-        <div class="grid cols-3">
+        <p class="subtle">将整款、整杂款或尾货采购记录装入箱子，并记录箱规、CBM、重量和箱码。</p><div class="candidate-summary">百货运清成本默认按箱体积 CBM 分摊；重量仅用于验收、对账、异常分析。</div>
+        <article class="gm-card"><h3>箱单基础信息</h3><div class="grid cols-3">
           <label>箱号<input value="GM-CTN-001"></label><label>箱内类型<select><option>整款 SKU</option><option>整杂款 SKU</option><option>尾货按重量</option></select></label><label>关联商品或采购记录<select><option>数据线混款</option><option>玩具尾货</option><option>厨房餐具整款</option></select></label><label>长 cm<input id="gmCartonLength" type="number" step="0.01"></label><label>宽 cm<input id="gmCartonWidth" type="number" step="0.01"></label><label>高 cm<input id="gmCartonHeight" type="number" step="0.01"></label><label>CBM<input id="gmCartonCbm" readonly></label><label>重量 kg<input type="number" step="0.01"></label><label>预估数量<input type="number" step="1"></label><label>采购金额 RMB<input type="number" step="0.01"></label><label>备注<select><option>混装</option><option>尾货</option><option>不确定</option></select></label>
-        </div>
-        <p class="subtle small">重量 kg 保留用于验收、对账、异常分析，不作为百货默认运清分摊依据。</p>
-        <h3>GM_CARTON 标签预览 / 打印</h3>
-        <p>GM_CARTON（仅箱码，不可用于 POS 销售，不可作为正式商品码，不可作为门店收货码）</p>
-        <div class="card">GM_CARTON｜GM-CTN-001｜供应商：示例供应商｜采购摘要：整杂款混装｜CBM：0.0000｜重量：0 kg｜箱内件数：200｜创建日期：2026-05-20｜条码/二维码占位</div>
+        </div></article>
+        <article class="gm-card"><h3>箱规与体积</h3><div class="gm-summary-grid"><label class="gm-metric">长 cm<input id="gmCartonLengthMirror" type="number" step="0.01"></label><label class="gm-metric">宽 cm<input id="gmCartonWidthMirror" type="number" step="0.01"></label><label class="gm-metric">高 cm<input id="gmCartonHeightMirror" type="number" step="0.01"></label><label class="gm-metric gm-metric-highlight">CBM<input id="gmCartonCbmMirror" readonly></label><label class="gm-metric">重量 kg<input type="number" step="0.01"></label></div><p class="subtle small">CBM = 长 × 宽 × 高 ÷ 1,000,000</p></article>
+        <article class="gm-card"><h3>已关联内容预览</h3><table class="table"><thead><tr><th>名称 / 记录</th><th>类型</th><th>数量 / 重量</th><th>金额(RMB)</th><th>备注</th></tr></thead><tbody><tr><td>数据线混款</td><td>整杂款 SKU</td><td>200 件</td><td>1200.00</td><td>-</td></tr><tr><td>玩具尾货</td><td>尾货按重量</td><td>45.60 kg</td><td>456.00</td><td>-</td></tr></tbody></table></article>
+        <article class="gm-card"><h3>GM_CARTON 标签预览 / 打印</h3><div class="grid cols-2"><div class="form-grid"><label>箱号<input value="GM-CTN-001"></label><label>供应商<input value="示例供应商"></label><label>采购摘要<input value="整杂款混装"></label><label>CBM<input value="0.0000"></label><label>重量 kg<input value="0"></label><label>纸张尺寸<select><option>A6</option><option>A5</option></select></label><label>打印份数<input type="number" value="1"></label><div class="button-row"><button type="button">生成标签预览</button><button type="button" class="ghost-button">打印占位</button></div></div><div class="card gm-label-card"><strong>GM_CARTON</strong><p>GM-CTN-001</p><p>供应商：示例供应商</p><p>采购摘要：整杂款混装</p><p>CBM：0.0000</p><p>重量 kg：0</p><p>箱内件数：200</p><p>创建日期：2026-05-20</p><p>条码 / 二维码占位</p></div></div><p class="candidate-summary gm-warning">GM_CARTON 为箱码，不可用于 POS 销售；不是正式商品码；不是门店收货码。</p></article>
+        <article class="gm-card"><h3>装箱摘要</h3><div class="gm-summary-grid"><label class="gm-metric">已录箱数<input value="2" readonly></label><label class="gm-metric">总体积(CBM)<input value="0.2145" readonly></label><label class="gm-metric">总重量(kg)<input value="58.4" readonly></label></div></article>
       </section>
 
       <section class="panel" data-workspace-panel="chinaProcurement">
         <div class="panel-head"><h2>百货采购：百货采购档案 / 财务成本</h2></div>
-        <div class="grid cols-2">
-          <label>采购归集单号<input value="GM-FIN-20260520-001" readonly></label><label>采购日期<input type="date"></label><label>供应商姓名<input></label><label>供应商联系方式<input></label><label>采购地点<input placeholder="义乌 / 广州 / 市场名"></label><label>采购类型<select><option>整款</option><option>整杂款</option><option>尾货按重量</option></select></label><label>付款方式<select><option>现金</option><option>微信</option><option>支付宝</option><option>银行</option><option>赊账</option></select></label><label>付款状态<select><option>未付</option><option>部分付款</option><option>已付款</option><option>待补票据</option></select></label><label>采购金额 RMB<input type="number" step="0.01"></label><label>其他费用 RMB<input type="number" step="0.01"></label><label>采购人<input value="当前登录账号（只读）" readonly></label><label>票据/收据/转账截图<input type="file" multiple></label><label>备注<input></label>
-        </div>
-        <p>运清成本分摊方式：按箱体积 CBM 分摊（第一版锁定）。</p>
-        <p>重量字段说明：用于验收、对账、异常分析，不作为百货默认运清分摊依据。</p>
+        <p class="subtle">用于记录百货采购的财务归集、付款信息、票据和成本分摊依据。</p><div class="candidate-summary">运清成本分摊方式：按箱体积 CBM 分摊（第一版锁定）｜重量字段保留，用于验收、对账、异常分析。</div>
+        <article class="gm-card"><h3>基础信息</h3><div class="grid cols-3"><label>采购归集单号<input value="GM-FIN-20260520-001" readonly></label><label>采购日期<input type="date"></label><label>采购地点<input placeholder="义乌 / 广州 / 市场名"></label><label>采购类型<select><option>整款</option><option>整杂款</option><option>尾货按重量</option></select></label><label>采购人<input value="当前登录账号（只读）" readonly></label></div></article>
+        <article class="gm-card"><h3>供应商与金额</h3><div class="grid cols-3"><label>供应商姓名<input></label><label>供应商联系方式<input></label><label>采购金额 RMB<input id="gmFinancePurchaseAmount" type="number" step="0.01"></label><label>其他费用 RMB<input id="gmFinanceOtherFee" type="number" step="0.01"></label><label>备注<input></label></div></article>
+        <article class="gm-card"><h3>付款信息</h3><div class="grid cols-2"><label>付款方式<select><option>现金</option><option>微信</option><option>支付宝</option><option>银行</option><option>赊账</option></select></label><label>付款状态<select><option>未付</option><option>部分付款</option><option>已付款</option><option>待补票据</option></select></label></div><div class="candidate-summary gm-payable-summary">采购金额 + 其他费用 = 应付合计：<strong id="gmFinancePayableTotal">0.00</strong></div></article>
+        <article class="gm-card"><h3>票据附件</h3><div class="gm-upload-grid"><div class="gm-upload-tile">采购收据<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">转账截图<br>+ 上传图片<br><span>支持 JPG / PNG</span></div><div class="gm-upload-tile">其他票据<br>+ 上传图片<br><span>支持 JPG / PNG</span></div></div></article>
+        <article class="gm-card"><h3>成本规则说明</h3><ul class="template-readonly-list"><li>采购成本按实际购买方式记录。</li><li>运清成本按箱体积 CBM 分摊。</li><li>重量仅保留，不作为默认分摊依据。</li></ul></article>
       </section>
 
 
