@@ -1200,6 +1200,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                     "generated_by": "Austin",
                     "rack_code": "PDA-P-001",
                     "sale_price_kes": 204,
+                    "selected_price": 204,
                     "category_main": "pants",
                     "category_sub": "jeans pant",
                     "grade": "P",
@@ -1210,7 +1211,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                     "baseline_default_sale_price_kes": 1,
                 },
             )
-        self.assertEqual(below_p_ctx.exception.status_code, 400)
+        self.assertEqual(below_p_ctx.exception.status_code, 409)
 
         with self.assertRaises(HTTPException) as below_s_ctx:
             self.state.generate_store_items_for_sdo_package(
@@ -1221,6 +1222,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                     "generated_by": "Austin",
                     "rack_code": "PDA-S-001",
                     "sale_price_kes": 155,
+                    "selected_price": 155,
                     "category_main": "pants",
                     "category_sub": "jeans pant",
                     "grade": "S",
@@ -1231,7 +1233,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                     "baseline_default_sale_price_kes": 1,
                 },
             )
-        self.assertEqual(below_s_ctx.exception.status_code, 400)
+        self.assertEqual(below_s_ctx.exception.status_code, 409)
 
         p_allowed = self.state.generate_store_items_for_sdo_package(
             package["display_code"],
@@ -2404,7 +2406,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 row["category_main"] == "tops"
                 and row["category_sub"] == "lady tops"
                 and row["grade"] == "P"
-                and row["default_sale_price_kes"] > 0
+                and row["default_sale_price_kes"] == 185
                 for row in rows
             )
         )
@@ -2413,7 +2415,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 row["category_main"] == "pants"
                 and row["category_sub"] == "cargo pant"
                 and row["grade"] == "P"
-                and row["default_sale_price_kes"] > 0
+                and row["default_sale_price_kes"] == 205
                 for row in rows
             )
         )
@@ -2422,7 +2424,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 row["category_main"] == "jacket"
                 and row["category_sub"] == "jacket"
                 and row["grade"] == "S"
-                and row["default_sale_price_kes"] > 0
+                and row["default_sale_price_kes"] == 198
                 for row in rows
             )
         )
