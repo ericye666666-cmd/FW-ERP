@@ -1978,6 +1978,47 @@
         </div>
       </section>
 
+      <section class="panel" data-workspace-panel="chinaProcurement">
+        <div class="panel-head"><h2>百货采购：整款 / 整杂款 SKU 录入</h2></div>
+        <div class="grid cols-3">
+          <label>商品中文名<input></label><label>商品英文名<input></label><label>采购类型<select><option>整款 SKU</option><option>整杂款 SKU</option></select></label>
+          <label>商超三级类目<input placeholder="例：3C数码配件 / 数据线 / Type-C 数据线"></label><label>长 mm<input type="number"></label><label>宽 mm<input type="number"></label><label>高 mm<input type="number"></label>
+          <label>供应商姓名<input></label><label>供应商联系方式<input></label><label>采购单价 RMB<input id="gmSkuUnitPrice" type="number" step="0.01"></label><label>采购数量<input id="gmSkuQty" type="number" step="1"></label><label>采购金额小计<input id="gmSkuSubtotal" readonly></label>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="chinaProcurement">
+        <div class="panel-head"><h2>百货采购：尾货 / 按重量采购录入</h2></div>
+        <div class="grid cols-3">
+          <label>采购记录号<input value="GM-WGT-20260520-001" readonly></label><label>采购重量 kg<input id="gmWeightKg" type="number" step="0.01"></label><label>采购总价 RMB<input id="gmWeightTotalPrice" type="number" step="0.01"></label><label>单公斤价格 RMB/kg<input id="gmWeightUnitPrice" readonly></label>
+          <label>供应商姓名<input></label><label>供应商联系方式<input></label><label>采购地点<input></label>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="chinaProcurement">
+        <div class="panel-head"><h2>百货采购：百货箱单录入</h2></div>
+        <div class="grid cols-3">
+          <label>箱号<input value="GM-CTN-001"></label><label>长 cm<input id="gmCartonLength" type="number" step="0.01"></label><label>宽 cm<input id="gmCartonWidth" type="number" step="0.01"></label><label>高 cm<input id="gmCartonHeight" type="number" step="0.01"></label><label>CBM<input id="gmCartonCbm" readonly></label><label>重量 kg<input type="number" step="0.01"></label>
+        </div>
+      </section>
+
+      <section class="panel" data-workspace-panel="chinaProcurement">
+        <div class="panel-head"><h2>百货采购：百货箱码打印</h2></div>
+        <p>GM_CARTON（仅箱码，不可用于 POS 销售）</p>
+        <div class="card">箱号：GM-CTN-001｜供应商：示例供应商｜采购摘要：整杂款混装｜CBM：0.0000｜重量：0 kg｜条码/二维码占位</div>
+      </section>
+
+      <section class="panel" data-workspace-panel="chinaProcurement">
+        <div class="panel-head"><h2>百货采购：百货采购档案 / 财务成本</h2></div>
+        <div class="grid cols-2">
+          <label>采购归集单号<input value="GM-FIN-20260520-001" readonly></label><label>采购类型<select><option>整款</option><option>整杂款</option><option>尾货按重量</option></select></label>
+          <label>付款方式<select><option>现金</option><option>微信</option><option>支付宝</option><option>银行</option><option>赊账</option></select></label><label>付款状态<select><option>未付</option><option>部分付款</option><option>已付款</option><option>待补票据</option></select></label>
+        </div>
+        <p>运清成本分摊方式：按箱体积 CBM 分摊（第一版锁定）。</p>
+        <p>重量字段说明：用于验收、对账、异常分析，不作为百货默认运清分摊依据。</p>
+      </section>
+
+
       <section class="panel" data-workspace-panel="admin">
         <div class="panel-head">
           <h2>账号 / 用户</h2>
