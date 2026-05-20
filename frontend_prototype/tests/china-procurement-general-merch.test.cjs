@@ -9,12 +9,18 @@ const appJs = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 test('china procurement has garment/general merch nav sections and four pages', () => {
   assert.match(appJs, /id: "china", title: "服装采购"/);
   assert.match(appJs, /id: "generalMerch", title: "百货采购"/);
+  assert.match(appJs, /chinaProcurement: WAREHOUSE_PANEL_NAV_META\.filter\(\(item\) => item\.section === "china" \|\| item\.section === "generalMerch"\)/);
   [
     '百货采购：整款 / 整杂款商品录入',
     '百货采购：尾货 / 按重量采购录入',
     '百货采购：百货箱单录入 / 打印',
     '百货采购：百货采购档案 / 财务成本',
   ].forEach((title) => assert.match(indexHtml, new RegExp(title)));
+  ['整款 / 整杂款商品录入', '尾货 / 按重量采购录入', '箱单录入 / 打印', '采购档案 / 财务成本'].forEach((title) => {
+    assert.match(appJs, new RegExp(`navTitle: "${title}"`));
+  });
+  assert.doesNotMatch(appJs, /navTitle: "百货采购：/);
+  assert.doesNotMatch(appJs, /页面 22/);
 });
 
 test('spu + sku table fields and summary are present', () => {
@@ -27,5 +33,6 @@ test('by-weight, carton, label and finance required copy + ui classes exist', ()
 
   ['gm-card', 'gm-upload-grid', 'gm-upload-tile', 'gm-summary-grid', 'gm-metric', 'gm-metric-highlight', 'gm-label-preview', 'gm-label-head', 'gm-label-code-placeholder', 'gm-table-scroll', 'gm-rule-grid', 'gm-rule-switch'].forEach((cls) => assert.match(indexHtml, new RegExp(cls)));
   assert.doesNotMatch(indexHtml, /百货采购：百货箱码打印/);
+  assert.doesNotMatch(appJs, /百货箱码打印/);
   assert.match(appJs, /bindGeneralMerchPrototypeCalculations/);
 });

@@ -3168,7 +3168,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "generalMerch",
     order: 141,
     icon: "箱",
-    navTitle: "百货箱单录入 / 打印",
+    navTitle: "箱单录入 / 打印",
     navTitleEn: "Carton List Entry",
   },
   {
@@ -3176,7 +3176,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "generalMerch",
     order: 143,
     icon: "财",
-    navTitle: "百货采购档案 / 财务成本",
+    navTitle: "采购档案 / 财务成本",
     navTitleEn: "Procurement Archive / Finance Cost",
   },
   {
@@ -3651,7 +3651,7 @@ const WORKSPACE_NAV_SECTIONS_MAP = {
 };
 
 const WORKSPACE_PANEL_NAV_META_MAP = {
-  chinaProcurement: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section === "china"),
+  chinaProcurement: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section === "china" || item.section === "generalMerch"),
   warehouse: WAREHOUSE_PANEL_NAV_META.filter((item) => item.section !== "china"),
   operations: OPERATIONS_PANEL_NAV_META,
   contentCenter: [{ match: "商品内容中心", section: "default", order: 1, icon: "内", navTitle: "商品内容中心", navTitleEn: "Content Center" }],

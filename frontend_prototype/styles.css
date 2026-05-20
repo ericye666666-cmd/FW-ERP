@@ -1610,6 +1610,24 @@ body.cashier-terminal-mode .cashier-terminal-shell textarea {
   color: #ffffff;
 }
 
+.workspace-side-panel[data-workspace="chinaProcurement"] .workspace-page-section-head strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.workspace-side-panel[data-workspace="chinaProcurement"] .workspace-page-link {
+  min-height: 36px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  color: #cbd5e1;
+}
+
+.workspace-side-panel[data-workspace="chinaProcurement"] .workspace-page-link.active {
+  background: #1e40af;
+  color: #ffffff;
+}
+
 .workspace-side-panel[data-workspace="warehouse"] .workspace-page-bar .button-row {
   display: none;
 }
