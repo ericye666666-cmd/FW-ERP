@@ -2393,7 +2393,7 @@ const DEFAULT_APPAREL_DEFAULT_SALE_PRICES = apparelDefaultCostFlow.DEFAULT_APPAR
   category_main: row.category_main,
   category_sub: row.category_sub,
   grade: row.grade,
-  default_sale_price_kes: roundToTwo(Number(row.default_cost_kes || 0) * 2),
+  default_sale_price_kes: roundToTwo(Number(row.default_cost_kes || 0)),
   note: `${row.note || `${row.category_main} / ${row.category_sub} ${row.grade} 档默认成本`}；参考售价 = 默认成本 × 2`,
 }));
 const DEFAULT_APPAREL_SORTING_RACKS = apparelSortingRackFlow.DEFAULT_APPAREL_SORTING_RACKS || [
@@ -3197,11 +3197,11 @@ const WAREHOUSE_PANEL_NAV_META = [
     hiddenInNav: true,
   },
   {
-    match: "4.7 默认成本价管理",
+    match: "4.7 服装默认售价规则",
     section: "general",
     order: 139.9,
     icon: "价",
-    navTitle: "默认成本价管理",
+    navTitle: "服装默认售价规则",
     navTitleEn: "Default Cost Management",
   },
   {
@@ -11740,7 +11740,7 @@ function renderApparelDefaultCostSummary(record = null) {
         <article class="store-metric"><strong>已配总数</strong><span>${escapeHtml(String(summary.totalCount || 0))}</span></article>
         <article class="store-metric"><strong>P 档</strong><span>${escapeHtml(String(summary.gradeCounts?.P || 0))}</span></article>
         <article class="store-metric"><strong>S 档</strong><span>${escapeHtml(String(summary.gradeCounts?.S || 0))}</span></article>
-        <article class="store-metric"><strong>说明</strong><span>当前先做默认成本价底表</span></article>
+        <article class="store-metric"><strong>说明</strong><span>当前维护服装默认售价规则</span></article>
       </div>
     `;
   } else {
@@ -11749,8 +11749,8 @@ function renderApparelDefaultCostSummary(record = null) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>当前口径</strong><span>${escapeHtml(`${current.category_main} / ${current.category_sub}`)}</span></article>
         <article class="store-metric"><strong>等级</strong><span>${escapeHtml(current.grade)}</span></article>
-        <article class="store-metric"><strong>默认成本价</strong><span>${escapeHtml(formatKesAmount(current.default_cost_kes, "KES 0.00"))}</span></article>
-        <article class="store-metric"><strong>说明</strong><span>${escapeHtml(current.note || "默认成本价配置")}</span></article>
+        <article class="store-metric"><strong>默认售价</strong><span>${escapeHtml(formatKesAmount(current.default_cost_kes, "KES 0.00"))}</span></article>
+        <article class="store-metric"><strong>说明</strong><span>${escapeHtml(current.note || "默认售价配置")}</span></article>
       </div>
     `;
   }
@@ -11771,7 +11771,7 @@ function renderApparelDefaultCostSummary(record = null) {
         </article>
       `)
       .join("")
-    : "先新增一条默认成本价配置。";
+    : "先新增一条默认售价配置。";
 }
 
 function renderApparelDefaultSalePriceSummary(record = null) {
@@ -11906,7 +11906,7 @@ function renderApparelSortingRackSummary(record = null) {
       <div class="report-summary-grid">
         <article class="store-metric"><strong>当前口径</strong><span>${escapeHtml(`${current.category_main} / ${current.category_sub}`)}</span></article>
         <article class="store-metric"><strong>等级</strong><span>${escapeHtml(current.grade)}</span></article>
-        <article class="store-metric"><strong>默认成本价</strong><span>${escapeHtml(formatKesAmount(current.default_cost_kes, "KES 0.00"))}</span></article>
+        <article class="store-metric"><strong>默认售价</strong><span>${escapeHtml(formatKesAmount(current.default_cost_kes, "KES 0.00"))}</span></article>
         <article class="store-metric"><strong>锁定库位</strong><span>${escapeHtml(current.rack_code)}</span></article>
       </div>
     `;
@@ -40415,6 +40415,8 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
     return null;
   }
   const defaultPrice = grade === "CUSTOM" ? 0 : getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, grade);
+  const baselineGrade = grade === "CUSTOM" ? "P" : grade;
+  const baselineDefaultPrice = getStoreMobileSuggestedSalePrice(line.category_main, line.category_sub, baselineGrade);
   const customPriceInput = [...document.querySelectorAll("[data-mobile-pricing-custom-price]")].find(
     (input) => input instanceof HTMLInputElement && String(input.dataset.mobilePricingCustomPrice || "") === sourceLineKey,
   );
@@ -40429,10 +40431,13 @@ function createStoreMobilePricingBatch(state = storeMobilePricingPreviewState, v
   }
   const priceKes = grade === "CUSTOM" ? customPrice : defaultPrice;
   if (!(priceKes > 0)) {
-    state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在默认售价管理配置 P/S 默认售价。";
+    state.pricingSourceLineMessage = grade === "CUSTOM" ? "请输入自定义价格。" : "请先在服装默认售价规则配置 P/S 默认售价。";
     return null;
   }
   const group = {
+    baseline_grade: baselineGrade,
+    default_sale_price_kes: defaultPrice,
+    baseline_default_sale_price_kes: baselineDefaultPrice,
     group_id: `BATCH-${String((state.priceGroups || []).length + 1).padStart(2, "0")}-${grade}`,
     source_line_key: sourceLineKey,
     category_main: line.category_main,
@@ -42432,6 +42437,9 @@ async function generateStoreMobileBatchStoreItems(state = storeMobilePricingPrev
     category_short: group.category_short || group.category_sub || group.category || group.category_main || "",
     grade: group.grade || "",
     pricing_type: pricingType,
+    baseline_grade: group.baseline_grade || (pricingType === "CUSTOM" ? "P" : pricingType),
+    default_sale_price_kes: Number(group.default_sale_price_kes || group.sale_price_kes || group.price_kes || 0),
+    baseline_default_sale_price_kes: Number(group.baseline_default_sale_price_kes || 0),
     quantity: groupQuantity,
     pricing_batch_id: group.pricing_batch_id || group.group_id,
     source_line_key: group.source_line_key,
@@ -45841,7 +45849,7 @@ async function submitApparelDefaultCost(event) {
     throw new Error("等级只支持 P 或 S。");
   }
   if (!(draftRecord.default_cost_kes > 0)) {
-    throw new Error("请先填写默认成本价。");
+    throw new Error("请先填写默认售价。");
   }
   const record = await request("/warehouse/apparel-default-costs", {
     method: "POST",
@@ -45950,7 +45958,7 @@ async function submitApparelSortingRack(event) {
     throw new Error("等级只支持 P 或 S。");
   }
   if (!(draftRecord.default_cost_kes > 0)) {
-    throw new Error("请先在 4.7 默认成本价管理里配置这条默认成本价。");
+    throw new Error("请先在 4.7 服装默认售价规则里配置这条默认售价。");
   }
   if (!draftRecord.rack_code) {
     throw new Error("请先填写锁定分拣库位。");
@@ -51215,7 +51223,7 @@ document.addEventListener("click", async (event) => {
         renderApparelSortingRackSummary();
         renderJsonBuilder("sorting-result-items");
         syncJsonBuilderToField("sorting-result-items");
-        writeOutput("#apparelDefaultCostOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认成本价表移除。`);
+        writeOutput("#apparelDefaultCostOutput", `${categoryMain} / ${categorySub} / ${grade} 已从默认售价表移除。`);
       } catch (error) {
         renderErrorSummary("#apparelDefaultCostSummary", formatErrorMessage(error));
       }

@@ -278,6 +278,9 @@ class StoreDeliveryPackageStoreItemGenerateRequest(BaseModel):
     category_short: str = ""
     grade: str = ""
     pricing_type: str = ""
+    baseline_grade: Optional[str] = ""
+    default_sale_price_kes: Optional[float] = 0
+    baseline_default_sale_price_kes: Optional[float] = 0
     quantity: int = Field(ge=1)
     pricing_batch_id: str = ""
     source_line_key: str = ""

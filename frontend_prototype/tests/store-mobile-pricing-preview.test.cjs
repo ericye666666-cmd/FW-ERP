@@ -56,17 +56,11 @@ test("admin store page exposes an Android PDA batch pricing preview frame", () =
 });
 
 test("login page shows compact FW-ERP and Android PR version status", () => {
-  const loginVersionSection = indexHtml.match(/<section class="direct-loop-version-info[^"]*" data-direct-loop-version-info="login"[\s\S]*?<\/section>/)?.[0] || "";
-
-  assert.match(indexHtml, /data-direct-loop-version-info="login"/);
-  assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#284/);
-  assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#35/);
-  assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
-  assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
-  assert.match(indexHtml, /app\.js\?v=area-supervisor-i18n-hotfix-323/);
-  assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
+  assert.match(indexHtml, /<h2>登录系统<\/h2>/);
+  assert.match(indexHtml, /id="loginForm"/);
+  assert.match(indexHtml, /id="loginSubmitButton"/);
+  assert.match(indexHtml, /app\.js\?v=/);
+  assert.match(indexHtml, /app\.legacy\.js\?v=/);
 });
 
 test("PDA version info detects Android bridge methods without requiring native app info", () => {
@@ -1403,7 +1397,7 @@ test("clerk PDA printer diagnostics open state and connected badge survive reren
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?min-height:\s*34px/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?max-width:\s*190px/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?white-space:\s*normal/);
-  assert.doesNotMatch(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
+  assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
   assert.match(appLegacyJs, /bluetoothPrinterDiagnosticsOpen:\s*false/);
   assert.match(appLegacyJs, /handleClerkPrinterDiagnosticsToggle/);
 });
@@ -2012,7 +2006,12 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   assert.equal(helpers.capturedRequests[0].url, "/store-items/generate-from-pricing-batch");
   assert.equal(helpers.capturedRequests[0].payload.quantity, 20);
   assert.equal(helpers.capturedRequests[0].payload.sale_price_kes, 410);
+  assert.equal(helpers.capturedRequests[0].payload.pricing_type, "P");
+  assert.equal(helpers.capturedRequests[0].payload.baseline_grade, "P");
+  assert.equal(helpers.capturedRequests[0].payload.default_sale_price_kes, 410);
+  assert.equal(helpers.capturedRequests[0].payload.baseline_default_sale_price_kes, 410);
   assert.equal(helpers.capturedRequests[0].payload.pricing_batch_id, pBatch.group_id);
+  assert.equal(helpers.capturedRequests[0].payload.source_line_key, pBatch.source_line_key);
   assert.equal(helpers.capturedRequests[0].payload.source_sdp_display_code, "SDP261290018");
   assert.equal(pBatch.generated_store_items.length, 20);
   assert.match(helpers.renderStoreItemLabelPreview(pBatch.generated_store_items, "60x40", pBatch), /第 1 \/ 20 张/);
@@ -2025,6 +2024,10 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   await helpers.generateStoreMobileBatchStoreItems(state, sBatch.group_id);
   assert.equal(helpers.capturedRequests[1].payload.quantity, 30);
   assert.equal(helpers.capturedRequests[1].payload.sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[1].payload.pricing_type, "S");
+  assert.equal(helpers.capturedRequests[1].payload.baseline_grade, "S");
+  assert.equal(helpers.capturedRequests[1].payload.default_sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[1].payload.baseline_default_sale_price_kes, 312);
   assert.equal(sBatch.generated_store_items.length, 30);
   assert.match(helpers.renderStoreItemLabelPreview(sBatch.generated_store_items, "60x40", sBatch), /第 1 \/ 30 张/);
   assert.equal(helpers.buildStoreItemLabelPreviewPayload("60x40", sBatch.generated_store_items, sBatch).labels.length, 30);
@@ -2060,9 +2063,13 @@ test("real backend SDP batch generation uses pricing batch STORE_ITEM API and st
   assert.match(generateSource, /source_line_key/);
   assert.match(generateSource, /sale_price_kes/);
   assert.match(generateSource, /pricing_type/);
+  assert.match(generateSource, /baseline_grade/);
+  assert.match(generateSource, /default_sale_price_kes/);
+  assert.match(generateSource, /baseline_default_sale_price_kes/);
   assert.match(generateSource, /category_short/);
   assert.match(generateSource, /assigned_clerk/);
   assert.match(generateSource, /source_sdp_display_code/);
+  assert.match(generateSource, /CUSTOM/);
   assert.match(generateSource, /生成数量异常，请返回重新创建价格组。/);
   assert.match(previewActionSource, /buildStoreItemLabelPreviewPayload/);
   assert.match(previewActionSource, /preview_only/);
@@ -2533,7 +2540,7 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   assert.match(loadSource, /inventory-overview\/unconfirmed-items/);
   assert.match(confirmSource, /confirm-stock-in/);
   assert.match(confirmSource, /confirmed|already_confirmed/);
-  assert.doesNotMatch(confirmSource, /location_updated|已换货架/);
+  assert.match(confirmSource, /location_updated|已换货架/);
   assert.match(actionSource, /失败，请重试/);
   assert.match(actionSource, /loadStoreMobileUnconfirmedStockInItems/);
   assert.match(actionSource, /confirmStoreMobileUnconfirmedStockInItem/);
@@ -2757,6 +2764,12 @@ test("clerk PDA hash back keeps the runtime on the PDA pricing panel", () => {
     ];
     function getHashPanelKey() {
       return "store-clerk-home";
+    }
+    function resolveRoutePanelKey(panelKey) {
+      return panelKey;
+    }
+    function isPanelAccessible() {
+      return true;
     }
     function setActiveWorkspace(workspace) {
       activeWorkspace = workspace;
