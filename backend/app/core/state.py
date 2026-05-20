@@ -132,15 +132,15 @@ def _build_default_apparel_default_sale_prices() -> list[dict[str, Any]]:
                     "category_main": preset["category_main"],
                     "category_sub": preset["category_sub"],
                     "grade": "P",
-                    "default_sale_price_kes": round(float(preset["cost_p"]) * 2, 2),
-                    "note": f"{preset['label']} P 档参考售价 = 默认成本 × 2",
+                    "default_sale_price_kes": round(float(preset["cost_p"]), 2),
+                    "note": f"{preset['label']} P 档默认售价（兼容旧数据 seed）",
                 },
                 {
                     "category_main": preset["category_main"],
                     "category_sub": preset["category_sub"],
                     "grade": "S",
-                    "default_sale_price_kes": round(float(preset["cost_s"]) * 2, 2),
-                    "note": f"{preset['label']} S 档参考售价 = 默认成本 × 2",
+                    "default_sale_price_kes": round(float(preset["cost_s"]), 2),
+                    "note": f"{preset['label']} S 档默认售价（兼容旧数据 seed）",
                 },
             ]
         )
@@ -15426,6 +15426,19 @@ class InMemoryState:
         pricing_type = str(payload.get("pricing_type") or "").strip().upper()
         if pricing_type not in {"P", "S", "CUSTOM"}:
             pricing_type = "CUSTOM"
+        baseline_grade = str(payload.get("baseline_grade") or "").strip().upper()
+        default_sale_price_kes = round(float(payload.get("default_sale_price_kes") or 0), 2)
+        baseline_default_sale_price_kes = round(float(payload.get("baseline_default_sale_price_kes") or 0), 2)
+        if pricing_type in {"P", "S"}:
+            baseline_grade = pricing_type
+            baseline_default_sale_price_kes = default_sale_price_kes
+        if pricing_type == "CUSTOM":
+            if baseline_grade not in {"P", "S"}:
+                raise HTTPException(status_code=400, detail="CUSTOM 必须选择 baseline_grade=P 或 S")
+            if baseline_default_sale_price_kes <= 0:
+                raise HTTPException(status_code=400, detail="CUSTOM 缺少 baseline 默认售价")
+            if sale_price_kes < baseline_default_sale_price_kes:
+                raise HTTPException(status_code=409, detail="自定义售价不能低于当前 P/S 默认售价")
 
         timestamp = now_iso()
         category_main = str(payload.get("category_main") or "").strip()
@@ -15481,6 +15494,9 @@ class InMemoryState:
                 "category_name": category_name,
                 "grade": grade or str(lineage.get("grade") or "").strip().upper(),
                 "pricing_type": pricing_type,
+                "baseline_grade": baseline_grade,
+                "default_sale_price_kes": default_sale_price_kes,
+                "baseline_default_sale_price_kes": baseline_default_sale_price_kes,
                 "sale_price_kes": sale_price_kes,
                 "selected_price": sale_price_kes,
                 "selling_price_kes": sale_price_kes,
