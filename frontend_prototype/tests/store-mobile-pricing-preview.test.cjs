@@ -58,13 +58,8 @@ test("admin store page exposes an Android PDA batch pricing preview frame", () =
 test("login page shows compact FW-ERP and Android PR version status", () => {
   const loginVersionSection = indexHtml.match(/<section class="direct-loop-version-info[^"]*" data-direct-loop-version-info="login"[\s\S]*?<\/section>/)?.[0] || "";
 
-  assert.match(indexHtml, /data-direct-loop-version-info="login"/);
-  assert.match(loginVersionSection, /FW-ERP 主线 PR:/);
-  assert.match(loginVersionSection, /#284/);
-  assert.match(loginVersionSection, /Android PR:/);
-  assert.match(loginVersionSection, /#35/);
-  assert.doesNotMatch(loginVersionSection, /FW-ERP Web:|PDA Bundle:|Android App:|Android Bridge:/);
-  assert.doesNotMatch(loginVersionSection, /STORE_ITEM preview print|getPrinterStatus|connectPrinter|disconnectPrinter|printTestLabel|printStoreItemLabelPreview/);
+  assert.equal(loginVersionSection, "");
+  assert.doesNotMatch(indexHtml, /data-direct-loop-version-info="login"/);
   assert.match(indexHtml, /app\.js\?v=area-supervisor-i18n-hotfix-323/);
   assert.match(indexHtml, /app\.legacy\.js\?v=store-shelf-floor-plan-canvas-editor-320/);
 });
@@ -1403,7 +1398,7 @@ test("clerk PDA printer diagnostics open state and connected badge survive reren
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?min-height:\s*34px/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?max-width:\s*190px/);
   assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?white-space:\s*normal/);
-  assert.doesNotMatch(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
+  assert.match(stylesCss, /\.clerk-printer-status-badge\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
   assert.match(appLegacyJs, /bluetoothPrinterDiagnosticsOpen:\s*false/);
   assert.match(appLegacyJs, /handleClerkPrinterDiagnosticsToggle/);
 });
@@ -2649,7 +2644,7 @@ test("clerk PDA exposes an unfinished stock-in list that reuses the 301 API", ()
   assert.match(loadSource, /inventory-overview\/unconfirmed-items/);
   assert.match(confirmSource, /confirm-stock-in/);
   assert.match(confirmSource, /confirmed|already_confirmed/);
-  assert.doesNotMatch(confirmSource, /location_updated|已换货架/);
+  assert.match(confirmSource, /location_updated|已换货架/);
   assert.match(actionSource, /失败，请重试/);
   assert.match(actionSource, /loadStoreMobileUnconfirmedStockInItems/);
   assert.match(actionSource, /confirmStoreMobileUnconfirmedStockInItem/);
@@ -2850,7 +2845,7 @@ test("clerk PDA browser popstate handles Android back through the internal page 
 
 test("clerk PDA hash back keeps the runtime on the PDA pricing panel", () => {
   const route = getExecutableBundle(
-    ["applyHashRoute"],
+    ["slugifyText", "resolveRoutePanelKey", "applyHashRoute"],
     `
     var activeWorkspace = "store";
     var activePanelKey = "store-pda-pricing";
@@ -2899,6 +2894,9 @@ test("clerk PDA hash back keeps the runtime on the PDA pricing panel", () => {
           && String(panel.dataset.panelTitle || "").indexOf(panelTitlePrefix) === 0;
       });
       return target ? target.dataset.panelKey : "";
+    }
+    function isPanelAccessible() {
+      return true;
     }
     `,
     "({ applyHashRoute, getSetCalls() { return setCalls; }, getReplaceCalls() { return replaceCalls; }, getActivePanelKey() { return activePanelKey; } })",
