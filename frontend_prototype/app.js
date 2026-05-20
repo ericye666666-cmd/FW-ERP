@@ -3873,7 +3873,7 @@ function getRoleAccessProfile(user = currentSession.user) {
   const chinaEntryRoles = new Set(["china_entry", "china_operator", "procurement", "buyer"]);
   if (chinaEntryRoles.has(roleCode)) {
     return createRoleAccessProfile(["chinaProcurement", "warehouse"], {
-      chinaProcurement: ["china"],
+      chinaProcurement: ["china", "generalMerch"],
       warehouse: ["inbound", "departmentInbound", "general"],
     });
   }
@@ -3881,7 +3881,7 @@ function getRoleAccessProfile(user = currentSession.user) {
   const chinaFinanceRoles = new Set(["china_finance", "finance", "accountant"]);
   if (chinaFinanceRoles.has(roleCode)) {
     return createRoleAccessProfile(["chinaProcurement", "warehouse", "finance", "auditRisk", "admin"], {
-      chinaProcurement: ["china"],
+      chinaProcurement: ["china", "generalMerch"],
       warehouse: ["general"],
       finance: ["default"],
       auditRisk: ["default"],
