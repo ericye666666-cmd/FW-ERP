@@ -2061,6 +2061,7 @@ test("generated pricing groups are locked and draft pricing groups remain deleta
 
 test("real backend SDP batch generation uses pricing batch STORE_ITEM API and stays preview-only", () => {
   const generateSource = extractFunctionSource(appJs, "generateStoreMobileBatchStoreItems");
+  const validateSource = extractFunctionSource(appJs, "validateStoreMobilePriceGroupForm");
   const previewActionSource = extractFunctionSource(appJs, "prepareStoreMobileBatchLabelPreview");
   const actionSource = extractFunctionSource(appJs, "handleStoreMobilePricingPreviewAction");
 
@@ -2076,7 +2077,7 @@ test("real backend SDP batch generation uses pricing batch STORE_ITEM API and st
   assert.match(generateSource, /assigned_clerk/);
   assert.match(generateSource, /source_sdp_display_code/);
   assert.match(generateSource, /CUSTOM/);
-  assert.match(generateSource, /自定义售价不能低于当前 P\/S 默认售价/);
+  assert.match(validateSource, /自定义售价不能低于当前 P\/S 默认售价/);
   assert.match(generateSource, /生成数量异常，请返回重新创建价格组。/);
   assert.match(previewActionSource, /buildStoreItemLabelPreviewPayload/);
   assert.match(previewActionSource, /preview_only/);
