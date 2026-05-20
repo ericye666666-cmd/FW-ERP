@@ -21,6 +21,7 @@ test('china procurement has garment/general merch nav sections and four pages', 
   });
   assert.doesNotMatch(appJs, /navTitle: "百货采购：/);
   assert.doesNotMatch(appJs, /页面 22/);
+  assert.doesNotMatch(indexHtml, />\s*中方管理\s*<\/h2>/);
 });
 
 test('spu + sku table fields and summary are present', () => {
