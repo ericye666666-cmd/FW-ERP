@@ -3031,7 +3031,7 @@ function getRoleAccessProfile(user = currentSession.user) {
   if (!roleCode) {
     return createRoleAccessProfile(["overview", "testing", "warehouse", "operations", "store", "admin"]);
   }
-  const superRoles = /* @__PURE__ */ new Set(["admin", "super_admin", "owner", "boss", "headquarters", "head_office"]);
+  const superRoles = /* @__PURE__ */ new Set(["admin", "super_admin", "system_admin", "owner", "boss", "headquarters", "head_office"]);
   if (superRoles.has(roleCode)) {
     return createRoleAccessProfile(["overview", "testing", "warehouse", "operations", "store", "admin"]);
   }

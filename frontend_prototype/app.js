@@ -3833,7 +3833,7 @@ const LEGACY_WORKSPACE_MAP = {
 
 const WORKSPACE_ORDER = ["chinaProcurement", "warehouse", "operations", "contentCenter", "store", "finance", "auditRisk", "admin"];
 const FULL_SECTION_ACCESS = Object.freeze({
-  chinaProcurement: ["china"],
+  chinaProcurement: ["china", "generalMerch"],
   warehouse: ["inbound", "departmentInbound", "workorder", "replenishment", "baleSales", "general"],
   contentCenter: ["default"],
   finance: ["default"],
@@ -3865,7 +3865,7 @@ function getRoleAccessProfile(user = currentSession.user) {
     return createRoleAccessProfile([], {});
   }
 
-  const superRoles = new Set(["admin", "super_admin", "owner", "boss", "headquarters", "head_office"]);
+  const superRoles = new Set(["admin", "super_admin", "system_admin", "owner", "boss", "headquarters", "head_office"]);
   if (superRoles.has(roleCode)) {
     return createRoleAccessProfile(["testing", "chinaProcurement", "warehouse", "operations", "contentCenter", "store", "finance", "auditRisk", "admin"]);
   }
