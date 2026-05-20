@@ -15,7 +15,7 @@ test('china procurement has garment/general merch nav sections and four pages', 
   assert.match(appJs, /const superRoles = new Set\(\["admin", "super_admin", "system_admin", "owner", "boss", "headquarters", "head_office"\]\)/);
   assert.match(appJs, /const FULL_SECTION_ACCESS = Object\.freeze\(\{\n  chinaProcurement: \["china", "generalMerch"\],/);
   [
-    '百货采购：整款 / 整杂款商品录入',
+    '整款 / 整杂款商品录入',
     '百货采购：尾货 / 按重量采购录入',
     '百货采购：百货箱单录入 / 打印',
     '百货采购：百货采购档案 / 财务成本',
