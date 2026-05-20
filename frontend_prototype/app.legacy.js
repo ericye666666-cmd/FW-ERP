@@ -3058,12 +3058,12 @@ const WAREHOUSE_PANEL_NAV_META = [
     navTitleEn: "Three-Stage Shipment Cost Completion"
   },
   {
-    match: "百货采购：整款 / 整杂款 SKU 录入",
+    match: "百货采购：整款 / 整杂款商品录入",
     section: "generalMerch",
     order: 139,
     icon: "百",
-    navTitle: "整款 / 整杂款 SKU 录入",
-    navTitleEn: "SKU / Mixed-SKU Entry"
+    navTitle: "整款 / 整杂款商品录入",
+    navTitleEn: "SPU + SKU Entry"
   },
   {
     match: "百货采购：尾货 / 按重量采购录入",
@@ -48993,9 +48993,6 @@ document.querySelectorAll("[data-action]").forEach((button) => {
   });
 });
 function bindGeneralMerchPrototypeCalculations() {
-  const skuUnit = document.querySelector("#gmSkuUnitPrice");
-  const skuQty = document.querySelector("#gmSkuQty");
-  const skuSubtotal = document.querySelector("#gmSkuSubtotal");
   const weightKg = document.querySelector("#gmWeightKg");
   const weightTotal = document.querySelector("#gmWeightTotalPrice");
   const weightUnit = document.querySelector("#gmWeightUnitPrice");
@@ -49003,15 +49000,35 @@ function bindGeneralMerchPrototypeCalculations() {
   const cartonW = document.querySelector("#gmCartonWidth");
   const cartonH = document.querySelector("#gmCartonHeight");
   const cartonCbm = document.querySelector("#gmCartonCbm");
+  const skuRows = [...document.querySelectorAll("#gmSkuTable tbody tr")];
+  const skuRowsCount = document.querySelector("#gmSkuRows");
+  const skuTotalQty = document.querySelector("#gmSkuTotalQty");
+  const skuTotalAmount = document.querySelector("#gmSkuTotalAmount");
   const calc = () => {
-    if (skuSubtotal) skuSubtotal.value = ((Number(skuUnit == null ? void 0 : skuUnit.value) || 0) * (Number(skuQty == null ? void 0 : skuQty.value) || 0)).toFixed(2);
+    let qtySum = 0;
+    let amountSum = 0;
+    skuRows.forEach((row) => {
+      var _a2, _b;
+      const unit = Number((_a2 = row.querySelector(".gm-sku-unit")) == null ? void 0 : _a2.value) || 0;
+      const qty = Number((_b = row.querySelector(".gm-sku-qty")) == null ? void 0 : _b.value) || 0;
+      const subtotal = unit * qty;
+      const subtotalEl = row.querySelector(".gm-sku-subtotal");
+      if (subtotalEl) subtotalEl.value = subtotal.toFixed(2);
+      qtySum += qty;
+      amountSum += subtotal;
+    });
+    if (skuRowsCount) skuRowsCount.value = String(skuRows.length);
+    if (skuTotalQty) skuTotalQty.value = String(qtySum);
+    if (skuTotalAmount) skuTotalAmount.value = amountSum.toFixed(2);
     if (weightUnit) {
       const kg = Number(weightKg == null ? void 0 : weightKg.value) || 0;
       weightUnit.value = kg > 0 ? ((Number(weightTotal == null ? void 0 : weightTotal.value) || 0) / kg).toFixed(2) : "0.00";
     }
-    if (cartonCbm) cartonCbm.value = ((Number(cartonL == null ? void 0 : cartonL.value) || 0) * (Number(cartonW == null ? void 0 : cartonW.value) || 0) * (Number(cartonH == null ? void 0 : cartonH.value) || 0) / 1e6).toFixed(4);
+    if (cartonCbm) {
+      cartonCbm.value = ((Number(cartonL == null ? void 0 : cartonL.value) || 0) * (Number(cartonW == null ? void 0 : cartonW.value) || 0) * (Number(cartonH == null ? void 0 : cartonH.value) || 0) / 1e6).toFixed(4);
+    }
   };
-  [skuUnit, skuQty, weightKg, weightTotal, cartonL, cartonW, cartonH].forEach((el) => el == null ? void 0 : el.addEventListener("input", calc));
+  [...document.querySelectorAll(".gm-sku-unit, .gm-sku-qty"), weightKg, weightTotal, cartonL, cartonW, cartonH].forEach((el) => el == null ? void 0 : el.addEventListener("input", calc));
   calc();
 }
 refreshSession().catch((error) => {
