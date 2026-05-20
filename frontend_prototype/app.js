@@ -2771,8 +2771,8 @@ const WAREHOUSE_NAV_SECTIONS = [
   },
   {
     id: "china",
-    title: "中方管理",
-    titleEn: "China Management",
+    title: "服装采购",
+    titleEn: "Garment Procurement",
     iconSvg:
       '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.75 6.25h10.5M4.75 10h10.5M4.75 13.75h7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13.25 12.25 15.5 14.5l-2.25 2.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   },
