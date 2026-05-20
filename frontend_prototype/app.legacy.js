@@ -2402,7 +2402,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "generalMerch",
     order: 141,
     icon: "箱",
-    navTitle: "百货箱单录入 / 打印",
+    navTitle: "箱单录入 / 打印",
     navTitleEn: "Carton List Entry",
   },
   {
@@ -2410,7 +2410,7 @@ const WAREHOUSE_PANEL_NAV_META = [
     section: "generalMerch",
     order: 143,
     icon: "财",
-    navTitle: "百货采购档案 / 财务成本",
+    navTitle: "采购档案 / 财务成本",
     navTitleEn: "Procurement Archive / Finance Cost",
   },
   {
