@@ -6,14 +6,13 @@ const path = require('node:path');
 const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const appJs = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
-test('china procurement has garment/general merch nav sections and five pages', () => {
+test('china procurement has garment/general merch nav sections and four pages', () => {
   assert.match(appJs, /id: "china", title: "服装采购"/);
   assert.match(appJs, /id: "generalMerch", title: "百货采购"/);
   [
     '百货采购：整款 / 整杂款商品录入',
     '百货采购：尾货 / 按重量采购录入',
-    '百货采购：百货箱单录入',
-    '百货采购：百货箱码打印',
+    '百货采购：百货箱单录入 / 打印',
     '百货采购：百货采购档案 / 财务成本',
   ].forEach((title) => assert.match(indexHtml, new RegExp(title)));
 });

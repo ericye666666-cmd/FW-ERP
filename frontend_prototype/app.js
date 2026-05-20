@@ -3164,20 +3164,12 @@ const WAREHOUSE_PANEL_NAV_META = [
     navTitleEn: "By-Weight Purchase Entry",
   },
   {
-    match: "百货采购：百货箱单录入",
+    match: "百货采购：百货箱单录入 / 打印",
     section: "generalMerch",
     order: 141,
     icon: "箱",
-    navTitle: "百货箱单录入",
+    navTitle: "百货箱单录入 / 打印",
     navTitleEn: "Carton List Entry",
-  },
-  {
-    match: "百货采购：百货箱码打印",
-    section: "generalMerch",
-    order: 142,
-    icon: "码",
-    navTitle: "百货箱码打印",
-    navTitleEn: "Carton Label Preview",
   },
   {
     match: "百货采购：百货采购档案 / 财务成本",

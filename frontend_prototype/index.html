@@ -2015,17 +2015,14 @@
       </section>
 
       <section class="panel" data-workspace-panel="chinaProcurement">
-        <div class="panel-head"><h2>百货采购：百货箱单录入</h2></div>
+        <div class="panel-head"><h2>百货采购：百货箱单录入 / 打印</h2></div>
         <div class="grid cols-3">
           <label>箱号<input value="GM-CTN-001"></label><label>箱内类型<select><option>整款 SKU</option><option>整杂款 SKU</option><option>尾货按重量</option></select></label><label>关联商品或采购记录<select><option>数据线混款</option><option>玩具尾货</option><option>厨房餐具整款</option></select></label><label>长 cm<input id="gmCartonLength" type="number" step="0.01"></label><label>宽 cm<input id="gmCartonWidth" type="number" step="0.01"></label><label>高 cm<input id="gmCartonHeight" type="number" step="0.01"></label><label>CBM<input id="gmCartonCbm" readonly></label><label>重量 kg<input type="number" step="0.01"></label><label>预估数量<input type="number" step="1"></label><label>采购金额 RMB<input type="number" step="0.01"></label><label>备注<select><option>混装</option><option>尾货</option><option>不确定</option></select></label>
         </div>
         <p class="subtle small">重量 kg 保留用于验收、对账、异常分析，不作为百货默认运清分摊依据。</p>
-      </section>
-
-      <section class="panel" data-workspace-panel="chinaProcurement">
-        <div class="panel-head"><h2>百货采购：百货箱码打印</h2></div>
+        <h3>GM_CARTON 标签预览 / 打印</h3>
         <p>GM_CARTON（仅箱码，不可用于 POS 销售，不可作为正式商品码，不可作为门店收货码）</p>
-        <div class="card">箱号：GM-CTN-001｜供应商：示例供应商｜采购摘要：整杂款混装｜CBM：0.0000｜重量：0 kg｜条码/二维码占位</div>
+        <div class="card">GM_CARTON｜GM-CTN-001｜供应商：示例供应商｜采购摘要：整杂款混装｜CBM：0.0000｜重量：0 kg｜箱内件数：200｜创建日期：2026-05-20｜条码/二维码占位</div>
       </section>
 
       <section class="panel" data-workspace-panel="chinaProcurement">
