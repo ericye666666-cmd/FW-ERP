@@ -2012,7 +2012,12 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   assert.equal(helpers.capturedRequests[0].url, "/store-items/generate-from-pricing-batch");
   assert.equal(helpers.capturedRequests[0].payload.quantity, 20);
   assert.equal(helpers.capturedRequests[0].payload.sale_price_kes, 410);
+  assert.equal(helpers.capturedRequests[0].payload.pricing_type, "P");
+  assert.equal(helpers.capturedRequests[0].payload.baseline_grade, "P");
+  assert.equal(helpers.capturedRequests[0].payload.default_sale_price_kes, 410);
+  assert.equal(helpers.capturedRequests[0].payload.baseline_default_sale_price_kes, 410);
   assert.equal(helpers.capturedRequests[0].payload.pricing_batch_id, pBatch.group_id);
+  assert.equal(helpers.capturedRequests[0].payload.source_line_key, pBatch.source_line_key);
   assert.equal(helpers.capturedRequests[0].payload.source_sdp_display_code, "SDP261290018");
   assert.equal(pBatch.generated_store_items.length, 20);
   assert.match(helpers.renderStoreItemLabelPreview(pBatch.generated_store_items, "60x40", pBatch), /第 1 \/ 20 张/);
@@ -2025,6 +2030,10 @@ test("STORE_ITEM generation request uses exact pricing group quantity and previe
   await helpers.generateStoreMobileBatchStoreItems(state, sBatch.group_id);
   assert.equal(helpers.capturedRequests[1].payload.quantity, 30);
   assert.equal(helpers.capturedRequests[1].payload.sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[1].payload.pricing_type, "S");
+  assert.equal(helpers.capturedRequests[1].payload.baseline_grade, "S");
+  assert.equal(helpers.capturedRequests[1].payload.default_sale_price_kes, 312);
+  assert.equal(helpers.capturedRequests[1].payload.baseline_default_sale_price_kes, 312);
   assert.equal(sBatch.generated_store_items.length, 30);
   assert.match(helpers.renderStoreItemLabelPreview(sBatch.generated_store_items, "60x40", sBatch), /第 1 \/ 30 张/);
   assert.equal(helpers.buildStoreItemLabelPreviewPayload("60x40", sBatch.generated_store_items, sBatch).labels.length, 30);
@@ -2060,9 +2069,14 @@ test("real backend SDP batch generation uses pricing batch STORE_ITEM API and st
   assert.match(generateSource, /source_line_key/);
   assert.match(generateSource, /sale_price_kes/);
   assert.match(generateSource, /pricing_type/);
+  assert.match(generateSource, /baseline_grade/);
+  assert.match(generateSource, /default_sale_price_kes/);
+  assert.match(generateSource, /baseline_default_sale_price_kes/);
   assert.match(generateSource, /category_short/);
   assert.match(generateSource, /assigned_clerk/);
   assert.match(generateSource, /source_sdp_display_code/);
+  assert.match(generateSource, /CUSTOM/);
+  assert.match(generateSource, /自定义售价不能低于当前 P\/S 默认售价/);
   assert.match(generateSource, /生成数量异常，请返回重新创建价格组。/);
   assert.match(previewActionSource, /buildStoreItemLabelPreviewPayload/);
   assert.match(previewActionSource, /preview_only/);

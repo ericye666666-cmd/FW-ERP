@@ -1070,6 +1070,7 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 "category_main": "pants",
                 "category_sub": "jeans pant",
                 "grade": "P",
+                "pricing_type": "P",
                 "quantity": 2,
             },
         )
@@ -1126,11 +1127,11 @@ class MainSortingFlowStateTest(unittest.TestCase):
                 "rack_code": "PDA-P-001",
                 "selected_price": 410,
                 "category_main": "pants",
-                "category_sub": "cargo pant",
+                "category_sub": "jeans pant",
                 "grade": "P",
                 "quantity": 2,
                 "pricing_batch_id": "BATCH-SDP-PANTS-P",
-                "source_line_key": "SDB260503AAG:pants:cargo pant",
+                "source_line_key": "SDB260503AAG:pants:jeans pant",
             },
         )
 
@@ -1141,12 +1142,136 @@ class MainSortingFlowStateTest(unittest.TestCase):
             self.assertEqual(token["source_type"], "SDB")
             self.assertEqual(token["source_code"], "SDB260503AAG")
             self.assertEqual(token["category_main"], "pants")
-            self.assertEqual(token["category_sub"], "cargo pant")
+            self.assertEqual(token["category_sub"], "jeans pant")
             self.assertEqual(token["grade"], "P")
             self.assertEqual(token["selected_price"], 410)
             self.assertEqual(token["selling_price_kes"], 410)
             self.assertEqual(token["pricing_batch_id"], "BATCH-SDP-PANTS-P")
-            self.assertEqual(token["source_line_key"], "SDB260503AAG:pants:cargo pant")
+            self.assertEqual(token["source_line_key"], "SDB260503AAG:pants:jeans pant")
+            self.assertEqual(token["pricing_type"], "P")
+            self.assertEqual(token["baseline_grade"], "P")
+            self.assertEqual(token["default_sale_price_kes"], 410)
+            self.assertEqual(token["baseline_default_sale_price_kes"], 410)
+            self.assertEqual(token["sale_price_kes"], 410)
+            self.assertEqual(token["unit_cost_kes"], 0)
+            self.assertEqual(token["source_cost_layer"], {})
+            self.assertEqual(token["cost_status"], "pending")
+            self.assertEqual(token["lineage_status"], "partial")
+            self.assertEqual(token["cost_source_refs"], [])
+
+    def test_store_item_generation_rejects_custom_price_below_default_baseline(self):
+        _, package = self._create_ready_assigned_sdo_package_for_store_item_generation(item_count=3)
+        self.state.upsert_apparel_default_sale_price(
+            {"category_main": "pants", "category_sub": "jeans pant", "grade": "P", "default_sale_price_kes": 210},
+            updated_by="warehouse_supervisor_1",
+        )
+        self.state.upsert_apparel_default_sale_price(
+            {"category_main": "pants", "category_sub": "jeans pant", "grade": "S", "default_sale_price_kes": 158},
+            updated_by="warehouse_supervisor_1",
+        )
+        with self.assertRaises(HTTPException) as missing_grade_ctx:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "PDA-P-001",
+                    "sale_price_kes": 410,
+                    "category_main": "pants",
+                    "category_sub": "jeans pant",
+                    "grade": "P",
+                    "quantity": 1,
+                    "pricing_type": "CUSTOM",
+                },
+            )
+        self.assertEqual(missing_grade_ctx.exception.status_code, 400)
+
+        with self.assertRaises(HTTPException) as below_p_ctx:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "PDA-P-001",
+                    "sale_price_kes": 204,
+                    "category_main": "pants",
+                    "category_sub": "jeans pant",
+                    "grade": "P",
+                    "quantity": 1,
+                    "pricing_type": "CUSTOM",
+                    "baseline_grade": "P",
+                    "default_sale_price_kes": 204,
+                    "baseline_default_sale_price_kes": 1,
+                },
+            )
+        self.assertEqual(below_p_ctx.exception.status_code, 409)
+
+        with self.assertRaises(HTTPException) as below_s_ctx:
+            self.state.generate_store_items_for_sdo_package(
+                package["display_code"],
+                {
+                    "store_code": "UTAWALA",
+                    "clerk": "Austin",
+                    "generated_by": "Austin",
+                    "rack_code": "PDA-S-001",
+                    "sale_price_kes": 155,
+                    "category_main": "pants",
+                    "category_sub": "jeans pant",
+                    "grade": "S",
+                    "quantity": 1,
+                    "pricing_type": "CUSTOM",
+                    "baseline_grade": "S",
+                    "default_sale_price_kes": 155,
+                    "baseline_default_sale_price_kes": 1,
+                },
+            )
+        self.assertEqual(below_s_ctx.exception.status_code, 409)
+
+        p_allowed = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "PDA-P-001",
+                "sale_price_kes": 205,
+                "category_main": "pants",
+                    "category_sub": "jeans pant",
+                "grade": "P",
+                "quantity": 1,
+                "pricing_type": "CUSTOM",
+                "baseline_grade": "P",
+                "default_sale_price_kes": 205,
+                "baseline_default_sale_price_kes": 1,
+                "pricing_batch_id": "BATCH-P-ALLOW",
+                "source_line_key": "line-p-allow",
+            },
+        )
+        self.assertEqual(p_allowed["store_items"][0]["baseline_default_sale_price_kes"], 210)
+
+        s_allowed = self.state.generate_store_items_for_sdo_package(
+            package["display_code"],
+            {
+                "store_code": "UTAWALA",
+                "clerk": "Austin",
+                "generated_by": "Austin",
+                "rack_code": "PDA-S-001",
+                "sale_price_kes": 156,
+                "category_main": "pants",
+                    "category_sub": "jeans pant",
+                "grade": "S",
+                "quantity": 1,
+                "pricing_type": "CUSTOM",
+                "baseline_grade": "S",
+                "default_sale_price_kes": 156,
+                "baseline_default_sale_price_kes": 1,
+                "pricing_batch_id": "BATCH-S-ALLOW",
+                "source_line_key": "line-s-allow",
+            },
+        )
+        self.assertEqual(s_allowed["store_items"][0]["baseline_default_sale_price_kes"], 158)
 
     def test_store_item_generation_inherits_sdo_package_token_and_cost_lineage(self):
         order, package = self._create_ready_assigned_sdo_package_for_store_item_generation(
